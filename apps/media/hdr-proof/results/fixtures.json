@@ -66,6 +66,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-8",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -144,7 +145,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8851300831616695,
+              "p95": 0.8851300831616693,
+              "maximum": 0.8851300831616693
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08381695510987752,
+              "p95": 0.09261485433447436,
+              "maximum": 0.09261485433447436
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08888115493242056,
+              "p95": 0.08929850266918543,
+              "maximum": 0.08930109399768431
+            },
+            "neutral_levels": 87,
+            "minimum_neutral_signal_step": 0.00044251163500419623,
+            "highlight_headroom": 0.11078049897001607,
+            "maximum_highlight_signal_step": 0.011642633707179328,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.007861927903133814,
+              "p95": 0.012900383228023659,
+              "maximum": 0.012900383228023659
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-p3-8-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-p3-8-opaque/sdr-control-0.png",
+        "sha256": "dcb4072751a4ea95d017146bbcfc7301c10b5ddd683da8eddcf57afa9936afc4",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-p3-8-alpha",
@@ -214,6 +262,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-8",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -292,7 +341,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8851300831616693,
+              "p95": 0.8851300831616693,
+              "maximum": 0.8851300831616693
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08381695510987752,
+              "p95": 0.09261485433447436,
+              "maximum": 0.09261485433447436
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08901377494272678,
+              "p95": 0.08930109399768431,
+              "maximum": 0.08930109399768431
+            },
+            "neutral_levels": 85,
+            "minimum_neutral_signal_step": 0.00044251163500419623,
+            "highlight_headroom": 0.11078049897001607,
+            "maximum_highlight_signal_step": 0.011642633707179328,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.0008361928416345761,
+              "p95": 0.0008361928416345761,
+              "maximum": 0.0008361928416345761
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-p3-8-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-p3-8-alpha/sdr-control-0.png",
+        "sha256": "c3cb70a410e78778d350132fada97c42ed71d2e7c6c52623d68f72e0b77da16e",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-p3-10-opaque",
@@ -361,6 +457,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -439,7 +536,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8856336308842605,
+              "p95": 0.8856336308842603,
+              "maximum": 0.8856336308842603
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0831995925313552,
+              "p95": 0.09039741004350715,
+              "maximum": 0.09039741004350715
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08883428868787431,
+              "p95": 0.08921630594372536,
+              "maximum": 0.08934094153127119
+            },
+            "neutral_levels": 98,
+            "minimum_neutral_signal_step": 0.00021362630655374915,
+            "highlight_headroom": 0.1098496986343176,
+            "maximum_highlight_signal_step": 0.011627374685282632,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.010925159633959625,
+              "p95": 0.0236956211224016,
+              "maximum": 0.0236956211224016
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-p3-10-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-p3-10-opaque/sdr-control-0.png",
+        "sha256": "118161379efaf61cb1b26ff8586b9d548922d5fd16596a9a6cec78630517b53c",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-p3-10-alpha",
@@ -509,6 +653,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -587,7 +732,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8856336308842603,
+              "p95": 0.8856336308842603,
+              "maximum": 0.8856336308842603
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0831995925313552,
+              "p95": 0.09039741004350715,
+              "maximum": 0.09039741004350715
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08888276716781443,
+              "p95": 0.08934094153127119,
+              "maximum": 0.08934094153127119
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.00021362630655374915,
+            "highlight_headroom": 0.1098496986343176,
+            "maximum_highlight_signal_step": 0.011627374685282632,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.0038971982616528935,
+              "p95": 0.0038971982616528935,
+              "maximum": 0.0038971982616528935
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-p3-10-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-p3-10-alpha/sdr-control-0.png",
+        "sha256": "5f91cdc024f98b4b9fb48dfb88691452f27e76c3835a2b130a8453abce1a7f0d",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-p3-12-opaque",
@@ -655,6 +847,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-12",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -733,7 +926,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8858777752346076,
+              "p95": 0.8858777752346074,
+              "maximum": 0.8858777752346074
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0837093067491601,
+              "p95": 0.08997206501263819,
+              "maximum": 0.08997206501263819
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08898609156496201,
+              "p95": 0.08937400542857986,
+              "maximum": 0.08941848333459003
+            },
+            "neutral_levels": 98,
+            "minimum_neutral_signal_step": 0.00030518043793392844,
+            "highlight_headroom": 0.1098191805905242,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.009606120559519314,
+              "p95": 0.012088564386180481,
+              "maximum": 0.012088564386180481
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-p3-12-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-p3-12-opaque/sdr-control-0.png",
+        "sha256": "391a460736537c6c23c5dff20ce894e120fb18d054942a40bcca4c1aa24753ca",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-p3-12-alpha",
@@ -802,6 +1042,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-12",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -880,7 +1121,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8858777752346074,
+              "p95": 0.8858777752346074,
+              "maximum": 0.8858777752346074
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0837093067491601,
+              "p95": 0.08997206501263819,
+              "maximum": 0.08997206501263819
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08898892490941517,
+              "p95": 0.08941848333459003,
+              "maximum": 0.08941848333459003
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.00030518043793392844,
+            "highlight_headroom": 0.1098191805905242,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.011122931024891576,
+              "p95": 0.011122931024891576,
+              "maximum": 0.011122931024891576
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-p3-12-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-p3-12-alpha/sdr-control-0.png",
+        "sha256": "c1e863e60485ba833797a74f436a18b390b2ad8c77ebe6df2cdf6ac5506941b7",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-rec2020-8-opaque",
@@ -949,6 +1237,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-8",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -1027,7 +1316,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8851300831616695,
+              "p95": 0.8851300831616693,
+              "maximum": 0.8851300831616693
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08381695510987787,
+              "p95": 0.09261485433447454,
+              "maximum": 0.09261485433447454
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08888115493242094,
+              "p95": 0.08929850266918585,
+              "maximum": 0.0893010939976848
+            },
+            "neutral_levels": 87,
+            "minimum_neutral_signal_step": 0.00044251163500419623,
+            "highlight_headroom": 0.11078049897001607,
+            "maximum_highlight_signal_step": 0.011642633707179328,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.005613153476603996,
+              "p95": 0.008603787466105874,
+              "maximum": 0.008603787466105874
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-rec2020-8-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-rec2020-8-opaque/sdr-control-0.png",
+        "sha256": "61361a35d5de1ddf4def760c6f175147f42e0c037110e8feac6ba7d8340927bd",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-rec2020-8-alpha",
@@ -1097,6 +1433,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-8",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -1175,7 +1512,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8851300831616693,
+              "p95": 0.8851300831616693,
+              "maximum": 0.8851300831616693
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08381695510987787,
+              "p95": 0.09261485433447454,
+              "maximum": 0.09261485433447454
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08901377494272714,
+              "p95": 0.0893010939976848,
+              "maximum": 0.0893010939976848
+            },
+            "neutral_levels": 85,
+            "minimum_neutral_signal_step": 0.00044251163500419623,
+            "highlight_headroom": 0.11078049897001607,
+            "maximum_highlight_signal_step": 0.011642633707179328,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.008235672963706113,
+              "p95": 0.008235672963706113,
+              "maximum": 0.008235672963706113
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-rec2020-8-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-rec2020-8-alpha/sdr-control-0.png",
+        "sha256": "da03ca0f4c914a260e4de6255fdfee611f957671367f73049beba4c949a56a13",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-rec2020-10-opaque",
@@ -1244,6 +1628,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -1322,7 +1707,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8856336308842605,
+              "p95": 0.8856336308842603,
+              "maximum": 0.8856336308842603
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08319959253135553,
+              "p95": 0.09039741004350756,
+              "maximum": 0.09039741004350756
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.0888342886878746,
+              "p95": 0.0892163059437258,
+              "maximum": 0.08934094153127142
+            },
+            "neutral_levels": 98,
+            "minimum_neutral_signal_step": 0.00021362630655374915,
+            "highlight_headroom": 0.1098496986343176,
+            "maximum_highlight_signal_step": 0.011627374685282632,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.007351067664328202,
+              "p95": 0.011266857615043098,
+              "maximum": 0.011266857615043098
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-rec2020-10-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-rec2020-10-opaque/sdr-control-0.png",
+        "sha256": "1e8defdb6bbe25f4aac73dc14bb4a227d54783cc7750e84a1560f3677ae5e151",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-rec2020-10-alpha",
@@ -1392,6 +1824,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -1470,7 +1903,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8856336308842603,
+              "p95": 0.8856336308842603,
+              "maximum": 0.8856336308842603
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08319959253135553,
+              "p95": 0.09039741004350756,
+              "maximum": 0.09039741004350756
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08888276716781475,
+              "p95": 0.08934094153127142,
+              "maximum": 0.08934094153127142
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.00021362630655374915,
+            "highlight_headroom": 0.1098496986343176,
+            "maximum_highlight_signal_step": 0.011627374685282632,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.010786345377941507,
+              "p95": 0.010786345377941507,
+              "maximum": 0.010786345377941507
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-rec2020-10-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-rec2020-10-alpha/sdr-control-0.png",
+        "sha256": "c56b8856fa081346b5459b4a6ee307f5dd92b0e9901785f7957c13d3018fbdcc",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-rec2020-12-opaque",
@@ -1538,6 +2018,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-12",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -1616,7 +2097,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8858777752346076,
+              "p95": 0.8858777752346074,
+              "maximum": 0.8858777752346074
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08370930674916037,
+              "p95": 0.08997206501263835,
+              "maximum": 0.08997206501263835
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08898609156496225,
+              "p95": 0.08937400542858008,
+              "maximum": 0.08941848333459058
+            },
+            "neutral_levels": 98,
+            "minimum_neutral_signal_step": 0.00030518043793392844,
+            "highlight_headroom": 0.1098191805905242,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.0037368919691594875,
+              "p95": 0.006942217396764662,
+              "maximum": 0.006942217396764662
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-rec2020-12-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-rec2020-12-opaque/sdr-control-0.png",
+        "sha256": "de133b2163ac831b7b6e08ae65c9a907fdd099dde7db2c39a750e073b5fd63c3",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-pq-rec2020-12-alpha",
@@ -1685,6 +2213,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-12",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -1763,7 +2292,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8858777752346074,
+              "p95": 0.8858777752346074,
+              "maximum": 0.8858777752346074
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08370930674916037,
+              "p95": 0.08997206501263835,
+              "maximum": 0.08997206501263835
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08898892490941553,
+              "p95": 0.08941848333459058,
+              "maximum": 0.08941848333459058
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.00030518043793392844,
+            "highlight_headroom": 0.1098191805905242,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.0042684585107138,
+              "p95": 0.0042684585107138,
+              "maximum": 0.0042684585107138
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-pq-rec2020-12-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-pq-rec2020-12-alpha/sdr-control-0.png",
+        "sha256": "1d3c31bf15b81590adacc1118a16ba097d67e11b9ed915828bb9de57ea117e94",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-p3-8-opaque",
@@ -1832,6 +2408,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-8",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -1910,7 +2487,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8847079168891943,
+              "p95": 0.884707916889194,
+              "maximum": 0.884707916889194
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08244003626159355,
+              "p95": 0.08967253495610784,
+              "maximum": 0.08967253495610784
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08882853561901985,
+              "p95": 0.08928673388300751,
+              "maximum": 0.08939685973363436
+            },
+            "neutral_levels": 93,
+            "minimum_neutral_signal_step": 0.000473029678797589,
+            "highlight_headroom": 0.11084662139823509,
+            "maximum_highlight_signal_step": 0.011128913303323884,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.0053914064211128924,
+              "p95": 0.011878398370199255,
+              "maximum": 0.011878398370199255
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-p3-8-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-p3-8-opaque/sdr-control-0.png",
+        "sha256": "99844a1c804edd663efc1657f3f6e22b41f7f1b7f94fc4030c6d7b14ef6d30cd",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-p3-8-alpha",
@@ -1980,6 +2604,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-8",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -2058,7 +2683,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.884707916889194,
+              "p95": 0.884707916889194,
+              "maximum": 0.884707916889194
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08244003626159355,
+              "p95": 0.08967253495610784,
+              "maximum": 0.08967253495610784
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.0889948480086377,
+              "p95": 0.08939685973363436,
+              "maximum": 0.08939685973363436
+            },
+            "neutral_levels": 91,
+            "minimum_neutral_signal_step": 0.000473029678797589,
+            "highlight_headroom": 0.11084662139823509,
+            "maximum_highlight_signal_step": 0.011128913303323884,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.0028374055853385505,
+              "p95": 0.0028374055853385505,
+              "maximum": 0.0028374055853385505
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-p3-8-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-p3-8-alpha/sdr-control-0.png",
+        "sha256": "358a840f3852a302f7f191fe77709777f6c61b86790cce383a58f25b10e2bada",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-p3-10-opaque",
@@ -2127,6 +2799,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -2205,7 +2878,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8854606953027646,
+              "p95": 0.8854606953027644,
+              "maximum": 0.8854606953027644
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08354017944062682,
+              "p95": 0.09011759945810999,
+              "maximum": 0.09011759945810999
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08913172476136495,
+              "p95": 0.08928532646628655,
+              "maximum": 0.08929567897828977
+            },
+            "neutral_levels": 98,
+            "minimum_neutral_signal_step": 0.0003204394598306248,
+            "highlight_headroom": 0.11009384298466474,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.011055585402323107,
+              "p95": 0.014897675525275128,
+              "maximum": 0.014897675525275128
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-p3-10-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-p3-10-opaque/sdr-control-0.png",
+        "sha256": "9ab19f7b958a17db152c11ac8a5a9de935828edc7fd82bcc4e43a120fd449a3e",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-p3-10-alpha",
@@ -2275,6 +2995,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -2353,7 +3074,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8854606953027644,
+              "p95": 0.8854606953027644,
+              "maximum": 0.8854606953027644
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08354017944062682,
+              "p95": 0.09011759945810999,
+              "maximum": 0.09011759945810999
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08906724366201038,
+              "p95": 0.08929567897828977,
+              "maximum": 0.08929567897828977
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.0003204394598306248,
+            "highlight_headroom": 0.11009384298466474,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.014897675525275128,
+              "p95": 0.014897675525275128,
+              "maximum": 0.014897675525275128
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-p3-10-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-p3-10-alpha/sdr-control-0.png",
+        "sha256": "d7c5f69be2371ba9a3a383ac410c989b53a1e82ab72a755b0713054ae9808270",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-p3-12-opaque",
@@ -2421,6 +3189,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-12",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -2499,7 +3268,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8857150123343762,
+              "p95": 0.885715012334376,
+              "maximum": 0.885715012334376
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0832617626295177,
+              "p95": 0.0913321993686735,
+              "maximum": 0.0913321993686735
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08896626946785441,
+              "p95": 0.08920029522077084,
+              "maximum": 0.08923501753382902
+            },
+            "neutral_levels": 98,
+            "minimum_neutral_signal_step": 0.000289921416037231,
+            "highlight_headroom": 0.10983952595305313,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.010016458712126987,
+              "p95": 0.014384168210593126,
+              "maximum": 0.014384168210593126
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-p3-12-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-p3-12-opaque/sdr-control-0.png",
+        "sha256": "f681a28cc4369c804c77553938e08346a29918947b9cc7273da9470da69ece26",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-p3-12-alpha",
@@ -2568,6 +3384,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-12",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1024,
@@ -2646,7 +3463,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.885715012334376,
+              "p95": 0.885715012334376,
+              "maximum": 0.885715012334376
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0832617626295177,
+              "p95": 0.0913321993686735,
+              "maximum": 0.0913321993686735
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08900315285524212,
+              "p95": 0.08923501753382902,
+              "maximum": 0.08923501753382902
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.000289921416037231,
+            "highlight_headroom": 0.10983952595305313,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.011955722032443184,
+              "p95": 0.011955722032443184,
+              "maximum": 0.011955722032443184
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-p3-12-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-p3-12-alpha/sdr-control-0.png",
+        "sha256": "dd630fc68e2c8ff1ddf3e2e1d2661c770c316f125499c85748afc414ba9837b6",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-rec2020-8-opaque",
@@ -2715,6 +3579,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-8",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -2793,7 +3658,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8847079168891943,
+              "p95": 0.884707916889194,
+              "maximum": 0.884707916889194
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08244003626159391,
+              "p95": 0.08967253495610784,
+              "maximum": 0.08967253495610784
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08880680948206841,
+              "p95": 0.0891686092362361,
+              "maximum": 0.08928673388300788
+            },
+            "neutral_levels": 93,
+            "minimum_neutral_signal_step": 0.000473029678797589,
+            "highlight_headroom": 0.11084662139823509,
+            "maximum_highlight_signal_step": 0.011128913303323884,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.011700260542317339,
+              "p95": 0.025077655498991026,
+              "maximum": 0.025077655498991026
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-rec2020-8-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-rec2020-8-opaque/sdr-control-0.png",
+        "sha256": "9a95ab497d800e4375e4ce6cfe8f9f9de23fd2b53d36419355eebbbb9e65d0e0",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-rec2020-8-alpha",
@@ -2863,6 +3775,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-8",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -2941,7 +3854,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.884707916889194,
+              "p95": 0.884707916889194,
+              "maximum": 0.884707916889194
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08244003626159391,
+              "p95": 0.08967253495610784,
+              "maximum": 0.08967253495610784
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08894994732560421,
+              "p95": 0.08928673388300788,
+              "maximum": 0.08928673388300788
+            },
+            "neutral_levels": 91,
+            "minimum_neutral_signal_step": 0.000473029678797589,
+            "highlight_headroom": 0.11084662139823509,
+            "maximum_highlight_signal_step": 0.011128913303323884,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.010023126127960984,
+              "p95": 0.010023126127960984,
+              "maximum": 0.010023126127960984
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-rec2020-8-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-rec2020-8-alpha/sdr-control-0.png",
+        "sha256": "3569d070ef3a2099098eb7578def683acf9e479534a017baaf48535f282699ad",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-rec2020-10-opaque",
@@ -3010,6 +3970,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -3088,7 +4049,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8854606953027646,
+              "p95": 0.8854606953027644,
+              "maximum": 0.8854606953027644
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0835401794406271,
+              "p95": 0.0901175994581102,
+              "maximum": 0.0901175994581102
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08914758887181279,
+              "p95": 0.08928532646628701,
+              "maximum": 0.08929567897829027
+            },
+            "neutral_levels": 98,
+            "minimum_neutral_signal_step": 0.000289921416037231,
+            "highlight_headroom": 0.11009384298466474,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.010849798082559023,
+              "p95": 0.018815261024230385,
+              "maximum": 0.018815261024230385
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-rec2020-10-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-rec2020-10-opaque/sdr-control-0.png",
+        "sha256": "2c9cdcccaee76a5859741bbb7f982d428c33469a69508ccecfdee077c8ad0d83",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-rec2020-10-alpha",
@@ -3158,6 +4166,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -3236,7 +4245,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8854606953027644,
+              "p95": 0.8854606953027644,
+              "maximum": 0.8854606953027644
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0835401794406271,
+              "p95": 0.0901175994581102,
+              "maximum": 0.0901175994581102
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08910123818439827,
+              "p95": 0.08929567897829027,
+              "maximum": 0.08929567897829027
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.000289921416037231,
+            "highlight_headroom": 0.11009384298466474,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.013734133223446686,
+              "p95": 0.013734133223446686,
+              "maximum": 0.013734133223446686
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-rec2020-10-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-rec2020-10-alpha/sdr-control-0.png",
+        "sha256": "f5a0983fa60fd5eacf483875c57b9ae8c1536934c5a9fb522e84f671f5241917",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-rec2020-12-opaque",
@@ -3304,6 +4360,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-12",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -3382,7 +4439,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8857150123343762,
+              "p95": 0.885715012334376,
+              "maximum": 0.885715012334376
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08326176262951802,
+              "p95": 0.09133219936867362,
+              "maximum": 0.09133219936867362
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08896075165203327,
+              "p95": 0.08919859683088383,
+              "maximum": 0.08923501753382945
+            },
+            "neutral_levels": 98,
+            "minimum_neutral_signal_step": 0.000289921416037231,
+            "highlight_headroom": 0.10983952595305313,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.010555678674164829,
+              "p95": 0.025474608829003664,
+              "maximum": 0.025474608829003664
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-rec2020-12-opaque/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-rec2020-12-opaque/sdr-control-0.png",
+        "sha256": "d62bbf586e85766ac9fe64a3c4e2d62f20c33496812b9a53ec64cfe311b39885",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "avif-hlg-rec2020-12-alpha",
@@ -3451,6 +4555,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-12",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -3529,7 +4634,54 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.885715012334376,
+              "p95": 0.885715012334376,
+              "maximum": 0.885715012334376
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08326176262951802,
+              "p95": 0.09133219936867362,
+              "maximum": 0.09133219936867362
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08899132896419634,
+              "p95": 0.08923501753382945,
+              "maximum": 0.08923501753382945
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.000289921416037231,
+            "highlight_headroom": 0.10983952595305313,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.0061924271934908235,
+              "p95": 0.0061924271934908235,
+              "maximum": 0.0061924271934908235
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/avif-hlg-rec2020-12-alpha/decoded-0.png",
+        "output": "/proof/work/avif/avif-hlg-rec2020-12-alpha/sdr-control-0.png",
+        "sha256": "49dac1179164d5ef2121b6dde1c44f8a66e5ccb434f92428205968c225ee29db",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "animated-pq-alpha",
@@ -3634,6 +4786,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -3704,6 +4857,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -3782,7 +4936,103 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": false,
+        "measurement": {
+          "passed": false,
+          "tone_curve_passed": false,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8828564888990615,
+              "p95": 0.8828564888990615,
+              "maximum": 0.8828564888990615
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08319959253135553,
+              "p95": 0.09039741004350756,
+              "maximum": 0.09039741004350756
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08888276716781475,
+              "p95": 0.08934094153127142,
+              "maximum": 0.08934094153127142
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.00021362630655374915,
+            "highlight_headroom": 0.09889372091248949,
+            "maximum_highlight_signal_step": 0.010696574349584265,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.008134941710950482,
+              "p95": 0.008134941710950482,
+              "maximum": 0.008134941710950482
+            }
+          },
+          "failures": [
+            "highlight_flattening"
+          ],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/animated-pq-alpha/decoded-0.png",
+        "output": "/proof/work/avif/animated-pq-alpha/sdr-control-0.png",
+        "sha256": "dc55660b10bc7b1046deb70b75e4b4994199fdc47cf3aae9d636d34d9aa8e717",
+        "peak_nits": 4000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      },
+      {
+        "passed": false,
+        "measurement": {
+          "passed": false,
+          "tone_curve_passed": false,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8828564888990615,
+              "p95": 0.8828564888990615,
+              "maximum": 0.8828564888990615
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.08319959253135553,
+              "p95": 0.09039741004350756,
+              "maximum": 0.09039741004350756
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08888276716781475,
+              "p95": 0.08934094153127142,
+              "maximum": 0.08934094153127142
+            },
+            "neutral_levels": 97,
+            "minimum_neutral_signal_step": 0.00021362630655374915,
+            "highlight_headroom": 0.11262684061951633,
+            "maximum_highlight_signal_step": 0.013733119707026842,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.008134941710950482,
+              "p95": 0.008134941710950482,
+              "maximum": 0.008134941710950482
+            }
+          },
+          "failures": [
+            "highlight_flattening"
+          ],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/animated-pq-alpha/decoded-1.png",
+        "output": "/proof/work/avif/animated-pq-alpha/sdr-control-1.png",
+        "sha256": "05c9f58f7a16086c280cd35539a28cb1692c80b6a78e7f01f5bbabdacf848da9",
+        "peak_nits": 4000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "id": "animated-hlg-alpha",
@@ -3887,6 +5137,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -3957,6 +5208,7 @@
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": "avif-10",
         "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
         "regions": {
           "shadow": {
             "samples": 1056,
@@ -4035,7 +5287,99 @@
       "loop": true,
       "alpha": true
     },
-    "source_valid": true
+    "source_valid": true,
+    "sdr_tone_controls": [
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8854606953027644,
+              "p95": 0.8854606953027644,
+              "maximum": 0.8854606953027644
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0835401794406271,
+              "p95": 0.0901175994581102,
+              "maximum": 0.0901175994581102
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08910123818439827,
+              "p95": 0.08929567897829027,
+              "maximum": 0.08929567897829027
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.000289921416037231,
+            "highlight_headroom": 0.11009384298466474,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.013734133223446686,
+              "p95": 0.013734133223446686,
+              "maximum": 0.013734133223446686
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/animated-hlg-alpha/decoded-0.png",
+        "output": "/proof/work/avif/animated-hlg-alpha/sdr-control-0.png",
+        "sha256": "f5a0983fa60fd5eacf483875c57b9ae8c1536934c5a9fb522e84f671f5241917",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      },
+      {
+        "passed": true,
+        "measurement": {
+          "passed": true,
+          "tone_curve_passed": true,
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "measurements": {
+            "ordinary_white_signal": {
+              "mean": 0.8854606953027644,
+              "p95": 0.8854606953027644,
+              "maximum": 0.8854606953027644
+            },
+            "shadow_relative_luminance_error": {
+              "mean": 0.0835401794406271,
+              "p95": 0.0901175994581102,
+              "maximum": 0.0901175994581102
+            },
+            "midtone_relative_luminance_error": {
+              "mean": 0.08910123818439827,
+              "p95": 0.08929567897829027,
+              "maximum": 0.08929567897829027
+            },
+            "neutral_levels": 96,
+            "minimum_neutral_signal_step": 0.000289921416037231,
+            "highlight_headroom": 0.11009384298466474,
+            "maximum_highlight_signal_step": 0.012130922407873612,
+            "gamut_reference_delta_e_itp": {
+              "mean": 0.013734133223446686,
+              "p95": 0.013734133223446686,
+              "maximum": 0.013734133223446686
+            }
+          },
+          "failures": [],
+          "reference_display": {
+            "sdr_nominal_white_nits": 100,
+            "source_ordinary_white_nits": 203
+          }
+        },
+        "source": "/proof/work/avif/animated-hlg-alpha/decoded-1.png",
+        "output": "/proof/work/avif/animated-hlg-alpha/sdr-control-1.png",
+        "sha256": "3920437a9bd2a6a0e38b21585875d1456ae6c88474492ecfe5b5f0b5aee0bc46",
+        "peak_nits": 1000,
+        "geometry": "identity",
+        "scope": "Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately."
+      }
+    ]
   },
   {
     "fixture_id": "gainmap-android-iso",
@@ -4131,6 +5475,7 @@
       "components": 1
     },
     "iso_identifier": true,
+    "map_private_tags": [],
     "android_xmp_properties": {},
     "iso_metadata": {
       "minimum_version": 0,
@@ -4353,7 +5698,8 @@
       "XMP-xmp:MetadataDate",
       "XMP-xmp:ModifyDate",
       "XMP-xmpNote:HasExtendedXMP",
-      "XMP-GCamera:HDRPlusMakerNote"
+      "XMP-GCamera:HDRPlusMakerNote",
+      "gain-map:XMP-x:XMPToolkit"
     ],
     "base": {
       "depth": 8,
@@ -4369,6 +5715,9 @@
       "components": 1
     },
     "iso_identifier": false,
+    "map_private_tags": [
+      "XMP-x:XMPToolkit"
+    ],
     "android_xmp_properties": {
       "XMP-hdrgm:Version": 1.0,
       "XMP-hdrgm:HDRCapacityMin": 0,
@@ -4620,7 +5969,11 @@
       "GPS:GPSHPositioningError",
       "Composite:RunTimeSincePowerUp",
       "Composite:GPSAltitude",
-      "Composite:GPSDateTime"
+      "Composite:GPSDateTime",
+      "gain-map:XMP-x:XMPToolkit",
+      "gain-map:XMP-apdi:AuxiliaryImageType",
+      "gain-map:XMP-apdi:StoredFormat",
+      "gain-map:XMP-apdi:NativeFormat"
     ],
     "base": {
       "depth": 8,
@@ -4636,6 +5989,12 @@
       "components": 1
     },
     "iso_identifier": false,
+    "map_private_tags": [
+      "XMP-x:XMPToolkit",
+      "XMP-apdi:AuxiliaryImageType",
+      "XMP-apdi:StoredFormat",
+      "XMP-apdi:NativeFormat"
+    ],
     "android_xmp_properties": {},
     "independent_hdr_decode": true
   },
@@ -4876,7 +6235,11 @@
       "GPS:GPSHPositioningError",
       "Composite:RunTimeSincePowerUp",
       "Composite:GPSAltitude",
-      "Composite:GPSDateTime"
+      "Composite:GPSDateTime",
+      "gain-map:XMP-x:XMPToolkit",
+      "gain-map:XMP-apdi:NativeFormat",
+      "gain-map:XMP-apdi:AuxiliaryImageType",
+      "gain-map:XMP-apdi:StoredFormat"
     ],
     "base": {
       "depth": 8,
@@ -4892,6 +6255,12 @@
       "components": 1
     },
     "iso_identifier": false,
+    "map_private_tags": [
+      "XMP-x:XMPToolkit",
+      "XMP-apdi:NativeFormat",
+      "XMP-apdi:AuxiliaryImageType",
+      "XMP-apdi:StoredFormat"
+    ],
     "android_xmp_properties": {},
     "independent_hdr_decode": true
   },

@@ -699,17 +699,17 @@
     },
     {
       "file": "avif-pq-rec2020-10-opaque-hdr-avif-preserve-preserve-contain.avif",
-      "sha256": "597be78d2a54b48a188f75f2f4291d4d59eb09904960730ca93b3ccfc010dc43",
+      "sha256": "fecb121e3543495d96cf489ea9903ef4958b3227b273e35c55b6f3ae40141305",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-pq-rec2020-10-opaque:hdr:avif:preserve:preserve:contain",
-      "codec_status": "tested and failed",
+      "codec_status": "qualified",
       "consumer_status": "pending manual review",
       "facts": {
         "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-10-opaque/hdr-avif-preserve-contain/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.avif",
-          "FileSize": 1917,
+          "FileSize": 1781,
           "FilePermissions": 100644,
           "FileType": "AVIF",
           "FileTypeExtension": "AVIF",
@@ -736,7 +736,7 @@
           "TransferCharacteristics": 16,
           "MatrixCoefficients": 0,
           "VideoFullRangeFlag": 1,
-          "MediaDataSize": 1642,
+          "MediaDataSize": 1506,
           "MediaDataOffset": 275,
           "ImageSize": "57 38",
           "Megapixels": 0.002166
@@ -748,13 +748,13 @@
         "transfer": 16,
         "matrix": 0,
         "alpha": "Absent",
-        "sha256": "597be78d2a54b48a188f75f2f4291d4d59eb09904960730ca93b3ccfc010dc43"
+        "sha256": "fecb121e3543495d96cf489ea9903ef4958b3227b273e35c55b6f3ae40141305"
       },
-      "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+      "warning": null
     },
     {
       "file": "avif-pq-rec2020-10-opaque-sdr-avif-srgb-preserve-contain.avif",
-      "sha256": "40ceeaa1ccb07c5d33a474a45fb90c399fbeb4588ea5ab80ae68ebcadb4f264c",
+      "sha256": "8d6a09b0971761347a76aea1b70fc506cc4acd9326e768801508708484c6d77b",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-pq-rec2020-10-opaque:sdr:avif:srgb:preserve:contain",
       "codec_status": "tested and failed",
@@ -764,7 +764,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.avif",
-          "FileSize": 1344,
+          "FileSize": 1408,
           "FilePermissions": 100644,
           "FileType": "AVIF",
           "FileTypeExtension": "AVIF",
@@ -791,7 +791,7 @@
           "TransferCharacteristics": 13,
           "MatrixCoefficients": 0,
           "VideoFullRangeFlag": 1,
-          "MediaDataSize": 1069,
+          "MediaDataSize": 1133,
           "MediaDataOffset": 275,
           "ImageSize": "57 38",
           "Megapixels": 0.002166
@@ -803,13 +803,13 @@
         "transfer": 13,
         "matrix": 0,
         "alpha": "Absent",
-        "sha256": "40ceeaa1ccb07c5d33a474a45fb90c399fbeb4588ea5ab80ae68ebcadb4f264c"
+        "sha256": "8d6a09b0971761347a76aea1b70fc506cc4acd9326e768801508708484c6d77b"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "avif-pq-rec2020-10-opaque-sdr-jpg-srgb-preserve-identity.jpg",
-      "sha256": "b18bd5afda79037c25b6e0e6ae22f590f2ebeeb25f8d6ec1dde7e5920cd5edd4",
+      "sha256": "0c7b157f711c531838a5fdd8a05335a4f68121fdf04fdd3b48dc0be31ac9861a",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-pq-rec2020-10-opaque:sdr:jpg:srgb:preserve:identity",
       "codec_status": "tested and failed",
@@ -818,12 +818,37 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.jpg",
-          "FileSize": 403,
+          "FileSize": 1253,
           "FilePermissions": 100644,
           "FileType": "JPEG",
           "FileTypeExtension": "JPG",
           "MIMEType": "image/jpeg",
-          "Comment": "Lavc62.28.102",
+          "ProfileCMMType": "lcms",
+          "ProfileVersion": 1056,
+          "ProfileClass": "mntr",
+          "ColorSpaceData": "RGB ",
+          "ProfileConnectionSpace": "XYZ ",
+          "ProfileDateTime": "2018:03:20 09:14:29",
+          "ProfileFileSignature": "acsp",
+          "PrimaryPlatform": "MSFT",
+          "CMMFlags": 0,
+          "DeviceManufacturer": "saws",
+          "DeviceModel": "ctrl",
+          "DeviceAttributes": "0 0",
+          "RenderingIntent": 0,
+          "ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ProfileCreator": "hand",
+          "ProfileID": "121 233 191 86 90 62 1 182 131 35 133 85 70 247 79 170",
+          "ProfileDescription": "sRGB",
+          "ProfileCopyright": "CC0",
+          "MediaWhitePoint": "0.9642 1 0.82491",
+          "ChromaticAdaptation": "1.04784 0.0229 -0.0502 0.02954 0.99051 -0.01707 -0.00925 0.01508 0.75172",
+          "RedMatrixColumn": "0.43604 0.22244 0.0139",
+          "GreenMatrixColumn": "0.3851 0.71693 0.09708",
+          "BlueMatrixColumn": "0.14307 0.06062 0.71393",
+          "RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
           "ImageWidth": 96,
           "ImageHeight": 64,
           "EncodingProcess": 0,
@@ -833,22 +858,22 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "b18bd5afda79037c25b6e0e6ae22f590f2ebeeb25f8d6ec1dde7e5920cd5edd4"
+        "sha256": "0c7b157f711c531838a5fdd8a05335a4f68121fdf04fdd3b48dc0be31ac9861a"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "avif-pq-rec2020-10-opaque-sdr-png-srgb-preserve-identity.png",
-      "sha256": "3304de5031c1be679d5835e5848de020508ac6832962e4010c0bbfbd7d64c909",
+      "sha256": "1e8defdb6bbe25f4aac73dc14bb4a227d54783cc7750e84a1560f3677ae5e151",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-pq-rec2020-10-opaque:sdr:png:srgb:preserve:identity",
-      "codec_status": "tested and failed",
+      "codec_status": "qualified",
       "consumer_status": "pending manual review",
       "facts": {
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.png",
-          "FileSize": 1219,
+          "FileSize": 924,
           "FilePermissions": 100644,
           "FileType": "PNG",
           "FileTypeExtension": "PNG",
@@ -876,13 +901,13 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "3304de5031c1be679d5835e5848de020508ac6832962e4010c0bbfbd7d64c909"
+        "sha256": "1e8defdb6bbe25f4aac73dc14bb4a227d54783cc7750e84a1560f3677ae5e151"
       },
-      "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+      "warning": null
     },
     {
       "file": "avif-pq-rec2020-10-opaque-sdr-webp-srgb-preserve-identity.webp",
-      "sha256": "cd5aa13c1b5b0987924011bee1503458c25757d782960bb985e2dc43e9078c89",
+      "sha256": "45b5e5891ec1a47f2c0524a2a9393fe47d702d63b49a5b38089ec73592ecad16",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-pq-rec2020-10-opaque:sdr:webp:srgb:preserve:identity",
       "codec_status": "tested and failed",
@@ -891,24 +916,51 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.webp",
-          "FileSize": 142,
+          "FileSize": 650,
           "FilePermissions": 100644,
-          "FileType": "WEBP (lossless)",
+          "FileType": "Extended WEBP (lossless)",
           "FileTypeExtension": "WEBP",
           "MIMEType": "image/webp",
+          "WebP_Flags": 32,
           "ImageWidth": 96,
           "ImageHeight": 64,
+          "ProfileCMMType": "lcms",
+          "ProfileVersion": 1056,
+          "ProfileClass": "mntr",
+          "ColorSpaceData": "RGB ",
+          "ProfileConnectionSpace": "XYZ ",
+          "ProfileDateTime": "2018:03:20 09:14:29",
+          "ProfileFileSignature": "acsp",
+          "PrimaryPlatform": "MSFT",
+          "CMMFlags": 0,
+          "DeviceManufacturer": "saws",
+          "DeviceModel": "ctrl",
+          "DeviceAttributes": "0 0",
+          "RenderingIntent": 0,
+          "ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ProfileCreator": "hand",
+          "ProfileID": "121 233 191 86 90 62 1 182 131 35 133 85 70 247 79 170",
+          "ProfileDescription": "sRGB",
+          "ProfileCopyright": "CC0",
+          "MediaWhitePoint": "0.9642 1 0.82491",
+          "ChromaticAdaptation": "1.04784 0.0229 -0.0502 0.02954 0.99051 -0.01707 -0.00925 0.01508 0.75172",
+          "RedMatrixColumn": "0.43604 0.22244 0.0139",
+          "GreenMatrixColumn": "0.3851 0.71693 0.09708",
+          "BlueMatrixColumn": "0.14307 0.06062 0.71393",
+          "RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
           "AlphaIsUsed": 0,
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "cd5aa13c1b5b0987924011bee1503458c25757d782960bb985e2dc43e9078c89"
+        "sha256": "45b5e5891ec1a47f2c0524a2a9393fe47d702d63b49a5b38089ec73592ecad16"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "avif-pq-rec2020-10-opaque-sdr-gif-srgb-preserve-identity.gif",
-      "sha256": "b89cb782ad1cb74b9074f0dd15d1688fee8b88eec3ca6fc49f9933868605d62a",
+      "sha256": "1afb926e21099508e2fe2b626da87c17ef949ead0fff7168a5ae4f706b77937a",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-pq-rec2020-10-opaque:sdr:gif:srgb:preserve:identity",
       "codec_status": "tested and failed",
@@ -917,7 +969,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.gif",
-          "FileSize": 2079,
+          "FileSize": 2021,
           "FilePermissions": 100644,
           "FileType": "GIF",
           "FileTypeExtension": "GIF",
@@ -934,7 +986,7 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "b89cb782ad1cb74b9074f0dd15d1688fee8b88eec3ca6fc49f9933868605d62a"
+        "sha256": "1afb926e21099508e2fe2b626da87c17ef949ead0fff7168a5ae4f706b77937a"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1041,17 +1093,17 @@
     },
     {
       "file": "avif-hlg-rec2020-10-opaque-hdr-avif-preserve-preserve-contain.avif",
-      "sha256": "9512631cf290731304112e30127e938c425986e3dd54f402eb06373488b52d74",
+      "sha256": "6739406c00d01813a9625b82b1182ca72b3b3bc3109116d8c27190c579c69cbd",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-hlg-rec2020-10-opaque:hdr:avif:preserve:preserve:contain",
-      "codec_status": "tested and failed",
+      "codec_status": "qualified",
       "consumer_status": "pending manual review",
       "facts": {
         "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-rec2020-10-opaque/hdr-avif-preserve-contain/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.avif",
-          "FileSize": 2001,
+          "FileSize": 1920,
           "FilePermissions": 100644,
           "FileType": "AVIF",
           "FileTypeExtension": "AVIF",
@@ -1078,7 +1130,7 @@
           "TransferCharacteristics": 18,
           "MatrixCoefficients": 0,
           "VideoFullRangeFlag": 1,
-          "MediaDataSize": 1726,
+          "MediaDataSize": 1645,
           "MediaDataOffset": 275,
           "ImageSize": "57 38",
           "Megapixels": 0.002166
@@ -1090,13 +1142,13 @@
         "transfer": 18,
         "matrix": 0,
         "alpha": "Absent",
-        "sha256": "9512631cf290731304112e30127e938c425986e3dd54f402eb06373488b52d74"
+        "sha256": "6739406c00d01813a9625b82b1182ca72b3b3bc3109116d8c27190c579c69cbd"
       },
-      "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+      "warning": null
     },
     {
       "file": "avif-hlg-rec2020-10-opaque-sdr-avif-srgb-preserve-contain.avif",
-      "sha256": "2136940c2ebebb9db94c89d151a3a93bace96816ffa4a4068045238c0cad9287",
+      "sha256": "65ee0ad77fc3d5147e6b6b62dc15a8d4fc5fae01ee90d04189a3bd0a15f6d6a7",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-hlg-rec2020-10-opaque:sdr:avif:srgb:preserve:contain",
       "codec_status": "tested and failed",
@@ -1106,7 +1158,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.avif",
-          "FileSize": 1482,
+          "FileSize": 1400,
           "FilePermissions": 100644,
           "FileType": "AVIF",
           "FileTypeExtension": "AVIF",
@@ -1133,7 +1185,7 @@
           "TransferCharacteristics": 13,
           "MatrixCoefficients": 0,
           "VideoFullRangeFlag": 1,
-          "MediaDataSize": 1207,
+          "MediaDataSize": 1125,
           "MediaDataOffset": 275,
           "ImageSize": "57 38",
           "Megapixels": 0.002166
@@ -1145,13 +1197,13 @@
         "transfer": 13,
         "matrix": 0,
         "alpha": "Absent",
-        "sha256": "2136940c2ebebb9db94c89d151a3a93bace96816ffa4a4068045238c0cad9287"
+        "sha256": "65ee0ad77fc3d5147e6b6b62dc15a8d4fc5fae01ee90d04189a3bd0a15f6d6a7"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "avif-hlg-rec2020-10-opaque-sdr-jpg-srgb-preserve-identity.jpg",
-      "sha256": "eb9f0dd0dd37bb15e1609ed70ec1621803194b3de26e7551d5c0d509ccf1579c",
+      "sha256": "54eb2f9d29eca7511fd419f18b8cc2760d99eeaaa60afca3f6fdb294bb863b22",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-hlg-rec2020-10-opaque:sdr:jpg:srgb:preserve:identity",
       "codec_status": "tested and failed",
@@ -1160,12 +1212,37 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.jpg",
-          "FileSize": 434,
+          "FileSize": 1278,
           "FilePermissions": 100644,
           "FileType": "JPEG",
           "FileTypeExtension": "JPG",
           "MIMEType": "image/jpeg",
-          "Comment": "Lavc62.28.102",
+          "ProfileCMMType": "lcms",
+          "ProfileVersion": 1056,
+          "ProfileClass": "mntr",
+          "ColorSpaceData": "RGB ",
+          "ProfileConnectionSpace": "XYZ ",
+          "ProfileDateTime": "2018:03:20 09:14:29",
+          "ProfileFileSignature": "acsp",
+          "PrimaryPlatform": "MSFT",
+          "CMMFlags": 0,
+          "DeviceManufacturer": "saws",
+          "DeviceModel": "ctrl",
+          "DeviceAttributes": "0 0",
+          "RenderingIntent": 0,
+          "ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ProfileCreator": "hand",
+          "ProfileID": "121 233 191 86 90 62 1 182 131 35 133 85 70 247 79 170",
+          "ProfileDescription": "sRGB",
+          "ProfileCopyright": "CC0",
+          "MediaWhitePoint": "0.9642 1 0.82491",
+          "ChromaticAdaptation": "1.04784 0.0229 -0.0502 0.02954 0.99051 -0.01707 -0.00925 0.01508 0.75172",
+          "RedMatrixColumn": "0.43604 0.22244 0.0139",
+          "GreenMatrixColumn": "0.3851 0.71693 0.09708",
+          "BlueMatrixColumn": "0.14307 0.06062 0.71393",
+          "RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
           "ImageWidth": 96,
           "ImageHeight": 64,
           "EncodingProcess": 0,
@@ -1175,22 +1252,22 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "eb9f0dd0dd37bb15e1609ed70ec1621803194b3de26e7551d5c0d509ccf1579c"
+        "sha256": "54eb2f9d29eca7511fd419f18b8cc2760d99eeaaa60afca3f6fdb294bb863b22"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "avif-hlg-rec2020-10-opaque-sdr-png-srgb-preserve-identity.png",
-      "sha256": "7e26e2da120767cc82af1a44634785030740b29f3ee1430eb9f2c95bf21a2a1b",
+      "sha256": "2c9cdcccaee76a5859741bbb7f982d428c33469a69508ccecfdee077c8ad0d83",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-hlg-rec2020-10-opaque:sdr:png:srgb:preserve:identity",
-      "codec_status": "tested and failed",
+      "codec_status": "qualified",
       "consumer_status": "pending manual review",
       "facts": {
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.png",
-          "FileSize": 1280,
+          "FileSize": 1166,
           "FilePermissions": 100644,
           "FileType": "PNG",
           "FileTypeExtension": "PNG",
@@ -1218,13 +1295,13 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "7e26e2da120767cc82af1a44634785030740b29f3ee1430eb9f2c95bf21a2a1b"
+        "sha256": "2c9cdcccaee76a5859741bbb7f982d428c33469a69508ccecfdee077c8ad0d83"
       },
-      "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+      "warning": null
     },
     {
       "file": "avif-hlg-rec2020-10-opaque-sdr-webp-srgb-preserve-identity.webp",
-      "sha256": "cf45d2ead6403132b3014fea8507dff0cf64f3abd996b695ab0936dfc0c4dedb",
+      "sha256": "4222ad072544399ed0299ee17c49558b9d21130ebc42c6e025b7ea13356fd500",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-hlg-rec2020-10-opaque:sdr:webp:srgb:preserve:identity",
       "codec_status": "tested and failed",
@@ -1233,24 +1310,51 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.webp",
-          "FileSize": 178,
+          "FileSize": 658,
           "FilePermissions": 100644,
-          "FileType": "WEBP (lossless)",
+          "FileType": "Extended WEBP (lossless)",
           "FileTypeExtension": "WEBP",
           "MIMEType": "image/webp",
+          "WebP_Flags": 32,
           "ImageWidth": 96,
           "ImageHeight": 64,
+          "ProfileCMMType": "lcms",
+          "ProfileVersion": 1056,
+          "ProfileClass": "mntr",
+          "ColorSpaceData": "RGB ",
+          "ProfileConnectionSpace": "XYZ ",
+          "ProfileDateTime": "2018:03:20 09:14:29",
+          "ProfileFileSignature": "acsp",
+          "PrimaryPlatform": "MSFT",
+          "CMMFlags": 0,
+          "DeviceManufacturer": "saws",
+          "DeviceModel": "ctrl",
+          "DeviceAttributes": "0 0",
+          "RenderingIntent": 0,
+          "ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ProfileCreator": "hand",
+          "ProfileID": "121 233 191 86 90 62 1 182 131 35 133 85 70 247 79 170",
+          "ProfileDescription": "sRGB",
+          "ProfileCopyright": "CC0",
+          "MediaWhitePoint": "0.9642 1 0.82491",
+          "ChromaticAdaptation": "1.04784 0.0229 -0.0502 0.02954 0.99051 -0.01707 -0.00925 0.01508 0.75172",
+          "RedMatrixColumn": "0.43604 0.22244 0.0139",
+          "GreenMatrixColumn": "0.3851 0.71693 0.09708",
+          "BlueMatrixColumn": "0.14307 0.06062 0.71393",
+          "RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
           "AlphaIsUsed": 0,
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "cf45d2ead6403132b3014fea8507dff0cf64f3abd996b695ab0936dfc0c4dedb"
+        "sha256": "4222ad072544399ed0299ee17c49558b9d21130ebc42c6e025b7ea13356fd500"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "avif-hlg-rec2020-10-opaque-sdr-gif-srgb-preserve-identity.gif",
-      "sha256": "20a36eb644e3c4762359881e84bf141d3fe71c9309afa836b158ec59a8365ce5",
+      "sha256": "a11f2b27a9f0160da9ffd7031ef4b1ef4558cf2628e1bdcbd9a550ade0e53584",
       "role": "Inspected native conversion candidate",
       "case_id": "avif-hlg-rec2020-10-opaque:sdr:gif:srgb:preserve:identity",
       "codec_status": "tested and failed",
@@ -1259,7 +1363,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.gif",
-          "FileSize": 2078,
+          "FileSize": 2041,
           "FilePermissions": 100644,
           "FileType": "GIF",
           "FileTypeExtension": "GIF",
@@ -1276,7 +1380,7 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "20a36eb644e3c4762359881e84bf141d3fe71c9309afa836b158ec59a8365ce5"
+        "sha256": "a11f2b27a9f0160da9ffd7031ef4b1ef4558cf2628e1bdcbd9a550ade0e53584"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1383,7 +1487,7 @@
     },
     {
       "file": "animated-pq-alpha-hdr-avif-preserve-preserve-contain.avif",
-      "sha256": "7cab2d151065db13b31594c3977fce00a091ed69d0ce8448ec1a22177b830dcc",
+      "sha256": "bf9cde3030708c2e33df280cc4bf80c1f32ec2fd0f2cd6f1430a13b284953b41",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:hdr:avif:preserve:preserve:contain",
       "codec_status": "tested and failed",
@@ -1393,7 +1497,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.avif",
-          "FileSize": 6930,
+          "FileSize": 5790,
           "FilePermissions": 100644,
           "FileType": "MP4",
           "FileTypeExtension": "MP4",
@@ -1455,11 +1559,11 @@
           "GraphicsMode": 0,
           "OpColor": "0 0 0",
           "OtherFormat": "av01",
-          "MediaDataSize": 5123,
+          "MediaDataSize": 3983,
           "MediaDataOffset": 1807,
           "ImageSize": "57 38",
           "Megapixels": 0.002166,
-          "AvgBitrate": 13661
+          "AvgBitrate": 10621
         },
         "width": 57,
         "height": 38,
@@ -1468,13 +1572,13 @@
         "transfer": 16,
         "matrix": 0,
         "alpha": "Not",
-        "sha256": "7cab2d151065db13b31594c3977fce00a091ed69d0ce8448ec1a22177b830dcc"
+        "sha256": "bf9cde3030708c2e33df280cc4bf80c1f32ec2fd0f2cd6f1430a13b284953b41"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "animated-pq-alpha-sdr-avif-srgb-preserve-contain.avif",
-      "sha256": "7954ea08c74dc32995e706a06714326e743329d16b214b66d7cfa314d4548d35",
+      "sha256": "5905677d1afa76b02ece6def955465bd2ec22c06e1c82562d2fe385e571014b8",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:sdr:avif:srgb:preserve:contain",
       "codec_status": "tested and failed",
@@ -1484,7 +1588,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.avif",
-          "FileSize": 5143,
+          "FileSize": 4918,
           "FilePermissions": 100644,
           "FileType": "MP4",
           "FileTypeExtension": "MP4",
@@ -1546,11 +1650,11 @@
           "GraphicsMode": 0,
           "OpColor": "0 0 0",
           "OtherFormat": "av01",
-          "MediaDataSize": 3336,
+          "MediaDataSize": 3111,
           "MediaDataOffset": 1807,
           "ImageSize": "57 38",
           "Megapixels": 0.002166,
-          "AvgBitrate": 8896
+          "AvgBitrate": 8296
         },
         "width": 57,
         "height": 38,
@@ -1559,13 +1663,13 @@
         "transfer": 13,
         "matrix": 0,
         "alpha": "Not",
-        "sha256": "7954ea08c74dc32995e706a06714326e743329d16b214b66d7cfa314d4548d35"
+        "sha256": "5905677d1afa76b02ece6def955465bd2ec22c06e1c82562d2fe385e571014b8"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "animated-pq-alpha-hdr-avif-preserve-static-contain.avif",
-      "sha256": "fa2b905009e9bb27f66b25631ef07350d401695a727650893e9a07bb1ebb985c",
+      "sha256": "2729b282141473ffeaaf50c25bcbc8cc5d41ac9e629b465e73ca8cf6a55121e1",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:hdr:avif:preserve:static:contain",
       "codec_status": "tested and failed",
@@ -1575,7 +1679,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.avif",
-          "FileSize": 2847,
+          "FileSize": 2475,
           "FilePermissions": 100644,
           "FileType": "AVIF",
           "FileTypeExtension": "AVIF",
@@ -1603,7 +1707,7 @@
           "MatrixCoefficients": 0,
           "VideoFullRangeFlag": 1,
           "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
-          "MediaDataSize": 2417,
+          "MediaDataSize": 2045,
           "MediaDataOffset": 430,
           "ImageSize": "57 38",
           "Megapixels": 0.002166
@@ -1615,13 +1719,13 @@
         "transfer": 16,
         "matrix": 0,
         "alpha": "Not",
-        "sha256": "fa2b905009e9bb27f66b25631ef07350d401695a727650893e9a07bb1ebb985c"
+        "sha256": "2729b282141473ffeaaf50c25bcbc8cc5d41ac9e629b465e73ca8cf6a55121e1"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "animated-pq-alpha-sdr-webp-srgb-preserve-contain.webp",
-      "sha256": "f77687e1ab9744948c661602623befd5dace818f603bef7fce65eedbbabf9485",
+      "sha256": "8e8d1ceff42647bec92e483f66a7457121daa23ab8919250835e98051a6f07ec",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:sdr:webp:srgb:preserve:contain",
       "codec_status": "tested and failed",
@@ -1630,7 +1734,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.webp",
-          "FileSize": 1476,
+          "FileSize": 1442,
           "FilePermissions": 100644,
           "FileType": "Extended WEBP",
           "FileTypeExtension": "WEBP",
@@ -1670,7 +1774,7 @@
           "ImageSize": "57 38",
           "Megapixels": 0.002166
         },
-        "sha256": "f77687e1ab9744948c661602623befd5dace818f603bef7fce65eedbbabf9485",
+        "sha256": "8e8d1ceff42647bec92e483f66a7457121daa23ab8919250835e98051a6f07ec",
         "durations_ms": [
           300,
           700
@@ -1681,7 +1785,7 @@
     },
     {
       "file": "animated-pq-alpha-sdr-jpg-srgb-static-identity.jpg",
-      "sha256": "b0bef6a2bb49eb0808a713669d046e63d74adaf886fd84c5064cd7691e6e94e7",
+      "sha256": "64ca4d508110f98d9ce4df60875b0eabf8f7770c3b37440a7c6bea64a1acbfe4",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:sdr:jpg:srgb:static:identity",
       "codec_status": "tested and failed",
@@ -1690,12 +1794,37 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.jpg",
-          "FileSize": 502,
+          "FileSize": 1753,
           "FilePermissions": 100644,
           "FileType": "JPEG",
           "FileTypeExtension": "JPG",
           "MIMEType": "image/jpeg",
-          "Comment": "Lavc62.28.102",
+          "ProfileCMMType": "lcms",
+          "ProfileVersion": 1056,
+          "ProfileClass": "mntr",
+          "ColorSpaceData": "RGB ",
+          "ProfileConnectionSpace": "XYZ ",
+          "ProfileDateTime": "2018:03:20 09:14:29",
+          "ProfileFileSignature": "acsp",
+          "PrimaryPlatform": "MSFT",
+          "CMMFlags": 0,
+          "DeviceManufacturer": "saws",
+          "DeviceModel": "ctrl",
+          "DeviceAttributes": "0 0",
+          "RenderingIntent": 0,
+          "ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ProfileCreator": "hand",
+          "ProfileID": "121 233 191 86 90 62 1 182 131 35 133 85 70 247 79 170",
+          "ProfileDescription": "sRGB",
+          "ProfileCopyright": "CC0",
+          "MediaWhitePoint": "0.9642 1 0.82491",
+          "ChromaticAdaptation": "1.04784 0.0229 -0.0502 0.02954 0.99051 -0.01707 -0.00925 0.01508 0.75172",
+          "RedMatrixColumn": "0.43604 0.22244 0.0139",
+          "GreenMatrixColumn": "0.3851 0.71693 0.09708",
+          "BlueMatrixColumn": "0.14307 0.06062 0.71393",
+          "RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
           "ImageWidth": 96,
           "ImageHeight": 64,
           "EncodingProcess": 0,
@@ -1705,13 +1834,13 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "b0bef6a2bb49eb0808a713669d046e63d74adaf886fd84c5064cd7691e6e94e7"
+        "sha256": "64ca4d508110f98d9ce4df60875b0eabf8f7770c3b37440a7c6bea64a1acbfe4"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "animated-pq-alpha-sdr-png-srgb-static-identity.png",
-      "sha256": "402bd90439cc7400ba51830953c9fa892cfddd53a8261b39194088a07d570030",
+      "sha256": "dc55660b10bc7b1046deb70b75e4b4994199fdc47cf3aae9d636d34d9aa8e717",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:sdr:png:srgb:static:identity",
       "codec_status": "tested and failed",
@@ -1720,7 +1849,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.png",
-          "FileSize": 1474,
+          "FileSize": 1071,
           "FilePermissions": 100644,
           "FileType": "PNG",
           "FileTypeExtension": "PNG",
@@ -1748,13 +1877,13 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "402bd90439cc7400ba51830953c9fa892cfddd53a8261b39194088a07d570030"
+        "sha256": "dc55660b10bc7b1046deb70b75e4b4994199fdc47cf3aae9d636d34d9aa8e717"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "animated-pq-alpha-sdr-webp-srgb-static-identity.webp",
-      "sha256": "ccae18af145264336a1d19ba5693a4480825b1f144c2d3c252adf62fb2b8fe62",
+      "sha256": "30a53e61486488fd7a1293b466cdd87bafbb040733a7efe9cb519bd232c31ba6",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:sdr:webp:srgb:static:identity",
       "codec_status": "tested and failed",
@@ -1763,24 +1892,51 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.webp",
-          "FileSize": 250,
+          "FileSize": 704,
           "FilePermissions": 100644,
-          "FileType": "WEBP (lossless)",
+          "FileType": "Extended WEBP (lossless)",
           "FileTypeExtension": "WEBP",
           "MIMEType": "image/webp",
+          "WebP_Flags": 48,
           "ImageWidth": 96,
           "ImageHeight": 64,
+          "ProfileCMMType": "lcms",
+          "ProfileVersion": 1056,
+          "ProfileClass": "mntr",
+          "ColorSpaceData": "RGB ",
+          "ProfileConnectionSpace": "XYZ ",
+          "ProfileDateTime": "2018:03:20 09:14:29",
+          "ProfileFileSignature": "acsp",
+          "PrimaryPlatform": "MSFT",
+          "CMMFlags": 0,
+          "DeviceManufacturer": "saws",
+          "DeviceModel": "ctrl",
+          "DeviceAttributes": "0 0",
+          "RenderingIntent": 0,
+          "ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ProfileCreator": "hand",
+          "ProfileID": "121 233 191 86 90 62 1 182 131 35 133 85 70 247 79 170",
+          "ProfileDescription": "sRGB",
+          "ProfileCopyright": "CC0",
+          "MediaWhitePoint": "0.9642 1 0.82491",
+          "ChromaticAdaptation": "1.04784 0.0229 -0.0502 0.02954 0.99051 -0.01707 -0.00925 0.01508 0.75172",
+          "RedMatrixColumn": "0.43604 0.22244 0.0139",
+          "GreenMatrixColumn": "0.3851 0.71693 0.09708",
+          "BlueMatrixColumn": "0.14307 0.06062 0.71393",
+          "RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
           "AlphaIsUsed": 1,
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "ccae18af145264336a1d19ba5693a4480825b1f144c2d3c252adf62fb2b8fe62"
+        "sha256": "30a53e61486488fd7a1293b466cdd87bafbb040733a7efe9cb519bd232c31ba6"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "animated-pq-alpha-sdr-gif-srgb-static-identity.gif",
-      "sha256": "e409a49a4427393f7f761a168a824bea2c16cf35c0f59ea61b37b9d67d5aa6dd",
+      "sha256": "869154ca7c918c3ded9dd48a0bc763e23be7707903f913426f3acb870a0c2d55",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:sdr:gif:srgb:static:identity",
       "codec_status": "tested and failed",
@@ -1789,7 +1945,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.gif",
-          "FileSize": 2332,
+          "FileSize": 1959,
           "FilePermissions": 100644,
           "FileType": "GIF",
           "FileTypeExtension": "GIF",
@@ -1807,22 +1963,22 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "e409a49a4427393f7f761a168a824bea2c16cf35c0f59ea61b37b9d67d5aa6dd"
+        "sha256": "869154ca7c918c3ded9dd48a0bc763e23be7707903f913426f3acb870a0c2d55"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "animated-pq-alpha-hdr-png-preserve-static-identity.png",
-      "sha256": "57a9e6cf5e8f2b4192d8c81423ec9ba111881d7b2742e2a2bc9d4fa12f8ac23d",
+      "sha256": "8d5288535f14d92ce31a79f57eae841c969106c05e50e004df6ed9e4f92cc01d",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:hdr:png:preserve:static:identity",
-      "codec_status": "tested and failed",
+      "codec_status": "qualified",
       "consumer_status": "pending manual review",
       "facts": {
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.png",
-          "FileSize": 1057,
+          "FileSize": 917,
           "FilePermissions": 100644,
           "FileType": "PNG",
           "FileTypeExtension": "PNG",
@@ -1852,13 +2008,13 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "57a9e6cf5e8f2b4192d8c81423ec9ba111881d7b2742e2a2bc9d4fa12f8ac23d"
+        "sha256": "8d5288535f14d92ce31a79f57eae841c969106c05e50e004df6ed9e4f92cc01d"
       },
-      "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+      "warning": null
     },
     {
       "file": "animated-pq-alpha-hdr-webp-preserve-static-identity.webp",
-      "sha256": "fb34aaf795986b70b41faf0687078a1a54136bc6c1f6d19cc29fe932b931edba",
+      "sha256": "599fffad78059eaa9bc2bf15ba97775d5d4538f4f42ec8fb09a137d4f133c541",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:hdr:webp:preserve:static:identity",
       "codec_status": "tested and failed",
@@ -1867,7 +2023,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.webp",
-          "FileSize": 228,
+          "FileSize": 184,
           "FilePermissions": 100644,
           "FileType": "WEBP (lossless)",
           "FileTypeExtension": "WEBP",
@@ -1878,13 +2034,13 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "fb34aaf795986b70b41faf0687078a1a54136bc6c1f6d19cc29fe932b931edba"
+        "sha256": "599fffad78059eaa9bc2bf15ba97775d5d4538f4f42ec8fb09a137d4f133c541"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
     {
       "file": "animated-pq-alpha-hdr-jpg-preserve-static-identity.jpg",
-      "sha256": "4592e745633734346fea3e074e0c72f04d42709287a1d7c5cf6811b60a5ebfa4",
+      "sha256": "ffd039e69744dc4348a627ae5d778fd3b936d65a4a359818fc07e326959c9ba7",
       "role": "Inspected native conversion candidate",
       "case_id": "animated-pq-alpha:hdr:jpg:preserve:static:identity",
       "codec_status": "tested and failed",
@@ -1893,7 +2049,7 @@
         "exiftool": {
           "ExifToolVersion": 13.55,
           "FileName": "output.jpg",
-          "FileSize": 535,
+          "FileSize": 476,
           "FilePermissions": 100644,
           "FileType": "JPEG",
           "FileTypeExtension": "JPG",
@@ -1908,59 +2064,9 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "4592e745633734346fea3e074e0c72f04d42709287a1d7c5cf6811b60a5ebfa4"
+        "sha256": "ffd039e69744dc4348a627ae5d778fd3b936d65a4a359818fc07e326959c9ba7"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
-    },
-    {
-      "file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain.jpg",
-      "sha256": "a507a7f28a912a7a02ceb00cd45106c40274c6ba8c7fe046b8f101694b665ed8",
-      "role": "Inspected native conversion candidate",
-      "case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:contain",
-      "codec_status": "tested and failed",
-      "consumer_status": "pending manual review",
-      "facts": {
-        "sha256": "a507a7f28a912a7a02ceb00cd45106c40274c6ba8c7fe046b8f101694b665ed8",
-        "metadata": {
-          "ExifTool:ExifToolVersion": 13.55,
-          "File:FileType": "JPEG",
-          "File:FileTypeExtension": "JPG",
-          "File:MIMEType": "image/jpeg",
-          "File:ImageWidth": 173,
-          "File:ImageHeight": 130,
-          "File:EncodingProcess": 0,
-          "File:BitsPerSample": 8,
-          "File:ColorComponents": 3,
-          "File:YCbCrSubSampling": "1 1",
-          "Composite:ImageSize": "173 130",
-          "Composite:Megapixels": 0.02249
-        },
-        "frame_count": 1,
-        "opaque": true,
-        "coded_depth": 8,
-        "private_tags": [],
-        "base": {
-          "depth": 8,
-          "width": 173,
-          "height": 130,
-          "components": 3
-        },
-        "gain_map_present": false
-      },
-      "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
-    },
-    {
-      "file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-reference-sdr.png",
-      "sha256": "b58ac4171554daab4ab1736bc37eb041681927999a46369b8b7117e4c0683731",
-      "role": "Independent matched-geometry authored SDR reference",
-      "case_id": null,
-      "codec_status": "source reference, not a conversion qualification",
-      "consumer_status": "pending manual review",
-      "facts": {
-        "reference_sha256": "b58ac4171554daab4ab1736bc37eb041681927999a46369b8b7117e4c0683731",
-        "case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:contain"
-      },
-      "warning": null
     },
     {
       "file": "gainmap-android-xmp-hdr-avif-preserve-preserve-contain.avif",
@@ -2250,6 +2356,7 @@
           "components": 1
         },
         "iso_identifier": true,
+        "map_private_tags": [],
         "android_xmp_properties": {},
         "iso_metadata": {
           "minimum_version": 0,
@@ -2867,6 +2974,148 @@
       "warning": null
     },
     {
+      "file": "gainmap-apple-new-hdr-jpg-preserve-preserve-contain.jpg",
+      "sha256": "8c64de337e6a050ec7b28fa291075b264cfd27eaf5c61996fab1f4923206bebc",
+      "role": "Inspected native conversion candidate",
+      "case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:contain",
+      "codec_status": "tested and failed",
+      "consumer_status": "pending manual review",
+      "facts": {
+        "sha256": "8c64de337e6a050ec7b28fa291075b264cfd27eaf5c61996fab1f4923206bebc",
+        "metadata": {
+          "ExifTool:ExifToolVersion": 13.55,
+          "File:FileType": "JPEG",
+          "File:FileTypeExtension": "JPG",
+          "File:MIMEType": "image/jpeg",
+          "File:ImageWidth": 173,
+          "File:ImageHeight": 231,
+          "File:EncodingProcess": 0,
+          "File:BitsPerSample": 8,
+          "File:ColorComponents": 3,
+          "File:YCbCrSubSampling": "1 1",
+          "XMP-x:XMPToolkit": "Adobe XMP Core 5.1.2",
+          "XMP-hdrgm:Version": 1.0,
+          "XMP-GContainer:DirectoryItemSemantic": [
+            "Primary",
+            "GainMap"
+          ],
+          "XMP-GContainer:DirectoryItemMime": [
+            "image/jpeg",
+            "image/jpeg"
+          ],
+          "XMP-GContainer:DirectoryItemLength": 2656,
+          "ICC-header:ProfileCMMType": "appl",
+          "ICC-header:ProfileVersion": 1024,
+          "ICC-header:ProfileClass": "mntr",
+          "ICC-header:ColorSpaceData": "RGB ",
+          "ICC-header:ProfileConnectionSpace": "XYZ ",
+          "ICC-header:ProfileDateTime": "2022:01:01 00:00:00",
+          "ICC-header:ProfileFileSignature": "acsp",
+          "ICC-header:PrimaryPlatform": "APPL",
+          "ICC-header:CMMFlags": 0,
+          "ICC-header:DeviceManufacturer": "APPL",
+          "ICC-header:DeviceModel": "",
+          "ICC-header:DeviceAttributes": "0 0",
+          "ICC-header:RenderingIntent": 0,
+          "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ICC-header:ProfileCreator": "appl",
+          "ICC-header:ProfileID": "236 253 163 142 56 133 71 195 109 180 189 79 122 218 24 47",
+          "ICC_Profile:ProfileDescription": "Display P3",
+          "ICC_Profile:ProfileCopyright": "Copyright Apple Inc., 2022",
+          "ICC_Profile:MediaWhitePoint": "0.96419 1 0.82489",
+          "ICC_Profile:RedMatrixColumn": "0.51512 0.2412 -0.00105",
+          "ICC_Profile:GreenMatrixColumn": "0.29198 0.69225 0.04189",
+          "ICC_Profile:BlueMatrixColumn": "0.1571 0.06657 0.78407",
+          "ICC_Profile:RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "ICC_Profile:ChromaticAdaptation": "1.04788 0.02292 -0.0502 0.02959 0.99048 -0.01706 -0.00923 0.01508 0.75168",
+          "ICC_Profile:BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "ICC_Profile:GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "APP2:UniformResourceName": "urn:iso:std:iso:ts:21496:-1",
+          "MPF0:MPFVersion": "0100",
+          "MPF0:NumberOfImages": 2,
+          "MPImage1:MPImageFlags": 0,
+          "MPImage1:MPImageFormat": 0,
+          "MPImage1:MPImageType": 196608,
+          "MPImage1:MPImageLength": 16064,
+          "MPImage1:MPImageStart": 0,
+          "MPImage1:DependentImage1EntryNumber": 0,
+          "MPImage1:DependentImage2EntryNumber": 0,
+          "MPImage2:MPImageFlags": 0,
+          "MPImage2:MPImageFormat": 0,
+          "MPImage2:MPImageType": 0,
+          "MPImage2:MPImageLength": 2656,
+          "MPImage2:MPImageStart": 16064,
+          "MPImage2:DependentImage1EntryNumber": 0,
+          "MPImage2:DependentImage2EntryNumber": 0,
+          "MPImage2:MPImage2": "(Binary data 2656 bytes, use -b option to extract)",
+          "Google:GainMapImage": "(Binary data 2656 bytes, use -b option to extract)",
+          "Composite:ImageSize": "173 231",
+          "Composite:Megapixels": 0.039963
+        },
+        "frame_count": 1,
+        "opaque": true,
+        "coded_depth": 8,
+        "private_tags": [],
+        "base": {
+          "depth": 8,
+          "width": 173,
+          "height": 231,
+          "components": 3
+        },
+        "gain_map_present": true,
+        "map": {
+          "depth": 8,
+          "width": 87,
+          "height": 116,
+          "components": 3
+        },
+        "iso_identifier": true,
+        "map_private_tags": [],
+        "android_xmp_properties": {
+          "XMP-hdrgm:Version": 1.0,
+          "XMP-hdrgm:GainMapMin": 0,
+          "XMP-hdrgm:GainMapMax": 2.1804,
+          "XMP-hdrgm:Gamma": 1,
+          "XMP-hdrgm:OffsetSDR": 0,
+          "XMP-hdrgm:OffsetHDR": 0,
+          "XMP-hdrgm:HDRCapacityMin": 0,
+          "XMP-hdrgm:HDRCapacityMax": 2.1804,
+          "XMP-hdrgm:BaseRenditionIsHDR": false
+        },
+        "iso_metadata": {
+          "minimum_version": 0,
+          "writer_version": 0,
+          "use_base_colour_space": true,
+          "backward": false,
+          "base_headroom": 0.0,
+          "alternate_headroom": 2.1803970336914062,
+          "channels": [
+            {
+              "minimum": 0.0,
+              "maximum": 2.1803970336914062,
+              "gamma": 1.0,
+              "base_offset": 0.0,
+              "alternate_offset": 0.0
+            }
+          ]
+        }
+      },
+      "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+    },
+    {
+      "file": "gainmap-apple-new-hdr-jpg-preserve-preserve-contain-reference-sdr.png",
+      "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
+      "role": "Independent matched-geometry authored SDR reference",
+      "case_id": null,
+      "codec_status": "source reference, not a conversion qualification",
+      "consumer_status": "pending manual review",
+      "facts": {
+        "reference_sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
+        "case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:contain"
+      },
+      "warning": null
+    },
+    {
       "file": "gainmap-apple-new-hdr-avif-preserve-preserve-contain.avif",
       "sha256": "71c6128f6ba7b91f636ff26c5a5642289b7e6e4de307f5511f3cc8939a6a7aab",
       "role": "Inspected native conversion candidate",
@@ -3234,6 +3483,7 @@
           "components": 1
         },
         "iso_identifier": true,
+        "map_private_tags": [],
         "android_xmp_properties": {},
         "iso_metadata": {
           "minimum_version": 0,
@@ -3409,13 +3659,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-jpg-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "55c902345fdc5be44c4214790b125b5fade07ac1cc9654bd185f034d207836ae",
+      "sha256": "68f21c779542ae5ade331ac3b708b5092714642349da24fe5de776745797dce7",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "55c902345fdc5be44c4214790b125b5fade07ac1cc9654bd185f034d207836ae",
+        "reference_sha256": "68f21c779542ae5ade331ac3b708b5092714642349da24fe5de776745797dce7",
         "case_id": "gainmap-apple-new:sdr:jpg:srgb:preserve:contain"
       },
       "warning": null
@@ -3573,13 +3823,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-avif-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "e8bc7050ed152b58e72ee9413b7904d81de1c015732e3f182f5574eeeca48ad3",
+      "sha256": "c843a865c52f90ae61e720759e611e0913ad90519a9f3b7c33808e9704034e9e",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "e8bc7050ed152b58e72ee9413b7904d81de1c015732e3f182f5574eeeca48ad3",
+        "reference_sha256": "c843a865c52f90ae61e720759e611e0913ad90519a9f3b7c33808e9704034e9e",
         "case_id": "gainmap-apple-new:sdr:avif:srgb:preserve:contain"
       },
       "warning": null
@@ -3721,13 +3971,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-png-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "49a3ec8008dc47f2837176b17ab9418766ce3c80a123814f3814cce5aaaab437",
+      "sha256": "c843a865c52f90ae61e720759e611e0913ad90519a9f3b7c33808e9704034e9e",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "49a3ec8008dc47f2837176b17ab9418766ce3c80a123814f3814cce5aaaab437",
+        "reference_sha256": "c843a865c52f90ae61e720759e611e0913ad90519a9f3b7c33808e9704034e9e",
         "case_id": "gainmap-apple-new:sdr:png:srgb:preserve:contain"
       },
       "warning": null
@@ -3855,13 +4105,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-webp-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "49a3ec8008dc47f2837176b17ab9418766ce3c80a123814f3814cce5aaaab437",
+      "sha256": "0c3a898299f252166897539508c4657f6ba41e95eb7eefdca49abf8a0008db16",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "49a3ec8008dc47f2837176b17ab9418766ce3c80a123814f3814cce5aaaab437",
+        "reference_sha256": "0c3a898299f252166897539508c4657f6ba41e95eb7eefdca49abf8a0008db16",
         "case_id": "gainmap-apple-new:sdr:webp:srgb:preserve:contain"
       },
       "warning": null
@@ -3945,13 +4195,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-gif-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "49a3ec8008dc47f2837176b17ab9418766ce3c80a123814f3814cce5aaaab437",
+      "sha256": "0c3a898299f252166897539508c4657f6ba41e95eb7eefdca49abf8a0008db16",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "49a3ec8008dc47f2837176b17ab9418766ce3c80a123814f3814cce5aaaab437",
+        "reference_sha256": "0c3a898299f252166897539508c4657f6ba41e95eb7eefdca49abf8a0008db16",
         "case_id": "gainmap-apple-new:sdr:gif:srgb:preserve:contain"
       },
       "warning": null
@@ -4056,6 +4306,7 @@
           "components": 1
         },
         "iso_identifier": true,
+        "map_private_tags": [],
         "android_xmp_properties": {},
         "iso_metadata": {
           "minimum_version": 0,
@@ -4177,6 +4428,7 @@
           "components": 1
         },
         "iso_identifier": true,
+        "map_private_tags": [],
         "android_xmp_properties": {},
         "iso_metadata": {
           "minimum_version": 0,

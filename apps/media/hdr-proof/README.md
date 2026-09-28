@@ -19,3 +19,19 @@ The complete run replaces the generated report and measurement files under `resu
 Changes to fixtures require an intentional `--update-fixture-lock` run and review of the changed source hashes. Dependency changes require new lock files and native qualification. The suite never downloads a floating fixture or silently refreshes an expected hash during normal execution. `fixtures/generated-sha256.json` covers generated AVIF and selector inputs; the committed JPEG fixture manifest and fixture tests cover the camera corpus and regenerated ISO representation.
 
 The Python color equations and request oracle exist only in this proof. FFmpeg/libplacebo, Sharp/libvips/libultrahdr, and libavif/AOM perform the native candidate conversions. dav1d, ExifTool, Pillow/libjpeg, a small reader linked to libpng, and the independent gain-map reader check the bytes. Their precise limitations are recorded in every affected case. Unit tests of the proof-side request oracle do not claim production endpoint behavior. Media's existing dependency versions, source admission, UI, migrations, generation policy and caching are unchanged.
+
+The proof image includes explicitly pinned experimental native patches. Apple
+retained-map experiments isolate libultrahdr PR484 and PR491 separately and
+together; the final candidate uses both. A local libavif sequence-writing patch
+fixes animated orientation serialization. These patches do not upgrade Media's
+production dependencies. Their source, patch, recipe and binary hashes are
+recorded by the build and [native version evidence](results/native-versions.json).
+
+The SDR candidate's [independent reference](sdr_reference.py) declares its tone
+curve and relative-colorimetric gamut clipping. Out-of-gamut saturation detail
+can be lost; this is a deliberate mapping choice to evaluate during physical
+review. The [native candidate](sdr_candidate.py) implements the conversion using
+FFmpeg, separately from that reference. Identity tone controls must pass, and
+every encoded derivative must also pass full appearance, signaling and privacy
+checks. Eight-bit output failures remain recorded even when a higher-precision
+PNG passes. No existing acceptance thresholds were relaxed.

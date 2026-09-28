@@ -12,13 +12,6 @@ export default defineBaseConfig({
     maxConcurrency: 1,
     maxWorkers: 1,
     fileParallelism: false,
-    poolOptions: {
-      threads: {
-        singleThread: false,
-        maxThreads: 5,
-        minThreads: 2,
-      },
-    },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

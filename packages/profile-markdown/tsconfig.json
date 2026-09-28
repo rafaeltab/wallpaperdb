@@ -20,7 +20,7 @@
     "noFallthroughCasesInSwitch": true,
     "composite": true,
     "allowImportingTsExtensions": true,
-    "types": ["vitest/globals"],
+    "types": ["node", "vitest/globals"],
     "erasableSyntaxOnly": true
   },
   "include": ["src/**/*", "test/**/*"],

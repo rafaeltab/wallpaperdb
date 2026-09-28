@@ -1,4 +1,4 @@
-FROM node:22-bookworm
+FROM node:22.22.3-bookworm
 
 # Install system dependencies, GitHub CLI, Docker CLI, and Make.
 RUN apt-get update && apt-get install -y \

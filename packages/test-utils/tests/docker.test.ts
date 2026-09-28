@@ -6,6 +6,7 @@ const docker = new Docker();
 
 describe.skip(
     "DockerTesterBuilder",
+    { concurrent: true },
     () => {
         it("should start a network when needed", async () => {
             const Tester = createDefaultTesterBuilder()
@@ -95,5 +96,4 @@ describe.skip(
             await tester.destroy();
         });
     },
-    { concurrent: true },
 );

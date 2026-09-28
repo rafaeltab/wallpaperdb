@@ -10,13 +10,7 @@ export default defineBaseConfig({
     hookTimeout: 60000,
     // Enable parallel test execution within files
     maxConcurrency: 5, // Run up to 5 tests in parallel per file
-    poolOptions: {
-      threads: {
-        singleThread: false,
-        maxThreads: 5,
-        minThreads: 2,
-      },
-    },
+    maxWorkers: 5,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

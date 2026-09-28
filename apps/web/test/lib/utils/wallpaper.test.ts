@@ -258,8 +258,8 @@ describe('wallpaper utilities', () => {
       match: ReturnType<typeof vi.fn>;
       put: ReturnType<typeof vi.fn>;
     };
-    let mockFetch: ReturnType<typeof vi.fn>;
-    let mockCreateElement: ReturnType<typeof vi.fn>;
+    let mockFetch: ReturnType<typeof vi.fn<typeof fetch>>;
+    let mockCreateElement: ReturnType<typeof vi.fn<typeof document.createElement>>;
     let mockLink: {
       href: string;
       download: string;
@@ -284,13 +284,13 @@ describe('wallpaper utilities', () => {
         put: vi.fn(() => Promise.resolve()),
       };
 
-      vi.spyOn(global.caches, 'open').mockResolvedValue(
+      vi.spyOn(globalThis.caches, 'open').mockResolvedValue(
         mockCache as unknown as Cache,
       );
 
       // Mock fetch
       mockFetch = vi.fn();
-      global.fetch = mockFetch;
+      globalThis.fetch = mockFetch;
 
       // Mock createElement for download link
       mockLink = {
@@ -302,7 +302,7 @@ describe('wallpaper utilities', () => {
 
       mockCreateElement = vi.fn((tag: string) => {
         if (tag === 'a') {
-          return mockLink;
+          return mockLink as unknown as HTMLElement;
         }
         return document.createElement(tag);
       });
@@ -440,7 +440,7 @@ describe('wallpaper utilities', () => {
 
     describe('Cache API Unavailable', () => {
       beforeEach(() => {
-        vi.spyOn(global.caches, 'open').mockRejectedValueOnce(
+        vi.spyOn(globalThis.caches, 'open').mockRejectedValueOnce(
           new Error('Cache API not available'),
         );
       });
@@ -489,11 +489,7 @@ describe('wallpaper utilities', () => {
 
       it('handles fetch returning non-ok response', async () => {
         mockCache.match.mockResolvedValueOnce(undefined);
-        mockFetch.mockResolvedValueOnce({
-          ok: false,
-          status: 404,
-          statusText: 'Not Found',
-        });
+        mockFetch.mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }));
 
         await expect(downloadVariant(mockVariant)).rejects.toThrow();
       });

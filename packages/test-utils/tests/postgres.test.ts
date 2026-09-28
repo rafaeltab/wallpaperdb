@@ -11,6 +11,7 @@ const docker = new Docker();
 
 describe(
     "PostgresTesterBuilder",
+    { concurrent: true },
     () => {
         it("should create a container", async () => {
             const Tester = createDefaultTesterBuilder()
@@ -290,5 +291,4 @@ ORDER BY schemaname, tablename;`);
             await tester2.destroy();
         });
     },
-    { concurrent: true },
 );

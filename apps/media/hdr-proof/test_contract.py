@@ -165,6 +165,54 @@ class DiagnosticTests(unittest.TestCase):
         self.assertTrue(report["evidence_errors"])
 
 
+class ProductCoverageTests(unittest.TestCase):
+    """Aggregation rules only; these records never stand in for native proof."""
+
+    def sdr_case(self, *, depth, qualified):
+        planned = next(case for case in required_cases() if case['cell_id'] == 'static-avif:sdr:avif')
+        checks = {key: True for key in ('native_encoder', 'independent_decoder', 'structure', 'appearance', 'privacy')}
+        checks['appearance'] = qualified
+        return {**planned, 'case_id': planned['case_id'] + (f':depth-{depth}' if depth != 8 else ''),
+                'selectors': {**planned['selectors'], 'depth': str(depth)},
+                'status': 'qualified' if qualified else 'tested and failed', 'checks': checks}
+
+    def test_omitted_depth_requirement_accepts_exact_qualified_twelve_bit_evidence(self):
+        failed = self.sdr_case(depth=8, qualified=False)
+        passed = self.sdr_case(depth=12, qualified=True)
+        report = build_matrix([failed, passed])
+        coverage = report['product_coverage']
+        self.assertEqual(coverage['required_count'], 320)
+        self.assertEqual(coverage['qualified_count'], 1)
+        item = next(item for item in coverage['requirements'] if item['coverage_case_id'] == failed['case_id'])
+        self.assertNotIn('depth', item['selectors'])
+        self.assertEqual(item['qualified_evidence'], [passed['case_id']])
+        cell = next(cell for cell in report['cells'] if cell['id'] == failed['cell_id'])
+        self.assertEqual(cell['evidence'][0]['status'], 'tested and failed')
+        self.assertEqual(report['diagnostic_summary']['required_cases']['qualified'], 0)
+        self.assertFalse(cell['advertisable'])
+
+    def test_depth_flexibility_does_not_change_fixture_geometry_or_alpha_promise(self):
+        for change in ({'w': 99}, {'transparency': 'coerce'}, {'motion': 'static'}):
+            evidence = self.sdr_case(depth=12, qualified=True)
+            evidence['selectors'].update(change)
+            report = build_matrix([evidence])
+            self.assertEqual(report['product_coverage']['qualified_count'], 0)
+
+    def test_webp_requirement_retains_eight_bit_depth_and_full_alpha(self):
+        report = build_matrix([])
+        webp = [item for item in report['product_coverage']['requirements'] if item['cell_id'] == 'animated-pq:sdr:webp']
+        self.assertEqual(len(webp), 5)
+        self.assertTrue(all(item['selectors']['depth'] == '8' for item in webp))
+        self.assertTrue(all(item['selectors']['transparency'] == 'preserve' for item in webp))
+
+    def test_incomplete_native_evidence_cannot_fulfill_omitted_depth_requirement(self):
+        evidence = self.sdr_case(depth=12, qualified=True)
+        evidence['checks']['independent_decoder'] = False
+        report = build_matrix([evidence])
+        self.assertEqual(report['product_coverage']['qualified_count'], 0)
+        self.assertTrue(report['evidence_errors'])
+
+
 class ProofRequestTests(unittest.TestCase):
     def reject(self, selectors, status, facts=FACTS):
         with self.assertRaises(ProofRequestError) as caught:

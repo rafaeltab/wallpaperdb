@@ -36,9 +36,19 @@ every encoded derivative must also pass full appearance, signaling and privacy
 checks. Eight-bit output failures remain recorded even when a higher-precision
 PNG passes. No existing acceptance thresholds were relaxed.
 
-Optional SDR AVIF `depth=12` cases have distinct selector tuples and case IDs.
+Additional SDR AVIF `depth=12` cases have distinct selector tuples and case IDs.
 They retain the predeclared `sdr-8` color and luminance limits as a minimum
 fidelity requirement; higher coded precision does not relax appearance or tone
-thresholds. Every required `depth=8` case remains in the original coverage plan.
-A passing 12-bit neighbor cannot qualify a failed required tuple or its whole
-ledger cell.
+thresholds. Every explicit `depth=8` case remains in the original fixed coverage
+plan, including its failures. That plan's eight-bit SDR AVIF choice was a proof
+choice, not a product requirement. The accepted contract permits a suitable
+supported depth when depth is omitted.
+
+The matrix separately records `product_coverage`, matching product requests to
+qualified exact fixture/geometry/selector evidence. An omitted-depth SDR AVIF
+request can use a qualified 12-bit candidate; a failed explicit eight-bit request
+stays failed. WebP retains its eight-bit constraint. Schema version 2 preserves
+the legacy `required_case_count` and `diagnostic_summary.required_cases` fields
+as the original fixed 320-case coverage plan for comparison. Product milestones
+use `product_coverage`; physical browser, viewer and wallpaper checks remain
+pending. This is proof accounting, not a runtime depth-selection policy.

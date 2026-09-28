@@ -85,7 +85,10 @@ def ledger_cells():
                 selectors = {"range": dynamic_range, "gamut": "preserve", "depth": "preserve", "motion": "preserve", "transparency": "preserve"}
                 if dynamic_range == "sdr" and source in {"static-avif", "animated-pq"} and output in {"avif", "webp"}:
                     selectors["gamut"] = "srgb"
-                    selectors["depth"] = "8"
+                    if output == "webp":
+                        selectors["depth"] = "8"
+                    else:
+                        selectors.pop("depth")
                 cells.append({
                     "id": f"{source}:{dynamic_range}:{output}", "source_id": source,
                     "source": label, "range": dynamic_range, "output": output,
@@ -101,7 +104,11 @@ def ledger_cells():
 
 
 def required_cases():
-    """Finite minimum coverage plan; extra observed tuples never erase its gaps."""
+    """Legacy fixed coverage plan; its SDR AVIF depth-8 choice is not product policy.
+
+    Keep these exact cases so additional candidates never erase their failures.
+    Product requirements are evaluated separately with omitted-depth semantics.
+    """
     cases = []
 
     def add(fixture, source, dynamic_range, output, gamut, depth="preserve", motion="preserve", transparency="preserve"):
@@ -210,6 +217,62 @@ def _diagnostic_summary(cells, plan):
     }
 
 
+def _product_coverage(cells, plan):
+    """Match accepted product requests to independently qualified exact tuples."""
+    by_cell = {cell['id']: cell for cell in cells}
+    requirements = []
+    for planned in plan:
+        selectors = dict(planned['selectors'])
+        selectable_depth = planned['cell_id'] in ('static-avif:sdr:avif', 'animated-pq:sdr:avif')
+        if selectable_depth:
+            selectors.pop('depth')
+        expected = validate_selectors(selectors)
+        matching = []
+        for evidence in by_cell[planned['cell_id']]['evidence']:
+            if evidence.get('fixture_id') != planned['fixture_id']:
+                continue
+            try:
+                actual = validate_selectors(evidence.get('selectors', {}))
+            except ProofRequestError:
+                continue
+            if selectable_depth:
+                if actual['depth'] not in ('8', '10', '12'):
+                    continue
+                actual['depth'] = 'auto'
+            if actual == expected and evidence['status'] in ('qualified', 'tested and failed'):
+                matching.append(evidence)
+        qualified = sorted({item['case_id'] for item in matching
+                            if item['status'] == 'qualified' and not item.get('blockers')})
+        requirements.append({
+            'requirement_id': 'product:' + planned['case_id'],
+            'coverage_case_id': planned['case_id'], 'cell_id': planned['cell_id'],
+            'fixture_id': planned['fixture_id'], 'geometry': planned['geometry'],
+            'selectors': selectors,
+            'depth_policy': 'Omitted depth permits a qualified supported AVIF depth.' if selectable_depth else 'Exact requested depth promise.',
+            'status': 'qualified' if qualified else 'tested and failed' if matching else 'untested',
+            'qualified_evidence': qualified,
+            'tested_evidence': sorted({item['case_id'] for item in matching}),
+        })
+    rows = []
+    for cell in cells:
+        selected = [item for item in requirements if item['cell_id'] == cell['id']]
+        if not selected:
+            continue
+        row = {'cell_id': cell['id'], 'required_count': len(selected),
+               'qualified_count': sum(item['status'] == 'qualified' for item in selected),
+               'untested_count': sum(item['status'] == 'untested' for item in selected)}
+        row['codec_complete'] = row['qualified_count'] == row['required_count']
+        cell['product_coverage'] = row
+        rows.append(row)
+    return {
+        'scope': 'Accepted product requests across the declared fixture/geometry plan. Numeric-depth failures remain separate exact-case evidence. This does not implement runtime depth selection or qualify physical consumers.',
+        'required_count': len(requirements),
+        'qualified_count': sum(item['status'] == 'qualified' for item in requirements),
+        'untested_count': sum(item['status'] == 'untested' for item in requirements),
+        'requirements': requirements, 'cells': rows,
+    }
+
+
 def build_matrix(evidence):
     """Aggregate evidence fail-closed; successful encoding alone cannot qualify."""
     cells = ledger_cells()
@@ -266,14 +329,17 @@ def build_matrix(evidence):
         # Physical consumer proof is a separate required gate. This suite never
         # turns file-only evidence into a production capability advertisement.
         cell["advertisable"] = False
+    product_coverage = _product_coverage(cells, plan)
     return {
-        "schema_version": 1, "scope": "Automated codec proof only; no production capability publication or physical-display certification.",
+        "schema_version": 2, "scope": "Automated codec proof only; no production capability publication or physical-display certification.",
         "ledger_cell_count": 85, "generic_sdr_control_count": 5,
         "statuses": list(STATUSES), "cells": cells,
         "required_case_count": len(plan), "evidence_errors": errors,
+        "coverage_plan_scope": "required_case_count and diagnostic_summary.required_cases retain the original fixed 320-case suite plan. Product requirements use product_coverage; SDR AVIF output depth was not mandated as 8 by the accepted contract.",
         "diagnostic_summary": _diagnostic_summary(cells, plan),
+        "product_coverage": product_coverage,
         "milestone_qualified": False,
-        "milestone_blockers": ["Physical browser/native viewer/OS wallpaper checks remain pending manual review."] + [cell["id"] for cell in cells if cell["required"] and cell["status"] != "qualified"],
+        "milestone_blockers": ["Physical browser/native viewer/OS wallpaper checks remain pending manual review."] + [row['cell_id'] for row in product_coverage['cells'] if not row['codec_complete']],
         "policy_sources": [
             "https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153",
             "https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5870519681",

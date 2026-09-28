@@ -135,15 +135,28 @@ def diagnostic_report(matrix):
     all_cases = summary['all_cases']
     lines = [
         '## Failure stages', '',
-        f'Of {summary["required_plan_size"]} planned required cases, {required["cases"]} have exact fixture/selector evidence and {required["qualified"]} qualify. Native encoding completed in {required["native_completed"]}; {required["native_operation_failures"]} stopped at a native operation. A native failure can occur while preparing an input fixture, before the final encoder is reached.', '',
+        f'Of {summary["required_plan_size"]} original fixed-plan cases, {required["cases"]} have exact fixture/selector evidence and {required["qualified"]} qualify. This plan chose eight-bit SDR AVIF; that choice is not a product requirement when depth is omitted. Native encoding completed in {required["native_completed"]}; {required["native_operation_failures"]} stopped at a native operation. A native failure can occur while preparing an input fixture, before the final encoder is reached.', '',
         f'Across all recorded cases, {all_cases["measured_failure_cases"]} have measured check failures and {all_cases["missing_evidence_cases"]} lack required evidence. These counts overlap. A missing ordinary-white patch after cropping or an unavailable independent gamut reference is an evidence gap, not a measured change to those pixels.', '',
         'False downstream flags on a failed native operation are unevaluated. They do not establish additional appearance, decoder, or metadata privacy failures. Successful encoding also does not establish qualification. The original status enums and required passing criteria remain unchanged.', '',
-        '| Required path | Planned | Observed | Native completed | Native failure | Measured failure | Missing evidence | Qualified |',
+        '| Fixed coverage path | Planned | Observed | Native completed | Native failure | Measured failure | Missing evidence | Qualified |',
         '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
     ]
     for row in summary['required_cells']:
         lines.append(f'| `{row["cell_id"]}` | {row["planned_cases"]} | {row["cases"]} | {row["native_completed"]} | {row["native_operation_failures"]} | {row["measured_failure_cases"]} | {row["missing_evidence_cases"]} | {row["qualified"]} |')
     lines += ['', 'Measured failures and evidence gaps count cases once per column, even when several frames fail. Per-check counts and case diagnostics are in [the matrix](conversion-matrix.json); raw measurements and native errors remain in [measurements](measurements.json).', '']
+    return lines
+
+
+def product_coverage_report(matrix):
+    coverage = matrix['product_coverage']
+    lines = ['## Accepted product coverage', '',
+             f'{coverage["qualified_count"]} of {coverage["required_count"]} declared product fixture/geometry requirements have qualified codec evidence. {coverage["untested_count"]} have no matching tested tuple.', '',
+             'The accepted contract permits a suitable supported depth when depth is omitted. Required SDR AVIF requests therefore accept exact qualified 8-, 10-, or 12-bit evidence. This does not qualify a failed explicit depth=8 request. WebP retains its eight-bit output constraint. Every other selector, source fixture, geometry, and qualification gate must match. No runtime depth-selection policy is implemented here.', '',
+             '| Required product path | Fixture/geometry requirements | Qualified | Untested |',
+             '| --- | ---: | ---: | ---: |']
+    for row in coverage['cells']:
+        lines.append(f'| `{row["cell_id"]}` | {row["required_count"]} | {row["qualified_count"]} | {row["untested_count"]} |')
+    lines += ['', 'These counts cover the declared corpus only. A ledger cell can retain failed exact-selector candidates while its required product requests have qualified alternatives. Consumer review and a usable SDR wallpaper download remain separate requirements. The original fixed-plan outcomes below remain visible.', '']
     return lines
 
 
@@ -156,7 +169,8 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              'Reproduce from the repository root with `make run PACKAGE=media SCRIPT=proof:hdr`. Docker must support linux/amd64. The default command returns exit 2 while required codec cases or physical checks are unqualified. This is an intentional qualification failure, not a passing release gate.','',
              f'Recorded {len(evidence)} conversion attempts over {len(fixtures)} fixture records: {stages["native_completed"]} completed native encoding, {stages["native_operation_failures"]} stopped at a native operation, and {stages["native_not_established"]} lack a confirmed native outcome. Qualification outcomes: '+', '.join(f'{value} {key}' for key,value in sorted(counts.items()))+'.',
              f'The inventory covers {matrix["ledger_cell_count"]} HDR-ledger cells and {matrix["generic_sdr_control_count"]} labeled SDR controls. Ledger outcomes: '+', '.join(f'{value} {key}' for key,value in sorted(cell_counts.items()))+'.','',
-             f'The finite required plan contains {matrix["required_case_count"]} cases. Unexecuted required cases: {sum(len(cell["missing_cases"]) for cell in matrix["cells"])}. Unlisted cross-products are untested, even when a neighboring case passes.','',
+             f'The original fixed coverage plan contains {matrix["required_case_count"]} cases. Unexecuted fixed-plan cases: {sum(len(cell["missing_cases"]) for cell in matrix["cells"])}. Unlisted cross-products are untested, even when a neighboring case passes.','',
+             *product_coverage_report(matrix),
              *diagnostic_report(matrix),
              '## Environment and reproducibility','',
              'The image uses the same Node 22 Alpine/musl deployment shape as Media. This is a proposed native proof pipeline, not the existing Sharp 0.33 production worker. No service dependency was upgraded. HDR geometry uses native FFmpeg/zimg float processing and luminance-coupled HLG transforms. The calibrated SDR candidate uses the native CPU Mobius filter. CPU lavapipe runs the retained libplacebo comparison trials without a host GPU. Network access is disabled during tests.','',
@@ -172,7 +186,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              'The predeclared [thresholds](../thresholds.json) report BT.2124 Delta E ITP and luminance error separately for shadows, midtones, and highlights. Best-effort SDR additionally requires 203-nit ordinary white near 0.90 sRGB signal, retained shadows/midtones, smooth highlight detail, and an independent chromatic mapping reference. The calibrated candidate uses a fixed Mobius knee of 0.6, a 1.1 exposure factor and 0.99 peak output scale. Its explicit relative-colorimetric gamut mapping clips out-of-gamut sRGB channels after primary conversion; it does not claim perceptual gamut compression. The independent reference derives the shoulder from boundary conditions and converts through D65 XYZ. Identity controls test tone policy before crop, while every encoded derivative is compared at its actual geometry, grouped by source HDR luminance region. Authored JPEG SDR bases bypass automatic HDR tone mapping.','',
              'Read [measurements](measurements.json) for each case, including native failures, facts, region statistics, source/output hashes and artifact paths. Full artifacts remain under `../work/` after a run; selected inspected files are committed under [manual](manual/manifest.json). Failed candidates are diagnostic files, not approved fallbacks.','',
              '## Required and candidate paths','',
-             '| Source family | Range | Output | Policy | Automated status | Missing required cases |',
+             '| Source family | Range | Output | Policy | Exact-case aggregate status | Missing fixed-plan cases |',
              '| --- | --- | --- | --- | --- | ---: |']
     for cell in matrix['cells']:
         if cell['in_hdr_ledger']:
@@ -205,7 +219,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- The pinned Apple fixes remove the retained-layer encoding error and correct new-Apple headroom. Required Apple geometries now encode and independently decode, but regional SDR-base and HDR reconstruction errors still exceed the fixed limits. Resampling the base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. Recomputing a map against the retained authored base remains an untested candidate.',
               '- The retained native JPEG writer now emits independently parsed ISO plus Android metadata. ISO-only source JPEG still lacks a maintained independent reconstruction reader in this environment. The Android element-style XMP fixture is rejected by the native reader; fractional map-coordinate crops also remain rejected. These failures are explicit.',
               '- Same-transfer AVIF geometry now operates in display-linear light with explicit alpha handling. Cover resizing filters the full image before cropping, preserving samples across the crop boundary. Remaining image-edge downscale differences and output quantization still fail some regional appearance/alpha gates. Native zimg clamps the filter at image boundaries; the independent Pillow reference truncates and normalizes there. The animated orientation serialization regression passes.',
-              '- Calibrated static SDR tone/gamut controls pass, and exact SDR PNG cases qualify. Some eight-bit SDR outputs still fail the unchanged near-black Delta E gates: rounding a small positive signal to black can exceed the maximum even when the tone policy passes. Optional 12-bit SDR AVIF tuples retain the same predeclared sdr-8 appearance ceiling and separate case IDs; they cannot replace failed required eight-bit requests. The animated PQ sequence also retains a highlight-gradation blocker.',
+              '- Calibrated static SDR tone/gamut controls pass, and exact SDR PNG cases qualify. Some eight-bit SDR outputs still fail the unchanged near-black Delta E gates: rounding a small positive signal to black can exceed the maximum even when the tone policy passes. Additional 12-bit SDR AVIF tuples retain the same predeclared sdr-8 appearance ceiling and separate case IDs. They can satisfy an omitted-depth product request, but never qualify its failed explicit eight-bit neighbor. The animated PQ sequence also retains a highlight-gradation blocker.',
               '- Animated outputs need exact fully composed frames, unequal durations, repetition count and fractional alpha. Failed animation or alpha cases remain required blockers.',
               '- Unexecuted optional HDR PNG/APNG, HDR WebP, gain-map AVIF and other accepted-source rows remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
               '- These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.',

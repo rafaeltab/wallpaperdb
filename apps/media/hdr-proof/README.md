@@ -35,3 +35,10 @@ FFmpeg, separately from that reference. Identity tone controls must pass, and
 every encoded derivative must also pass full appearance, signaling and privacy
 checks. Eight-bit output failures remain recorded even when a higher-precision
 PNG passes. No existing acceptance thresholds were relaxed.
+
+Optional SDR AVIF `depth=12` cases have distinct selector tuples and case IDs.
+They retain the predeclared `sdr-8` color and luminance limits as a minimum
+fidelity requirement; higher coded precision does not relax appearance or tone
+thresholds. Every required `depth=8` case remains in the original coverage plan.
+A passing 12-bit neighbor cannot qualify a failed required tuple or its whole
+ledger cell.

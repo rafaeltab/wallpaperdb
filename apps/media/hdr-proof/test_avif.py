@@ -139,3 +139,31 @@ class FixtureTests(unittest.TestCase):
                                       reference, authored[0], 'pq', 'rec2020', peak_nits=1000)
             self.assertTrue(control['passed'], control)
             self.assertIn('ordinary_white_signal', control['measurement']['measurements'])
+
+    def test_native_optional_twelve_bit_sdr_keeps_required_eight_bit_failures(self):
+        from avif import run
+        from matrix import build_matrix, required_cases
+        spec = {'id': 'avif-pq-rec2020-10-opaque', 'transfer': 'pq', 'gamut': 'rec2020',
+                'depth': 10, 'alpha': False, 'frames': 1}
+        with tempfile.TemporaryDirectory() as temporary:
+            result = run(temporary, specs=[spec])
+            cases = {case['case_id']: case for case in result['evidence']}
+            self.assertEqual(len(cases), 22)
+            for geometry in ('contain', 'cover', 'fill', 'upscale', 'orientation'):
+                baseline_id = f'{spec["id"]}:sdr:avif:srgb:preserve:{geometry}'
+                baseline, candidate = cases[baseline_id], cases[baseline_id + ':depth-12']
+                self.assertEqual(baseline['selectors']['depth'], '8')
+                self.assertEqual(candidate['selectors']['depth'], '12')
+                self.assertEqual(candidate['facts']['depth'], 12)
+                self.assertEqual(candidate['status'], 'qualified', candidate['blockers'])
+                self.assertNotEqual(baseline['artifacts']['output'], candidate['artifacts']['output'])
+                self.assertTrue(candidate['optional_depth_variant'])
+                self.assertEqual(candidate['measurements']['frames'][0]['fixture_class'], 'sdr-8')
+                self.assertEqual(candidate['appearance_threshold_policy']['coded_depth'], 12)
+            failed_eight = cases[f'{spec["id"]}:sdr:avif:srgb:preserve:contain']
+            self.assertEqual(failed_eight['status'], 'tested and failed')
+            matrix = build_matrix(result['evidence'])
+            self.assertEqual(len(required_cases()), 320)
+            self.assertEqual(matrix['evidence_errors'], [])
+            cell = next(cell for cell in matrix['cells'] if cell['id'] == 'static-avif:sdr:avif')
+            self.assertEqual(cell['status'], 'tested and failed')

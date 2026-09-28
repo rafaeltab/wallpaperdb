@@ -287,13 +287,13 @@ def sdr_tone_control(source, output, reference, authored, transfer, gamut, *, pe
             'scope': 'Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately.'}
 
 
-def run(output_dir):
+def run(output_dir, *, specs=None):
     from appearance import compare_appearance, sdr_signal_to_nits, RGB_TO_XYZ
     from sdr_reference import reference_srgb
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     evidence, fixtures = [], []
-    for spec in fixture_specs():
+    for spec in (fixture_specs() if specs is None else specs):
         folder = output_dir/spec['id']
         source, source_facts, analytic = generate_fixture(spec, folder)
         source_frames = decode_avif(source, folder, spec['frames'])
@@ -323,25 +323,40 @@ def run(output_dir):
             tone_controls.append(control)
         fixtures[-1]['sdr_tone_controls'] = tone_controls
         source_id = 'static-avif' if spec['frames'] == 1 else f'animated-{spec["transfer"]}'
-        operations = [(dynamic_range, 'avif', motion, geometry) for dynamic_range in ('hdr','sdr') for geometry in ('contain','cover','fill','upscale','orientation') for motion in ('preserve',)]
+        operations = [(dynamic_range, 'avif', motion, geometry, None) for dynamic_range in ('hdr','sdr') for geometry in ('contain','cover','fill','upscale','orientation') for motion in ('preserve',)]
         if spec['frames'] == 2:
-            operations += [('hdr', 'avif', 'static', g) for g in ('contain','cover','fill','upscale','orientation')]
-            operations += [('sdr', 'webp', 'preserve', g) for g in ('contain','cover','fill','upscale','orientation')]
+            operations += [('hdr', 'avif', 'static', g, None) for g in ('contain','cover','fill','upscale','orientation')]
+            operations += [('sdr', 'webp', 'preserve', g, None) for g in ('contain','cover','fill','upscale','orientation')]
         # Viable additional encodings on every source-depth/gamut/alpha tuple.
-        operations += [('sdr', ext, 'static' if spec['frames']==2 else 'preserve', 'identity') for ext in ('jpg','png','webp','gif')]
-        operations += [('hdr', ext, 'static' if spec['frames']==2 else 'preserve', 'identity') for ext in ('png','webp','jpg')]
-        for dynamic_range, ext, motion, geometry in operations:
+        operations += [('sdr', ext, 'static' if spec['frames']==2 else 'preserve', 'identity', None) for ext in ('jpg','png','webp','gif')]
+        operations += [('hdr', ext, 'static' if spec['frames']==2 else 'preserve', 'identity', None) for ext in ('png','webp','jpg')]
+        # These explicit selectors add precision alternatives. Original depth-8
+        # requests, case IDs, and failures remain in the required coverage plan.
+        operations += [('sdr', 'avif', 'preserve', g, 12) for g in ('contain','cover','fill','upscale','orientation')]
+        for dynamic_range, ext, motion, geometry, depth_variant in operations:
             sdr = dynamic_range == 'sdr'
             target_gamut = 'srgb' if sdr else spec['gamut']
             target_transfer = 'srgb' if sdr else spec['transfer']
             depth = (8 if sdr else spec['depth']) if ext == 'avif' else (16 if ext == 'png' else 8)
+            if depth_variant is not None:
+                depth = depth_variant
             selector_gamut = 'srgb' if sdr else 'preserve'
             case_id = f'{spec["id"]}:{dynamic_range}:{ext}:{selector_gamut}:{motion}:{geometry}'
-            case_dir = folder/f'{dynamic_range}-{ext}-{motion}-{geometry}'
+            if depth_variant is not None:
+                case_id += f':depth-{depth_variant}'
+            directory_suffix = f'-depth-{depth_variant}' if depth_variant is not None else ''
+            case_dir = folder/f'{dynamic_range}-{ext}-{motion}-{geometry}{directory_suffix}'
             case_dir.mkdir(exist_ok=True)
             selectors = {'format': ext, 'range': dynamic_range, 'gamut': selector_gamut, 'depth': 'preserve' if ext == 'avif' and not sdr else str(depth), 'motion': motion, 'transparency': 'coerce' if ext in ('jpg','gif') and spec['alpha'] else 'preserve'}
             selectors.update({'contain': {'w':58,'h':38,'fit':'contain'}, 'cover': {'w':40,'h':40,'fit':'cover'}, 'fill': {'w':40,'h':48,'fit':'fill'}, 'upscale': {'w':120,'h':80,'fit':'contain'}, 'orientation': {'w':58,'fit':'contain'}, 'identity': {}}[geometry])
             item = {'case_id':case_id, 'fixture_id':spec['id'], 'cell_id':f'{source_id}:{dynamic_range}:{ext}', 'selectors':selectors, 'geometry':geometry, 'status':'tested and failed', 'checks':{k:False for k in ('native_encoder','independent_decoder','structure','appearance','privacy')}, 'blockers':[], 'artifacts':{}, 'measurements':{}}
+            if depth_variant is not None:
+                item['optional_depth_variant'] = True
+                item['appearance_threshold_policy'] = {
+                    'profile': 'sdr-8', 'coded_depth': depth,
+                    'reason': 'Higher coded precision must meet the same predeclared SDR color/luminance ceiling; no appearance or tone-policy threshold is relaxed.',
+                    'required_coverage': 'Additional selector tuple; does not replace any required depth-8 case.',
+                }
             try:
                 count = 1 if motion == 'static' else spec['frames']
                 refs = [geometry_reference(frame, geometry) for frame in reference_source[:count]]
@@ -447,7 +462,7 @@ def encode_other(paths, target, ext, transfer, gamut, refs, count, spec):
     facts = {'exiftool':{k:v for k,v in exif.items() if k not in ('SourceFile','FileModifyDate','FileAccessDate','FileInodeChangeDate','Directory')}, 'sha256':digest(target)}
     # Pillow uses native libjpeg for JPEG, an independent GIF reader and
     # libwebp's decoder. It also exposes fully composed WebP animation frames.
-    # The 16-bit PNG diagnostic remains explicitly unqualified for independence.
+    # PNG samples come from the separate native libpng decoder, preserving 16 bits.
     actual = []
     if ext == 'webp' and count==2:
         with Image.open(target) as image:

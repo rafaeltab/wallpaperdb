@@ -40,20 +40,13 @@ jobs:
       - name: Install turbo
         run: pnpm add -g turbo
 
-      - name: Verify Make command interface
-        run: make test-make
-
       - name: Build, lint, and type-check
-        run: turbo run build lint check-types
-
-      - name: Check Sandcastle runner
-        run: make sandcastle-check-types
+        run: make check
 
       - name: Run unit and integration tests
-        run: turbo run test:unit test:integration --concurrency=1
-
-      - name: Verify object storage configuration
-        run: make storage-infra-test
+        run: |
+          make test-unit
+          make test-integration
 
       - name: Merge coverage reports
         run: pnpm coverage:merge

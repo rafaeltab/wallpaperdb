@@ -24,9 +24,6 @@ export CRAP_THRESHOLD
 INFRA_COMPOSE = docker compose -p $(COMPOSE_PROJECT_NAME) -f infra/docker-compose.yml
 APPS_COMPOSE  = docker compose -p $(COMPOSE_PROJECT_NAME) -f infra/docker-compose.apps.yml
 
-SANDCASTLE_AUTH_DIR ?= .sandcastle
-SANDCASTLE_OPENCODE_AUTH ?= $(HOME)/.local/share/opencode/auth.json
-GITHUB_CLI ?= gh
 TURBO := "$(CURDIR)/node_modules/.bin/turbo"
 CI_CONCURRENCY ?= 1
 
@@ -37,7 +34,7 @@ DB ?=
 SCRIPT ?=
 ARGS ?=
 FORCE ?=
-WORKSPACES := root $(notdir $(patsubst %/,%,$(dir $(wildcard apps/*/package.json packages/*/package.json))))
+WORKSPACES := root scripts infra-local $(notdir $(patsubst %/,%,$(dir $(wildcard apps/*/package.json packages/*/package.json))))
 ifneq ($(strip $(PACKAGE)),)
 ifneq ($(words $(PACKAGE)),1)
 $(error PACKAGE must select exactly one workspace)
@@ -53,9 +50,9 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 .PHONY: help install dev stop build test test-unit test-integration test-e2e test-focused \
         format lint lint-fix check-types check run \
         infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
-        migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info nats-stream-setup-test \
-        storage-test storage-infra-test coverage-summary crap check-crap \
-        worktree-remove worktree-env-test sandcastle-auth sandcastle-test sandcastle-check-types test-make ci-runner-test ci clean
+        migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
+        coverage-summary crap check-crap \
+        worktree-remove ci clean
 
 help: ## Show commands and selectors
 	@echo "WallpaperDB — project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
@@ -183,81 +180,25 @@ redis-info: ## Show Redis info
 nats-setup-streams: ## Initialize NATS streams
 	@NATS_SERVER=nats://localhost:$(NATS_HOST_PORT) ./infra/nats/init/setup-streams.sh
 
-nats-stream-setup-test: ## Verify stream creation and retention upgrades
-	@pnpm exec vitest run infra/nats/init/setup-streams.test.ts --maxWorkers=1 --no-file-parallelism
-
 nats-stream-list: ## List NATS streams
 	@nats stream list --server nats://localhost:$(NATS_HOST_PORT)
 
 nats-stream-info: ## Inspect WALLPAPER stream
 	@nats stream info WALLPAPER --server nats://localhost:$(NATS_HOST_PORT)
 
-storage-test: ## Test S3 compatibility against SeaweedFS
-	@$(TURBO) run build --filter='@wallpaperdb/test-utils^...'
-	@pnpm --filter @wallpaperdb/test-utils test tests/s3.test.ts
-
-storage-infra-test: ## Test storage config, auth, bootstrap, and persistence
-	@node --test scripts/lib/env-pipeline.test.mjs
-	@node scripts/test-object-storage.mjs
-
 coverage-summary: ## Summarize existing test coverage
 	@node scripts/coverage-summary.js
 
 crap: ## Rank functions using fresh test coverage (optional PACKAGE)
-	@PACKAGE="$(PACKAGE)" pnpm exec tsx scripts/crap.mts report
+	@PACKAGE="$(PACKAGE)" pnpm exec wallpaperdb-crap report
 
 check-crap: ## Check CRAP scores (requires CRAP_THRESHOLD; optional PACKAGE)
-	@PACKAGE="$(PACKAGE)" pnpm exec tsx scripts/crap.mts check
+	@PACKAGE="$(PACKAGE)" pnpm exec wallpaperdb-crap check
 
 worktree-remove: ## Tear down this worktree and release its slot
 	@node scripts/teardown-worktree.mjs
 
-sandcastle-auth: ## Refresh local Sandcastle credentials
-	@if ! command -v "$(GITHUB_CLI)" >/dev/null 2>&1; then \
-		echo "GitHub CLI not found. Install 'gh' and run 'gh auth login' first."; \
-		exit 1; \
-	fi
-	@if [ ! -f "$(SANDCASTLE_OPENCODE_AUTH)" ]; then \
-		echo "OpenCode auth not found at $(SANDCASTLE_OPENCODE_AUTH). Sign in to OpenCode first."; \
-		exit 1; \
-	fi
-	@github_token="$$( "$(GITHUB_CLI)" auth token )" || { \
-		echo "Unable to read GitHub credentials. Run 'gh auth login' first."; \
-		exit 1; \
-	}; \
-	if [ -z "$$github_token" ]; then \
-		echo "GitHub CLI returned an empty token. Run 'gh auth login' first."; \
-		exit 1; \
-	fi; \
-	umask 077; \
-	mkdir -p "$(SANDCASTLE_AUTH_DIR)/.opencode"; \
-	printf 'GH_TOKEN=%s\n' "$$github_token" > "$(SANDCASTLE_AUTH_DIR)/.env"; \
-	cp "$(SANDCASTLE_OPENCODE_AUTH)" "$(SANDCASTLE_AUTH_DIR)/.opencode/auth.json"; \
-	chmod 600 "$(SANDCASTLE_AUTH_DIR)/.env" "$(SANDCASTLE_AUTH_DIR)/.opencode/auth.json"; \
-	echo "Sandcastle credentials refreshed in $(SANDCASTLE_AUTH_DIR)."
-
-sandcastle-test: ## Test Sandcastle runner
-	@pnpm sandcastle:test
-
-sandcastle-check-types: ## Type-check Sandcastle runner
-	@pnpm sandcastle:check-types
-
-test-make: ## Test command routing without starting services
-	@node --test scripts/makefile.test.mjs scripts/crap-scope.test.mjs
-
-worktree-env-test: ## Verify generated service credentials and environment rules
-	@pnpm exec vitest run scripts/lib/env-pipeline.test.ts --maxWorkers=1 --no-file-parallelism
-
-ci-runner-test: ## Verify CI stops and reports failures correctly
-	@pnpm exec vitest run scripts/ci-runner.test.ts --maxWorkers=1 --no-file-parallelism
-
-ci: test-make ## Run full CI pipeline (FORCE=1 bypasses cache; always all packages)
-	@$(MAKE) ci-runner-test
-	@$(MAKE) worktree-env-test
-	@$(MAKE) nats-stream-setup-test
-	@$(MAKE) sandcastle-test
-	@$(MAKE) sandcastle-check-types
-	@$(MAKE) storage-infra-test
+ci: ## Run full CI pipeline (FORCE=1 bypasses cache; always all packages)
 	@echo "Running full CI checks locally..."
 	@set -e; \
 	start_time=$$(date +%s); \

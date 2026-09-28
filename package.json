@@ -12,9 +12,6 @@
         "test:coverage": "vitest run --coverage",
         "test:ui": "vitest --ui",
         "coverage:merge": "mkdir -p coverage && find packages apps -path '*/coverage/*' -name lcov.info -exec cat {} + > coverage/lcov.info",
-        "sandcastle": "tsx .sandcastle/main.ts",
-        "sandcastle:test": "vitest run .sandcastle/helpers.test.ts",
-        "sandcastle:check-types": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --skipLibCheck .sandcastle/*.ts",
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check-types": "tsc --project tsconfig.tooling.json"
     },
@@ -22,16 +19,13 @@
         "graphql": "16.12.0"
     },
     "devDependencies": {
-        "@ai-hero/sandcastle": "npm:@rafaeltab/sandcastle@0.13.0-fork.1",
-        "@types/istanbul-lib-coverage": "2.0.6",
         "@types/node": "^26.0.1",
         "@vitest/coverage-v8": "5.0.2",
         "@vitest/ui": "5.0.2",
         "@wallpaperdb/crap-typescript-core": "workspace:*",
+        "@wallpaperdb/scripts": "workspace:*",
         "@wallpaperdb/vitest-config": "workspace:*",
         "graphql": "16.12.0",
-        "istanbul-lib-coverage": "3.2.2",
-        "tsx": "^4.22.4",
         "turbo": "^2.6.1",
         "typescript": "^5.7.2",
         "vitest": "5.0.2"

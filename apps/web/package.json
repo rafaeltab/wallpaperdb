@@ -13,6 +13,7 @@
     "check-types": "node scripts/generate-routes.mjs && tsc -b",
     "test": "vitest run",
     "test:unit": "vitest run --coverage",
+    "test:integration": "node --test test/clean-checkout.test.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

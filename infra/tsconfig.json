@@ -5,9 +5,8 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "noEmit": true,
-    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["crap.config.mts", "test/integration/**/*.ts", "vitest.integration.config.ts", "apps/*/vitest*.ts", "packages/*/vitest*.ts"]
+  "include": ["nats/init/**/*.ts"]
 }

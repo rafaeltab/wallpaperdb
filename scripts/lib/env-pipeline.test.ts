@@ -36,7 +36,7 @@ describe('Profile picture service credentials', () => {
 
   it('supports explicit token regeneration and preserves an existing configured token', () => {
     const regenerated = resolveGenerateMarker('USER_MEDIA_SERVICE_TOKEN={GENERATE}\n', knownUserSecrets);
-    expect(regenerated.secrets.USER_MEDIA_SERVICE_TOKEN).toMatch(/^[a-f0-9]{64}$/);
+    expect(regenerated.secrets).toHaveProperty('USER_MEDIA_SERVICE_TOKEN', expect.stringMatching(/^[a-f0-9]{64}$/));
     const preserved = resolveGenerateMarker(regenerated.content, knownUserSecrets);
     expect(preserved).toEqual(regenerated);
   });

@@ -11,12 +11,6 @@ importers:
 
   .:
     devDependencies:
-      '@ai-hero/sandcastle':
-        specifier: npm:@rafaeltab/sandcastle@0.13.0-fork.1
-        version: '@rafaeltab/sandcastle@0.13.0-fork.1'
-      '@types/istanbul-lib-coverage':
-        specifier: 2.0.6
-        version: 2.0.6
       '@types/node':
         specifier: ^26.0.1
         version: 26.0.1
@@ -29,18 +23,15 @@ importers:
       '@wallpaperdb/crap-typescript-core':
         specifier: workspace:*
         version: link:packages/crap-typescript-core
+      '@wallpaperdb/scripts':
+        specifier: workspace:*
+        version: link:scripts
       '@wallpaperdb/vitest-config':
         specifier: workspace:*
         version: link:packages/vitest-config
       graphql:
         specifier: 16.12.0
         version: 16.12.0
-      istanbul-lib-coverage:
-        specifier: 3.2.2
-        version: 3.2.2
-      tsx:
-        specifier: ^4.22.4
-        version: 4.22.4
       turbo:
         specifier: ^2.6.1
         version: 2.7.2
@@ -141,6 +132,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      '@wallpaperdb/scripts':
+        specifier: workspace:*
+        version: link:../../scripts
       '@wallpaperdb/test-logger':
         specifier: workspace:*
         version: link:../../packages/test-logger
@@ -341,6 +335,9 @@ importers:
       '@vitest/ui':
         specifier: 5.0.2
         version: 5.0.2(vitest@5.0.2)
+      '@wallpaperdb/scripts':
+        specifier: workspace:*
+        version: link:../../scripts
       '@wallpaperdb/test-logger':
         specifier: workspace:*
         version: link:../../packages/test-logger
@@ -507,6 +504,9 @@ importers:
       '@vitest/ui':
         specifier: 5.0.2
         version: 5.0.2(vitest@5.0.2)
+      '@wallpaperdb/scripts':
+        specifier: workspace:*
+        version: link:../../scripts
       '@wallpaperdb/test-logger':
         specifier: workspace:*
         version: link:../../packages/test-logger
@@ -707,6 +707,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.16.0
+      '@wallpaperdb/scripts':
+        specifier: workspace:*
+        version: link:../../scripts
       '@wallpaperdb/test-logger':
         specifier: workspace:*
         version: link:../../packages/test-logger
@@ -834,6 +837,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.16.0
+      '@wallpaperdb/scripts':
+        specifier: workspace:*
+        version: link:../../scripts
       '@wallpaperdb/test-logger':
         specifier: workspace:*
         version: link:../../packages/test-logger
@@ -982,6 +988,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.16.0
+      '@wallpaperdb/scripts':
+        specifier: workspace:*
+        version: link:../../scripts
       '@wallpaperdb/test-logger':
         specifier: workspace:*
         version: link:../../packages/test-logger
@@ -1109,6 +1118,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
+      '@wallpaperdb/scripts':
+        specifier: workspace:*
+        version: link:../../scripts
       '@wallpaperdb/test-logger':
         specifier: workspace:*
         version: link:../../packages/test-logger
@@ -1310,7 +1322,20 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  infra: {}
+  infra:
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.3.8
+        version: 2.3.10
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.0.1
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: 5.0.2
+        version: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@26.0.1)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))
 
   packages/auth:
     dependencies:
@@ -1756,6 +1781,34 @@ importers:
         specifier: 5.0.2
         version: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@26.0.1)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))
 
+  scripts:
+    dependencies:
+      '@wallpaperdb/crap-typescript-core':
+        specifier: workspace:*
+        version: link:../packages/crap-typescript-core
+      istanbul-lib-coverage:
+        specifier: 3.2.2
+        version: 3.2.2
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.3.8
+        version: 2.3.10
+      '@types/istanbul-lib-coverage':
+        specifier: 2.0.6
+        version: 2.0.6
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.0.1
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: 5.0.2
+        version: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@26.0.1)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))
+
 packages:
 
   '@actions/core@1.11.1':
@@ -2192,14 +2245,6 @@ packages:
 
   '@borewit/text-codec@0.2.1':
     resolution: {integrity: sha512-k7vvKPbf7J2fZ5klGRD9AeKfUvojuZIQ3BT5u7Jfv+puwXkUBUT5PVyMDfJZpy30CBDXGMgw7fguK/lpOMBvgw==}
-
-  '@clack/core@1.4.2':
-    resolution: {integrity: sha512-0Ty/1Gfm+Kb07sXcuESjyKfwEhSy4Ns1AgeEisHb/bDY5fWme0tTeTkU14T1Gmcs17YIjB/teiDe4uaCghbYqQ==}
-    engines: {node: '>= 20.12.0'}
-
-  '@clack/prompts@1.6.0':
-    resolution: {integrity: sha512-EYlRokl8szrP9Z25qT5aepMdBjzBvHF9ZEhzIiUBc9guz/T31EqRgvD0QSgZcpE93xiwrr+OkB4nz0BZyF6fSA==}
-    engines: {node: '>= 20.12.0'}
 
   '@clerk/backend@3.4.1':
     resolution: {integrity: sha512-+Tgo1uPEFpBRvyFW3JtPbrTMRgiP+pWBo9gi2tTB0AxEqR2I/kSYy5l3+KqWciUpbVZtVvLXm1j+NEE2WEG+jg==}
@@ -5461,18 +5506,6 @@ packages:
   '@radix-ui/rect@1.1.1':
     resolution: {integrity: sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw==}
 
-  '@rafaeltab/sandcastle@0.13.0-fork.1':
-    resolution: {integrity: sha512-Zcy5ozZMvryvwfZU71DKX+s5oImGalYQZjjNVDpkczxnynyHQXrwvzcrsKyTXFb5qZVyHD3lgbqt36WLSGya6A==}
-    hasBin: true
-    peerDependencies:
-      '@daytona/sdk': ^0.164.0
-      '@vercel/sandbox': '>=2.0.0 <4'
-    peerDependenciesMeta:
-      '@daytona/sdk':
-        optional: true
-      '@vercel/sandbox':
-        optional: true
-
   '@redis/bloom@1.2.0':
     resolution: {integrity: sha512-HG2DFjYKbpNmVXsa0keLHp/3leGJz1mjh09f2RLGGLQZzSHpkmZWuwJbAvo3QcRY8p80m5+ZdXZdYOSBLlp7Cg==}
     peerDependencies:
@@ -7597,20 +7630,11 @@ packages:
   fast-sha256@1.3.0:
     resolution: {integrity: sha512-n11RGP/lrWEFI/bWdygLxhI+pVeo1ZYIVwvvPkW7azl/rOy+F3HYRZ2K5zeE9mmkhQppyv9sQFx0JM9UabnpPQ==}
 
-  fast-string-truncated-width@3.0.3:
-    resolution: {integrity: sha512-0jjjIEL6+0jag3l2XWWizO64/aZVtpiGE3t0Zgqxv0DPuxiMjvB3M24fCyhZUO4KomJQPj3LTSUnDP3GpdwC0g==}
-
-  fast-string-width@3.0.2:
-    resolution: {integrity: sha512-gX8LrtNEI5hq8DVUfRQMbr5lpaS4nMIWV+7XEbXk2b8kiQIizgnlr12B4dA3ZEx3308ze0O4Q1R+cHts8kyUJg==}
-
   fast-uri@2.4.0:
     resolution: {integrity: sha512-ypuAmmMKInk5q7XcepxlnUWDLWv4GFtaJqAzWKqn62IpQ3pejtr5dTVbt3vwqVaMKmkNR55sTT+CqUKIaT21BA==}
 
   fast-uri@3.1.0:
     resolution: {integrity: sha512-iPeeDKJSWf4IEOasVVrknXpaBV0IApz/gp7S2bb7Z4Lljbl2MGJRqInZiUrQwV16cpzw/D3S5j5Julj/gT52AA==}
-
-  fast-wrap-ansi@0.2.2:
-    resolution: {integrity: sha512-7F2Fl+TjRSenLqlU3UjSH0iyqopqoZIu7eZVpEirP2g1GtWa2G/ecEmBdgz31+Mxr+ELclgg6sokpSFIQiZ02Q==}
 
   fast-xml-parser@4.5.3:
     resolution: {integrity: sha512-RKihhV+SHsIUGXObeVy9AXiBbFwkVk7Syp8XgwN5U3JV416+Gwp/GO9i0JYKmikykgz/UHRrrV4ROuZEo/T0ig==}
@@ -11376,18 +11400,6 @@ snapshots:
 
   '@borewit/text-codec@0.2.1': {}
 
-  '@clack/core@1.4.2':
-    dependencies:
-      fast-wrap-ansi: 0.2.2
-      sisteransi: 1.0.5
-
-  '@clack/prompts@1.6.0':
-    dependencies:
-      '@clack/core': 1.4.2
-      fast-string-width: 3.0.2
-      fast-wrap-ansi: 0.2.2
-      sisteransi: 1.0.5
-
   '@clerk/backend@3.4.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@clerk/shared': 4.8.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -14810,10 +14822,6 @@ snapshots:
 
   '@radix-ui/rect@1.1.1': {}
 
-  '@rafaeltab/sandcastle@0.13.0-fork.1':
-    dependencies:
-      '@clack/prompts': 1.6.0
-
   '@redis/bloom@1.2.0(@redis/client@1.6.1)':
     dependencies:
       '@redis/client': 1.6.1
@@ -17306,19 +17314,9 @@ snapshots:
 
   fast-sha256@1.3.0: {}
 
-  fast-string-truncated-width@3.0.3: {}
-
-  fast-string-width@3.0.2:
-    dependencies:
-      fast-string-truncated-width: 3.0.3
-
   fast-uri@2.4.0: {}
 
   fast-uri@3.1.0: {}
-
-  fast-wrap-ansi@0.2.2:
-    dependencies:
-      fast-string-width: 3.0.2
 
   fast-xml-parser@4.5.3:
     dependencies:

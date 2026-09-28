@@ -9,17 +9,7 @@ const makefile = readFileSync(new URL('../Makefile', import.meta.url), 'utf8');
 function runCi(force: string, failingStage: string) {
   const directory = mkdtempSync(join(tmpdir(), 'wallpaperdb-ci-test-'));
   try {
-    // Keep the real orchestration recipe; replace only its external checks.
-    const prechecks = [
-      'test-make',
-      'worktree-env-test',
-      'nats-stream-setup-test',
-      'sandcastle-test',
-      'sandcastle-check-types',
-      'storage-infra-test',
-      'ci-runner-test',
-    ];
-    writeFileSync(join(directory, 'Makefile'), `${makefile}\n${prechecks.join(' ')}:\n\t@true\n`);
+    writeFileSync(join(directory, 'Makefile'), makefile);
     writeFileSync(join(directory, 'turbo'), `#!/bin/sh
 stage=workspace
 case "$*" in *test:e2e*) stage=e2e ;; esac

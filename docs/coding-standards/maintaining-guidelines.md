@@ -6,7 +6,7 @@ Scope: authority and maintenance of the coding guidelines across the repository.
 
 - [CODING_STANDARDS.md](../../CODING_STANDARDS.md) indexes the authoritative coding guidelines. Each guideline defines its scope; all applicable rules remain binding regardless of when they are consulted. Workflow instructions govern when guidelines are read and checked.
 - These guidelines define the required end state, including existing code within their scope. Implementation examples, historical plans, and guidance elsewhere do not add coding standards unless adopted into this collection.
-- Coding guidelines do not govern development workflows, agent behavior, contribution processes, or migration planning. Sandcastle, skills, and their respective workflow instructions remain separate and authoritative within their scopes.
+- Coding guidelines do not govern development workflows, agent behavior, contribution processes, or migration planning. Skills and their workflow instructions remain separate and authoritative within their scopes.
 - Project-wide rules apply across workspaces. Backend rules apply to backend code and are not automatically requirements for frontend code. Frontend-specific guidelines have not yet been established.
 - Applicability follows the responsibilities touched by a change, not merely its folder. No guideline document is mandatory reading for every task; the relevant workflow determines when guidance is consulted or reviewed.
 

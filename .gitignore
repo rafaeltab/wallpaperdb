@@ -3,8 +3,8 @@ node_modules
 .pnpm-store
 .repos/
 
-# Local OpenCode/Sandcastle auth state
-.sandcastle/.opencode/auth.json
+# Ignore any local state left by the removed Sandcastle runner.
+.sandcastle/
 
 # Worktree slot assignment output
 .worktree

@@ -31,6 +31,23 @@ def run(root):
             except Exception as error:
                 row['error'] = str(error)
             records.append(row)
+    # This independently measured CPU candidate is not qualified by its neutral
+    # tone curve alone. Chromatic references and geometries remain required.
+    from sdr_candidate import convert as convert_calibrated
+    folder = root/'avif'/'avif-pq-rec2020-10-opaque'
+    source = folder/'decoded-0.png'
+    files = [output/f'pq-cpu-mobius-calibrated-{repeat}.png' for repeat in range(2)]
+    for file in files:
+        convert_calibrated(source, file, 'pq', 'rec2020', peak_nits=1000)
+    signals = [read_png(file) for file in files]
+    source_nits = decode_transfer(read_png(source)[..., :3], 'pq', 'rec2020')
+    measurement = evaluate_sdr_tone_map(source_nits, signals[0][..., :3], source_gamut='rec2020')
+    records.append({'source':str(source), 'source_facts':inspect_avif(folder/f'{folder.name}.avif'),
+                    'algorithm':'CPU Mobius knee 0.6; exposure 1.1; output scale 0.99; declared peak 1000 nits',
+                    'measurement':measurement, 'repeat_identical_pixels':bool(np.array_equal(*signals)),
+                    'sha256':[digest(file) for file in files], 'artifacts':[str(file) for file in files],
+                    'status':'tested and failed',
+                    'blocker':'Neutral calibration alone does not qualify chromatic mapping, alpha, or transformed outputs.'})
     folder = root/'avif'/'animated-pq-alpha'
     for adaptive in (False, True):
         whites, hashes = [], []

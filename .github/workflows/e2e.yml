@@ -13,7 +13,11 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     env:
+      USE_VERCEL_CACHE: ${{ vars.TURBO_TEAM != '' && (github.actor_id == '29227505' || github.actor_id == '290168728') && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
       COMPOSE_PROJECT_NAME: wallpaperdb
       CURSOR_SECRET: ${{ secrets.CURSOR_SECRET }}
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -41,6 +45,16 @@ jobs:
       - name: Install turbo
         run: pnpm add -g turbo
 
+      - name: Set up Vercel Remote Cache
+        if: env.USE_VERCEL_CACHE == 'true'
+        uses: vercel/setup-turborepo-remote-cache-action@v1.1.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+
+      - name: Report unavailable Turbo cache
+        if: env.USE_VERCEL_CACHE != 'true'
+        run: echo '::warning::Vercel Remote Cache is unavailable for this run; Turbo tasks have no shared cache.'
+
       - name: Build
         run: make build
 
@@ -55,6 +69,9 @@ jobs:
 
       - name: Run E2E tests
         run: make test-e2e
+        env:
+          TURBO_TOKEN: ''
+          TURBO_TEAM: ''
 
       - name: Capture browser E2E service diagnostics
         if: failure()

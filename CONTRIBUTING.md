@@ -4,7 +4,7 @@ Start with the [coding guidelines](CODING_STANDARDS.md) for the work you are cha
 
 ## Set up a checkout
 
-Use Node.js 22.12.0 or later on the 22.x line and the pnpm version pinned in [package.json](package.json). You also need Docker with Compose watch support and Git with worktree support.
+Use Node.js 22.12.0 or later on the 22.x line and the pnpm version pinned in [package.json](package.json). You also need Docker with [Buildx](https://docs.docker.com/build/install-buildx/) and Compose watch support, and Git with worktree support.
 
 ```sh
 git clone https://github.com/rafaeltab/wallpaperdb.git

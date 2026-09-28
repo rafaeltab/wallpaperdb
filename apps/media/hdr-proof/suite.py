@@ -160,7 +160,20 @@ def product_coverage_report(matrix):
     return lines
 
 
-def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual):
+def precision_report(precision):
+    lines = ['## Scoped eight-bit precision diagnostic', '',
+             f'The exhaustive diagnostic evaluates all {precision["enumerated_codes_per_reference"]:,} full-range sRGB RGB8 triples for each selected reference color. It finds {precision["selected_samples_with_impossible_maximum_gate"]} of {precision["shadow_samples"]} visible shadow samples that cannot meet the fixed maximum Delta E ITP gate in this representation.', '',
+             '| Reference sRGB code units | Matching shadow pixels | Best RGB8 code | Minimum Delta E ITP |',
+             '| --- | ---: | --- | ---: |']
+    for row in precision['references']:
+        lines.append(f'| {row["reference_rgb8_code_units"]} | {row["visible_matching_samples"]} | {row["best_rgb8_code"]} | {row["minimum_delta_e_itp"]:.6f} |')
+    lines += ['',
+              f'The native AOM encode and independent dav1d decode preserve the supplied RGB8 codes exactly: {precision["native_counterexample"]["decoded_exactly_matches_supplied_rgb8"]}. The encoder cannot recover precision absent from those codes. The [diagnostic record](precision.json) includes reference, source, metric and threshold hashes, native commands, and six additional YUV encoding trials.', '',
+              'This is a floating-point enumeration for one unchanged grade and one representation. It does not establish that eight-bit AVIF, another declared transfer, every YUV encoding, or another independently justified SDR grade is impossible. The diagnostic cannot qualify any conversion or physical display.', '']
+    return lines
+
+
+def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
@@ -172,6 +185,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              f'The original fixed coverage plan contains {matrix["required_case_count"]} cases. Unexecuted fixed-plan cases: {sum(len(cell["missing_cases"]) for cell in matrix["cells"])}. Unlisted cross-products are untested, even when a neighboring case passes.','',
              *product_coverage_report(matrix),
              *diagnostic_report(matrix),
+             *precision_report(precision),
              '## Environment and reproducibility','',
              'The image uses the same Node 22 Alpine/musl deployment shape as Media. This is a proposed native proof pipeline, not the existing Sharp 0.33 production worker. No service dependency was upgraded. HDR geometry uses native FFmpeg/zimg float processing and luminance-coupled HLG transforms. The calibrated SDR candidate uses the native CPU Mobius filter. CPU lavapipe runs the retained libplacebo comparison trials without a host GPU. Network access is disabled during tests.','',
              f'- Node: `{native_versions["node"]}`',
@@ -255,6 +269,9 @@ def main():
     environment = versions()
     avif_result = avif.run(WORK/'avif')
     write_json(WORK/'avif-evidence.json',avif_result)
+    from precision import run as run_precision
+    precision = run_precision(WORK, WORK/'precision')
+    write_json(RESULTS/'precision.json', precision)
     gainmap_result = gainmap.run(WORK)
     from crossformat import run as run_crossformat
     crossformat_result = run_crossformat(WORK)
@@ -278,7 +295,7 @@ def main():
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,avif_result['fixtures'])
-    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual))
+    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))
     return 1 if errors else 2

@@ -52,3 +52,10 @@ the legacy `required_case_count` and `diagnostic_summary.required_cases` fields
 as the original fixed 320-case coverage plan for comparison. Product milestones
 use `product_coverage`; physical browser, viewer and wallpaper checks remain
 pending. This is proof accounting, not a runtime depth-selection policy.
+
+The complete command also reproduces a [precision diagnostic](precision.py).
+It enumerates every full-range sRGB RGB8 triple for selected shadow references,
+then encodes and independently decodes an exact-code counterexample. Its bounds
+apply only to that transfer, matrix, grade and per-pixel metric. They do not
+declare a format impossible or qualify a conversion. Additional native YUV
+trials and all reference hashes remain in the generated `results/precision.json`.

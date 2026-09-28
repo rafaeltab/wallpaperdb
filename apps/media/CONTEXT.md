@@ -41,6 +41,15 @@ An Asset readiness state in which Media offers unchanged source bytes but no tra
 **Original**:
 The immutable wallpaper asset accepted by Wallpaper Ingestion.
 
+**Gain-map image**:
+An image with an authored SDR base and separate gain-map data used to reconstruct an HDR appearance. The base and map have their own coded depths; the reconstructed HDR appearance does not have one coded sample depth.
+
+**Authored SDR base**:
+The SDR image embedded in a gain-map image, distinct from an SDR rendition made by tone mapping an HDR image.
+
+**HDR-only image**:
+An HDR-encoded image without an embedded authored SDR base. A separately authored SDR companion is a different source, not part of this image.
+
 **Variant (legacy)**:
 The existing name for a wallpaper-specific Materialized rendition. Use Rendition or Materialized rendition in the replacement domain model.
 

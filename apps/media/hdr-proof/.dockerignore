@@ -4,3 +4,5 @@
 !environment/
 !environment/**
 !png_decode.c
+!native-gainmap-build.sh
+!native_gainmap.cpp

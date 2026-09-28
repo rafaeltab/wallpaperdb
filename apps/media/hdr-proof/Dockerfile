@@ -9,6 +9,8 @@ ENV NODE_PATH=/opt/proof/node_modules
 ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
 COPY gainmap-build.sh /opt/proof/gainmap-build.sh
 RUN sh /opt/proof/gainmap-build.sh
+COPY native-gainmap-build.sh native_gainmap.cpp /opt/proof/
+RUN sh /opt/proof/native-gainmap-build.sh
 COPY png_decode.c /opt/proof/png_decode.c
 RUN cc -O2 -Wall -Wextra -Werror /opt/proof/png_decode.c -lpng -o /usr/local/bin/hdr-proof-png-decode
 WORKDIR /proof

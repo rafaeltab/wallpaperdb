@@ -188,15 +188,20 @@ def _convert_hdr_frame(source, output, transfer, gamut, mode, width, height):
                   + f',setparams=color_trc={source_transfer},zscale={base}:'
                   f'transferin={source_transfer}:transfer={source_transfer}')
 
-    crop = 'crop=ih:ih:(iw-ih)/2:0,' if mode == 'cover' else ''
+    geometry = f'zscale=w={width}:h={height}:filter=bilinear,'
+    if mode == 'cover':
+        # Fit the full image before the final crop so antialias taps can read
+        # source pixels immediately outside the requested box. Cropping first
+        # removes those samples and changes the white/black boundary pixels.
+        geometry = (f'zscale=w=iw*{height}/ih:h={height}:filter=bilinear,'
+                    f'crop={width}:{height}:(iw-ow)/2:0,')
     # zimg otherwise premultiplies *nonlinear* values before a transfer change.
     # During transfer-only stages both negotiated alpha modes are therefore
     # marked premultiplied to suppress its implicit association changes. The
     # actual multiplication occurs explicitly below, after linearization.
     filters = (
         'format=gbrap16le,setparams=alpha_mode=premultiplied,' + linearize + ','
-        'premultiply=inplace=1,setparams=alpha_mode=premultiplied,' + crop
-        + f'zscale=w={width}:h={height}:filter=bilinear,'
+        'premultiply=inplace=1,setparams=alpha_mode=premultiplied,' + geometry +
         'format=gbrapf32le:alpha_modes=premultiplied,unpremultiply=inplace=1,'
         'setparams=alpha_mode=premultiplied,' + encode + ','
         'format=gbrap16le:alpha_modes=premultiplied,setparams=alpha_mode=straight,'

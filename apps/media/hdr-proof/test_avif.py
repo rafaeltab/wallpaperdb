@@ -88,6 +88,25 @@ class FixtureTests(unittest.TestCase):
             self.assertIn('shadow.delta_e_max', measurement['failures'])
             self.assertGreater(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
 
+    def test_native_cover_filters_before_cropping_the_white_black_boundary(self):
+        for transfer, gamut in (('pq', 'rec2020'), ('hlg', 'p3')):
+            for alpha in (False, True):
+                with self.subTest(transfer=transfer, alpha=alpha), tempfile.TemporaryDirectory() as temporary:
+                    source, target = Path(temporary)/'source.png', Path(temporary)/'target.png'
+                    scene = make_scene(alpha)
+                    signal = scene.copy()
+                    signal[..., :3] = encode_transfer(scene[..., :3], transfer, gamut)
+                    write_png(source, signal)
+                    reference = read_png(source)
+                    reference[..., :3] = decode_transfer(reference[..., :3], transfer, gamut)
+                    reference = geometry_reference(reference, 'cover')
+                    convert_frame(source, target, transfer, gamut, 'cover')
+                    actual = read_png(target)
+                    measured = compare_appearance(reference[..., :3], decode_transfer(actual[..., :3], transfer, gamut),
+                        reference_gamut=gamut, actual_gamut=gamut, fixture_class='avif-12', alpha=reference[..., 3])
+                    self.assertTrue(measured['passed'], measured)
+                    self.assertLessEqual(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
+
     def test_native_sdr_geometry_matches_independent_full_color_reference(self):
         for transfer in ('pq', 'hlg'):
             with self.subTest(transfer=transfer), tempfile.TemporaryDirectory() as temporary:

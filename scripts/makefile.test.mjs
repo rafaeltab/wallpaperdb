@@ -196,6 +196,14 @@ test('dev defaults to Compose and scopes workspace dev through Turbo', () => {
   assert.match(output('dev', 'PACKAGE=docs'), /run dev .*--filter=@wallpaperdb\/docs/);
 });
 
+test('stop tears down apps before infrastructure for the selected Compose project', () => {
+  const commands = output('stop', 'COMPOSE_PROJECT_NAME=isolated');
+  const apps = commands.indexOf('docker compose -p isolated -f infra/docker-compose.apps.yml down');
+  const infra = commands.indexOf('docker compose -p isolated -f infra/docker-compose.yml down');
+  assert.ok(apps >= 0, 'stop must tear down the app stack');
+  assert.ok(infra > apps, 'stop must tear down infrastructure after apps');
+});
+
 test('database and Compose commands use explicit selectors', () => {
   assert.match(output('psql'), /psql -U wallpaperdb\s/);
   assert.match(output('psql', 'DB=media'), /-d wallpaperdb_media/);

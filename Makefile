@@ -50,7 +50,7 @@ TURBO_PACKAGE = $(if $(filter root,$(PACKAGE)),//,@wallpaperdb/$(PACKAGE))
 FILTER = $(if $(PACKAGE),--filter=$(TURBO_PACKAGE))
 TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 
-.PHONY: help install dev build test test-unit test-integration test-e2e test-focused \
+.PHONY: help install dev stop build test test-unit test-integration test-e2e test-focused \
         format lint lint-fix check-types check run \
         infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info nats-stream-setup-test \
@@ -75,6 +75,10 @@ else
 	@scripts/check-infra.sh || (echo "Start infrastructure with: make infra-start" && exit 1)
 	@$(APPS_COMPOSE) watch
 endif
+
+stop: ## Stop application and infrastructure containers
+	@$(MAKE) apps-stop
+	@$(MAKE) infra-stop
 
 build: ## Build workspaces (optional PACKAGE)
 	@$(TURBO) run build $(TURBO_FLAGS)

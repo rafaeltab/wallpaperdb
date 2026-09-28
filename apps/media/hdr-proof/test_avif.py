@@ -167,3 +167,25 @@ class FixtureTests(unittest.TestCase):
             self.assertEqual(matrix['evidence_errors'], [])
             cell = next(cell for cell in matrix['cells'] if cell['id'] == 'static-avif:sdr:avif')
             self.assertEqual(cell['status'], 'tested and failed')
+
+    def test_native_sixteen_bit_png_rejects_eight_bit_fractional_alpha_precision(self):
+        from avif import encode_other
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            reference = np.full((8, 12, 4), .25)
+            reference[..., 3] = np.linspace(.03125, .96875, 8*12).reshape(8, 12)
+            reference = np.rint(reference*65535)/65535
+            spec = {'alpha': True, 'frames': 1}
+            for quantized in (False, True):
+                with self.subTest(eight_bit_alpha_in_sixteen_bit_png=quantized):
+                    pixels = reference.copy()
+                    if quantized:
+                        pixels[..., 3] = np.rint(pixels[..., 3]*255)/255
+                    source, output = directory/f'input-{quantized}.png', directory/f'output-{quantized}.png'
+                    write_png(source, pixels)
+                    facts, actual, checks = encode_other([source], output, 'png', 'srgb', 'srgb', [reference], 1, spec)
+                    self.assertEqual(facts['exiftool']['BitDepth'], 16)
+                    self.assertEqual(checks['alpha'], not quantized)
+                    self.assertEqual(facts['alpha_measurement']['absolute_error_limit'], 2/65535)
+                    actual_error = float(np.max(np.abs(actual[0][..., 3]-reference[..., 3])))
+                    self.assertEqual(facts['alpha_measurement']['maximum_absolute_error'], actual_error)

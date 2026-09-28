@@ -484,10 +484,22 @@ def encode_other(paths, target, ext, transfer, gamut, refs, count, spec):
     depth_verified = (exif.get('BitDepth') == 16 if ext == 'png' else
                       exif.get('BitsPerSample') == 8 if ext == 'jpg' else
                       'WEBP' in actual_type if ext == 'webp' else actual_type == 'GIF')
+    alpha_limit = 0 if ext in ('jpg', 'gif') else 2/(65535 if ext == 'png' else 255)
+    alpha_errors = []
+    for decoded, reference in zip(actual, refs):
+        expected_alpha = (np.ones_like(reference[..., 3]) if ext == 'jpg' else
+                          (reference[..., 3] >= .5) if ext == 'gif' else reference[..., 3])
+        alpha_errors.append(float(np.max(np.abs(decoded[..., 3]-expected_alpha))))
+    facts['alpha_measurement'] = {
+        'comparison': 'explicit opaque coercion' if ext == 'jpg' else 'explicit binary coercion' if ext == 'gif' else 'preserved fractional alpha',
+        'absolute_error_limit': alpha_limit,
+        'maximum_absolute_error': max(alpha_errors, default=None),
+        'frame_maximum_absolute_errors': alpha_errors,
+    }
     detail = {'dimensions':all(a.shape == r.shape for a,r in zip(actual,refs)), 'frames':len(actual)==count,
               'color_signaling': signaled_srgb if transfer=='srgb' else exif.get('TransferCharacteristics')==TRANSFERS[transfer],
               'gamut': signaled_srgb if gamut=='srgb' else exif.get('ColorPrimaries')==PRIMARIES[gamut],
-              'alpha': all(np.max(np.abs(a[...,3]-r[...,3]))<=2/255 for a,r in zip(actual,refs)) if ext not in ('jpg','gif') else all(np.array_equal(a[...,3], np.ones_like(r[...,3]) if ext=='jpg' else (r[...,3]>=.5)) for a,r in zip(actual,refs)),
+              'alpha': bool(alpha_errors) and all(error <= alpha_limit for error in alpha_errors),
               'depth': depth_verified,
               'timing': facts.get('durations_ms')==[300,700] if count==2 else True,
               'loop': facts.get('loop')==3 if count==2 else True}

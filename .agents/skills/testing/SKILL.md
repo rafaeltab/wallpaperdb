@@ -1,11 +1,20 @@
 ---
 name: testing
-description: Repository test execution and infrastructure pitfalls. Use when running or troubleshooting tests.
+description: Repository test planning, spec testing sections, test seam selection, execution, and infrastructure troubleshooting. Use when deciding where behavior belongs or running tests.
 ---
 
 # Testing
 
 Use [shared testing principles](../../../docs/coding-standards/project-organization.md#shared-testing-principles) and select subject-specific requirements through [CODING_STANDARDS.md](../../../CODING_STANDARDS.md). Command names such as `test-unit` and `test-integration` select workspace scripts; they do not define a test's architectural boundary.
+
+## Choose test seams
+
+- Use [browser E2E tests](../../../docs/coding-standards/project-organization.md#browser-e2e-testing) for a small set of successful, complete user journeys.
+- Use [driving-adapter contract tests](../../../docs/coding-standards/adapters.md#testing) for inbound protocol translation and external responses.
+- Use [capability tests](../../../docs/coding-standards/application-and-domain.md#testing) for application decisions through a driving port with controlled adapters, never production adapters.
+- Use [driven-adapter contract tests](../../../docs/coding-standards/adapters.md#testing) for production adapters against real infrastructure and their port guarantees.
+
+Keep capability decisions in capability tests. Test protocol translation and infrastructure behavior in adapter tests. Add [composition tests](../../../docs/coding-standards/composition-and-operations.md#testing) when wiring or composition introduces a distinct risk.
 
 Use `make help` to discover commands. To run a focused test, use `make test-focused PACKAGE=<workspace> ARGS='<file or filter>'`; it builds dependencies and runs tests serially. `make coverage-summary` reads existing coverage, so run the relevant coverage-producing tests first.
 

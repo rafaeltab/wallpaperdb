@@ -6,7 +6,6 @@
     ],
     "globalDependencies": [
         "packages/vitest-config/src/**",
-        "packages/vitest-config/dist/**",
         "packages/test-logger/src/**"
     ],
     "tasks": {

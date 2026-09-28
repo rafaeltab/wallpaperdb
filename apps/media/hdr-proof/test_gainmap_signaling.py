@@ -1,15 +1,19 @@
 """Real emitted ICC metadata must establish gamut before appearance can qualify."""
 
+import hashlib
+import io
 import json
 from pathlib import Path
+import struct
 import subprocess
 import tempfile
+import time
 import unittest
 
 import numpy as np
 from PIL import Image, ImageCms
 
-from gainmap import inspect, output_gamut
+from gainmap import geometry, inspect, output_gamut, source_image
 
 ROOT = Path(__file__).parent
 
@@ -65,6 +69,35 @@ class GainMapColorSignalingTests(unittest.TestCase):
             self.assertEqual(facts["metadata"]["ICC_Profile:ProfileDescription"], "sRGB built-in")
             np.testing.assert_array_equal(before, np.asarray(Image.open(output).convert("RGB")))
             self.assertIsNone(output_gamut(facts))
+
+    def test_reference_srgb_profile_has_fixed_date_and_unchanged_native_cms_pixels(self):
+        source = ROOT / "fixtures" / "gainmap" / "gainmap-apple-new.jpg"
+        reference = source_image(source, "srgb")
+        profile = reference.info["icc_profile"]
+        self.assertEqual(struct.unpack(">6H", profile[24:36]), (2000, 1, 1, 0, 0, 0))
+        with Image.open(source) as image:
+            original_profile = ImageCms.ImageCmsProfile(io.BytesIO(image.info["icc_profile"]))
+            native = ImageCms.profileToProfile(image.convert("RGB"), original_profile,
+                                               ImageCms.createProfile("sRGB"),
+                                               renderingIntent=0, outputMode="RGB")
+        np.testing.assert_array_equal(np.asarray(reference), np.asarray(native))
+        original_bytes = native.info["icc_profile"]
+        self.assertEqual(profile[:24] + profile[36:], original_bytes[:24] + original_bytes[36:])
+
+    def test_reference_png_bytes_repeat_across_native_profile_clock_ticks(self):
+        source = ROOT / "fixtures" / "gainmap" / "gainmap-apple-new.jpg"
+
+        def encoded_reference():
+            reference = geometry(source_image(source, "srgb"), "contain")
+            profile = reference.info["icc_profile"]
+            reference.info.clear()
+            buffer = io.BytesIO()
+            reference.save(buffer, format="PNG", icc_profile=profile)
+            return buffer.getvalue()
+
+        first = encoded_reference()
+        time.sleep(1.1)  # LittleCMS creation timestamps have one-second precision.
+        self.assertEqual(hashlib.sha256(first).hexdigest(), hashlib.sha256(encoded_reference()).hexdigest())
 
 
 if __name__ == "__main__":

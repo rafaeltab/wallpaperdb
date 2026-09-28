@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 import re
 import shutil
+import struct
 import subprocess
 
 import numpy as np
@@ -125,12 +126,20 @@ def inspect(path, directory):
 
 
 def source_image(path, gamut):
-    image = Image.open(path)
-    profile = image.info.get("icc_profile")
-    image = image.convert("RGB")
+    with Image.open(path) as original:
+        profile = original.info.get("icc_profile")
+        image = original.convert("RGB")
     if gamut == "srgb" and profile:
         image = ImageCms.profileToProfile(image, ImageCms.ImageCmsProfile(io.BytesIO(profile)),
                                           ImageCms.createProfile("sRGB"), renderingIntent=0, outputMode="RGB")
+        # LittleCMS writes the current time into a newly generated profile.
+        # ICC header bytes 24..35 contain six big-endian uint16 date fields.
+        # Fix only this reference profile's creation date to 2000-01-01 UTC;
+        # do this after the native CMS transform so serializing and reopening
+        # its in-memory color tags cannot alter reference-pixel rounding.
+        reference_profile = bytearray(image.info["icc_profile"])
+        reference_profile[24:36] = struct.pack(">6H", 2000, 1, 1, 0, 0, 0)
+        image.info["icc_profile"] = bytes(reference_profile)
     return image
 
 

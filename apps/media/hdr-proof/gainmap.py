@@ -229,6 +229,13 @@ def run(output_dir):
         evidence_dir = directory / "sources" / name
         facts = inspect(path, evidence_dir)
         gamut = "srgb" if name == "gainmap-android-xmp" else "p3"
+        established_gamut = output_gamut(facts)
+        if established_gamut is None and (facts["metadata"].get("ExifIFD:ColorSpace") == 1
+                                          and facts["metadata"].get("InteropIFD:InteropIndex") == "R98"):
+            established_gamut = "srgb"
+        facts["established_gamut"] = established_gamut
+        if established_gamut != gamut:
+            raise ValueError(f"Fixture {name} lacks independent signaling for its declared {gamut} gamut")
         sources[name] = {"path": path, "facts": facts, "gamut": gamut}
         try:
             sources[name]["hdr"] = independent_hdr(path, evidence_dir, gamut)
@@ -262,6 +269,7 @@ def run(output_dir):
                             command(["exiftool", "-overwrite_original", "-Orientation#=6", input_path], case_dir / "orientation-fixture.log")
                         native_mode = "native-retain" if mode == "keep" and fmt == "jpg" else mode
                         jobs.append({"case_id": case_id, "fixture_id": name, "mode": native_mode,
+                                     "source_gamut": established_gamut,
                                      "input": str(input_path), "output": str(case_dir / f"output.{fmt}"),
                                      "geometry": operation, "orientation": 6 if operation == "orientation" else 1,
                                      "gamut": gamut_selector, "format": fmt})
@@ -276,6 +284,7 @@ def run(output_dir):
                 command(["exiftool", "-overwrite_original", f"-Orientation#={orientation}", input_path], case_dir / "orientation-fixture.log")
                 jobs.append({"case_id": case_id, "fixture_id": name,
                              "mode": "native-retain" if mode == "keep" else mode,
+                             "source_gamut": established_gamut,
                              "input": str(input_path), "output": str(case_dir / "output.jpg"),
                              "geometry": "orientation", "orientation": orientation, "gamut": "preserve", "format": "jpg"})
 
@@ -295,6 +304,7 @@ def run(output_dir):
                     "structure": False, "appearance": False, "privacy": False},
                 "blockers": [], "artifacts": [], "measurements": {}}
         case["selectors"]["format"] = job["format"]
+        case["established_source_gamut"] = job["source_gamut"]
         if job["mode"] == "native-retain":
             case["candidate"] = "libultrahdr-2.0.2+PR484+PR491:retain-base-and-map:sharp-0.35.5-geometry"
             case["native_build"] = NATIVE_RETAIN_BUILD

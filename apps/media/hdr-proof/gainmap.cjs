@@ -27,6 +27,16 @@ function orientMap(pipeline, orientation) {
   return pipeline;
 }
 
+async function outputColor(pipeline, job) {
+  if (job.gamut === 'srgb') return pipeline.withIccProfile('srgb');
+  // Source gamut is established independently before this candidate runs.
+  // The Android fixture signals sRGB through EXIF but has no embedded ICC.
+  if (job.source_gamut === 'srgb' && !(await pipeline.metadata()).icc) {
+    return pipeline.withIccProfile('srgb');
+  }
+  return pipeline.keepIccProfile();
+}
+
 async function nativeRetain(job) {
   if (job.format !== 'jpg' || job.gamut !== 'preserve') {
     throw new Error('Native retained-map candidate requires JPEG and gamut=preserve');
@@ -63,8 +73,8 @@ async function nativeRetain(job) {
   const baseHeight = swapped ? source.width : source.height;
   const mapWidth = swapped ? source.map_height : source.map_width;
   const mapHeight = swapped ? source.map_width : source.map_height;
-  await geometry(sharp(base), job.geometry).keepIccProfile()
-    .jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toFile(transformedBase);
+  const basePipeline = await outputColor(geometry(sharp(base), job.geometry), job);
+  await basePipeline.jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toFile(transformedBase);
   const target = await sharp(transformedBase).metadata();
   const mapTargetWidth = Math.max(1, Math.round(target.width * mapWidth / baseWidth));
   const mapTargetHeight = Math.max(1, Math.round(target.height * mapHeight / baseHeight));
@@ -99,7 +109,7 @@ async function main() {
       if (job.mode === 'keep') pipeline = pipeline.keepGainMap();
       if (job.mode === 'regenerate') pipeline = pipeline.withGainMap();
       pipeline = geometry(pipeline, job.geometry);
-      pipeline = job.gamut === 'srgb' ? pipeline.withIccProfile('srgb') : pipeline.keepIccProfile();
+      pipeline = await outputColor(pipeline, job);
       const options = {
         jpg: { quality: 95, chromaSubsampling: '4:4:4' },
         avif: { quality: 95, bitdepth: 8, chromaSubsampling: '4:4:4', effort: 4 },

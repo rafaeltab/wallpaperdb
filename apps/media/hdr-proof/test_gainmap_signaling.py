@@ -19,11 +19,13 @@ ROOT = Path(__file__).parent
 
 
 class GainMapColorSignalingTests(unittest.TestCase):
-    def encode(self, directory, source, gamut, fmt):
+    def encode(self, directory, source, gamut, fmt, source_gamut=None):
         output = directory / f"{source}-{gamut}.{fmt}"
         job = {"case_id": "color-signaling", "mode": "sdr", "geometry": "contain",
                "format": fmt, "gamut": gamut, "output": str(output),
                "input": str(ROOT / "fixtures" / "gainmap" / f"{source}.jpg")}
+        if source_gamut is not None:
+            job["source_gamut"] = source_gamut
         result = subprocess.run(["node", str(ROOT / "gainmap.cjs")], input=json.dumps([job]),
                                 capture_output=True, text=True, check=True, timeout=30)
         self.assertTrue(json.loads(result.stdout)["ok"], result.stdout)
@@ -40,6 +42,29 @@ class GainMapColorSignalingTests(unittest.TestCase):
                         output = self.encode(directory, source, selector, fmt)
                         facts = inspect(output, directory / output.stem / fmt)
                         self.assertEqual(output_gamut(facts), expected)
+
+    def test_known_unprofiled_android_base_emits_srgb_without_changing_native_pixels(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            plain, known = directory / "plain", directory / "known"
+            plain.mkdir()
+            known.mkdir()
+            source = ROOT / "fixtures" / "gainmap" / "gainmap-android-xmp.jpg"
+            source_facts = inspect(source, directory / "source")
+            self.assertEqual(source_facts["metadata"]["ExifIFD:ColorSpace"], 1)
+            self.assertEqual(source_facts["metadata"]["InteropIFD:InteropIndex"], "R98")
+            self.assertIsNone(output_gamut(source_facts))
+            for fmt in ("jpg", "avif", "png", "webp"):
+                with self.subTest(format=fmt):
+                    output = self.encode(known, "gainmap-android-xmp", "preserve", fmt, "srgb")
+                    facts = inspect(output, known / fmt)
+                    self.assertEqual(output_gamut(facts), "srgb")
+                    self.assertEqual(facts["private_tags"], [])
+                    if fmt == "jpg":
+                        untagged = self.encode(plain, "gainmap-android-xmp", "preserve", fmt)
+                        self.assertIsNone(output_gamut(inspect(untagged, plain / fmt)))
+                        np.testing.assert_array_equal(np.asarray(Image.open(output).convert("RGB")),
+                                                      np.asarray(Image.open(untagged).convert("RGB")))
 
     def test_native_profile_removal_preserves_pixels_but_removes_gamut_proof(self):
         with tempfile.TemporaryDirectory() as temporary:

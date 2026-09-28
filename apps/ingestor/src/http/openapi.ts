@@ -4,7 +4,7 @@ export const uploadSchema: FastifySchema = {
   summary: 'Upload a wallpaper',
   security: [{ bearerAuth: [] }],
   description:
-    'Upload a JPEG, PNG, or WebP image. Content is inspected from bytes; images may be at most 50 MiB and between 1280×720 and 7680×4320 pixels.',
+    'Upload a still JPEG, PNG, or WebP image. Content is inspected from bytes. Encoded file size must be at most 50 MiB (52,428,800 bytes). Image dimensions must be at most 20,000 pixels per axis and 100,000,000 total pixels. There is no minimum image size. Animated PNG and WebP are rejected.',
   tags: ['Upload'],
   response: { 200: { $ref: 'UploadSuccessResponse#' } },
 };

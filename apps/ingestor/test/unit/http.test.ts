@@ -142,16 +142,26 @@ it.each<{ outcome: UploadOutcome; status: number; type: string; detail?: string 
   {
     outcome: {
       _tag: 'InvalidDimensions',
-      width: 1,
-      height: 1,
-      minWidth: 1280,
-      minHeight: 720,
-      maxWidth: 7680,
-      maxHeight: 4320,
+      width: 20001,
+      height: 100,
+      maxWidth: 20000,
+      maxHeight: 20000,
     },
     status: 400,
     type: 'dimensions-out-of-bounds',
-    detail: 'Image dimensions must be between 1280x720 and 7680x4320 pixels.',
+    detail: 'Image dimensions 20001x100 exceed the 20000-pixel per-axis limit.',
+  },
+  {
+    outcome: { _tag: 'TooManyPixels', width: 10001, height: 10000, maxPixels: 100000000 },
+    status: 400,
+    type: 'pixels-out-of-bounds',
+    detail: 'Image dimensions 10001x10000 exceed the 100000000-pixel limit.',
+  },
+  {
+    outcome: { _tag: 'UnsupportedAnimation' },
+    status: 400,
+    type: 'unsupported-animation',
+    detail: 'Animated PNG and WebP images are not supported. Upload a still image.',
   },
 ])('maps $outcome._tag to a declared HTTP response', async ({ outcome, status, type, detail }) => {
   const { app } = await fixture(outcome);

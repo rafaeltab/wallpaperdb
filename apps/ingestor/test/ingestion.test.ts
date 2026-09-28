@@ -15,10 +15,8 @@ describe('Wallpaper ingestion', () => {
       _tag: 'InvalidDimensions',
       width: 1,
       height: 1,
-      minWidth: 1280,
-      minHeight: 720,
-      maxWidth: 7680,
-      maxHeight: 4320,
+      maxWidth: 20000,
+      maxHeight: 20000,
     },
   ])('does not persist rejected content: $_tag', async (rejection) => {
     const test = fixture({ inspection: { inspect: () => Effect.succeed(rejection) } });

@@ -109,7 +109,7 @@ describe('uploadWallpaperWithDetails', () => {
       ok: false,
       status: 400,
       json: () =>
-        Promise.resolve({ detail: 'Image dimensions 10001x10000 exceed the 100000000-pixel limit.' }),
+        Promise.resolve({ detail: 'Image dimensions 10001x10000 exceed the 100MP limit.' }),
       headers: new Headers(),
     });
 
@@ -118,7 +118,7 @@ describe('uploadWallpaperWithDetails', () => {
     expect(result.success).toBe(false);
     expect(result.error?.type).toBe('validation');
     expect(result.error?.message).toBe(
-      'Image dimensions 10001x10000 exceed the 100000000-pixel limit.'
+      'Image dimensions 10001x10000 exceed the 100MP limit.'
     );
     expect(result.error?.retryAfter).toBeUndefined();
   });

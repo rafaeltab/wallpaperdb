@@ -858,7 +858,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "0c7b157f711c531838a5fdd8a05335a4f68121fdf04fdd3b48dc0be31ac9861a"
+        "sha256": "0c7b157f711c531838a5fdd8a05335a4f68121fdf04fdd3b48dc0be31ac9861a",
+        "alpha_measurement": {
+          "comparison": "explicit opaque coercion",
+          "absolute_error_limit": 0,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -901,7 +909,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "1e8defdb6bbe25f4aac73dc14bb4a227d54783cc7750e84a1560f3677ae5e151"
+        "sha256": "1e8defdb6bbe25f4aac73dc14bb4a227d54783cc7750e84a1560f3677ae5e151",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 3.0518043793392844e-05,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": null
     },
@@ -954,7 +970,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "45b5e5891ec1a47f2c0524a2a9393fe47d702d63b49a5b38089ec73592ecad16"
+        "sha256": "45b5e5891ec1a47f2c0524a2a9393fe47d702d63b49a5b38089ec73592ecad16",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 0.00784313725490196,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -986,7 +1010,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "1afb926e21099508e2fe2b626da87c17ef949ead0fff7168a5ae4f706b77937a"
+        "sha256": "1afb926e21099508e2fe2b626da87c17ef949ead0fff7168a5ae4f706b77937a",
+        "alpha_measurement": {
+          "comparison": "explicit binary coercion",
+          "absolute_error_limit": 0,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1031,7 +1063,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "510b6c6da62113d8f3b9fa24bcd836b58abf3146c3d692c83353fd480ba8a447"
+        "sha256": "510b6c6da62113d8f3b9fa24bcd836b58abf3146c3d692c83353fd480ba8a447",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 3.0518043793392844e-05,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": null
     },
@@ -1057,7 +1097,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "a56b0ba4c33b8b4c0316fcddb80b711e3df118861b9e32b1aabb2faafe088a1b"
+        "sha256": "a56b0ba4c33b8b4c0316fcddb80b711e3df118861b9e32b1aabb2faafe088a1b",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 0.00784313725490196,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1087,9 +1135,71 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "ee490a10dc147014e3bc632cf505f67c7401574cffab14689fe349e7da2b3448"
+        "sha256": "ee490a10dc147014e3bc632cf505f67c7401574cffab14689fe349e7da2b3448",
+        "alpha_measurement": {
+          "comparison": "explicit opaque coercion",
+          "absolute_error_limit": 0,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+    },
+    {
+      "file": "avif-pq-rec2020-10-opaque-sdr-avif-srgb-preserve-contain-depth-12.avif",
+      "sha256": "b6f8a83c9f3995f0fd2e14e3f578e74a01038add2b04ea314c2131150cf513dc",
+      "role": "Inspected native conversion candidate",
+      "case_id": "avif-pq-rec2020-10-opaque:sdr:avif:srgb:preserve:contain:depth-12",
+      "codec_status": "qualified",
+      "consumer_status": "pending manual review",
+      "facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-10-opaque/sdr-avif-preserve-contain-depth-12/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 2346,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "12 12 12",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 2075,
+          "MediaDataOffset": 271,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 12,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 0,
+        "alpha": "Absent",
+        "sha256": "b6f8a83c9f3995f0fd2e14e3f578e74a01038add2b04ea314c2131150cf513dc"
+      },
+      "warning": null
     },
     {
       "file": "avif-hlg-rec2020-10-opaque-hdr-avif-preserve-preserve-contain.avif",
@@ -1252,7 +1362,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "54eb2f9d29eca7511fd419f18b8cc2760d99eeaaa60afca3f6fdb294bb863b22"
+        "sha256": "54eb2f9d29eca7511fd419f18b8cc2760d99eeaaa60afca3f6fdb294bb863b22",
+        "alpha_measurement": {
+          "comparison": "explicit opaque coercion",
+          "absolute_error_limit": 0,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1295,7 +1413,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "2c9cdcccaee76a5859741bbb7f982d428c33469a69508ccecfdee077c8ad0d83"
+        "sha256": "2c9cdcccaee76a5859741bbb7f982d428c33469a69508ccecfdee077c8ad0d83",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 3.0518043793392844e-05,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": null
     },
@@ -1348,7 +1474,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "4222ad072544399ed0299ee17c49558b9d21130ebc42c6e025b7ea13356fd500"
+        "sha256": "4222ad072544399ed0299ee17c49558b9d21130ebc42c6e025b7ea13356fd500",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 0.00784313725490196,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1380,7 +1514,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "a11f2b27a9f0160da9ffd7031ef4b1ef4558cf2628e1bdcbd9a550ade0e53584"
+        "sha256": "a11f2b27a9f0160da9ffd7031ef4b1ef4558cf2628e1bdcbd9a550ade0e53584",
+        "alpha_measurement": {
+          "comparison": "explicit binary coercion",
+          "absolute_error_limit": 0,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1425,7 +1567,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "83d1279f16ffc4976070a5b68172ffba59923414dcbb9e5217159e24418ae89a"
+        "sha256": "83d1279f16ffc4976070a5b68172ffba59923414dcbb9e5217159e24418ae89a",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 3.0518043793392844e-05,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": null
     },
@@ -1451,7 +1601,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "4ef825ad1b1198119e0e23d472ddb23a23683b88e215fce821ca3ac77efeb518"
+        "sha256": "4ef825ad1b1198119e0e23d472ddb23a23683b88e215fce821ca3ac77efeb518",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 0.00784313725490196,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1481,9 +1639,71 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "2779005f43b13a8571ec5d3a1c8677f306974c81c496d2a0ebadfcb5b1d49ac6"
+        "sha256": "2779005f43b13a8571ec5d3a1c8677f306974c81c496d2a0ebadfcb5b1d49ac6",
+        "alpha_measurement": {
+          "comparison": "explicit opaque coercion",
+          "absolute_error_limit": 0,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+    },
+    {
+      "file": "avif-hlg-rec2020-10-opaque-sdr-avif-srgb-preserve-contain-depth-12.avif",
+      "sha256": "fc83907c989997f0bf710892d69289468f1a76b5b6894c7d55cad6c9a8dfb323",
+      "role": "Inspected native conversion candidate",
+      "case_id": "avif-hlg-rec2020-10-opaque:sdr:avif:srgb:preserve:contain:depth-12",
+      "codec_status": "qualified",
+      "consumer_status": "pending manual review",
+      "facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-rec2020-10-opaque/sdr-avif-preserve-contain-depth-12/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 2466,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "12 12 12",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 2195,
+          "MediaDataOffset": 271,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 12,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 0,
+        "alpha": "Absent",
+        "sha256": "fc83907c989997f0bf710892d69289468f1a76b5b6894c7d55cad6c9a8dfb323"
+      },
+      "warning": null
     },
     {
       "file": "animated-pq-alpha-hdr-avif-preserve-preserve-contain.avif",
@@ -1779,7 +1999,16 @@
           300,
           700
         ],
-        "loop": 3
+        "loop": 3,
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 0.00784313725490196,
+          "maximum_absolute_error": 0.004240870475769043,
+          "frame_maximum_absolute_errors": [
+            0.004240870475769043,
+            0.0038230419158935547
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1834,7 +2063,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "64ca4d508110f98d9ce4df60875b0eabf8f7770c3b37440a7c6bea64a1acbfe4"
+        "sha256": "64ca4d508110f98d9ce4df60875b0eabf8f7770c3b37440a7c6bea64a1acbfe4",
+        "alpha_measurement": {
+          "comparison": "explicit opaque coercion",
+          "absolute_error_limit": 0,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1877,7 +2114,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "dc55660b10bc7b1046deb70b75e4b4994199fdc47cf3aae9d636d34d9aa8e717"
+        "sha256": "dc55660b10bc7b1046deb70b75e4b4994199fdc47cf3aae9d636d34d9aa8e717",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 3.0518043793392844e-05,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1930,7 +2175,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "30a53e61486488fd7a1293b466cdd87bafbb040733a7efe9cb519bd232c31ba6"
+        "sha256": "30a53e61486488fd7a1293b466cdd87bafbb040733a7efe9cb519bd232c31ba6",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 0.00784313725490196,
+          "maximum_absolute_error": 0.0029144731822690166,
+          "frame_maximum_absolute_errors": [
+            0.0029144731822690166
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -1963,7 +2216,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "869154ca7c918c3ded9dd48a0bc763e23be7707903f913426f3acb870a0c2d55"
+        "sha256": "869154ca7c918c3ded9dd48a0bc763e23be7707903f913426f3acb870a0c2d55",
+        "alpha_measurement": {
+          "comparison": "explicit binary coercion",
+          "absolute_error_limit": 0,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -2008,7 +2269,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "8d5288535f14d92ce31a79f57eae841c969106c05e50e004df6ed9e4f92cc01d"
+        "sha256": "8d5288535f14d92ce31a79f57eae841c969106c05e50e004df6ed9e4f92cc01d",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 3.0518043793392844e-05,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
       },
       "warning": null
     },
@@ -2034,7 +2303,15 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "599fffad78059eaa9bc2bf15ba97775d5d4538f4f42ec8fb09a137d4f133c541"
+        "sha256": "599fffad78059eaa9bc2bf15ba97775d5d4538f4f42ec8fb09a137d4f133c541",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 0.00784313725490196,
+          "maximum_absolute_error": 0.004715037766079178,
+          "frame_maximum_absolute_errors": [
+            0.004715037766079178
+          ]
+        }
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -2064,7 +2341,105 @@
           "ImageSize": "96 64",
           "Megapixels": 0.006144
         },
-        "sha256": "ffd039e69744dc4348a627ae5d778fd3b936d65a4a359818fc07e326959c9ba7"
+        "sha256": "ffd039e69744dc4348a627ae5d778fd3b936d65a4a359818fc07e326959c9ba7",
+        "alpha_measurement": {
+          "comparison": "explicit opaque coercion",
+          "absolute_error_limit": 0,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
+      },
+      "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+    },
+    {
+      "file": "animated-pq-alpha-sdr-avif-srgb-preserve-contain-depth-12.avif",
+      "sha256": "ab159d3f01ec9dfa3501f12254d081b691f99d5158849c4897ee6fd7a4d4d414",
+      "role": "Inspected native conversion candidate",
+      "case_id": "animated-pq-alpha:sdr:avif:srgb:preserve:contain:depth-12",
+      "codec_status": "tested and failed",
+      "consumer_status": "pending manual review",
+      "facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/animated-pq-alpha/sdr-avif-preserve-contain-depth-12/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * Repeat Count   : 2\n * 10 timescales per second, 1.00 seconds (10 timescales), 2 frames\n * Image Sequence Frames: (2 expected frames)\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 0.30 (3 timescales)] [57x38]\n   * Decoded frame [1] [pts 0.30 (3 timescales)] [duration 0.70 (7 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 7395,
+          "FilePermissions": 100644,
+          "FileType": "MP4",
+          "FileTypeExtension": "MP4",
+          "MIMEType": "video/mp4",
+          "MajorBrand": "avis",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "avis",
+            "msf1",
+            "iso8",
+            "mif1",
+            "miaf"
+          ],
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "12 12 12",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+          "MovieHeaderVersion": 1,
+          "CreateDate": "1970:01:01 00:00:01",
+          "ModifyDate": "1970:01:01 00:00:01",
+          "TimeScale": 10,
+          "Duration": 3,
+          "PreferredRate": 1,
+          "PreferredVolume": 1,
+          "PreviewTime": 0,
+          "PreviewDuration": 0,
+          "PosterTime": 0,
+          "SelectionTime": 0,
+          "SelectionDuration": 0,
+          "CurrentTime": 0,
+          "NextTrackID": 2,
+          "TrackHeaderVersion": 1,
+          "TrackCreateDate": "1970:01:01 00:00:01",
+          "TrackModifyDate": "1970:01:01 00:00:01",
+          "TrackID": 1,
+          "TrackDuration": 3,
+          "TrackLayer": 0,
+          "TrackVolume": 0,
+          "MatrixStructure": "1 0 0 0 1 0 0 0 1",
+          "MediaHeaderVersion": 16777216,
+          "MediaCreateDate": "1970:01:01 00:00:01",
+          "MediaModifyDate": "1970:01:01 00:00:01",
+          "MediaTimeScale": 10,
+          "MediaDuration": 1,
+          "MediaLanguageCode": "und",
+          "HandlerType": "auxv",
+          "GraphicsMode": 0,
+          "OpColor": "0 0 0",
+          "OtherFormat": "av01",
+          "MediaDataSize": 5592,
+          "MediaDataOffset": 1803,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166,
+          "AvgBitrate": 14912
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 12,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 0,
+        "alpha": "Not",
+        "sha256": "ab159d3f01ec9dfa3501f12254d081b691f99d5158849c4897ee6fd7a4d4d414"
       },
       "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
     },
@@ -3659,13 +4034,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-jpg-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "68f21c779542ae5ade331ac3b708b5092714642349da24fe5de776745797dce7",
+      "sha256": "f14f7dc46a0f456720565325bbb654304696fbfe61267b447d6e7a886a6084a7",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "68f21c779542ae5ade331ac3b708b5092714642349da24fe5de776745797dce7",
+        "reference_sha256": "f14f7dc46a0f456720565325bbb654304696fbfe61267b447d6e7a886a6084a7",
         "case_id": "gainmap-apple-new:sdr:jpg:srgb:preserve:contain"
       },
       "warning": null
@@ -3823,13 +4198,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-avif-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "c843a865c52f90ae61e720759e611e0913ad90519a9f3b7c33808e9704034e9e",
+      "sha256": "e2fbead33596f8dc9a87164dfda96726eb5dac7e031683013886684af0a7337d",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "c843a865c52f90ae61e720759e611e0913ad90519a9f3b7c33808e9704034e9e",
+        "reference_sha256": "e2fbead33596f8dc9a87164dfda96726eb5dac7e031683013886684af0a7337d",
         "case_id": "gainmap-apple-new:sdr:avif:srgb:preserve:contain"
       },
       "warning": null
@@ -3971,13 +4346,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-png-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "c843a865c52f90ae61e720759e611e0913ad90519a9f3b7c33808e9704034e9e",
+      "sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "c843a865c52f90ae61e720759e611e0913ad90519a9f3b7c33808e9704034e9e",
+        "reference_sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
         "case_id": "gainmap-apple-new:sdr:png:srgb:preserve:contain"
       },
       "warning": null
@@ -4105,13 +4480,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-webp-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "0c3a898299f252166897539508c4657f6ba41e95eb7eefdca49abf8a0008db16",
+      "sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "0c3a898299f252166897539508c4657f6ba41e95eb7eefdca49abf8a0008db16",
+        "reference_sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
         "case_id": "gainmap-apple-new:sdr:webp:srgb:preserve:contain"
       },
       "warning": null
@@ -4195,13 +4570,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-gif-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "0c3a898299f252166897539508c4657f6ba41e95eb7eefdca49abf8a0008db16",
+      "sha256": "92554f9bfd2324a1f04ec07e70fd4118b7a843c7fbfc513ce1e1b8758d4b068c",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "0c3a898299f252166897539508c4657f6ba41e95eb7eefdca49abf8a0008db16",
+        "reference_sha256": "92554f9bfd2324a1f04ec07e70fd4118b7a843c7fbfc513ce1e1b8758d4b068c",
         "case_id": "gainmap-apple-new:sdr:gif:srgb:preserve:contain"
       },
       "warning": null

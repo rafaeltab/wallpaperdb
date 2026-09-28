@@ -4,26 +4,26 @@ The HDR milestone remains blocked. Automated codec results do not qualify browse
 
 Reproduce from the repository root with `make run PACKAGE=media SCRIPT=proof:hdr`. Docker must support linux/amd64. The default command returns exit 2 while required codec cases or physical checks are unqualified. This is an intentional qualification failure, not a passing release gate.
 
-Recorded 715 conversion attempts over 32 fixture records: 699 completed native encoding, 16 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 137 qualified, 578 tested and failed.
+Recorded 845 conversion attempts over 32 fixture records: 829 completed native encoding, 16 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 290 qualified, 555 tested and failed.
 The inventory covers 85 HDR-ledger cells and 5 labeled SDR controls. Ledger outcomes: 9 deliberately deferred, 17 incompatible with the requested selectors, 5 qualified, 28 tested and failed, 26 untested.
 
 The finite required plan contains 320 cases. Unexecuted required cases: 0. Unlisted cross-products are untested, even when a neighboring case passes.
 
 ## Failure stages
 
-Of 320 planned required cases, 320 have exact fixture/selector evidence and 82 qualify. Native encoding completed in 315; 5 stopped at a native operation. A native failure can occur while preparing an input fixture, before the final encoder is reached.
+Of 320 planned required cases, 320 have exact fixture/selector evidence and 132 qualify. Native encoding completed in 315; 5 stopped at a native operation. A native failure can occur while preparing an input fixture, before the final encoder is reached.
 
-Across all recorded cases, 561 have measured check failures and 79 lack required evidence. These counts overlap. A missing ordinary-white patch after cropping or an unavailable independent gamut reference is an evidence gap, not a measured change to those pixels.
+Across all recorded cases, 489 have measured check failures and 108 lack required evidence. These counts overlap. A missing ordinary-white patch after cropping or an unavailable independent gamut reference is an evidence gap, not a measured change to those pixels.
 
 False downstream flags on a failed native operation are unevaluated. They do not establish additional appearance, decoder, or metadata privacy failures. Successful encoding also does not establish qualification. The original status enums and required passing criteria remain unchanged.
 
 | Required path | Planned | Observed | Native completed | Native failure | Measured failure | Missing evidence | Qualified |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `gainmap-jpeg:hdr:jpg` | 20 | 20 | 15 | 5 | 15 | 5 | 0 |
-| `gainmap-jpeg:sdr:jpg` | 40 | 40 | 40 | 0 | 40 | 0 | 0 |
-| `static-avif:hdr:avif` | 120 | 120 | 120 | 0 | 42 | 0 | 78 |
-| `static-avif:sdr:avif` | 120 | 120 | 120 | 0 | 120 | 0 | 0 |
-| `animated-pq:hdr:avif` | 10 | 10 | 10 | 0 | 6 | 0 | 4 |
+| `gainmap-jpeg:sdr:jpg` | 40 | 40 | 40 | 0 | 35 | 5 | 0 |
+| `static-avif:hdr:avif` | 120 | 120 | 120 | 0 | 18 | 0 | 102 |
+| `static-avif:sdr:avif` | 120 | 120 | 120 | 0 | 96 | 0 | 24 |
+| `animated-pq:hdr:avif` | 10 | 10 | 10 | 0 | 4 | 0 | 6 |
 | `animated-pq:sdr:avif` | 5 | 5 | 5 | 0 | 5 | 0 | 0 |
 | `animated-pq:sdr:webp` | 5 | 5 | 5 | 0 | 5 | 0 | 0 |
 
@@ -179,15 +179,15 @@ The tunable Mobius and Reinhard trials use maintained native functions with fixe
 
 - The pinned Apple fixes remove the retained-layer encoding error and correct new-Apple headroom. Required Apple geometries now encode and independently decode, but regional SDR-base and HDR reconstruction errors still exceed the fixed limits. Resampling the base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. Recomputing a map against the retained authored base remains an untested candidate.
 - The retained native JPEG writer now emits independently parsed ISO plus Android metadata. ISO-only source JPEG still lacks a maintained independent reconstruction reader in this environment. The Android element-style XMP fixture is rejected by the native reader; fractional map-coordinate crops also remain rejected. These failures are explicit.
-- Same-transfer AVIF geometry now operates in display-linear light with explicit alpha handling. Remaining downscale/crop boundary differences and output quantization still fail some regional appearance/alpha gates. Native zimg clamps the filter at image boundaries; the independent Pillow reference truncates and normalizes there. The animated orientation serialization regression passes.
-- Calibrated static SDR tone/gamut controls pass, and exact SDR PNG cases qualify. Eight-bit SDR output remains limited by the unchanged near-black Delta E gates: rounding a small positive signal to black can exceed the maximum even when the tone policy passes. The animated PQ sequence also retains a highlight-gradation blocker. Higher precision is a separate selector, not permission to qualify a failed eight-bit request.
+- Same-transfer AVIF geometry now operates in display-linear light with explicit alpha handling. Cover resizing filters the full image before cropping, preserving samples across the crop boundary. Remaining image-edge downscale differences and output quantization still fail some regional appearance/alpha gates. Native zimg clamps the filter at image boundaries; the independent Pillow reference truncates and normalizes there. The animated orientation serialization regression passes.
+- Calibrated static SDR tone/gamut controls pass, and exact SDR PNG cases qualify. Some eight-bit SDR outputs still fail the unchanged near-black Delta E gates: rounding a small positive signal to black can exceed the maximum even when the tone policy passes. Optional 12-bit SDR AVIF tuples retain the same predeclared sdr-8 appearance ceiling and separate case IDs; they cannot replace failed required eight-bit requests. The animated PQ sequence also retains a highlight-gradation blocker.
 - Animated outputs need exact fully composed frames, unequal durations, repetition count and fractional alpha. Failed animation or alpha cases remain required blockers.
 - Unexecuted optional HDR PNG/APNG, HDR WebP, gain-map AVIF and other accepted-source rows remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.
 - These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.
 - The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.
 - Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.
 
-Prepared 107 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
+Prepared 110 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
 
 ## Suite integrity
 

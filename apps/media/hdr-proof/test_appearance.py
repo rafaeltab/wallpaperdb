@@ -62,6 +62,24 @@ class AppearanceTests(unittest.TestCase):
         self.assertEqual(set(result["regions"]), {"shadow", "midtone", "highlight"})
         self.assertGreater(result["regions"]["shadow"]["samples"], 0)
 
+    def test_sdr_errors_can_be_grouped_by_original_hdr_luminance(self):
+        reference = np.repeat(np.array([[1., 50., 90.]])[..., None], 3, axis=-1)
+        actual = reference.copy()
+        actual[0, 2] = 45
+        result = compare_appearance(reference, actual, reference_gamut='srgb', actual_gamut='srgb',
+                                    fixture_class='sdr-8', region_reference_luminance_nits=np.array([[1., 150., 1000.]]))
+        self.assertFalse(result['passed'])
+        self.assertEqual(result['regions']['highlight']['samples'], 1)
+        self.assertAlmostEqual(result['regions']['highlight']['reference_mean_nits'], 90, places=3)
+        self.assertTrue(any(failure.startswith('highlight.') for failure in result['failures']))
+
+    def test_region_luminance_requires_matched_finite_nonnegative_geometry(self):
+        reference = reference_ramp()
+        for invalid in (np.array([1.]), np.full(reference.shape[:-1], np.nan), -np.ones(reference.shape[:-1])):
+            with self.subTest(shape=invalid.shape), self.assertRaisesRegex(ValueError, 'region luminance'):
+                compare_appearance(reference, reference, reference_gamut='rec2020', actual_gamut='rec2020',
+                                   fixture_class='avif-10', region_reference_luminance_nits=invalid)
+
     def test_wrong_transfer_cannot_pass_even_with_identical_shape(self):
         ramp = reference_ramp()
         wrong = np.minimum(ramp, 100)

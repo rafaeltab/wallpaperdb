@@ -136,12 +136,14 @@ def _summary(values):
 
 
 def compare_appearance(reference_rgb_nits, actual_rgb_nits, *, reference_gamut,
-                       actual_gamut, fixture_class, alpha=None):
+                       actual_gamut, fixture_class, alpha=None, region_reference_luminance_nits=None):
     """Measure every present luminance region against its fixed fixture gate.
 
     Alpha only selects visible straight-RGB samples. Callers must independently
     check actual alpha values and composition; this function does not certify
     alpha or encoded facts. It never resizes, rotates, clips, or aligns images.
+    Optional region luminance groups SDR errors by the corresponding HDR source
+    regions. Color and luminance differences still use the mapped SDR reference.
     """
     reference, actual = _pair(reference_rgb_nits, actual_rgb_nits)
     reference_gamut, actual_gamut = _gamut(reference_gamut), _gamut(actual_gamut)
@@ -151,15 +153,21 @@ def compare_appearance(reference_rgb_nits, actual_rgb_nits, *, reference_gamut,
     visible = _visibility(reference.shape[:-1], alpha)
     reference_y = reference @ RGB_TO_XYZ[reference_gamut][1]
     actual_y = actual @ RGB_TO_XYZ[actual_gamut][1]
+    region_y = reference_y
+    if region_reference_luminance_nits is not None:
+        region_y = np.asarray(region_reference_luminance_nits, dtype=np.float64)
+        if (region_y.shape != reference_y.shape or not np.all(np.isfinite(region_y))
+                or np.any(region_y < 0)):
+            raise ValueError('Explicit region luminance must have matched geometry and finite nonnegative values')
     differences = delta_e_itp(reference, actual, reference_gamut, actual_gamut)
     absolute_y_error = np.abs(actual_y - reference_y)
     floor = limits["luminance_absolute_floor_nits"]
     relative_y_error = np.maximum(absolute_y_error - floor, 0) / np.maximum(reference_y, floor)
     regions, failures = {}, []
     masks = {
-        "shadow": reference_y <= 10,
-        "midtone": (reference_y > 10) & (reference_y <= 203.000001),
-        "highlight": reference_y > 203.000001,
+        "shadow": region_y <= 10,
+        "midtone": (region_y > 10) & (region_y <= 203.000001),
+        "highlight": region_y > 203.000001,
     }
     for name, mask in masks.items():
         mask = mask & visible
@@ -190,6 +198,7 @@ def compare_appearance(reference_rgb_nits, actual_rgb_nits, *, reference_gamut,
         "metric": "BT.2124 Delta E ITP",
         "fixture_class": fixture_class,
         "thresholds_sha256": THRESHOLDS_SHA256,
+        "region_basis": "explicit_source_luminance_nits" if region_reference_luminance_nits is not None else "appearance_reference_luminance_nits",
         "regions": regions,
         "failures": failures,
         "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks",

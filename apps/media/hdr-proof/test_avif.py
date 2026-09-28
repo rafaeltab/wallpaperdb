@@ -4,7 +4,8 @@ import tempfile
 from pathlib import Path
 import numpy as np
 from avif import make_scene, encode_transfer, decode_transfer, geometry_reference, write_png, read_png, convert_frame
-from appearance import compare_appearance
+from appearance import compare_appearance, sdr_signal_to_nits
+from sdr_reference import reference_srgb
 
 
 class FixtureTests(unittest.TestCase):
@@ -86,3 +87,36 @@ class FixtureTests(unittest.TestCase):
             self.assertFalse(measurement['passed'])
             self.assertIn('shadow.delta_e_max', measurement['failures'])
             self.assertGreater(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
+
+    def test_native_sdr_geometry_matches_independent_full_color_reference(self):
+        for transfer in ('pq', 'hlg'):
+            with self.subTest(transfer=transfer), tempfile.TemporaryDirectory() as temporary:
+                source, target = Path(temporary)/'source.png', Path(temporary)/'target.png'
+                scene = make_scene(True)
+                signal = scene.copy()
+                signal[..., :3] = encode_transfer(scene[..., :3], transfer, 'rec2020')
+                write_png(source, signal)
+                reference = read_png(source)
+                reference[..., :3] = decode_transfer(reference[..., :3], transfer, 'rec2020')
+                reference = geometry_reference(reference, 'upscale')
+                convert_frame(source, target, transfer, 'rec2020', 'upscale', sdr=True, peak_nits=1000)
+                actual = read_png(target)
+                expected = reference_srgb(reference[..., :3], 'rec2020', peak_nits=1000)
+                measured = compare_appearance(sdr_signal_to_nits(expected), sdr_signal_to_nits(actual[..., :3]),
+                    reference_gamut='srgb', actual_gamut='srgb', fixture_class='sdr-8', alpha=reference[..., 3])
+                self.assertTrue(measured['passed'], measured)
+                self.assertLessEqual(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
+
+    def test_eight_bit_tone_control_finds_authored_white_after_source_quantization(self):
+        from avif import generate_fixture, decode_avif, sdr_tone_control
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            spec = {'id': 'pq8-control', 'transfer': 'pq', 'gamut': 'rec2020', 'depth': 8, 'alpha': False, 'frames': 1}
+            source, _, authored = generate_fixture(spec, directory)
+            decoded = decode_avif(source, directory, 1)[0]
+            reference = decoded.copy()
+            reference[..., :3] = decode_transfer(decoded[..., :3], 'pq', 'rec2020')
+            control = sdr_tone_control(directory/'decoded-0.png', directory/'control.png',
+                                      reference, authored[0], 'pq', 'rec2020', peak_nits=1000)
+            self.assertTrue(control['passed'], control)
+            self.assertIn('ordinary_white_signal', control['measurement']['measurements'])

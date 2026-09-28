@@ -142,12 +142,20 @@ def decode_avif(path, directory, count):
     return frames
 
 
-def convert_frame(source, output, transfer, gamut, mode, *, sdr=False, mapper='bt.2446a'):
+def convert_frame(source, output, transfer, gamut, mode, *, sdr=False, mapper=None, peak_nits=None):
     with Image.open(source) as image:
         width, height = image.size
     outw, outh = {'identity': (width,height), 'static': (width,height), 'orientation': (58,87), 'contain': (57,38), 'cover': (40,40), 'fill': (40,48), 'upscale': (120,80)}[mode]
     if not sdr:
         _convert_hdr_frame(source, output, transfer, gamut, mode, outw, outh)
+        return
+    if mapper is None:
+        from sdr_candidate import convert
+        if peak_nits is None:
+            raise ValueError('The calibrated SDR candidate requires a declared sequence peak in nits')
+        intermediate = Path(output).with_name(Path(output).stem + '-hdr.png')
+        _convert_hdr_frame(source, intermediate, transfer, gamut, mode, outw, outh)
+        convert(intermediate, output, transfer, gamut, peak_nits=peak_nits)
         return
     target_gamut = 'srgb' if sdr else gamut
     target_transfer = 'srgb' if sdr else transfer
@@ -253,8 +261,30 @@ def structure_checks(facts, frames, spec, reference, transfer, gamut, depth, cou
     return checks
 
 
+def sdr_tone_control(source, output, reference, authored, transfer, gamut, *, peak_nits):
+    from appearance import evaluate_sdr_tone_map
+    from sdr_reference import reference_srgb
+
+    convert_frame(source, output, transfer, gamut, 'identity', sdr=True, peak_nits=peak_nits)
+    actual = read_png(output)
+    # Probe identity comes from the authored fixture, not an arbitrary tolerance
+    # search in a quantized decode. Eight-bit PQ can move 203 nits beyond the
+    # default two-nit search window while retaining a valid ordinary-white patch.
+    white = np.all(np.isclose(authored[..., :3], 203, atol=1e-6, rtol=0), axis=-1)
+    measurement = evaluate_sdr_tone_map(
+        reference[..., :3], actual[..., :3], source_gamut=gamut,
+        probe_masks={'ordinary_white': white}, alpha=reference[..., 3],
+        reference_srgb=reference_srgb(reference[..., :3], gamut, peak_nits=peak_nits),
+    )
+    return {'passed': measurement['passed'], 'measurement': measurement,
+            'source': str(source), 'output': str(output), 'sha256': digest(output),
+            'peak_nits': peak_nits, 'geometry': 'identity',
+            'scope': 'Native identity controls for the shared tone/gamut recipe; encoded derivative appearance and structure are checked separately.'}
+
+
 def run(output_dir):
-    from appearance import compare_appearance, evaluate_sdr_tone_map
+    from appearance import compare_appearance, sdr_signal_to_nits, RGB_TO_XYZ
+    from sdr_reference import reference_srgb
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     evidence, fixtures = [], []
@@ -275,6 +305,18 @@ def run(output_dir):
         fixtures.append({'id': spec['id'], 'path': str(source), 'sha256': digest(source), 'spec': spec,
                          'facts': source_facts, 'analytic_measurements': source_errors,
                          'structural_checks': source_structure, 'source_valid': source_valid})
+        # One declared peak is shared by every frame. Per-frame exposure would
+        # make the animation's unchanged ordinary-white patch flicker.
+        peak_nits = 4000 if spec['frames'] == 2 and spec['transfer'] == 'pq' else 1000
+        tone_controls = []
+        for i, (reference, authored) in enumerate(zip(reference_source, analytic)):
+            try:
+                control = sdr_tone_control(folder/f'decoded-{i}.png', folder/f'sdr-control-{i}.png',
+                                           reference, authored, spec['transfer'], spec['gamut'], peak_nits=peak_nits)
+            except Exception as error:
+                control = {'passed': False, 'peak_nits': peak_nits, 'error': str(error)}
+            tone_controls.append(control)
+        fixtures[-1]['sdr_tone_controls'] = tone_controls
         source_id = 'static-avif' if spec['frames'] == 1 else f'animated-{spec["transfer"]}'
         operations = [(dynamic_range, 'avif', motion, geometry) for dynamic_range in ('hdr','sdr') for geometry in ('contain','cover','fill','upscale','orientation') for motion in ('preserve',)]
         if spec['frames'] == 2:
@@ -311,7 +353,8 @@ def run(output_dir):
                 converted = []
                 for i, input_file in enumerate(inputs):
                     png = case_dir/f'converted-{i}.png'
-                    convert_frame(input_file, png, spec['transfer'], spec['gamut'], geometry, sdr=sdr)
+                    convert_frame(input_file, png, spec['transfer'], spec['gamut'], geometry,
+                                  sdr=sdr, peak_nits=peak_nits if sdr else None)
                     converted.append(png)
                 target = case_dir/f'output.{ext}'
                 if ext == 'avif':
@@ -333,16 +376,29 @@ def run(output_dir):
                 if ext == 'avif':
                     item['checks']['privacy'] &= all(re.search(r'\* '+kind+r' Metadata\s*:\s*Absent',facts['info']) is not None for kind in ('Exif','XMP'))
                 measurements = []
-                for ref, decoded in zip(refs,actual):
+                for i, (ref, decoded) in enumerate(zip(refs,actual)):
                     if sdr:
-                        measured = evaluate_sdr_tone_map(ref[..., :3], decoded[..., :3], source_gamut=spec['gamut'], alpha=ref[..., 3])
+                        expected = reference_srgb(ref[..., :3], spec['gamut'], peak_nits=peak_nits)
+                        measured = compare_appearance(
+                            sdr_signal_to_nits(expected), sdr_signal_to_nits(decoded[..., :3]),
+                            reference_gamut='srgb', actual_gamut='srgb', fixture_class='sdr-8',
+                            alpha=None if ext == 'jpg' else ref[..., 3],
+                            region_reference_luminance_nits=ref[..., :3] @ RGB_TO_XYZ[spec['gamut']][1],
+                        )
+                        measured['tone_control_passed'] = tone_controls[i]['passed']
+                        measured['passed'] &= tone_controls[i]['passed']
+                        if not tone_controls[i]['passed']:
+                            measured['failures'].append('identity_tone_control')
                     else:
                         measured = compare_appearance(ref[..., :3], decode_transfer(decoded[..., :3], target_transfer, target_gamut), reference_gamut=spec['gamut'], actual_gamut=target_gamut, fixture_class=f'avif-{spec["depth"]}', alpha=None if ext=='jpg' else ref[..., 3])
                     measurements.append(measured)
                 item['measurements']['frames'] = measurements
                 item['checks']['appearance'] = all(m['passed'] for m in measurements)
                 if sdr:
-                    item['blockers'].append('Native BT.2446A/perceptual gamut mapping needs an independent chromatic reference; neutral tone-policy tests are enforced separately.')
+                    item['measurements']['tone_controls'] = tone_controls[:count]
+                    item['sdr_candidate'] = {'algorithm': 'CPU Mobius knee 0.6; exposure 1.1; output scale 0.99',
+                                             'peak_nits': peak_nits,
+                                             'gamut_mapping': 'Relative colorimetric D65 primary conversion with explicit sRGB channel clipping'}
                 if ext == 'jpg' and not sdr:
                     item['checks']['structure'] = False
                     item['blockers'].append('Single-layer JPEG is not the required dual-metadata gain-map representation.')
@@ -375,7 +431,10 @@ def encode_other(paths, target, ext, transfer, gamut, refs, count, spec):
         options += ['-filter_complex','[0:v]format=rgba,split[image][palette];[palette]palettegen=reserve_transparent=1[pal];[image][pal]paletteuse=alpha_threshold=128','-frames:v','1']
     else:
         options += ['-pix_fmt','rgba64be','-color_primaries',str(PRIMARIES[gamut]),'-color_trc',str(TRANSFERS[transfer]),'-frames:v','1']
-    if ext == 'webp' and count == 2:
+    if transfer == 'srgb' and ext in ('jpg', 'webp') and count == 1:
+        native(['node', Path(__file__).parent/'encode-sdr.cjs'],
+               data=json.dumps({'input': str(paths[0]), 'output': str(target), 'format': ext}).encode())
+    elif ext == 'webp' and count == 2:
         native(['node', Path(__file__).parent/'webp-sequence.cjs', json.dumps({'inputs':[str(p) for p in paths], 'output':str(target)})])
     else:
         native(options+[target])

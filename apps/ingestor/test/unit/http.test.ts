@@ -155,7 +155,7 @@ it.each<{ outcome: UploadOutcome; status: number; type: string; detail?: string 
     outcome: { _tag: 'TooManyPixels', width: 10001, height: 10000, maxPixels: 100000000 },
     status: 400,
     type: 'pixels-out-of-bounds',
-    detail: 'Image dimensions 10001x10000 exceed the 100000000-pixel limit.',
+    detail: 'Image dimensions 10001x10000 exceed the 100MP limit.',
   },
   {
     outcome: { _tag: 'UnsupportedAnimation' },

@@ -98,7 +98,7 @@ describe('UploadPage', () => {
             status: 'failed',
             error: {
               type: 'validation',
-              message: 'Image dimensions 10001x10000 exceed the 100000000-pixel limit.',
+              message: 'Image dimensions 10001x10000 exceed the 100MP limit.',
             },
           },
         ],
@@ -127,7 +127,7 @@ describe('UploadPage', () => {
 
     expect(screen.getByTestId('upload-failed-count')).toHaveTextContent('1 failed');
     expect(screen.getByTestId('upload-file-item')).toHaveTextContent(
-      'Image dimensions 10001x10000 exceed the 100000000-pixel limit.'
+      'Image dimensions 10001x10000 exceed the 100MP limit.'
     );
     expect(screen.getByTestId('retry-failed-button')).toBeInTheDocument();
   });

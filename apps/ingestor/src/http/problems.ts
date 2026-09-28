@@ -57,7 +57,7 @@ export function sendUpload(reply: FastifyReply, result: UploadOutcome) {
       const { _tag, ...dimensions } = result;
       return sendProblem(reply, 400, 'pixels-out-of-bounds', 'Pixel Limit Exceeded', {
         ...dimensions,
-        detail: `Image dimensions ${result.width}x${result.height} exceed the ${result.maxPixels}-pixel limit.`,
+        detail: `Image dimensions ${result.width}x${result.height} exceed the ${result.maxPixels / 1_000_000}MP limit.`,
       });
     }
   }

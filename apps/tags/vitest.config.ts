@@ -10,13 +10,7 @@ export default defineBaseConfig({
     testTimeout: 30000,
     hookTimeout: 60000,
     maxConcurrency: 5,
-    poolOptions: {
-      threads: {
-        singleThread: false,
-        maxThreads: 5,
-        minThreads: 2,
-      },
-    },
+    maxWorkers: 5,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

@@ -1,5 +1,14 @@
-import '@testing-library/jest-dom/vitest';
-import { vi } from 'vitest';
+import * as matchers from '@testing-library/jest-dom/matchers';
+import type { TestingLibraryMatchers } from '@testing-library/jest-dom/matchers';
+import { expect, vi } from 'vitest';
+
+declare module 'vitest' {
+  interface Matchers<R extends void | Promise<void>, T>
+    extends TestingLibraryMatchers<(value: T) => unknown, R> {}
+}
+
+// Register on this workspace's Vitest instance; the jest-dom entry point can resolve another copy.
+expect.extend(matchers);
 
 // Mock window.matchMedia for components that use it (e.g., theme detection)
 Object.defineProperty(window, 'matchMedia', {
@@ -17,11 +26,13 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock ResizeObserver for components that use it
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+globalThis.ResizeObserver = vi.fn().mockImplementation(function () {
+  return {
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  };
+});
 
 // Mock DataTransfer for drag and drop tests
 class MockDataTransfer {
@@ -61,7 +72,7 @@ class MockDataTransfer {
   }
 }
 
-global.DataTransfer = MockDataTransfer as unknown as typeof DataTransfer;
+globalThis.DataTransfer = MockDataTransfer as unknown as typeof DataTransfer;
 
 // Mock IntersectionObserver with controllable trigger for testing
 type IntersectionCallback = (entries: IntersectionObserverEntry[]) => void;
@@ -102,7 +113,7 @@ class MockIntersectionObserver implements IntersectionObserver {
   }
 }
 
-global.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
+globalThis.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
 
 // Test helper to trigger intersection on all observers
 export function triggerIntersection(isIntersecting: boolean) {
@@ -135,7 +146,7 @@ const mockCache = {
   keys: vi.fn(() => Promise.resolve([])),
 };
 
-global.caches = {
+globalThis.caches = {
   open: vi.fn(() => Promise.resolve(mockCache)),
   delete: vi.fn(() => Promise.resolve(true)),
   has: vi.fn(() => Promise.resolve(false)),
@@ -144,8 +155,8 @@ global.caches = {
 } as unknown as CacheStorage;
 
 // Mock URL.createObjectURL and URL.revokeObjectURL
-global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
-global.URL.revokeObjectURL = vi.fn();
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+globalThis.URL.revokeObjectURL = vi.fn();
 
 // Mock navigator.clipboard
 Object.defineProperty(navigator, 'clipboard', {

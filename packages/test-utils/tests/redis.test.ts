@@ -11,6 +11,7 @@ const docker = new Docker();
 
 describe(
     "RedisTesterBuilder",
+    { concurrent: true },
     () => {
         it("should create a container", async () => {
             const Tester = createDefaultTesterBuilder()
@@ -328,5 +329,4 @@ describe(
             await tester.destroy();
         });
     },
-    { concurrent: true },
 );

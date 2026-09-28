@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["scripts/crap.mts", "crap.config.mts", "test/integration/**/*.ts", "vitest.integration.config.ts"]
+  "include": ["scripts/crap.mts", "crap.config.mts", "test/integration/**/*.ts", "vitest.integration.config.ts", "apps/*/vitest*.ts", "packages/*/vitest*.ts"]
 }

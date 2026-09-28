@@ -11,6 +11,7 @@ const docker = new Docker();
 
 describe(
     "NatsTesterBuilder",
+    { concurrent: true },
     () => {
         it("should create a container", async () => {
             const Tester = createDefaultTesterBuilder()
@@ -317,5 +318,4 @@ describe(
             expect(() => tester.nats.config).toThrow("NATS not initialized");
         });
     },
-    { concurrent: true },
 );

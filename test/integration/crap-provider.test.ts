@@ -21,8 +21,8 @@ const effect = gatewayRequire.resolve('effect/Effect');
 
 type Analysis = Awaited<ReturnType<typeof analyzeProvider>>;
 
-async function analyzeProvider(directory: string, provider: string) {
-  const installation = provider === 'vitest-5' ? path.join(repository, 'apps/gateway') : repository;
+async function analyzeProvider(directory: string) {
+  const installation = repository;
   await mkdir(directory);
   await symlink(path.join(installation, 'node_modules'), path.join(directory, 'node_modules'));
   for (const file of ['callbacks.ts', 'callbacks.test.ts']) {
@@ -35,8 +35,7 @@ async function analyzeProvider(directory: string, provider: string) {
       fileParallelism: false,
       maxWorkers: 1,
       coverage: {
-        ...(provider === 'vitest-3-defaults' ? defaults.test.coverage : {}),
-        ...(provider === 'vitest-3-legacy' ? { experimentalAstAwareRemapping: false } : {}),
+        ...defaults.test.coverage,
         enabled: true,
         provider: 'v8',
         include: ['callbacks.ts'],
@@ -74,38 +73,18 @@ function functionAt(analysis: Analysis, marker: string) {
   return methods[0];
 }
 
-describe.each(['vitest-3-legacy', 'vitest-3-defaults', 'vitest-5'])('%s provider coverage', (provider) => {
+describe('Vitest 5 provider coverage', () => {
   let temporaryDirectory: string;
   let analysis: Analysis;
 
   beforeAll(async () => {
     temporaryDirectory = await mkdtemp(path.join(tmpdir(), 'wallpaperdb-crap-provider-'));
-    analysis = await analyzeProvider(path.join(temporaryDirectory, provider), provider);
+    analysis = await analyzeProvider(path.join(temporaryDirectory, 'vitest-5'));
   }, 60_000);
 
   afterAll(async () => {
     if (temporaryDirectory) await rm(temporaryDirectory, { recursive: true, force: true });
   });
-
-  if (provider === 'vitest-3-legacy') {
-    test('missing callback metadata stays unknown even when its parent executes', () => {
-      for (const marker of ['export const uncalled =', 'const branchless =']) {
-        const method = functionAt(analysis, marker);
-        expect(method.statementCoverage).toMatchObject({ status: 'unknown', percent: null });
-        expect(method.coverage).toMatchObject({ status: 'unknown', percent: null });
-      }
-    });
-
-    test('function-entry counters do not establish source-branch coverage', () => {
-      const branchless = functionAt(analysis, 'export const called =');
-      expect(branchless.branchCoverage.status).toBe('structural_na');
-
-      const decision = functionAt(analysis, 'export function namedDecision(');
-      expect(decision.statementCoverage).toMatchObject({ status: 'measured', percent: 100 });
-      expect(decision.branchCoverage.percent ?? 0).toBeLessThan(100);
-    });
-    return;
-  }
 
   test('uncalled callbacks remain uncovered after their wrappers and parents execute', () => {
     for (const marker of ['export const uncalled =', 'const branched =', 'const branchless =']) {

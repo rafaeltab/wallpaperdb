@@ -183,12 +183,12 @@ def decode(path, *, gamut='srgb', gamma=None):
     pixels = np.frombuffer(raw, dtype=np.uint8).reshape(facts['height'], facts['width'], 3) / 255
     tags = json.loads(native(['exiftool', '-json', '-n', '-G1', '-s', path]))[0]
     transform = tags.get('Adobe:ColorTransform')
-    predictive_rgb = (facts.get('sof') == 3 and any(
-        marker == 0xC3 and len(value) == 15 and value[6::3] == b'RGB'
+    identified_rgb = (facts.get('sof') in (0, 3) and any(
+        marker == 0xC0 + facts['sof'] and len(value) == 15 and value[6::3] == b'RGB'
         and value[7::3] == b'\x11\x11\x11' for marker, value in segments(data)))
-    if transform != 0 and not (transform is None and predictive_rgb):
+    if transform != 0 and not (transform is None and identified_rgb):
         raise ValueError('RGB JPEG coding was not independently signaled')
-    color_model = ('SOF3 RGB component identifiers with verified RGB ICC'
+    color_model = (f'SOF{facts["sof"]} RGB component identifiers with verified RGB ICC'
                    if transform is None else 'Adobe ColorTransform 0 with verified RGB ICC')
     from gainmap import private_metadata_tags
     return pixels, {**facts, 'color': color, 'decoder': 'FFmpeg native MJPEG decoder',

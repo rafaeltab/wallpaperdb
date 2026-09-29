@@ -20,7 +20,7 @@ from lossless_jpeg import encode as encode_lossless
 
 
 def encode(source, output, operation, *, gamut, map_policy='smalloffset', orientation=6,
-           geometry_revision='decoder-gamut-v1'):
+           geometry_revision='decoder-gamut-v1', coding='lossless-rgb'):
     source, output = Path(source), Path(output)
     fixtures = json.loads((gainmap.FIXTURES/'manifest.json').read_text())['fixtures']
     matches = [fixture for fixture in fixtures if fixture['sha256'] == gainmap.digest(source)]
@@ -28,6 +28,12 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
         raise ValueError('Native combined candidate requires a pinned source with established gamut facts')
     if map_policy not in ('fullrange', 'smalloffset', 'identity', 'moderateoffset'):
         raise ValueError('Unknown native gain-map encoder policy')
+    if coding not in ('lossless-rgb', 'dct-rgb'):
+        raise ValueError('Unknown native JPEG coding representation')
+    if coding == 'dct-rgb':
+        from dct_jpeg import encode as encode_jpeg
+    else:
+        encode_jpeg = encode_lossless
     if geometry_revision not in ('decoder-gamut-v1', 'gainmap-hdr-target-gamut-v1'):
         raise ValueError('Unknown native geometry coordinate revision')
     if operation not in gainmap.GEOMETRIES or orientation not in range(1, 9):
@@ -53,7 +59,7 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     profile[24:36] = struct.pack('>6H', 2020, 1, 1, 0, 0, 0)
     profile[84:100] = bytes(16)
     base = directory/'base.jpg'
-    base_encoding = encode_lossless(authored, base, icc_profile=bytes(profile))
+    base_encoding = encode_jpeg(authored, base, icc_profile=bytes(profile))
 
     source_pq = gainmap_hdr.decode_source(source, directory/'hdr-source', gamut)
     # Keep the prior decoder-coordinate experiment available. The explicitly
@@ -85,26 +91,33 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     tool = f'/opt/proof/libavif/{map_policy}/avifgainmaputil'
     # Auto depth preserves the HDR input precision while the authored PNG base
     # and gain-map JPEG remain 8-bit. Passing -d8 also quantizes PQ input to 8.
-    gainmap.command([tool, 'combine', authored, hdr, avif, '--cicp-base', f'{primaries}/13/0',
+    # DCT changes the base samples. Compute the gain against the actual
+    # compressed JPEG through native libavif/libjpeg, so its IDCT precision
+    # and the source for gain calculation match the native reconstruction.
+    gain_base = base if coding == 'dct-rgb' else authored
+    gainmap.command([tool, 'combine', gain_base, hdr, avif, '--cicp-base', f'{primaries}/13/0',
                      '--cicp-alternate', f'{primaries}/16/0', '--ignore-profile', '--downscaling', '1',
                      '--depth-gain-map', '8', '--qgain-map', '100', '--yuv-gain-map', '444',
                      '-y', '444', '-d', '0', '-q', '100', '-s', '10'], directory/'native-map-generation.log')
     gainmap.command(['avifgainmaputil', 'extractgainmap', avif, gain_png], directory/'map-extraction.log')
-    map_encoding = encode_lossless(gain_png, gain_jpeg)
+    map_encoding = encode_jpeg(gain_png, gain_jpeg)
     gainmap.command(['/opt/proof/ultrahdr/precise/hdr-proof-uhdr', 'pack-avif', avif, base, gain_jpeg, output],
                     directory/'native-packing.log')
     geometry['dimensions'] = [width, height]
-    result = {'candidate': f'native-libavif-{map_policy}-lossless-rgb-jpeg',
+    result = {'candidate': f'native-libavif-{map_policy}-{coding}-jpeg',
               'source_fixture': matches[0]['id'], 'source_sha256': gainmap.digest(source),
               'base_geometry': base_geometry, 'base_encoding': base_encoding,
               'hdr_geometry': geometry, 'hdr_intent_filters': filters, 'map_encoding': map_encoding,
               'map_policy': map_policy, 'native_map_encoder': tool,
               'source_reference_revision': geometry_revision,
+              'jpeg_coding': coding, 'gain_map_base_from_compressed_jpeg': coding == 'dct-rgb',
               'map_encoder_sha256': hashlib.sha256(Path(tool).read_bytes()).hexdigest(),
               'authored_sdr_png': str(authored), 'hdr_intent_pq_png': str(hdr), 'gain_map_png': str(gain_png),
               'output': str(output), 'output_sha256': gainmap.digest(output), 'parts_directory': str(directory),
               'consumer_status': 'pending manual review',
-              'coding_scope': 'JPEG SOF3 RGB8 base and RGB8 gain map; native libavif SOF3 reader remains unsupported'}
+              'coding_scope': ('JPEG SOF3 RGB8 base and RGB8 gain map; native libavif SOF3 reader remains unsupported'
+                  if coding == 'lossless-rgb' else 'JPEG SOF0 RGB8 DCT base/map; both authored SDR and reconstructed HDR '
+                  'must pass; RGB component identifiers survive native packing without Adobe APP14')}
     if orientation_facts:
         result['orientation_source'] = orientation_facts
     (directory/'encoding-evidence.json').write_text(json.dumps(result, indent=2)+'\n')

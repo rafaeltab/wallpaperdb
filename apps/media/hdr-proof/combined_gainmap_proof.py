@@ -17,7 +17,8 @@ from matrix import GAINMAP_GEOMETRIES
 
 
 def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
-        policies=('identity', 'moderateoffset'), reference_revision='gainmap-hdr-target-gamut-v1'):
+        policies=('identity', 'moderateoffset'), reference_revision='gainmap-hdr-target-gamut-v1',
+        coding='lossless-rgb'):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     fixtures = json.loads((gainmap.FIXTURES/'manifest.json').read_text())['fixtures']
@@ -33,7 +34,7 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
         source_hdr, source_hdr_gamut, source_decoder = gainmap.source_hdr(source, source_directory, gamut)
         for policy in policies:
             for operation in geometries:
-                candidate = f'native-combine-{policy}-lossless-rgb'
+                candidate = f'native-combine-{policy}-{coding}'
                 case_id = f'{name}:hdr:jpg:preserve:preserve:{operation}:{candidate}:{reference_revision}'
                 folder = directory/case_id.replace(':', '-')
                 folder.mkdir(exist_ok=True)
@@ -45,9 +46,12 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                         'candidate': candidate, 'geometry': operation, 'selectors': selectors,
                         'source_reference_revision': reference_revision, 'source_sha256': gainmap.digest(source),
                         'status': 'tested and failed', 'consumer_status': 'pending manual review',
-                        'known_consumer_limitations': [
+                        'known_consumer_limitations': ([
                             'Pinned native libavif cannot read JPEG SOF3 predictive base/map coding; '
-                            'physical browser and wallpaper consumers have not been tested.'],
+                            'physical browser and wallpaper consumers have not been tested.'] if coding == 'lossless-rgb' else [
+                            'Pinned libavif can read SOF0 but converts RGB gain-map samples to 8-bit BT.601 YCbCr '
+                            'during its AVIF reconstruction route; that additional rounding has separate appearance failures. '
+                            'Physical browser and wallpaper consumers have not been tested.']),
                         'checks': {key: False for key in ('native_encoder', 'independent_source_decoder',
                             'independent_decoder', 'native_geometry', 'structure', 'appearance', 'privacy')},
                         'blockers': [], 'artifacts': {}, 'measurements': {}, 'reference_revision_diagnostics': {}}
@@ -84,7 +88,7 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                         'purpose': 'Independent matched-geometry authored SDR base for HDR JPEG comparison'}
                     target = folder/'output.jpg'
                     encoded = gainmap_combine.encode(source, target, operation, gamut=gamut, map_policy=policy,
-                        orientation=orientation, geometry_revision=reference_revision)
+                        orientation=orientation, geometry_revision=reference_revision, coding=coding)
                     case['checks']['native_encoder'] = True
                     case['native_candidate'] = encoded
                     if 'orientation_source' in encoded:
@@ -157,6 +161,26 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                     case['hdr_decoder_evidence'] = {'native': native_facts, 'iso': decoded_iso['evidence']}
                     case['artifacts'] = {'output': str(target), 'sha256': gainmap.digest(target),
                         'reference_sdr': str(reference_sdr), 'reference_sdr_sha256': gainmap.digest(reference_sdr)}
+                    if coding == 'dct-rgb':
+                        # Keep this third decoder route's extra native map
+                        # conversion visible. It is neither the encoder nor a
+                        # physical consumer, and it must not erase its failures
+                        # when the independent JPEG/ISO reconstruction passes.
+                        decoder_directory = folder/'baseline-libavif-decoder'
+                        decoder_directory.mkdir(exist_ok=True)
+                        diagnostic = {'decoded': False, 'status': 'tested and failed',
+                            'scope': 'Pinned libavif JPEG to AVIF to PQ raster route; RGB map samples '
+                                     'are converted to 8-bit BT.601 YCbCr. No physical consumer qualification.'}
+                        try:
+                            libavif_hdr = gainmap.independent_hdr(target, decoder_directory, gamut)
+                            diagnostic['decoded'] = True
+                            diagnostic['measurement'] = compare_appearance(hdr_reference, libavif_hdr,
+                                reference_gamut=reference_gamut, actual_gamut='rec2020', fixture_class='gainmap-hdr')
+                            if diagnostic['measurement']['passed']:
+                                diagnostic['status'] = 'qualified'
+                        except Exception as error:
+                            diagnostic['failure'] = str(error)
+                        case['consumer_decoder_diagnostics'] = {'baseline_libavif': diagnostic}
                     case['blockers'] = [f'Failed {key} check' for key, passed in case['checks'].items() if not passed]
                     if all(case['checks'].values()):
                         case['status'] = 'qualified'

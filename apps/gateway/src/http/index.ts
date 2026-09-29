@@ -12,6 +12,7 @@ import { Availability } from '../capabilities/availability/index.js';
 import { createGraphql } from '../graphql/index.js';
 import { HttpExecution, httpExecutionLayer, type HttpServices } from '../runtime.js';
 import { inspectOperation } from './security.js';
+import { installAdmissionSchema } from './admission-schema.js';
 
 export interface HttpConfig {
   readonly port: number;
@@ -276,6 +277,7 @@ export async function createHttpApp<E>(
       description: 'GraphQL gateway for browsing wallpapers and public contributor Profiles.',
     });
     installBatchLimit(app, config);
+    installAdmissionSchema(app);
     const graphql = createGraphql(execution, config);
     await app.register(mercurius, {
       ...graphql,

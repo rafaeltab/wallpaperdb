@@ -72,6 +72,68 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 describe('GraphQL security driving contract', () => {
+  it('documents quota and overload responses with explicit cost and retry units', async () => {
+    const app = await build();
+    const response = await app.inject({ url: '/documentation/json' });
+    expect(response.statusCode).toBe(200);
+    const document = response.json();
+    for (const method of ['get', 'post']) {
+      const responses = document.paths['/graphql'][method].responses;
+      expect(responses['429']).toMatchObject({
+        headers: {
+          'Retry-After': {
+            schema: { type: 'integer' },
+            description: expect.stringContaining('seconds'),
+          },
+          'X-RateLimit-Cost-Limit': { description: expect.stringContaining('points') },
+        },
+        content: {
+          'application/json': {
+            schema: {
+              properties: {
+                errors: {
+                  items: {
+                    properties: {
+                      extensions: {
+                        properties: {
+                          code: { enum: ['RATE_LIMIT_EXCEEDED'] },
+                          retryAfter: { description: expect.stringContaining('milliseconds') },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(responses['503']).toMatchObject({
+        headers: { 'Retry-After': { description: expect.stringContaining('seconds') } },
+        content: {
+          'application/json': {
+            schema: {
+              properties: {
+                errors: {
+                  items: {
+                    properties: {
+                      extensions: { properties: { code: { enum: ['GATEWAY_OVERLOADED'] } } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(responses['2XX'].headers['X-RateLimit-Cost-Remaining'].description).toContain(
+        'points'
+      );
+      expect(responses['2XX'].headers['X-RateLimit-Cost-Reset'].description).toContain(
+        'milliseconds'
+      );
+    }
+  });
   it('charges the selected operation with resolved default variables on repeated requests', async () => {
     const charges: unknown[] = [];
     const app = await build(

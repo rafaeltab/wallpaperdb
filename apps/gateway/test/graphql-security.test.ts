@@ -596,7 +596,7 @@ describe('GraphQL security driving contract', () => {
   it.each([
     '/graphql?operationName=test',
     '/%67raphql',
-  ])('limits GraphQL URL %s and separates user agents', async (url) => {
+  ])('limits GraphQL URL %s despite user agent rotation', async (url) => {
     const app = await build({ rateLimitMaxAnonymous: 1 });
     expect((await execute(app)).statusCode).toBe(200);
     const limited = await app.inject({
@@ -612,11 +612,16 @@ describe('GraphQL security driving contract', () => {
         await app.inject({
           method: 'POST',
           url: '/graphql',
-          headers: { 'user-agent': 'other' },
+          headers: {
+            'user-agent': 'other',
+            authorization: 'Bearer caller-token',
+            'x-forwarded-for': '198.51.100.9',
+            forwarded: 'for=198.51.100.10',
+          },
           payload: { query },
         })
       ).statusCode
-    ).toBe(200);
+    ).toBe(429);
   });
   it.each([
     { nodeEnv: 'production' as const },

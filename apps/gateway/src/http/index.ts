@@ -49,11 +49,8 @@ function isGraphql(url: string) {
 function graphqlError(code: string, message: string, extensions: Record<string, unknown> = {}) {
   return { errors: [{ message, extensions: { code, ...extensions } }] };
 }
-function fingerprint(ip: string, userAgent?: string) {
-  return crypto
-    .createHash('sha256')
-    .update(`${ip}\u0000${userAgent ?? ''}`)
-    .digest('hex');
+function fingerprint(ip: string) {
+  return crypto.createHash('sha256').update(ip).digest('hex');
 }
 const operationRequest = Schema.is(
   Schema.Struct({
@@ -121,9 +118,7 @@ function installAdmission(
         );
     }
     const result = await execution.run(
-      Admission.use((admission) =>
-        admission.admit(fingerprint(request.ip, request.headers['user-agent']))
-      ),
+      Admission.use((admission) => admission.admit(fingerprint(request.ip))),
       { signal: request.gatewaySignal }
     );
     switch (result._tag) {

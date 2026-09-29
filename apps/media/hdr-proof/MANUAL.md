@@ -23,7 +23,10 @@ The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
 two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit
 SDR APNG counterparts carry a standard sRGB chunk; the SDR AVIF and WebP
 counterparts carry gamma-2.2 CICP or ICC signaling. Keep their browser, native
-viewer and wallpaper results pending independently on all four devices.
+viewer and wallpaper results pending independently on all four devices. The
+separate EXIF-8 source variants exercise animation orientation; their inspected
+derivatives bake the rotation into every frame. Check both frames' dimensions
+and orientation independently from a still preview.
 
 ## Browser procedure
 

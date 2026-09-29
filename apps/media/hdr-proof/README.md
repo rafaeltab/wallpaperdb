@@ -103,17 +103,19 @@ PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no
 disposal, 300/700 ms timing and three plays. Native FFmpeg encodes the animation;
 an independent chunk reader checks timing, loops and signaling, then gives
 untouched compressed frame data to the native libpng decoder. Exact source
-sample comparisons include fractional alpha. Contain derivatives cover HDR
-APNG and AVIF, plus explicit SDR APNG, gamma-2.2 AVIF and gamma-2.2 ICC WebP.
+sample comparisons include fractional alpha. Contain, cover, fill, upscale and
+orientation derivatives cover HDR APNG and AVIF, plus explicit SDR APNG,
+gamma-2.2 AVIF and gamma-2.2 ICC WebP. Four separately hashed EXIF-8 sources
+exercise real nonidentity orientation; every native frame rotation is checked
+against an independent exact pixel rotation before geometry conversion.
 HDR APNG signals CICP; native SDR APNG uses the standard sRGB chunk. The unchanged
 SDR reference uses one declared sequence peak, 4000 nits for PQ or 1000 nits for
 the HLG reference display. Original-byte and unsupported-composition controls
 remain separate from codec qualification. Two native partial-rectangle fixtures
 verify exact SOURCE replacement, including fractional alpha and stored RGB under
 zero alpha. The independent reader checks rectangle bounds and requires the
-first default-image frame to fill the canvas. OVER blending, disposal,
-orientation, static extraction and other geometries remain unqualified in this
-APNG subset.
+first default-image frame to fill the canvas. OVER blending, disposal, static
+extraction and unlisted geometries remain unqualified in this APNG subset.
 Browser, viewer and wallpaper interpretation remains pending manual review for
 every emitted representation.
 

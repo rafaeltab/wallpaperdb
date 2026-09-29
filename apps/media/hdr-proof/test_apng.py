@@ -21,6 +21,10 @@ class ApngTests(unittest.TestCase):
                     source, facts, authored = apng.generate_fixture(spec, directory/spec['id'])
                     repeated, _, _ = apng.generate_fixture(spec, directory/'repeat'/spec['id'])
                     self.assertEqual(source.read_bytes(), repeated.read_bytes())
+                    oriented, oriented_facts, _ = apng.generate_orientation_fixture(source, directory/'orientation'/spec['id'])
+                    repeated_orientation, _, _ = apng.generate_orientation_fixture(repeated, directory/'repeat-orientation'/spec['id'])
+                    self.assertEqual(oriented.read_bytes(), repeated_orientation.read_bytes())
+                    self.assertEqual(oriented_facts['orientation'], 8)
                     facts, frames = apng.inspect_and_decode(source, directory/'decoded'/spec['id'])
                     self.assertEqual(facts['depth'], 16)
                     self.assertEqual(facts['primaries'], avif.PRIMARIES[spec['gamut']])
@@ -74,7 +78,7 @@ class ApngTests(unittest.TestCase):
     def test_contain_hdr_and_explicit_sdr_sequences_meet_existing_gates(self):
         spec = next(apng.fixture_specs())
         with tempfile.TemporaryDirectory() as temporary:
-            result = apng.run(Path(temporary), specs=[spec])
+            result = apng.run(Path(temporary), specs=[spec], geometries=('contain',))
         self.assertEqual(len(result['evidence']), 5)
         for case in result['evidence']:
             with self.subTest(case=case['case_id']):
@@ -145,18 +149,38 @@ class ApngTests(unittest.TestCase):
         import suite
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
-            result = apng.run(folder/'work', specs=[next(apng.fixture_specs())])
+            result = apng.run(folder/'work', specs=[next(apng.fixture_specs())], geometries=('contain', 'orientation'))
             (folder/'results').mkdir()
             # Only the evidence destination changes; every fixture and candidate
             # above uses its real native encoder and independent decoder.
             with patch.object(suite, 'ROOT', folder), patch.object(suite, 'RESULTS', folder/'results'):
                 files = suite.candidate_files(result['evidence'], result['fixtures'])
-            self.assertEqual(len(files), 6)
+            self.assertEqual(len(files), 12)
             self.assertTrue(all(entry['consumer_status'] == 'pending manual review' for entry in files))
             candidates = [entry for entry in files if entry['case_id']]
-            self.assertEqual(len(candidates), 5)
+            self.assertEqual(len(candidates), 10)
             self.assertTrue(all(entry['codec_status'] == 'qualified' for entry in candidates))
             self.assertTrue(all(entry['sha256'] == avif.digest(folder/'results/manual'/entry['file']) for entry in files))
+
+    def test_crop_stretch_upscale_and_real_orientation_preserve_animation(self):
+        spec = next(spec for spec in apng.fixture_specs()
+                    if spec['transfer'] == 'hlg' and spec['gamut'] == 'rec2020')
+        with tempfile.TemporaryDirectory() as temporary:
+            result = apng.run(Path(temporary), specs=[spec],
+                              geometries=('cover', 'fill', 'upscale', 'orientation'))
+        self.assertEqual(len(result['evidence']), 20)
+        self.assertEqual(len(result['fixtures']), 2)
+        for case in result['evidence']:
+            with self.subTest(case=case['case_id']):
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertTrue(case['measurements']['sequence_white_control']['passed'])
+                self.assertGreater(case['measurements']['sequence_white_control']['samples'], 0)
+                self.assertTrue(case['structural_checks']['orientation_baked'])
+                if case['geometry'] == 'orientation':
+                    self.assertEqual(case['source_facts']['orientation'], 8)
+                    self.assertEqual(case['source_facts']['display_width'], 64)
+                    self.assertTrue(case['fixture_id'].endswith('-orientation-8'))
+                    self.assertTrue(all(case['orientation_source']['exact_rotation_frames']))
 
 
 if __name__ == '__main__':

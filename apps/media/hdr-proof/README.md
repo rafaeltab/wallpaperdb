@@ -209,6 +209,19 @@ for the orientation case. The extracted source map is hash-bound before and
 after decoding. All five required ISO geometries now have measured adaptation
 failures; XMP and Apple intermediate rendering remains untested.
 
+The [independent XMP source reader](gainmap_xmp.py) now establishes the original
+photograph at boosts 2 and 16 with independently parsed XML gain arithmetic and
+the pinned point-bilinear map sampling convention. Original JPEG base/map samples
+and imported AV1 samples agree exactly, as do all gain metadata fields. Source
+maximum error against native libavif is 0.213356 under the unchanged gates.
+The independent float references have distinct names and hashes; the legacy
+native PQ endpoint reference remains unchanged. Native analytic controls cover
+nontrivial gamma, unequal offsets, channel gains and the zero-weight bypass.
+The source explicitly declares EXIF sRGB but lacks the ICC required by the
+Android container specification, so its scope is a legacy EXIF-sRGB renderer.
+The differing UltraHDR source renderer remains a failed diagnostic. This source
+proof does not qualify a derivative or physical display.
+
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
 the same HDR intent and fixed appearance limits. Analytic near-black controls

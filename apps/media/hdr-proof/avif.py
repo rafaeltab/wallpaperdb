@@ -358,7 +358,7 @@ def run(output_dir, *, specs=None):
         # distinct representation and independent decode for genuine gamma 2.2.
         operations += [('sdr', 'avif', 'preserve', g, None, 'gamma22') for g in ('contain','cover','fill','upscale','orientation')]
         operations += [('sdr', ext, 'static' if spec['frames'] == 2 else 'preserve', g, None, 'gamma22')
-                       for ext in ('jpg', 'webp') for g in ('identity','contain','cover','fill','upscale','orientation')
+                       for ext in ('jpg', 'webp', 'gif') for g in ('identity','contain','cover','fill','upscale','orientation')
                        if not (spec['frames'] == 2 and ext == 'webp' and g != 'identity')]
         if spec['frames'] == 2:
             operations += [('sdr', 'webp', 'preserve', g, None, 'gamma22') for g in ('contain','cover','fill','upscale','orientation')]
@@ -457,7 +457,7 @@ def run(output_dir, *, specs=None):
                         measured = compare_appearance(
                             sdr_signal_to_nits(expected), actual_nits,
                             reference_gamut='srgb', actual_gamut=actual_gamut, fixture_class='sdr-8',
-                            alpha=None if ext == 'jpg' else ref[..., 3],
+                            alpha=None if ext == 'jpg' else ref[..., 3] >= .5 if ext == 'gif' else ref[..., 3],
                             region_reference_luminance_nits=ref[..., :3] @ RGB_TO_XYZ[spec['gamut']][1],
                         )
                         measured['tone_control_passed'] = tone_controls[i]['passed']
@@ -492,23 +492,30 @@ def run(output_dir, *, specs=None):
 
 def encode_gamma_other(paths, target, ext, refs, count):
     import gamma_icc
-    gamma_icc.encode(paths, target, ext)
-    facts, actual, profile = gamma_icc.inspect_and_decode(target)
-    alpha_limit = 0 if ext == 'jpg' else 2/255
-    errors = [float(np.max(np.abs(frame[..., 3] - (1 if ext == 'jpg' else reference[..., 3]))))
+    if ext == 'gif':
+        import gamma_gif
+        gamma_gif.encode(paths, target)
+        facts, actual, profile = gamma_gif.inspect_and_decode(target)
+    else:
+        gamma_icc.encode(paths, target, ext)
+        facts, actual, profile = gamma_icc.inspect_and_decode(target)
+    alpha_limit = 0 if ext in ('jpg', 'gif') else 2/255
+    errors = [float(np.max(np.abs(frame[..., 3] - (1 if ext == 'jpg' else reference[..., 3] >= .5 if ext == 'gif' else reference[..., 3]))))
               for frame, reference in zip(actual, refs)]
-    facts['alpha_measurement'] = {'comparison': 'explicit opaque coercion' if ext == 'jpg' else 'preserved fractional alpha',
+    facts['alpha_measurement'] = {'comparison': 'explicit opaque coercion' if ext == 'jpg' else 'explicit binary coercion' if ext == 'gif' else 'preserved fractional alpha',
                                   'absolute_error_limit': alpha_limit, 'frame_maximum_absolute_errors': errors,
                                   'maximum_absolute_error': max(errors, default=None)}
     facts['sha256'] = digest(target)
     exif = facts['exiftool']
+    depth_verified = (exif.get('BitsPerSample') == 8 if ext == 'jpg' else
+                      facts['format'] == 'GIF' and facts['depth'] == 8 if ext == 'gif' else
+                      facts['format'] == 'WEBP' and 'WEBP' in str(exif.get('FileType', '')).upper())
     detail = {'dimensions': all(frame.shape == ref.shape for frame, ref in zip(actual, refs)),
               'frames': len(actual) == count,
               'color_signaling': facts['icc']['gamma22_srgb_primaries'],
               'gamut': facts['icc']['gamma22_srgb_primaries'],
               'orientation_baked': exif.get('Orientation', 1) == 1,
-              'depth': exif.get('BitsPerSample') == 8 if ext == 'jpg' else
-                       facts['format'] == 'WEBP' and 'WEBP' in str(exif.get('FileType', '')).upper(),
+              'depth': depth_verified,
               'alpha': bool(errors) and all(error <= alpha_limit for error in errors),
               'timing': facts['durations_ms'] == [300, 700] if count == 2 else True,
               'loop': facts['loop'] == 3 if count == 2 else True}

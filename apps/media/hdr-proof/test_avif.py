@@ -181,7 +181,7 @@ class FixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             result = run(temporary, specs=[spec])
             cases = {case['case_id']: case for case in result['evidence']}
-            self.assertEqual(len(cases), 39)
+            self.assertEqual(len(cases), 45)
             for geometry in ('contain', 'cover', 'fill', 'upscale', 'orientation'):
                 baseline_id = f'{spec["id"]}:sdr:avif:srgb:preserve:{geometry}'
                 baseline, candidate = cases[baseline_id], cases[baseline_id + ':depth-12']
@@ -200,6 +200,10 @@ class FixtureTests(unittest.TestCase):
                 self.assertEqual(gamma['facts']['depth'], 8)
                 self.assertTrue(gamma['optional_transfer_variant'])
                 self.assertEqual(gamma['measurements']['frames'][0]['fixture_class'], 'sdr-8')
+                gif = cases[f'{spec["id"]}:sdr:gif:srgb:preserve:{geometry}:transfer-gamma22']
+                self.assertEqual(gif['status'], 'qualified', gif['blockers'])
+                self.assertEqual(gif['facts']['format'], 'GIF')
+                self.assertTrue(gif['facts']['icc']['gamma22_srgb_primaries'])
             failed_eight = cases[f'{spec["id"]}:sdr:avif:srgb:preserve:contain']
             self.assertEqual(failed_eight['status'], 'tested and failed')
             matrix = build_matrix(result['evidence'])

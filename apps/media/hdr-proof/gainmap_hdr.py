@@ -9,6 +9,7 @@ dropping it through swscale first would quantize linear light to 16 bits.
 
 import math
 from pathlib import Path
+import struct
 
 import numpy as np
 from PIL import Image
@@ -34,6 +35,8 @@ def resample_pq(source_pq, output, operation, orientation=1):
     output = Path(output)
     with Image.open(source_pq) as image:
         source_width, source_height = image.size
+    if operation == 'cover':
+        return _cover_pq(source_pq, output, source_width, source_height)
     width, height = source_width, source_height
     prefix = []
     if operation == "orientation":
@@ -79,6 +82,50 @@ def resample_pq(source_pq, output, operation, orientation=1):
             "normalization_nits": 10000, "width": 173 if operation == "cover" else target_width,
             "height": 173 if operation == "cover" else target_height, "filter": filters,
             "source_size": [source_width, source_height]}
+
+
+def _cover_pq(source, output, width, height):
+    """Keep the fractional source window instead of rounding an intermediate size."""
+    padded = output.with_suffix('.padded.gbrapf32')
+    filters = ('format=gbrap16le,pad=iw*3:ih*3:iw:ih:color=black@0,'
+               'setparams=alpha_mode=premultiplied,format=gbrapf32le:alpha_modes=premultiplied,'
+               'zscale=agamma=0:transferin=16:primariesin=9:matrixin=0:rangein=full:'
+               'transfer=linear:primaries=9:matrix=0:range=full:npl=10000,'
+               'format=gbrapf32le:alpha_modes=premultiplied')
+    command(['ffmpeg', '-v', 'error', '-y', '-i', source, '-vf', filters,
+             '-frames:v', '1', '-pix_fmt', 'gbrapf32le', '-f', 'rawvideo', padded],
+            output.with_suffix('.linearize.log'))
+    data = padded.read_bytes()
+    plane_size = 3*width * 3*height * 4
+    if len(data) != 4*plane_size:
+        raise ValueError('Native padded HDR float size disagrees with geometry')
+    # Repack existing float planes without an alpha-removal pixel conversion.
+    # swscale's alpha-drop path would quantize these linear samples to 16 bits.
+    pixels, coverage = output.with_suffix('.pixels.raw'), output.with_suffix('.coverage.raw')
+    pixels.write_bytes(data[:3*plane_size])
+    coverage.write_bytes(data[3*plane_size:] * 3)
+    numerator, denominator = output.with_suffix('.numerator.raw'), output.with_suffix('.denominator.raw')
+    side = min(width, height)
+    region = [width+(width-side)/2, height+(height-side)/2, side, side]
+    for input_path, output_path in ((pixels, numerator), (coverage, denominator)):
+        command(['hdr-proof-zimg-window', input_path, output_path, 3*width, 3*height,
+                 173, 173, *region], output_path.with_suffix('.log'))
+    inputs = []
+    for path in (numerator, denominator):
+        inputs += ['-f', 'rawvideo', '-pix_fmt', 'gbrpf32le', '-s', '173x173', '-i', path]
+    linear = output.with_suffix('.linear.gbrpf32')
+    normalize = "[0:v][1:v]blend=all_expr='if(gt(B,0),max(A/B,0),0)'[out]"
+    command(['ffmpeg', '-v', 'error', '-y', *inputs, '-filter_complex_threads', '1',
+             '-filter_complex', normalize, '-map', '[out]', '-frames:v', '1',
+             '-pix_fmt', 'gbrpf32le', '-f', 'rawvideo', linear], output.with_suffix('.normalize.log'))
+    rgb = linear.read_bytes()
+    if len(rgb) != 3*173*173*4:
+        raise ValueError('Native normalized HDR float size disagrees with geometry')
+    output.write_bytes(rgb + struct.pack('<f', 1.0) * (173*173))
+    return {'path': str(output), 'format': 'gbrapf32le', 'gamut': 'rec2020', 'transfer': 'linear',
+            'normalization_nits': 10000, 'width': 173, 'height': 173,
+            'filter': filters, 'normalization_filter': normalize, 'native_active_region': region,
+            'source_size': [width, height]}
 
 
 def read_linear(result):

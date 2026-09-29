@@ -15,6 +15,21 @@ ROOT = Path(__file__).parent
 
 
 class NativeGainMapHdrGeometryTests(unittest.TestCase):
+    def test_fractional_hdr_cover_matches_the_existing_reference_without_rounding_crop(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for name, gamut in (("apple-new", "p3"), ("android-xmp", "srgb")):
+                with self.subTest(source=name):
+                    case_dir = directory/name
+                    (case_dir/'reference').mkdir(parents=True)
+                    source = ROOT/'fixtures/gainmap'/f'gainmap-{name}.jpg'
+                    reference = independent_hdr(source, case_dir/'reference', gamut)
+                    pq = decode_source(source, case_dir/'native', gamut)
+                    result = resample_pq(pq, case_dir/'cover.gbrapf32', 'cover')
+                    measured = compare_appearance(array_geometry(reference, 'cover'), read_linear(result),
+                        reference_gamut='rec2020', actual_gamut='rec2020', fixture_class='gainmap-hdr')
+                    self.assertTrue(measured['passed'], measured['failures'])
+
     def test_real_native_hdr_geometry_matches_unchanged_independent_reference(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

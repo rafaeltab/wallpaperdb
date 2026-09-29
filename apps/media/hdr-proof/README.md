@@ -117,6 +117,12 @@ and both actual JPEG layers remain eight-bit SOF0. This qualifies the experiment
 ICC-aware file path at the declared full display headroom. The stock reader
 that assumes sRGB still fails, so consumer compatibility remains pending.
 The five preceding failures stay visible and retain their exact output hashes.
+The same recipe also passes the Android XMP upscale. This source uses the
+existing native libavif PQ16 bridge with requested depth 12; its source
+reference shares libavif gain application. The source comparison verifies that
+transport, while separate final HDR readers establish output accuracy.
+The ISO-only float32 source decoder remains narrowly scoped. Stock-reader
+failure and pending consumer review also apply to this XMP output.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

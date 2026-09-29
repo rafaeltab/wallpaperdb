@@ -451,6 +451,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               *coefficient_diagnostic_report(mozjpeg_diagnosis),
               '## Blockers and scope limits','',
               '- The [fractional map-gamma-1.5 candidate](icc-gainmap-midpointoffset-gamma1.5.json) passes the unchanged SDR, native HDR, independent HDR and cross-reader gates for ISO JPEG upscale. It retains the gamma-3.2 compressed base, eight-bit SOF0 layers and midpoint offsets. Qualification requires the experimental ICC-aware readers at the declared full display headroom; the stock sRGB-assuming reader still fails and physical consumers remain pending. All five preceding failed representations remain separate.',
+              '- The [Android XMP fractional-gamma upscale](icc-gainmap-xmp-midpointoffset-gamma1.5.json) passes the same file gates using the existing PQ16 source bridge with requested native depth 12. Its source reference shares libavif gain application; source transport agreement is not a claim of a second source-renderer implementation. Independent final HDR readers still qualify the output. The ISO-only float32 guard, stock-reader failure and pending physical status are unchanged.',
               '- The [integer-DCT map alternative](icc-gainmap-midpointoffset-gamma2-islow.json) retains the exact midpoint gamma-2 compressed base and native pre-JPEG map. It changes only native map JPEG coding. Both HDR readers still fail shadow maxima and their agreement worsens; its original floating-DCT counterpart remains separate.',
               '- Separately regenerated gain-map AVIF containment, crop, stretch and upscale check actual base, map and alternate precision against the source. Each native moderate-offset depth-8 candidate passes authored SDR and both HDR readers at log2 display headroom 4. The four stock depth-8 results fail; all eight automatic-depth variants declare alternate depth 12 and remain incompatible with the requested preservation selectors. Regenerated headroom and offsets differ from the source, so intermediate display adaptation remains untested. This is a declared endpoint proof, with physical consumers pending.',
               '- The [logarithmic midpoint-offset candidate](icc-gainmap-midpointoffset-gamma2.json) fixes the gamma-2 trial at ISO offsets 1/16384. Both HDR readers pass the existing midtone/highlight gates but fail their shadow maxima; their cross-comparison also fails in shadows. This separate result narrows the precision tradeoff without qualifying the JPEG or changing the original gates.',
@@ -588,6 +589,10 @@ def main():
         result = run_icc_gainmap(WORK/name, map_policy=policy, map_gamma=gamma, map_method=method)
         write_json(RESULTS/f'{name}.json', result)
         icc_results.extend(result['cases'])
+    xmp_icc = run_icc_gainmap(WORK/'icc-gainmap-xmp-midpointoffset-gamma1.5',
+        source_id='gainmap-android-xmp', map_policy='midpointoffset', map_gamma=1.5)
+    write_json(RESULTS/'icc-gainmap-xmp-midpointoffset-gamma1.5.json', xmp_icc)
+    icc_results.extend(xmp_icc['cases'])
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))

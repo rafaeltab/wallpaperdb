@@ -55,7 +55,8 @@ file separately from the SOF3 file; neither result establishes the other's
 decoder, gain-map interpretation or HDR presentation behavior.
 Gamma-3.2 ICC-aware HDR JPEG experiments have separate SDR-base and HDR
 measurements. The midpoint-offset map-gamma-1.5 ISO upscale passes the file
-gates with experimental ICC-aware readers. The preceding five variants remain
+gates with experimental ICC-aware readers, as does the separate Android XMP
+upscale. The preceding five ISO variants remain
 failed diagnostics. Stock native readers assume sRGB transfer or reject ICC
 in this path. Each manifest entry retains this qualification scope and its
 reader limitations. Check ICC interpretation and HDR reconstruction separately

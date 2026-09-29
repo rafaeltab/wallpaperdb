@@ -4,7 +4,7 @@ The HDR milestone remains blocked. Automated codec results do not qualify browse
 
 Reproduce from the repository root with `make run PACKAGE=media SCRIPT=proof:hdr`. Docker must support linux/amd64. The default command returns exit 2 while required codec cases or physical checks are unqualified. This is an intentional qualification failure, not a passing release gate.
 
-Recorded 2813 conversion attempts over 64 fixture records: 2803 completed native encoding, 10 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 2178 qualified, 635 tested and failed.
+Recorded 3022 conversion attempts over 72 fixture records: 3012 completed native encoding, 10 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 2387 qualified, 635 tested and failed.
 The inventory covers 85 HDR-ledger cells and 5 labeled SDR controls. Ledger outcomes: 9 deliberately deferred, 17 incompatible with the requested selectors, 12 qualified, 28 tested and failed, 19 untested.
 
 The original fixed coverage plan contains 320 cases. Unexecuted fixed-plan cases: 0. Unlisted cross-products are untested, even when a neighboring case passes.
@@ -222,6 +222,7 @@ Each value is the maximum of the recorded regional statistic across the tested g
 | `gainmap-android-iso` | `native-combine-moderateoffset-jpegli-base-dct-float-map` | `gainmap-hdr-target-gamut-v1` | 4/6 | 0.4356 | 28.6637 | 1.1834 | 7.5227 | 1.9313 |
 | `gainmap-android-iso` | `native-combine-moderateoffset-lossless-rgb` | `gainmap-hdr-target-gamut-v1` | 6/6 | 0.0004 | 5.0994 | 1.0444 | 4.6038 | 1.6505 |
 | `gainmap-android-iso` | `native-combine-moderateoffset-lossless-rgb-source-float32` | `gainmap-hdr-target-gamut-v1` | 6/6 | 0.0004 | 5.0994 | 1.0460 | 4.2965 | 1.6285 |
+| `gainmap-android-iso` | `native-combine-moderateoffset-mozjpeg-base-dct-float-map` | `gainmap-hdr-target-gamut-v1` | 1/1 | 0.4120 | 7.1832 | 1.0693 | 6.4514 | 1.6724 |
 | `gainmap-android-xmp` | `native-combine-identity-lossless-rgb` | `gainmap-hdr-target-gamut-v1` | 6/6 | 0.0004 | 2.0849 | 1.2553 | 3.0473 | 3.1721 |
 | `gainmap-android-xmp` | `native-combine-moderateoffset-dct-float-rgb` | `gainmap-hdr-target-gamut-v1` | 5/6 | 0.3243 | 27.7158 | 0.8948 | 6.4785 | 2.3871 |
 | `gainmap-android-xmp` | `native-combine-moderateoffset-dct-rgb` | `gainmap-hdr-target-gamut-v1` | 5/6 | 0.3479 | 25.4949 | 0.9491 | 6.1151 | 2.5249 |
@@ -242,10 +243,33 @@ The following separate decoder diagnostics do not alter the file qualification a
 
 | Independent reader diagnostic | Attempted | Appearance passed | Failed or unqualified |
 | --- | ---: | ---: | ---: |
-| `baseline_libavif` | 72 | 16 | 56 |
-| `rgb_libavif` | 72 | 69 | 3 |
+| `baseline_libavif` | 73 | 16 | 57 |
+| `rgb_libavif` | 73 | 70 | 3 |
 
-The separate [JPEGli base experiment](jpegli-base-experiment.json) records 64 native SOF0 RGB8 trials, of which 4 pass the unchanged authored-SDR base checks. Each failed trial retains its regional measurements. These base experiments do not qualify an HDR derivative and are excluded from the conversion-attempt counts above. A JPEGli HDR candidate must independently regenerate and validate its gain map and reconstructed HDR output.
+The SOF0 union below counts each exact observed request once across native alternatives with independently inspected SOF0 base and map layers. Fixture and source hash, normalized selectors, geometry, crop and source-orientation facts, and reference revision must match. A request qualifies only when an exact alternative passes all original checks without blockers or rejected measurements. The per-candidate failures above remain unchanged.
+
+| Reference revision | Qualified/observed exact SOF0 requests | Qualified/observed required requests |
+| --- | ---: | ---: |
+| `gainmap-hdr-target-gamut-v1` | 18/24 | 14/20 |
+
+These denominators cover the observed corpus only; the required column matches the fixed plan within that corpus. Unobserved requests remain untested. This summary selects no runtime encoder and changes no matrix status. Physical browser and OS wallpaper qualification remains pending manual review.
+
+The separate [JPEGli base experiment](jpegli-base-experiment.json) records 64 native SOF0 RGB8 trials, of which 4 pass the unchanged authored-SDR base checks. Each failed trial retains its regional measurements.
+
+The bounded [JPEGli quality experiment](jpegli-quality-experiment.json) records 84 native trials, with 0 passing and 84 failed or unqualified. It retains every declared quality/table/adaptive option for the remaining source/geometry corpus under the same authored-SDR reference and thresholds.
+
+Both base experiments do not qualify an HDR derivative and are excluded from the conversion-attempt counts above. A JPEGli HDR candidate must independently regenerate and validate its gain map and reconstructed HDR output. Physical consumer review remains pending.
+
+## Native MozJPEG base experiments
+
+These separate authored-SDR base experiments are excluded from the conversion-attempt counts. A passing base still needs a regenerated gain map and complete independent HDR qualification. Every physical consumer remains pending manual review.
+
+| Native setup | Trials | Qualified SDR bases | Measured appearance failures | Decoder errors |
+| --- | ---: | ---: | ---: | ---: |
+| Optimized Huffman | 56 | 4 | 52 | 0 |
+| Retained standard Huffman | 56 | 0 | 30 | 26 |
+
+The [optimized-Huffman trials](mozjpeg-base-experiment.json) retain every declared DCT/trellis/deringing option. The [initial standard-Huffman setup](mozjpeg-standard-huffman-experiment.json) remains reproducible, including malformed streams that FFmpeg conceals despite exiting zero. Both native command runners now reject error-level decoder diagnostics; concealed rasters cannot supply appearance evidence.
 
 ## Blockers and scope limits
 
@@ -264,14 +288,14 @@ The separate [JPEGli base experiment](jpegli-base-experiment.json) records 64 na
 - Additional gamma-3.2 GIF candidates use native nearest rounding and retain the same SDR reference and fixed thresholds. Static AVIF/APNG cases have separate IDs from gamma-2.2 failures. Optional animated APNG-to-GIF cases preserve 300/700 ms timing and three total plays, encoded as two GIF repeats. Explicit binary coercion compares exact threshold decisions. Quantized half-alpha mismatches remain failed and record the reference, encoder-input and decoded values.
 - A further animated GIF candidate resamples alpha separately with native zimg and rounds to sixteen bits after each axis. Independent checks require identical RGB16 samples, intermediate alpha error within the existing PNG16 ceiling and exact final binary decisions. These candidates preserve the original SDR grade and keep the earlier half-alpha failures visible.
 - Static 16-bit HDR PNG sources have separate PQ/HLG, P3/Rec.2020 and alpha evidence for identity, contain, cover, fill, upscale and independently checked EXIF-8 orientation. Their source and HDR conversions use the unchanged stricter avif-12 appearance gates. Matching same-format identity requests are byte-exact controls. Six conflicting/unknown PNG signaling controls retain exact originals and withhold transforms.
-- Separate eight-bit PQ/HLG PNG sources use their own reviewed source hash lock. Their containment cases cover HDR PNG8/AVIF8 and explicit SDR PNG16/AVIF8. The direct-input failures remain recorded. A separate native zimg storage expansion must preserve every independently decoded RGBA sample exactly before conversion; it changes neither the reference intent nor the fixed output gates. Matching requests retain exact originals, and unknown CICP facts withhold transformations. Unlisted PNG8 geometries and formats remain untested.
-- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain, cover, fill, upscale and independently checked EXIF-8 orientation derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. Four orientation sources have distinct hashes and every native rotation matches the independently decoded frames exactly. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Native SOURCE rectangles are independently reconstructed by exact RGBA replacement; out-of-bounds rectangles, partial default images, OVER blending and disposal remain rejected. Static extraction checks the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF at each tested geometry. JPEG opacity and GIF binary alpha require explicit coercion; preserve-alpha requests are rejected. The two PQ static GIF orientation cases exceed the fixed shadow color-error ceiling and remain unqualified. Unlisted APNG geometries remain untested.
+- Separate eight-bit PQ/HLG PNG sources use their own reviewed source hash lock. Their containment cases cover HDR PNG8/AVIF8 and explicit SDR PNG16/AVIF8. The direct-input failures remain recorded. A separate native zimg storage expansion must preserve every independently decoded RGBA sample exactly before conversion; it changes neither the reference intent nor the fixed output gates. The normalized candidate also covers crop, fill, upscale and real EXIF-8 orientation under the same gates. Eight separately hashed orientation sources require unchanged coded samples and an exact independent rotation check before resampling. Matching requests retain exact originals, and unknown CICP facts withhold transformations. Unlisted PNG8 geometries and formats remain untested.
+- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain, cover, fill, upscale and independently checked EXIF-8 orientation derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. Four orientation sources have distinct hashes and every native rotation matches the independently decoded frames exactly. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Native SOURCE rectangles are independently reconstructed by exact RGBA replacement; out-of-bounds rectangles, partial default images, OVER blending and disposal remain rejected. Static extraction checks the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF at each tested geometry. JPEG opacity and GIF binary alpha require explicit coercion; preserve-alpha requests are rejected. The two original gamma-2.2 PQ static GIF orientation cases exceed the fixed shadow color-error ceiling and remain unqualified. The newer gamma-3.2 cases retain separate measurements and qualification. Unlisted APNG geometries remain untested.
 - Unlisted PNG/APNG cross-products, HDR WebP, gain-map AVIF and other unexecuted accepted-source requests remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.
 - These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.
 - The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.
 - Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.
 
-Prepared 808 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
+Prepared 883 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
 
 ## Suite integrity
 

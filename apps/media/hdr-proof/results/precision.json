@@ -71,7 +71,7 @@
   "source_avif_sha256": "43a7c7cafbb2b596e819a04eac3bd87ab8e6e2cd2102c39c66f0252f3d2505d8",
   "source_decoded_png_sha256": "4395d4196248268a3d714ff280be1c965414d583c78068ba99e28609ff06f64c",
   "reference_recipe_sha256": "9365ef53d057206e324a99249df10fcde3576b210ff81aa22c9b054af4710826",
-  "geometry_and_transfer_reference_sha256": "b43e1ebe404b3dc59b70bfa2a239e498acf0a7e60d87e488d7911267fbf97610",
+  "geometry_and_transfer_reference_sha256": "28c87a831fe1b29333060b870e5f081e744b8dd3deec9ccbe21e07ed1bdac6e1",
   "metric_source_sha256": "a0be551e0e7c27b9fb786c63d1fa72113c5f66415360ce3ae854c72aeb3809e8",
   "native_counterexample": {
     "status": "diagnostic_only",

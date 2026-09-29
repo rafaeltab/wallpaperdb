@@ -9,6 +9,25 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_includes_old_apple_and_iso_candidates_with_coding_scope(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            cases = []
+            for name in ('gainmap-apple-old', 'gainmap-android-iso'):
+                output = root/f'{name}.jpg'
+                output.write_bytes(b'file-copy-test-only')
+                cases.append({'case_id': name+':hdr:jpg:contain:copy-test', 'fixture_id': name,
+                    'geometry': 'contain', 'status': 'tested and failed', 'artifacts': {'output': str(output)},
+                    'native_candidate': {'coding_scope': 'JPEG SOF3; physical consumer qualification pending'}})
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files(cases, [])
+            self.assertEqual(len(files), 2)
+            for entry in files:
+                self.assertIn('SOF3', entry['coding_scope'])
+                self.assertEqual(entry['codec_status'], 'tested and failed')
+                self.assertEqual(entry['consumer_status'], 'pending manual review')
+
     def test_manual_copy_finds_output_after_native_command_log(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

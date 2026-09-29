@@ -28,6 +28,21 @@ fixes animated orientation serialization. These patches do not upgrade Media's
 production dependencies. Their source, patch, recipe and binary hashes are
 recorded by the build and [native version evidence](results/native-versions.json).
 
+The [combined gain-map proof](combined_gainmap_proof.py) separately resizes the
+authored SDR base and reconstructed HDR intent, computes a new native gain map,
+and retains RGB8 base/map samples with native predictive lossless JPEG coding.
+Isolated libavif variants measure rare-gain retention, smaller offsets and identity
+matrix coding. Separate libultrahdr variants test RGB JPEG decoding and its
+existing exact transfer/gain formulas. The pinned libavif reader rejects these
+SOF3 JPEG files; file accuracy and physical consumer compatibility remain separate.
+
+Its [versioned geometry reference](gainmap_reference.py) filters and clips in the
+requested gamut before conversion to metric coordinates. Clipping Lanczos
+excursions in Rec.2020 can create colors outside the requested P3 or sRGB gamut.
+Analytic tests prove this distinction and preserve identity colors. Original
+references, failing candidates and thresholds remain unchanged; new case IDs
+record `gainmap-hdr-target-gamut-v1` and retain diagnostic reference differences.
+
 The SDR candidate's [independent reference](sdr_reference.py) declares its tone
 curve and relative-colorimetric gamut clipping. Out-of-gamut saturation detail
 can be lost; this is a deliberate mapping choice to evaluate during physical
@@ -125,7 +140,7 @@ every emitted representation.
 
 Authored SDR lossless PNG and WebP candidates pass all four gain-map sources,
 two requested gamuts and seven geometries using 8-bit samples with independently
-verified gamma-3.2 ICC signaling. Their 112 cases keep the authored SDR grade and
+verified sRGB transfer and sRGB or P3 ICC primaries. Their 112 cases keep the authored SDR grade and
 unchanged appearance gates; physical consumer interpretation remains pending.
 
 The appearance metric keeps signed color coordinates when a valid color lies

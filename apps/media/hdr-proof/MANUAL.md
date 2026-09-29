@@ -19,6 +19,13 @@ Record date, reviewer, OS build, browser version, monitor/display identity, disp
 
 Test Android/ISO, Android XMP, old Apple and new Apple JPEG separately. Test every emitted PQ/HLG P3/Rec.2020 and 8/10/12-bit variant represented in the report. Do not infer one flavor's result from another flavor or assume wide gamut means HDR presentation. Animated HLG plus alpha and extra HDR PNG/APNG/WebP conversions remain optional candidates with separate records.
 
+Combined HDR JPEG candidates use SOF3 predictive RGB8 base and gain-map coding.
+The pinned libavif reader rejects this coding; the suite's validated native
+JPEG/ISO and patched libultrahdr decoders check its file accuracy. Record each
+browser, viewer and wallpaper setter's ability to decode these exact files
+before assessing visible HDR. A different JPEG candidate's result does not
+establish SOF3 compatibility. Keep every consumer result pending until tested.
+
 The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
 two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit
 SDR APNG counterparts carry a standard sRGB chunk; the SDR AVIF and WebP

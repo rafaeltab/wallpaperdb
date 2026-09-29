@@ -10,7 +10,7 @@ from pathlib import Path
 import struct
 
 import numpy as np
-from PIL import Image, ImageCms
+from PIL import Image, ImageCms, features
 
 import avif
 import gainmap_avif
@@ -136,19 +136,35 @@ def inspect_and_decode(path):
     return facts, codes, sdr_signal_to_nits(codes[..., :3]/255)
 
 
-def _encode(source, output):
+def _encode(source, output, palette):
     filters = ('[0:v]format=rgb24,split[image][palette];'
                '[palette]palettegen=max_colors=256:reserve_transparent=0[pal];'
                '[image][pal]paletteuse=dither=sierra2_4a')
-    avif.native(['ffmpeg', '-v', 'error', '-y', '-filter_complex_threads', '1', '-i', source,
-        '-filter_complex', filters, '-frames:v', '1', '-loop', '-1', '-map_metadata', '-1', '-threads', '1', output])
+    if palette == 'ffmpeg-sierra24':
+        avif.native(['ffmpeg', '-v', 'error', '-y', '-filter_complex_threads', '1', '-i', source,
+            '-filter_complex', filters, '-frames:v', '1', '-loop', '-1', '-map_metadata', '-1', '-threads', '1', output])
+        encoder = 'Native pinned FFmpeg palettegen, paletteuse and GIF encoder'
+        options = {'native_filters': filters}
+    else:
+        with Image.open(source) as image:
+            clean = Image.frombytes('RGB', image.size, image.convert('RGB').tobytes())
+            quantized = clean.quantize(colors=256, method=Image.Quantize.LIBIMAGEQUANT)
+            quantized.save(output, format='GIF', optimize=False, interlace=False)
+        encoder = 'Pillow native libimagequant and GIF writer'
+        options = {'colors': 256, 'optimize': False, 'interlace': False,
+            'native_package': next(line for line in avif.native(['apk', 'info', '-v']).decode().splitlines()
+                                   if line.startswith('libimagequant-')),
+            'native_version_api': features.version_feature('libimagequant'),
+            'adapter_source': 'https://raw.githubusercontent.com/python-pillow/Pillow/12.2.0/src/libImaging/QuantPngQuant.c',
+            'native_quantizer_convention': 'Pillow native adapter uses input/output gamma0.45455 and dithering level1. Actual emitted sRGB interpretation is measured independently.',
+            'native_library_hashes': {str(path): avif.digest(path) for path in sorted(Path('/usr/lib').glob('libimagequant.so.*'))}}
     profile = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
     profile[24:36] = struct.pack('>6H', 2020, 1, 1, 0, 0, 0)
     profile[84:100] = bytes(16)
     icc = output.with_suffix('.icc')
     icc.write_bytes(profile)
     avif.native(['exiftool', '-overwrite_original', f'-ICC_Profile<={icc}', output])
-    return {'encoder': 'Native pinned FFmpeg palettegen, paletteuse and GIF encoder', 'native_filters': filters,
+    return {'encoder': encoder, **options,
             'input': str(source), 'input_sha256': avif.digest(source),
             'icc_sha256': hashlib.sha256(profile).hexdigest(), 'output_sha256': avif.digest(output)}
 
@@ -171,19 +187,25 @@ def _palette_bound(output, reference, reference_path):
         'minimum_error_max': float(minimum.max()), 'pixels_above_fixed_maximum': int(np.count_nonzero(minimum > limit))}
 
 
-def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
+def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, palette='ffmpeg-sierra24'):
+    if palette not in ('ffmpeg-sierra24', 'libimagequant'):
+        raise ValueError('Only the two separately declared native palette candidates are supported')
     validate_selectors(SELECTORS if selectors is None else selectors)
     root = Path(directory)
     start = len(avif.COMMANDS)
     prepared = gainmap_avif_png.run(root/'native-png', source_lock=source_lock)
     original = prepared['evidence'][0]
-    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:sdr:gif:preserve:preserve:contain:authored-srgb256-sierra24',
+    suffix = 'srgb256-sierra24' if palette == 'ffmpeg-sierra24' else 'srgb256-libimagequant'
+    policy = POLICY if palette == 'ffmpeg-sierra24' else {**POLICY,
+        'output': 'Native libimagequant256 palette and Pillow GIF writer; actual standard sRGB ICC',
+        'palette_policy': 'Declared before measurement: the retained FFmpeg palette cannot meet the maximum gate for900pixels. Test one different native palette optimizer with unchanged source, reference and thresholds.'}
+    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:sdr:gif:preserve:preserve:contain:authored-{suffix}',
         'cell_id': 'avif-gainmap:sdr:gif', 'fixture_id': gainmap_avif.FIXTURE_ID,
-        'candidate': 'native-authored-base-gif-srgb256-sierra24', 'selectors': dict(SELECTORS), 'geometry': 'contain',
+        'candidate': f'native-authored-base-gif-{suffix}', 'selectors': dict(SELECTORS), 'geometry': 'contain',
         'source_facts': original['source_facts'], 'source_sha256': original['source_sha256'],
         'status': 'tested and failed', 'consumer_status': 'pending manual review',
         'qualification_scope': 'One opaque static authored SDR palette; no HDR or physical consumer qualification',
-        'threshold_scope': {**POLICY, 'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
+        'threshold_scope': {**policy, 'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
         'checks': {key: False for key in ('native_encoder', 'native_preparation', 'independent_source_decoder',
             'independent_decoder', 'structure', 'native_palette', 'appearance', 'privacy')},
         'measurements': {}, 'artifacts': {}, 'blockers': [], 'native_preparation': original}
@@ -197,11 +219,11 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
         if avif.digest(source) != original['artifacts']['sha256']:
             raise ValueError('Native preparation changed after inspection')
         _, native_pixels = gainmap_avif_png.inspect_and_decode(source)
-        case['native_candidate'] = _encode(source, output)
+        case['native_candidate'] = _encode(source, output, palette)
         case['checks']['native_encoder'] = True
         case['artifacts'] = {'output': str(output), 'sha256': avif.digest(output)}
         facts, _, linear = inspect_and_decode(output)
-        palette = compare_appearance(sdr_signal_to_nits(native_pixels[..., :3]), linear,
+        palette_measure = compare_appearance(sdr_signal_to_nits(native_pixels[..., :3]), linear,
             reference_gamut='srgb', actual_gamut='srgb', fixture_class='gainmap-sdr')
         reference = original['reference_sdr']
         reference_path = Path(reference['path'])
@@ -212,12 +234,12 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
         measured = compare_appearance(expected, linear, reference_gamut='srgb', actual_gamut='srgb',
                                      fixture_class='gainmap-sdr')
         case['palette_lower_bound'] = _palette_bound(output, expected, reference_path)
-        case['checks'].update({'independent_decoder': True, 'native_palette': palette['passed'],
+        case['checks'].update({'independent_decoder': True, 'native_palette': palette_measure['passed'],
             'structure': (facts['width'], facts['height'], facts['depth'], facts['orientation'], facts['frames'])
                 == (expected.shape[1], expected.shape[0], 8, 1, 1) and facts['opaque']
                 and facts['icc_sha256'] == case['native_candidate']['icc_sha256'],
             'appearance': measured['passed'], 'privacy': facts['privacy']})
-        case.update({'facts': facts, 'reference_sdr': reference, 'measurements': {'sdr': measured, 'palette': palette}})
+        case.update({'facts': facts, 'reference_sdr': reference, 'measurements': {'sdr': measured, 'palette': palette_measure}})
         case['blockers'] = [f'Failed {key} check' for key, passed in case['checks'].items() if not passed]
         if not case['blockers']:
             case['status'] = 'qualified'
@@ -234,8 +256,10 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
             rejected = True
         controls.append({'case_id': 'gainmap-avif-gif-'+label+'-withheld', 'passed': rejected,
                          'status': 'passed' if rejected else 'tested and failed'})
+    if palette != 'ffmpeg-sierra24':
+        controls = [{**control, 'case_id': control['case_id']+'-'+palette} for control in controls]
     return {'evidence': [case], 'source_fixtures': prepared['source_fixtures'], 'fixtures': [],
-            'controls': controls, 'commands': avif.COMMANDS[start:], 'scope': POLICY,
+            'controls': controls, 'commands': avif.COMMANDS[start:], 'scope': policy,
             'source_hashes': {name: avif.digest(Path(__file__).with_name(name)) for name in
                 ('gainmap_avif_gif.py', 'gainmap_avif_png.py', 'gainmap_avif.py', 'gainmap_iso.py',
                  'appearance.py', 'thresholds.json')},

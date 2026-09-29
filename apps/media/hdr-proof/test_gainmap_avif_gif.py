@@ -10,6 +10,30 @@ from gainmap_avif_gif import SELECTORS, inspect_and_decode, run
 
 
 class GainmapAvifGifTests(unittest.TestCase):
+    def test_separate_native_quantizer_retains_the_same_authored_reference(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result = run(Path(temporary), palette='libimagequant')
+            case = result['evidence'][0]
+            self.assertTrue(case['checks']['native_encoder'], case['blockers'])
+            self.assertTrue(case['checks']['independent_decoder'], case['blockers'])
+            self.assertTrue(case['checks']['structure'], case['blockers'])
+            self.assertTrue(case['checks']['privacy'], case['blockers'])
+            self.assertIn('libimagequant', case['native_candidate']['encoder'])
+            self.assertEqual(case['reference_sdr']['sha256'],
+                             'b58ac4171554daab4ab1736bc37eb041681927999a46369b8b7117e4c0683731')
+            self.assertEqual(case['status'] == 'qualified', all(case['checks'].values()))
+            self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertEqual(case['status'], 'tested and failed')
+            self.assertEqual(case['artifacts']['sha256'],
+                             '76c698c153a42767771ffd71bc258c340caf88bae733d8aeed00f5438f6371c2')
+            self.assertEqual(case['palette_lower_bound']['pixels_above_fixed_maximum'], 951)
+            self.assertAlmostEqual(case['measurements']['sdr']['regions']['shadow']['delta_e_itp']['maximum'],
+                                   62.973723511959726, places=8)
+            self.assertTrue(case['native_candidate']['native_library_hashes'])
+            self.assertIn('libimagequant-4.2.2-r0', case['native_candidate']['native_package'])
+            self.assertEqual(case['native_candidate']['native_version_api'], '4.0.0')
+            self.assertTrue(all(control['case_id'].endswith('-libimagequant') for control in result['controls']))
+
     def test_real_native_containment_records_palette_and_appearance_separately(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = run(Path(temporary))
@@ -80,6 +104,8 @@ class GainmapAvifGifTests(unittest.TestCase):
     def test_unknown_source_and_unproved_selectors_do_not_reach_an_encoder(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            with self.assertRaises(ValueError):
+                run(root, palette='unknown')
             for change in ({'range': 'hdr'}, {'depth': '16'}, {'gamut': 'p3'},
                            {'transparency': 'opaque'}, {'w': 174}, {'motion': 'static'}):
                 before = len(avif.COMMANDS)

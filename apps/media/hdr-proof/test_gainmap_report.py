@@ -6,7 +6,8 @@ import numpy as np
 
 from appearance import compare_appearance
 
-from suite import gainmap_candidate_report, jpegli_experiment_report, mozjpeg_experiment_report
+from suite import (coefficient_diagnostic_report, gainmap_candidate_report,
+                   jpegli_experiment_report, mozjpeg_experiment_report)
 from matrix import CHECKS, GAINMAP_GEOMETRIES
 
 
@@ -18,6 +19,16 @@ def measurement(mean, maximum, luminance):
 
 
 class MozjpegReportTests(unittest.TestCase):
+    def test_coefficient_report_preserves_best_profile_and_remaining_dc_failures(self):
+        rendered = '\n'.join(coefficient_diagnostic_report({'cases': [{
+            'fixture_id': 'source', 'geometry': 'upscale', 'native_geometry_measurement': {'passed': True},
+            'profiles': [{'worst_pixel': {'delta_e_itp': error},
+                          'unchanged_dc_blocks': {'failing_pixel_count': pixels}}
+                         for error, pixels in ((26, 235), (25, 140))]}]}))
+        self.assertIn('| `source` | upscale | 2 | True | 25.0000 | 140 |', rendered)
+        self.assertIn('cannot qualify a converter or physical consumer', rendered)
+        self.assertIn('is an inference', rendered)
+
     def test_base_report_keeps_decoder_failures_separate_from_appearance(self):
         valid = {'status': 'qualified', 'measurement': {'passed': True}}
         measured = {'status': 'tested and failed', 'measurement': {'passed': False}}

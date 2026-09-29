@@ -80,6 +80,11 @@ on the six remaining source/geometry cases. It raises the coefficient-distortion
 penalty under fixed quality-100 quantizers and unchanged source samples. Its
 default controls must reproduce their earlier JPEG bytes exactly; all failures
 remain in [their own measurements](results/mozjpeg-lambda-experiment.json).
+The [coefficient diagnostic](mozjpeg_diagnostics.py) reads actual compressed
+coefficients with pinned native libjpeg and checks the reference, native-input
+and output hashes. It distinguishes geometry error from coding error and counts
+failed shadow pixels in blocks with unchanged DC coefficients. This diagnostic
+does not qualify a conversion or prove every baseline JPEG encoder impossible.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
@@ -233,6 +238,21 @@ grade with gamma-2.2 ICC coding and fractional alpha. A restricted static VP8L
 reader checks container structure before native decoding. FFmpeg's native WebP
 decoder must match both Pillow/libwebp and the coded encoder input exactly;
 regional appearance, tone/gamut policy and privacy still have separate gates.
+A separate nearest-code quantizer must match independently rounded sixteen-bit
+RGB and alpha samples exactly, within half an output code. Both quantization
+candidates retain separate measurements and the same final appearance and alpha
+limits. The earlier JPEG and static/animated WebP defaults retain pinned bytes.
+
+The [gain-map AVIF source proof](gainmap_avif.py) regenerates one separately
+[hash-locked source](fixtures/gainmap-avif-source-sha256.json) from the Android
+XMP JPEG. Independent BMFF parsing reads base/map associations and per-channel
+gain fractions; direct AV1 packet decoding checks actual native depth and color
+signaling before any eight-bit conversion. The pinned libavif metadata printer
+repeats channel zero, so its text remains diagnostic evidence. The
+[authored-SDR derivative](gainmap_avif_proof.py) uses AOM source decoding and
+encoding, independent dav1d samples and unchanged photographic appearance gates.
+Unknown required facts preserve exact originals and withhold transformation.
+HDR reconstruction and gain-map AVIF HDR derivatives remain unqualified.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

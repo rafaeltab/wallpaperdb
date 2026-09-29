@@ -60,6 +60,7 @@ def versions():
                    'native_dct_jpeg_binary_sha256':avif.digest(Path('/usr/local/bin/hdr-proof-dct-jpeg')),
                    'native_jpegli_binary_sha256':avif.digest(Path('/opt/proof/jpegli/hdr-proof-jpegli')),
                    'native_mozjpeg_binary_sha256':avif.digest(Path('/opt/proof/mozjpeg/hdr-proof-mozjpeg')),
+                   'native_jpeg_coefficient_reader_sha256':avif.digest(Path('/usr/local/bin/hdr-proof-jpeg-coefficients')),
                    'proof_source_sha256':{path.name:avif.digest(path) for path in sorted(ROOT.iterdir())
                        if path.is_file() and (path.name == 'Dockerfile' or path.suffix in ('.py','.c','.cpp','.cjs','.sh','.patch','.cmake'))},
                    'libultrahdr_variant_binaries':Path('/opt/proof/ultrahdr/binary-sha256.txt').read_text(),
@@ -104,10 +105,9 @@ def candidate_files(evidence, fixtures):
                         'coding_scope':coding_scope or (case.get('native_candidate',{}).get('coding_scope') if case else None),
                         'warning':'A failed candidate is a diagnostic comparison, not an approved download or SDR fallback.' if case and case['status']!='qualified' else None})
     for fixture in fixtures:
-        spec = fixture.get('spec')
-        if spec and (spec['depth'] in (8,10,12,16) or spec['frames']==2):
-            suffix = Path(fixture['path']).suffix
-            copy(fixture['path'], f'source-{fixture["id"]}{suffix}', 'Inspected synthetic HDR source',
+        suffix = Path(fixture['path']).suffix
+        if suffix in ('.jpg', '.avif', '.png', '.webp', '.gif'):
+            copy(fixture['path'], f'source-{fixture["id"]}{suffix}', 'Inspected source fixture',
                  facts=fixture['facts'], expected_sha256=fixture.get('sha256'))
     gainmap_directory = ROOT/'fixtures/gainmap'
     if gainmap_directory.exists():
@@ -345,7 +345,21 @@ def mozjpeg_experiment_report(base, historical, lambdas):
         'The [bounded trellis-precision follow-up](mozjpeg-lambda-experiment.json) increases the native coefficient-distortion penalty for the remaining six source/geometry cases. It retains default controls, unchanged quality-100 quantizers, authored samples and appearance gates. Failure of these declared options does not prove every baseline JPEG encoder impossible.', '']
 
 
-def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas):
+def coefficient_diagnostic_report(diagnosis):
+    lines = ['## Remaining baseline JPEG precision evidence', '',
+        'This read-only [native coefficient diagnostic](mozjpeg-coefficient-diagnosis.json) cannot qualify a converter or physical consumer. It retains the failed input statuses and checks output, reference and native-input hashes before reading actual JPEG coefficients.', '',
+        '| Source | Geometry | Profiles | Native geometry passes | Smallest full-image maximum Delta E | Minimum failing shadow pixels in unchanged-DC blocks |',
+        '| --- | --- | ---: | --- | ---: | ---: |']
+    for case in diagnosis['cases']:
+        profiles = case['profiles']
+        maximum = min(profile['worst_pixel']['delta_e_itp'] for profile in profiles)
+        remaining = min(profile['unchanged_dc_blocks']['failing_pixel_count'] for profile in profiles)
+        lines.append(f'| `{case["fixture_id"]}` | {case["geometry"]} | {len(profiles)} | {case["native_geometry_measurement"]["passed"]} | {maximum:.4f} | {remaining} |')
+    return lines + ['',
+        'Failures persist in blocks whose DC coefficients match the no-trellis control. The higher-lambda trials change real output bytes and AC coefficients. Quantized AC/IDCT error is an inference from those coefficients and decoded samples; these observations do not prove every possible baseline JPEG encoder incapable of meeting the fixed gates.', '']
+
+
+def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
@@ -407,6 +421,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               *gainmap_candidate_report(evidence),
               *jpegli_experiment_report(jpegli, jpegli_quality),
               *mozjpeg_experiment_report(mozjpeg, mozjpeg_historical, mozjpeg_lambdas),
+              *coefficient_diagnostic_report(mozjpeg_diagnosis),
               '## Blockers and scope limits','',
               '- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.',
               '- The separately versioned gainmap-hdr-target-gamut-v1 reference filters and clips negative Lanczos excursions in the requested output primaries. Clipping in the earlier Rec.2020 decoder coordinates could create negative components in the requested P3 or sRGB gamut. Analytic commutation, out-of-gamut and identity controls verify this correction. Old references and failed case IDs remain visible; new cases record the reference revision and diagnostic differences. Appearance thresholds are unchanged.',
@@ -427,7 +442,8 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain, cover, fill, upscale and independently checked EXIF-8 orientation derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. Four orientation sources have distinct hashes and every native rotation matches the independently decoded frames exactly. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Native SOURCE rectangles are independently reconstructed by exact RGBA replacement; out-of-bounds rectangles, partial default images, OVER blending and disposal remain rejected. Static extraction checks the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF at each tested geometry. JPEG opacity and GIF binary alpha require explicit coercion; preserve-alpha requests are rejected. The two original gamma-2.2 PQ static GIF orientation cases exceed the fixed shadow color-error ceiling and remain unqualified. The newer gamma-3.2 cases retain separate measurements and qualification. Unlisted APNG geometries remain untested.',
               '- Additional PNG8-to-HDR PNG16 and AVIF12 cases use the stricter existing avif-12 output gates across contain, cover, fill, upscale and real EXIF-8 orientation. Source quantization is measured separately. Native rotation must match the independently decoded original samples before geometry changes; alpha must remain within two codes at the actual output depth.',
               '- Separate PNG8-to-SDR WebP containment candidates use the unchanged tone/gamut grade and gamma-2.2 ICC coding. The static VP8L reader checks dimensions, alpha signaling, metadata and chunk structure. Independent native FFmpeg decoding must match Pillow/libwebp and the actual encoder-input codes exactly. Those exact storage checks do not replace appearance, tone or alpha thresholds.',
-              '- Unlisted PNG/APNG cross-products, HDR WebP, gain-map AVIF and other unexecuted accepted-source requests remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
+              '- One separately locked gain-map AVIF source has an authored-SDR AVIF containment candidate. Independent BMFF/tmap parsing, actual AV1 packet depth/signaling, dav1d samples and AOM candidate decoding establish the source base. Native metadata text repeats channel-zero gain values; the independently parsed per-channel fractions remain authoritative. Unknown color, depth, orientation or metadata withholds transformation and preserves exact originals. This does not qualify source HDR reconstruction or any HDR derivative.',
+              '- Unlisted PNG/APNG cross-products, HDR WebP and other unexecuted accepted-source requests remain untested. Gain-map AVIF HDR candidates retain their independent reconstruction and geometry blockers. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
               '- These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.',
               '- The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.',
               '- Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.', '',
@@ -475,7 +491,7 @@ def main():
         geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
     write_json(WORK/'hdr-png8-precision-evidence.json',png8_precision_result)
     from hdr_png8_webp import run as run_hdr_png8_webp
-    png8_webp_result = run_hdr_png8_webp(WORK/'hdr-png8-webp')
+    png8_webp_result = run_hdr_png8_webp(WORK/'hdr-png8-webp', nearest_quantization=True)
     write_json(WORK/'hdr-png8-webp-evidence.json',png8_webp_result)
     from apng import run as run_apng
     apng_result = run_apng(WORK/'apng', animated_gif=True)
@@ -497,6 +513,12 @@ def main():
     mozjpeg_lambdas = run_mozjpeg(WORK/'mozjpeg-lambda-experiment',
         corpus=LAMBDA_CORPUS, options=LAMBDA_OPTIONS, lambdas=LAMBDAS)
     write_json(RESULTS/'mozjpeg-lambda-experiment.json', mozjpeg_lambdas)
+    from mozjpeg_diagnostics import run as run_mozjpeg_diagnosis
+    mozjpeg_diagnosis = run_mozjpeg_diagnosis(WORK/'mozjpeg-coefficient-diagnosis', mozjpeg_result, mozjpeg_lambdas)
+    write_json(RESULTS/'mozjpeg-coefficient-diagnosis.json', mozjpeg_diagnosis)
+    from gainmap_avif_proof import run as run_gainmap_avif
+    gainmap_avif_result = run_gainmap_avif(WORK/'gainmap-avif-authored-sdr')
+    write_json(WORK/'gainmap-avif-evidence.json', gainmap_avif_result)
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))
@@ -525,12 +547,13 @@ def main():
     controls = run_selectors(WORK/'selectors')
     controls['controls'].extend(png_result['controls'])
     controls['controls'].extend(png8_result['controls'])
+    controls['controls'].extend(gainmap_avif_result['controls'])
     controls['controls'].extend(apng_result['controls'])
-    evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + png8_precision_result['evidence'] + png8_webp_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
+    evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + png8_precision_result['evidence'] + png8_webp_result['evidence'] + gainmap_avif_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
     locked_fixtures = avif_result['fixtures'] + png_result['fixtures'] + apng_result['fixtures'] + controls.get('fixtures',[])
     # PNG8 validates its separate source lock before any conversion. Preserve
     # the original generated corpus lock, including its PNG16 hashes.
-    generated_fixtures = locked_fixtures + png8_result['fixtures'] + png8_geometry_result['fixtures']
+    generated_fixtures = locked_fixtures + png8_result['fixtures'] + png8_geometry_result['fixtures'] + gainmap_avif_result['source_fixtures']
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
     errors = matrix['evidence_errors'] + fixture_lock(locked_fixtures,args.update_fixture_lock)
@@ -547,7 +570,7 @@ def main():
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,generated_fixtures)
-    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas))
+    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas,mozjpeg_diagnosis))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))
     return 1 if errors else 2

@@ -30,6 +30,9 @@ increased output precision cannot recover detail absent from that source.
 Separate PNG8-to-SDR WebP candidates use gamma-2.2 ICC coding and fractional
 alpha. Confirm that each consumer interprets the embedded profile and preserves
 the transparent edges against the same SDR reference.
+Nearest-code WebP candidates have distinct `nearest8` names. Compare their
+transparent edges and shadow/midtone gradients with the earlier candidates;
+each representation retains its own file qualification and pending consumer result.
 The separately named MozJPEG ISO crop uses baseline RGB8 JPEG coding for both
 the SDR base and gain map. Check its SDR appearance and HDR reconstruction in
 each consumer independently of the predictive-lossless JPEG candidates.
@@ -50,6 +53,11 @@ Separate SOF0 DCT JPEG candidates have their own manifest entries. Some retain
 measured shadow failures and are only diagnostic files. Test a qualified SOF0
 file separately from the SOF3 file; neither result establishes the other's
 decoder, gain-map interpretation or HDR presentation behavior.
+
+The optional gain-map AVIF source has a separately inspected authored-SDR AVIF
+derivative. Compare it with the matched SDR base and verify privacy and geometry.
+Its native HDR reconstruction remains unqualified; the SDR result does not
+establish HDR support for that source or container.
 
 The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
 two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit

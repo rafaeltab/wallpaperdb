@@ -10,6 +10,22 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_includes_verified_gainmap_avif_without_a_synthetic_scene_spec(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            source = root/'native-gainmap.avif'
+            source.write_bytes(b'file-copy-test-only')
+            fixture = {'id': 'avif-gainmap-from-android-xmp', 'path': str(source),
+                'sha256': suite.avif.digest(source), 'facts': {'hdr_reconstruction': 'untested'}}
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files([], [fixture])
+            self.assertEqual(len(files), 1)
+            self.assertEqual(files[0]['facts']['hdr_reconstruction'], 'untested')
+            self.assertEqual(files[0]['sha256'], fixture['sha256'])
+            self.assertNotIn('synthetic', files[0]['role'])
+            self.assertEqual(files[0]['consumer_status'], 'pending manual review')
+
     def test_manual_bundle_includes_complete_mozjpeg_hdr_crop(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

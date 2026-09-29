@@ -221,7 +221,7 @@ groups:
           severity: warning
 
       - uid: gateway-quota-unenforced
-        title: Gateway Quota Enforcement Unavailable
+        title: Gateway Shared Quota or Usage Unavailable
         condition: B
         data:
           - refId: A
@@ -230,7 +230,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: sum(increase({__name__=~"admission_quota_(fallback|disabled)_total"}[5m])) or vector(0)
+              expr: (sum(increase({__name__=~"admission_quota_(fallback|disabled)_total"}[5m])) or vector(0)) + (max((1 - admission_usage_available) and (time() - admission_usage_observed_at < 30)) or vector(0)) + (absent(admission_usage_observed_at > time() - 30) or vector(0))
               instant: true
               range: false
               intervalMs: 1000
@@ -268,8 +268,8 @@ groups:
         execErrState: Error
         for: 1m
         annotations:
-          summary: Gateway fleet-wide quota is unavailable
-          description: "Inspect admission_quota_fallback_total by reason: disabled, unavailable, or command_failure. Outage requests use smaller per-replica budgets, so the fleet-wide limit is unavailable. admission_quota_recovery_total records successful returns to shared admission without merging outage charges. admission_quota_disabled_total identifies intentional development-only bypass; production rejects disabled protection. Check Redis connectivity and command failures."
+          summary: Gateway shared quota or its usage telemetry is unavailable
+          description: "Shared usage collection also reports unavailability during idle traffic. Missing fresh observations or any reporting replica with unavailable shared usage triggers this alert. The fleet mean is unavailable while local fallback is in use. Inspect admission_quota_fallback_total by reason: disabled, unavailable, or command_failure. Outage requests use smaller per-replica budgets, so the fleet-wide limit is unavailable. admission_quota_recovery_total records successful returns to shared admission without merging outage charges. admission_quota_disabled_total identifies intentional development-only bypass; production rejects disabled protection. Check Redis connectivity and command failures."
         labels:
           severity: critical
           service: gateway

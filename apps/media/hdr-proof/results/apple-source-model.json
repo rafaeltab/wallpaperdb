@@ -1,0 +1,1143 @@
+{
+  "status": "diagnostic_only",
+  "source": {
+    "sha256": "2e4310a0dd37a98678e057e25d936bbc4f936bb6fe17380c0ce99e58ecaa603b",
+    "map_sha256": "fbe1522aabb91ad7b56710b3bcb8b1ceb7e35c908eba6a0730217b041ddf6348",
+    "path": "/proof/fixtures/gainmap/gainmap-apple-old.jpg",
+    "map_path": "/proof/work/apple-source-model/source-inspection/map.jpg",
+    "color": {
+      "gamut": "p3",
+      "transfer": "srgb",
+      "icc_sha256": "20789fdbea9835251a4f0796c8bf45cbd964896044886540da21ffc7457af0ab",
+      "icc_version_major": 4,
+      "rgb_to_xyz_d50": [
+        [
+          0.5151214599609375,
+          0.2919769287109375,
+          0.1571044921875
+        ],
+        [
+          0.2411956787109375,
+          0.6922454833984375,
+          0.0665740966796875
+        ],
+        [
+          -0.0010528564453125,
+          0.0418853759765625,
+          0.7840728759765625
+        ]
+      ],
+      "channel_transfer_parameters": [
+        [
+          2.399993896484375,
+          0.9478607177734375,
+          0.0521392822265625,
+          0.077392578125,
+          0.0404510498046875,
+          0,
+          0
+        ],
+        [
+          2.399993896484375,
+          0.9478607177734375,
+          0.0521392822265625,
+          0.077392578125,
+          0.0404510498046875,
+          0,
+          0
+        ],
+        [
+          2.399993896484375,
+          0.9478607177734375,
+          0.0521392822265625,
+          0.077392578125,
+          0.0404510498046875,
+          0,
+          0
+        ]
+      ],
+      "media_white_xyz": [
+        0.9641876220703125,
+        1.0,
+        0.82489013671875
+      ],
+      "header_flags": 0,
+      "pcs_illuminant_xyz": [
+        0.964202880859375,
+        1.0,
+        0.8249053955078125
+      ],
+      "gamut_basis": "ICC colorants and explicit chromatic adaptation match D65 primaries"
+    },
+    "model": {
+      "version": 65536,
+      "auxiliary_type": "urn:com:apple:photo:2020:aux:hdrgainmap",
+      "maker33_fraction": [
+        82317,
+        54194
+      ],
+      "maker48_fraction": [
+        0,
+        1
+      ],
+      "maker33": 1.5189319850906005,
+      "maker48": 0.0,
+      "headroom_log2": 3.0,
+      "headroom_linear": 8.0,
+      "xmp_sha256": "30971d0bb80bfee7c4392f81e84bc0fb8364e628277a083a1b1b1b3442c4a65a",
+      "xmp_headroom": "absent"
+    },
+    "facts": {
+      "sha256": "2e4310a0dd37a98678e057e25d936bbc4f936bb6fe17380c0ce99e58ecaa603b",
+      "metadata": {
+        "ExifTool:ExifToolVersion": 13.55,
+        "File:FileType": "JPEG",
+        "File:FileTypeExtension": "JPG",
+        "File:MIMEType": "image/jpeg",
+        "File:ExifByteOrder": "MM",
+        "File:ImageWidth": 384,
+        "File:ImageHeight": 512,
+        "File:EncodingProcess": 0,
+        "File:BitsPerSample": 8,
+        "File:ColorComponents": 3,
+        "File:YCbCrSubSampling": "2 2",
+        "JFIF:JFIFVersion": "1 1",
+        "JFIF:ResolutionUnit": 1,
+        "JFIF:XResolution": 300,
+        "JFIF:YResolution": 300,
+        "IFD0:Make": "Apple",
+        "IFD0:Model": "iPhone 13 mini",
+        "IFD0:Orientation": 1,
+        "IFD0:XResolution": 72,
+        "IFD0:YResolution": 72,
+        "IFD0:ResolutionUnit": 2,
+        "IFD0:Software": "18.7.1",
+        "IFD0:ModifyDate": "2026:01:07 15:20:14",
+        "IFD0:HostComputer": "iPhone 13 mini",
+        "IFD0:YCbCrPositioning": 1,
+        "ExifIFD:ExposureTime": 0.0009823182711,
+        "ExifIFD:FNumber": 1.6,
+        "ExifIFD:ExposureProgram": 2,
+        "ExifIFD:ISO": 50,
+        "ExifIFD:ExifVersion": "0232",
+        "ExifIFD:DateTimeOriginal": "2026:01:07 15:20:14",
+        "ExifIFD:CreateDate": "2026:01:07 15:20:14",
+        "ExifIFD:OffsetTime": "+01:00",
+        "ExifIFD:OffsetTimeOriginal": "+01:00",
+        "ExifIFD:OffsetTimeDigitized": "+01:00",
+        "ExifIFD:ComponentsConfiguration": "1 2 3 0",
+        "ExifIFD:ShutterSpeedValue": "0.000982000000006454",
+        "ExifIFD:ApertureValue": 1.59999999932056,
+        "ExifIFD:BrightnessValue": 7.795659837,
+        "ExifIFD:ExposureCompensation": 0,
+        "ExifIFD:MeteringMode": 5,
+        "ExifIFD:Flash": 16,
+        "ExifIFD:FocalLength": 5.1,
+        "ExifIFD:SubjectArea": "2006 1508 2213 1330",
+        "ExifIFD:SubSecTimeOriginal": 930,
+        "ExifIFD:SubSecTimeDigitized": 930,
+        "ExifIFD:FlashpixVersion": "0100",
+        "ExifIFD:ColorSpace": 65535,
+        "ExifIFD:ExifImageWidth": 4032,
+        "ExifIFD:ExifImageHeight": 3024,
+        "ExifIFD:SensingMethod": 2,
+        "ExifIFD:SceneType": 1,
+        "ExifIFD:ExposureMode": 0,
+        "ExifIFD:WhiteBalance": 0,
+        "ExifIFD:FocalLengthIn35mmFormat": 26,
+        "ExifIFD:SceneCaptureType": 0,
+        "ExifIFD:LensInfo": "1.539999962 5.1 1.6 2.4",
+        "ExifIFD:LensMake": "Apple",
+        "ExifIFD:LensModel": "iPhone 13 mini back dual wide camera 5.1mm f/1.6",
+        "ExifIFD:CompositeImage": 2,
+        "Apple:MakerNoteVersion": 15,
+        "Apple:RunTimeFlags": 1,
+        "Apple:RunTimeValue": 7662998208416,
+        "Apple:RunTimeScale": 1000000000,
+        "Apple:RunTimeEpoch": 0,
+        "Apple:AEStable": 0,
+        "Apple:AETarget": 159,
+        "Apple:AEAverage": 157,
+        "Apple:AFStable": 1,
+        "Apple:AccelerationVector": "0.01757224836 -0.988631666 -0.02797703446",
+        "Apple:FocusDistanceRange": "0.18359375 0.21875",
+        "Apple:ImageCaptureType": 10,
+        "Apple:LivePhotoVideoIndex": 1112547328,
+        "Apple:PhotosAppFeatureFlags": 0,
+        "Apple:HDRHeadroom": 1.518931985,
+        "Apple:AFPerformance": "105 268435504",
+        "Apple:SignalToNoiseRatio": 54.50344462,
+        "Apple:PhotoIdentifier": "0170521C-E077-45C0-90AE-F1E1E92069E5",
+        "Apple:ColorTemperature": 5579,
+        "Apple:CameraType": 1,
+        "Apple:FocusPosition": 63,
+        "Apple:HDRGain": 0,
+        "Apple:SemanticStyle": "{_0=1,_1=0,_2=0,_3=0}",
+        "GPS:GPSLatitudeRef": "N",
+        "GPS:GPSLongitudeRef": "E",
+        "GPS:GPSAltitudeRef": 0,
+        "GPS:GPSAltitude": 47.59040248,
+        "GPS:GPSTimeStamp": "14:20:08",
+        "GPS:GPSSpeedRef": "K",
+        "GPS:GPSSpeed": 0,
+        "GPS:GPSImgDirectionRef": "T",
+        "GPS:GPSImgDirection": 101.3891449,
+        "GPS:GPSDestBearingRef": "T",
+        "GPS:GPSDestBearing": 101.3891449,
+        "GPS:GPSDateStamp": "2026:01:07",
+        "GPS:GPSHPositioningError": 13.68423872,
+        "MPF0:MPFVersion": "0100",
+        "MPF0:NumberOfImages": 2,
+        "MPImage1:MPImageFlags": 0,
+        "MPImage1:MPImageFormat": 0,
+        "MPImage1:MPImageType": 196608,
+        "MPImage1:MPImageLength": 44891,
+        "MPImage1:MPImageStart": 0,
+        "MPImage1:DependentImage1EntryNumber": 0,
+        "MPImage1:DependentImage2EntryNumber": 0,
+        "MPImage2:MPImageFlags": 0,
+        "MPImage2:MPImageFormat": 0,
+        "MPImage2:MPImageType": 0,
+        "MPImage2:MPImageLength": 5921,
+        "MPImage2:MPImageStart": 44821,
+        "MPImage2:DependentImage1EntryNumber": 0,
+        "MPImage2:DependentImage2EntryNumber": 0,
+        "MPImage2:MPImage2": "(Binary data 5921 bytes, use -b option to extract)",
+        "ICC-header:ProfileCMMType": "appl",
+        "ICC-header:ProfileVersion": 1024,
+        "ICC-header:ProfileClass": "mntr",
+        "ICC-header:ColorSpaceData": "RGB ",
+        "ICC-header:ProfileConnectionSpace": "XYZ ",
+        "ICC-header:ProfileDateTime": "2022:01:01 00:00:00",
+        "ICC-header:ProfileFileSignature": "acsp",
+        "ICC-header:PrimaryPlatform": "APPL",
+        "ICC-header:CMMFlags": 0,
+        "ICC-header:DeviceManufacturer": "APPL",
+        "ICC-header:DeviceModel": "",
+        "ICC-header:DeviceAttributes": "0 0",
+        "ICC-header:RenderingIntent": 0,
+        "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+        "ICC-header:ProfileCreator": "appl",
+        "ICC-header:ProfileID": "236 253 163 142 56 133 71 195 109 180 189 79 122 218 24 47",
+        "ICC_Profile:ProfileDescription": "Display P3",
+        "ICC_Profile:ProfileCopyright": "Copyright Apple Inc., 2022",
+        "ICC_Profile:MediaWhitePoint": "0.96419 1 0.82489",
+        "ICC_Profile:RedMatrixColumn": "0.51512 0.2412 -0.00105",
+        "ICC_Profile:GreenMatrixColumn": "0.29198 0.69225 0.04189",
+        "ICC_Profile:BlueMatrixColumn": "0.1571 0.06657 0.78407",
+        "ICC_Profile:RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+        "ICC_Profile:ChromaticAdaptation": "1.04788 0.02292 -0.0502 0.02959 0.99048 -0.01706 -0.00923 0.01508 0.75168",
+        "ICC_Profile:BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
+        "ICC_Profile:GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+        "Composite:RunTimeSincePowerUp": 7662.998208416,
+        "Composite:Aperture": 1.6,
+        "Composite:ImageSize": "384 512",
+        "Composite:Megapixels": 0.196608,
+        "Composite:ScaleFactor35efl": 5.09803921568628,
+        "Composite:ShutterSpeed": 0.0009823182711,
+        "Composite:SubSecCreateDate": "2026:01:07 15:20:14.930+01:00",
+        "Composite:SubSecDateTimeOriginal": "2026:01:07 15:20:14.930+01:00",
+        "Composite:SubSecModifyDate": "2026:01:07 15:20:14+01:00",
+        "Composite:GPSAltitude": 47.59040248,
+        "Composite:GPSDateTime": "2026:01:07 14:20:08Z",
+        "Composite:CircleOfConfusion": "0.00589368958489306",
+        "Composite:FOV": 69.3903656740024,
+        "Composite:FocalLength35efl": 26,
+        "Composite:HyperfocalDistance": 2.75824672572995,
+        "Composite:LightValue": 12.3476656563301,
+        "Composite:LensID": "iPhone 13 mini back dual wide camera 5.1mm f/1.6"
+      },
+      "frame_count": 1,
+      "opaque": true,
+      "coded_depth": 8,
+      "private_tags": [
+        "IFD0:Make",
+        "IFD0:Model",
+        "IFD0:Software",
+        "IFD0:ModifyDate",
+        "IFD0:HostComputer",
+        "ExifIFD:ExposureTime",
+        "ExifIFD:FNumber",
+        "ExifIFD:ExposureProgram",
+        "ExifIFD:ISO",
+        "ExifIFD:DateTimeOriginal",
+        "ExifIFD:CreateDate",
+        "ExifIFD:OffsetTime",
+        "ExifIFD:OffsetTimeOriginal",
+        "ExifIFD:OffsetTimeDigitized",
+        "ExifIFD:ShutterSpeedValue",
+        "ExifIFD:ApertureValue",
+        "ExifIFD:BrightnessValue",
+        "ExifIFD:ExposureCompensation",
+        "ExifIFD:MeteringMode",
+        "ExifIFD:Flash",
+        "ExifIFD:FocalLength",
+        "ExifIFD:SubjectArea",
+        "ExifIFD:SubSecTimeOriginal",
+        "ExifIFD:SubSecTimeDigitized",
+        "ExifIFD:SensingMethod",
+        "ExifIFD:SceneType",
+        "ExifIFD:ExposureMode",
+        "ExifIFD:WhiteBalance",
+        "ExifIFD:FocalLengthIn35mmFormat",
+        "ExifIFD:SceneCaptureType",
+        "ExifIFD:LensInfo",
+        "ExifIFD:LensMake",
+        "ExifIFD:LensModel",
+        "ExifIFD:CompositeImage",
+        "Apple:MakerNoteVersion",
+        "Apple:RunTimeFlags",
+        "Apple:RunTimeValue",
+        "Apple:RunTimeScale",
+        "Apple:RunTimeEpoch",
+        "Apple:AEStable",
+        "Apple:AETarget",
+        "Apple:AEAverage",
+        "Apple:AFStable",
+        "Apple:AccelerationVector",
+        "Apple:FocusDistanceRange",
+        "Apple:ImageCaptureType",
+        "Apple:LivePhotoVideoIndex",
+        "Apple:PhotosAppFeatureFlags",
+        "Apple:HDRHeadroom",
+        "Apple:AFPerformance",
+        "Apple:SignalToNoiseRatio",
+        "Apple:PhotoIdentifier",
+        "Apple:ColorTemperature",
+        "Apple:CameraType",
+        "Apple:FocusPosition",
+        "Apple:HDRGain",
+        "Apple:SemanticStyle",
+        "GPS:GPSLatitudeRef",
+        "GPS:GPSLongitudeRef",
+        "GPS:GPSAltitudeRef",
+        "GPS:GPSAltitude",
+        "GPS:GPSTimeStamp",
+        "GPS:GPSSpeedRef",
+        "GPS:GPSSpeed",
+        "GPS:GPSImgDirectionRef",
+        "GPS:GPSImgDirection",
+        "GPS:GPSDestBearingRef",
+        "GPS:GPSDestBearing",
+        "GPS:GPSDateStamp",
+        "GPS:GPSHPositioningError",
+        "Composite:RunTimeSincePowerUp",
+        "Composite:GPSAltitude",
+        "Composite:GPSDateTime",
+        "gain-map:XMP-x:XMPToolkit",
+        "gain-map:XMP-apdi:AuxiliaryImageType",
+        "gain-map:XMP-apdi:StoredFormat",
+        "gain-map:XMP-apdi:NativeFormat"
+      ],
+      "base": {
+        "depth": 8,
+        "width": 384,
+        "height": 512,
+        "components": 3,
+        "sof": 0
+      },
+      "gain_map_present": true,
+      "map": {
+        "depth": 8,
+        "width": 192,
+        "height": 256,
+        "components": 1,
+        "sof": 0
+      },
+      "iso_identifier": false,
+      "map_private_tags": [
+        "XMP-x:XMPToolkit",
+        "XMP-apdi:AuxiliaryImageType",
+        "XMP-apdi:StoredFormat",
+        "XMP-apdi:NativeFormat"
+      ],
+      "android_xmp_properties": {}
+    }
+  },
+  "primary_sources": {
+    "document": "https://developer.apple.com/documentation/appkit/applying-apple-hdr-effect-to-your-photos",
+    "data": "https://developer.apple.com/tutorials/data/documentation/appkit/applying-apple-hdr-effect-to-your-photos.json",
+    "captured_data_sha256": "4dab6b7f57563541982df1e639ec2367093e2ff5a9a2fda1d1e6a7e0b050ed40",
+    "capture_date_utc": "2026-09-29",
+    "capture_scope": "Interpretation provenance, not a network dependency of this offline proof. No full document is copied into the repository.",
+    "applicability": "The primary article names the actual Apple auxiliary type, version-key presence, single-channel 8-bit map and MakerNotes 33/48. It specifies full application, not numeric version dispatch or intermediate display weighting.",
+    "fixture_provenance": "https://github.com/AOMediaCodec/libavif/blob/8da5b8e5ad873f73b02875057015c27d7c327cbe/tests/data/README.md",
+    "fixture_scope": "Personal iPhone photo resized in Preview. The separate newer fixture reuses these pixels with manually transplanted XMP; its XMP headroom precedence is not established by this article.",
+    "native_import": "https://github.com/AOMediaCodec/libavif/blob/v1.4.1/apps/shared/avifjpeg.c",
+    "native_application": "https://github.com/AOMediaCodec/libavif/blob/v1.4.1/src/gainmap.c",
+    "native_source_archive_sha256": "d4aea31a4becb3273ba7968221be2e48148ba05eb8a68d14e671963e17785648"
+  },
+  "reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+  "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+  "scope": {
+    "documented_effect": "Full source headroom 8 only, observed through native boost 16 invocation",
+    "sampling": "Explicit Pillow BILINEAR8 map-to-base convention; the article requires resizing but does not prescribe a unique filter",
+    "intermediate_adaptation_qualified": false,
+    "new_apple_model_qualified": false,
+    "limitations": [
+      "No source boost 2 interpretation is inferred from the full-effect article.",
+      "No numeric-version dispatch or newer XMP headroom precedence is inferred.",
+      "Legacy source references and conversion cases remain unchanged.",
+      "A passing legacy control verifies that convention only; it cannot qualify the documented model."
+    ]
+  },
+  "checks": {
+    "source_provenance": true,
+    "actual_color_and_makernotes": true,
+    "source_samples_preserved": true,
+    "independent_av1_import_decode": true,
+    "actual_native_bridge_facts": true,
+    "legacy_convention_control": true,
+    "bound_inputs_unchanged": true
+  },
+  "import_agreement": {
+    "base_changed_codes": 0,
+    "map_changed_codes": 0,
+    "tmap": {
+      "use_base_color_space": true,
+      "base_headroom": [
+        0,
+        1
+      ],
+      "alternate_headroom": [
+        3,
+        1
+      ],
+      "gain_map_min": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "gain_map_max": [
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          1
+        ]
+      ],
+      "gamma": [
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "base_offset": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "alternate_offset": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    "original_map_samples_sha256": "daebcba66a6e724bc9c9b578f82cbdf1780b621b9b7d59db5a41415edbb0e486",
+    "imported_map_samples_sha256": "daebcba66a6e724bc9c9b578f82cbdf1780b621b9b7d59db5a41415edbb0e486",
+    "packets": {
+      "base": {
+        "path": "/proof/work/apple-source-model/base.obu",
+        "sha256": "ce92df6b85943044bfe37fccd2b05d0b416e993e1dd7382c6ef76f1009f91e63",
+        "facts": {
+          "frames": [
+            {
+              "media_type": "video",
+              "stream_index": 0,
+              "key_frame": 1,
+              "pts": 0,
+              "pts_time": "0.000000",
+              "pkt_dts": 0,
+              "pkt_dts_time": "0.000000",
+              "best_effort_timestamp": 0,
+              "best_effort_timestamp_time": "0.000000",
+              "duration": 48000,
+              "duration_time": "0.040000",
+              "pkt_pos": "0",
+              "pkt_size": "189442",
+              "width": 384,
+              "height": 512,
+              "crop_top": 0,
+              "crop_bottom": 0,
+              "crop_left": 0,
+              "crop_right": 0,
+              "pix_fmt": "gbrp",
+              "sample_aspect_ratio": "1:1",
+              "pict_type": "I",
+              "interlaced_frame": 0,
+              "top_field_first": 0,
+              "lossless": 0,
+              "repeat_pict": 0,
+              "color_range": "pc",
+              "color_space": "gbr",
+              "color_primaries": "smpte432",
+              "color_transfer": "iec61966-2-1"
+            }
+          ],
+          "streams": [
+            {
+              "index": 0,
+              "codec_name": "av1",
+              "codec_long_name": "Alliance for Open Media AV1",
+              "profile": "High",
+              "codec_type": "video",
+              "codec_tag_string": "[0][0][0][0]",
+              "codec_tag": "0x0000",
+              "mime_codec_string": "av01.1.01M.08.0.000.12.13.00.1",
+              "width": 384,
+              "height": 512,
+              "coded_width": 384,
+              "coded_height": 512,
+              "has_b_frames": 0,
+              "sample_aspect_ratio": "1:1",
+              "display_aspect_ratio": "3:4",
+              "pix_fmt": "gbrp",
+              "level": 1,
+              "color_range": "pc",
+              "color_space": "gbr",
+              "color_transfer": "iec61966-2-1",
+              "color_primaries": "smpte432",
+              "refs": 1,
+              "r_frame_rate": "1200000/1",
+              "avg_frame_rate": "25/1",
+              "time_base": "1/1200000",
+              "nb_read_frames": "1",
+              "extradata_size": 11,
+              "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+              }
+            }
+          ]
+        }
+      },
+      "map": {
+        "path": "/proof/work/apple-source-model/map.obu",
+        "sha256": "3e926b7df0f1b3362965f6ee9f3d158e780606ce7477d7370a16c4b1b0cf2f57",
+        "facts": {
+          "frames": [
+            {
+              "media_type": "video",
+              "stream_index": 0,
+              "key_frame": 1,
+              "pts": 0,
+              "pts_time": "0.000000",
+              "pkt_dts": 0,
+              "pkt_dts_time": "0.000000",
+              "best_effort_timestamp": 0,
+              "best_effort_timestamp_time": "0.000000",
+              "duration": 48000,
+              "duration_time": "0.040000",
+              "pkt_pos": "0",
+              "pkt_size": "7511",
+              "width": 192,
+              "height": 256,
+              "crop_top": 0,
+              "crop_bottom": 0,
+              "crop_left": 0,
+              "crop_right": 0,
+              "pix_fmt": "gray",
+              "sample_aspect_ratio": "1:1",
+              "pict_type": "I",
+              "interlaced_frame": 0,
+              "top_field_first": 0,
+              "lossless": 0,
+              "repeat_pict": 0,
+              "color_range": "pc",
+              "color_space": "smpte170m"
+            }
+          ],
+          "streams": [
+            {
+              "index": 0,
+              "codec_name": "av1",
+              "codec_long_name": "Alliance for Open Media AV1",
+              "profile": "Main",
+              "codec_type": "video",
+              "codec_tag_string": "[0][0][0][0]",
+              "codec_tag": "0x0000",
+              "mime_codec_string": "av01.0.00M.08.1.110.02.02.06.1",
+              "width": 192,
+              "height": 256,
+              "coded_width": 192,
+              "coded_height": 256,
+              "has_b_frames": 0,
+              "sample_aspect_ratio": "1:1",
+              "display_aspect_ratio": "3:4",
+              "pix_fmt": "gray",
+              "level": 0,
+              "color_range": "pc",
+              "color_space": "smpte170m",
+              "refs": 1,
+              "r_frame_rate": "1200000/1",
+              "avg_frame_rate": "25/1",
+              "time_base": "1/1200000",
+              "nb_read_frames": "1",
+              "extradata_size": 11,
+              "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+              }
+            }
+          ]
+        }
+      }
+    },
+    "no_map_reinterpretation_before_gain_application": true
+  },
+  "legacy_control": {
+    "status": "qualified named legacy convention",
+    "reference": {
+      "path": "/proof/work/apple-source-model/legacy-log-full.npy",
+      "sha256": "3de1edcde2ecac6d95af9fa7844f2b2d5b54f953350c6fb17cfaada0eb6dcf51",
+      "gamut": "p3",
+      "transfer": "linear",
+      "units": "cd/m2",
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "measurement": {
+      "passed": true,
+      "metric": "BT.2124 Delta E ITP",
+      "fixture_class": "gainmap-hdr",
+      "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+      "region_basis": "appearance_reference_luminance_nits",
+      "regions": {
+        "shadow": {
+          "samples": 104802,
+          "delta_e_itp": {
+            "mean": 0.09464427443178854,
+            "p95": 0.14359794872508877,
+            "maximum": 0.5261071655702396
+          },
+          "luminance_absolute_error_nits": {
+            "mean": 0.0019954062701262308,
+            "p95": 0.006708631804793974,
+            "maximum": 0.08830952857172747
+          },
+          "luminance_relative_error_above_absolute_floor": {
+            "mean": 0.0,
+            "p95": 0.0,
+            "maximum": 0.0
+          },
+          "reference_mean_nits": 3.836797733530898,
+          "actual_mean_nits": 3.837159173105475
+        },
+        "midtone": {
+          "samples": 78140,
+          "delta_e_itp": {
+            "mean": 0.11613185948972228,
+            "p95": 0.5479237509583949,
+            "maximum": 0.6984430837450706
+          },
+          "luminance_absolute_error_nits": {
+            "mean": 0.08612342955009061,
+            "p95": 0.3978964086424376,
+            "maximum": 1.8173471844793028
+          },
+          "luminance_relative_error_above_absolute_floor": {
+            "mean": 0.00041906603069700034,
+            "p95": 0.006042564259634452,
+            "maximum": 0.008822645731588297
+          },
+          "reference_mean_nits": 76.81275674325978,
+          "actual_mean_nits": 76.77125517268125
+        },
+        "highlight": {
+          "samples": 13666,
+          "delta_e_itp": {
+            "mean": 0.19220344772253067,
+            "p95": 0.6550896626630381,
+            "maximum": 0.7163072712591411
+          },
+          "luminance_absolute_error_nits": {
+            "mean": 0.5681537867684086,
+            "p95": 2.4571183426755283,
+            "maximum": 7.445338600619948
+          },
+          "luminance_relative_error_above_absolute_floor": {
+            "mean": 0.0016448618894872613,
+            "p95": 0.008133885944047804,
+            "maximum": 0.008986033525022396
+          },
+          "reference_mean_nits": 284.4801743823562,
+          "actual_mean_nits": 284.07363686494114
+        }
+      },
+      "failures": [],
+      "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+    },
+    "native_display_boost": 16,
+    "scope": "Implementation comparison, not faithful Apple source qualification"
+  },
+  "documented_full_model": {
+    "status": "tested and failed",
+    "reference": {
+      "path": "/proof/work/apple-source-model/documented-full.npy",
+      "sha256": "0166ec877116c9e6af93c0e0341fe5c6845eb2a28f9c972ff534c3e9134d25e5",
+      "gamut": "p3",
+      "transfer": "linear",
+      "units": "cd/m2",
+      "dimensions": [
+        384,
+        512
+      ],
+      "revision": "apple-old-documented-full-rec709-linear-bilinear8-v1"
+    },
+    "measurement": {
+      "passed": false,
+      "metric": "BT.2124 Delta E ITP",
+      "fixture_class": "gainmap-hdr",
+      "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+      "region_basis": "appearance_reference_luminance_nits",
+      "regions": {
+        "shadow": {
+          "samples": 104897,
+          "delta_e_itp": {
+            "mean": 0.18009568964235537,
+            "p95": 0.29533181201798053,
+            "maximum": 3.965679841582861
+          },
+          "luminance_absolute_error_nits": {
+            "mean": 0.015528817680639708,
+            "p95": 0.03596393209593707,
+            "maximum": 0.6838592395282692
+          },
+          "luminance_relative_error_above_absolute_floor": {
+            "mean": 2.8484504256677362e-05,
+            "p95": 0.0,
+            "maximum": 0.06137267617593248
+          },
+          "reference_mean_nits": 3.8273931123938842,
+          "actual_mean_nits": 3.8427811729165207
+        },
+        "midtone": {
+          "samples": 80464,
+          "delta_e_itp": {
+            "mean": 2.456080640205857,
+            "p95": 6.410304065416424,
+            "maximum": 7.256455182117879
+          },
+          "luminance_absolute_error_nits": {
+            "mean": 4.101505313915033,
+            "p95": 13.789768347413077,
+            "maximum": 19.864351670793155
+          },
+          "luminance_relative_error_above_absolute_floor": {
+            "mean": 0.0329280829372103,
+            "p95": 0.09020794006986337,
+            "maximum": 0.1013209971265574
+          },
+          "reference_mean_nits": 76.77044119303143,
+          "actual_mean_nits": 80.87186074313199
+        },
+        "highlight": {
+          "samples": 11247,
+          "delta_e_itp": {
+            "mean": 4.3484822101145975,
+            "p95": 6.237199053363254,
+            "maximum": 7.283869877373043
+          },
+          "luminance_absolute_error_nits": {
+            "mean": 14.941335457949698,
+            "p95": 20.21767385733338,
+            "maximum": 38.4435988785217
+          },
+          "luminance_relative_error_above_absolute_floor": {
+            "mean": 0.05868056119359252,
+            "p95": 0.08544585317308996,
+            "maximum": 0.10044525756177258
+          },
+          "reference_mean_nits": 286.7050475973216,
+          "actual_mean_nits": 299.88695089522554
+        }
+      },
+      "failures": [
+        "midtone.delta_e_mean",
+        "midtone.delta_e_p95",
+        "midtone.luminance_relative_p95",
+        "highlight.delta_e_mean",
+        "highlight.delta_e_p95",
+        "highlight.luminance_relative_p95"
+      ],
+      "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+    }
+  },
+  "native_artifacts": {
+    "imported": {
+      "path": "/proof/work/apple-source-model/native-import.avif",
+      "sha256": "9b1de6fc29f85b35d7424cc4480c922d064ac1df99e098d23faa40d7663f7f1f"
+    },
+    "legacy_pq": {
+      "path": "/proof/work/apple-source-model/native-legacy-full.png",
+      "sha256": "5c7ba366aae7ac1710251bceec97aa5c265d5f39048075b95d3b3b834769630f",
+      "color": {
+        "width": 384,
+        "height": 512,
+        "depth": 16,
+        "orientation": 1,
+        "display_width": 384,
+        "display_height": 512,
+        "primaries": 9,
+        "transfer": 16,
+        "matrix": 0,
+        "full_range": true,
+        "gamut": "rec2020",
+        "transfer_name": "pq",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "native-legacy-full.png",
+          "FileSize": 360778,
+          "FilePermissions": 100644,
+          "FileType": "PNG",
+          "FileTypeExtension": "PNG",
+          "MIMEType": "image/png",
+          "ImageWidth": 384,
+          "ImageHeight": 512,
+          "BitDepth": 16,
+          "ColorType": 2,
+          "Compression": 0,
+          "Filter": 0,
+          "Interlace": 0,
+          "WhitePointX": 0.3127,
+          "WhitePointY": 0.329,
+          "RedX": 0.708,
+          "RedY": 0.292,
+          "GreenX": 0.17,
+          "GreenY": 0.797,
+          "BlueX": 0.131,
+          "BlueY": 0.046,
+          "ColorPrimaries": 9,
+          "TransferCharacteristics": 16,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "ImageSize": "384 512",
+          "Megapixels": 0.196608
+        }
+      },
+      "inspection": {
+        "sha256": "5c7ba366aae7ac1710251bceec97aa5c265d5f39048075b95d3b3b834769630f",
+        "metadata": {
+          "ExifTool:ExifToolVersion": 13.55,
+          "File:FileType": "PNG",
+          "File:FileTypeExtension": "PNG",
+          "File:MIMEType": "image/png",
+          "PNG:ImageWidth": 384,
+          "PNG:ImageHeight": 512,
+          "PNG:BitDepth": 16,
+          "PNG:ColorType": 2,
+          "PNG:Compression": 0,
+          "PNG:Filter": 0,
+          "PNG:Interlace": 0,
+          "PNG:WhitePointX": 0.3127,
+          "PNG:WhitePointY": 0.329,
+          "PNG:RedX": 0.708,
+          "PNG:RedY": 0.292,
+          "PNG:GreenX": 0.17,
+          "PNG:GreenY": 0.797,
+          "PNG:BlueX": 0.131,
+          "PNG:BlueY": 0.046,
+          "PNG-cICP:ColorPrimaries": 9,
+          "PNG-cICP:TransferCharacteristics": 16,
+          "PNG-cICP:MatrixCoefficients": 0,
+          "PNG-cICP:VideoFullRangeFlag": 1,
+          "Composite:ImageSize": "384 512",
+          "Composite:Megapixels": 0.196608
+        },
+        "frame_count": 1,
+        "opaque": true,
+        "coded_depth": 16,
+        "private_tags": []
+      }
+    }
+  },
+  "bound_inputs": {
+    "/proof/fixtures/gainmap/gainmap-apple-old.jpg": "2e4310a0dd37a98678e057e25d936bbc4f936bb6fe17380c0ce99e58ecaa603b",
+    "/proof/work/apple-source-model/source-inspection/map.jpg": "fbe1522aabb91ad7b56710b3bcb8b1ceb7e35c908eba6a0730217b041ddf6348",
+    "/proof/work/apple-source-model/documented-full.npy": "0166ec877116c9e6af93c0e0341fe5c6845eb2a28f9c972ff534c3e9134d25e5",
+    "/proof/work/apple-source-model/legacy-log-full.npy": "3de1edcde2ecac6d95af9fa7844f2b2d5b54f953350c6fb17cfaada0eb6dcf51",
+    "/proof/work/apple-source-model/native-import.avif": "9b1de6fc29f85b35d7424cc4480c922d064ac1df99e098d23faa40d7663f7f1f",
+    "/proof/work/apple-source-model/base.obu": "ce92df6b85943044bfe37fccd2b05d0b416e993e1dd7382c6ef76f1009f91e63",
+    "/proof/work/apple-source-model/map.obu": "3e926b7df0f1b3362965f6ee9f3d158e780606ce7477d7370a16c4b1b0cf2f57",
+    "/proof/work/apple-source-model/native-legacy-full.png": "5c7ba366aae7ac1710251bceec97aa5c265d5f39048075b95d3b3b834769630f"
+  },
+  "commands": [
+    {
+      "argv": [
+        "avifgainmaputil",
+        "convert",
+        "/proof/fixtures/gainmap/gainmap-apple-old.jpg",
+        "/proof/work/apple-source-model/native-import.avif",
+        "--cicp",
+        "12/13/0",
+        "--ignore-profile",
+        "-d",
+        "8",
+        "-y",
+        "444",
+        "-q",
+        "100",
+        "--qgain-map",
+        "100",
+        "-s",
+        "10"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffprobe",
+        "-v",
+        "error",
+        "-c:v",
+        "libdav1d",
+        "-f",
+        "obu",
+        "-show_frames",
+        "-show_streams",
+        "-of",
+        "json",
+        "/proof/work/apple-source-model/base.obu"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "libdav1d",
+        "-i",
+        "/proof/work/apple-source-model/base.obu",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffprobe",
+        "-v",
+        "error",
+        "-c:v",
+        "libdav1d",
+        "-f",
+        "obu",
+        "-show_frames",
+        "-show_streams",
+        "-of",
+        "json",
+        "/proof/work/apple-source-model/map.obu"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "libdav1d",
+        "-i",
+        "/proof/work/apple-source-model/map.obu",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "gray",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "avifgainmaputil",
+        "tonemap",
+        "/proof/work/apple-source-model/native-import.avif",
+        "/proof/work/apple-source-model/native-legacy-full.png",
+        "--headroom",
+        "4",
+        "--cicp-output",
+        "9/16/0",
+        "--ignore-profile",
+        "-d",
+        "12",
+        "-y",
+        "444"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "exiftool",
+        "-j",
+        "-n",
+        "/proof/work/apple-source-model/native-legacy-full.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "hdr-proof-png-decode",
+        "/proof/work/apple-source-model/native-legacy-full.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    }
+  ],
+  "consumer_status": "pending manual review",
+  "inspection_commands": [
+    {
+      "command": [
+        "exiftool",
+        "-json",
+        "-n",
+        "-G1",
+        "-s",
+        "/proof/fixtures/gainmap/gainmap-apple-old.jpg"
+      ],
+      "exit_code": 0,
+      "stdout": "[{\n  \"SourceFile\": \"/proof/fixtures/gainmap/gainmap-apple-old.jpg\",\n  \"ExifTool:ExifToolVersion\": 13.55,\n  \"System:FileName\": \"gainmap-apple-old.jpg\",\n  \"System:Directory\": \"/proof/fixtures/gainmap\",\n  \"System:FileSize\": 50742,\n  \"System:FileModifyDate\": \"2026:09:29 19:26:26+00:00\",\n  \"System:FileAccessDate\": \"2026:09:29 19:27:06+00:00\",\n  \"System:FileInodeChangeDate\": \"2026:09:29 19:26:26+00:00\",\n  \"System:FilePermissions\": 100600,\n  \"File:FileType\": \"JPEG\",\n  \"File:FileTypeExtension\": \"JPG\",\n  \"File:MIMEType\": \"image/jpeg\",\n  \"File:ExifByteOrder\": \"MM\",\n  \"File:ImageWidth\": 384,\n  \"File:ImageHeight\": 512,\n  \"File:EncodingProcess\": 0,\n  \"File:BitsPerSample\": 8,\n  \"File:ColorComponents\": 3,\n  \"File:YCbCrSubSampling\": \"2 2\",\n  \"JFIF:JFIFVersion\": \"1 1\",\n  \"JFIF:ResolutionUnit\": 1,\n  \"JFIF:XResolution\": 300,\n  \"JFIF:YResolution\": 300,\n  \"IFD0:Make\": \"Apple\",\n  \"IFD0:Model\": \"iPhone 13 mini\",\n  \"IFD0:Orientation\": 1,\n  \"IFD0:XResolution\": 72,\n  \"IFD0:YResolution\": 72,\n  \"IFD0:ResolutionUnit\": 2,\n  \"IFD0:Software\": \"18.7.1\",\n  \"IFD0:ModifyDate\": \"2026:01:07 15:20:14\",\n  \"IFD0:HostComputer\": \"iPhone 13 mini\",\n  \"IFD0:YCbCrPositioning\": 1,\n  \"ExifIFD:ExposureTime\": 0.0009823182711,\n  \"ExifIFD:FNumber\": 1.6,\n  \"ExifIFD:ExposureProgram\": 2,\n  \"ExifIFD:ISO\": 50,\n  \"ExifIFD:ExifVersion\": \"0232\",\n  \"ExifIFD:DateTimeOriginal\": \"2026:01:07 15:20:14\",\n  \"ExifIFD:CreateDate\": \"2026:01:07 15:20:14\",\n  \"ExifIFD:OffsetTime\": \"+01:00\",\n  \"ExifIFD:OffsetTimeOriginal\": \"+01:00\",\n  \"ExifIFD:OffsetTimeDigitized\": \"+01:00\",\n  \"ExifIFD:ComponentsConfiguration\": \"1 2 3 0\",\n  \"ExifIFD:ShutterSpeedValue\": \"0.000982000000006454\",\n  \"ExifIFD:ApertureValue\": 1.59999999932056,\n  \"ExifIFD:BrightnessValue\": 7.795659837,\n  \"ExifIFD:ExposureCompensation\": 0,\n  \"ExifIFD:MeteringMode\": 5,\n  \"ExifIFD:Flash\": 16,\n  \"ExifIFD:FocalLength\": 5.1,\n  \"ExifIFD:SubjectArea\": \"2006 1508 2213 1330\",\n  \"ExifIFD:SubSecTimeOriginal\": 930,\n  \"ExifIFD:SubSecTimeDigitized\": 930,\n  \"ExifIFD:FlashpixVersion\": \"0100\",\n  \"ExifIFD:ColorSpace\": 65535,\n  \"ExifIFD:ExifImageWidth\": 4032,\n  \"ExifIFD:ExifImageHeight\": 3024,\n  \"ExifIFD:SensingMethod\": 2,\n  \"ExifIFD:SceneType\": 1,\n  \"ExifIFD:ExposureMode\": 0,\n  \"ExifIFD:WhiteBalance\": 0,\n  \"ExifIFD:FocalLengthIn35mmFormat\": 26,\n  \"ExifIFD:SceneCaptureType\": 0,\n  \"ExifIFD:LensInfo\": \"1.539999962 5.1 1.6 2.4\",\n  \"ExifIFD:LensMake\": \"Apple\",\n  \"ExifIFD:LensModel\": \"iPhone 13 mini back dual wide camera 5.1mm f/1.6\",\n  \"ExifIFD:CompositeImage\": 2,\n  \"Apple:MakerNoteVersion\": 15,\n  \"Apple:RunTimeFlags\": 1,\n  \"Apple:RunTimeValue\": 7662998208416,\n  \"Apple:RunTimeScale\": 1000000000,\n  \"Apple:RunTimeEpoch\": 0,\n  \"Apple:AEStable\": 0,\n  \"Apple:AETarget\": 159,\n  \"Apple:AEAverage\": 157,\n  \"Apple:AFStable\": 1,\n  \"Apple:AccelerationVector\": \"0.01757224836 -0.988631666 -0.02797703446\",\n  \"Apple:FocusDistanceRange\": \"0.18359375 0.21875\",\n  \"Apple:ImageCaptureType\": 10,\n  \"Apple:LivePhotoVideoIndex\": 1112547328,\n  \"Apple:PhotosAppFeatureFlags\": 0,\n  \"Apple:HDRHeadroom\": 1.518931985,\n  \"Apple:AFPerformance\": \"105 268435504\",\n  \"Apple:SignalToNoiseRatio\": 54.50344462,\n  \"Apple:PhotoIdentifier\": \"0170521C-E077-45C0-90AE-F1E1E92069E5\",\n  \"Apple:ColorTemperature\": 5579,\n  \"Apple:CameraType\": 1,\n  \"Apple:FocusPosition\": 63,\n  \"Apple:HDRGain\": 0,\n  \"Apple:SemanticStyle\": \"{_0=1,_1=0,_2=0,_3=0}\",\n  \"GPS:GPSLatitudeRef\": \"N\",\n  \"GPS:GPSLongitudeRef\": \"E\",\n  \"GPS:GPSAltitudeRef\": 0,\n  \"GPS:GPSAltitude\": 47.59040248,\n  \"GPS:GPSTimeStamp\": \"14:20:08\",\n  \"GPS:GPSSpeedRef\": \"K\",\n  \"GPS:GPSSpeed\": 0,\n  \"GPS:GPSImgDirectionRef\": \"T\",\n  \"GPS:GPSImgDirection\": 101.3891449,\n  \"GPS:GPSDestBearingRef\": \"T\",\n  \"GPS:GPSDestBearing\": 101.3891449,\n  \"GPS:GPSDateStamp\": \"2026:01:07\",\n  \"GPS:GPSHPositioningError\": 13.68423872,\n  \"MPF0:MPFVersion\": \"0100\",\n  \"MPF0:NumberOfImages\": 2,\n  \"MPImage1:MPImageFlags\": 0,\n  \"MPImage1:MPImageFormat\": 0,\n  \"MPImage1:MPImageType\": 196608,\n  \"MPImage1:MPImageLength\": 44891,\n  \"MPImage1:MPImageStart\": 0,\n  \"MPImage1:DependentImage1EntryNumber\": 0,\n  \"MPImage1:DependentImage2EntryNumber\": 0,\n  \"MPImage2:MPImageFlags\": 0,\n  \"MPImage2:MPImageFormat\": 0,\n  \"MPImage2:MPImageType\": 0,\n  \"MPImage2:MPImageLength\": 5921,\n  \"MPImage2:MPImageStart\": 44821,\n  \"MPImage2:DependentImage1EntryNumber\": 0,\n  \"MPImage2:DependentImage2EntryNumber\": 0,\n  \"MPImage2:MPImage2\": \"(Binary data 5921 bytes, use -b option to extract)\",\n  \"ICC-header:ProfileCMMType\": \"appl\",\n  \"ICC-header:ProfileVersion\": 1024,\n  \"ICC-header:ProfileClass\": \"mntr\",\n  \"ICC-header:ColorSpaceData\": \"RGB \",\n  \"ICC-header:ProfileConnectionSpace\": \"XYZ \",\n  \"ICC-header:ProfileDateTime\": \"2022:01:01 00:00:00\",\n  \"ICC-header:ProfileFileSignature\": \"acsp\",\n  \"ICC-header:PrimaryPlatform\": \"APPL\",\n  \"ICC-header:CMMFlags\": 0,\n  \"ICC-header:DeviceManufacturer\": \"APPL\",\n  \"ICC-header:DeviceModel\": \"\",\n  \"ICC-header:DeviceAttributes\": \"0 0\",\n  \"ICC-header:RenderingIntent\": 0,\n  \"ICC-header:ConnectionSpaceIlluminant\": \"0.9642 1 0.82491\",\n  \"ICC-header:ProfileCreator\": \"appl\",\n  \"ICC-header:ProfileID\": \"236 253 163 142 56 133 71 195 109 180 189 79 122 218 24 47\",\n  \"ICC_Profile:ProfileDescription\": \"Display P3\",\n  \"ICC_Profile:ProfileCopyright\": \"Copyright Apple Inc., 2022\",\n  \"ICC_Profile:MediaWhitePoint\": \"0.96419 1 0.82489\",\n  \"ICC_Profile:RedMatrixColumn\": \"0.51512 0.2412 -0.00105\",\n  \"ICC_Profile:GreenMatrixColumn\": \"0.29198 0.69225 0.04189\",\n  \"ICC_Profile:BlueMatrixColumn\": \"0.1571 0.06657 0.78407\",\n  \"ICC_Profile:RedTRC\": \"(Binary data 32 bytes, use -b option to extract)\",\n  \"ICC_Profile:ChromaticAdaptation\": \"1.04788 0.02292 -0.0502 0.02959 0.99048 -0.01706 -0.00923 0.01508 0.75168\",\n  \"ICC_Profile:BlueTRC\": \"(Binary data 32 bytes, use -b option to extract)\",\n  \"ICC_Profile:GreenTRC\": \"(Binary data 32 bytes, use -b option to extract)\",\n  \"Composite:RunTimeSincePowerUp\": 7662.998208416,\n  \"Composite:Aperture\": 1.6,\n  \"Composite:ImageSize\": \"384 512\",\n  \"Composite:Megapixels\": 0.196608,\n  \"Composite:ScaleFactor35efl\": 5.09803921568628,\n  \"Composite:ShutterSpeed\": 0.0009823182711,\n  \"Composite:SubSecCreateDate\": \"2026:01:07 15:20:14.930+01:00\",\n  \"Composite:SubSecDateTimeOriginal\": \"2026:01:07 15:20:14.930+01:00\",\n  \"Composite:SubSecModifyDate\": \"2026:01:07 15:20:14+01:00\",\n  \"Composite:GPSAltitude\": 47.59040248,\n  \"Composite:GPSDateTime\": \"2026:01:07 14:20:08Z\",\n  \"Composite:CircleOfConfusion\": \"0.00589368958489306\",\n  \"Composite:FOV\": 69.3903656740024,\n  \"Composite:FocalLength35efl\": 26,\n  \"Composite:HyperfocalDistance\": 2.75824672572995,\n  \"Composite:LightValue\": 12.3476656563301,\n  \"Composite:LensID\": \"iPhone 13 mini back dual wide camera 5.1mm f/1.6\"\n}]\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "exiftool",
+        "-json",
+        "-G1",
+        "-s",
+        "/proof/work/apple-source-model/source-inspection/map.jpg"
+      ],
+      "exit_code": 0,
+      "stdout": "[{\n  \"SourceFile\": \"/proof/work/apple-source-model/source-inspection/map.jpg\",\n  \"ExifTool:ExifToolVersion\": 13.55,\n  \"System:FileName\": \"map.jpg\",\n  \"System:Directory\": \"/proof/work/apple-source-model/source-inspection\",\n  \"System:FileSize\": \"5.9 kB\",\n  \"System:FileModifyDate\": \"2026:09:29 20:00:02+00:00\",\n  \"System:FileAccessDate\": \"2026:09:29 20:00:02+00:00\",\n  \"System:FileInodeChangeDate\": \"2026:09:29 20:00:02+00:00\",\n  \"System:FilePermissions\": \"-rw-r--r--\",\n  \"File:FileType\": \"JPEG\",\n  \"File:FileTypeExtension\": \"jpg\",\n  \"File:MIMEType\": \"image/jpeg\",\n  \"File:ImageWidth\": 192,\n  \"File:ImageHeight\": 256,\n  \"File:EncodingProcess\": \"Baseline DCT, Huffman coding\",\n  \"File:BitsPerSample\": 8,\n  \"File:ColorComponents\": 1,\n  \"XMP-x:XMPToolkit\": \"XMP Core 6.0.0\",\n  \"XMP-apdi:AuxiliaryImageType\": \"urn:com:apple:photo:2020:aux:hdrgainmap\",\n  \"XMP-apdi:StoredFormat\": \"L008\",\n  \"XMP-apdi:NativeFormat\": \"L008\",\n  \"XMP-HDRGainMap:HDRGainMapVersion\": \"0.1.0.0\",\n  \"Composite:ImageSize\": \"192x256\",\n  \"Composite:Megapixels\": 0.049\n}]\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "exiftool",
+        "-b",
+        "-MPImage2",
+        "/proof/fixtures/gainmap/gainmap-apple-old.jpg"
+      ],
+      "stderr": "",
+      "stdout_artifact": "/proof/work/apple-source-model/source-inspection/map.jpg",
+      "stdout_sha256": "fbe1522aabb91ad7b56710b3bcb8b1ceb7e35c908eba6a0730217b041ddf6348",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "exiftool",
+        "-json",
+        "-n",
+        "-G1",
+        "-s",
+        "/proof/work/apple-source-model/native-legacy-full.png"
+      ],
+      "exit_code": 0,
+      "stdout": "[{\n  \"SourceFile\": \"/proof/work/apple-source-model/native-legacy-full.png\",\n  \"ExifTool:ExifToolVersion\": 13.55,\n  \"System:FileName\": \"native-legacy-full.png\",\n  \"System:Directory\": \"/proof/work/apple-source-model\",\n  \"System:FileSize\": 360778,\n  \"System:FileModifyDate\": \"2026:09:29 20:00:02+00:00\",\n  \"System:FileAccessDate\": \"2026:09:29 20:00:03+00:00\",\n  \"System:FileInodeChangeDate\": \"2026:09:29 20:00:02+00:00\",\n  \"System:FilePermissions\": 100644,\n  \"File:FileType\": \"PNG\",\n  \"File:FileTypeExtension\": \"PNG\",\n  \"File:MIMEType\": \"image/png\",\n  \"PNG:ImageWidth\": 384,\n  \"PNG:ImageHeight\": 512,\n  \"PNG:BitDepth\": 16,\n  \"PNG:ColorType\": 2,\n  \"PNG:Compression\": 0,\n  \"PNG:Filter\": 0,\n  \"PNG:Interlace\": 0,\n  \"PNG:WhitePointX\": 0.3127,\n  \"PNG:WhitePointY\": 0.329,\n  \"PNG:RedX\": 0.708,\n  \"PNG:RedY\": 0.292,\n  \"PNG:GreenX\": 0.17,\n  \"PNG:GreenY\": 0.797,\n  \"PNG:BlueX\": 0.131,\n  \"PNG:BlueY\": 0.046,\n  \"PNG-cICP:ColorPrimaries\": 9,\n  \"PNG-cICP:TransferCharacteristics\": 16,\n  \"PNG-cICP:MatrixCoefficients\": 0,\n  \"PNG-cICP:VideoFullRangeFlag\": 1,\n  \"Composite:ImageSize\": \"384 512\",\n  \"Composite:Megapixels\": 0.196608\n}]\n",
+      "stderr": ""
+    }
+  ],
+  "source_hashes": {
+    "apple_source_model.py": "c0ea59fb45e0fe40c9c29ba417abd745f9ea9fa9b0cdbcf29a578203277eea76",
+    "test_apple_source_model.py": "59f500c6ef1f8da0046ec627d8f5931a252d645183884edca3b0f2afe783faf0",
+    "gainmap.py": "8fadf964ec8a29e9a6dc01aeb0eecd6db79a7aa10f4df1fdd809d04a7a8507e9",
+    "gainmap_iso.py": "0d578029a968efed05247d34139a510d9f86d5c8d8b9d21b14fe3fb0085cd89d",
+    "gainmap_avif.py": "98a6d8aed6e496ff6a4effd1f08e75bb825f7eabee9aa8a0241bfe739f5337c1",
+    "avif.py": "28c87a831fe1b29333060b870e5f081e744b8dd3deec9ccbe21e07ed1bdac6e1",
+    "hdr_png.py": "1670e711d84017166c704a178d1a799af067452f342ab3e92c5215e987e30b68",
+    "appearance.py": "a0be551e0e7c27b9fb786c63d1fa72113c5f66415360ce3ae854c72aeb3809e8",
+    "thresholds.json": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf"
+  }
+}

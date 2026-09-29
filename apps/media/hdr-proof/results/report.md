@@ -4,14 +4,14 @@ The HDR milestone remains blocked. Required conversion and display-headroom rend
 
 Reproduce from the repository root with `make run PACKAGE=media SCRIPT=proof:hdr`. Docker must support linux/amd64. The default command returns exit 2 while required codec cases or physical checks are unqualified. This is an intentional qualification failure, not a passing release gate.
 
-Recorded 3195 conversion attempts over 73 fixture records: 3185 completed native encoding, 10 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 8 incompatible with the requested selectors, 2511 qualified, 676 tested and failed.
+Recorded 3209 conversion attempts over 73 fixture records: 3199 completed native encoding, 10 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 8 incompatible with the requested selectors, 2520 qualified, 681 tested and failed.
 The inventory covers 85 HDR-ledger cells and 5 labeled SDR controls. Ledger outcomes: 9 deliberately deferred, 17 incompatible with the requested selectors, 15 qualified, 32 tested and failed, 12 untested.
 
 The original fixed coverage plan contains 320 cases. Unexecuted fixed-plan cases: 0. Unlisted cross-products are untested, even when a neighboring case passes.
 
 ## Accepted product coverage
 
-320 of 320 declared product fixture/geometry requirements have qualified codec evidence. 0 have no matching tested tuple.
+320 of 320 declared fixture/geometry endpoint comparisons have qualified codec evidence under their named source models. 0 have no matching tested tuple.
 
 The accepted contract permits a suitable supported depth when depth is omitted. Required SDR AVIF requests therefore accept exact qualified 8-, 10-, or 12-bit evidence. This does not qualify a failed explicit depth=8 request. WebP retains its eight-bit output constraint. Every other selector, source fixture, geometry, and qualification gate must match. No runtime depth-selection policy is implemented here.
 
@@ -25,7 +25,7 @@ The accepted contract permits a suitable supported depth when depth is omitted. 
 | `animated-pq:sdr:avif` | 5 | 5 | 0 |
 | `animated-pq:sdr:webp` | 5 | 5 | 0 |
 
-These counts cover the declared corpus only. Gain-map HDR counts describe the original display boost 16 comparisons; they do not qualify intermediate display headroom. A ledger cell can retain failed exact-selector candidates while its endpoint requests have qualified alternatives. Consumer review and a usable SDR wallpaper download remain separate requirements. The original fixed-plan outcomes below remain visible.
+These counts cover the declared corpus only. Gain-map HDR counts describe the original display boost 16 comparisons; they do not qualify intermediate display headroom. Old Apple endpoint comparisons retain the legacy libavif source model, which fails the documented full-HDR source comparison. Its rendering gate requires the separately named documented reference. A ledger cell can retain failed exact-selector candidates while its endpoint requests have qualified alternatives. Consumer review and a usable SDR wallpaper download remain separate requirements. The original fixed-plan outcomes below remain visible.
 
 1 of 25 additional HDR rendering requirements qualify. An unqualified row blocks faithful-HDR qualification independently of the endpoint counts and pending physical checks.
 
@@ -41,11 +41,11 @@ These counts cover the declared corpus only. Gain-map HDR counts describe the or
 | `gainmap-android-iso:hdr:jpg:fill:display-boost64` | 64 | tested and failed |
 | `gainmap-android-iso:hdr:jpg:orientation:display-boost2` | 2 | tested and failed |
 | `gainmap-android-iso:hdr:jpg:orientation:display-boost64` | 64 | tested and failed |
-| `gainmap-android-xmp:hdr:jpg:contain:display-boost2` | 2 | untested |
-| `gainmap-android-xmp:hdr:jpg:cover:display-boost2` | 2 | untested |
-| `gainmap-android-xmp:hdr:jpg:fill:display-boost2` | 2 | untested |
-| `gainmap-android-xmp:hdr:jpg:upscale:display-boost2` | 2 | untested |
-| `gainmap-android-xmp:hdr:jpg:orientation:display-boost2` | 2 | untested |
+| `gainmap-android-xmp:hdr:jpg:contain:display-boost2` | 2 | tested and failed |
+| `gainmap-android-xmp:hdr:jpg:cover:display-boost2` | 2 | tested and failed |
+| `gainmap-android-xmp:hdr:jpg:fill:display-boost2` | 2 | tested and failed |
+| `gainmap-android-xmp:hdr:jpg:upscale:display-boost2` | 2 | tested and failed |
+| `gainmap-android-xmp:hdr:jpg:orientation:display-boost2` | 2 | tested and failed |
 | `gainmap-apple-old:hdr:jpg:contain:display-boost2` | 2 | untested |
 | `gainmap-apple-old:hdr:jpg:cover:display-boost2` | 2 | untested |
 | `gainmap-apple-old:hdr:jpg:fill:display-boost2` | 2 | untested |
@@ -67,7 +67,7 @@ One identical output file at display boosts 2, 16, 64: tested and failed. Differ
 
 Of 320 original fixed-plan cases, 320 have exact fixture/selector evidence and 156 qualify. This plan chose eight-bit SDR AVIF; that choice is not a product requirement when depth is omitted. Native encoding completed in 320; 0 stopped at a native operation. A native failure can occur while preparing an input fixture, before the final encoder is reached.
 
-Across all recorded cases, 645 have measured check failures and 60 lack required evidence. These counts overlap. A missing ordinary-white patch after cropping or an unavailable independent gamut reference is an evidence gap, not a measured change to those pixels.
+Across all recorded cases, 650 have measured check failures and 60 lack required evidence. These counts overlap. A missing ordinary-white patch after cropping or an unavailable independent gamut reference is an evidence gap, not a measured change to those pixels.
 
 False downstream flags on a failed native operation are unevaluated. They do not establish additional appearance, decoder, or metadata privacy failures. Successful encoding also does not establish qualification. The original status enums and required passing criteria remain unchanged.
 
@@ -95,6 +95,27 @@ The exhaustive diagnostic evaluates all 16,777,216 full-range sRGB RGB8 triples 
 The native AOM encode and independent dav1d decode preserve the supplied RGB8 codes exactly: True. The encoder cannot recover precision absent from those codes. The [diagnostic record](precision.json) includes reference, source, metric and threshold hashes, native commands, and six additional YUV encoding trials.
 
 This is a floating-point enumeration for one unchanged grade and one representation. It does not establish that eight-bit AVIF, another declared transfer, every YUV encoding, or another independently justified SDR grade is impossible. The diagnostic cannot qualify any conversion or physical display.
+
+## Fixed ISO gain-map code bound
+
+The [read-only diagnostic](iso-map-code-bound.json) searches every RGB8 gain-map triple for each selected shadow pixel. One triple must serve boosts 2, 16 and 64 with the fixed decoded base and actual gain metadata. Actual emitted-code reconstruction must agree with the independent decoder before enumeration.
+
+| Pixel [x, y] | Enumerated codes | Minimum joint maximum Delta E ITP | Best shared RGB8 code | Codes meeting all three maximum gates |
+| --- | ---: | ---: | --- | ---: |
+| [236, 822] | 16,777,216 | 109.491281 | [0, 0, 0] | 0 |
+| [242, 640] | 16,777,216 | 54.101789 | [35, 32, 0] | 0 |
+
+A minimum above the unchanged maximum of 8 rules out a map-code-only correction for that fixed representation. The float64 search optimistically ignores JPEG neighborhood coupling; it is not a formal interval-arithmetic certificate. Other base pixels, offsets, capacities, metadata, map precision, geometry and representations remain outside this bound. A feasible pixel code would still need actual native encoding and all regional gates. This diagnostic cannot qualify a conversion or physical consumer.
+
+## Fixed-base ISO offset bound
+
+The [shared-offset diagnostic](iso-global-offset-bound.json) keeps the same decoded P3 base and positive ordered display weights. It encloses the unchanged maximum-error balls in conservative RGB intervals. Two pixels constrain the same green-channel offset difference `D = 203 * (base offset - alternate offset)`.
+
+| D upper bound, nits | D lower bound, nits | Contradiction margin, nits | Contradiction |
+| ---: | ---: | ---: | --- |
+| -2.764145 | -1.468168 | 1.295977 | established |
+
+The unchanged maximum of 8 supplies the error-ball radius. Disjoint offset bounds rule out every shared nonnegative offset pair for this fixed model, including arbitrary map precision and per-pixel gains. The analytic enclosure uses linear support, monotone PQ inversion and signed matrix intervals. Numerical sampling only checks the implementation. Guarded float64 arithmetic is not a formal directed-rounding certificate. Other bases, capacities, reference models, geometry, gain equations and physical consumers remain outside this result. This diagnostic cannot qualify a conversion.
 
 ## Environment and reproducibility
 
@@ -283,8 +304,12 @@ Each value is the maximum of the recorded regional statistic across the tested g
 | `gainmap-android-iso` | `native-combine-moderateoffset-mozjpeg-base-dct-float-map-same-file-headroom` | `gainmap-iso-full-headroom-boost64-v1` | 0/1 | 0.4120 | 7.1832 | 25.1032 | 120.0772 | 104.9228 |
 | `gainmap-android-iso` | `native-combine-moderateoffset-mozjpeg-base-dct-float-map-same-file-headroom` | `gainmap-iso-intermediate-boost2-v1` | 0/1 | 0.4120 | 7.1832 | 22.6427 | 71.9363 | 77.9394 |
 | `gainmap-android-xmp` | `native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5` | `gainmap-hdr-target-gamut-v1` | 1/1 | 0.7870 | 3.8356 | 0.9059 | 6.9264 | 2.0220 |
+| `gainmap-android-xmp` | `native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5-independent-xmp-headroom` | `gainmap-xmp-independent-boost16-v1` | 1/1 | 0.7870 | 3.8356 | 0.9094 | 6.9264 | 2.0268 |
+| `gainmap-android-xmp` | `native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5-independent-xmp-headroom` | `gainmap-xmp-intermediate-boost2-v1` | 0/1 | 0.7870 | 3.8356 | 9.4959 | 93.5670 | 30.0381 |
 | `gainmap-android-xmp` | `native-combine-identity-lossless-rgb` | `gainmap-hdr-target-gamut-v1` | 6/6 | 0.0004 | 2.0849 | 1.2553 | 3.0473 | 3.1721 |
 | `gainmap-android-xmp` | `native-combine-moderateoffset-dct-float-rgb` | `gainmap-hdr-target-gamut-v1` | 5/6 | 0.3243 | 27.7158 | 0.8948 | 6.4785 | 2.3871 |
+| `gainmap-android-xmp` | `native-combine-moderateoffset-dct-float-rgb-independent-xmp-headroom` | `gainmap-xmp-independent-boost16-v1` | 4/4 | 0.3243 | 7.8722 | 0.8958 | 6.0992 | 2.3874 |
+| `gainmap-android-xmp` | `native-combine-moderateoffset-dct-float-rgb-independent-xmp-headroom` | `gainmap-xmp-intermediate-boost2-v1` | 0/4 | 0.3243 | 7.8722 | 9.9635 | 90.2211 | 31.5860 |
 | `gainmap-android-xmp` | `native-combine-moderateoffset-dct-rgb` | `gainmap-hdr-target-gamut-v1` | 5/6 | 0.3479 | 25.4949 | 0.9491 | 6.1151 | 2.5249 |
 | `gainmap-android-xmp` | `native-combine-moderateoffset-jpegli-base-dct-float-map` | `gainmap-hdr-target-gamut-v1` | 5/6 | 0.3577 | 25.4949 | 0.8988 | 6.5961 | 2.3915 |
 | `gainmap-android-xmp` | `native-combine-moderateoffset-lossless-rgb` | `gainmap-hdr-target-gamut-v1` | 6/6 | 0.0004 | 2.0849 | 0.7819 | 3.7019 | 1.9795 |
@@ -296,6 +321,7 @@ Each value is the maximum of the recorded regional statistic across the tested g
 | `gainmap-apple-new` | `native-combine-moderateoffset-dct-rgb` | `gainmap-hdr-target-gamut-v1` | 3/6 | 0.3906 | 28.6637 | 1.3123 | 7.8035 | 1.8902 |
 | `gainmap-apple-new` | `native-combine-moderateoffset-jpegli-base-dct-float-map` | `gainmap-hdr-target-gamut-v1` | 2/6 | 0.4328 | 35.2023 | 1.2259 | 7.7970 | 1.8154 |
 | `gainmap-apple-new` | `native-combine-moderateoffset-lossless-rgb` | `gainmap-hdr-target-gamut-v1` | 6/6 | 0.0003 | 3.3440 | 1.1281 | 4.2359 | 1.5549 |
+| `gainmap-apple-old` | `native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full` | `apple-old-documented-full-rec709-linear-bilinear8-v1` | 1/1 | 0.9220 | 4.6409 | 0.9797 | 4.2249 | 1.6308 |
 | `gainmap-apple-old` | `native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5` | `gainmap-hdr-target-gamut-v1` | 2/2 | 0.9220 | 5.0109 | 1.3606 | 7.0629 | 2.5011 |
 | `gainmap-apple-old` | `native-combine-identity-lossless-rgb` | `gainmap-hdr-target-gamut-v1` | 5/6 | 0.0003 | 3.3440 | 1.7808 | 4.0685 | 3.0539 |
 | `gainmap-apple-old` | `native-combine-moderateoffset-dct-float-rgb` | `gainmap-hdr-target-gamut-v1` | 4/6 | 0.3626 | 28.6637 | 1.2516 | 8.2264 | 2.2192 |
@@ -307,17 +333,20 @@ The following separate decoder diagnostics do not alter the file qualification a
 
 | Independent reader diagnostic | Attempted | Appearance passed | Failed or unqualified |
 | --- | ---: | ---: | ---: |
-| `baseline_libavif` | 85 | 19 | 66 |
-| `rgb_libavif` | 85 | 82 | 3 |
-| `stock_native_srgb` | 19 | 0 | 19 |
+| `baseline_libavif` | 93 | 21 | 72 |
+| `rgb_libavif` | 93 | 90 | 3 |
+| `stock_native_srgb` | 22 | 0 | 22 |
 
 The SOF0 union below counts each exact observed request once across native alternatives with independently inspected SOF0 base and map layers. Fixture and source hash, normalized selectors, geometry, crop and source-orientation facts, and reference revision must match. A request qualifies only when an exact alternative passes all original checks without blockers or rejected measurements. The per-candidate failures above remain unchanged.
 
 | Reference revision | Qualified/observed exact SOF0 requests | Qualified/observed required requests |
 | --- | ---: | ---: |
+| `apple-old-documented-full-rec709-linear-bilinear8-v1` | 1/1 | 1/1 |
 | `gainmap-hdr-target-gamut-v1` | 24/24 | 20/20 |
 | `gainmap-iso-full-headroom-boost64-v1` | 1/5 | 1/5 |
 | `gainmap-iso-intermediate-boost2-v1` | 0/5 | 0/5 |
+| `gainmap-xmp-independent-boost16-v1` | 5/5 | 5/5 |
+| `gainmap-xmp-intermediate-boost2-v1` | 0/5 | 0/5 |
 
 These denominators cover the observed corpus only; the required column matches the fixed plan within that corpus. Unobserved requests remain untested. This summary selects no runtime encoder and changes no matrix status. Physical browser and OS wallpaper qualification remains pending manual review.
 
@@ -362,13 +391,18 @@ Failures persist in blocks whose DC coefficients match the no-trellis control. T
 - The [ISO full-source-headroom proof](iso-full-headroom-boost64.json) also fails. At display boost 64 both source and output gain weights equal one, but the output remains identical to its boost-16 rendering while the source becomes brighter. Its shadow maximum is 129.3897 Delta E ITP and highlight mean is 25.0703. The matrix requires one identical output file to pass boosts 2, 16 and 64; different files cannot jointly qualify adaptation.
 - A separate [native full-source candidate](iso-full-source-candidate.json) reconstructs the ISO source at boost 64 before geometry and gain-map regeneration. That full-source rendering passes, with independent shadow maximum 7.79985 under the unchanged limit of 8. The exact same output fails boosts 2 and 16, so it does not clear the joint adaptation requirement. Its regenerated capacity is 3.089498 log2 versus the source 5.622376. The original output and all earlier failures remain separate evidence.
 - The [source-capacity candidate](iso-source-capacity.json) copies only the original capacity fields through the pinned native packer. Compressed base/map coding, actual ICC bytes and every other ISO field remain exact; ISO/XMP/native metadata agree. Source and output weights match at all three boosts. Highlight mean error improves from 20.4759 to 0.62918 at boost 2 and from 26.6022 to 1.02007 at boost 16, but shadow and midtone maxima still fail. Boost-64 pixels and measurements remain exactly equal to the qualified full-source control. This corrects the capacity mismatch without qualifying adaptation.
-- The [ISO geometry rendering proof](iso-geometry-headroom.json) reruns the existing qualified containment, crop, stretch and EXIF6 orientation recipes. It preserves their exact files and every original endpoint measurement. Each passes display boost 16 and fails appearance at 2 and 64; all other gates pass. The twelve rendering records retain their separate references and manual-file labels. These measurements cover all five required ISO geometries together with the upscale proofs, while XMP and Apple intermediate rendering remains untested.
+- The [ISO geometry rendering proof](iso-geometry-headroom.json) reruns the existing qualified containment, crop, stretch and EXIF6 orientation recipes. It preserves their exact files and every original endpoint measurement. Each passes display boost 16 and fails appearance at 2 and 64; all other gates pass. The twelve rendering records retain their separate references and manual-file labels. These measurements cover all five required ISO geometries together with the upscale proofs. Other source dialects require their own measurements.
+- The [independent XMP source proof](xmp-source-reference.json) reads original JPEG samples and XML gain parameters independently of native gain application. It declares the pinned point-bilinear sampling convention and separate boost-2/16 reference revisions. Every original/imported base and map code and per-channel gain field must agree; source and reference-relation appearance use unchanged regional gates. Native nonlinear-gamma, unequal-offset, per-channel and zero-weight controls exercise the equations. The original has explicit EXIF sRGB but lacks the ICC required by the Android container specification, so its legacy source scope does not establish container conformance. The different UltraHDR source renderer remains a failed diagnostic. A source-reader result cannot qualify a resized output or physical consumer.
+- The [XMP geometry rendering proof](xmp-containment-headroom.json) retains the five exact earlier native HDR JPEGs and compares them with independent same-boost source references after geometry. Every boost-16 rendering passes; every boost-2 rendering fails appearance. Containment shadow maximum is 88.53405 against the unchanged limit of 8; other boost-2 maxima range from 81.43344 to 93.56704. Both output readers agree and all nonappearance gates pass. Real EXIF6 facts and original coded samples are bound before one independent reference rotation. Upscale retains the experimental ICC-aware reader scope. All five same-file requirements remain failed; ten rendering scopes and references enter the manual bundle. Apple intermediate adaptation remains untested.
 - The [fractional map-gamma-1.5 candidate](icc-gainmap-midpointoffset-gamma1.5.json) passes the unchanged SDR, native HDR, independent HDR and cross-reader gates for ISO JPEG upscale. It retains the gamma-3.2 compressed base, eight-bit SOF0 layers and midpoint offsets. Qualification requires the experimental ICC-aware readers at display boost 16; the stock sRGB-assuming reader still fails and physical consumers remain pending. All five preceding failed representations remain separate.
 - The [Android XMP fractional-gamma upscale](icc-gainmap-xmp-midpointoffset-gamma1.5.json) passes the same file gates using the existing PQ16 source bridge with requested native depth 12. Its source reference shares libavif gain application; source transport agreement is not a claim of a second source-renderer implementation. Independent final HDR readers still qualify the output. The ISO-only float32 guard, stock-reader failure and pending physical status are unchanged.
 - New Apple containment passes the same ICC-aware JPEG recipe, while the original upscale remains failed at independent HDR shadow maximum 8.08225 against the unchanged limit 8. Native source/geometry/intent, SDR appearance and cross-reader agreement pass. A separate integer-DCT map keeps that shadow failure and adds highlight p95 failures in both HDR readers, with identical base and pre-JPEG map samples. A separately named FLOAT-base/FLOAT-map upscale preserves native gamma3.2 input and P3 ICC bytes, regenerates the map against its actual compressed base, and passes all gates at maximum HDR error 6.77896. The observed SOF0 union now covers 24/24 tuples, including 20/20 required, within the declared reader scope. Exact auxiliary XMP model/version/headroom facts govern this source; removing its non-authoritative MakerNotes leaves native reconstruction byte-identical, while unknown required XMP facts reject transformation.
 - Old Apple containment and upscale also pass the exact midpoint-offset fractional-gamma recipe through the experimental ICC-aware readers. Native source reconstruction requires the original Apple headroom MakerNotes, with a real stripped-source rejection control. Final native and independent HDR gates remain separate from the shared-libavif source reference. Stock-reader failures and physical review stay pending.
+- The [old Apple source-model diagnostic](apple-source-model.json) independently applies Apple's documented full effect: inverse Rec.709 map transfer, followed by linear gain multiplication using actual MakerNote headroom 8. Native import preserves every original base/map sample and applies the retained exponential coded-map convention. That convention passes its own control but fails six unchanged regional gates against the documented model: midtone mean/p95 Delta E 2.45608/6.41030 and highlight mean/p95 4.34848/6.23720, plus both relative-luminance p95 gates. These legacy endpoint measurements remain recorded with their model limitation. The documented full reference has a distinct revision; intermediate Apple adaptation and applicability to the transplanted newer XMP fixture remain unqualified.
 - The gain-map AVIF authored SDR GIF containment remains failed despite valid native encoding, actual sRGB ICC, opaque one-frame structure and independent decoding. Palette-only and full-reference errors both exceed the fixed photographic gates. The read-only exact-palette lower bound identifies 900 pixels for which changing dithering cannot meet the existing maximum; it makes no claim about other palettes or encoders. A separate native libimagequant candidate also fails, with 951 pixels outside the fixed maximum for its exact palette. Its native package version and differing library API report are recorded separately. The separate gamma3.2 ICC/libimagequant palette improves shadow maximum to 46.78 and its bound to 794 pixels, but still fails the fixed shadow and midtone gates. All three photographic palettes remain unqualified.
 - The [integer-DCT map alternative](icc-gainmap-midpointoffset-gamma2-islow.json) retains the exact midpoint gamma-2 compressed base and native pre-JPEG map. It changes only native map JPEG coding. Both HDR readers still fail shadow maxima and their agreement worsens; its original floating-DCT counterpart remains separate.
+- The [corrected native old Apple source](apple-native-source.json) applies the documented full model with native JPEG samples, bilinear8 map expansion and FFmpeg float32 arithmetic. It passes the independent photographic gates with maximum Delta E ITP 0.000027853. Analytic controls cover all 65,536 base/map code pairs at full-effect headrooms 1 and 8; maximum numeric error is 0.000466684 nits. Unknown source facts reject preparation. This qualifies encoder input only; derivatives, intermediate adaptation and the newer Apple model require separate evidence. The legacy source-model failures remain recorded.
+- The [corrected old Apple containment](apple-hdr-jpeg-contain.json) uses the independently established documented full source, native P3 float geometry and checked PQ16 intent. Its actual RGB8 SOF0 layers and authored SDR grade pass all declared file gates at boost 16. Independent HDR maximum is 4.52892; native maximum is 4.22494; authored SDR maximum remains exactly 4.64090 from the retained control. The source headroom is 8 and both full gain weights equal one. The inspected manual bundle contains its own JPEG, SDR reference and native HDR intent. ICC-aware interpretation remains required; stock-reader limitations, intermediate Apple adaptation and physical consumers remain unqualified.
 - Separately regenerated gain-map AVIF containment, crop, stretch and upscale check actual base, map and alternate precision against the source. Each native moderate-offset depth-8 candidate passes authored SDR and both HDR readers at log2 display headroom 4. The four stock depth-8 results fail; all eight automatic-depth variants declare alternate depth 12 and remain incompatible with the requested preservation selectors. Regenerated headroom and offsets differ from the source, so intermediate display adaptation remains untested. This is a declared endpoint proof, with physical consumers pending.
 - The [logarithmic midpoint-offset candidate](icc-gainmap-midpointoffset-gamma2.json) fixes the gamma-2 trial at ISO offsets 1/16384. Both HDR readers pass the existing midtone/highlight gates but fail their shadow maxima; their cross-comparison also fails in shadows. This separate result narrows the precision tradeoff without qualifying the JPEG or changing the original gates.
 - The [separate map-gamma-2 experiment](icc-gainmap-smalloffset-gamma2.json) retains the small ISO offset and both eight-bit JPEG layers. AVIF/ISO/XMP/native gamma values and zero/fractional/full-headroom controls must agree. Highlight error improves, but shadow error and regional means remain failed under the same gates. Earlier gamma-1 bytes and failed cases stay separate.
@@ -377,6 +411,7 @@ Failures persist in blocks whose DC coefficients match the no-trellis control. T
 - The locked gain-map AVIF source has separately qualified standard-sRGB RGB8 JPEG containment, crop and stretch. Its standard-sRGB upscale remains failed at shadow maximum 25.49485 in both native-input and full-reference comparisons. A separate gamma-3.2 ICC upscale passes the same gates with shadow maximum 3.83562. Exhaustive native transfer checks preserve the authored SDR reference and primaries; regional mean errors increase but stay within their unchanged limits. Actual ICC semantics, RGB components and Adobe transform establish color; raw decoder defaults remain diagnostics. Native JPEG coding error and full authored-reference error must both pass unchanged photographic gates. No separate JPEG aspect declaration is invented, and physical compatibility remains pending.
 - The gain-map AVIF source has separately qualified HDR JPEG containment, crop, stretch and upscale through ICC-aware readers at display boost 16. Native authored SDR and corrected PQ16 HDR preparations supply encoder pixels; direct dav1d source samples and parsed tmap metadata supply the independent reference. Actual RGB8 SOF0 layers, ISO/XMP/native agreement, privacy and both endpoint appearances pass unchanged gates. Independent HDR maximum across these geometries is 6.10543; original containment bytes and measurements remain exact. These endpoint measurements retain stock-reader limitations; separate intermediate rendering and physical consumer checks remain necessary.
 - A separate gain-map AVIF-to-HDR-JPEG containment proof renders that exact file at display boost 2. Both readers agree but fail the unchanged appearance gates, with independent shadow maximum 75.26896. Capacity-normalized and uncompressed-map diagnostics retain shadow errors. The original authored SDR geometry remains fixed; replacing it with linear-light geometry would fail its existing reference. This measured adaptation failure does not create an additional required product path or change the passing boost-16 endpoint.
+- An optional unresized gain-map AVIF-to-HDR-JPEG conversion retains the original raster and checked source gain metadata. One actual RGB8 file passes authored SDR and both HDR readers at boosts 2, source-full and 16. Independent HDR maximum is 4.666031 across those renderings; SDR maximum is 3.962015. Actual ICC interpretation remains necessary. Candidate/reference pairs are prepared for physical review. This identity result does not qualify resizing, crop, orientation or unmeasured headrooms; the failed resized candidates remain unchanged.
 - A separate native AVIF-to-HDR-JPEG trial retains original source gain metadata while resizing its map and authored base separately. It restores matching source/output weights and preserves the SDR measurement exactly, but fails HDR appearance at boost 2, source-full headroom and boost 16. Independent shadow maxima are 146.7847 at boost 2 and 171.395 at full headroom. Read-only reference diagnostics identify exact nonmonotonic channel samples that an equal-offset gain curve cannot reproduce exactly; they do not prove that every approximate encoding must fail the regional limits.
 - Authored SDR WebP containment, crop, stretch and upscale from the locked gain-map AVIF uses the same verified native source/geometry preparation. Actual lossless RGB8 WebP and native sRGB ICC semantics are independently inspected. FFmpeg and libwebp must recover every native input sample exactly; the independent authored SDR reference and unchanged photographic limits still determine appearance qualification. HDR and physical consumer interpretation are separate.
 - Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.
@@ -406,10 +441,10 @@ Failures persist in blocks whose DC coefficients match the no-trellis control. T
 - The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.
 - Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.
 
-Prepared 1101 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
+Prepared 1130 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
 
 ## Suite integrity
 
-Proof-side controls: 141. Unit tests run before native conversions. Evidence validation errors: 0.
+Proof-side controls: 144. Unit tests run before native conversions. Evidence validation errors: 0.
 
 Policy authority: [HDR resolution](https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153), [complete ledger](https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5870519681), [proof ticket](https://github.com/rafaeltab/wallpaperdb/issues/284), [delivery contract](https://github.com/rafaeltab/wallpaperdb/issues/250). Native algorithm references: [FFmpeg libplacebo filter](https://ffmpeg.org/ffmpeg-filters.html#libplacebo), [libplacebo options](https://libplacebo.org/options/), [libavif tools](https://github.com/AOMediaCodec/libavif/tree/v1.4.1/apps), [Sharp gain-map API](https://sharp.pixelplumbing.com/api-output/#keepgainmap).

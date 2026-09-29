@@ -224,7 +224,7 @@ def selectors(mode, gamut, operation):
 
 
 def source_hdr(path, directory, gamut):
-    """Decode a source whose gamut the caller has already established."""
+    """Decode a gain-map JPEG whose gamut the caller has already established."""
     from gainmap_iso import decode_iso_source
     try:
         pixels = independent_hdr(path, directory, gamut)
@@ -414,11 +414,11 @@ def run(output_dir):
                 if not source["facts"]["independent_hdr_decode"]:
                     case["blockers"].append("Source HDR has no independently verified decoder within the supported native/ISO reader scope; supplementary reconstruction cannot qualify this conversion.")
                 try:
-                    hdr_output = independent_hdr(path, case_dir, actual_gamut)
-                    hdr_gamut = "rec2020"
+                    hdr_output, hdr_gamut, decoder_evidence = source_hdr(path, case_dir, actual_gamut)
+                    case['output_decoder_evidence'] = decoder_evidence
                 except Exception as error:
                     case["checks"]["independent_decoder"] = False
-                    case["blockers"].append("Maintained independent HDR decoder rejected output: " + str(error)[:1300])
+                    case["blockers"].append("Output is outside the verified native/ISO HDR decoder scope: " + str(error)[:1300])
                     if job["format"] != "jpg" or not facts.get("iso_metadata"):
                         raise ValueError("No independently reconstructable HDR output")
                     hdr_output, _ = reconstruct(path.read_bytes(), (case_dir / "map.jpg").read_bytes())
@@ -478,7 +478,7 @@ def run(output_dir):
         cases.append(evidence)
     result = {"fixtures": fixture_evidence, "cases": cases,
               "scope": "Native codec candidates only. Production routing and physical displays are not qualified.",
-              "oracle_limitations": ["ISO-only JPEG has no maintained independent reconstruction reader in the pinned tools; the numerical oracle is supplementary.",
+              "oracle_limitations": ["ISO-only reconstruction qualifies decoder evidence only within the separately tested native-libjpeg/ISO reader scope; unknown metadata and color facts remain unsupported.",
                                      "The old/new Apple fixture pair shares pixels; the new file substitutes documented newer metadata."]}
     (directory / "evidence.json").write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
     return result

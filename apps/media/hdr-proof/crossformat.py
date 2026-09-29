@@ -8,7 +8,7 @@ from PIL import Image
 
 from appearance import compare_appearance
 from avif import decode_avif, decode_transfer
-from gainmap import ROOT, command, digest, independent_hdr, inspect, output_gamut
+from gainmap import ROOT, command, digest, source_hdr, inspect, output_gamut
 from gainmap_iso import reconstruct
 
 
@@ -70,11 +70,11 @@ def run(output_dir, fixture_directory=None):
                 np.asarray(Image.fromarray(source_nits[..., channel].astype(np.float32)).resize((173, 115), Image.Resampling.LANCZOS))
                 for channel in range(3)], axis=-1), 0)
             try:
-                actual = independent_hdr(output, case_dir, actual_gamut)
+                actual, decoded_gamut, decoder_evidence = source_hdr(output, case_dir, actual_gamut)
                 item["checks"]["independent_decoder"] = True
-                decoded_gamut = "rec2020"
+                item['output_decoder_evidence'] = decoder_evidence
             except Exception as error:
-                item["blockers"].append("Maintained independent HDR decoder rejected emitted ISO JPEG: " + str(error)[:1300])
+                item["blockers"].append("Output is outside the verified native/ISO HDR decoder scope: " + str(error)[:1300])
                 actual, _ = reconstruct(output.read_bytes(), (case_dir / "map.jpg").read_bytes())
                 decoded_gamut = actual_gamut
                 item["measurements"]["hdr_oracle_scope"] = "Supplementary proof-only ISO oracle, not independently qualified ISO interoperability"

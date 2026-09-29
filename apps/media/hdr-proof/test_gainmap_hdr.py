@@ -1,20 +1,55 @@
 """Native float geometry must retain HDR light and the declared edge convention."""
 
+import json
 from pathlib import Path
 import tempfile
 import unittest
 
 import numpy as np
+from PIL import Image
 
 from appearance import compare_appearance
 from gainmap import array_geometry, independent_hdr
 from gainmap_hdr import decode_source, resample_pq, read_linear
-from avif import write_png
+from avif import native, write_png
 
 ROOT = Path(__file__).parent
 
 
 class NativeGainMapHdrGeometryTests(unittest.TestCase):
+    def test_iso_source_native_repack_retains_independently_reconstructed_hdr(self):
+        from gainmap import inspect
+        from gainmap_iso import decode_iso_source
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = ROOT/'fixtures/gainmap/gainmap-android-iso.jpg'
+            inspect(source, directory/'reference')
+            reference = decode_iso_source(source.read_bytes(), (directory/'reference/map.jpg').read_bytes())
+            pq = decode_source(source, directory/'native', 'p3')
+            evidence = json.loads((directory/'native/iso-native-evidence.json').read_text())
+            self.assertEqual(evidence['decoded_color_facts']['gamut'], 1)
+            self.assertEqual(evidence['decoded_color_facts']['requested_display_boost'], 16)
+            tags = json.loads(native(['exiftool', '-j', '-n', pq]))[0]
+            self.assertEqual([tags[key] for key in ('ColorPrimaries', 'TransferCharacteristics',
+                                                   'MatrixCoefficients', 'VideoFullRangeFlag')],
+                             [12, 16, 0, 1])
+            self.assertEqual(tags['BitDepth'], 16)
+            with Image.open(directory/'reference/map.jpg') as image:
+                expected_map = np.asarray(image.convert('RGB').resize((384, 512), Image.Resampling.BILINEAR))
+            with Image.open(directory/'native/map-full.png') as image:
+                np.testing.assert_array_equal(np.asarray(image), expected_map)
+            with Image.open(source) as image, Image.open(directory/'native/base-native.png') as base:
+                np.testing.assert_array_equal(np.asarray(base), np.asarray(image.convert('RGB')))
+            for operation in ('contain', 'cover', 'fill', 'upscale', 'crop', 'orientation'):
+                with self.subTest(geometry=operation):
+                    orientation = 6 if operation == 'orientation' else 1
+                    result = resample_pq(pq, directory/f'{operation}.gbrapf32', operation,
+                                         orientation, gamut='p3')
+                    expected = array_geometry(reference['linear_rgb_nits'], operation, orientation)
+                    measured = compare_appearance(expected, read_linear(result), reference_gamut='p3',
+                                                  actual_gamut=result['gamut'], fixture_class='gainmap-hdr')
+                    self.assertTrue(measured['passed'], measured['failures'])
+
     def test_fractional_hdr_cover_matches_the_existing_reference_without_rounding_crop(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

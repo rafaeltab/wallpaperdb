@@ -20,6 +20,7 @@ export const httpConfig: HttpConfig = {
   nodeEnv: 'test',
   mediaServiceUrl: 'http://media.example.com',
   mediaPublicPath: '/media',
+  graphqlMaxActive: 32,
   graphqlMaxDepth: 5,
   graphqlMaxComplexity: 2000,
   graphqlMaxUniqueFields: 50,

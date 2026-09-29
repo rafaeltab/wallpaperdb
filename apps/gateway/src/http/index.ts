@@ -20,6 +20,7 @@ export interface HttpConfig {
   readonly mediaServiceUrl: string;
   readonly mediaPublicBaseUrl?: string;
   readonly mediaPublicPath: string;
+  readonly graphqlMaxActive: number;
   readonly graphqlMaxDepth: number;
   readonly graphqlMaxComplexity: number;
   readonly graphqlMaxUniqueFields: number;
@@ -251,7 +252,7 @@ export async function createHttpApp<E>(
   app.addHook('onClose', () => runtime.dispose());
   try {
     const execution = await runtime.runPromise(HttpExecution, { signal: options.signal });
-    const requests = installRequestLifecycle(app);
+    const requests = installRequestLifecycle(app, config);
     app.addHook('preClose', async () => {
       app.connectionsState.isShuttingDown = true;
       await runtime.runPromise(
@@ -413,7 +414,8 @@ function recordTelemetry(record: () => void): void {
   }
 }
 
-function installRequestLifecycle(app: FastifyInstance) {
+function installRequestLifecycle(app: FastifyInstance, config: HttpConfig) {
+  const graphqlRequests = new Set<FastifyRequest>();
   const active = new Set<AbortController>();
   const connections = new Set<Socket>();
   app.server.on('connection', (socket) => {
@@ -441,6 +443,7 @@ function installRequestLifecycle(app: FastifyInstance) {
       request.raw.removeListener('aborted', abandon);
       reply.raw.removeListener('close', abandon);
       completions.delete(request);
+      graphqlRequests.delete(request);
       active.delete(controller);
       if (active.size === 0) {
         empty.openUnsafe();
@@ -454,6 +457,23 @@ function installRequestLifecycle(app: FastifyInstance) {
     completions.set(request, complete);
     request.raw.once('aborted', abandon);
     reply.raw.once('close', abandon);
+  });
+  app.addHook('preHandler', async (request, reply) => {
+    if (request.routeOptions.url !== '/graphql') return;
+    if (graphqlRequests.size >= config.graphqlMaxActive) {
+      recordTelemetry(() =>
+        recordCounter('graphql.active_work.rejected', 1, { reason: 'capacity' })
+      );
+      return reply
+        .code(503)
+        .header('Retry-After', '1')
+        .send(
+          graphqlError('GATEWAY_OVERLOADED', 'The gateway is busy. Please try again.', {
+            reason: 'capacity',
+          })
+        );
+    }
+    graphqlRequests.add(request);
   });
   app.addHook('onResponse', async (request) => {
     completions.get(request)?.();

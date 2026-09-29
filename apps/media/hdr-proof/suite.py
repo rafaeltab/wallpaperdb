@@ -452,6 +452,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '## Blockers and scope limits','',
               '- The [fractional map-gamma-1.5 candidate](icc-gainmap-midpointoffset-gamma1.5.json) passes the unchanged SDR, native HDR, independent HDR and cross-reader gates for ISO JPEG upscale. It retains the gamma-3.2 compressed base, eight-bit SOF0 layers and midpoint offsets. Qualification requires the experimental ICC-aware readers at the declared full display headroom; the stock sRGB-assuming reader still fails and physical consumers remain pending. All five preceding failed representations remain separate.',
               '- The [Android XMP fractional-gamma upscale](icc-gainmap-xmp-midpointoffset-gamma1.5.json) passes the same file gates using the existing PQ16 source bridge with requested native depth 12. Its source reference shares libavif gain application; source transport agreement is not a claim of a second source-renderer implementation. Independent final HDR readers still qualify the output. The ISO-only float32 guard, stock-reader failure and pending physical status are unchanged.',
+              '- New Apple containment passes the same ICC-aware JPEG recipe, while upscale remains failed at independent HDR shadow maximum8.08225 against the unchanged limit8. Native source/geometry/intent, SDR appearance and cross-reader agreement pass. Exact auxiliary XMP model/version/headroom facts govern this source; removing its non-authoritative MakerNotes leaves native reconstruction byte-identical, while unknown required XMP facts reject transformation.',
               '- Old Apple containment and upscale also pass the exact midpoint-offset fractional-gamma recipe through the experimental ICC-aware readers. Native source reconstruction requires the original Apple headroom MakerNotes, with a real stripped-source rejection control. Final native and independent HDR gates remain separate from the shared-libavif source reference. Stock-reader failures and physical review stay pending.',
               '- The gain-map AVIF authored SDR GIF containment remains failed despite valid native encoding, actual sRGB ICC, opaque one-frame structure and independent decoding. Palette-only and full-reference errors both exceed the fixed photographic gates. The read-only exact-palette lower bound identifies 900 pixels for which changing dithering cannot meet the existing maximum; it makes no claim about other palettes or encoders.',
               '- The [integer-DCT map alternative](icc-gainmap-midpointoffset-gamma2-islow.json) retains the exact midpoint gamma-2 compressed base and native pre-JPEG map. It changes only native map JPEG coding. Both HDR readers still fail shadow maxima and their agreement worsens; its original floating-DCT counterpart remains separate.',
@@ -460,7 +461,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- The [separate map-gamma-2 experiment](icc-gainmap-smalloffset-gamma2.json) retains the small ISO offset and both eight-bit JPEG layers. AVIF/ISO/XMP/native gamma values and zero/fractional/full-headroom controls must agree. Highlight error improves, but shadow error and regional means remain failed under the same gates. Earlier gamma-1 bytes and failed cases stay separate.',
               '- Separate ICC-aware HDR JPEG experiments use the actual gamma-3.2 base profile, native LittleCMS float32 linearization and native gain computation. Both the [moderate-offset](icc-gainmap-moderateoffset.json) and [small-offset](icc-gainmap-smalloffset.json) cases remain in the matrix. The former fails independent shadow reconstruction and decoder agreement; the latter improves agreement but fails midtone/highlight appearance. The fixed references, RGB8 layer depths and appearance gates are unchanged. Stock readers that assume sRGB or reject ICC remain separately recorded limitations. Their inspected files are diagnostic, with physical consumers pending.',
               '- Single-layer HDR PNG16 from the verified gain-map AVIF renderer retains a distinct original aspect failure: pHYs 0:1 does not establish the requested square pixels. A separate native setsar=1 rewrite must preserve every decoded RGB16 and alpha sample while establishing 1:1. Independent chunk parsing, ExifTool, libpng and FFmpeg check color, depth, geometry, privacy and storage; unchanged source, geometry and HDR appearance gates still apply. Neither representation certifies physical HDR presentation.',
-              '- The locked gain-map AVIF source also has a separately qualified standard-sRGB RGB8 JPEG containment. Actual ICC semantics, RGB components and Adobe transform establish color; raw decoder defaults remain diagnostics. Native JPEG coding error and full authored-reference error must both pass unchanged photographic gates. No separate JPEG aspect declaration is invented, and physical compatibility remains pending.',
+              '- The locked gain-map AVIF source has separately qualified standard-sRGB RGB8 JPEG containment, crop and stretch. Its upscale remains failed at shadow maximum25.49485 in both native-input and full-reference comparisons. Actual ICC semantics, RGB components and Adobe transform establish color; raw decoder defaults remain diagnostics. Native JPEG coding error and full authored-reference error must both pass unchanged photographic gates. No separate JPEG aspect declaration is invented, and physical compatibility remains pending.',
               '- Authored SDR WebP containment, crop, stretch and upscale from the locked gain-map AVIF uses the same verified native source/geometry preparation. Actual lossless RGB8 WebP and native sRGB ICC semantics are independently inspected. FFmpeg and libwebp must recover every native input sample exactly; the independent authored SDR reference and unchanged photographic limits still determine appearance qualification. HDR and physical consumer interpretation are separate.',
               '- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.',
               '- The separately versioned gainmap-hdr-target-gamut-v1 reference filters and clips negative Lanczos excursions in the requested output primaries. Clipping in the earlier Rec.2020 decoder coordinates could create negative components in the requested P3 or sRGB gamut. Analytic commutation, out-of-gamut and identity controls verify this correction. Old references and failed case IDs remain visible; new cases record the reference revision and diagnostic differences. Appearance thresholds are unchanged.',
@@ -583,7 +584,8 @@ def main():
         geometries=('contain', 'cover', 'fill', 'upscale'))
     write_json(WORK/'gainmap-avif-preserve-evidence.json', gainmap_avif_preserve_result)
     from gainmap_avif_jpeg import run as run_gainmap_avif_jpeg
-    gainmap_avif_jpeg_result = run_gainmap_avif_jpeg(WORK/'gainmap-avif-jpeg')
+    gainmap_avif_jpeg_result = run_gainmap_avif_jpeg(WORK/'gainmap-avif-jpeg',
+        geometries=('contain', 'cover', 'fill', 'upscale'))
     write_json(WORK/'gainmap-avif-jpeg-evidence.json', gainmap_avif_jpeg_result)
     from gainmap_avif_gif import run as run_gainmap_avif_gif
     gainmap_avif_gif_result = run_gainmap_avif_gif(WORK/'gainmap-avif-gif')
@@ -602,12 +604,13 @@ def main():
         source_id='gainmap-android-xmp', map_policy='midpointoffset', map_gamma=1.5)
     write_json(RESULTS/'icc-gainmap-xmp-midpointoffset-gamma1.5.json', xmp_icc)
     icc_results.extend(xmp_icc['cases'])
-    for operation in ('contain', 'upscale'):
-        name = f'icc-gainmap-apple-old-{operation}-midpointoffset-gamma1.5'
-        result = run_icc_gainmap(WORK/name, source_id='gainmap-apple-old', operation=operation,
-            map_policy='midpointoffset', map_gamma=1.5)
-        write_json(RESULTS/f'{name}.json', result)
-        icc_results.extend(result['cases'])
+    for source_id in ('gainmap-apple-old', 'gainmap-apple-new'):
+        for operation in ('contain', 'upscale'):
+            name = f'icc-{source_id}-{operation}-midpointoffset-gamma1.5'
+            result = run_icc_gainmap(WORK/name, source_id=source_id, operation=operation,
+                map_policy='midpointoffset', map_gamma=1.5)
+            write_json(RESULTS/f'{name}.json', result)
+            icc_results.extend(result['cases'])
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))

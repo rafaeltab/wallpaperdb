@@ -127,6 +127,11 @@ Old Apple containment and upscale also pass the exact same map recipe.
 Its native source path requires the original headroom MakerNotes, and a real
 source stripped of those facts remains original-only. These two cases retain
 their PQ source precision evidence and separate final HDR-reader measurements.
+New Apple containment also passes, while its upscale remains failed at an
+independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
+This source requires its auxiliary XMP model, version and headroom. Native
+reconstruction remains byte-identical after removing unused MakerNotes;
+unknown required XMP facts reject transformation.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
@@ -337,9 +342,10 @@ appearance checks. Stock depth-8 failures and automatic-depth-12 incompatibility
 remain visible. Qualification covers the declared full-headroom endpoints only:
 regenerated offsets and headroom differ from the source, so intermediate display
 adaptation remains untested. Physical consumers remain pending.
-The separate [authored SDR JPEG proof](gainmap_avif_jpeg.py) checks containment
+The separate [authored SDR JPEG proof](gainmap_avif_jpeg.py) checks containment, crop, stretch and upscale
 from the same gain-map AVIF source. Standard sRGB RGB8 quality-100 JPEG passes
-the unchanged photographic limits. Independent inspection establishes color
+the first three geometries. Upscale fails the unchanged shadow maximum at
+25.49485 in both native-input and full-reference comparisons. Independent inspection establishes color
 from actual ICC, RGB components and Adobe transform fields; decoder-guessed
 color defaults remain diagnostics. Actual dimensions are checked without
 inventing an absent JPEG aspect declaration. Physical interpretation remains

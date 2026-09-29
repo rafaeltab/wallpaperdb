@@ -1,7 +1,5 @@
 {
-  "annotations": {
-    "list": []
-  },
+  "annotations": { "list": [] },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -14,7 +12,7 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 1,
       "panels": [],
-      "title": "Security Overview",
+      "title": "Admission and query limits",
       "type": "row"
     },
     {
@@ -42,11 +40,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
         "textMode": "auto"
       },
       "pluginVersion": "10.0.0",
@@ -86,11 +80,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
         "textMode": "auto"
       },
       "pluginVersion": "10.0.0",
@@ -130,24 +120,21 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
         "textMode": "auto"
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(increase(graphql_security_rate_limited_total[5m]))",
-          "legendFormat": "Rate Limited",
+          "expr": "sum(increase(admission_quota_denied_total[5m]))",
+          "legendFormat": "Quota denials",
           "refId": "A"
         }
       ],
-      "title": "Rate Limit Violations (5m)",
-      "type": "stat"
+      "title": "Cost quota denials (5m)",
+      "type": "stat",
+      "description": "Shared or local cost budgets denied admission. Denied requests spend no points."
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -174,11 +161,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
         "textMode": "auto"
       },
       "pluginVersion": "10.0.0",
@@ -207,26 +190,15 @@
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
+            "scaleDistribution": { "type": "linear" },
             "showPoints": "never",
             "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
           "thresholds": {
@@ -242,45 +214,37 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 7 },
       "id": 6,
       "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(graphql_security_complexity_exceeded_total[$__rate_interval])",
+          "expr": "sum(rate(graphql_security_complexity_exceeded_total[$__rate_interval]))",
           "legendFormat": "Complexity Exceeded",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(graphql_security_breadth_exceeded_total[$__rate_interval])",
+          "expr": "sum(rate(graphql_security_breadth_exceeded_total[$__rate_interval]))",
           "legendFormat": "Breadth Exceeded",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(graphql_security_rate_limited_total[$__rate_interval])",
-          "legendFormat": "Rate Limited",
+          "expr": "sum(rate(admission_quota_denied_total[$__rate_interval]))",
+          "legendFormat": "Cost quota denials",
           "refId": "C"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(graphql_security_batch_exceeded_total[$__rate_interval])",
+          "expr": "sum(rate(graphql_security_batch_exceeded_total[$__rate_interval]))",
           "legendFormat": "Batch Exceeded",
           "refId": "D"
         }
       ],
-      "title": "Security Violations Over Time",
+      "title": "Inspection rejections and cost quota denials",
       "type": "timeseries"
     },
     {
@@ -288,7 +252,7 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
       "id": 7,
       "panels": [],
-      "title": "Query Complexity Analysis",
+      "title": "Inspected query scores",
       "type": "row"
     },
     {
@@ -305,26 +269,15 @@
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
+            "scaleDistribution": { "type": "linear" },
             "showPoints": "never",
             "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "line"
-            }
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "line" }
           },
           "mappings": [],
           "thresholds": {
@@ -341,40 +294,33 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "id": 8,
       "options": {
-        "legend": {
-          "calcs": ["mean", "max"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
+        "legend": { "calcs": [ "mean", "max" ], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.50, rate(graphql_query_complexity_bucket[$__rate_interval]))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(graphql_query_complexity_bucket[$__rate_interval])))",
           "legendFormat": "P50",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, rate(graphql_query_complexity_bucket[$__rate_interval]))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(graphql_query_complexity_bucket[$__rate_interval])))",
           "legendFormat": "P95",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.99, rate(graphql_query_complexity_bucket[$__rate_interval]))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(graphql_query_complexity_bucket[$__rate_interval])))",
           "legendFormat": "P99",
           "refId": "C"
         }
       ],
-      "title": "Query Complexity Distribution",
-      "type": "timeseries"
+      "title": "Query score distribution",
+      "type": "timeseries",
+      "description": "Complexity score per inspected GraphQL request, including denied requests. These are request-score percentiles, not per-IP usage percentiles. Inspection failures are charged 100 points when admitted regardless of their partial score."
     },
     {
       "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -401,23 +347,19 @@
         "minVizHeight": 10,
         "minVizWidth": 0,
         "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
         "showUnfilled": true
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum by (operation) (rate(graphql_query_complexity_sum[$__rate_interval])) / sum by (operation) (rate(graphql_query_complexity_count[$__rate_interval]))",
-          "legendFormat": "{{operation}}",
+          "expr": "sum(rate(graphql_query_complexity_sum[$__rate_interval])) / sum(rate(graphql_query_complexity_count[$__rate_interval]))",
+          "legendFormat": "Points per inspected query",
           "refId": "A"
         }
       ],
-      "title": "Average Complexity by Operation",
+      "title": "Mean inspected query score",
       "type": "bargauge"
     },
     {
@@ -425,7 +367,7 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
       "id": 10,
       "panels": [],
-      "title": "Rate Limiting",
+      "title": "Charged cost and fleet usage",
       "type": "row"
     },
     {
@@ -442,26 +384,15 @@
             "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
+            "scaleDistribution": { "type": "linear" },
             "showPoints": "never",
             "spanNulls": true,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
           },
           "mappings": [],
           "thresholds": {
@@ -470,53 +401,91 @@
               { "color": "green", "value": null }
             ]
           },
-          "unit": "reqps"
+          "unit": "short"
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 25 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
       "id": 11,
       "options": {
-        "legend": {
-          "calcs": ["mean", "max"],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
+        "legend": { "calcs": [ "mean", "max" ], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "rate(graphql_security_rate_limited_total[$__rate_interval])",
-          "legendFormat": "Rate Limited Requests",
+          "expr": "sum by (mode) (rate(admission_cost_charged_total[$__rate_interval]))",
+          "legendFormat": "{{mode}} points/s",
           "refId": "A"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rate(graphql_query_total[$__rate_interval]))",
-          "legendFormat": "Total Requests",
-          "refId": "B"
         }
       ],
-      "title": "Rate Limit Violations vs Total Traffic",
-      "type": "timeseries"
+      "title": "Charged cost points per second",
+      "type": "timeseries",
+      "description": "Confirmed admitted cost, summed across replicas by shared or local admission mode. Includes the 100-point inspection-rejection charge. No refunds for later execution failures. Redis minute accounting also includes reservations whose replies were lost; this counter reflects confirmed decisions."
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "unit": "short",
+          "noValue": "Unavailable / no charged IPs"
+        },
+        "overrides": []
       },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 33
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "id": 13,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "textMode": "auto"
       },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "(max(admission_usage_points and (time() - admission_usage_observed_at < 30) and (admission_usage_minute == (time() - time() % 60))) / (max(admission_usage_active_ips and (time() - admission_usage_observed_at < 30) and (admission_usage_minute == (time() - time() % 60))) > 0)) and ((min(admission_usage_available and (time() - admission_usage_observed_at < 30)) == 1) and (min(admission_usage_minute and (time() - admission_usage_observed_at < 30)) == (time() - time() % 60)) and (min(admission_usage_sampled_at and (time() - admission_usage_observed_at < 30)) > time() - 30))",
+          "legendFormat": "Shared points / active IP",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "title": "Mean charged points per active IP this minute",
+      "type": "stat",
+      "description": "Fleet-wide shared charged points divided by the HyperLogLog estimate of distinct charged IPs in the current UTC minute. Only positive charges participate. Replica samples repeat the same shared state and are deduplicated before division; the mean may decrease when new IPs do cheaper work. No IP identities or per-IP percentiles are exported. Unavailable if any reporting replica cannot read shared usage, samples are stale, the minute changes before the next collection, or no IP has charged work. Local fallback charges are not included. Retired replica samples expire after 30 seconds."
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 33 },
       "id": 12,
       "title": "Distributed quota fallback, recovery, and saturation",
       "description": "Fallback uses independent replica budgets. Recovery resumes Redis without merging outage charges. Saturation rejects with 503. No identity labels are exported.",
@@ -527,11 +496,7 @@
           "legendFormat": "Fallback {{reason}}",
           "refId": "A"
         },
-        {
-          "expr": "sum(rate(admission_quota_recovery_total[$__rate_interval]))",
-          "legendFormat": "Recovery",
-          "refId": "B"
-        },
+        { "expr": "sum(rate(admission_quota_recovery_total[$__rate_interval]))", "legendFormat": "Recovery", "refId": "B" },
         {
           "expr": "sum by (reason) (rate(admission_quota_saturated_total[$__rate_interval]))",
           "legendFormat": "Saturation {{reason}}",
@@ -543,23 +508,150 @@
           "refId": "D"
         }
       ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "id": 14,
+      "options": {
+        "legend": { "calcs": [ "mean", "max" ], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "max(admission_usage_points and (time() - admission_usage_observed_at < 30) and (admission_usage_minute == (time() - time() % 60))) and ((min(admission_usage_available and (time() - admission_usage_observed_at < 30)) == 1) and (min(admission_usage_minute and (time() - admission_usage_observed_at < 30)) == (time() - time() % 60)) and (min(admission_usage_sampled_at and (time() - admission_usage_observed_at < 30)) > time() - 30))",
+          "legendFormat": "Charged points",
+          "refId": "A",
+          "interval": "5s"
+        },
+        {
+          "expr": "max(admission_usage_active_ips and (time() - admission_usage_observed_at < 30) and (admission_usage_minute == (time() - time() % 60))) and ((min(admission_usage_available and (time() - admission_usage_observed_at < 30)) == 1) and (min(admission_usage_minute and (time() - admission_usage_observed_at < 30)) == (time() - time() % 60)) and (min(admission_usage_sampled_at and (time() - admission_usage_observed_at < 30)) > time() - 30))",
+          "legendFormat": "Approximate active IPs",
+          "refId": "B",
+          "interval": "5s"
+        }
+      ],
+      "title": "Shared minute charged points and active IP estimate",
+      "type": "timeseries",
+      "description": "Deduplicated fleet totals for the current UTC minute. Both series reset each minute and include only charged work. The IP count is approximate, not a count of HTTP callers.",
+      "interval": "5s"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "tooltip": false, "viz": false, "legend": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Unavailable", "color": "red" },
+                "1": { "text": "Available", "color": "green" }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "id": 15,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": [ "lastNotNull" ], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "(((min(admission_usage_available and (time() - admission_usage_observed_at < 30)) == 1) and (min(admission_usage_minute and (time() - admission_usage_observed_at < 30)) == (time() - time() % 60)) and (min(admission_usage_sampled_at and (time() - admission_usage_observed_at < 30)) > time() - 30)) * 0 + 1) or vector(0)",
+          "legendFormat": "Available",
+          "refId": "A",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "title": "Fleet usage availability",
+      "type": "stat",
+      "description": "1 means every currently reporting replica has a fresh current-minute shared snapshot. 0 means unavailable or no fresh reports. Idle minutes remain observable; a healthy minute with no charged IPs has no mean. Collection is every 10 seconds; samples expire after 30 seconds."
     }
   ],
   "refresh": "5s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["gateway", "graphql", "security"],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
+  "tags": [
+    "gateway",
+    "graphql",
+    "security"
+  ],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "",
   "title": "Gateway GraphQL Security",
   "uid": "gateway-graphql-security",
-  "version": 0,
+  "version": 2,
   "weekStart": ""
 }

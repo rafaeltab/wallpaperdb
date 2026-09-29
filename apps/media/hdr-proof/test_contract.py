@@ -81,13 +81,74 @@ class RenderingCoverageTests(unittest.TestCase):
         report = build_matrix([failed, endpoint])
         self.assertEqual(report['product_coverage']['qualified_count'], 1)
         rendering = report['rendering_coverage']
-        self.assertEqual((rendering['required_count'], rendering['qualified_count']), (1, 0))
+        self.assertEqual((rendering['required_count'], rendering['qualified_count']), (2, 0))
         requirement = rendering['requirements'][0]
         self.assertEqual(requirement['status'], 'tested and failed')
         self.assertEqual(requirement['tested_evidence'], [failed['case_id']])
         self.assertEqual(requirement['qualified_evidence'], [])
         self.assertIn(requirement['requirement_id'], report['milestone_blockers'])
         self.assertEqual(build_matrix([])['rendering_coverage']['requirements'][0]['status'], 'untested')
+
+    def test_full_source_headroom_requires_its_own_same_boost_reference(self):
+        case = self.case()
+        case.update(status='qualified', checks={key: True for key in case['checks']}, measurements={}, blockers=[])
+        full = {**case, 'case_id': 'bookkeeping-only-boost64',
+                'rendering_scope': {'display_boost': 64},
+                'source_reference_revision': 'gainmap-iso-full-headroom-boost64-v1'}
+        report = build_matrix([case, full])
+        self.assertEqual(report['rendering_coverage']['qualified_count'], 2)
+        self.assertEqual(report['product_coverage']['qualified_count'], 0)
+        requirement = report['rendering_coverage']['requirements'][1]
+        self.assertEqual(requirement['display_boost'], 64)
+        self.assertEqual(requirement['qualified_evidence'], [full['case_id']])
+        for change in ({'rendering_scope': {'display_boost': 16}},
+                       {'source_reference_revision': case['source_reference_revision']}):
+            with self.subTest(change=change):
+                changed = build_matrix([case, {**full, **change}])
+                self.assertEqual(changed['rendering_coverage']['qualified_count'], 1)
+                self.assertIn(requirement['requirement_id'], changed['milestone_blockers'])
+
+    def test_different_files_cannot_jointly_qualify_adaptation_without_a_headroom_selector(self):
+        from copy import deepcopy
+        case = self.case()
+        case.update(status='qualified', checks={key: True for key in case['checks']}, measurements={}, blockers=[])
+        cases = [{**case, 'case_id': f'bookkeeping-only-boost{boost}',
+                  'source_reference_revision': revision, 'rendering_scope': {'display_boost': boost},
+                  'artifacts': {'sha256': 'a'*64}}
+                 for boost, revision in ((2, 'gainmap-iso-intermediate-boost2-v1'),
+                                         (16, 'gainmap-hdr-target-gamut-v1'),
+                                         (64, 'gainmap-iso-full-headroom-boost64-v1'))]
+        report = build_matrix(cases)
+        joint = report['rendering_coverage']['same_file_requirement']
+        self.assertEqual(joint['display_boosts'], [2, 16, 64])
+        self.assertEqual(joint['status'], 'qualified')
+        self.assertEqual(joint['qualified_output_sha256'], ['a'*64])
+        self.assertNotIn(joint['requirement_id'], report['milestone_blockers'])
+        for mutation in ('different-file', 'missing-hash', 'invalid-hash', 'missing-point', 'failed-point',
+                         'wrong-reference', 'wrong-source', 'different-crop'):
+            changed = deepcopy(cases)
+            if mutation == 'different-file':
+                changed[1]['artifacts']['sha256'] = 'b'*64
+            elif mutation == 'missing-hash':
+                changed[1].pop('artifacts')
+            elif mutation == 'invalid-hash':
+                changed[1]['artifacts']['sha256'] = 'not-a-hash'
+            elif mutation == 'missing-point':
+                changed.pop(1)
+            elif mutation == 'failed-point':
+                changed[1]['measurements'] = {'hdr': {'passed': False}}
+            elif mutation == 'wrong-reference':
+                changed[1]['source_reference_revision'] = 'different-reference'
+            elif mutation == 'wrong-source':
+                changed[1]['source_sha256'] = 'b'*64
+            else:
+                changed[1]['probe_crop_rectangle'] = [1, 2, 3, 4]
+            with self.subTest(mutation=mutation):
+                report = build_matrix(changed)
+                joint = report['rendering_coverage']['same_file_requirement']
+                self.assertNotEqual(joint['status'], 'qualified')
+                self.assertEqual(joint['qualified_output_sha256'], [])
+                self.assertIn(joint['requirement_id'], report['milestone_blockers'])
 
     def test_only_exact_source_selectors_headroom_reference_and_passing_gates_count(self):
         from copy import deepcopy

@@ -76,6 +76,11 @@ observation. Repeat gain-map comparisons at different brightness settings and
 window sizes, recording changing shadow, exposure and highlight behavior.
 The browser's actual effective headroom may be unknown, so do not label a
 brightness setting as an exact numerical boost without measuring it.
+The original ISO candidate also has a failed boost-64 full-source comparison.
+Its source capacity exceeds boost 16, so that earlier comparison is not the
+fully applied source HDR image. Use the joint same-file record for boosts 2,
+16 and 64; successes from different output files cannot be combined into one
+adaptive-HDR approval.
 
 The optional gain-map AVIF source has separately inspected authored-SDR AVIF
 derivatives for containment, crop, stretch and upscale. Compare them with the

@@ -246,6 +246,10 @@ def product_coverage_report(matrix):
     for row in rendering['requirements']:
         lines.append(f'| `{row["requirement_id"]}` | {row["display_boost"]} | {row["status"]} |')
     lines += ['', 'Source and output must use the same display boost and the declared independent reference. A passing endpoint or another headroom value cannot satisfy this gate. No new product selector or runtime generation policy is introduced.', '']
+    same_file = rendering['same_file_requirement']
+    boosts = ', '.join(str(value) for value in same_file['display_boosts'])
+    lines += [f'One identical output file at display boosts {boosts}: {same_file["status"]}. '
+              'Different output files cannot jointly satisfy adaptive-HDR qualification; the matrix joins their actual SHA-256 hashes across every rendering point.', '']
     return lines
 
 
@@ -457,6 +461,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               *coefficient_diagnostic_report(mozjpeg_diagnosis),
               '## Blockers and scope limits','',
               '- The [ISO intermediate-headroom proof](iso-intermediate-boost2.json) fails at display boost 2 against an independently reconstructed source at that same boost. Both actual output readers agree within the existing limits, but reconstructed appearance does not. The source capacity is about 49.26 times SDR white; the regenerated file is about 4.47. Read-only pre-JPEG-map and ideal-gain diagnostics retain large errors. A normalized-weight diagnostic reduces broad bias but still fails; normalizing capacity to the boost-16 reference endpoint is insufficient in that diagnostic. Other capacity choices remain untested. The separate display-boost-16 endpoint remains measured; the boost-2 rendering requirement blocks faithful-HDR qualification independently of endpoint counts and physical review.',
+              '- The [ISO full-source-headroom proof](iso-full-headroom-boost64.json) also fails. At display boost 64 both source and output gain weights equal one, but the output remains identical to its boost-16 rendering while the source becomes brighter. Its shadow maximum is 129.3897 Delta E ITP and highlight mean is 25.0703. The matrix requires one identical output file to pass boosts 2, 16 and 64; different files cannot jointly qualify adaptation.',
               '- The [fractional map-gamma-1.5 candidate](icc-gainmap-midpointoffset-gamma1.5.json) passes the unchanged SDR, native HDR, independent HDR and cross-reader gates for ISO JPEG upscale. It retains the gamma-3.2 compressed base, eight-bit SOF0 layers and midpoint offsets. Qualification requires the experimental ICC-aware readers at display boost 16; the stock sRGB-assuming reader still fails and physical consumers remain pending. All five preceding failed representations remain separate.',
               '- The [Android XMP fractional-gamma upscale](icc-gainmap-xmp-midpointoffset-gamma1.5.json) passes the same file gates using the existing PQ16 source bridge with requested native depth 12. Its source reference shares libavif gain application; source transport agreement is not a claim of a second source-renderer implementation. Independent final HDR readers still qualify the output. The ISO-only float32 guard, stock-reader failure and pending physical status are unchanged.',
               '- New Apple containment passes the same ICC-aware JPEG recipe, while the original upscale remains failed at independent HDR shadow maximum 8.08225 against the unchanged limit 8. Native source/geometry/intent, SDR appearance and cross-reader agreement pass. A separate integer-DCT map keeps that shadow failure and adds highlight p95 failures in both HDR readers, with identical base and pre-JPEG map samples. A separately named FLOAT-base/FLOAT-map upscale preserves native gamma3.2 input and P3 ICC bytes, regenerates the map against its actual compressed base, and passes all gates at maximum HDR error 6.77896. The observed SOF0 union now covers 24/24 tuples, including 20/20 required, within the declared reader scope. Exact auxiliary XMP model/version/headroom facts govern this source; removing its non-authoritative MakerNotes leaves native reconstruction byte-identical, while unknown required XMP facts reject transformation.',
@@ -641,6 +646,9 @@ def main():
     iso_intermediate = run_iso_intermediate(WORK/'iso-intermediate-boost2')
     write_json(RESULTS/'iso-intermediate-boost2.json', iso_intermediate)
     icc_results.extend(iso_intermediate['cases'])
+    iso_full_headroom = run_iso_intermediate(WORK/'iso-full-headroom-boost64', display_boost=64)
+    write_json(RESULTS/'iso-full-headroom-boost64.json', iso_full_headroom)
+    icc_results.extend(iso_full_headroom['cases'])
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))

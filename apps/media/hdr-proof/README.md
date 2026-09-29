@@ -146,8 +146,11 @@ and pending physical review remain unchanged.
 These gain-map endpoint measurements use display boost 16. They do not prove
 faithful adaptation at other display headroom values. The matrix separately
 requires ISO upscale at boost 2, using the same source/output display boost
-and an independently reconstructed, matched-geometry source reference. A
-failure of that rendering blocks faithful-HDR qualification even when all
+and an independently reconstructed, matched-geometry source reference. It also
+requires boost 64, which fully applies this source's gain map. One identical
+output file must pass boosts 2, 16 and 64; different files at different headroom
+values cannot satisfy the joint requirement. Display headroom is not a product
+selector. An unqualified rendering blocks faithful-HDR qualification even when all
 320 original fixture/geometry requests have passing endpoint alternatives.
 The [boost-2 proof](iso_intermediate_headroom.py) reruns the exact native
 converter and records a large appearance failure while both output readers
@@ -158,6 +161,11 @@ much of the broad exposure bias but still fails the shadow and midtone maxima.
 Normalizing capacity to the boost-16 reference endpoint is insufficient in
 this diagnostic. Other capacity choices remain untested. These diagnostic
 pixels never enter the encoder or qualify a file.
+The original output also fails the separate boost-64 full-source comparison.
+Both output readers agree, and its decoded pixels are exactly equal to those
+at boost 16, while the independently reconstructed source becomes brighter.
+The earlier endpoint success therefore proves neither intermediate adaptation
+nor this source's fully applied HDR appearance.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

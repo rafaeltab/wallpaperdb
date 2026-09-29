@@ -2,7 +2,7 @@ import { Deferred, Effect, Layer } from 'effect';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Catalogue, type Profile } from '../src/capabilities/catalogue/index.js';
-import { createHttpApp } from '../src/http/index.js';
+import { type HttpConfig, createHttpApp } from '../src/http/index.js';
 import { EmptyCatalogue, httpConfig, httpTestLayer } from './unit/http-fixture.js';
 
 const profile: Profile = {
@@ -32,7 +32,12 @@ function controlledCatalogue(read: Effect.Effect<Profile | null>, onSearch = () 
     searchProfiles: () => empty.searchProfiles(),
   });
 }
-async function serve(catalogue: Catalogue, shutdownTimeoutMs = 1000, config = httpConfig) {
+async function serve(
+  catalogue: Catalogue,
+  shutdownTimeoutMs = 1000,
+  overrides: Partial<HttpConfig> = {}
+) {
+  const config = { ...httpConfig, ...overrides };
   const app = await createHttpApp(config, httpTestLayer(config, { catalogue }), {
     shutdownTimeoutMs,
   });
@@ -53,6 +58,38 @@ function query(address: string, signal?: AbortSignal) {
 }
 
 describe('HTTP request lifecycle', () => {
+  it('rejects excess GraphQL work before inspection or charging and recovers capacity after completion', async () => {
+    const release = Deferred.makeUnsafe<void>();
+    let entered = false;
+    const read = Effect.sync(() => {
+      entered = true;
+    }).pipe(Effect.andThen(Deferred.await(release)), Effect.as(profile));
+    const { address } = await serve(controlledCatalogue(read), 1000, { graphqlMaxActive: 1 });
+    const pending = query(address);
+    await expect.poll(() => entered).toBe(true);
+    const rejected = await fetch(`${address}/graphql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: 'invalid GraphQL' }),
+    });
+    expect(rejected.status).toBe(503);
+    expect(await rejected.json()).toMatchObject({
+      errors: [{ extensions: { code: 'GATEWAY_OVERLOADED' } }],
+    });
+    expect(rejected.headers.get('x-ratelimit-cost-remaining')).toBeNull();
+    expect((await fetch(`${address}/ready`)).status).not.toBe(429);
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    const first = await pending;
+    expect(first.status).toBe(200);
+    await first.json();
+    const next = await query(address);
+    expect(next.status).toBe(200);
+    expect(
+      Number(first.headers.get('x-ratelimit-cost-remaining')) -
+        Number(next.headers.get('x-ratelimit-cost-remaining'))
+    ).toBeLessThan(100);
+  });
+
   it('finishes a whole GraphQL response during shutdown grace, including later nested resolvers', async () => {
     const release = Effect.runSync(Deferred.make<void>());
     let entered = false;

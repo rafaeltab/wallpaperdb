@@ -32,6 +32,9 @@ class IccGainmapTests(unittest.TestCase):
     def test_midpointoffset_gamma15_preserves_fractional_metadata_and_headroom(self):
         self._headroom_control('midpointoffset', map_gamma=1.5)
 
+    def test_midpointoffset_gamma15_islow_preserves_fractional_metadata_and_headroom(self):
+        self._headroom_control('midpointoffset', map_gamma=1.5, map_method='islow')
+
     def _headroom_control(self, map_policy, *, map_gamma=1, map_method='float'):
         from avif import encode_transfer
         from icc_gainmap import pack, independent_decode, native_decode
@@ -161,7 +164,7 @@ class IccGainmapTests(unittest.TestCase):
                 self.assertEqual(len(avif.COMMANDS), before)
                 self.assertFalse(output.exists())
             for policy, gamma, method in (('smalloffset', 2, 'islow'),
-                    ('moderateoffset', 1, 'islow'), ('midpointoffset', 2, 'unknown'), ('midpointoffset', 1.5, 'islow')):
+                    ('moderateoffset', 1, 'islow'), ('midpointoffset', 2, 'unknown')):
                 before = len(avif.COMMANDS)
                 with self.subTest(policy=policy, method=method), self.assertRaises(ValueError):
                     pack('missing-base.jpg', 'missing-intent.png', output,
@@ -405,6 +408,44 @@ class IccGainmapTests(unittest.TestCase):
                         map_policy='midpointoffset', map_gamma=1.5)
                 self.assertEqual(len(avif.COMMANDS), before)
             self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_gamma15_islow_is_bounded_to_new_apple_upscale(self):
+        import avif
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            for source, operation in (('gainmap-android-iso', 'upscale'),
+                    ('gainmap-android-xmp', 'upscale'), ('gainmap-apple-old', 'upscale'),
+                    ('gainmap-apple-new', 'contain')):
+                before = len(avif.COMMANDS)
+                with self.subTest(source=source, operation=operation), self.assertRaises(ValueError):
+                    run(Path(temporary), source_id=source, operation=operation,
+                        map_policy='midpointoffset', map_gamma=1.5, map_method='islow')
+                self.assertEqual(len(avif.COMMANDS), before)
+            self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_new_apple_islow_map_retains_failure_with_identical_base_and_native_map_input(self):
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            case = run(Path(temporary), source_id='gainmap-apple-new', operation='upscale',
+                       map_policy='midpointoffset', map_gamma=1.5, map_method='islow')['cases'][0]
+            self.assertEqual(case['status'], 'tested and failed')
+            self.assertEqual(case['blockers'], ['Failed appearance check'])
+            self.assertTrue(all(value for key, value in case['checks'].items() if key != 'appearance'))
+            self.assertFalse(case['checks']['appearance'])
+            self.assertEqual(case['measurements']['reconstructed_hdr']['failures'], ['highlight.delta_e_p95'])
+            self.assertEqual(case['measurements']['independent_hdr']['failures'],
+                             ['shadow.delta_e_max', 'highlight.delta_e_p95'])
+            self.assertEqual(case['artifacts']['sha256'],
+                             '44cde5862e2438eaaad2ab9ed38faa63ba1a35bbbc915bfda96680c01a37488f')
+            self.assertEqual(case['native_candidate']['base_sha256'],
+                             'd235565259e4348657c42acca6c50d94b9aa16e51c8fcc76b91e5233a6d356ea')
+            self.assertEqual(case['native_candidate']['computed_map_sha256'],
+                             '96c24593b0a1f81a84dea9a6c488a386fd2ade34e053262cfeb8f6fe8d1dd8c3')
+            self.assertEqual(case['native_candidate']['map_encoding']['method'], 'islow')
+            self.assertEqual(case['native_candidate']['map_gamma'], 1.5)
+            self.assertIn('dct-islow-map', case['case_id'])
+            self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
 
     def test_new_apple_xmp_headroom_is_authoritative_and_unknown_models_are_rejected(self):
         import avif

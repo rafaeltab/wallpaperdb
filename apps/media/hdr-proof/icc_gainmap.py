@@ -30,8 +30,8 @@ def _encoder(map_policy, map_gamma, map_method='float'):
             or map_gamma == 1.5 and map_policy != 'midpointoffset'):
         raise ValueError('Only the declared gamma1, gamma2 and midpointoffset gamma1.5 candidates are supported')
     if (map_method not in ('float', 'islow') or map_method == 'islow'
-            and (map_policy != 'midpointoffset' or map_gamma != 2)):
-        raise ValueError('The separate ISLOW map candidate requires midpointoffset and gamma2')
+            and (map_policy != 'midpointoffset' or map_gamma not in (1.5, 2))):
+        raise ValueError('The separate ISLOW map candidates require midpointoffset and gamma1.5 or gamma2')
     variant = ('midpointoffset-gamma15' if map_gamma == 1.5 else
                f'{map_policy}-gamma2' if map_gamma == 2 else 'smalloffset')
     return TOOL if map_policy == 'moderateoffset' else str(Path(TOOL).parent/variant/Path(TOOL).name)
@@ -169,8 +169,13 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
     _encoder(map_policy, map_gamma, map_method)
     if source_id not in ('gainmap-android-iso', 'gainmap-android-xmp', 'gainmap-apple-old', 'gainmap-apple-new'):
         raise ValueError('Only the four pinned ISO, XMP and Apple sources are supported')
-    if source_id != 'gainmap-android-iso' and (map_policy, map_gamma, map_method) != ('midpointoffset', 1.5, 'float'):
-        raise ValueError('The XMP/Apple experiments admit only midpointoffset gamma1.5 FLOAT maps')
+    new_apple_islow = (source_id, operation, map_policy, map_gamma, map_method) == (
+        'gainmap-apple-new', 'upscale', 'midpointoffset', 1.5, 'islow')
+    if map_gamma == 1.5 and map_method == 'islow' and not new_apple_islow:
+        raise ValueError('The gamma1.5 ISLOW candidate is bounded to new Apple upscale')
+    if (source_id != 'gainmap-android-iso'
+            and (map_policy, map_gamma, map_method) != ('midpointoffset', 1.5, 'float') and not new_apple_islow):
+        raise ValueError('The XMP/Apple experiments admit only their predeclared midpointoffset gamma1.5 maps')
     allowed_geometry = ('contain', 'upscale') if source_id in ('gainmap-apple-old', 'gainmap-apple-new') else ('upscale',)
     if operation not in allowed_geometry:
         raise ValueError('Only the exact predeclared source/geometry tuples are admitted')
@@ -354,7 +359,8 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
     report = {'scope': f'One predeclared {name}-{operation} ICC-aware native HDR candidate; unchanged appearance gates',
         'source_policy': {'fixture': name, 'geometry': operation, 'native_precision': source_precision,
             'reference_revision': revision, 'gamut': gamut,
-            'declaration': 'XMP upscale and old/new Apple contain/upscale admit only the unchanged midpointoffset gamma1.5 FLOAT map recipe; '
+            'declaration': 'XMP upscale and old/new Apple contain/upscale admit the unchanged midpointoffset gamma1.5 FLOAT map recipe; '
+                'one separate ISLOW map candidate is admitted only for new Apple upscale. '
                 'the ISO-only float32 source guard remains unchanged. Source, geometry, native HDR intent, '
                 'authored SDR and both final HDR readers must pass the existing gates.'},
         'map_representation': {'policy': map_policy, 'encoding_gamma': map_gamma, 'coded_depth': 8,
@@ -370,6 +376,11 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
             'islow_rationale': 'The retained midpoint gamma2 float-DCT map has 17 reference pixels above '
                 '8 deltaE, versus zero before JPEG coding; its worst cross-reader error has equal base '
                 'samples and a one-code map difference. One ISLOW map trial changes only native DCT coding.',
+            'new_apple_islow_rationale': 'Declared before encoding: new Apple upscale has one pixel above '
+                '8 deltaE. Its native map input [0,5,9] decodes [0,6,9] in both JPEG readers, while '
+                'the compressed base decodes [82,70,60] natively and [82,71,60] independently. '
+                'Each isolated error passes, but together they reach 8.082252. One ISLOW map trial '
+                'preserves the exact compressed base and pre-JPEG map to test native DCT quantization.',
             'gamma15_rationale': 'Declared before encoding: at the retained midpoint gamma2 worst black '
                 'pixel, normalized gain 0.020102 makes the local inverse code sensitivity for gamma1.5 '
                 '18.9% of gamma2. At the measured highlight median 0.613469 it rises 4.43%. '

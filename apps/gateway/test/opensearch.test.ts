@@ -6,7 +6,12 @@ import { metrics } from '@opentelemetry/api';
 import { Effect, Layer } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type OpenSearchGateway, openSearchLayer } from '../src/adapters/opensearch/index.js';
-import type { SearchBatch, SearchSelection, Variant, Wallpaper } from '../src/capabilities/catalogue/index.js';
+import type {
+  SearchBatch,
+  SearchSelection,
+  Variant,
+  Wallpaper,
+} from '../src/capabilities/catalogue/index.js';
 import type { ProjectCatalogue, ProjectionChange } from '../src/capabilities/projection/index.js';
 import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
 

@@ -54,6 +54,7 @@ export function gatewayLayer(config: Config, options: AppOptions = {}) {
     enabled: config.rateLimitEnabled,
     limit: config.quotaCapacity,
     windowMs: config.quotaRefillMs,
+    fallback: { capacity: 100000, refillMs: 60000, maxVisitors: 10000 },
   }).pipe(
     Layer.provide(
       redisQuotaLayer({

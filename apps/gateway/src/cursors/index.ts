@@ -1,6 +1,10 @@
 import crypto from 'node:crypto';
 import { DateTime, Effect, Layer, Schema } from 'effect';
-import { CatalogueCursors, type CursorValue, type InvalidCursor } from '../capabilities/catalogue/index.js';
+import {
+  CatalogueCursors,
+  type CursorValue,
+  type InvalidCursor,
+} from '../capabilities/catalogue/index.js';
 
 const envelopeSchema = Schema.fromJsonString(
   Schema.Struct({

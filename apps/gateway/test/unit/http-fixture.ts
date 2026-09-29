@@ -85,6 +85,7 @@ export function httpTestLayer(
           enabled: true,
           limit: config.quotaCapacity,
           windowMs: 60000,
+          fallback: { capacity: 100000, refillMs: 60000, maxVisitors: 10000 },
         }).pipe(Layer.provide(memoryQuotaLayer)),
     ports.availability
       ? Layer.succeed(Availability, ports.availability)

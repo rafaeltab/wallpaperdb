@@ -20,4 +20,14 @@ cmake -S libavif-1.4.1 -B build -DCMAKE_BUILD_TYPE=Release \
     -DAVIF_CODEC_DAV1D=SYSTEM -DAVIF_LIBXML2=SYSTEM -DAVIF_LIBYUV=OFF
 cmake --build build --target avifgainmaputil avifenc avifdec --parallel 4
 cp build/avifgainmaputil build/avifenc build/avifdec /usr/local/bin/
+# Keep the independent baseline decoder and default encoder above. A separate
+# native encoder candidate retains rare gains that the default 0.1% trimming
+# policy discards. This can widen the 8-bit map interval; appearance still has
+# to pass the unchanged gates after encoding and independent decoding.
+echo '4d7c364b56c95dde7225275fe50c12f9e39fbe97f4686080e8a9cc1983878fec  /opt/proof/libavif-full-range-gain.patch' | sha256sum -c -
+patch -d libavif-1.4.1 -p1 < /opt/proof/libavif-full-range-gain.patch
+cmake --build build --target avifgainmaputil --parallel 4
+mkdir -p /opt/proof/libavif/fullrange
+cp build/avifgainmaputil /opt/proof/libavif/fullrange/
+sha256sum /opt/proof/libavif/fullrange/avifgainmaputil > /opt/proof/libavif/fullrange/binary-sha256.txt
 rm -rf /tmp/gainmap-build

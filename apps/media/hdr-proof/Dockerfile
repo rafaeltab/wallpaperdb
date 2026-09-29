@@ -7,7 +7,7 @@ RUN cp /opt/proof/environment/package.json /opt/proof/environment/package-lock.j
     && cd /opt/proof && npm ci --no-audit --no-fund
 ENV NODE_PATH=/opt/proof/node_modules
 ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
-COPY gainmap-build.sh libavif-sequence-transform.patch /opt/proof/
+COPY gainmap-build.sh libavif-sequence-transform.patch libavif-full-range-gain.patch /opt/proof/
 RUN sh /opt/proof/gainmap-build.sh
 COPY native-gainmap-build.sh native_gainmap.cpp libultrahdr-xmp-arrays.patch libultrahdr-rgb-jpeg.patch /opt/proof/
 RUN sh /opt/proof/native-gainmap-build.sh
@@ -15,4 +15,6 @@ COPY png_decode.c /opt/proof/png_decode.c
 RUN cc -O2 -Wall -Wextra -Werror /opt/proof/png_decode.c -lpng -o /usr/local/bin/hdr-proof-png-decode
 COPY native-zimg-build.sh native_zimg_window.c /opt/proof/
 RUN sh /opt/proof/native-zimg-build.sh
+COPY native_lossless_jpeg.c /opt/proof/native_lossless_jpeg.c
+RUN cc -O2 -Wall -Wextra -Werror /opt/proof/native_lossless_jpeg.c -ljpeg -o /usr/local/bin/hdr-proof-lossless-jpeg
 WORKDIR /proof

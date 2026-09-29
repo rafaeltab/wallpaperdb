@@ -39,7 +39,7 @@ class NativeAvifGainMapTests(unittest.TestCase):
         subprocess.run(["avifgainmaputil", "combine", str(base), str(hdr), str(avif),
                         "--cicp-base", "1/13/0", "--cicp-alternate", "1/16/0", "--ignore-profile",
                         "--downscaling", "1", "--depth-gain-map", "8", "--qgain-map", "100",
-                        "--yuv-gain-map", "444", "-y", "444", "-d", "8", "-q", "100", "-s", "10"],
+                        "--yuv-gain-map", "444", "-y", "444", "-d", "0", "-q", "100", "-s", "10"],
                        check=True, capture_output=True, timeout=30)
         subprocess.run(["avifgainmaputil", "extractgainmap", str(avif), str(gain)],
                        check=True, capture_output=True, timeout=30)

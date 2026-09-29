@@ -151,10 +151,11 @@ def decode_iso_source(base_bytes, map_bytes, *, headroom=4.0):
         'native_libjpeg_turbo_version': features.version_feature('libjpeg_turbo'),
         'base': base, 'gain_map': gain, 'base_color': color, 'iso_metadata': metadata,
         'headroom_log2': headroom, 'sdr_white_nits': 203, 'orientation': orientation,
-        'validation': 'Analytic native-JPEG vectors and independent libavif XMP reconstruction controls in test_gainmap_iso.py',
+        'validation': 'Analytic native-JPEG/libavif controls in test_gainmap_iso.py; predictive RGB JPEG/native gain application controls in test_lossless_jpeg.py',
         'limitations': ['Forward ISO version-0 layout in base color space only; one nonambiguous metadata packet.',
                         'Verified sRGB transfer with sRGB/P3 matrix ICC dialects; unknown color facts are rejected.',
                         '8-bit RGB base and grayscale/RGB map; gain-map samples use metadata gamma, without ICC conversion.',
+                        'SOF3 predictive JPEG has native sample/application controls; the pinned libavif reader rejects it.',
                         'Pillow bilinear map resizing at JPEG sample precision; only the committed corpus and controls are proven.',
                         'Identity source orientation only; no physical HDR display or whole-format interoperability claim.'],
     }}
@@ -180,9 +181,10 @@ def segments(data):
 
 def jpeg_facts(data):
     for marker, value in segments(data):
-        if marker in (0xC0, 0xC1, 0xC2):
+        if marker in (0xC0, 0xC1, 0xC2, 0xC3):
             depth, height, width, components = struct.unpack(">BHHB", value[:6])
-            return {"depth": depth, "width": width, "height": height, "components": components}
+            return {"depth": depth, "width": width, "height": height, "components": components,
+                    "sof": marker - 0xC0}
     raise ValueError("JPEG SOF missing")
 
 

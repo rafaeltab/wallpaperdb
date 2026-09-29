@@ -75,12 +75,19 @@ native-map-sampling candidate remains failed; the antialiased-map candidate has
 its own source, geometry and output measurements against the declared renderer
 convention. Compare the exact files independently on each device. A browser may
 sample the source gain map differently, so record the source rendering as well
-as the derivative. No gain-map-preserving AVIF output or physical HDR presentation
-has been qualified by these automated results.
+as the derivative. These single-layer results do not establish physical HDR
+presentation or gain-map interpretation.
 Single-layer HDR PNG16 candidates use the same declared renderer convention.
 Keep the original ambiguous-aspect diagnostic separate from the square-pixel
 candidate, and compare each qualified PNG with the corresponding PQ AVIF12 and
 authored SDR pair. Opening a 16-bit PNG does not establish visible HDR output.
+The separate regenerated gain-map AVIF containment keeps eight-bit base, map
+and alternate declarations. It passes the authored SDR endpoint and the declared
+log2-headroom-4 HDR reference. Its regenerated offsets and headroom differ from
+the source; intermediate display adaptation remains untested. Compare source
+and derivative at stable brightness, then repeat at another brightness setting
+and window size. Record any changing exposure or highlight difference separately
+from decoding, color signaling and the measured full-headroom result.
 
 The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
 two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit

@@ -447,6 +447,8 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               *mozjpeg_experiment_report(mozjpeg, mozjpeg_historical, mozjpeg_lambdas),
               *coefficient_diagnostic_report(mozjpeg_diagnosis),
               '## Blockers and scope limits','',
+              '- The [integer-DCT map alternative](icc-gainmap-midpointoffset-gamma2-islow.json) retains the exact midpoint gamma-2 compressed base and native pre-JPEG map. It changes only native map JPEG coding. Both HDR readers still fail shadow maxima and their agreement worsens; its original floating-DCT counterpart remains separate.',
+              '- A separately regenerated gain-map AVIF containment checks actual base, map and alternate precision against the source. One native moderate-offset depth-8 candidate passes authored SDR and both HDR readers at log2 display headroom 4. The stock depth-8 result fails; both automatic-depth variants declare alternate depth 12 and remain incompatible with the requested preservation selectors. Regenerated headroom and offsets differ from the source, so intermediate display adaptation remains untested. This is a declared endpoint proof, with physical consumers pending.',
               '- The [logarithmic midpoint-offset candidate](icc-gainmap-midpointoffset-gamma2.json) fixes the gamma-2 trial at ISO offsets 1/16384. Both HDR readers pass the existing midtone/highlight gates but fail their shadow maxima; their cross-comparison also fails in shadows. This separate result narrows the precision tradeoff without qualifying the JPEG or changing the original gates.',
               '- The [separate map-gamma-2 experiment](icc-gainmap-smalloffset-gamma2.json) retains the small ISO offset and both eight-bit JPEG layers. AVIF/ISO/XMP/native gamma values and zero/fractional/full-headroom controls must agree. Highlight error improves, but shadow error and regional means remain failed under the same gates. Earlier gamma-1 bytes and failed cases stay separate.',
               '- Separate ICC-aware HDR JPEG experiments use the actual gamma-3.2 base profile, native LittleCMS float32 linearization and native gain computation. Both the [moderate-offset](icc-gainmap-moderateoffset.json) and [small-offset](icc-gainmap-smalloffset.json) cases remain in the matrix. The former fails independent shadow reconstruction and decoder agreement; the latter improves agreement but fails midtone/highlight appearance. The fixed references, RGB8 layer depths and appearance gates are unchanged. Stock readers that assume sRGB or reject ICC remain separately recorded limitations. Their inspected files are diagnostic, with physical consumers pending.',
@@ -474,7 +476,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- One separately locked gain-map AVIF source has authored-SDR AVIF containment, crop, stretch and upscale candidates. Independent BMFF/tmap parsing, actual AV1 packet depth/signaling, dav1d samples and AOM candidate decoding establish the source base. Native metadata text repeats channel-zero gain values; the independently parsed per-channel fractions remain authoritative. Unknown color, depth, orientation or metadata withholds transformation and preserves exact originals. Nonidentity orientation remains original-only. The SDR result does not establish HDR qualification.',
               '- Additional authored-SDR PNG8 containment, crop, stretch and upscale candidates use the same gain-map AVIF base and unchanged photographic SDR reference. Their native sRGB/cHRM/gAMA signaling and square-pixel pHYs are independently parsed and cross-checked with ExifTool. Native libpng must recover every actual encoder-input RGB8 sample exactly. Appearance and privacy remain separate gates; source import error receives no additional allowance.',
               '- Gain-map AVIF HDR containment, crop, stretch and upscale each have two distinct native candidates against the same predeclared bilinear-map renderer convention. Original libavif source, linear-geometry and emitted-output failures remain recorded. The separate native antialiased-map and float32 gain candidate must pass all three unchanged appearance gates and independent single-layer PQ AVIF12 signaling, depth, opacity, square-pixel and privacy checks. Each input normalization is retained during PQ encoding. Its renderer convention is not claimed as a uniquely mandated ISO filter or as physical interoperability. Named source-reconstruction profiles are bound to the canonical fixture hash without changing the original SDR inspection facts.',
-              '- Unlisted PNG/APNG cross-products, HDR WebP and other unexecuted accepted-source requests remain untested. Gain-map-preserving AVIF output and untested gain-map AVIF selectors remain unqualified. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
+              '- Unlisted PNG/APNG cross-products, HDR WebP and other unexecuted accepted-source requests remain untested. Other gain-map AVIF selector and adaptation combinations remain unqualified. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
               '- These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.',
               '- The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.',
               '- Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.', '',
@@ -568,11 +570,17 @@ def main():
     gainmap_avif_hdr_png_result = run_gainmap_avif_hdr_png(WORK/'gainmap-avif-hdr-png-geometries',
         geometries=('contain', 'cover', 'fill', 'upscale'))
     write_json(WORK/'gainmap-avif-hdr-png-evidence.json', gainmap_avif_hdr_png_result)
+    from gainmap_avif_preserve import run as run_gainmap_avif_preserve
+    gainmap_avif_preserve_result = run_gainmap_avif_preserve(WORK/'gainmap-avif-preserve')
+    write_json(WORK/'gainmap-avif-preserve-evidence.json', gainmap_avif_preserve_result)
     from icc_gainmap import run as run_icc_gainmap
     icc_results = []
-    for policy, gamma in (('moderateoffset', 1), ('smalloffset', 1), ('smalloffset', 2), ('midpointoffset', 2)):
+    for policy, gamma, method in (('moderateoffset', 1, 'float'), ('smalloffset', 1, 'float'),
+                                  ('smalloffset', 2, 'float'), ('midpointoffset', 2, 'float'),
+                                  ('midpointoffset', 2, 'islow')):
         name = f'icc-gainmap-{policy}'+('-gamma2' if gamma == 2 else '')
-        result = run_icc_gainmap(WORK/name, map_policy=policy, map_gamma=gamma)
+        name += '-islow' if method == 'islow' else ''
+        result = run_icc_gainmap(WORK/name, map_policy=policy, map_gamma=gamma, map_method=method)
         write_json(RESULTS/f'{name}.json', result)
         icc_results.extend(result['cases'])
     gainmap_result = gainmap.run(WORK)
@@ -608,9 +616,11 @@ def main():
     controls['controls'].extend(gainmap_avif_webp_result['controls'])
     controls['controls'].extend(gainmap_avif_hdr_result['controls'])
     controls['controls'].extend(gainmap_avif_hdr_png_result['controls'])
+    controls['controls'].extend(gainmap_avif_preserve_result['controls'])
     controls['controls'].extend(apng_result['controls'])
     evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + png8_precision_result['evidence'] + png8_webp_result['evidence'] + gainmap_avif_result['evidence'] + gainmap_avif_png_result['evidence'] + gainmap_avif_hdr_result['evidence'] + gainmap_avif_hdr_png_result['evidence'] + icc_results + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
     evidence += gainmap_avif_webp_result['evidence']
+    evidence += gainmap_avif_preserve_result['evidence']
     locked_fixtures = avif_result['fixtures'] + png_result['fixtures'] + apng_result['fixtures'] + controls.get('fixtures',[])
     # PNG8 validates its separate source lock before any conversion. Preserve
     # the original generated corpus lock, including its PNG16 hashes.

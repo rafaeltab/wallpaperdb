@@ -106,6 +106,9 @@ A separate gamma-2 candidate uses the logarithmic midpoint offset, 1/16384.
 It passes midtone and highlight limits but fails both readers' shadow maxima
 and their cross-comparison. Exact emitted offsets, metadata agreement and
 headroom controls remain mandatory; this failure does not qualify the path.
+An integer-DCT map alternative keeps that exact compressed base and pre-JPEG
+gain map. Shadow failures persist, and cross-decoder agreement worsens. Both
+native map encodings remain separate failed evidence.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
@@ -299,8 +302,8 @@ each native input's actual luminance normalization. The map-sampling convention
 is fixed for this proof; it is not claimed as ISO's uniquely mandated filter.
 Containment, crop, stretch and upscale keep separate candidate results; the
 original source-sampling failures remain visible at every geometry.
-Named reconstruction profiles remain bound to the source hash. Gain-map-preserving
-output and physical consumer interoperability remain unqualified.
+Named reconstruction profiles remain bound to the source hash. Physical consumer
+interoperability remains unqualified.
 The separate [HDR PNG16 proof](gainmap_avif_hdr_png.py) checks the same native
 source reconstruction and unchanged HDR reference. Its original PNG does not
 establish requested square pixels: pHYs reports 0:1. A native rewrite declares
@@ -308,6 +311,13 @@ establish requested square pixels: pHYs reports 0:1. A native rewrite declares
 FFmpeg and ExifTool verify storage, PQ signaling, dimensions and privacy;
 source, geometry and final appearance must still pass. The original aspect
 failure stays visible beside the corrected candidate.
+The separate [regenerated gain-map AVIF proof](gainmap_avif_preserve.py) preserves
+actual base, map and alternate depth at eight bits. Independent BMFF/tmap and
+AV1 packet inspection precede authored SDR, independent HDR and native HDR
+appearance checks. Stock depth-8 failures and automatic-depth-12 incompatibility
+remain visible. Qualification covers the declared full-headroom endpoints only:
+regenerated offsets and headroom differ from the source, so intermediate display
+adaptation remains untested. Physical consumers remain pending.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

@@ -4,7 +4,7 @@ The HDR milestone remains blocked. Required conversion and display-headroom rend
 
 Reproduce from the repository root with `make run PACKAGE=media SCRIPT=proof:hdr`. Docker must support linux/amd64. The default command returns exit 2 while required codec cases or physical checks are unqualified. This is an intentional qualification failure, not a passing release gate.
 
-Recorded 3209 conversion attempts over 73 fixture records: 3199 completed native encoding, 10 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 8 incompatible with the requested selectors, 2520 qualified, 681 tested and failed.
+Recorded 3229 conversion attempts over 74 fixture records: 3219 completed native encoding, 10 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 8 incompatible with the requested selectors, 2540 qualified, 681 tested and failed.
 The inventory covers 85 HDR-ledger cells and 5 labeled SDR controls. Ledger outcomes: 9 deliberately deferred, 17 incompatible with the requested selectors, 15 qualified, 32 tested and failed, 12 untested.
 
 The original fixed coverage plan contains 320 cases. Unexecuted fixed-plan cases: 0. Unlisted cross-products are untested, even when a neighboring case passes.
@@ -116,6 +116,21 @@ The [shared-offset diagnostic](iso-global-offset-bound.json) keeps the same deco
 | -2.764145 | -1.468168 | 1.295977 | established |
 
 The unchanged maximum of 8 supplies the error-ball radius. Disjoint offset bounds rule out every shared nonnegative offset pair for this fixed model, including arbitrary map precision and per-pixel gains. The analytic enclosure uses linear support, monotone PQ inversion and signed matrix intervals. Numerical sampling only checks the implementation. Guarded float64 arithmetic is not a formal directed-rounding certificate. Other bases, capacities, reference models, geometry, gain equations and physical consumers remain outside this result. This diagnostic cannot qualify a conversion.
+
+## Same-ICC RGB8 base bound
+
+The [decoded-base diagnostic](iso-base-code-bound.json) enumerates all 16,777,216 RGB8 triples under the same actual gamma3.2 P3 ICC. It admits each pixel code only when its authored SDR maximum error is at most 8. SDR at 100 nits determines that admission; own-primary HDR at 203 nits supplies the offset inequalities. Fresh source references and native evidence establish both strict gain directions before enumeration.
+
+| Pixel [x, y] | Admitted RGB8 codes | Green codes | Own-green HDR interval, nits |
+| --- | ---: | --- | --- |
+| [236, 822] | 668 | 65..73 | 2.557950..3.708534 |
+| [242, 640] | 603 | 64..72 | 2.434138..3.548405 |
+
+| D upper bound, nits | D lower bound, nits | Contradiction margin, nits | Contradiction |
+| ---: | ---: | ---: | --- |
+| -2.225486 | -2.198134 | 0.027353 | established |
+
+The HDR maximum remains 8. This optimistic bound ignores JPEG neighborhood coupling and the other regional SDR gates, and permits arbitrary per-pixel gains and map precision at the current positive ordered weights. Other ICC transfers or colorants, continuous or higher-precision bases, capacities, reference models and gain equations remain outside the result. Float64 classification checks its distance from the unchanged gate but is not a formal directed-rounding certificate. This diagnostic cannot qualify a conversion or physical consumer.
 
 ## Environment and reproducibility
 
@@ -321,7 +336,7 @@ Each value is the maximum of the recorded regional statistic across the tested g
 | `gainmap-apple-new` | `native-combine-moderateoffset-dct-rgb` | `gainmap-hdr-target-gamut-v1` | 3/6 | 0.3906 | 28.6637 | 1.3123 | 7.8035 | 1.8902 |
 | `gainmap-apple-new` | `native-combine-moderateoffset-jpegli-base-dct-float-map` | `gainmap-hdr-target-gamut-v1` | 2/6 | 0.4328 | 35.2023 | 1.2259 | 7.7970 | 1.8154 |
 | `gainmap-apple-new` | `native-combine-moderateoffset-lossless-rgb` | `gainmap-hdr-target-gamut-v1` | 6/6 | 0.0003 | 3.3440 | 1.1281 | 4.2359 | 1.5549 |
-| `gainmap-apple-old` | `native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full` | `apple-old-documented-full-rec709-linear-bilinear8-v1` | 1/1 | 0.9220 | 4.6409 | 0.9797 | 4.2249 | 1.6308 |
+| `gainmap-apple-old` | `native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full` | `apple-old-documented-full-rec709-linear-bilinear8-v1` | 5/5 | 0.9364 | 5.0109 | 1.3866 | 7.3411 | 2.4727 |
 | `gainmap-apple-old` | `native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5` | `gainmap-hdr-target-gamut-v1` | 2/2 | 0.9220 | 5.0109 | 1.3606 | 7.0629 | 2.5011 |
 | `gainmap-apple-old` | `native-combine-identity-lossless-rgb` | `gainmap-hdr-target-gamut-v1` | 5/6 | 0.0003 | 3.3440 | 1.7808 | 4.0685 | 3.0539 |
 | `gainmap-apple-old` | `native-combine-moderateoffset-dct-float-rgb` | `gainmap-hdr-target-gamut-v1` | 4/6 | 0.3626 | 28.6637 | 1.2516 | 8.2264 | 2.2192 |
@@ -335,13 +350,13 @@ The following separate decoder diagnostics do not alter the file qualification a
 | --- | ---: | ---: | ---: |
 | `baseline_libavif` | 93 | 21 | 72 |
 | `rgb_libavif` | 93 | 90 | 3 |
-| `stock_native_srgb` | 22 | 0 | 22 |
+| `stock_native_srgb` | 26 | 0 | 26 |
 
 The SOF0 union below counts each exact observed request once across native alternatives with independently inspected SOF0 base and map layers. Fixture and source hash, normalized selectors, geometry, crop and source-orientation facts, and reference revision must match. A request qualifies only when an exact alternative passes all original checks without blockers or rejected measurements. The per-candidate failures above remain unchanged.
 
 | Reference revision | Qualified/observed exact SOF0 requests | Qualified/observed required requests |
 | --- | ---: | ---: |
-| `apple-old-documented-full-rec709-linear-bilinear8-v1` | 1/1 | 1/1 |
+| `apple-old-documented-full-rec709-linear-bilinear8-v1` | 5/5 | 5/5 |
 | `gainmap-hdr-target-gamut-v1` | 24/24 | 20/20 |
 | `gainmap-iso-full-headroom-boost64-v1` | 1/5 | 1/5 |
 | `gainmap-iso-intermediate-boost2-v1` | 0/5 | 0/5 |
@@ -402,7 +417,9 @@ Failures persist in blocks whose DC coefficients match the no-trellis control. T
 - The gain-map AVIF authored SDR GIF containment remains failed despite valid native encoding, actual sRGB ICC, opaque one-frame structure and independent decoding. Palette-only and full-reference errors both exceed the fixed photographic gates. The read-only exact-palette lower bound identifies 900 pixels for which changing dithering cannot meet the existing maximum; it makes no claim about other palettes or encoders. A separate native libimagequant candidate also fails, with 951 pixels outside the fixed maximum for its exact palette. Its native package version and differing library API report are recorded separately. The separate gamma3.2 ICC/libimagequant palette improves shadow maximum to 46.78 and its bound to 794 pixels, but still fails the fixed shadow and midtone gates. All three photographic palettes remain unqualified.
 - The [integer-DCT map alternative](icc-gainmap-midpointoffset-gamma2-islow.json) retains the exact midpoint gamma-2 compressed base and native pre-JPEG map. It changes only native map JPEG coding. Both HDR readers still fail shadow maxima and their agreement worsens; its original floating-DCT counterpart remains separate.
 - The [corrected native old Apple source](apple-native-source.json) applies the documented full model with native JPEG samples, bilinear8 map expansion and FFmpeg float32 arithmetic. It passes the independent photographic gates with maximum Delta E ITP 0.000027853. Analytic controls cover all 65,536 base/map code pairs at full-effect headrooms 1 and 8; maximum numeric error is 0.000466684 nits. Unknown source facts reject preparation. This qualifies encoder input only; derivatives, intermediate adaptation and the newer Apple model require separate evidence. The legacy source-model failures remain recorded.
-- The [corrected old Apple containment](apple-hdr-jpeg-contain.json) uses the independently established documented full source, native P3 float geometry and checked PQ16 intent. Its actual RGB8 SOF0 layers and authored SDR grade pass all declared file gates at boost 16. Independent HDR maximum is 4.52892; native maximum is 4.22494; authored SDR maximum remains exactly 4.64090 from the retained control. The source headroom is 8 and both full gain weights equal one. The inspected manual bundle contains its own JPEG, SDR reference and native HDR intent. ICC-aware interpretation remains required; stock-reader limitations, intermediate Apple adaptation and physical consumers remain unqualified.
+- The [corrected old Apple derivatives](apple-hdr-jpeg-contain.json) use the independently established documented full source, native P3 float geometry and checked PQ16 intent. Containment, crop, stretch, upscale and real EXIF6 orientation pass the unchanged file gates at boost 16, with independent HDR maxima 4.52892, 4.84060, 4.69820, 7.34111 and 5.33441. Containment preserves its prior output bytes and measurements, including authored SDR maximum 4.64090. The source headroom is 8 and both full gain weights equal one. Each manual entry contains its own JPEG, SDR reference and native HDR intent. The deterministic EXIF6 source is separately copied with its actual facts and hash; stored base/map/ICC/MakerNotes stay exact, then both geometry paths rotate clockwise once. ICC-aware interpretation remains required; stock-reader limitations, intermediate Apple adaptation and physical consumers remain unqualified.
+- The [corrected old Apple PQ AVIFs](apple-hdr-avif-contain.json) independently preserve the documented full image at explicit 8/10/12-bit depths after containment, crop, stretch and upscale. All twelve tuples pass the unchanged photographic gates; maximum Delta E ITP is 0.350935 at 12 bits, 0.821563 at 10 bits and 2.8433 at 8 bits, with no extra precision allowance. The original containment12 file and measurements remain exact. Native float source and geometry feed FFmpeg/zimg then AOM; dav1d separately decodes actual PQ/P3 samples. Emitted depth, CICP, dimensions, square pixels, opacity, identity orientation and metadata privacy pass. Each single-layer output contains no authored SDR base or gain map, with an inspected manual entry containing the authored SDR comparison and native HDR intent. Other selectors/orientation, automatic display tone mapping and physical consumers require separate evidence.
+- The [corrected old Apple PQ16 PNGs](apple-hdr-png-contain.json) pass the documented full-effect containment, crop, stretch and upscale comparisons with maximum Delta E ITP 0.258409, 0.275747, 0.270038 and 0.257914. Containment retains its original bytes and measurements. The native RGB16 writer emits P3/PQ CICP, matching chromaticities and square pixels; independent libpng samples agree exactly with FFmpeg. The strict output subset is static, opaque, identity-oriented and private-metadata-free. Each explicit depth16 output has an authored SDR manual companion; these results do not qualify an embedded SDR base, gain-map adaptation or physical HDR display.
 - Separately regenerated gain-map AVIF containment, crop, stretch and upscale check actual base, map and alternate precision against the source. Each native moderate-offset depth-8 candidate passes authored SDR and both HDR readers at log2 display headroom 4. The four stock depth-8 results fail; all eight automatic-depth variants declare alternate depth 12 and remain incompatible with the requested preservation selectors. Regenerated headroom and offsets differ from the source, so intermediate display adaptation remains untested. This is a declared endpoint proof, with physical consumers pending.
 - The [logarithmic midpoint-offset candidate](icc-gainmap-midpointoffset-gamma2.json) fixes the gamma-2 trial at ISO offsets 1/16384. Both HDR readers pass the existing midtone/highlight gates but fail their shadow maxima; their cross-comparison also fails in shadows. This separate result narrows the precision tradeoff without qualifying the JPEG or changing the original gates.
 - The [separate map-gamma-2 experiment](icc-gainmap-smalloffset-gamma2.json) retains the small ISO offset and both eight-bit JPEG layers. AVIF/ISO/XMP/native gamma values and zero/fractional/full-headroom controls must agree. Highlight error improves, but shadow error and regional means remain failed under the same gates. Earlier gamma-1 bytes and failed cases stay separate.
@@ -441,7 +458,7 @@ Failures persist in blocks whose DC coefficients match the no-trellis control. T
 - The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.
 - Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.
 
-Prepared 1130 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
+Prepared 1187 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
 
 ## Suite integrity
 

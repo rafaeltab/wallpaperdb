@@ -25554,11 +25554,11 @@
   "native_logs": [
     {
       "path": "/proof/work/iso-geometry-headroom/contain/boost16/inspection/exiftool.log",
-      "sha256": "2b3219c0d8efc38f2e3aa9ac997907005ef19ab5b12fd623b6d27bc3a7f2ffaf"
+      "sha256": "4a0bc805a772226684d18aa92c5f28f5ac48d25b7096c75b8763803eec6588d9"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/boost16/inspection/map-exiftool.log",
-      "sha256": "49e00b0f715d0b4f8dcac463d9d5e6d430257a3e15c41fcd01351daa2280e282"
+      "sha256": "54b6c06310c7286ff6238ab94e5f3dcda57d202cfeed69a9bd0c01c8f13e5227"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/boost16/inspection/map-extraction.log",
@@ -25566,11 +25566,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/boost2/inspection/exiftool.log",
-      "sha256": "2b3219c0d8efc38f2e3aa9ac997907005ef19ab5b12fd623b6d27bc3a7f2ffaf"
+      "sha256": "4a0bc805a772226684d18aa92c5f28f5ac48d25b7096c75b8763803eec6588d9"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/boost2/inspection/map-exiftool.log",
-      "sha256": "5ffd5ba3a04246824e3c85940daf804d113650b6e4d4422fd5458f046516fbda"
+      "sha256": "0d84a0fd9a35849c7b1ffbf86b064272eb7f04b1e202440928a0fefcdefdc69b"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/boost2/inspection/map-extraction.log",
@@ -25578,11 +25578,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/boost64/inspection/exiftool.log",
-      "sha256": "2b3219c0d8efc38f2e3aa9ac997907005ef19ab5b12fd623b6d27bc3a7f2ffaf"
+      "sha256": "4a0bc805a772226684d18aa92c5f28f5ac48d25b7096c75b8763803eec6588d9"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/boost64/inspection/map-exiftool.log",
-      "sha256": "82ba35e46bff2d93225d5c5333426cde7fa77f38a3de934a246bf0be1569c25a"
+      "sha256": "325de242bac0fee3dc12b583453e66e8ee0a936f78b361045850e3d0cf3d1cf1"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/boost64/inspection/map-extraction.log",
@@ -25606,7 +25606,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1/hdr-intent-inspection/exiftool.log",
-      "sha256": "a86f00ca28bfca5ca500f24aba9e27793b0c9d89a0be444d68a9f76896427f30"
+      "sha256": "c65df1992f1565183e05f23c55f68f2ae165df3b23d49337b7ed392d2ed5218e"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1/independent-native-hdr.log",
@@ -25618,11 +25618,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1/inspection/exiftool.log",
-      "sha256": "2b3219c0d8efc38f2e3aa9ac997907005ef19ab5b12fd623b6d27bc3a7f2ffaf"
+      "sha256": "4a0bc805a772226684d18aa92c5f28f5ac48d25b7096c75b8763803eec6588d9"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1/inspection/map-exiftool.log",
-      "sha256": "2495695c932eeb27d75c5b39add4678b6a4d4c3fbcf3f012c007c51025d328f9"
+      "sha256": "5edbbfdb83b9477ffbd3229bda8ff815955219ed1c0f87ad4efadf59b36895b3"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1/inspection/map-extraction.log",
@@ -25690,15 +25690,15 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/png-info.log",
-      "sha256": "166fa339223dbe24777d215104d990e654c0793fe4af68106dbf17dc1288d8a4"
+      "sha256": "ef39ff1b45b3ef0aa7083f14c3aac1caaf2c62ed29408af9d071ed6664ba7a5d"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/exiftool.log",
-      "sha256": "2b3219c0d8efc38f2e3aa9ac997907005ef19ab5b12fd623b6d27bc3a7f2ffaf"
+      "sha256": "4a0bc805a772226684d18aa92c5f28f5ac48d25b7096c75b8763803eec6588d9"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/map-exiftool.log",
-      "sha256": "dddd3d15ee9f6d58936dc9279387da73e498ca42aac33cb7f18e447ae78c11f1"
+      "sha256": "913765e0c55ebfad557a26a6b16fcb7738d6a8fd4ff77c11cbe5d901a2409251"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/map-extraction.log",
@@ -25710,7 +25710,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/sources/gainmap-android-iso/exiftool.log",
-      "sha256": "c132107d047185a318ff082ccac235041c393617550bc6a9e4e046ee0cd4805f"
+      "sha256": "3b72327c1e43205843a34c1a0b51ad56652fbf1969ebbbb8678fa8ca4b04f026"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/sources/gainmap-android-iso/independent-hdr-convert.log",
@@ -25718,7 +25718,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/sources/gainmap-android-iso/map-exiftool.log",
-      "sha256": "72f945efbe2d06f0beba7cc848f8257debfc184bd29c7cdf3e5c1027efd456a1"
+      "sha256": "096767c2c25653848b1d0b0cef043303e3eabbfb3eb1cfec116b5d7ff0a32db1"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/contain/converter-endpoint/sources/gainmap-android-iso/map-extraction.log",
@@ -25726,11 +25726,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/boost16/inspection/exiftool.log",
-      "sha256": "2c3a652665d483a47abc0c1405779846cb2827c5543c738bc40ebd5dcee10841"
+      "sha256": "5c271dc94436188d6bb7503c4523f1aa2ddfe6567ceab945a02b5a4fa1c89df8"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/boost16/inspection/map-exiftool.log",
-      "sha256": "ae58bed2a2b90601e37d8a65be4daabf5d1d5779fef5e98ee2905b35f16237a7"
+      "sha256": "4f3a8f8c0bfe2c863fab2a4f164118b0e09986e9d6dfd067328908b68011c062"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/boost16/inspection/map-extraction.log",
@@ -25738,11 +25738,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/boost2/inspection/exiftool.log",
-      "sha256": "2c3a652665d483a47abc0c1405779846cb2827c5543c738bc40ebd5dcee10841"
+      "sha256": "5c271dc94436188d6bb7503c4523f1aa2ddfe6567ceab945a02b5a4fa1c89df8"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/boost2/inspection/map-exiftool.log",
-      "sha256": "39e90bd94a7cb887d42da299a98d38dc07aebe857e19e803cd9a5122e88022b9"
+      "sha256": "8293c131d0feb3da3879dfe510ae47ab35392fb3613048ae4bd1d82e5c2c7e2c"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/boost2/inspection/map-extraction.log",
@@ -25750,11 +25750,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/boost64/inspection/exiftool.log",
-      "sha256": "2c3a652665d483a47abc0c1405779846cb2827c5543c738bc40ebd5dcee10841"
+      "sha256": "5c271dc94436188d6bb7503c4523f1aa2ddfe6567ceab945a02b5a4fa1c89df8"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/boost64/inspection/map-exiftool.log",
-      "sha256": "42c218f7f9aebbe527be51c682950c759a16750331d73b921eed916b76380963"
+      "sha256": "b4c3d4f4ea34da2d998f412dde3acfe29a17c0d36debff853168c5ef0bed15d1"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/boost64/inspection/map-extraction.log",
@@ -25778,7 +25778,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-cover-native-combine-moderateoffset-mozjpeg-base-dct-float-map-gainmap-hdr-target-gamut-v1/hdr-intent-inspection/exiftool.log",
-      "sha256": "6dd14100cdb096f1b5ce633c940536e41f0ab626ba9e21843365e4507c219a5f"
+      "sha256": "2d160164e70846d7c2c4f5f33f856acae31d8b7271607f906e87ac2709b437be"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-cover-native-combine-moderateoffset-mozjpeg-base-dct-float-map-gainmap-hdr-target-gamut-v1/independent-native-hdr.log",
@@ -25790,11 +25790,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-cover-native-combine-moderateoffset-mozjpeg-base-dct-float-map-gainmap-hdr-target-gamut-v1/inspection/exiftool.log",
-      "sha256": "2c3a652665d483a47abc0c1405779846cb2827c5543c738bc40ebd5dcee10841"
+      "sha256": "5c271dc94436188d6bb7503c4523f1aa2ddfe6567ceab945a02b5a4fa1c89df8"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-cover-native-combine-moderateoffset-mozjpeg-base-dct-float-map-gainmap-hdr-target-gamut-v1/inspection/map-exiftool.log",
-      "sha256": "b393a9d340210f964a584a419a4afb85acd1f1f4d8a3b10b334bb9e46810d01b"
+      "sha256": "be710cff3f72f38be84fa7802cf5e32d190c4d9b9345bad2765b5d2bfd4a6422"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-cover-native-combine-moderateoffset-mozjpeg-base-dct-float-map-gainmap-hdr-target-gamut-v1/inspection/map-extraction.log",
@@ -25874,15 +25874,15 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-cover-native-combine-moderateoffset-mozjpeg-base-dct-float-map-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/png-info.log",
-      "sha256": "6f04f3c8d922bdabf8f110e04a3ff6bbaca63ae0568e33a0e8bc76585dc390fa"
+      "sha256": "0d5e67328c0f0ea52bb80c45add70cecc1c7ddbd6a5367ee29ec425853753a02"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-cover-native-combine-moderateoffset-mozjpeg-base-dct-float-map-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/exiftool.log",
-      "sha256": "2c3a652665d483a47abc0c1405779846cb2827c5543c738bc40ebd5dcee10841"
+      "sha256": "5c271dc94436188d6bb7503c4523f1aa2ddfe6567ceab945a02b5a4fa1c89df8"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-cover-native-combine-moderateoffset-mozjpeg-base-dct-float-map-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/map-exiftool.log",
-      "sha256": "f7eb029f50323378bedf25e75e2b9597798cc0c1d39f699ca1c27f0cb367cd5e"
+      "sha256": "f6fa7e08f06d5d41037a431782373e36b33b7a6681ed969e5ac3f3971379d48c"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-cover-native-combine-moderateoffset-mozjpeg-base-dct-float-map-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/map-extraction.log",
@@ -25894,7 +25894,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/sources/gainmap-android-iso/exiftool.log",
-      "sha256": "c132107d047185a318ff082ccac235041c393617550bc6a9e4e046ee0cd4805f"
+      "sha256": "3b72327c1e43205843a34c1a0b51ad56652fbf1969ebbbb8678fa8ca4b04f026"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/sources/gainmap-android-iso/independent-hdr-convert.log",
@@ -25902,7 +25902,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/sources/gainmap-android-iso/map-exiftool.log",
-      "sha256": "cf064d5dc60530dfa4e6fda84b6bbdcf8adcfd7ef384d9c358d47e0dcedbaf13"
+      "sha256": "b338d4bb26c4ad914e067fd095eb1e411735282ca17900b3ad13ed29b508710f"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/cover/converter-endpoint/sources/gainmap-android-iso/map-extraction.log",
@@ -25910,11 +25910,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/boost16/inspection/exiftool.log",
-      "sha256": "57cfdc54f8173edebf3edb66562ee904b8e241ed45e1a8dc47ecce110b9641f7"
+      "sha256": "e7c16897f55ced4cf4f9302852d0f6e87b6e3e11ebb3a3c009f74addf5751a4f"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/boost16/inspection/map-exiftool.log",
-      "sha256": "f63ee9d6e34f632337477ad0252fad2a09a0e09ab3eb7e1134f6a507dcf7d44d"
+      "sha256": "98238b3db6bd6506149c0af45170f202d6d52235ccacb6c8c262db4c3cca76ee"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/boost16/inspection/map-extraction.log",
@@ -25922,11 +25922,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/boost2/inspection/exiftool.log",
-      "sha256": "57cfdc54f8173edebf3edb66562ee904b8e241ed45e1a8dc47ecce110b9641f7"
+      "sha256": "e7c16897f55ced4cf4f9302852d0f6e87b6e3e11ebb3a3c009f74addf5751a4f"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/boost2/inspection/map-exiftool.log",
-      "sha256": "cea42d247c713d79a5ede7abaa1a4b63dcee6a0a05e67e0aee30365a6ce5902b"
+      "sha256": "7e2a6eec5dca93edd4f15feef473e82982733314be6e6b0fdfde5fb1b0128941"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/boost2/inspection/map-extraction.log",
@@ -25934,11 +25934,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/boost64/inspection/exiftool.log",
-      "sha256": "57cfdc54f8173edebf3edb66562ee904b8e241ed45e1a8dc47ecce110b9641f7"
+      "sha256": "e7c16897f55ced4cf4f9302852d0f6e87b6e3e11ebb3a3c009f74addf5751a4f"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/boost64/inspection/map-exiftool.log",
-      "sha256": "cc037f81e780b718558f59dec236daa95137daf5ad8c65f8762d2544125450ce"
+      "sha256": "4ebd0f246fa91c1df6389eae3067577b52dd10e6d1a509579a04383e3ccb4178"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/boost64/inspection/map-extraction.log",
@@ -25962,7 +25962,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-fill-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/hdr-intent-inspection/exiftool.log",
-      "sha256": "f1d261f0bc726ed24cd46db5f24c0b3b0d40bd81ad7eefb4f67261e4dcc92098"
+      "sha256": "62c5a83de9d7ce20129426edf5cfe7aedbc8201c0e99f37f75fc0a68578d6e4b"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-fill-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/independent-native-hdr.log",
@@ -25974,11 +25974,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-fill-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/inspection/exiftool.log",
-      "sha256": "57cfdc54f8173edebf3edb66562ee904b8e241ed45e1a8dc47ecce110b9641f7"
+      "sha256": "e7c16897f55ced4cf4f9302852d0f6e87b6e3e11ebb3a3c009f74addf5751a4f"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-fill-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/inspection/map-exiftool.log",
-      "sha256": "85baca875b0c19a0b760e7da23b3c1e1ed555ea43fdf4c24f3bb02abe2e36874"
+      "sha256": "7bf9c16c0f89b97ba49896ae378645f0de54b573ffc9a14c2058362b6d35e8d4"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-fill-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/inspection/map-extraction.log",
@@ -26046,15 +26046,15 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-fill-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/png-info.log",
-      "sha256": "42f622b6476ad33e3f6ed90670b4b69b762dd3dfd8b8726b3222929a2a59ec53"
+      "sha256": "e46aa196d074ab4f644475449204feb1985ac9cec333afb0c109762a82df8a07"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-fill-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/exiftool.log",
-      "sha256": "57cfdc54f8173edebf3edb66562ee904b8e241ed45e1a8dc47ecce110b9641f7"
+      "sha256": "e7c16897f55ced4cf4f9302852d0f6e87b6e3e11ebb3a3c009f74addf5751a4f"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-fill-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/map-exiftool.log",
-      "sha256": "5d00a84062c241cf9c8f902a02642f9caa8711f9a99749192d33289fca64adf3"
+      "sha256": "146dbfc8c33aff14432a0916b73f919205c8d72fb89006c20dfece43e536a81e"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-fill-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/map-extraction.log",
@@ -26066,7 +26066,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/sources/gainmap-android-iso/exiftool.log",
-      "sha256": "c132107d047185a318ff082ccac235041c393617550bc6a9e4e046ee0cd4805f"
+      "sha256": "3b72327c1e43205843a34c1a0b51ad56652fbf1969ebbbb8678fa8ca4b04f026"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/sources/gainmap-android-iso/independent-hdr-convert.log",
@@ -26074,7 +26074,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/sources/gainmap-android-iso/map-exiftool.log",
-      "sha256": "08ba3f569e92f1c39d93e0b2e5cd234978e80bb023be7b061af07d127d6317d7"
+      "sha256": "ad2f6447e3d3e6697df86b40cf6e6e9d661d809a394efeb3c932167815aa59dd"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/fill/converter-endpoint/sources/gainmap-android-iso/map-extraction.log",
@@ -26082,11 +26082,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/boost16/inspection/exiftool.log",
-      "sha256": "66a57dc4bf022886135c456790c6d44e075761c4d71b6c3a91e34236a18d9593"
+      "sha256": "8dc94ba63d3ae818bd2d2825bce129aeb3dbc95a1f8d17694050e07fdca0e2d5"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/boost16/inspection/map-exiftool.log",
-      "sha256": "664041c8d945cc061411007854b0bc5808841368905f5fd855410389bb89b68d"
+      "sha256": "33ef41f05568256166da16266e79695ffbd7314726c0feaf9ee8e819c625160a"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/boost16/inspection/map-extraction.log",
@@ -26094,11 +26094,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/boost2/inspection/exiftool.log",
-      "sha256": "66a57dc4bf022886135c456790c6d44e075761c4d71b6c3a91e34236a18d9593"
+      "sha256": "8dc94ba63d3ae818bd2d2825bce129aeb3dbc95a1f8d17694050e07fdca0e2d5"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/boost2/inspection/map-exiftool.log",
-      "sha256": "da84c1c8825d79136764f920bc98e96394be8f81634f02331d21e671596e53a8"
+      "sha256": "2c76d46ebd28070d8238f2159f3bf943fffc0a66df61cac281d4ad7080ce6379"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/boost2/inspection/map-extraction.log",
@@ -26106,11 +26106,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/boost64/inspection/exiftool.log",
-      "sha256": "66a57dc4bf022886135c456790c6d44e075761c4d71b6c3a91e34236a18d9593"
+      "sha256": "8dc94ba63d3ae818bd2d2825bce129aeb3dbc95a1f8d17694050e07fdca0e2d5"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/boost64/inspection/map-exiftool.log",
-      "sha256": "e3f8a48840eef144547324852ccad1a8fd2d13bee8a8f1620d5bd172093146e8"
+      "sha256": "baf78d556af171ef57d450d414020ab80d58a3ae2cc6999fa4df10e06764fd78"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/boost64/inspection/map-extraction.log",
@@ -26134,7 +26134,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/hdr-intent-inspection/exiftool.log",
-      "sha256": "d63be00353c50b08211496fdc6b76addc76333e522d3cf12fc9df8465eb502d4"
+      "sha256": "7a1e8131e4207d4a51b0a58cadbab1e645812fe4d2589a1007333b0b9ee92502"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/independent-native-hdr.log",
@@ -26146,11 +26146,11 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/inspection/exiftool.log",
-      "sha256": "66a57dc4bf022886135c456790c6d44e075761c4d71b6c3a91e34236a18d9593"
+      "sha256": "8dc94ba63d3ae818bd2d2825bce129aeb3dbc95a1f8d17694050e07fdca0e2d5"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/inspection/map-exiftool.log",
-      "sha256": "973f142337433a6f31f89de40437e093cc4f0704ab559d125715d4d4a2883815"
+      "sha256": "ce566ff7880f2c6b20c9ca64e4d0fd5100f7b6ee532af0ea8ea65c55fc8c1937"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/inspection/map-extraction.log",
@@ -26226,15 +26226,15 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/png-info.log",
-      "sha256": "d3129905e9ead0cfd86b23a4651ba17d6300ff5e448be6636e16e1ef7c863a23"
+      "sha256": "422be94c3533f537e25376cf4c1a7884713a23206d0931a0875f387004444480"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/exiftool.log",
-      "sha256": "66a57dc4bf022886135c456790c6d44e075761c4d71b6c3a91e34236a18d9593"
+      "sha256": "8dc94ba63d3ae818bd2d2825bce129aeb3dbc95a1f8d17694050e07fdca0e2d5"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/map-exiftool.log",
-      "sha256": "ed199bae04f0d5b3d929834e608df15d2f55c6fef624a7b89010b083b9dbb571"
+      "sha256": "79191ba37826b9b6ba341ea15c5993c0cc80673cb5b2e16908110fa9e0be06c4"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1/rgb-libavif-decoder/source/map-extraction.log",
@@ -26246,7 +26246,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/sources/gainmap-android-iso/exiftool.log",
-      "sha256": "c132107d047185a318ff082ccac235041c393617550bc6a9e4e046ee0cd4805f"
+      "sha256": "3b72327c1e43205843a34c1a0b51ad56652fbf1969ebbbb8678fa8ca4b04f026"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/sources/gainmap-android-iso/independent-hdr-convert.log",
@@ -26254,7 +26254,7 @@
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/sources/gainmap-android-iso/map-exiftool.log",
-      "sha256": "1c698e9161fdd99c901ec48c778a80e58491f3db3c8d68fbc5c08ebe6d5fcbd6"
+      "sha256": "9273bca0d78a2b9914be782c916d6a76dca77c72395b936efd3c6302fa38332e"
     },
     {
       "path": "/proof/work/iso-geometry-headroom/orientation/converter-endpoint/sources/gainmap-android-iso/map-extraction.log",

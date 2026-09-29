@@ -1506,6 +1506,160 @@
           "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
         },
         {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "full_headroom": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "full_headroom": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "full_headroom": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "full_headroom": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+        },
+        {
           "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "fixture_id": "gainmap-apple-old",
           "selectors": {
@@ -24305,6 +24459,160 @@
           "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
         },
         {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "full_headroom": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "full_headroom": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "full_headroom": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "full_headroom": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+        },
+        {
           "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "fixture_id": "gainmap-apple-old",
           "selectors": {
@@ -27999,6 +28307,456 @@
       "alternative_selectors": [],
       "evidence": [
         {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:12:contain:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "12",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:12:contain:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:12:cover:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "12",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:12:cover:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:12:fill:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "12",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:12:fill:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:12:upscale:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "12",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:12:upscale:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:10:contain:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "10",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:10:contain:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:10:cover:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "10",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:10:cover:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:10:fill:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "10",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:10:fill:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:10:upscale:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "10",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:10:upscale:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:8:contain:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "8",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:8:contain:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:8:cover:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "8",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:8:cover:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:8:fill:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "8",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:8:fill:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:8:upscale:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "8",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:8:upscale:documented-full-native"
+        },
+        {
           "case_id": "gainmap-android-iso:hdr:avif:preserve:preserve:contain",
           "fixture_id": "gainmap-android-iso",
           "selectors": {
@@ -29394,6 +30152,456 @@
       ],
       "qualified_cases": [
         {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:12:contain:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "12",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:12:contain:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:12:cover:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "12",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:12:cover:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:12:fill:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "12",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:12:fill:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:12:upscale:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "12",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:12:upscale:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:10:contain:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "10",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:10:contain:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:10:cover:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "10",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:10:cover:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:10:fill:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "10",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:10:fill:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:10:upscale:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "10",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:10:upscale:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:8:contain:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "8",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:8:contain:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:8:cover:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "8",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:8:cover:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:8:fill:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "8",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:8:fill:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:avif:preserve:8:upscale:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "avif",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "8",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:avif:preserve:8:upscale:documented-full-native"
+        },
+        {
           "case_id": "gainmap-android-iso:hdr:avif:preserve:preserve:contain:native-pq-depth-12:gainmap-hdr-target-gamut-v1",
           "fixture_id": "gainmap-android-iso",
           "selectors": {
@@ -30237,6 +31445,152 @@
       "qualification_scope": "Only listed exact fixture/selector cases; no inferred cross-product.",
       "alternative_selectors": [],
       "evidence": [
+        {
+          "case_id": "gainmap-apple-old:hdr:png:preserve:16:contain:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "png",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "16",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:png:preserve:16:contain:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:png:preserve:16:cover:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "png",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "16",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:png:preserve:16:cover:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:png:preserve:16:fill:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "png",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "16",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:png:preserve:16:fill:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:png:preserve:16:upscale:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "png",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "16",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:png:preserve:16:upscale:documented-full-native"
+        },
         {
           "case_id": "gainmap-android-iso:hdr:png:preserve:preserve:contain",
           "fixture_id": "gainmap-android-iso",
@@ -31482,6 +32836,152 @@
         }
       ],
       "qualified_cases": [
+        {
+          "case_id": "gainmap-apple-old:hdr:png:preserve:16:contain:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "png",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "16",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:png:preserve:16:contain:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:png:preserve:16:cover:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "png",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "16",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:png:preserve:16:cover:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:png:preserve:16:fill:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "png",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "16",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:png:preserve:16:fill:documented-full-native"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:png:preserve:16:upscale:documented-full-native",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "png",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "16",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true,
+            "integrity": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:png:preserve:16:upscale:documented-full-native"
+        },
         {
           "case_id": "gainmap-android-iso:hdr:png:preserve:preserve:contain:native-pq-depth-16:gainmap-hdr-target-gamut-v1",
           "fixture_id": "gainmap-android-iso",
@@ -212019,11 +213519,11 @@
       "missing_evidence_checks": {}
     },
     "all_cases": {
-      "cases": 3209,
-      "native_completed": 3199,
+      "cases": 3229,
+      "native_completed": 3219,
       "native_operation_failures": 10,
       "native_not_established": 0,
-      "qualified": 2520,
+      "qualified": 2540,
       "measured_failure_cases": 650,
       "missing_evidence_cases": 60,
       "failed_gates_after_native_completion": {
@@ -213278,6 +214778,7 @@
         "depth_policy": "Exact requested depth promise.",
         "status": "qualified",
         "qualified_evidence": [
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -213285,6 +214786,7 @@
         ],
         "tested_evidence": [
           "gainmap-apple-old:hdr:jpg:preserve:preserve:cover",
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -213316,6 +214818,7 @@
         "depth_policy": "Exact requested depth promise.",
         "status": "qualified",
         "qualified_evidence": [
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -213323,6 +214826,7 @@
         ],
         "tested_evidence": [
           "gainmap-apple-old:hdr:jpg:preserve:preserve:fill",
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -213353,11 +214857,13 @@
         "depth_policy": "Exact requested depth promise.",
         "status": "qualified",
         "qualified_evidence": [
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-lossless-rgb:gainmap-hdr-target-gamut-v1"
         ],
         "tested_evidence": [
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale",
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
@@ -213391,6 +214897,7 @@
         "depth_policy": "Exact requested depth promise.",
         "status": "qualified",
         "qualified_evidence": [
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-moderateoffset-jpegli-base-dct-float-map:gainmap-hdr-target-gamut-v1",
@@ -213398,6 +214905,7 @@
         ],
         "tested_evidence": [
           "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation",
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -223323,9 +224831,13 @@
               "h": 173,
               "fit": "cover"
             },
-            "status": "untested",
-            "qualified_evidence": [],
-            "tested_evidence": []
+            "status": "qualified",
+            "qualified_evidence": [
+              "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+            ],
+            "tested_evidence": [
+              "gainmap-apple-old:hdr:jpg:preserve:preserve:cover:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+            ]
           }
         ]
       },
@@ -223384,9 +224896,13 @@
               "h": 211,
               "fit": "fill"
             },
-            "status": "untested",
-            "qualified_evidence": [],
-            "tested_evidence": []
+            "status": "qualified",
+            "qualified_evidence": [
+              "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+            ],
+            "tested_evidence": [
+              "gainmap-apple-old:hdr:jpg:preserve:preserve:fill:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+            ]
           }
         ]
       },
@@ -223443,9 +224959,13 @@
               "w": 769,
               "fit": "contain"
             },
-            "status": "untested",
-            "qualified_evidence": [],
-            "tested_evidence": []
+            "status": "qualified",
+            "qualified_evidence": [
+              "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+            ],
+            "tested_evidence": [
+              "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+            ]
           }
         ]
       },
@@ -223508,9 +225028,13 @@
             "source_transform_requirement": {
               "exif_orientation": 6
             },
-            "status": "untested",
-            "qualified_evidence": [],
-            "tested_evidence": []
+            "status": "qualified",
+            "qualified_evidence": [
+              "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+            ],
+            "tested_evidence": [
+              "gainmap-apple-old:hdr:jpg:preserve:preserve:orientation:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full:apple-old-documented-full-rec709-linear-bilinear8-v1:render-boost16"
+            ]
           }
         ]
       },
@@ -223892,7 +225416,7 @@
   "suite_integrity_errors": [],
   "native_run_completed": true,
   "unit_tests": {
-    "run": 551,
+    "run": 597,
     "failures": 0,
     "errors": 0
   }

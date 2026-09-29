@@ -50,6 +50,11 @@ def versions():
                    'libultrahdr_build_recipe_sha256':avif.digest(ROOT/'native-gainmap-build.sh'),
                    'libultrahdr_xmp_patch_sha256':avif.digest(ROOT/'libultrahdr-xmp-arrays.patch'),
                    'independent_iso_reader_sha256':avif.digest(ROOT/'gainmap_iso.py'),
+                   'native_zimg_window_source_sha256':avif.digest(ROOT/'native_zimg_window.c'),
+                   'native_zimg_build_recipe_sha256':avif.digest(ROOT/'native-zimg-build.sh'),
+                   'native_zimg_window_binary_sha256':avif.digest(Path('/usr/local/bin/hdr-proof-zimg-window')),
+                   'proof_source_sha256':{path.name:avif.digest(path) for path in sorted(ROOT.iterdir())
+                       if path.is_file() and (path.name == 'Dockerfile' or path.suffix in ('.py','.c','.cpp','.cjs','.sh','.patch'))},
                    'libultrahdr_variant_binaries':Path('/opt/proof/ultrahdr/binary-sha256.txt').read_text(),
                    'thresholds_sha256':avif.digest(ROOT/'thresholds.json')})
     return values
@@ -89,7 +94,7 @@ def candidate_files(evidence, fixtures):
             copy(fixture['path'], f'source-{fixture["id"]}{suffix}', 'Inspected synthetic HDR source', facts=fixture['facts'])
     for source in (ROOT/'fixtures/gainmap').glob('*.jpg'):
         copy(source,f'source-{source.name}','Provenance-documented gain-map source; exact original')
-    selected = [case for case in evidence if (case.get('fixture_id') in ('avif-pq-rec2020-10-opaque','avif-hlg-rec2020-10-opaque','animated-pq-alpha','png-pq-rec2020-16-alpha','png-hlg-p3-16-opaque') and case.get('geometry') in ('contain','identity')) or (case.get('fixture_id') in ('gainmap-apple-new','gainmap-android-xmp') and case.get('geometry')=='contain')]
+    selected = [case for case in evidence if (case.get('fixture_id') in ('avif-pq-rec2020-10-opaque','avif-hlg-rec2020-10-opaque','animated-pq-alpha','png-pq-rec2020-16-alpha','png-hlg-p3-16-opaque') and case.get('geometry') in ('contain','identity')) or (case.get('fixture_id') in ('gainmap-apple-new','gainmap-android-xmp') and case.get('geometry')=='contain') or (case.get('fixture_id', '').startswith('apng-') and case.get('geometry')=='contain')]
     for case in selected:
         artifacts = case.get('artifacts')
         values = [artifacts.get('output')] if isinstance(artifacts,dict) else artifacts or []
@@ -115,7 +120,7 @@ def fixture_lock(fixtures, update):
     generated = {f['id']:f['sha256'] for f in fixtures if f.get('spec') or f.get('generator')}
     path = ROOT/'fixtures/generated-sha256.json'
     if update:
-        write_json(path,{'generator':'avif.py, hdr_png.py and selector_probes.py; native versions locked by environment/ and Dockerfile', 'sha256':generated})
+        write_json(path,{'generator':'avif.py, hdr_png.py, apng.py and selector_probes.py; native versions locked by environment/ and Dockerfile', 'sha256':generated})
     if not path.exists():
         return ['Missing generated fixture hash lock; capture once with --update-fixture-lock before committing.']
     expected = json.loads(path.read_text())['sha256']
@@ -200,6 +205,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              '## How to read the evidence','',
              'A qualified case requires a real encoder, a separate decoder, exact structural checks, fixed appearance thresholds, and metadata privacy. Independent AV1 decoding uses dav1d, while encoding uses AOM. ExifTool independently reads emitted signaling. The locally patched libavif sequence writer retains animated orientation; its patch and binary hashes are recorded. Gain-map JPEG uses pinned experimental libultrahdr PR484 and PR491 patches and a local per-channel XMP parser/writer patch, with dual ISO/Android metadata. These are proof builds, not upstream releases. ISO-only source reconstruction uses a separately validated native-libjpeg/ISO reader for verified sRGB-transfer RGB bases, supported sRGB/P3 ICC matrices and forward ISO metadata. Analytic vectors and independent native libavif/XMP controls test this narrow reader; unknown color facts or metadata layouts are rejected.','',
              'All comparisons use display-referred linear light. PQ uses ST 2084 absolute luminance. HLG uses a declared 1000-nit reference display and gamma 1.2 OOTF. Geometry references use independent Pillow floating-point bilinear resampling with premultiplied alpha. The comparison includes patch boundaries; interpolation differences are measured rather than hidden by discarding edges. These synthetic charts stress conversion and do not represent every photographic or artistic source.','',
+             'Authored SDR JPEG candidates additionally use a correctly declared gamma-3.2 ICC transfer with sRGB or P3 primaries. They preserve the independently referenced authored SDR grade and existing acceptance gates while testing the forty required gain-map source/gamut/geometry requests. The native RGB JPEG encoder and independent FFmpeg MJPEG decoder check emitted pixels; the actual ICC matrix and curves determine their color interpretation. Native zimg fractional crop windows retain the filter samples needed at cover boundaries. Standard sRGB-transfer candidates and their failures remain separate. The accepted gamut selectors identify primaries, so a different correctly signaled transfer does not change those selectors. ICC interpretation by physical consumers remains pending.','',
              'The predeclared [thresholds](../thresholds.json) report BT.2124 Delta E ITP and luminance error separately for shadows, midtones, and highlights. Best-effort SDR additionally requires 203-nit ordinary white near 0.90 sRGB signal, retained shadows/midtones, smooth highlight detail, and an independent chromatic mapping reference. The 1000-nit candidate uses a fixed Mobius knee of 0.6 and exposure 1.1. The 4000-nit sequence uses knee 0.54 and exposure 1.2 across both frames. Both use peak output scale 0.99. Its explicit relative-colorimetric gamut mapping clips out-of-gamut sRGB channels after primary conversion; it does not claim perceptual gamut compression. The independent reference derives the shoulder from boundary conditions and converts through D65 XYZ. Identity controls test tone policy before crop, while every encoded derivative is compared at its actual geometry, grouped by source HDR luminance region. Authored JPEG SDR bases bypass automatic HDR tone mapping. Separate gamma-2.2 candidates preserve the same SDR grade with sRGB primaries and a correctly declared coding transfer. AVIF uses CICP 1/4/0; JPEG/WebP/GIF use an independently parsed ICC matrix/TRC profile. GIF requires explicit binary-alpha coercion when the source has fractional alpha. They are not standard sRGB-transfer files. Every emitted representation needs its own consumer review.','',
              'Read [measurements](measurements.json) for each case, including native failures, facts, region statistics, source/output hashes and artifact paths. Full artifacts remain under `../work/` after a run; selected inspected files are committed under [manual](manual/manifest.json). Failed candidates are diagnostic files, not approved fallbacks.','',
              '## Required and candidate paths','',
@@ -238,7 +244,9 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- Same-transfer AVIF geometry operates in display-linear light with explicit alpha handling. Cover resizing filters before cropping. A separate native coverage resample normalizes image-edge weights to the unchanged independent reference. The declared required static and animated HDR AVIF requests have qualified file evidence; this does not extend to untested photographs or consumers.',
               '- Calibrated static and sequence-wide SDR tone/gamut controls pass. Eight-bit sRGB-transfer failures remain visible. Higher-depth and correctly declared gamma-2.2 candidates retain the same predeclared sdr-8 appearance ceiling and distinct case IDs. Qualified alternatives can satisfy matching product selectors; they never change a failed representation into a passing one. The gamma transfer must be interpreted correctly by each consumer.',
               '- Animated outputs retain separate checks for fully composed frames, unequal durations, repetition count and fractional alpha. Only the matching qualified representation can fulfill the requested animation and transparency selectors.',
-              '- Static 16-bit HDR PNG sources have separate PQ/HLG, P3/Rec.2020 and alpha evidence for identity, contain, cover, fill, upscale and independently checked EXIF-8 orientation. Their source and HDR conversions use the unchanged stricter avif-12 appearance gates. Matching same-format identity requests are byte-exact controls. Six conflicting/unknown PNG signaling controls retain exact originals and withhold transforms. APNG, unlisted PNG cross-products, HDR WebP, gain-map AVIF and other unexecuted accepted-source requests remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
+              '- Static 16-bit HDR PNG sources have separate PQ/HLG, P3/Rec.2020 and alpha evidence for identity, contain, cover, fill, upscale and independently checked EXIF-8 orientation. Their source and HDR conversions use the unchanged stricter avif-12 appearance gates. Matching same-format identity requests are byte-exact controls. Six conflicting/unknown PNG signaling controls retain exact originals and withhold transforms.',
+              '- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Real native partial rectangles and unsupported composition remain rejected. Other APNG geometries, static extraction and orientation remain unqualified.',
+              '- Unlisted PNG/APNG cross-products, HDR WebP, gain-map AVIF and other unexecuted accepted-source requests remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
               '- These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.',
               '- The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.',
               '- Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.', '',
@@ -275,6 +283,9 @@ def main():
     from hdr_png import run as run_hdr_png
     png_result = run_hdr_png(WORK/'hdr-png')
     write_json(WORK/'hdr-png-evidence.json',png_result)
+    from apng import run as run_apng
+    apng_result = run_apng(WORK/'apng')
+    write_json(WORK/'apng-evidence.json',apng_result)
     from precision import run as run_precision
     precision = run_precision(WORK, WORK/'precision')
     write_json(RESULTS/'precision.json', precision)
@@ -288,8 +299,9 @@ def main():
     tone = run_tone(WORK)
     controls = run_selectors(WORK/'selectors')
     controls['controls'].extend(png_result['controls'])
-    evidence = avif_result['evidence'] + png_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + crossformat_result + controls.get('evidence',[])
-    generated_fixtures = avif_result['fixtures'] + png_result['fixtures'] + controls.get('fixtures',[])
+    controls['controls'].extend(apng_result['controls'])
+    evidence = avif_result['evidence'] + png_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + crossformat_result + controls.get('evidence',[])
+    generated_fixtures = avif_result['fixtures'] + png_result['fixtures'] + apng_result['fixtures'] + controls.get('fixtures',[])
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
     errors = matrix['evidence_errors'] + fixture_lock(generated_fixtures,args.update_fixture_lock)

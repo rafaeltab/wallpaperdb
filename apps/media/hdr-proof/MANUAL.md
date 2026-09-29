@@ -19,6 +19,12 @@ Record date, reviewer, OS build, browser version, monitor/display identity, disp
 
 Test Android/ISO, Android XMP, old Apple and new Apple JPEG separately. Test every emitted PQ/HLG P3/Rec.2020 and 8/10/12-bit variant represented in the report. Do not infer one flavor's result from another flavor or assume wide gamut means HDR presentation. Animated HLG plus alpha and extra HDR PNG/APNG/WebP conversions remain optional candidates with separate records.
 
+The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
+two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit
+SDR APNG counterparts carry a standard sRGB chunk; the SDR AVIF and WebP
+counterparts carry gamma-2.2 CICP or ICC signaling. Keep their browser, native
+viewer and wallpaper results pending independently on all four devices.
+
 ## Browser procedure
 
 - [ ] Verify the downloaded file hash against the report before opening it. Record exact file path and selectors, including range, gamut, depth, motion, transparency and geometry.
@@ -28,6 +34,7 @@ Test Android/ISO, Android XMP, old Apple and new Apple JPEG separately. Test eve
 - [ ] Check the saturated art and gamut patches for hue shifts or flat clipping. Compare the sRGB SDR reference independently from the preserved-gamut reference.
 - [ ] Test gamma-2.2 SDR candidates separately from standard sRGB-transfer candidates. Verify their inspected CICP `1/4/0` or embedded ICC profile, then compare the same SDR reference on each browser, viewer and wallpaper setter. A consumer that ignores the declared transfer can change shadows and contrast despite using the correct primaries.
 - [ ] Play animated PQ AVIF over both dark and light checkerboard backgrounds. Verify fractional alpha and edges, first fully composed frame, frame order, frame durations, loop behavior and steady exposure across frames. Repeat playback and reload to detect adaptation or rerun exposure shifts.
+- [ ] Repeat the animation checks for optional HDR APNG and its inspected SDR APNG/AVIF/WebP derivatives. Record whether the consumer displays both frames or only the PNG default image. Compare the fixed ordinary-white column across frames, fractional alpha, 300/700 ms timing and three plays. A still preview does not qualify animation.
 - [ ] Test static extraction against the animation's first fully composed frame, with the same crop and background.
 - [ ] If Safari's HDR AVIF animation fails, test the separately inspected animated SDR WebP with `range=sdr&gamut=srgb&depth=8`. Record its motion/alpha result independently. Keep the HDR AVIF download available; do not relabel the SDR fallback HDR.
 - [ ] In Firefox and every unqualified HDR path, explicitly request a qualified SDR rendition. Confirm its format decodes and animates where required. Record both the selected format and `range=sdr&gamut=srgb`; do not count an implicit HDR flattening as the fallback.

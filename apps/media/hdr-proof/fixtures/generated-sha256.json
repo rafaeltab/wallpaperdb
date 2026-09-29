@@ -1,5 +1,5 @@
 {
-  "generator": "avif.py, hdr_png.py and selector_probes.py; native versions locked by environment/ and Dockerfile",
+  "generator": "avif.py, hdr_png.py, apng.py and selector_probes.py; native versions locked by environment/ and Dockerfile",
   "sha256": {
     "avif-pq-p3-8-opaque": "f53d15d9e644cc0d22aabdedd229d53d2e7f91371a683ca3b6ace55bb1e2b372",
     "avif-pq-p3-8-alpha": "d3491dbf323cb9aa57173bcc911df196b9aabea07f0dcf4422c22e65c3ef040a",
@@ -44,6 +44,10 @@
     "png-hlg-p3-16-opaque-orientation-8": "32e54b52da91b38cc90f8eeae2b411e69b42af43bd10371451eaf95955d1f123",
     "png-hlg-p3-16-alpha-orientation-8": "e889b8f9fd8d4d460987e706b5f9bfa92360b4e7e82a885647c1535b5c02ca72",
     "png-hlg-rec2020-16-opaque-orientation-8": "9f4d1d5d66ade09a2762e328bec4a07d21d008c64140e5c78b0d3a555b1f9419",
-    "png-hlg-rec2020-16-alpha-orientation-8": "5fb994f254241961e709fc3a2209b90dbfbe040a832ac8133d345707aa58b42b"
+    "png-hlg-rec2020-16-alpha-orientation-8": "5fb994f254241961e709fc3a2209b90dbfbe040a832ac8133d345707aa58b42b",
+    "apng-pq-p3-16-alpha": "90aab788dd82ca2fe6453b364999d94df60939fcb88b59fb1d42f07be61ebf30",
+    "apng-pq-rec2020-16-alpha": "cb0c011b0448eaa442fae8911fdd4812b32a8bba5d39e9d395fa331cbbb4d956",
+    "apng-hlg-p3-16-alpha": "81c197b13072d9d4b78d065dfb425208462739ed53dbf8f9900e30ee15f01b59",
+    "apng-hlg-rec2020-16-alpha": "acdc9c212b9848a31b8f81833a43f0b788cf46eebf3e032967519627e902d3d5"
   }
 }

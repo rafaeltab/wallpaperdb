@@ -16,7 +16,7 @@ Read the generated [report](results/report.md), [conversion matrix](results/conv
 
 The complete run replaces the generated report and measurement files under `results/`; it leaves complete intermediates and native diagnostics in ignored `work/`. Selected inspected files and their hashes are committed under [results/manual](results/manual/manifest.json). Follow [MANUAL.md](MANUAL.md) on the agreed Mac, iPad, Windows PC, and Galaxy. Browser and OS qualification stays pending until those devices have been checked by the user. A diagnostic file marked failed is not an approved SDR fallback.
 
-Changes to fixtures require an intentional `--update-fixture-lock` run and review of the changed source hashes. Dependency changes require new lock files and native qualification. The suite never downloads a floating fixture or silently refreshes an expected hash during normal execution. `fixtures/generated-sha256.json` covers generated AVIF, HDR PNG and selector inputs; the committed JPEG fixture manifest and fixture tests cover the camera corpus and regenerated ISO representation.
+Changes to fixtures require an intentional `--update-fixture-lock` run and review of the changed source hashes. Dependency changes require new lock files and native qualification. The suite never downloads a floating fixture or silently refreshes an expected hash during normal execution. `fixtures/generated-sha256.json` covers generated AVIF, HDR PNG/APNG and selector inputs; the committed JPEG fixture manifest and fixture tests cover the camera corpus and regenerated ISO representation.
 
 The Python color equations and request oracle exist only in this proof. FFmpeg/libplacebo, Sharp/libvips/libultrahdr, and libavif/AOM perform the native candidate conversions. dav1d, ExifTool, Pillow/libjpeg, a small reader linked to libpng, and the independent gain-map reader check the bytes. Their precise limitations are recorded in every affected case. Unit tests of the proof-side request oracle do not claim production endpoint behavior. Media's existing dependency versions, source admission, UI, migrations, generation policy and caching are unchanged.
 
@@ -69,6 +69,18 @@ contract defines `gamut=srgb` as primaries, so these candidates retain the same
 selectors while recording different representation IDs. Profile-aware physical
 review remains mandatory; existing failed sRGB-transfer files stay failed.
 
+The [authored SDR JPEG proof](authored_sdr_proof.py) also evaluates gamma-3.2
+ICC encodings against the same independently decoded authored SDR base. These
+are real RGB JPEG8 files with independently checked sRGB or P3 primaries and
+actual profile curves. The coding transfer changes; the reference grade and
+appearance gates do not. These candidates cover the forty required gain-map
+source, gamut and geometry requests while standard sRGB-transfer failures stay
+visible. Native zimg applies fractional crop windows with normalized filter
+boundaries for cover geometry. Cropping to integer bounds before resampling
+would discard samples used by the independent reference. As with gamma-2.2,
+the accepted gamut selectors identify primaries. Every ICC representation
+still needs separate browser, viewer and wallpaper review.
+
 The [HDR PNG generator](hdr_png.py) creates eight deterministic static charts
 covering PQ/HLG, P3/Rec.2020 and opaque/fractional alpha at 16 bits. Native PNG
 encoding writes CICP; ExifTool checks signaling and the separate libpng reader
@@ -83,8 +95,24 @@ and do not count as encoder evidence. Converted files must remove the source's
 numeric GPS, camera model, serial, EXIF and XMP data. Six metadata-only negative
 controls cover unknown transfer, conflicting or duplicate CICP, invalid CRC,
 and conflicting ICC/sRGB signaling. They retain exact originals and withhold
-transformation. APNG and unlisted cross-products remain untested; this proof does
-not change source admission.
+transformation. Unlisted cross-products remain untested; this proof does not
+change source admission.
+
+The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
+PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no
+disposal, 300/700 ms timing and three plays. Native FFmpeg encodes the animation;
+an independent chunk reader checks timing, loops and signaling, then gives
+untouched compressed frame data to the native libpng decoder. Exact source
+sample comparisons include fractional alpha. Contain derivatives cover HDR
+APNG and AVIF, plus explicit SDR APNG, gamma-2.2 AVIF and gamma-2.2 ICC WebP.
+HDR APNG signals CICP; native SDR APNG uses the standard sRGB chunk. The unchanged
+SDR reference uses one declared sequence peak, 4000 nits for PQ or 1000 nits for
+the HLG reference display. Original-byte and unsupported-composition controls
+remain separate from codec qualification. A real native partial-rectangle
+animation is rejected; partial rectangles, OVER blending, disposal, orientation,
+static extraction and other geometries remain unqualified in this APNG subset.
+Browser, viewer and wallpaper interpretation remains pending manual review for
+every emitted representation.
 
 The appearance metric keeps signed color coordinates when a valid color lies
 outside an intermediate RGB gamut. P3 red, for example, has a negative blue

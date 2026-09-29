@@ -54,6 +54,8 @@ export const Admission = Context.Service<Admission>('wallpaperdb.gateway.admissi
 
 /** Bounded admission transitions, without visitor identifiers or infrastructure details. */
 export type AdmissionEvent =
+  | { readonly _tag: 'Charged'; readonly points: number; readonly mode: 'shared' | 'local' }
+  | { readonly _tag: 'Denied'; readonly mode: 'shared' | 'local' }
   | { readonly _tag: 'Fallback'; readonly reason: QuotaUnavailable['reason'] }
   | { readonly _tag: 'Recovery' }
   | { readonly _tag: 'LocalStateSaturated' }

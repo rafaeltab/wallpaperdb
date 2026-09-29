@@ -6,6 +6,10 @@ export const admissionTelemetryLayer = Layer.succeed(AdmissionTelemetry, {
   record: (event) =>
     Effect.try(() => {
       switch (event._tag) {
+        case 'Charged':
+          return recordCounter('admission.cost.charged', event.points, { mode: event.mode });
+        case 'Denied':
+          return recordCounter('admission.quota.denied', 1, { mode: event.mode });
         case 'Fallback':
           return recordCounter('admission.quota.fallback', 1, { reason: event.reason });
         case 'Recovery':
@@ -17,3 +21,5 @@ export const admissionTelemetryLayer = Layer.succeed(AdmissionTelemetry, {
       }
     }).pipe(Effect.ignore),
 });
+
+export { quotaUsageTelemetryLayer } from './usage.js';

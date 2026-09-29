@@ -107,13 +107,7 @@ function installBatchLimit(app: FastifyInstance, config: HttpConfig) {
     if (Array.isArray(request.body)) {
       const exceeded = request.body.length > config.graphqlMaxBatchSize;
       if (exceeded) {
-        const batchSize = request.body.length;
-        recordTelemetry(() =>
-          recordCounter('graphql.security.batch_exceeded', 1, {
-            batchSize,
-            threshold: config.graphqlMaxBatchSize,
-          })
-        );
+        recordTelemetry(() => recordCounter('graphql.security.batch_exceeded', 1));
       }
       return reply
         .code(400)
@@ -345,6 +339,7 @@ export async function createHttpApp<E>(
         ).pipe(Effect.withSpan('admission.inspect_query')),
         { signal: request.gatewaySignal }
       );
+      recordTelemetry(() => recordHistogram('graphql.query.complexity', result.complexity));
       const decision = await execution.run(
         Admission.use((admission) =>
           admission.admit(
@@ -382,23 +377,15 @@ export async function createHttpApp<E>(
       }
       context.reply.header('X-RateLimit-Cost-Remaining', String(decision.remaining));
       context.reply.header('X-RateLimit-Cost-Reset', String(decision.reset));
-      recordTelemetry(() => recordHistogram('graphql.query.complexity', result.complexity));
       if (result.error) {
         const extensions = result.error.extensions;
         if (extensions.code === 'COMPLEXITY_LIMIT_EXCEEDED') {
-          recordTelemetry(() =>
-            recordCounter('graphql.security.complexity_exceeded', 1, {
-              complexity: result.complexity,
-              threshold: config.graphqlMaxComplexity,
-            })
-          );
+          recordTelemetry(() => recordCounter('graphql.security.complexity_exceeded', 1));
         } else if (extensions.code === 'BREADTH_LIMIT_EXCEEDED') {
           const aliases = typeof extensions.aliases === 'number';
           recordTelemetry(() =>
             recordCounter('graphql.security.breadth_exceeded', 1, {
               type: aliases ? 'aliases' : 'unique_fields',
-              count: aliases ? Number(extensions.aliases) : Number(extensions.unique_fields),
-              threshold: aliases ? config.graphqlMaxAliases : config.graphqlMaxUniqueFields,
             })
           );
         }

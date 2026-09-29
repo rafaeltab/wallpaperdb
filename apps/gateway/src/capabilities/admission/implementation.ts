@@ -10,6 +10,12 @@ export function admissionLayer(
     Effect.gen(function* () {
       const quota = yield* Quota;
       const telemetry = yield* AdmissionTelemetry;
+      const recordDecision = (result: AdmissionResult, cost: number, mode: 'shared' | 'local') => {
+        if (result._tag === 'Allowed' && cost > 0)
+          return telemetry.record({ _tag: 'Charged', points: cost, mode });
+        if (result._tag === 'Limited') return telemetry.record({ _tag: 'Denied', mode });
+        return Effect.void;
+      };
       const local = new Map<string, { tokens: number; updated: number }>();
       let nextSweep = 0;
       let degraded = false;
@@ -60,6 +66,7 @@ export function admissionLayer(
         if (policy.enabled) {
           const cost = inspection._tag === 'Rejected' ? 100 : inspection.cost;
           return yield* quota.take(visitor, policy.limit, policy.windowMs, cost).pipe(
+            Effect.tap((result) => recordDecision(result, cost, 'shared')),
             Effect.tap((result) => {
               if (result._tag === 'Saturated' || !degraded) return Effect.void;
               degraded = false;
@@ -69,7 +76,9 @@ export function admissionLayer(
               Effect.gen(function* () {
                 degraded = true;
                 yield* telemetry.record({ _tag: 'Fallback', reason: error.reason });
-                return yield* fallback(visitor, cost);
+                return yield* fallback(visitor, cost).pipe(
+                  Effect.tap((result) => recordDecision(result, cost, 'local'))
+                );
               })
             )
           );

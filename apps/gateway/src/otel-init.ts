@@ -122,7 +122,7 @@ export const initializeOtel = Effect.fn('gateway.telemetry.initialize')(function
                 timeoutMillis: exportTimeoutMillis,
                 httpAgentOptions: transports.agent,
               }),
-              exportIntervalMillis: 60000,
+              exportIntervalMillis: 10000,
               exportTimeoutMillis,
             }),
           ],

@@ -1,4 +1,7 @@
-import { admissionTelemetryLayer } from './adapters/admission-telemetry/index.js';
+import {
+  admissionTelemetryLayer,
+  quotaUsageTelemetryLayer,
+} from './adapters/admission-telemetry/index.js';
 import { Effect, Layer, Redacted } from 'effect';
 import type { FastifyInstance } from 'fastify';
 import { availabilityProbeLayer } from './adapters/availability/index.js';
@@ -51,6 +54,13 @@ export function gatewayLayer(config: Config, options: AppOptions = {}) {
       )
     )
   );
+  const quota = redisQuotaLayer({
+    redisEnabled: config.redisEnabled,
+    redisHost: config.redisHost,
+    redisPort: config.redisPort,
+    redisPassword:
+      config.redisPassword === undefined ? undefined : Redacted.value(config.redisPassword),
+  });
   const admission = admissionLayer({
     enabled: config.rateLimitEnabled,
     limit: config.quotaCapacity,
@@ -60,20 +70,7 @@ export function gatewayLayer(config: Config, options: AppOptions = {}) {
       refillMs: config.quotaFallbackRefillMs,
       maxVisitors: config.quotaFallbackMaxVisitors,
     },
-  }).pipe(
-    Layer.provide(
-      Layer.merge(
-        admissionTelemetryLayer,
-        redisQuotaLayer({
-          redisEnabled: config.redisEnabled,
-          redisHost: config.redisHost,
-          redisPort: config.redisPort,
-          redisPassword:
-            config.redisPassword === undefined ? undefined : Redacted.value(config.redisPassword),
-        })
-      )
-    )
-  );
+  }).pipe(Layer.provide(Layer.merge(admissionTelemetryLayer, quota)));
   const probe = Layer.unwrap(
     Effect.gen(function* () {
       const search = yield* OpenSearchGateway;
@@ -88,9 +85,12 @@ export function gatewayLayer(config: Config, options: AppOptions = {}) {
       });
     })
   ).pipe(Layer.provide(Layer.mergeAll(search, consumers)));
-  return Layer.mergeAll(catalogue, admission, availabilityLayer.pipe(Layer.provide(probe))).pipe(
-    Layer.provide(gatewayTracingLayer)
-  );
+  return Layer.mergeAll(
+    catalogue,
+    admission,
+    quotaUsageTelemetryLayer.pipe(Layer.provide(quota)),
+    availabilityLayer.pipe(Layer.provide(probe))
+  ).pipe(Layer.provide(gatewayTracingLayer));
 }
 
 export async function createApp(

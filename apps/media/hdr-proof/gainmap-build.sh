@@ -58,4 +58,12 @@ cmake --build build --target avifgainmaputil --parallel 4
 mkdir -p /opt/proof/libavif/moderateoffset
 cp build/avifgainmaputil /opt/proof/libavif/moderateoffset/
 sha256sum /opt/proof/libavif/moderateoffset/avifgainmaputil > /opt/proof/libavif/moderateoffset/binary-sha256.txt
+# Separate reader experiment. Keep the baseline reader above unchanged.
+# Gain-map JPEG RGB samples need no extra 8-bit BT.601 intermediate.
+echo '80a32fe007756fa6f091351908d0ccc9ba6c852e9e2d470595073a946e70f954  /opt/proof/libavif-rgb-reader.patch' | sha256sum -c -
+patch -d libavif-1.4.1 -p1 < /opt/proof/libavif-rgb-reader.patch
+cmake --build build --target avifgainmaputil --parallel 4
+mkdir -p /opt/proof/libavif/rgbreader
+cp build/avifgainmaputil /opt/proof/libavif/rgbreader/
+sha256sum /opt/proof/libavif/rgbreader/avifgainmaputil > /opt/proof/libavif/rgbreader/binary-sha256.txt
 rm -rf /tmp/gainmap-build

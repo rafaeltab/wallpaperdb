@@ -18,3 +18,4 @@
 !native_zimg_window.c
 !native_lossless_jpeg.c
 !native_dct_jpeg.c
+!libavif-rgb-reader.patch

@@ -789,6 +789,10 @@ def main():
                                      geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
     write_json(RESULTS/'apple-hdr-avif-contain.json', apple_hdr_avif)
     icc_results.extend(apple_hdr_avif['cases'])
+    apple_hdr_avif_rec2020 = run_apple_hdr_avif(WORK/'apple-hdr-avif-rec2020-contain',
+                                              depths=(12, 10, 8), gamut='rec2020')
+    write_json(RESULTS/'apple-hdr-avif-rec2020-contain.json', apple_hdr_avif_rec2020)
+    icc_results.extend(apple_hdr_avif_rec2020['cases'])
     from apple_hdr_png import run as run_apple_hdr_png
     apple_hdr_png = run_apple_hdr_png(WORK/'apple-hdr-png-contain',
                                    geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))

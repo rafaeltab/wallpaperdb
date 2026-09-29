@@ -180,6 +180,14 @@ supplies a matched SDR comparison and inspected native HDR intent. Display tone
 mapping, other selectors and physical consumers require separate proof. The
 EXIF6 cases reconstruct the actual stored raster before one clockwise rotation
 in each geometry path; all twelve earlier outputs and measurements remain exact.
+Three separately named containment files request Rec.2020 explicitly at 8, 10
+and 12 bits. Their independent HDR maxima are 3.391872, 1.019600 and 0.545535.
+Native zimg converts the P3 geometry, while the unchanged P3 reference measures
+both the native Rec.2020 intent and emitted AVIF across gamuts. AOM and dav1d
+verify the actual Rec.2020 signaling and samples. All fifteen P3 outputs and
+measurements remain exact. Other Rec.2020 geometries are unqualified until
+separately tested; these containment results do not establish physical HDR
+presentation or an embedded SDR base.
 The [explicit PQ16 P3 PNG proofs](apple_hdr_png.py) also pass the documented
 full-effect containment, crop, stretch and upscale comparisons, with maximum
 Delta E ITP 0.258409, 0.275747, 0.270037 and 0.257913. A separately tested

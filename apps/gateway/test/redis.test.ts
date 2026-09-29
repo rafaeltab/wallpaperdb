@@ -20,6 +20,7 @@ import {
   type AdmissionResult,
   type QuotaUnavailable,
   Quota,
+  QuotaUsage,
 } from '../src/capabilities/admission/index.js';
 
 let container: StartedTestContainer;
@@ -34,7 +35,9 @@ async function distributed(port = container.getMappedPort(6379), enabled = true)
     redisQuotaLayer({ redisEnabled: enabled, redisHost: '127.0.0.1', redisPort: port })
   );
   const quota = await runtime.runPromise(Quota);
+  const usage = await runtime.runPromise(QuotaUsage);
   return {
+    usage,
     quota: {
       take: (...args: Parameters<Quota['take']>) =>
         quota.take(...args).pipe(Effect.catchTag('QuotaUnavailable', Effect.succeed)),
@@ -147,6 +150,107 @@ async function proxy() {
 }
 
 describe('quota storage contract', () => {
+  it('atomically counts charged points and distinct charged identities across replicas', async () => {
+    const a = await distributed();
+    const b = await distributed();
+    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    try {
+      await control.del(
+        'graphql:quota:usage',
+        'graphql:quota:usage:ips',
+        'graphql:quota:usage:invalid'
+      );
+      const results = await Effect.runPromise(
+        Effect.all(
+          Array.from({ length: 8 }, (_, i) =>
+            (i % 2 ? a : b).quota.take('usage-shared', 300, 60000000, 100)
+          ),
+          { concurrency: 'unbounded' }
+        )
+      );
+      expect(results.filter((result) => result._tag === 'Allowed')).toHaveLength(3);
+      await Effect.runPromise(b.quota.take('usage-other', 1000, 60000, 20));
+      await Effect.runPromise(a.quota.take('usage-zero', 1000, 60000, 0));
+      const snapshot = await Effect.runPromise(a.usage.read());
+      expect(snapshot).toMatchObject({ _tag: 'Available', points: 320, activeIps: 2 });
+      expect(await Effect.runPromise(b.usage.read())).toMatchObject({
+        _tag: 'Available',
+        points: 320,
+        activeIps: 2,
+      });
+      expect(await control.pttl('graphql:quota:usage')).toBeGreaterThan(0);
+      expect(await control.pttl('graphql:quota:usage:ips')).toBeGreaterThan(0);
+    } finally {
+      control.disconnect();
+      await a.dispose();
+      await b.dispose();
+    }
+  });
+  it('discards previous-minute usage, including when idle, and starts a fresh distinct estimate', async () => {
+    const adapter = await distributed();
+    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    try {
+      const [seconds] = await control.time();
+      const previousMinute = Math.floor(Number(seconds) / 60) * 60 - 60;
+      await control.hset('graphql:quota:usage', 'minute', previousMinute, 'points', 9999);
+      await control.del('graphql:quota:usage:ips');
+      await control.pfadd('graphql:quota:usage:ips', 'previous-ip');
+      expect(await Effect.runPromise(adapter.usage.read())).toMatchObject({
+        _tag: 'Available',
+        points: 0,
+        activeIps: 0,
+      });
+      await Effect.runPromise(adapter.quota.take('usage-new-minute', 1000, 60000, 25));
+      expect(await Effect.runPromise(adapter.usage.read())).toMatchObject({
+        _tag: 'Available',
+        points: 25,
+        activeIps: 1,
+      });
+    } finally {
+      control.disconnect();
+      await adapter.dispose();
+    }
+  });
+  it('keeps admitted cost charged when telemetry storage fails and marks the mean unavailable', async () => {
+    const adapter = await distributed();
+    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    try {
+      await Effect.runPromise(adapter.quota.take('usage-corruption', 1000, 60000000, 100));
+      await control.del('graphql:quota:usage:ips');
+      await control.set('graphql:quota:usage:ips', 'not-a-hyperloglog');
+      expect(
+        await Effect.runPromise(adapter.quota.take('usage-corruption', 1000, 60000000, 100))
+      ).toMatchObject({ _tag: 'Allowed', remaining: 800 });
+      expect(await Effect.runPromise(adapter.usage.read())).toEqual({ _tag: 'Unavailable' });
+      expect(Number(await control.hget('graphql:quota:usage', 'points'))).toBeGreaterThan(0);
+    } finally {
+      await control.del(
+        'graphql:quota:usage',
+        'graphql:quota:usage:ips',
+        'graphql:quota:usage:invalid'
+      );
+      control.disconnect();
+      await adapter.dispose();
+    }
+  });
+  it('reports usage unavailable on outage and recovers without inventing local fleet usage', async () => {
+    const bridge = await proxy();
+    const adapter = await distributed(bridge.port);
+    try {
+      expect(await Effect.runPromise(adapter.usage.read())).toMatchObject({ _tag: 'Available' });
+      bridge.disconnect();
+      await expect
+        .poll(() => Effect.runPromise(adapter.usage.read()))
+        .toEqual({ _tag: 'Unavailable' });
+      bridge.restore();
+      await expect
+        .poll(() => Effect.runPromise(adapter.usage.read()), { timeout: 5000 })
+        .toMatchObject({ _tag: 'Available' });
+    } finally {
+      await adapter.dispose();
+      await bridge.close();
+    }
+  });
   it('refills continuously and denies weighted reservations without debiting the balance', async () => {
     const adapter = await distributed();
     const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });

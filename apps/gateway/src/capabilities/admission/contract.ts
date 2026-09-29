@@ -64,3 +64,21 @@ export interface AdmissionTelemetry {
 export const AdmissionTelemetry = Context.Service<AdmissionTelemetry>(
   'wallpaperdb.gateway.admission.Telemetry'
 );
+
+/** Fleet-wide charges in the current UTC minute. Only positive charged work counts.
+ * Distinct IPs are approximate. Unavailable data must not become a local estimate.
+ * A snapshot atomically pairs its total and estimate using the storage clock.
+ */
+export type QuotaUsageSnapshot =
+  | { readonly _tag: 'Unavailable' }
+  | {
+      readonly _tag: 'Available';
+      readonly minute: number;
+      readonly sampledAt: number;
+      readonly points: number;
+      readonly activeIps: number;
+    };
+export interface QuotaUsage {
+  read(): Effect.Effect<QuotaUsageSnapshot>;
+}
+export const QuotaUsage = Context.Service<QuotaUsage>('wallpaperdb.gateway.admission.QuotaUsage');

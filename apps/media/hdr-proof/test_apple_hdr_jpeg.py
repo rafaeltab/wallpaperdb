@@ -212,13 +212,105 @@ class AppleHdrJpegGeometryTests(unittest.TestCase):
         self.assertEqual(contained['reference_sdr']['sha256'], baseline['reference_sdr']['sha256'])
 
     def test_unproved_geometry_and_ambiguous_selector_lists_stop_before_native_work(self):
-        for geometries in ((), ('contain', 'contain'), ('orientation',), ('crop',), ('identity',)):
+        for geometries in ((), ('contain', 'contain'), ('orientation-8',), ('crop',), ('identity',)):
             before = len(avif.COMMANDS)
             with self.assertRaises(ValueError):
                 self.module.run(self.root/'rejected', geometries=geometries)
             self.assertEqual(len(avif.COMMANDS), before)
         with self.assertRaises(ValueError):
             self.module.run(self.root/'ambiguous', geometries=('contain', 'cover'), selectors=self.module.SELECTORS)
+
+
+class AppleHdrJpegOrientationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import apple_hdr_jpeg
+        cls.module = apple_hdr_jpeg
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.root = Path(cls.temporary.name)
+        cls.report = cls.module.run(cls.root/'proof', geometries=('orientation',))
+        cls.case = cls.report['cases'][0]
+
+    def test_real_exif6_source_rotates_exactly_once_under_the_documented_full_model(self):
+        import numpy as np
+        from PIL import Image
+        case = self.case
+        self.assertEqual(case['geometry'], 'orientation')
+        self.assertEqual(case['orientation_source']['orientation'], 6)
+        self.assertEqual(case['orientation_source']['sha256'],
+                         '691ce29e25ba756cf0d9d2a4e498fcb4f246eaa0fd7046b15fb10f38b58053c9')
+        self.assertEqual(case['artifacts']['source'], case['orientation_source']['path'])
+        self.assertEqual(case['artifacts']['source_sha256'], case['orientation_source']['sha256'])
+        self.assertEqual(case['source_facts']['metadata']['IFD0:Orientation'], 6)
+        self.assertFalse(case['source_precision_evidence']['orientation_applied'])
+        self.assertEqual(case['native_geometry']['padding_filter'].count('transpose=clock'), 1)
+        original = np.load(self.report['native_source_preparation']['reference']['path'])
+        rotated = np.rot90(original, -1)
+        expected = np.maximum(np.stack([np.asarray(Image.fromarray(rotated[..., channel].astype(np.float32)).resize(
+            (173, 130), Image.Resampling.LANCZOS)) for channel in range(3)], axis=-1), 0)
+        self.assertTrue(np.array_equal(np.load(case['reference_hdr']['path']), expected))
+        for layer in ('base', 'map'):
+            self.assertEqual(case['facts'][layer], {'depth': 8, 'width': 173, 'height': 130, 'components': 3, 'sof': 0})
+            self.assertEqual(case['facts']['layer_structure'][layer]['orientation'], 1)
+
+    def test_orientation_has_its_own_full_effect_gates_and_matrix_record(self):
+        case = self.case
+        self.assertEqual(case['status'] == 'qualified', all(case['checks'].values()))
+        self.assertEqual(case['status'], 'qualified', case['blockers'])
+        self.assertEqual(case['artifacts']['sha256'], '4424eed895b19213ad7e96c6ed4cfd941ecd78e829d6b9e25f81bdd594cbcbb8')
+        self.assertEqual(case['source_reference_revision'], apple_source_model.REFERENCE_REVISION)
+        self.assertEqual(case['rendering_scope']['display_boost'], 16)
+        self.assertEqual(case['rendering_scope']['source_full_headroom'], 8)
+        self.assertEqual(case['rendering_scope']['source_orientation'], 6)
+        self.assertEqual(case['rendering_scope']['orientation_applications'], 1)
+        self.assertEqual(case['selectors'], self.module._selectors('orientation'))
+        self.assertEqual(case['consumer_status'], 'pending manual review')
+        self.assertTrue(case['measurements']['authored_sdr_base']['passed'])
+        self.assertEqual(case['measurements']['authored_sdr_base'],
+                         self.report['converter_control']['cases'][0]['measurements']['authored_sdr_base'])
+        self.assertEqual(build_matrix([case])['evidence_errors'], [])
+
+    def test_unknown_orientation_requests_reject_before_native_work(self):
+        for source, selectors in ((Path(self.case['orientation_source']['path']), self.module._selectors('orientation')),
+                (apple_source_model.SOURCE, {**self.module._selectors('orientation'), 'gamut': 'srgb'}),
+                (apple_source_model.SOURCE, {**self.module._selectors('orientation'), 'w': 174}),
+                (apple_source_model.SOURCE, {**self.module._selectors('orientation'), 'orientation': 8})):
+            before = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                self.module.run(self.root/'bad-request', source=source, selectors=selectors, geometries=('orientation',))
+            self.assertEqual(len(avif.COMMANDS), before)
+
+    def test_real_generated_source_metadata_change_stops_before_native_pixel_work(self):
+        real_generate = self.module.apple_orientation_source.generate
+        boundary = []
+
+        def generate_then_change(directory, **kwargs):
+            source = real_generate(directory, **kwargs)
+            avif.native(['exiftool', '-overwrite_original', '-Orientation#=8', source])
+            boundary.append(len(avif.COMMANDS))
+            return source
+
+        with patch.object(self.module.apple_orientation_source, 'generate', side_effect=generate_then_change):
+            with self.assertRaisesRegex(ValueError, 'Generated EXIF6 source changed'):
+                self.module.run(self.root/'changed-generated-source', geometries=('orientation',))
+        self.assertEqual(len(avif.COMMANDS), boundary[0])
+
+    def test_oriented_input_remains_bound_after_actual_native_source_preparation(self):
+        real_prepare = self.module.apple_orientation_source.run
+
+        def prepare_then_change(directory, **kwargs):
+            result = real_prepare(directory, **kwargs)
+            source = Path(result['orientation_source']['path'])
+            source.write_bytes(source.read_bytes()+b'late orientation source drift')
+            return result
+
+        with patch.object(self.module.apple_orientation_source, 'run', side_effect=prepare_then_change):
+            report = self.module.run(self.root/'oriented-input-drift', geometries=('orientation',))
+        case = report['cases'][0]
+        self.assertEqual(case['status'], 'tested and failed')
+        self.assertTrue(any('integrity' in value for value in case['blockers']))
+        self.assertEqual(case['artifacts']['source_sha256'], self.module.apple_orientation_source.SOURCE_SHA256)
 
 
 if __name__ == '__main__':

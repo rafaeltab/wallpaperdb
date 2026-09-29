@@ -1,6 +1,6 @@
 """Old Apple HDR JPEG geometries using the independently documented full effect.
 
-Only contain, cover, fill and upscale at display boost 16 are measured. The source's full headroom
+Contain, cover, fill, upscale and real EXIF6 orientation at display boost 16 are measured. The source's full headroom
 is 8, and no intermediate Apple adaptation model is inferred. Native float
 source preparation, native geometry and PQ intent are separately checked
 before the existing midpoint-offset/gamma1.5 FLOAT map encoder. The original
@@ -14,6 +14,7 @@ import numpy as np
 from PIL import Image
 
 import apple_native_source
+import apple_orientation_source
 import apple_source_model
 import avif
 import gainmap
@@ -30,12 +31,14 @@ from matrix import GAINMAP_GEOMETRIES
 
 SELECTORS = {'format': 'jpg', 'range': 'hdr', 'gamut': 'preserve', 'depth': 'preserve',
              'motion': 'preserve', 'transparency': 'preserve', 'w': 173, 'fit': 'contain'}
-SIZES = {'contain': (173, 231), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 1025)}
+SIZES = {'contain': (173, 231), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 1025),
+         'orientation': (173, 130)}
 REVISION = apple_source_model.REFERENCE_REVISION
 DEPENDENCIES = ('apple_hdr_jpeg.py', 'test_apple_hdr_jpeg.py', *apple_native_source.DEPENDENCIES,
                 'gainmap_linear.py', 'gainmap_hdr.py', 'icc_gainmap.py', 'gainmap_metadata.py',
                 'gainmap_avif_hdr_jpeg.py', 'gamma_icc.py', 'dct_jpeg.py', 'native_icc_gainmap.cpp',
-                'native_dct_jpeg.c', 'gainmap_combine.py', 'gainmap_reference.py', 'matrix.py')
+                'native_dct_jpeg.c', 'gainmap_combine.py', 'gainmap_reference.py', 'matrix.py',
+                *apple_orientation_source.DEPENDENCIES)
 
 
 def _selectors(operation):
@@ -138,16 +141,16 @@ def inspect_output(path, directory, *, dimensions=(173, 231)):
     return facts
 
 
-def _control(directory, operation):
+def _control(directory, operation, *, source=apple_source_model.SOURCE):
     if operation in ('contain', 'upscale'):
         return icc_gainmap.run(directory, source_id='gainmap-apple-old', operation=operation,
                               map_policy='midpointoffset', map_gamma=1.5, map_method='float')
-    # The legacy ICC experiment did not admit cover/fill. Preserve that scope
-    # and independently check only the established native authored-SDR stage.
+    # These additional requests reuse only the established native authored-SDR
+    # stage; this control adds no legacy HDR interpretation or qualification.
     directory.mkdir(parents=True, exist_ok=True)
-    source, base = apple_source_model.SOURCE, directory/'gamma32-base.jpg'
+    source, base = Path(source), directory/'gamma32-base.jpg'
     encoding = gainmap_sdr.encode(source, base, operation, gamut='p3', gamma=3.2)
-    reference = gainmap.geometry(gainmap.source_image(source, 'preserve'), operation, 1)
+    reference = gainmap.geometry(gainmap.source_image(source, 'preserve'), operation, 6 if operation == 'orientation' else 1)
     profile = reference.info.get('icc_profile')
     reference.info.clear()
     ref_path = directory/'reference-sdr.png'
@@ -172,8 +175,15 @@ def _run_one(directory, *, source, selectors=None, operation='contain'):
     width, height = SIZES[operation]
     directory.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
-    hashes = {name: avif.digest(Path(__file__).with_name(name)) for name in DEPENDENCIES}
-    control = _control(directory/'legacy-converter', operation)
+    hashes = {name: avif.digest(Path(__file__).parent/name) for name in DEPENDENCIES}
+    parent_source = source
+    if operation == 'orientation':
+        source = apple_orientation_source.generate(directory/'orientation-fixture', parent=parent_source)
+        if avif.digest(source) != apple_orientation_source.SOURCE_SHA256:
+            raise ValueError('Generated EXIF6 source changed before native conversion')
+    actual_source_hash = avif.digest(source)
+    orientation = 6 if operation == 'orientation' else 1
+    control = _control(directory/'legacy-converter', operation, source=source)
     legacy = control['cases'][0]
     candidate = 'native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full'
     case = {'case_id': f'gainmap-apple-old:hdr:jpg:preserve:preserve:{operation}:{candidate}:{REVISION}:render-boost16',
@@ -201,14 +211,23 @@ def _run_one(directory, *, source, selectors=None, operation='contain'):
     report = {'converter_control': control, 'cases': [case], 'reference_revision': REVISION,
               'scope': f'One separately encoded old Apple {operation} under the documented full model; legacy evidence is unchanged'}
     try:
-        prepared = apple_native_source.run(directory/'documented-source')
+        prepared = (apple_orientation_source.run(directory/'documented-source', source=source)
+                    if operation == 'orientation' else apple_native_source.run(directory/'documented-source'))
         report['native_source_preparation'] = prepared
         if prepared['status'] != 'qualified source preparation' or not all(prepared['checks'].values()):
             raise ValueError('Documented Apple source preparation did not qualify')
         if not legacy['measurements']['authored_sdr_base']['passed']:
             raise ValueError('Unchanged authored SDR preparation control failed')
         native = prepared['native_source']
-        geometry = gainmap_linear.resample_linear(native, directory/'geometry.gbrapf32', operation)
+        if operation == 'orientation':
+            if (native.get('source_orientation') != 6 or native.get('orientation_applied') is not False
+                    or prepared['orientation_source']['sha256'] != actual_source_hash
+                    or prepared['orientation_source']['path'] != str(source)):
+                raise ValueError('Actual EXIF6 source must remain unrotated until derivative geometry')
+            case['orientation_source'] = prepared['orientation_source']
+            case['rendering_scope'].update({'source_orientation': 6, 'orientation_applications': 1})
+            case['threshold_scope']['geometry'] = 'Independently reconstruct the unchanged stored raster, rotate EXIF6 clockwise once, then the established P3 float32 Lanczos containment'
+        geometry = gainmap_linear.resample_linear(native, directory/'geometry.gbrapf32', operation, orientation)
         intent = directory/'native-intent-pq.png'
         filters = _intent(geometry, intent, operation=operation)
         intent_facts, intent_nits = inspect_intent(intent, directory/'intent-inspection', dimensions=(width, height))
@@ -217,9 +236,9 @@ def _run_one(directory, *, source, selectors=None, operation='contain'):
             raise ValueError('Native authored SDR base integrity changed')
         candidate_facts = icc_gainmap.pack(base, intent, output, map_policy='midpointoffset', map_gamma=1.5, map_method='float')
         case['checks']['native_encoder'] = True
-        case['artifacts'] = {'source': str(source), 'source_sha256': admitted_source_hash,
+        case['artifacts'] = {'source': str(source), 'source_sha256': actual_source_hash,
                              'output': str(output), 'sha256': avif.digest(output)}
-        expected = gainmap.array_geometry(np.load(prepared['reference']['path']), operation)
+        expected = gainmap.array_geometry(np.load(prepared['reference']['path']), operation, orientation)
         reference_path = directory/'independent-documented-full.npy'
         np.save(reference_path, expected)
         reference = {'path': str(reference_path), 'sha256': avif.digest(reference_path), 'gamut': 'p3',
@@ -227,7 +246,7 @@ def _run_one(directory, *, source, selectors=None, operation='contain'):
             'source_reference_revision': REVISION, 'purpose': 'Independent documented full effect, then unchanged matched geometry'}
         facts = inspect_output(output, directory/'inspection', dimensions=(width, height))
         output_map = directory/'inspection/map.jpg'
-        bound = {**prepared['bound_files'], str(source): admitted_source_hash,
+        bound = {**prepared['bound_files'], str(source): actual_source_hash, str(parent_source): admitted_source_hash,
             str(base): candidate_facts['base_sha256'], str(output): avif.digest(output),
             str(output_map): avif.digest(output_map), str(intent): intent_facts['sha256'],
             str(geometry['path']): avif.digest(geometry['path']), str(reference_path): reference['sha256'],
@@ -283,7 +302,7 @@ def _run_one(directory, *, source, selectors=None, operation='contain'):
         case['consumer_decoder_diagnostics'] = {'stock_native_srgb': diagnostic}
         case['known_consumer_limitations'].append(f"stock_native_srgb file diagnostic at boost 16: {diagnostic['status']}.")
         if (any(avif.digest(path) != sha for path, sha in bound.items())
-                or any(avif.digest(Path(__file__).with_name(name)) != sha for name, sha in hashes.items())):
+                or any(avif.digest(Path(__file__).parent/name) != sha for name, sha in hashes.items())):
             raise ValueError('Source, reference or emitted output integrity changed during decoding')
         case['checks']['integrity'] = True
         case['bound_files'] = bound

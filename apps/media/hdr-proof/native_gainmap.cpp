@@ -1,6 +1,7 @@
 // Proof-only adapter for native retained-map packing and HDR/SDR intent
 // regeneration. Sharp/FFmpeg perform geometry; libultrahdr computes the map.
 #include "ultrahdr_api.h"
+#include <avif/avif.h>
 #include "ultrahdr/gainmapmath.h"
 
 #include <fstream>
@@ -8,6 +9,9 @@
 #include <iostream>
 #include <iterator>
 #include <memory>
+#include <csetjmp>
+#include <cstdio>
+#include <jpeglib.h>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -43,6 +47,38 @@ static uhdr_compressed_image_t image(void* data, size_t size) {
   return {data, size, size, UHDR_CG_UNSPECIFIED, UHDR_CT_UNSPECIFIED, UHDR_CR_UNSPECIFIED};
 }
 
+struct JpegError {
+  jpeg_error_mgr manager;
+  std::jmp_buf jump;
+  char detail[JMSG_LENGTH_MAX];
+};
+
+static void jpeg_error(j_common_ptr decoder) {
+  auto* error = reinterpret_cast<JpegError*>(decoder->err);
+  decoder->err->format_message(decoder, error->detail);
+  std::longjmp(error->jump, 1);
+}
+
+static void check_jpeg(const Bytes& bytes, const avifImage* expected, const char* label) {
+  jpeg_decompress_struct decoder{};
+  JpegError error{};
+  decoder.err = jpeg_std_error(&error.manager);
+  error.manager.error_exit = jpeg_error;
+  if (setjmp(error.jump)) {
+    jpeg_destroy_decompress(&decoder);
+    throw std::runtime_error(std::string(label) + " JPEG header: " + error.detail);
+  }
+  jpeg_create_decompress(&decoder);
+  jpeg_mem_src(&decoder, bytes.data(), bytes.size());
+  jpeg_read_header(&decoder, TRUE);
+  const bool dimensions = decoder.image_width == expected->width && decoder.image_height == expected->height;
+  const bool layout = decoder.data_precision == 8 && decoder.num_components == 3 &&
+                     (decoder.jpeg_color_space == JCS_YCbCr || decoder.jpeg_color_space == JCS_RGB);
+  jpeg_destroy_decompress(&decoder);
+  if (!dimensions) throw std::runtime_error(std::string(label) + " JPEG dimensions differ from native AVIF intent");
+  if (!layout) throw std::runtime_error(std::string(label) + " JPEG requires 8-bit RGB or YCbCr layout");
+}
+
 static void array(const float values[3]) {
   std::cout << '[' << values[0] << ',' << values[1] << ',' << values[2] << ']';
 }
@@ -74,6 +110,60 @@ static void describe(uhdr_codec_private_t* decoder) {
 
 int main(int argc, char** argv) {
   try {
+    if (argc > 1 && std::string(argv[1]) == "pack-avif") {
+      if (argc != 6) throw std::runtime_error("pack-avif avif base map output");
+      auto avif = std::unique_ptr<avifImage, decltype(&avifImageDestroy)>(avifImageCreateEmpty(), avifImageDestroy);
+      auto decoder = std::unique_ptr<avifDecoder, decltype(&avifDecoderDestroy)>(avifDecoderCreate(), avifDecoderDestroy);
+      if (!avif || !decoder) throw std::runtime_error("Cannot allocate native AVIF decoder");
+      decoder->imageContentToDecode = AVIF_IMAGE_CONTENT_ALL;
+      avifResult result = avifDecoderReadFile(decoder.get(), avif.get(), argv[2]);
+      if (result != AVIF_RESULT_OK) throw std::runtime_error(avifResultToString(result));
+      const avifGainMap* map = avif->gainMap;
+      if (!map || !map->image) throw std::runtime_error("No native AVIF gain map");
+      if (avif->depth != 8 || map->image->depth != 8 || !map->useBaseColorSpace ||
+          avif->yuvFormat != AVIF_PIXEL_FORMAT_YUV444 || map->image->yuvFormat != AVIF_PIXEL_FORMAT_YUV444 ||
+          avif->alphaPlane || map->image->alphaPlane || avif->transformFlags || map->image->transformFlags)
+        throw std::runtime_error("JPEG packing requires opaque 8-bit 444 base/map, identity orientation, and base-color-space application");
+      auto fraction = [](auto v) -> float {
+        if (v.d == 0) throw std::runtime_error("Zero native metadata denominator");
+        return static_cast<float>(v.n) / v.d;
+      };
+      uhdr_gainmap_metadata_t metadata{};
+      for (unsigned c = 0; c < 3; ++c) {
+        metadata.min_content_boost[c] = exp2(fraction(map->gainMapMin[c]));
+        metadata.max_content_boost[c] = exp2(fraction(map->gainMapMax[c]));
+        metadata.gamma[c] = fraction(map->gainMapGamma[c]);
+        metadata.offset_sdr[c] = fraction(map->baseOffset[c]);
+        metadata.offset_hdr[c] = fraction(map->alternateOffset[c]);
+        if (!std::isfinite(metadata.min_content_boost[c]) || !std::isfinite(metadata.max_content_boost[c]) ||
+            metadata.min_content_boost[c] <= 0 || metadata.max_content_boost[c] < metadata.min_content_boost[c] ||
+            !std::isfinite(metadata.gamma[c]) || metadata.gamma[c] != 1 ||
+            !std::isfinite(metadata.offset_sdr[c]) || metadata.offset_sdr[c] < 0 ||
+            !std::isfinite(metadata.offset_hdr[c]) || metadata.offset_hdr[c] < 0)
+          throw std::runtime_error("Unsupported native gain metadata: require finite ordered boosts, gamma 1, and nonnegative offsets");
+      }
+      metadata.hdr_capacity_min = exp2(fraction(map->baseHdrHeadroom));
+      metadata.hdr_capacity_max = exp2(fraction(map->alternateHdrHeadroom));
+      metadata.use_base_cg = map->useBaseColorSpace;
+      if (metadata.hdr_capacity_min != 1 || !std::isfinite(metadata.hdr_capacity_max) || metadata.hdr_capacity_max <= 1)
+        throw std::runtime_error("JPEG packing requires an SDR base and positive alternate HDR headroom");
+      Bytes base_data = read(argv[3]), map_data = read(argv[4]);
+      check_jpeg(base_data, avif.get(), "Base");
+      check_jpeg(map_data, map->image, "Map");
+      auto base = image(base_data.data(), base_data.size());
+      auto gain = image(map_data.data(), map_data.size());
+      Encoder encoder(uhdr_create_encoder(), uhdr_release_encoder);
+      if (!encoder) throw std::runtime_error("Cannot allocate native encoder");
+      check(uhdr_enc_set_compressed_image(encoder.get(), &base, UHDR_BASE_IMG), "set native combined base");
+      check(uhdr_enc_set_gainmap_image(encoder.get(), &gain, &metadata), "set native AVIF-computed map");
+      check(uhdr_encode(encoder.get()), "pack native AVIF-computed map");
+      const auto* output = uhdr_get_encoded_stream(encoder.get());
+      if (!output) throw std::runtime_error("Native encoder returned no output");
+      write(argv[5], output->data, output->data_sz);
+      std::cout << "{\"libavif_version\":\"" << avifVersion() << "\",\"libultrahdr_version\":\"" << UHDR_LIB_VERSION_STR
+                << "\",\"scope\":\"opaque RGB 8-bit base/map; native AVIF gamma-1 metadata; unchanged compressed JPEG samples\"}\n";
+      return 0;
+    }
     if (argc > 1 && std::string(argv[1]) == "regenerate-linear") {
       if (argc != 9) throw std::runtime_error("regenerate-linear gbrpf32 width height gamut base output source-headroom");
       Bytes raw = read(argv[2]), compressed_base = read(argv[6]);

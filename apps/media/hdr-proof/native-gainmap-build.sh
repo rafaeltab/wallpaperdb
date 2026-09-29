@@ -39,7 +39,7 @@ for variant in baseline pr484 pr491 both; do
     cp -P "$variant/build"/libuhdr.so* "/opt/proof/ultrahdr/$variant/"
     c++ -std=c++17 -O2 -Wall -Wextra -Werror -I "$variant/source" -I "$variant/source/lib/include" \
         -DPROOF_VARIANT="\"$variant\"" /opt/proof/native_gainmap.cpp \
-        -L "$variant/build" -luhdr -Wl,-rpath,\$ORIGIN \
+        -L "$variant/build" -luhdr -lavif -ljpeg -Wl,-rpath,\$ORIGIN \
         -o "/opt/proof/ultrahdr/$variant/hdr-proof-uhdr"
 done
 cd /opt/proof/ultrahdr

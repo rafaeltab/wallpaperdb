@@ -101,7 +101,8 @@ the separate gamma-3.2 ICC candidate, are failed palette diagnostics. Their meta
 privacy, actual sRGB ICC, opacity and one-frame structure pass, but their shadow
 and midtone color errors exceed the file gates. Do not use either as a qualified
 SDR fallback even if the consumer opens it.
-The gain-map AVIF source also has an inspected HDR JPEG containment with a
+The gain-map AVIF source also has inspected HDR JPEG containment, crop, stretch
+and upscale with a
 gamma-3.2 ICC base and regenerated RGB8 map. Its file measurements pass at
 display boost 16 through ICC-aware readers. Compare both SDR and HDR endpoints
 against their matched references; stock-reader and intermediate-adaptation

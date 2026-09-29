@@ -114,7 +114,7 @@ precision near zero gain and passes every unchanged appearance gate for the ISO
 JPEG upscale. Native and independent HDR maximum error is 7.31 deltaE ITP;
 cross-reader maximum error is 5.53. The compressed gamma-3.2 base remains exact,
 and both actual JPEG layers remain eight-bit SOF0. This qualifies the experimental
-ICC-aware file path at the declared full display headroom. The stock reader
+ICC-aware file path at display boost 16. The stock reader
 that assumes sRGB still fails, so consumer compatibility remains pending.
 The five preceding failures stay visible and retain their exact output hashes.
 The same recipe also passes the Android XMP upscale. This source uses the
@@ -155,8 +155,9 @@ agree. Its source capacity is about 49.26 times SDR white, compared with 4.47
 for the regenerated output. Read-only uncompressed-map and ideal-gain
 diagnostics retain the mismatch. Normalizing the interpolation weight removes
 much of the broad exposure bias but still fails the shadow and midtone maxima.
-Changing capacity metadata alone is therefore insufficient for this measured
-geometry. These diagnostic pixels never enter the encoder or qualify a file.
+Normalizing capacity to the boost-16 reference endpoint is insufficient in
+this diagnostic. Other capacity choices remain untested. These diagnostic
+pixels never enter the encoder or qualify a file.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
@@ -382,11 +383,12 @@ Adobe transform fields; decoder-guessed
 color defaults remain diagnostics. Actual dimensions are checked without
 inventing an absent JPEG aspect declaration. Physical interpretation remains
 pending independently from the lossless PNG, WebP and AVIF versions.
-The separate [HDR JPEG containment](gainmap_avif_hdr_jpeg.py) combines the
+The separate [HDR JPEG proof](gainmap_avif_hdr_jpeg.py) combines the
 verified native SDR and HDR preparations from this source. Its gamma-3.2 ICC
 base and regenerated midpoint-offset gamma-1.5 map pass the unchanged SDR,
-native HDR, independent HDR and cross-reader gates at display boost 16.
-Independent HDR maximum error is 3.84965; both actual JPEG layers are RGB8
+native HDR, independent HDR and cross-reader gates at display boost 16 for
+containment, crop, stretch and upscale. The original containment remains exact.
+Independent HDR maximum error is 6.10543 across these cases; both actual JPEG layers are RGB8
 SOF0. The source reference uses independent dav1d samples and parsed tmap
 metadata. Stock-reader failure and intermediate adaptation remain separate
 limitations; browser and wallpaper results remain pending.

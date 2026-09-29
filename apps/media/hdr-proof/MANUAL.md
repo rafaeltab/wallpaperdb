@@ -85,6 +85,10 @@ The separately named full-source candidate passes at boost 64 and fails at 2
 and 16. Its native HDR comparison PNG belongs only to the boost-64 record.
 Use the independent same-boost references for the other renderings; neither
 file has passed the complete adaptive comparison.
+The source-capacity variant preserves compressed coding and matches the source
+weights. It improves highlight measurements at boosts 2 and 16 but still fails
+their shadow/midtone gates. Its passing boost-64 comparison cannot clear those
+failures. Keep the variant's separate manifest record and file hash.
 The matrix inventories adaptation for every required gain-map geometry and
 source dialect. It requires the same file at boosts 2 and 16, plus 64 for the
 ISO source. Keep the untested XMP and Apple intermediate comparisons pending;

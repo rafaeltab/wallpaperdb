@@ -181,6 +181,15 @@ Its native regenerated capacity is 3.089498 log2, while the source is 5.622376.
 This improves the full-source endpoint but leaves the joint same-file adaptation
 requirement failed. It retains the exact compressed SDR base and every earlier
 candidate's evidence.
+The [source-capacity candidate](iso_source_capacity.py) changes only the two
+capacity fields using the pinned native compressed-image API. Exact compressed
+coding, ICC bytes and all other ISO metadata remain unchanged. Source/output
+weights now agree at all three boosts. Highlight mean error improves from
+20.4759 to 0.62918 at boost 2 and from 26.6022 to 1.02007 at boost 16. Shadow and
+midtone maxima still fail, so the same-file adaptation requirement remains
+failed. Full-source pixels and measurements stay exactly equal to the passing
+boost-64 control. The native packer header, library, source and binary are
+checksum-recorded; existing codec binaries remain unchanged.
 The [four other ISO geometries](iso_geometry_headroom.py) rerun their exact
 qualified recipes and preserve every original endpoint measurement. Each
 containment, crop, stretch and EXIF6 orientation file passes at boost 16 and

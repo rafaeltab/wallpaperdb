@@ -123,6 +123,10 @@ reference shares libavif gain application. The source comparison verifies that
 transport, while separate final HDR readers establish output accuracy.
 The ISO-only float32 source decoder remains narrowly scoped. Stock-reader
 failure and pending consumer review also apply to this XMP output.
+Old Apple containment and upscale also pass the exact same map recipe.
+Its native source path requires the original headroom MakerNotes, and a real
+source stripped of those facts remains original-only. These two cases retain
+their PQ source precision evidence and separate final HDR-reader measurements.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
@@ -340,6 +344,12 @@ from actual ICC, RGB components and Adobe transform fields; decoder-guessed
 color defaults remain diagnostics. Actual dimensions are checked without
 inventing an absent JPEG aspect declaration. Physical interpretation remains
 pending independently from the lossless PNG, WebP and AVIF versions.
+The [authored SDR GIF containment](gainmap_avif_gif.py) remains failed. Its real
+256-color native palette passes structure, ICC, opacity and independent decoding
+but exceeds the unchanged shadow and midtone appearance gates. A read-only
+comparison finds 900 reference pixels with no color in this exact palette
+within the maximum error of 8. Changing dithering alone cannot fix those pixels;
+this does not prove other palettes or GIF encoders impossible.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

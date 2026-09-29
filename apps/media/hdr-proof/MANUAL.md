@@ -56,8 +56,10 @@ decoder, gain-map interpretation or HDR presentation behavior.
 Gamma-3.2 ICC-aware HDR JPEG experiments have separate SDR-base and HDR
 measurements. The midpoint-offset map-gamma-1.5 ISO upscale passes the file
 gates with experimental ICC-aware readers, as does the separate Android XMP
-upscale. The preceding five ISO variants remain
-failed diagnostics. Stock native readers assume sRGB transfer or reject ICC
+upscale. Old Apple containment and upscale have their own qualified ICC-aware
+file candidates with the same pending consumer limitations. Their original
+source needs its headroom MakerNotes; a source missing those facts remains
+original-only. The five earlier ISO variants remain failed diagnostics. Stock native readers assume sRGB transfer or reject ICC
 in this path. Each manifest entry retains this qualification scope and its
 reader limitations. Check ICC interpretation and HDR reconstruction separately
 from a consumer's ability to open the JPEG; keep physical results pending.
@@ -77,6 +79,10 @@ The separate SDR JPEG containment uses standard sRGB ICC and RGB8 SOF0 coding.
 Compare its inspected file with the same authored SDR reference and the lossless
 variants. The JPEG has no separate aspect declaration; check the recorded
 raster dimensions and consumer geometry independently.
+The inspected SDR GIF containment is a failed palette diagnostic. Its metadata
+privacy, actual sRGB ICC, opacity and one-frame structure pass, but its shadow
+and midtone color errors exceed the file gates. Do not use it as a qualified
+SDR fallback even if the consumer opens it.
 The separately named HDR candidates emit single-layer PQ AVIF12 for containment,
 crop, stretch and upscale. The original
 native-map-sampling candidate remains failed; the antialiased-map candidate has

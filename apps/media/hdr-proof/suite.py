@@ -452,6 +452,8 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '## Blockers and scope limits','',
               '- The [fractional map-gamma-1.5 candidate](icc-gainmap-midpointoffset-gamma1.5.json) passes the unchanged SDR, native HDR, independent HDR and cross-reader gates for ISO JPEG upscale. It retains the gamma-3.2 compressed base, eight-bit SOF0 layers and midpoint offsets. Qualification requires the experimental ICC-aware readers at the declared full display headroom; the stock sRGB-assuming reader still fails and physical consumers remain pending. All five preceding failed representations remain separate.',
               '- The [Android XMP fractional-gamma upscale](icc-gainmap-xmp-midpointoffset-gamma1.5.json) passes the same file gates using the existing PQ16 source bridge with requested native depth 12. Its source reference shares libavif gain application; source transport agreement is not a claim of a second source-renderer implementation. Independent final HDR readers still qualify the output. The ISO-only float32 guard, stock-reader failure and pending physical status are unchanged.',
+              '- Old Apple containment and upscale also pass the exact midpoint-offset fractional-gamma recipe through the experimental ICC-aware readers. Native source reconstruction requires the original Apple headroom MakerNotes, with a real stripped-source rejection control. Final native and independent HDR gates remain separate from the shared-libavif source reference. Stock-reader failures and physical review stay pending.',
+              '- The gain-map AVIF authored SDR GIF containment remains failed despite valid native encoding, actual sRGB ICC, opaque one-frame structure and independent decoding. Palette-only and full-reference errors both exceed the fixed photographic gates. The read-only exact-palette lower bound identifies 900 pixels for which changing dithering cannot meet the existing maximum; it makes no claim about other palettes or encoders.',
               '- The [integer-DCT map alternative](icc-gainmap-midpointoffset-gamma2-islow.json) retains the exact midpoint gamma-2 compressed base and native pre-JPEG map. It changes only native map JPEG coding. Both HDR readers still fail shadow maxima and their agreement worsens; its original floating-DCT counterpart remains separate.',
               '- Separately regenerated gain-map AVIF containment, crop, stretch and upscale check actual base, map and alternate precision against the source. Each native moderate-offset depth-8 candidate passes authored SDR and both HDR readers at log2 display headroom 4. The four stock depth-8 results fail; all eight automatic-depth variants declare alternate depth 12 and remain incompatible with the requested preservation selectors. Regenerated headroom and offsets differ from the source, so intermediate display adaptation remains untested. This is a declared endpoint proof, with physical consumers pending.',
               '- The [logarithmic midpoint-offset candidate](icc-gainmap-midpointoffset-gamma2.json) fixes the gamma-2 trial at ISO offsets 1/16384. Both HDR readers pass the existing midtone/highlight gates but fail their shadow maxima; their cross-comparison also fails in shadows. This separate result narrows the precision tradeoff without qualifying the JPEG or changing the original gates.',
@@ -583,6 +585,9 @@ def main():
     from gainmap_avif_jpeg import run as run_gainmap_avif_jpeg
     gainmap_avif_jpeg_result = run_gainmap_avif_jpeg(WORK/'gainmap-avif-jpeg')
     write_json(WORK/'gainmap-avif-jpeg-evidence.json', gainmap_avif_jpeg_result)
+    from gainmap_avif_gif import run as run_gainmap_avif_gif
+    gainmap_avif_gif_result = run_gainmap_avif_gif(WORK/'gainmap-avif-gif')
+    write_json(WORK/'gainmap-avif-gif-evidence.json', gainmap_avif_gif_result)
     from icc_gainmap import run as run_icc_gainmap
     icc_results = []
     for policy, gamma, method in (('moderateoffset', 1, 'float'), ('smalloffset', 1, 'float'),
@@ -597,6 +602,12 @@ def main():
         source_id='gainmap-android-xmp', map_policy='midpointoffset', map_gamma=1.5)
     write_json(RESULTS/'icc-gainmap-xmp-midpointoffset-gamma1.5.json', xmp_icc)
     icc_results.extend(xmp_icc['cases'])
+    for operation in ('contain', 'upscale'):
+        name = f'icc-gainmap-apple-old-{operation}-midpointoffset-gamma1.5'
+        result = run_icc_gainmap(WORK/name, source_id='gainmap-apple-old', operation=operation,
+            map_policy='midpointoffset', map_gamma=1.5)
+        write_json(RESULTS/f'{name}.json', result)
+        icc_results.extend(result['cases'])
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))
@@ -632,11 +643,13 @@ def main():
     controls['controls'].extend(gainmap_avif_hdr_png_result['controls'])
     controls['controls'].extend(gainmap_avif_preserve_result['controls'])
     controls['controls'].extend(gainmap_avif_jpeg_result['controls'])
+    controls['controls'].extend(gainmap_avif_gif_result['controls'])
     controls['controls'].extend(apng_result['controls'])
     evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + png8_precision_result['evidence'] + png8_webp_result['evidence'] + gainmap_avif_result['evidence'] + gainmap_avif_png_result['evidence'] + gainmap_avif_hdr_result['evidence'] + gainmap_avif_hdr_png_result['evidence'] + icc_results + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
     evidence += gainmap_avif_webp_result['evidence']
     evidence += gainmap_avif_preserve_result['evidence']
     evidence += gainmap_avif_jpeg_result['evidence']
+    evidence += gainmap_avif_gif_result['evidence']
     locked_fixtures = avif_result['fixtures'] + png_result['fixtures'] + apng_result['fixtures'] + controls.get('fixtures',[])
     # PNG8 validates its separate source lock before any conversion. Preserve
     # the original generated corpus lock, including its PNG16 hashes.

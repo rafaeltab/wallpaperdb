@@ -131,6 +131,31 @@ class AuthoredSdrTests(unittest.TestCase):
                     self.assertEqual(facts['depth'], 8)
                     self.assertTrue(facts['privacy'])
 
+    def test_sof3_rgb_component_ids_establish_coding_without_adobe_marker(self):
+        from PIL import ImageCms
+        from lossless_jpeg import encode as lossless_encode
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source, output = directory/'source.png', directory/'predictive.jpg'
+            pixels = np.random.default_rng(263).integers(0, 256, (11, 17, 3), dtype=np.uint8)
+            Image.fromarray(pixels).save(source)
+            profile = ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes()
+            lossless_encode(source, output, icc_profile=profile)
+            # The native gain-map packer omits Adobe metadata. Remove only
+            # that declaration here, preserving the real predictive scan.
+            data, offset, header = output.read_bytes(), 2, b'\xff\xd8'
+            while data[offset:offset+2] != b'\xff\xda':
+                size = int.from_bytes(data[offset+2:offset+4], 'big')
+                if data[offset:offset+2] != b'\xff\xee':
+                    header += data[offset:offset+size+2]
+                offset += size + 2
+            output.write_bytes(header + data[offset:])
+            actual, facts = decode(output)
+            np.testing.assert_array_equal(np.rint(actual * 255).astype(np.uint8), pixels)
+            self.assertEqual(facts['sof'], 3)
+            self.assertIsNone(facts['jpeg_color_transform'])
+            self.assertEqual(facts['jpeg_color_model'], 'SOF3 RGB component identifiers with verified RGB ICC')
+
 
 if __name__ == '__main__':
     unittest.main()

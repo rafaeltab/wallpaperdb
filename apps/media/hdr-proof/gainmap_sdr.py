@@ -16,7 +16,7 @@ import numpy as np
 from PIL import Image, ImageCms
 
 from avif import native
-from gainmap_iso import _base_color_facts, jpeg_facts
+from gainmap_iso import _base_color_facts, jpeg_facts, segments
 
 
 _SOURCE_RGB = """
@@ -182,12 +182,18 @@ def decode(path, *, gamut='srgb', gamma=None):
                   '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1'])
     pixels = np.frombuffer(raw, dtype=np.uint8).reshape(facts['height'], facts['width'], 3) / 255
     tags = json.loads(native(['exiftool', '-json', '-n', '-G1', '-s', path]))[0]
-    if tags.get('Adobe:ColorTransform') != 0:
+    transform = tags.get('Adobe:ColorTransform')
+    predictive_rgb = (facts.get('sof') == 3 and any(
+        marker == 0xC3 and len(value) == 15 and value[6::3] == b'RGB'
+        and value[7::3] == b'\x11\x11\x11' for marker, value in segments(data)))
+    if transform != 0 and not (transform is None and predictive_rgb):
         raise ValueError('RGB JPEG coding was not independently signaled')
+    color_model = ('SOF3 RGB component identifiers with verified RGB ICC'
+                   if transform is None else 'Adobe ColorTransform 0 with verified RGB ICC')
     from gainmap import private_metadata_tags
     return pixels, {**facts, 'color': color, 'decoder': 'FFmpeg native MJPEG decoder',
                     'icc_sha256': hashlib.sha256(profile).hexdigest(),
-                    'jpeg_color_transform': tags['Adobe:ColorTransform'],
+                    'jpeg_color_transform': transform, 'jpeg_color_model': color_model,
                     'gamut': gamut, 'transfer': 'srgb' if gamma is None else f'gamma{gamma}',
                     'privacy': not private_metadata_tags(tags),
                     'metadata': {key: value for key, value in tags.items()

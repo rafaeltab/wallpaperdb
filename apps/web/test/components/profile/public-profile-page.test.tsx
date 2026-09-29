@@ -1,3 +1,4 @@
+import { GatewayAdmissionError } from '@/lib/graphql/admission';
 import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react';
@@ -295,7 +296,7 @@ describe('PublicProfilePage', () => {
       data: { pages: [{ edges: [{ node: { wallpaperId: 'wlpr_loaded' } }] }] },
       isLoading: false,
       isFetchingNextPage: false,
-      error: new Error('offline'),
+      error: new GatewayAdmissionError(503, 1000),
       hasNextPage: true,
       fetchNextPage: vi.fn(),
     });
@@ -314,6 +315,8 @@ describe('PublicProfilePage', () => {
     );
 
     expect(screen.getByText('wlpr_loaded')).toBeInTheDocument();
-    expect(screen.getByText('Could not load more wallpapers')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('busy');
+    expect(screen.queryByRole('button', { name: 'Load more wallpapers' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 });

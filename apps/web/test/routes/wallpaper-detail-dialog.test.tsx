@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Wallpaper } from '@/lib/graphql/types';
@@ -88,5 +88,35 @@ describe('Wallpaper detail dialog', () => {
       view.unmount();
       queryClient.clear();
     }
+  });
+});
+
+describe('Wallpaper detail admission errors', () => {
+  afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
+
+  it.each([[429, false], [503, false], [429, true], [503, true]] as const)('shows HTTP %s safely with cached=%s and supports manual retry', async (status, cached) => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(
+      JSON.stringify({ errors: [{ message: 'private error' }] }),
+      { status, headers: { 'content-type': 'application/json', 'retry-after': '0' } },
+    )));
+    vi.stubGlobal('fetch', fetch);
+    const client = new QueryClient();
+    if (cached) client.setQueryData(['wallpaper', wallpaper.wallpaperId], wallpaper, { updatedAt: 1 });
+    localStorage.setItem('wallpaper-detail-panel-open', 'false');
+    const root = createRootRoute();
+    const route = createRoute({ getParentRoute: () => root, path: '/wallpapers/$wallpaperId', component: WallpaperDetailPage });
+    const router = createRouter({ routeTree: root.addChildren([route]), history: createMemoryHistory({ initialEntries: ['/wallpapers/wlpr_dialog'] }) });
+    const view = render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
+    try {
+      expect(await screen.findByRole('alert')).toHaveTextContent(status === 429 ? 'network' : 'busy');
+      expect(screen.queryByText('Wallpaper not found')).not.toBeInTheDocument();
+      expect(screen.queryByText('private error')).not.toBeInTheDocument();
+      if (cached) expect(screen.getByRole('button', { name: 'Download original' })).toBeInTheDocument();
+      await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled());
+      const attempts = fetch.mock.calls.length;
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await vi.waitFor(() => expect(fetch.mock.calls.length).toBeGreaterThan(attempts));
+    } finally { view.unmount(); client.clear(); }
   });
 });

@@ -2,6 +2,7 @@ import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { ChevronDown, Download, PanelRight, Share } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { GraphQLError } from '@/components/graphql-error';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,15 @@ export function WallpaperDetailPage() {
   const [isImageLoading, setIsImageLoading] = useState(true);
 
   // Data fetching
-  const { data: wallpaper, isLoading, error } = useWallpaperQuery(wallpaperId);
+  const {
+    data: wallpaper,
+    isLoading,
+    error: queryError,
+    failureReason,
+    refetch,
+    isFetching,
+  } = useWallpaperQuery(wallpaperId);
+  const error = queryError ?? failureReason;
 
   // Auto-collapse panel on mobile
   useEffect(() => {
@@ -116,6 +125,21 @@ export function WallpaperDetailPage() {
     }
   };
 
+  if (error && !wallpaper) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <GraphQLError
+            error={error}
+            retry={refetch}
+            retrying={isFetching}
+            title="Error loading wallpaper"
+          />
+        </div>
+      </div>
+    );
+  }
+
   // Loading state
   if (isLoading) {
     return <WallpaperDetailSkeleton />;
@@ -134,23 +158,6 @@ export function WallpaperDetailPage() {
         <Link to="/" className="mt-4">
           <Button variant="outline">Back to Gallery</Button>
         </Link>
-      </div>
-    );
-  }
-
-  // Network or validation error
-  if (error) {
-    return (
-      <div className="flex h-screen flex-col items-center justify-center p-4">
-        <Alert variant="destructive" className="max-w-md">
-          <AlertTitle>Error loading wallpaper</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error ? error.message : 'An unexpected error occurred'}
-          </AlertDescription>
-        </Alert>
-        <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
-          Retry
-        </Button>
       </div>
     );
   }
@@ -180,6 +187,14 @@ export function WallpaperDetailPage() {
       {/* Main content - Simplified for debugging */}
       <div className="fixed inset-0 top-[3.5rem] bg-background p-4">
         <div className="h-full flex flex-col gap-3">
+          {error ? (
+            <GraphQLError
+              error={error}
+              retry={refetch}
+              retrying={isFetching}
+              title="Could not refresh wallpaper"
+            />
+          ) : null}
           {/* Image container - takes all available space, prevents overflow */}
           <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
             <WallpaperDisplay

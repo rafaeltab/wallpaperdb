@@ -31,8 +31,8 @@ static std::vector<unsigned char> read(const char* path, size_t maximum) {
 }
 
 int main(int argc, char** argv) {
-  if (argc != 9) {
-    std::fprintf(stderr, "input.raw output.jpg width height profile.icc-or-dash uint8|float32 standard|jpegli adaptive0|1\n");
+  if (argc != 9 && argc != 10) {
+    std::fprintf(stderr, "input.raw output.jpg width height profile.icc-or-dash uint8|float32 standard|jpegli adaptive0|1 [quality98|99|100]\n");
     return 2;
   }
   const unsigned width = dimension(argv[3]), height = dimension(argv[4]);
@@ -42,6 +42,8 @@ int main(int argc, char** argv) {
       (!standard && std::strcmp(argv[7], "jpegli")) ||
       (std::strcmp(argv[8], "0") && std::strcmp(argv[8], "1"))) return 2;
   const bool adaptive = std::strcmp(argv[8], "1") == 0;
+  const unsigned quality = argc == 10 ? dimension(argv[9]) : 100;
+  if (quality < 98 || quality > 100) return 2;
   const size_t stride = width * 3 * (floating ? sizeof(float) : 1);
   auto pixels = read(argv[1], stride * height);
   if (pixels.size() != stride * height) return 2;
@@ -68,7 +70,7 @@ int main(int argc, char** argv) {
   if (standard) jpegli_use_standard_quant_tables(&encoder);
   jpegli_set_defaults(&encoder);
   jpegli_set_colorspace(&encoder, JCS_RGB);
-  jpegli_set_quality(&encoder, 100, TRUE);
+  jpegli_set_quality(&encoder, static_cast<int>(quality), TRUE);
   jpegli_enable_adaptive_quantization(&encoder, adaptive);
   jpegli_set_progressive_level(&encoder, 0);
   jpegli_set_input_format(&encoder, floating ? JPEGLI_TYPE_FLOAT : JPEGLI_TYPE_UINT8,
@@ -88,7 +90,7 @@ int main(int argc, char** argv) {
   jpegli_destroy_compress(&encoder);
   if (std::fclose(output)) return 2;
   std::printf("{\"native_encoder\":\"JPEGli from libjxl 0.11.2\",\"input_type\":\"%s\","
-              "\"tables\":\"%s\",\"adaptive\":%s,\"coded_depth\":8}\n",
-              argv[6], argv[7], adaptive ? "true" : "false");
+              "\"tables\":\"%s\",\"adaptive\":%s,\"quality\":%u,\"coded_depth\":8}\n",
+              argv[6], argv[7], adaptive ? "true" : "false", quality);
   return 0;
 }

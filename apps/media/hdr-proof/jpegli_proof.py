@@ -24,6 +24,12 @@ REMAINING_DCT_CASES = (
     ('gainmap-apple-new', 'contain'), ('gainmap-apple-new', 'upscale'),
 )
 OPTIONS = tuple(itertools.product(('uint8', 'float32'), ('standard', 'jpegli'), (False, True)))
+# Declared before measurement: seven remaining SOF0-union failures, with q100
+# controls and both native table/adaptive choices. No reference/threshold change.
+QUALITY_CORPUS = tuple(case for case in REMAINING_DCT_CASES if case != ('gainmap-android-iso', 'contain'))
+QUALITY_OPTIONS = tuple((input_type, tables, adaptive, quality)
+    for quality in (100, 99, 98) for input_type, tables, adaptive in
+    itertools.product(('uint8',), ('standard', 'jpegli'), (False, True)))
 
 
 def run(directory, *, corpus=REMAINING_DCT_CASES, options=OPTIONS):
@@ -53,12 +59,16 @@ def run(directory, *, corpus=REMAINING_DCT_CASES, options=OPTIONS):
             profile = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
         profile[24:36] = struct.pack('>6H', 2020, 1, 1, 0, 0, 0)
         profile[84:100] = bytes(16)
-        for input_type, tables, adaptive in options:
+        for option in options:
+            input_type, tables, adaptive = option[:3]
+            quality = option[3] if len(option) == 4 else 100
             trial = f'jpegli-{input_type}-{tables}-adaptive{int(adaptive)}'
+            if quality != 100:
+                trial += f'-q{quality}'
             output = folder/f'{trial}.jpg'
             case = {'case_id': f'{name}:{geometry}:{trial}', 'fixture_id': name, 'geometry': geometry,
                 'source_sha256': gainmap.digest(source), 'gamut': gamut,
-                'options': {'input_type': input_type, 'tables': tables, 'adaptive': adaptive},
+                'options': {'input_type': input_type, 'tables': tables, 'adaptive': adaptive, 'quality': quality},
                 'status': 'tested and failed', 'consumer_status': 'pending manual review',
                 'qualification_scope': 'Authored SDR base codec experiment only; no gain-map or HDR derivative qualification',
                 'reference_sdr': {'path': str(reference_path), 'sha256': gainmap.digest(reference_path),
@@ -66,7 +76,7 @@ def run(directory, *, corpus=REMAINING_DCT_CASES, options=OPTIONS):
                 'native_geometry': geometry_evidence, 'checks': {}, 'blockers': []}
             try:
                 encoded = jpegli.encode(authored, output, icc_profile=bytes(profile), input_type=input_type,
-                                         tables=tables, adaptive=adaptive)
+                                         tables=tables, adaptive=adaptive, quality=quality)
                 actual, facts = gainmap_sdr.decode(output, gamut=gamut)
                 measurement = compare_appearance(reference_linear, sdr_signal_to_nits(actual),
                     reference_gamut=gamut, actual_gamut=gamut, fixture_class='gainmap-sdr')
@@ -88,6 +98,10 @@ def run(directory, *, corpus=REMAINING_DCT_CASES, options=OPTIONS):
     root = Path(__file__).parent
     return {'scope': 'Native JPEGli SOF0 RGB8 authored SDR base experiments only',
         'consumer_status': 'pending manual review', 'thresholds_sha256': THRESHOLDS_SHA256,
+        'declared_trial_plan': {'corpus': corpus, 'native_options': options,
+            'option_fields': ['input_type', 'tables', 'adaptive', 'quality_optional_default100'],
+            'reference': 'Unchanged independently decoded authored SDR with matched geometry',
+            'selection': 'Every declared option is recorded, including failures'},
         'native_versions': {'jpegli': 'libjxl 0.11.2', 'highway': '1.2.0',
                             'ffmpeg': native(['ffmpeg', '-version']).decode().splitlines()[0]},
         'source_hashes': {name: gainmap.digest(root/name) for name in (
@@ -102,8 +116,9 @@ def run(directory, *, corpus=REMAINING_DCT_CASES, options=OPTIONS):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--quality-sweep', action='store_true')
     args = parser.parse_args()
-    result = run(args.output)
+    result = run(args.output, corpus=QUALITY_CORPUS, options=QUALITY_OPTIONS) if args.quality_sweep else run(args.output)
     (args.output/'results.json').write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
     print(json.dumps({'qualified_sdr_base_trials': sum(case['status'] == 'qualified' for case in result['cases']),
                       'total_trials': len(result['cases']), 'results': str(args.output/'results.json')}))

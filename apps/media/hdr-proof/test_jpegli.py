@@ -54,6 +54,30 @@ class JpegliTests(unittest.TestCase):
                 encode(source, directory/'output.jpg')
             with self.assertRaisesRegex(ValueError, 'input'):
                 encode(source, directory/'output.jpg', input_type='uint12')
+            with self.assertRaisesRegex(ValueError, 'quality'):
+                encode(source, directory/'output.jpg', quality=97)
+
+    def test_bounded_native_quality_trials_preserve_rgb8(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory/'source.png'
+            Image.new('RGB', (8, 8), (17, 83, 219)).save(source)
+            profile = ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes()
+            quantizer_maxima = {}
+            for quality in (98, 99, 100):
+                with self.subTest(quality=quality):
+                    output = directory/f'q{quality}.jpg'
+                    encoded = encode(source, output, icc_profile=profile, quality=quality)
+                    actual, facts = decode(output, gamut='srgb')
+                    self.assertEqual(encoded['quality'], quality)
+                    self.assertEqual(facts['sof'], 0)
+                    self.assertEqual(facts['depth'], 8)
+                    self.assertEqual(actual.shape, (8, 8, 3))
+                    self.assertTrue(encoded['quantization_tables'])
+                    quantizer_maxima[quality] = max(max(table) for table in encoded['quantization_tables'].values())
+            self.assertEqual(quantizer_maxima[100], 1)
+            self.assertGreater(quantizer_maxima[99], quantizer_maxima[100])
+            self.assertGreater(quantizer_maxima[98], quantizer_maxima[99])
 
     def test_iso_improvement_keeps_failed_trials_unqualified(self):
         from jpegli_proof import run
@@ -72,6 +96,9 @@ class JpegliTests(unittest.TestCase):
             self.assertEqual([case['status'] for case in cases],
                              ['tested and failed', 'qualified', 'tested and failed', 'tested and failed'])
             self.assertLess(cases[1]['measurement']['regions']['shadow']['delta_e_itp']['maximum'], 8)
+            # Pin the emitted q100 bytes from the prior committed native trial.
+            self.assertEqual(cases[1]['artifacts']['sha256'],
+                             '129c9898b67e6a9548f544ffb6c7a4d74b17a7030c7db285c6189d0505380a9c')
             for case in (cases[0], cases[2], cases[3]):
                 self.assertIn('shadow.delta_e_max', case['measurement']['failures'])
                 self.assertIn('Failed appearance check', case['blockers'])

@@ -7,12 +7,16 @@ import {
   MeterProvider,
   PeriodicExportingMetricReader,
 } from '@opentelemetry/sdk-metrics';
-import { Effect, ManagedRuntime } from 'effect';
+import { Deferred, Effect, Layer, ManagedRuntime } from 'effect';
 import Redis from 'ioredis';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createTestHttpApp, EmptyCatalogue, httpConfig } from './unit/http-fixture.js';
+import { admissionTelemetryLayer } from '../src/adapters/admission-telemetry/index.js';
 import { redisQuotaLayer } from '../src/adapters/redis/index.js';
 import {
+  Admission,
+  admissionLayer,
   type AdmissionResult,
   type QuotaUnavailable,
   Quota,
@@ -477,4 +481,94 @@ describe('quota storage contract', () => {
       await bridge.close();
     }
   });
+});
+
+it('composes independent outage budgets with HTTP quota responses and active-work rejection', async () => {
+  const bridge = await proxy();
+  const replicas = await Promise.all(
+    [0, 1].map(async () => {
+      const runtime = ManagedRuntime.make(
+        admissionLayer({
+          enabled: true,
+          limit: 1000,
+          windowMs: 60000000,
+          fallback: { capacity: 100, refillMs: 60000000, maxVisitors: 10 },
+        }).pipe(
+          Layer.provide(admissionTelemetryLayer),
+          Layer.provide(
+            redisQuotaLayer({ redisEnabled: true, redisHost: '127.0.0.1', redisPort: bridge.port })
+          )
+        )
+      );
+      const admission = await runtime.runPromise(Admission);
+      return { runtime, admission };
+    })
+  );
+  const release = Deferred.makeUnsafe<void>();
+  let entered = false;
+  class SlowCatalogue extends EmptyCatalogue {
+    override search() {
+      return Effect.sync(() => {
+        entered = true;
+      }).pipe(Effect.andThen(Deferred.await(release)), Effect.andThen(super.search()));
+    }
+  }
+  const [a, b] = replicas;
+  if (!a || !b) throw new Error('Expected two replicas');
+  const apps = await Promise.all(
+    replicas.map(({ admission }) =>
+      createTestHttpApp(
+        { ...httpConfig, quotaCapacity: 1000, graphqlMaxActive: 1 },
+        { admission, catalogue: new SlowCatalogue() }
+      )
+    )
+  );
+  const [first, second] = apps;
+  if (!first || !second) throw new Error('Expected two HTTP adapters');
+  const invalid = (app: typeof first) =>
+    app.inject({ method: 'POST', url: '/graphql', payload: { query: 'invalid' } });
+  try {
+    bridge.disconnect();
+    await expect
+      .poll(() => Effect.runPromise(a.admission.admit('probe', { _tag: 'Valid', cost: 0 })))
+      .toMatchObject({ limit: 100 });
+    await expect
+      .poll(() => Effect.runPromise(b.admission.admit('probe', { _tag: 'Valid', cost: 0 })))
+      .toMatchObject({ limit: 100 });
+    const admitted = await invalid(first);
+    expect(admitted.statusCode).toBe(400);
+    expect(admitted.headers['x-ratelimit-cost-limit']).toBe('100');
+    const limited = await invalid(first);
+    expect(limited.statusCode).toBe(429);
+    expect(limited.json()).toMatchObject({
+      errors: [{ extensions: { code: 'RATE_LIMIT_EXCEEDED' } }],
+    });
+    expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+    expect((await invalid(second)).statusCode).toBe(400);
+    const pending = first.inject({
+      method: 'POST',
+      url: '/graphql',
+      remoteAddress: '192.0.2.10',
+      payload: { query: '{ searchWallpapers(first: 1) { edges { node { wallpaperId } } } }' },
+    });
+    // Start injection before polling the controlled backend.
+    const response = pending.then((value) => value);
+    await expect.poll(() => entered).toBe(true);
+    expect((await invalid(first)).statusCode).toBe(503);
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    expect((await response).statusCode).toBe(200);
+    bridge.restore();
+    await expect
+      .poll(() => Effect.runPromise(a.admission.admit('probe', { _tag: 'Valid', cost: 0 })), {
+        timeout: 5000,
+      })
+      .not.toMatchObject({ limit: 100 });
+    // The first shared reservation for this HTTP identity can spend the full shared budget.
+    expect((await invalid(first)).statusCode).toBe(400);
+  } finally {
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    await Promise.all(apps.map((app) => app.close()));
+    await Promise.all(replicas.map(({ runtime }) => runtime.dispose()));
+    await bridge.close();
+  }
 });

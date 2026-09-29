@@ -1,5 +1,9 @@
 import { DateTime, Effect, Layer, Ref } from 'effect';
-import { Quota, type AdmissionResult } from '../../src/capabilities/admission/index.js';
+import {
+  AdmissionTelemetry,
+  Quota,
+  type AdmissionResult,
+} from '../../src/capabilities/admission/index.js';
 
 type Windows = Map<string, { tokens: number; updated: number }>;
 
@@ -42,3 +46,7 @@ export const memoryQuotaLayer: Layer.Layer<Quota> = Layer.effect(
     return Quota.of({ take });
   })
 );
+
+export const quietAdmissionTelemetry = Layer.succeed(AdmissionTelemetry, {
+  record: () => Effect.void,
+});

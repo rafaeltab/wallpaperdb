@@ -1,18 +1,18 @@
-import { recordCounter } from '@wallpaperdb/core/telemetry';
 import { Clock, DateTime, Effect, Layer } from 'effect';
 import type { AdmissionPolicy, AdmissionResult, Inspection } from './contract.js';
-import { Admission, Quota } from './contract.js';
+import { Admission, AdmissionTelemetry, Quota } from './contract.js';
 
-export function admissionLayer(policy: AdmissionPolicy): Layer.Layer<Admission, never, Quota> {
+export function admissionLayer(
+  policy: AdmissionPolicy
+): Layer.Layer<Admission, never, Quota | AdmissionTelemetry> {
   return Layer.effect(
     Admission,
     Effect.gen(function* () {
       const quota = yield* Quota;
+      const telemetry = yield* AdmissionTelemetry;
       const local = new Map<string, { tokens: number; updated: number }>();
       let nextSweep = 0;
       let degraded = false;
-      const metric = (name: string, attributes: Record<string, string> = {}) =>
-        Effect.try(() => recordCounter(name, 1, attributes)).pipe(Effect.ignore);
       const fallback = Effect.fn('admission.local_quota')(function* (
         visitor: string,
         cost: number
@@ -41,7 +41,7 @@ export function admissionLayer(policy: AdmissionPolicy): Layer.Layer<Admission, 
             limit: capacity,
           };
         if (cost > 0 && !state && local.size >= maxVisitors) {
-          yield* metric('admission.quota.saturated', { reason: 'local_state' });
+          yield* telemetry.record({ _tag: 'LocalStateSaturated' });
           return { _tag: 'Saturated' };
         }
         const remaining = tokens - cost;
@@ -63,17 +63,18 @@ export function admissionLayer(policy: AdmissionPolicy): Layer.Layer<Admission, 
             Effect.tap((result) => {
               if (result._tag === 'Saturated' || !degraded) return Effect.void;
               degraded = false;
-              return metric('admission.quota.recovery');
+              return telemetry.record({ _tag: 'Recovery' });
             }),
             Effect.catchTag('QuotaUnavailable', (error) =>
               Effect.gen(function* () {
                 degraded = true;
-                yield* metric('admission.quota.fallback', { reason: error.reason });
+                yield* telemetry.record({ _tag: 'Fallback', reason: error.reason });
                 return yield* fallback(visitor, cost);
               })
             )
           );
         }
+        yield* telemetry.record({ _tag: 'Disabled' });
         const now = yield* DateTime.now;
         return {
           _tag: 'Allowed',

@@ -51,3 +51,16 @@ export interface Admission {
 }
 
 export const Admission = Context.Service<Admission>('wallpaperdb.gateway.admission.Admission');
+
+/** Bounded admission transitions, without visitor identifiers or infrastructure details. */
+export type AdmissionEvent =
+  | { readonly _tag: 'Fallback'; readonly reason: QuotaUnavailable['reason'] }
+  | { readonly _tag: 'Recovery' }
+  | { readonly _tag: 'LocalStateSaturated' }
+  | { readonly _tag: 'Disabled' };
+export interface AdmissionTelemetry {
+  record(event: AdmissionEvent): Effect.Effect<void>;
+}
+export const AdmissionTelemetry = Context.Service<AdmissionTelemetry>(
+  'wallpaperdb.gateway.admission.Telemetry'
+);

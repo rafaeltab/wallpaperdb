@@ -5,9 +5,9 @@ import {
   Admission,
   Quota,
   QuotaUnavailable,
-  admissionLayer,
+  admissionLayer as makeAdmissionLayer,
 } from '../../src/capabilities/admission/index.js';
-import { memoryQuotaLayer } from '../helpers/quota.js';
+import { memoryQuotaLayer, quietAdmissionTelemetry } from '../helpers/quota.js';
 
 const fallback = { capacity: 100000, refillMs: 60000, maxVisitors: 10000 };
 const policy = { fallback, enabled: true, limit: 2, windowMs: 1000 };
@@ -269,3 +269,7 @@ it.effect(
       });
     })
 );
+
+function admissionLayer(policy: Parameters<typeof makeAdmissionLayer>[0]) {
+  return makeAdmissionLayer(policy).pipe(Layer.provide(quietAdmissionTelemetry));
+}

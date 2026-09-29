@@ -230,7 +230,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: sum(increase(admission_quota_unenforced_total[5m])) or vector(0)
+              expr: sum(increase({__name__=~"admission_quota_(fallback|disabled)_total"}[5m])) or vector(0)
               instant: true
               range: false
               intervalMs: 1000
@@ -268,8 +268,62 @@ groups:
         execErrState: Error
         for: 1m
         annotations:
-          summary: Gateway admitted requests without enforcing the configured quota
-          description: "Requests bypassed distributed quota enforcement in the last 5 minutes. Inspect admission_quota_unenforced_total by reason: disabled, unavailable, saturated, or command_failure. Saturated means all 64 local command slots are occupied; bypasses can occur even with healthy Redis. Check REDIS_ENABLED, connectivity, and command failures or timeouts. The counter is emitted only when the admission policy is enabled."
+          summary: Gateway fleet-wide quota is unavailable
+          description: "Inspect admission_quota_fallback_total by reason: disabled, unavailable, or command_failure. Outage requests use smaller per-replica budgets, so the fleet-wide limit is unavailable. admission_quota_recovery_total records successful returns to shared admission without merging outage charges. admission_quota_disabled_total identifies intentional development-only bypass; production rejects disabled protection. Check Redis connectivity and command failures."
+        labels:
+          severity: critical
+          service: gateway
+
+      - uid: gateway-quota-saturated
+        title: Gateway Admission Capacity Saturated
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(increase(admission_quota_saturated_total[5m])) or vector(0)
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: Gateway rejects requests because admission capacity is saturated
+          description: "Requests receive HTTP 503. Inspect admission_quota_saturated_total by reason: saturated means all 64 Redis command slots are occupied; local_state means the bounded per-replica fallback identity store is full. Existing depleted budgets remain enforced. Check command latency, Redis connectivity, and source-IP volume."
         labels:
           severity: critical
           service: gateway

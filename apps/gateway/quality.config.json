@@ -6,6 +6,7 @@
     "adapters/events",
     "adapters/opensearch",
     "adapters/redis",
-    "adapters/availability"
+    "adapters/availability",
+    "adapters/admission-telemetry"
   ]
 }

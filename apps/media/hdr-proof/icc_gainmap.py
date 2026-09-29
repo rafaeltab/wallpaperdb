@@ -114,30 +114,57 @@ def native_decode(path, output, *, boost=16):
     return values, facts
 
 
-def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='float'):
-    """Bounded first experiment: the pinned ISO gain-map JPEG upscale only."""
+def _pq_source(path, directory, expected_size):
+    """Inspect the existing XMP PQ bridge without widening native source support."""
+    import gainmap_hdr
+    path = Path(path)
+    if gainmap_hdr._pq_source_primaries(path) != 9:
+        raise ValueError('XMP native source bridge must carry actual Rec.2020 PQ signaling')
+    facts = gainmap.inspect(path, directory)
+    signal = avif.read_png(path)
+    if (facts['coded_depth'] != 16 or facts['frame_count'] != 1 or not facts['opaque']
+            or facts['private_tags'] or facts['metadata'].get('IFD0:Orientation', 1) != 1
+            or signal.shape[1::-1] != tuple(expected_size)):
+        raise ValueError('XMP native source bridge has unsupported precision, dimensions, orientation, motion or metadata')
+    return avif.decode_transfer(signal[..., :3], 'pq', 'rec2020'), {
+        'path': str(path), 'sha256': avif.digest(path), 'gamut': 'rec2020', 'transfer': 'pq',
+        'coded_depth': 16, 'native_requested_depth': 12, 'facts': facts,
+        'scope': 'Existing native libavif reconstruction to PQ16 PNG; not the ISO-only float32 source decoder',
+        'reference_relationship': 'The established source reference shares native libavif gain application; '
+            'independent PNG readback verifies transport precision. Final HDR output uses separate '
+            'native ICC-aware and FFmpeg/ISO reconstruction gates.'}
+
+
+def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='float', source_id='gainmap-android-iso'):
+    """Bounded ISO experiments and one exact XMP-upscale gamma1.5 recipe."""
     import gainmap_combine
     import gainmap_hdr
     from gainmap_metadata import check_metadata
     from gainmap_reference import reference
     from appearance import compare_appearance, sdr_signal_to_nits, delta_e_itp
     from matrix import GAINMAP_GEOMETRIES
+    _encoder(map_policy, map_gamma, map_method)
+    if source_id not in ('gainmap-android-iso', 'gainmap-android-xmp'):
+        raise ValueError('Only pinned ISO and the separately admitted XMP source are supported')
+    if source_id == 'gainmap-android-xmp' and (map_policy, map_gamma, map_method) != ('midpointoffset', 1.5, 'float'):
+        raise ValueError('The XMP experiment admits only midpointoffset gamma1.5 FLOAT map upscale')
     folder = Path(directory)
     folder.mkdir(parents=True, exist_ok=True)
-    _encoder(map_policy, map_gamma, map_method)
     start = len(avif.COMMANDS)
-    name, operation, gamut = 'gainmap-android-iso', 'upscale', 'p3'
+    name, operation = source_id, 'upscale'
+    gamut, source_precision = ('p3', 'float32') if name == 'gainmap-android-iso' else ('srgb', 'pq16')
     source = gainmap.FIXTURES/f'{name}.jpg'
     fixture = next(f for f in json.loads((gainmap.FIXTURES/'manifest.json').read_text())['fixtures'] if f['id'] == name)
     if avif.digest(source) != fixture['sha256']:
-        raise ValueError('Pinned ISO source fixture hash changed')
+        raise ValueError('Pinned gain-map source fixture hash changed')
     revision = 'gainmap-hdr-target-gamut-v1'
-    candidate = f'native-combine-icc-gamma32-{map_policy}-dct-{map_method}-map-source-float32'
+    candidate = f'native-combine-icc-gamma32-{map_policy}-dct-{map_method}-map-source-{source_precision}'
     if map_gamma != 1:
         candidate += f'-map-gamma{map_gamma:g}'
     case = {'case_id': f'{name}:hdr:jpg:preserve:preserve:{operation}:{candidate}:{revision}',
         'fixture_id': name, 'source_sha256': fixture['sha256'], 'cell_id': 'gainmap-jpeg:hdr:jpg',
         'candidate': candidate, 'geometry': operation, 'source_reference_revision': revision,
+        'source_precision': source_precision,
         'selectors': {'format': 'jpg', 'range': 'hdr', 'gamut': 'preserve', 'depth': 'preserve',
             'motion': 'preserve', 'transparency': 'preserve', **GAINMAP_GEOMETRIES[operation]},
         'status': 'tested and failed', 'consumer_status': 'pending manual review',
@@ -165,18 +192,24 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
         # Reuse the unchanged pinned native source/geometry stage. Its old
         # JPEG is a recorded preparation artifact and cannot qualify this one.
         preparation = gainmap_combine.encode(source, folder/'preparation.jpg', operation, gamut=gamut,
-            map_policy='moderateoffset', geometry_revision=revision, source_precision='float32')
+            map_policy='moderateoffset', geometry_revision=revision, source_precision=source_precision)
         base, output = folder/'gamma32-base.jpg', folder/'output.jpg'
         base_encoding = gainmap_sdr.encode(source, base, operation, gamut=gamut, gamma=3.2)
         case['native_candidate'] = pack(base, preparation['hdr_intent_pq_png'], output,
             map_policy=map_policy, map_gamma=map_gamma, map_method=map_method)
         case['native_candidate'].update({'base_encoding': base_encoding, 'source_preparation': preparation})
         case['checks']['native_encoder'] = True
-        native_source = preparation['hdr_source']
-        values = np.fromfile(native_source['path'], '<f4').reshape(3, native_source['height'], native_source['width'])
-        values = values[[2, 0, 1]].transpose(1, 2, 0)*native_source['normalization_nits']
+        if source_precision == 'float32':
+            native_source = preparation['hdr_source']
+            values = np.fromfile(native_source['path'], '<f4').reshape(3, native_source['height'], native_source['width'])
+            values = values[[2, 0, 1]].transpose(1, 2, 0)*native_source['normalization_nits']
+        else:
+            source_pq = Path(preparation['parts_directory'])/'hdr-source/source-pq-rec2020.png'
+            values, native_source = _pq_source(source_pq, folder/'source-pq-inspection',
+                [fixture['expected']['width'], fixture['expected']['height']])
+        case['source_precision_evidence'] = native_source
         source_measure = compare_appearance(hdr_source, values, reference_gamut=source_gamut,
-            actual_gamut=gamut, fixture_class='gainmap-hdr')
+            actual_gamut=native_source['gamut'], fixture_class='gainmap-hdr')
         geometry_measure = compare_appearance(hdr_reference, gainmap_hdr.read_linear(preparation['hdr_geometry']),
             reference_gamut=gamut, actual_gamut=gamut, fixture_class='gainmap-hdr')
         case['checks']['native_source_precision'] = source_measure['passed']
@@ -190,7 +223,7 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
             ('ColorPrimaries', 'TransferCharacteristics', 'MatrixCoefficients', 'VideoFullRangeFlag')]
         case['hdr_intent'] = {'path': str(intent), 'sha256': avif.digest(intent), 'facts': intent_facts,
             'purpose': 'Inspected native HDR intent comparison; not an independent reference'}
-        case['checks']['hdr_intent'] = (intent_measure['passed'] and intent_cicp == [12,16,0,1]
+        case['checks']['hdr_intent'] = (intent_measure['passed'] and intent_cicp == [{'p3':12,'srgb':1}[gamut],16,0,1]
             and intent_facts['coded_depth'] == 16 and intent_facts['frame_count'] == 1 and intent_facts['opaque']
             and not intent_facts['private_tags'] and intent_signal.shape[:2] == hdr_reference.shape[:2])
         facts = gainmap.inspect(output, folder/'inspection')
@@ -274,7 +307,12 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
                 logged_commands.append({'log': str(log), **value})
         except (UnicodeError, json.JSONDecodeError):
             pass
-    report = {'scope': 'One predeclared ISO-upscale ICC-aware native HDR candidate; unchanged appearance gates',
+    report = {'scope': f'One predeclared {name}-upscale ICC-aware native HDR candidate; unchanged appearance gates',
+        'source_policy': {'fixture': name, 'geometry': operation, 'native_precision': source_precision,
+            'reference_revision': revision, 'gamut': gamut,
+            'declaration': 'XMP admits only the unchanged midpointoffset gamma1.5 FLOAT map recipe; '
+                'the ISO-only float32 source guard remains unchanged. Source, geometry, native HDR intent, '
+                'authored SDR and both final HDR readers must pass the existing gates.'},
         'map_representation': {'policy': map_policy, 'encoding_gamma': map_gamma, 'coded_depth': 8,
             'encoding': f'Native pow(normalized log gain, gamma), rounded to RGB8; native {map_method} DCT JPEG',
             'map_dct_method': map_method,
@@ -300,7 +338,7 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
         'source_hashes': {name: avif.digest(Path(__file__).with_name(name)) for name in
             ('icc_gainmap.py', 'native_icc_gainmap.cpp', 'icc-gainmap-build.sh', 'libavif-icc-linear-base.patch',
              'libavif-gamma2-gain.patch', 'libavif-midpoint-offset-gain.patch', 'libavif-gamma15-gain.patch',
-             'dct_jpeg.py', 'native_dct_jpeg.c')},
+             'dct_jpeg.py', 'native_dct_jpeg.c', 'gainmap_combine.py', 'gainmap_hdr.py')},
         'native_hashes': Path('/opt/proof/icc-gainmap/binary-sha256.txt').read_text(),
         'native_source_hashes': Path('/opt/proof/icc-gainmap/source-sha256.txt').read_text()}
     (folder/'results.json').write_text(json.dumps(report, indent=2)+'\n')

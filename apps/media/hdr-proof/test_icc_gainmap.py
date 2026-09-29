@@ -325,6 +325,59 @@ class IccGainmapTests(unittest.TestCase):
             self.assertEqual(case['consumer_status'], 'pending manual review')
             self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
 
+    def test_xmp_scope_rejects_unproved_recipes_and_sources_before_native_calls(self):
+        import avif
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            for arguments in ({'source_id': 'gainmap-apple-new'},
+                    {'source_id': 'gainmap-android-xmp'},
+                    {'source_id': 'gainmap-android-xmp', 'map_policy': 'midpointoffset', 'map_gamma': 2}):
+                before = len(avif.COMMANDS)
+                with self.subTest(arguments=arguments), self.assertRaises(ValueError):
+                    run(Path(temporary), **arguments)
+                self.assertEqual(len(avif.COMMANDS), before)
+            self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_xmp_upscale_uses_inspected_pq_source_and_qualifies_both_hdr_readers(self):
+        from icc_gainmap import run, _pq_source
+        from hdr_png import _png_chunks
+        import struct
+        import zlib
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            case = run(folder, source_id='gainmap-android-xmp', map_policy='midpointoffset', map_gamma=1.5)['cases'][0]
+            self.assertEqual(case['status'], 'qualified', case['blockers'])
+            self.assertTrue(all(case['checks'].values()))
+            self.assertTrue(all(value['passed'] for value in case['measurements'].values()))
+            self.assertEqual(case['source_precision'], 'pq16')
+            source = case['source_precision_evidence']
+            self.assertEqual((source['gamut'], source['transfer'], source['coded_depth'], source['native_requested_depth']),
+                             ('rec2020', 'pq', 16, 12))
+            self.assertIn('shares native libavif gain application', source['reference_relationship'])
+            self.assertEqual(case['hdr_intent']['facts']['metadata']['PNG-cICP:ColorPrimaries'], 1)
+            self.assertEqual(case['facts']['base']['depth'], 8)
+            self.assertEqual(case['facts']['map']['depth'], 8)
+            self.assertEqual(case['artifacts']['sha256'], 'a3a9191c6e6854b3cf5e982f9364d3448bb548ca7c85a2ba600e2cc411e51e53')
+            self.assertIn('source-pq16-map-gamma1.5', case['case_id'])
+            self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
+            pq = Path(source['path'])
+            with self.assertRaisesRegex(ValueError, 'dimensions'):
+                _pq_source(pq, folder/'wrong-size', [404, 302])
+            bad = folder/'wrong-color.png'
+            rewritten = bytearray(b'\x89PNG\r\n\x1a\n')
+            for kind, payload in _png_chunks(pq.read_bytes()):
+                if kind == b'cICP':
+                    payload = bytes([2, 16, 0, 1])
+                rewritten.extend(struct.pack('>I', len(payload))+kind+payload+struct.pack('>I', zlib.crc32(kind+payload)))
+            bad.write_bytes(rewritten)
+            with self.assertRaisesRegex(ValueError, 'signaling'):
+                _pq_source(bad, folder/'wrong-color', [403, 302])
+            bad.write_bytes(pq.read_bytes())
+            native(['exiftool', '-overwrite_original', '-Orientation#=6', bad])
+            with self.assertRaisesRegex(ValueError, 'orientation'):
+                _pq_source(bad, folder/'wrong-orientation', [403, 302])
+
 
 if __name__ == '__main__':
     unittest.main()

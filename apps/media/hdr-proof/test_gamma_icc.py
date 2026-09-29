@@ -6,11 +6,54 @@ from pathlib import Path
 import numpy as np
 
 from appearance import RGB_TO_XYZ, compare_appearance, sdr_signal_to_nits
-from avif import native, write_png
+from avif import digest, native, read_png, write_png
 from gamma_icc import make_profile, profile_facts, encode, inspect_and_decode, decode_signal_to_nits
 
 
 class GammaIccTests(unittest.TestCase):
+    def test_legacy_default_native_codec_bytes_remain_unchanged(self):
+        # Recorded before introducing the opt-in quantizer, at 42e68ff9, in
+        # the pinned proof image. The deterministic stimulus uses native PNG16.
+        expected = {
+            'static-jpeg': '29d0767b7035d155defb36a7ba601f4457436a7614137952c6523a46d1ee4f5f',
+            'static-webp': '162f6293d32481d2de0375396e123b2db92845eb1e003c434488300ab972f11e',
+            'animated-webp': 'c0a25f60f02b21a9ea32bb2317e8380e8e588b46ab634cb12f23e374814b77d7',
+        }
+        first = np.ones((16, 32, 4))
+        first[..., :3] = [.0014, .25, .885]
+        first[..., 3] = np.linspace(0, 1, 32)
+        second = first.copy()
+        second[..., :3] = [.2, .4, .6]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths = [root/'first.png', root/'second.png']
+            for path, pixels in zip(paths, (first, second)):
+                write_png(path, pixels)
+            for label, extension, inputs in (('static-jpeg', 'jpg', paths[:1]),
+                                             ('static-webp', 'webp', paths[:1]),
+                                             ('animated-webp', 'webp', paths)):
+                with self.subTest(candidate=label):
+                    output = root/f'{label}.{extension}'
+                    encode(inputs, output, extension)
+                    self.assertEqual(digest(output), expected[label])
+
+    def test_native_nearest_quantizer_matches_independent_integer_rounding(self):
+        # Exhaust every sixteen-bit alpha code, with changing straight RGB.
+        ramp = np.arange(65536, dtype=float).reshape(256, 256) / 65535
+        pixels = np.stack((ramp, ramp.T, 1 - ramp, np.roll(ramp, 47, axis=1)), axis=-1)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source, output = root/'source.png', root/'nearest.webp'
+            write_png(source, pixels)
+            encode([source], output, 'webp', quantization='nearest')
+            gamma16 = read_png(root/'nearest-gamma22-0.png')
+            gamma8 = read_png(root/'nearest-gamma22-8-0.png')
+            expected = np.rint(gamma16 * 255) / 255
+            np.testing.assert_array_equal(gamma8, expected)
+            self.assertLessEqual(float(np.max(np.abs(gamma8 - gamma16))), .5 / 255)
+            _, frames, _ = inspect_and_decode(output)
+            np.testing.assert_array_equal(frames[0], expected)
+
     def test_new_explicit_gamma_and_gamut_profiles_preserve_legacy_default_bytes(self):
         import hashlib
         self.assertEqual(hashlib.sha256(make_profile()).hexdigest(),

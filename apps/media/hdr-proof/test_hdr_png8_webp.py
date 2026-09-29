@@ -12,6 +12,39 @@ import hdr_png8_webp
 
 
 class PngEightBitWebpTests(unittest.TestCase):
+    def test_nearest_candidates_keep_legacy_bytes_and_measurements(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = hdr_png8_webp.run(root/'baseline')
+            extended = hdr_png8_webp.run(root/'nearest', nearest_quantization=True)
+            self.assertEqual(len(extended['evidence']), 16)
+            self.assertEqual(Counter(item['status'] for item in extended['evidence']), {'qualified': 16})
+            originals = {item['case_id']: item for item in baseline['evidence']}
+            for item in extended['evidence']:
+                with self.subTest(case=item['case_id']):
+                    if item['case_id'] in originals:
+                        before = originals[item['case_id']]
+                        self.assertEqual(item['artifacts']['sha256'], before['artifacts']['sha256'])
+                        self.assertEqual(item['measurements']['frames'], before['measurements']['frames'])
+                        self.assertEqual(item['status'], before['status'])
+                        continue
+                    self.assertTrue(item['case_id'].endswith(':nearest8'))
+                    self.assertTrue(item['quantization_measurement']['passed'])
+                    self.assertEqual(item['quantization_measurement']['mismatched_nearest_codes'], 0)
+                    self.assertLessEqual(item['quantization_measurement']['maximum_rgb_error'], .5 / 255)
+                    self.assertLessEqual(item['quantization_measurement']['maximum_alpha_error'], .5 / 255)
+                    self.assertTrue(all(item['checks'].values()), item['blockers'])
+                    before = originals[item['case_id'].removesuffix(':nearest8')]
+                    self.assertLessEqual(item['facts']['alpha_measurement']['maximum_absolute_error'],
+                                         before['facts']['alpha_measurement']['maximum_absolute_error'])
+            # The same independent stage gate must detect the original native
+            # conversion's rounding bias; a decodable lossless file is not enough.
+            first = Path(baseline['evidence'][0]['artifacts']['output']).parent
+            previous_rounding = hdr_png8_webp.inspect_quantization(
+                first/'output-gamma22-0.png', first/'output-gamma22-8-0.png')
+            self.assertFalse(previous_rounding['passed'])
+            self.assertGreater(previous_rounding['mismatched_nearest_codes'], 0)
+
     def test_all_containment_outputs_preserve_the_declared_sdr_grade_and_alpha(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = hdr_png8_webp.run(Path(temporary))

@@ -39,6 +39,14 @@ WEBP_POLICY = {
     'geometry': 'Contain 58 x 38 producing 57 x 38 with independent premultiplied bilinear geometry',
     'scope': 'Only these explicit SDR WebP containment tuples; physical consumers remain pending',
 }
+NEAREST_POLICY = {
+    'declared_before_native_measurements': True,
+    'method': 'Native full-range zscale, no dither, nearest 16-to-8-bit normalized RGBA codes',
+    'maximum_sample_error_limit': .5 / 255,
+    'rationale': ('Every emitted RGB and alpha code must equal independent nearest integer rounding '
+                  'of the decoded gamma16 input. This stage gate does not replace or relax the '
+                  'unchanged sdr-8 appearance, 1000-nit SDR grade or 2/255 geometry-alpha gates.'),
+}
 
 
 def _container(data):
@@ -100,7 +108,33 @@ def inspect_and_decode(path):
     return facts, pixels, profile
 
 
-def run(output_directory, *, specs=None, source_lock=SOURCE_LOCK):
+def inspect_quantization(gamma16_path, gamma8_path):
+    """Prove the actual native stage against integer code rounding, including alpha."""
+    decoded, depths = [], []
+    for path in (gamma16_path, gamma8_path):
+        raw = avif.native(['hdr-proof-png-decode', path])
+        width, height, depth = struct.unpack('<III', raw[:12])
+        if len(raw) != 12 + width * height * 8:
+            raise ValueError('Independent libpng quantization-stage dimensions disagree')
+        decoded.append(np.frombuffer(raw[12:], dtype='<u2').reshape(height, width, 4).astype(float)/65535)
+        depths.append(depth)
+    before, after = decoded
+    if before.shape != after.shape or depths != [16, 8]:
+        raise ValueError('Expected matched actual sixteen-bit and eight-bit quantization stages')
+    expected = np.rint(before * 255) / 255
+    mismatch = int(np.count_nonzero(after != expected))
+    rgb_error = float(np.max(np.abs(after[..., :3] - before[..., :3])))
+    alpha_error = float(np.max(np.abs(after[..., 3] - before[..., 3])))
+    return {**NEAREST_POLICY,
+        'passed': mismatch == 0 and max(rgb_error, alpha_error) <= NEAREST_POLICY['maximum_sample_error_limit'],
+        'mismatched_nearest_codes': mismatch,
+        'maximum_rgb_error': rgb_error, 'maximum_alpha_error': alpha_error,
+        'source_depth': depths[0], 'coded_depth': depths[1],
+        'source': str(gamma16_path), 'source_sha256': avif.digest(gamma16_path),
+        'coded': str(gamma8_path), 'coded_sha256': avif.digest(gamma8_path)}
+
+
+def run(output_directory, *, specs=None, source_lock=SOURCE_LOCK, nearest_quantization=False):
     root = Path(output_directory)
     root.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
@@ -123,73 +157,79 @@ def run(output_directory, *, specs=None, source_lock=SOURCE_LOCK):
         reference = avif.geometry_reference(reference_source, 'contain')
         selectors = {'format': 'webp', 'range': 'sdr', 'gamut': 'srgb', 'depth': '8',
                      'motion': 'preserve', 'transparency': 'preserve', 'w': 58, 'h': 38, 'fit': 'contain'}
-        case_id = f'{fixture["id"]}:sdr:webp:srgb:preserve:contain:normalized-source16:gamma22-icc'
-        directory = folder/case_id.replace(':', '-')
-        directory.mkdir(exist_ok=True)
-        item = {'case_id': case_id, 'fixture_id': fixture['id'], 'cell_id': 'hdr-png:sdr:webp',
-            'selectors': selectors, 'geometry': 'contain', 'status': 'tested and failed',
-            'checks': {key: False for key in ('native_encoder', 'independent_decoder', 'structure', 'appearance', 'privacy')},
-            'blockers': [], 'measurements': {}, 'artifacts': {}, 'source_facts': source_facts,
-            'consumer_status': 'pending manual review',
-            'threshold_scope': {**WEBP_POLICY, 'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))}}
-        try:
-            normalized = folder/'normalized-source.png'
-            normalization = hdr_png8_proof.normalize_source(source, normalized)
-            item['source_normalization'] = normalization
-            if not normalization['passed']:
-                raise ValueError('Exact native source normalization failed; SDR WebP conversion withheld')
-            known = {'format': 'png', 'range': 'hdr', 'gamut': gamut, 'depth': source_facts['depth'],
-                     'width': source_facts['width'], 'height': source_facts['height'], 'motion': 'static',
-                     'alpha': 'fractional' if np.any((pixels[..., 3] > 0) & (pixels[..., 3] < 1)) else 'none',
-                     'alpha_capable': True, 'orientation': source_facts['orientation']}
-            item['request_decision'] = request_decision(known, selectors)
-            if item['request_decision']['action'] != 'unqualified':
-                raise ValueError('The explicit SDR WebP tuple is outside this native experiment')
-            tone = avif.sdr_tone_control(normalized, folder/'sdr-control.png', reference_source,
-                avif.make_scene(source_facts['alpha_channel']), transfer, gamut, peak_nits=1000)
-            converted, target = directory/'converted.png', directory/'output.webp'
-            avif.convert_frame(normalized, converted, transfer, gamut, 'contain', sdr=True, peak_nits=1000)
-            gamma_icc.encode([converted], target, 'webp')
-            item['checks']['native_encoder'] = True
-            facts, actual, profile = inspect_and_decode(target)
-            coded = avif.read_png(directory/'output-gamma22-8-0.png')
-            mismatches = int(np.count_nonzero(actual != coded)) if actual.shape == coded.shape else -1
-            facts['lossless_storage'] = {'passed': mismatches == 0, 'mismatched_rgba_samples': mismatches,
-                'reference': 'Independent libpng decode of actual gamma-2.2 RGB8/RGBA8 encoder input'}
-            alpha_error = float(np.max(np.abs(actual[..., 3] - reference[..., 3])))
-            facts['alpha_measurement'] = {'maximum_absolute_error': alpha_error,
-                'absolute_error_limit': WEBP_POLICY['alpha_error_limit'],
-                'comparison': 'Independent premultiplied matched-geometry source alpha'}
-            detail = {'dimensions': actual.shape == reference.shape, 'depth': facts['depth'] == 8,
-                'color_signaling': facts['icc']['gamma22_srgb_primaries'],
-                'gamut': facts['icc']['gamut'] == 'srgb', 'frames': facts['container']['frames'] == 1,
-                'static_container': not facts['container']['animation'],
-                'orientation_baked': facts['exiftool'].get('Orientation', 1) == 1,
-                'alpha': alpha_error <= WEBP_POLICY['alpha_error_limit'],
-                'alpha_signaling': facts['alpha_flag_matches_pixels'],
-                'exact_lossless_storage': facts['lossless_storage']['passed']}
-            privacy = hdr_png.inspect_privacy(target, facts, 'webp')
-            expected = sdr_signal_to_nits(reference_srgb(reference[..., :3], gamut, peak_nits=1000))
-            actual_linear = gamma_icc.decode_signal_to_nits(actual[..., :3], profile)
-            measured = compare_appearance(expected, actual_linear, reference_gamut='srgb', actual_gamut='rec2020',
-                fixture_class='sdr-8', alpha=reference[..., 3],
-                region_reference_luminance_nits=reference[..., :3] @ RGB_TO_XYZ[gamut][1])
-            measured['tone_control_passed'] = tone['passed']
-            measured['passed'] &= tone['passed']
-            item['measurements'] = {'frames': [measured], 'tone_controls': [tone]}
-            item['checks'].update({'independent_decoder': True, 'structure': all(detail.values()),
-                                  'appearance': bool(measured['passed']), 'privacy': privacy['passed']})
-            item['facts'], item['structural_checks'], item['privacy_measurement'] = facts, detail, privacy
-            item['representation'] = {'primaries': 'srgb', 'transfer': 'ICC gamma 2.2', 'depth': 8,
-                                      'grade': WEBP_POLICY['reference_grade']}
-            item['artifacts'] = {'output': str(target), 'sha256': avif.digest(target),
-                                 'source': str(source), 'source_sha256': avif.digest(source)}
-            item['blockers'] += [f'Failed {key} check' for key, passed in item['checks'].items() if not passed]
-            if all(item['checks'].values()) and not item['blockers']:
-                item['status'] = 'qualified'
-        except Exception as error:
-            item['blockers'].append(str(error))
-        evidence.append(item)
+        for quantization in (('native', 'nearest') if nearest_quantization else ('native',)):
+            case_id = (f'{fixture["id"]}:sdr:webp:srgb:preserve:contain:normalized-source16:gamma22-icc'
+                       + (':nearest8' if quantization == 'nearest' else ''))
+            directory = folder/case_id.replace(':', '-')
+            directory.mkdir(exist_ok=True)
+            item = {'case_id': case_id, 'fixture_id': fixture['id'], 'cell_id': 'hdr-png:sdr:webp',
+                'selectors': selectors, 'geometry': 'contain', 'status': 'tested and failed',
+                'checks': {key: False for key in ('native_encoder', 'independent_decoder', 'structure', 'appearance', 'privacy')},
+                'blockers': [], 'measurements': {}, 'artifacts': {}, 'source_facts': source_facts,
+                'consumer_status': 'pending manual review',
+                'threshold_scope': {**WEBP_POLICY, 'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))}}
+            try:
+                normalized = folder/'normalized-source.png'
+                normalization = hdr_png8_proof.normalize_source(source, normalized)
+                item['source_normalization'] = normalization
+                if not normalization['passed']:
+                    raise ValueError('Exact native source normalization failed; SDR WebP conversion withheld')
+                known = {'format': 'png', 'range': 'hdr', 'gamut': gamut, 'depth': source_facts['depth'],
+                         'width': source_facts['width'], 'height': source_facts['height'], 'motion': 'static',
+                         'alpha': 'fractional' if np.any((pixels[..., 3] > 0) & (pixels[..., 3] < 1)) else 'none',
+                         'alpha_capable': True, 'orientation': source_facts['orientation']}
+                item['request_decision'] = request_decision(known, selectors)
+                if item['request_decision']['action'] != 'unqualified':
+                    raise ValueError('The explicit SDR WebP tuple is outside this native experiment')
+                tone = avif.sdr_tone_control(normalized, folder/'sdr-control.png', reference_source,
+                    avif.make_scene(source_facts['alpha_channel']), transfer, gamut, peak_nits=1000)
+                converted, target = directory/'converted.png', directory/'output.webp'
+                avif.convert_frame(normalized, converted, transfer, gamut, 'contain', sdr=True, peak_nits=1000)
+                gamma_icc.encode([converted], target, 'webp', quantization=quantization)
+                item['checks']['native_encoder'] = True
+                facts, actual, profile = inspect_and_decode(target)
+                coded = avif.read_png(directory/'output-gamma22-8-0.png')
+                mismatches = int(np.count_nonzero(actual != coded)) if actual.shape == coded.shape else -1
+                facts['lossless_storage'] = {'passed': mismatches == 0, 'mismatched_rgba_samples': mismatches,
+                    'reference': 'Independent libpng decode of actual gamma-2.2 RGB8/RGBA8 encoder input'}
+                alpha_error = float(np.max(np.abs(actual[..., 3] - reference[..., 3])))
+                facts['alpha_measurement'] = {'maximum_absolute_error': alpha_error,
+                    'absolute_error_limit': WEBP_POLICY['alpha_error_limit'],
+                    'comparison': 'Independent premultiplied matched-geometry source alpha'}
+                detail = {'dimensions': actual.shape == reference.shape, 'depth': facts['depth'] == 8,
+                    'color_signaling': facts['icc']['gamma22_srgb_primaries'],
+                    'gamut': facts['icc']['gamut'] == 'srgb', 'frames': facts['container']['frames'] == 1,
+                    'static_container': not facts['container']['animation'],
+                    'orientation_baked': facts['exiftool'].get('Orientation', 1) == 1,
+                    'alpha': alpha_error <= WEBP_POLICY['alpha_error_limit'],
+                    'alpha_signaling': facts['alpha_flag_matches_pixels'],
+                    'exact_lossless_storage': facts['lossless_storage']['passed']}
+                if quantization == 'nearest':
+                    item['quantization_measurement'] = inspect_quantization(
+                        directory/'output-gamma22-0.png', directory/'output-gamma22-8-0.png')
+                    detail['nearest_code_rounding'] = item['quantization_measurement']['passed']
+                privacy = hdr_png.inspect_privacy(target, facts, 'webp')
+                expected = sdr_signal_to_nits(reference_srgb(reference[..., :3], gamut, peak_nits=1000))
+                actual_linear = gamma_icc.decode_signal_to_nits(actual[..., :3], profile)
+                measured = compare_appearance(expected, actual_linear, reference_gamut='srgb', actual_gamut='rec2020',
+                    fixture_class='sdr-8', alpha=reference[..., 3],
+                    region_reference_luminance_nits=reference[..., :3] @ RGB_TO_XYZ[gamut][1])
+                measured['tone_control_passed'] = tone['passed']
+                measured['passed'] &= tone['passed']
+                item['measurements'] = {'frames': [measured], 'tone_controls': [tone]}
+                item['checks'].update({'independent_decoder': True, 'structure': all(detail.values()),
+                                      'appearance': bool(measured['passed']), 'privacy': privacy['passed']})
+                item['facts'], item['structural_checks'], item['privacy_measurement'] = facts, detail, privacy
+                item['representation'] = {'primaries': 'srgb', 'transfer': 'ICC gamma 2.2', 'depth': 8,
+                                          'grade': WEBP_POLICY['reference_grade']}
+                item['artifacts'] = {'output': str(target), 'sha256': avif.digest(target),
+                                     'source': str(source), 'source_sha256': avif.digest(source)}
+                item['blockers'] += [f'Failed {key} check' for key, passed in item['checks'].items() if not passed]
+                if all(item['checks'].values()) and not item['blockers']:
+                    item['status'] = 'qualified'
+            except Exception as error:
+                item['blockers'].append(str(error))
+            evidence.append(item)
         print(f'PNG8 {fixture["id"]}: native SDR WebP containment measured', flush=True)
     return {'evidence': evidence, 'fixtures': [], 'source_fixtures': sources, 'controls': [],
             'commands': avif.COMMANDS[start:], 'scope': WEBP_POLICY}

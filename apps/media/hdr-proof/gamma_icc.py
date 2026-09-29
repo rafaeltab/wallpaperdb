@@ -155,16 +155,24 @@ def decode_signal_to_nits(signal, profile, *, expected_gamma=2.2, expected_gamut
     return xyz @ np.linalg.inv(RGB_TO_XYZ['rec2020']).T
 
 
-def encode(paths, output, extension):
+def encode(paths, output, extension, *, quantization='native'):
     if extension not in ('jpg', 'webp') or not 1 <= len(paths) <= (2 if extension == 'webp' else 1):
         raise ValueError('Expected one JPEG frame or one/two WebP frames')
+    if quantization not in ('native', 'nearest'):
+        raise ValueError('Expected native or nearest 16-to-8-bit quantization')
     output = Path(output)
     encoded_frames = []
     for index, source in enumerate(paths):
         gamma16 = output.with_name(f'{output.stem}-gamma22-{index}.png')
         gamma8 = output.with_name(f'{output.stem}-gamma22-8-{index}.png')
         convert(source, gamma16)
-        native(['ffmpeg', '-v', 'error', '-y', '-i', gamma16, '-vf', 'format=rgba',
+        # Matching alpha-mode tags keep this code-value conversion from inserting
+        # association changes. Independent libpng checks cover every RGBA code.
+        quantizer = ('format=rgba' if quantization == 'native' else
+                     'format=gbrap16le,setparams=alpha_mode=premultiplied,'
+                     'zscale=rangein=full:range=full:dither=none,format=gbrap,'
+                     'setparams=alpha_mode=straight,format=rgba')
+        native(['ffmpeg', '-v', 'error', '-y', '-i', gamma16, '-vf', quantizer,
                 '-frames:v', '1', '-map_metadata', '-1', '-threads', '1', gamma8])
         encoded_frames.append(str(gamma8))
     native(['node', Path(__file__).with_name('encode-gamma-sdr.cjs')],

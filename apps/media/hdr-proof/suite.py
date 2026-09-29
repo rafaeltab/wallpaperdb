@@ -55,6 +55,8 @@ def versions():
                    'native_zimg_window_binary_sha256':avif.digest(Path('/usr/local/bin/hdr-proof-zimg-window')),
                    'native_lossless_jpeg_source_sha256':avif.digest(ROOT/'native_lossless_jpeg.c'),
                    'native_lossless_jpeg_binary_sha256':avif.digest(Path('/usr/local/bin/hdr-proof-lossless-jpeg')),
+                   'native_dct_jpeg_source_sha256':avif.digest(ROOT/'native_dct_jpeg.c'),
+                   'native_dct_jpeg_binary_sha256':avif.digest(Path('/usr/local/bin/hdr-proof-dct-jpeg')),
                    'proof_source_sha256':{path.name:avif.digest(path) for path in sorted(ROOT.iterdir())
                        if path.is_file() and (path.name == 'Dockerfile' or path.suffix in ('.py','.c','.cpp','.cjs','.sh','.patch'))},
                    'libultrahdr_variant_binaries':Path('/opt/proof/ultrahdr/binary-sha256.txt').read_text(),
@@ -266,11 +268,13 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- Combined gain-map candidates use JPEG SOF3 predictive RGB8 coding and proof-local native patches. The pinned libavif JPEG reader rejects SOF3, while the separately tested native JPEG/ISO and patched libultrahdr readers decode it. File qualification does not establish browser or wallpaper compatibility. Every exact representation still requires the listed physical consumer checks.',
               '- Separate SOF0 RGB8 DCT candidates compute a gain map against their actual compressed SDR base. Passing cases have a coding form that the pinned libavif reader can decode; DCT shadow errors still disqualify other cases. The libavif JPEG-to-AVIF-to-PQ decoder route adds eight-bit YCbCr map rounding, so its extra appearance failures remain separate diagnostics. Neither decoder result qualifies a physical browser or wallpaper setter.',
               '- A separate moderate-offset native gain-map candidate uses offsets of 1/4096 to reduce the eight-bit map interval while retaining near-black accuracy. Analytic dark controls and unchanged regional appearance gates check the tradeoff. All ISO, ExifTool XMP and native probe channel extrema, gamma, offsets and headroom must agree within documented serialization precision. The prior identity-policy upscale failures stay visible.',
+              '- Separate ISO float32 source candidates reuse the native codec transfer/gain functions before half-float storage and retain native float geometry. They must pass independent source, geometry, PQ intent and emitted-JPEG measurements. Floating-DCT alternatives use the native JDCT_FLOAT encoder while retaining the existing sRGB base transfer. Earlier source-precision and integer-DCT failures remain recorded.',
               '- Single-layer PQ PNG16 and AVIF12 candidates independently decode the executed native HDR intent against the gain-map source reference. They explicitly request output depth and preserve source primaries. The native PNG inspection file is also included as a manual comparison; its presence alone never qualifies a separate conversion. Explicit SDR requests continue to select the authored base.',
               '- The retained native JPEG writer emits independently parsed ISO plus per-channel Android metadata. Android element-style XMP now encodes and independently reconstructs. The validated ISO source reader removes a source-evidence gap within its declared scope. The separate native libavif regeneration route still rejects ISO-only input. Fractional map-coordinate crops in the retained-map route remain explicit failures.',
               '- Same-transfer AVIF geometry operates in display-linear light with explicit alpha handling. Cover resizing filters before cropping. A separate native coverage resample normalizes image-edge weights to the unchanged independent reference. The declared required static and animated HDR AVIF requests have qualified file evidence; this does not extend to untested photographs or consumers.',
               '- Calibrated static and sequence-wide SDR tone/gamut controls pass. Eight-bit sRGB-transfer failures remain visible. Higher-depth and correctly declared gamma-2.2 candidates retain the same predeclared sdr-8 appearance ceiling and distinct case IDs. Qualified alternatives can satisfy matching product selectors; they never change a failed representation into a passing one. The gamma transfer must be interpreted correctly by each consumer.',
               '- Animated outputs retain separate checks for fully composed frames, unequal durations, repetition count and fractional alpha. Only the matching qualified representation can fulfill the requested animation and transparency selectors.',
+              '- Every two-frame AVIF and APNG output also checks exact encoded-white stability where the independent references prove an unchanged source neighborhood. A one-code signal shift fails that control. Full-frame regional appearance and tone checks still apply.',
               '- Additional gamma-3.2 GIF candidates use native nearest rounding and retain the same SDR reference and fixed thresholds. Static AVIF/APNG cases have separate IDs from gamma-2.2 failures. Optional animated APNG-to-GIF cases preserve 300/700 ms timing and three total plays, encoded as two GIF repeats. Explicit binary coercion compares exact threshold decisions. Quantized half-alpha mismatches remain failed and record the reference, encoder-input and decoded values.',
               '- A further animated GIF candidate resamples alpha separately with native zimg and rounds to sixteen bits after each axis. Independent checks require identical RGB16 samples, intermediate alpha error within the existing PNG16 ceiling and exact final binary decisions. These candidates preserve the original SDR grade and keep the earlier half-alpha failures visible.',
               '- Static 16-bit HDR PNG sources have separate PQ/HLG, P3/Rec.2020 and alpha evidence for identity, contain, cover, fill, upscale and independently checked EXIF-8 orientation. Their source and HDR conversions use the unchanged stricter avif-12 appearance gates. Matching same-format identity requests are byte-exact controls. Six conflicting/unknown PNG signaling controls retain exact originals and withhold transforms.',
@@ -320,12 +324,16 @@ def main():
     write_json(RESULTS/'precision.json', precision)
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
-    authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','png','webp'))
+    authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))
     write_json(WORK/'authored-sdr-evidence.json',authored_sdr_result)
     from combined_gainmap_proof import run as run_combined_gainmap
     combined_gainmap_result = run_combined_gainmap(WORK/'combined-gainmap')
     combined_gainmap_result += run_combined_gainmap(WORK/'combined-gainmap-dct',
                                                    policies=('moderateoffset',), coding='dct-rgb')
+    combined_gainmap_result += run_combined_gainmap(WORK/'combined-gainmap-dct-float',
+                                                   policies=('moderateoffset',), coding='dct-float-rgb')
+    combined_gainmap_result += run_combined_gainmap(WORK/'combined-iso-float32',
+        names=('gainmap-android-iso',), policies=('moderateoffset',), source_precision='float32')
     write_json(WORK/'combined-gainmap-evidence.json',combined_gainmap_result)
     from gainmap_crossformat import run as run_gainmap_crossformat
     gainmap_crossformat_result = run_gainmap_crossformat(WORK/'gainmap-crossformat', combined_gainmap_result)

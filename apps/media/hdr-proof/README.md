@@ -54,6 +54,14 @@ to independently verified identity or two-times axes. Missing or conflicting
 color signaling, unknown ICC facts, nonidentity map orientation and unproved map
 ratios reject transformation.
 
+The ISO source also has a separate float32 reconstruction candidate. It calls
+the native codec's existing transfer and gain functions before half-float
+storage, then resamples in native float precision. Analytic channel/headroom
+controls and the unchanged independent source reference verify it. Its emitted
+JPEG cases retain the earlier PQ16 path and thresholds. A separate floating-DCT
+JPEG encoder tests the native library's `JDCT_FLOAT` method without changing
+the base transfer or gain-map interpretation.
+
 The [gain-map cross-format proof](gainmap_crossformat.py) separately evaluates
 single-layer PQ PNG16 and AVIF12 outputs from the native HDR intent. Independent
 libpng or dav1d decoding compares each emitted file with the reconstructed
@@ -183,6 +191,12 @@ Authored SDR lossless PNG and WebP candidates pass all four gain-map sources,
 two requested gamuts and seven geometries using 8-bit samples with independently
 verified sRGB transfer and sRGB or P3 ICC primaries. Their 112 cases keep the authored SDR grade and
 unchanged appearance gates; physical consumer interpretation remains pending.
+
+The [authored SDR AVIF candidate](authored_avif.py) uses native AOM RGB8 encoding
+and independent dav1d decoding. It preserves the base's eight-bit depth with
+explicit sRGB-transfer CICP and either sRGB or P3 primaries. It rejects auxiliary
+gain maps, conflicting ICC profiles, motion, alpha and disagreeing color facts.
+The same authored-base geometry and regional appearance limits still apply.
 
 The appearance metric keeps signed color coordinates when a valid color lies
 outside an intermediate RGB gamut. P3 red, for example, has a negative blue

@@ -52,6 +52,17 @@ for variant in baseline pr484 pr491 both rgb precise; do
         -DPROOF_VARIANT="\"$variant\"" /opt/proof/native_gainmap.cpp \
         -L "$variant/build" -luhdr -lavif -ljpeg -Wl,-rpath,\$ORIGIN \
         -o "/opt/proof/ultrahdr/$variant/hdr-proof-uhdr"
+    if [ "$variant" = precise ]; then
+        # The existing native transfer/gain functions have hidden shared
+        # symbols. Link their unchanged objects into a separate proof adapter
+        # to expose float32 samples before the decoder stores half floats.
+        cmake --build "$variant/build" --target uhdr-static --parallel 4
+        mkdir -p /opt/proof/ultrahdr/float32
+        c++ -std=c++17 -O2 -Wall -Wextra -Werror -I "$variant/source" -I "$variant/source/lib/include" \
+            -DPROOF_VARIANT='"float32"' -DPROOF_NATIVE_FLOAT32 /opt/proof/native_gainmap.cpp \
+            "$variant/build/libuhdr.a" -lavif -ljpeg -pthread \
+            -o /opt/proof/ultrahdr/float32/hdr-proof-uhdr
+    fi
 done
 cd /opt/proof/ultrahdr
 sha256sum */hdr-proof-uhdr */libuhdr.so.2.0.2 > binary-sha256.txt

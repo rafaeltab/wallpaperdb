@@ -1,8 +1,8 @@
 """Separate native float geometry candidate before a PQ16 intermediate.
 
-The source still has libultrahdr's half-float reconstruction precision. This
-candidate isolates the additional PQ encode/decode loss; it does not replace
-or change the passing PQ-based route. Native stack filters preserve float
+The default source keeps libultrahdr's half-float reconstruction precision.
+An explicit float32 candidate exposes the codec's existing gain functions
+before half storage. Both preserve the passing PQ-based route. Stack filters preserve float
 samples while padding, where FFmpeg's pad filter silently negotiates integers.
 """
 import hashlib
@@ -15,7 +15,9 @@ from gainmap import command
 from gainmap_hdr import _decode_iso_source
 
 
-def decode_iso_linear(source, directory, *, gamut):
+def decode_iso_linear(source, directory, *, gamut, precision='half'):
+    if precision not in ('half', 'float32'):
+        raise ValueError('Unknown native ISO source precision candidate')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     # The established decoder also emits a tagged inspection PNG. Consume its
@@ -24,11 +26,22 @@ def decode_iso_linear(source, directory, *, gamut):
     evidence = json.loads((directory/'iso-native-evidence.json').read_text())
     facts = evidence['decoded_color_facts']
     path = directory/'source-linear.gbrpf32'
+    precision_label = 'Native RGBA half-float samples expanded to float32 before any PQ16 roundtrip'
+    if precision == 'float32':
+        helper = '/opt/proof/ultrahdr/float32/hdr-proof-uhdr'
+        path = directory/'source-native-float32.gbrpf32'
+        precise_facts = json.loads(command([helper, 'decode-linear32', directory/'source-native.jpg', path, '16'],
+                                          directory/'iso-float32.log'))
+        if any(precise_facts[key] != facts[key] for key in ('width', 'height', 'gamut', 'requested_display_boost')):
+            raise ValueError('Native float32 source disagrees with established color, geometry, or headroom')
+        evidence = {**evidence, 'float32_native_facts': precise_facts,
+                    'float32_helper_sha256': hashlib.sha256(Path(helper).read_bytes()).hexdigest()}
+        precision_label = precise_facts['native_precision']
     return {'path': str(path), 'format': 'gbrpf32le', 'width': facts['width'], 'height': facts['height'],
             'gamut': evidence['gamut'], 'normalization_nits': evidence['sdr_white_nits'], 'alpha': False,
             'native_source': evidence, 'source_sha256': hashlib.sha256(Path(source).read_bytes()).hexdigest(),
             'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
-            'precision': 'Native RGBA half-float samples expanded to float32 before any PQ16 roundtrip'}
+            'precision': precision_label}
 
 
 def resample_linear(source, output, operation, orientation=1):
@@ -112,6 +125,8 @@ def resample_linear(source, output, operation, orientation=1):
     return {'path': str(output), 'format': 'gbrapf32le', 'gamut': source['gamut'],
             'normalization_nits': 203, 'width': target_width, 'height': target_height,
             'source_size': [width, height], 'source_float_sha256': source['sha256'],
+            'source_precision': source.get('precision', 'Declared analytic float32 source'),
+            'source_fixture_sha256': source.get('source_sha256'),
             'padding_filter': padding, 'normalization_filter': normalize, 'native_active_region': region,
             'output_sha256': hashlib.sha256(output.read_bytes()).hexdigest(),
             'candidate': 'native-linear-geometry-before-pq16', 'alpha': 'Established opaque source; exact output alpha 1'}

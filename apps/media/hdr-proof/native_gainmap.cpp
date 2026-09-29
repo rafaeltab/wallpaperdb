@@ -3,6 +3,8 @@
 #include "ultrahdr_api.h"
 #include <avif/avif.h>
 #include "ultrahdr/gainmapmath.h"
+#include "ultrahdr/jpegdecoderhelper.h"
+#include "ultrahdr/icc.h"
 
 #include <fstream>
 #include <iomanip>
@@ -207,11 +209,16 @@ int main(int argc, char** argv) {
     if (argc < 3) throw std::runtime_error("Usage: hdr-proof-uhdr probe input | extract input base map | roundtrip input output | pack metadata-source base map output");
     const std::string mode(argv[1]);
     const bool decode = mode == "decode-linear" && (argc == 4 || argc == 5);
+#ifdef PROOF_NATIVE_FLOAT32
+    const bool decode32 = mode == "decode-linear32" && argc == 5;
+#else
+    const bool decode32 = false;
+#endif
     const bool probe = mode == "probe" && argc == 3;
     const bool extract = mode == "extract" && argc == 5;
     const bool roundtrip = mode == "roundtrip" && argc == 4;
     const bool pack = mode == "pack" && argc == 6;
-    if (!(decode || probe || extract || roundtrip || pack)) throw std::runtime_error("Invalid operation or argument count");
+    if (!(decode || decode32 || probe || extract || roundtrip || pack)) throw std::runtime_error("Invalid operation or argument count");
     Bytes input = read(argv[2]);
     auto compressed = image(input.data(), input.size());
     Decoder decoder(uhdr_create_decoder(), uhdr_release_decoder);
@@ -259,6 +266,70 @@ int main(int argc, char** argv) {
     const auto* source_map = uhdr_dec_get_gainmap_image(decoder.get());
     const auto* source_metadata = uhdr_dec_get_gainmap_metadata(decoder.get());
     if (!source_base || !source_map || !source_metadata) throw std::runtime_error("Native decoder did not expose both compressed parts and metadata");
+#ifdef PROOF_NATIVE_FLOAT32
+    if (decode32) {
+      size_t consumed = 0;
+      const float requested_boost = std::stof(argv[4], &consumed);
+      if (consumed != std::string(argv[4]).size() || !std::isfinite(requested_boost) || requested_boost < 1)
+        throw std::runtime_error("Display boost must be finite and at least one");
+      auto metadata_copy = *source_metadata;
+      ultrahdr::uhdr_gainmap_metadata_ext_t metadata(metadata_copy, ultrahdr::kJpegrVersion);
+      check(ultrahdr::uhdr_validate_gainmap_metadata_descriptor(&metadata), "validate native gain metadata");
+      if (!metadata.use_base_cg || metadata.hdr_capacity_min != 1 || metadata.hdr_capacity_max <= 1)
+        throw std::runtime_error("Float32 proof requires forward SDR-base application in base color space");
+      ultrahdr::JpegDecoderHelper base_decoder, map_decoder;
+      check(base_decoder.decompressImage(source_base->data, source_base->data_sz, ultrahdr::DECODE_STREAM),
+            "decode native float32 base");
+      check(map_decoder.decompressImage(source_map->data, source_map->data_sz, ultrahdr::DECODE_STREAM),
+            "decode native float32 gain map");
+      auto base_pixels = base_decoder.getDecompressedImage();
+      auto map_pixels = map_decoder.getDecompressedImage();
+      const auto rgb8 = [](uhdr_img_fmt_t format) {
+        return format == UHDR_IMG_FMT_24bppRGB888 || format == UHDR_IMG_FMT_32bppRGBA8888;
+      };
+      if (!rgb8(base_pixels.fmt) || !rgb8(map_pixels.fmt) ||
+          base_decoder.getNumComponentsInImage() != 3 || map_decoder.getNumComponentsInImage() != 3 ||
+          base_pixels.w != map_pixels.w || base_pixels.h != map_pixels.h || !base_pixels.w || !base_pixels.h ||
+          base_pixels.w > 4096 || base_pixels.h > 4096 || map_decoder.getICCSize())
+        throw std::runtime_error("Float32 proof requires bounded equal-size RGB8 base/map and no map display ICC");
+      const auto gamut = ultrahdr::IccHelper::readIccColorGamut(base_decoder.getICCPtr(), base_decoder.getICCSize());
+      if (gamut != UHDR_CG_BT_709 && gamut != UHDR_CG_DISPLAY_P3)
+        throw std::runtime_error("Float32 proof requires an established sRGB/P3 base ICC");
+      // The driving adapter independently validates the actual ICC transfer
+      // as sRGB. No caller gamut label substitutes for the native ICC result.
+      const float display_boost = (std::min)(requested_boost, metadata.hdr_capacity_max);
+      const float weight = (std::max)(0.0f, (std::min)(1.0f,
+          (std::log2(display_boost) - std::log2(metadata.hdr_capacity_min)) /
+          (std::log2(metadata.hdr_capacity_max) - std::log2(metadata.hdr_capacity_min))));
+      auto get_base = ultrahdr::getPixelFn(base_pixels.fmt);
+      auto get_gain = ultrahdr::getPixelFn(map_pixels.fmt);
+      if (!get_base || !get_gain) throw std::runtime_error("Native RGB sample functions are unavailable");
+      const size_t count = size_t(base_pixels.w) * base_pixels.h;
+      std::vector<float> planes(count * 3);
+      for (unsigned y = 0; y < base_pixels.h; ++y) {
+        for (unsigned x = 0; x < base_pixels.w; ++x) {
+          // Reuse the codec's existing transfer and gain functions. The
+          // separate mode exposes their result before half-float storage.
+          auto base_linear = ultrahdr::srgbInvOetf(get_base(&base_pixels, x, y));
+          auto result = weight == 0 ? base_linear : ultrahdr::applyGain(
+              base_linear, get_gain(&map_pixels, x, y), &metadata, weight);
+          result = ultrahdr::clampPixelFloatLinear(result);
+          if (!std::isfinite(result.r) || !std::isfinite(result.g) || !std::isfinite(result.b))
+            throw std::runtime_error("Native float32 gain application produced nonfinite samples");
+          const size_t offset = size_t(y) * base_pixels.w + x;
+          planes[offset] = result.g;
+          planes[count + offset] = result.b;
+          planes[2 * count + offset] = result.r;
+        }
+      }
+      write(argv[3], planes.data(), planes.size() * sizeof(float));
+      std::cout << std::setprecision(9) << "{\"width\":" << base_pixels.w << ",\"height\":" << base_pixels.h
+                << ",\"gamut\":" << gamut << ",\"headroom\":" << metadata.hdr_capacity_max
+                << ",\"requested_display_boost\":" << requested_boost << ",\"gain_map_weight\":" << weight
+                << ",\"native_precision\":\"float32 gain application before half-float storage\"}\n";
+      return 0;
+    }
+#endif
     if (extract) {
       write(argv[3], source_base->data, source_base->data_sz);
       write(argv[4], source_map->data, source_map->data_sz);

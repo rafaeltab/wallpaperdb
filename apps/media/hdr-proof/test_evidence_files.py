@@ -1,5 +1,6 @@
 """Evidence bookkeeping must retain inspected files and every decoder gate."""
 from pathlib import Path
+import json
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -9,6 +10,37 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_rejects_missing_inspected_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            case = {'case_id': 'avif-pq-p3-8-opaque:contain:missing-output',
+                'fixture_id': 'avif-pq-p3-8-opaque', 'geometry': 'contain',
+                'status': 'qualified', 'artifacts': {'output': str(root/'missing.avif'),
+                                                    'sha256': '0'*64}}
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                with self.assertRaisesRegex(ValueError, 'Inspected manual file is missing'):
+                    suite.candidate_files([case], [])
+
+    def test_manual_gainmap_original_is_bound_to_committed_fixture_hash(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            fixture_dir = root/'fixtures/gainmap'
+            fixture_dir.mkdir(parents=True)
+            source = fixture_dir/'gainmap-apple-old.jpg'
+            source.write_bytes(b'file-copy-test-only')
+            expected_hash = suite.avif.digest(source)
+            (fixture_dir/'manifest.json').write_text(json.dumps({'fixtures': [{
+                'id': 'gainmap-apple-old', 'file': source.name, 'sha256': expected_hash}]}))
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files([], [])
+                self.assertEqual(len(files), 1)
+                self.assertEqual(files[0]['sha256'], expected_hash)
+                source.write_bytes(b'changed-after-inspection')
+                with self.assertRaisesRegex(ValueError, 'changed after inspection'):
+                    suite.candidate_files([], [])
+
     def test_manual_bundle_covers_every_png8_source_containment_and_orientation_representation(self):
         from hdr_png8 import fixture_specs
         with tempfile.TemporaryDirectory() as temporary:

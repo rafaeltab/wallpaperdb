@@ -87,6 +87,8 @@ def candidate_files(evidence, fixtures):
     def copy(source, name, role, case=None, facts=None, codec_status=None, coding_scope=None, expected_sha256=None):
         source = Path(source)
         if not source.exists():
+            if expected_sha256 is not None or (case and case['status'] == 'qualified'):
+                raise ValueError(f'Inspected manual file is missing: {name}')
             return
         destination = manual/name
         shutil.copyfile(source,destination)
@@ -106,8 +108,15 @@ def candidate_files(evidence, fixtures):
             suffix = Path(fixture['path']).suffix
             copy(fixture['path'], f'source-{fixture["id"]}{suffix}', 'Inspected synthetic HDR source',
                  facts=fixture['facts'], expected_sha256=fixture.get('sha256'))
-    for source in (ROOT/'fixtures/gainmap').glob('*.jpg'):
-        copy(source,f'source-{source.name}','Provenance-documented gain-map source; exact original')
+    gainmap_directory = ROOT/'fixtures/gainmap'
+    if gainmap_directory.exists():
+        for fixture in json.loads((gainmap_directory/'manifest.json').read_text())['fixtures']:
+            name = fixture['file']
+            if Path(name).name != name:
+                raise ValueError('Gain-map fixture manifest contains a nonlocal path')
+            copy(gainmap_directory/name, f'source-{name}',
+                 'Provenance-documented gain-map source; exact original',
+                 expected_sha256=fixture['sha256'])
     selected = [case for case in evidence
         if (case.get('fixture_id', '').startswith('avif-') and case.get('geometry') == 'contain')
         or (case.get('fixture_id', '').startswith('png-') and '-8-' in case['fixture_id']

@@ -44,9 +44,12 @@ def jpeg_facts(data):
 
 
 def iso_metadata(map_bytes):
-    payload = next((value[len(ISO_ID):] for marker, value in segments(map_bytes)
-                    if marker == 0xE2 and value.startswith(ISO_ID)), None)
-    if payload is None or len(payload) < 5:
+    payloads = [value[len(ISO_ID):] for marker, value in segments(map_bytes)
+                if marker == 0xE2 and value.startswith(ISO_ID)]
+    if len(payloads) != 1:
+        raise ValueError("Expected exactly one ISO gain-map metadata packet")
+    payload = payloads[0]
+    if len(payload) < 5:
         raise ValueError("ISO gain-map metadata missing")
     minimum_version, writer_version, flags = struct.unpack(">HHB", payload[:5])
     if minimum_version != 0 or flags & 0x33:
@@ -78,6 +81,8 @@ def iso_metadata(map_bytes):
                          "alternate_offset": fraction(True)})
     if any(channel["gamma"] <= 0 or channel["maximum"] < channel["minimum"] for channel in channels):
         raise ValueError("Invalid ISO gain-map gamma or gain bounds")
+    if position != len(payload):
+        raise ValueError("Unrecognized trailing ISO gain-map metadata")
     return {"minimum_version": minimum_version, "writer_version": writer_version,
             "use_base_colour_space": bool(flags & 64), "backward": bool(flags & 4),
             "base_headroom": base_headroom, "alternate_headroom": alternate_headroom,
@@ -85,6 +90,9 @@ def iso_metadata(map_bytes):
 
 
 def reconstruct(base_bytes, map_bytes, headroom=4.0):
+    # Headroom is log2(display peak / SDR white), not a linear ratio or nits.
+    if not np.isfinite(headroom) or headroom < 0:
+        raise ValueError("ISO display headroom must be finite and nonnegative")
     metadata = iso_metadata(map_bytes)
     if metadata["backward"] or not metadata["use_base_colour_space"]:
         raise ValueError("Numerical ISO oracle only handles forward maps in base colour space")
@@ -98,6 +106,10 @@ def reconstruct(base_bytes, map_bytes, headroom=4.0):
                            ((base_signal + 0.055) / 1.055) ** 2.4)
     weight = np.clip((headroom - metadata["base_headroom"]) /
                      (metadata["alternate_headroom"] - metadata["base_headroom"]), 0, 1)
+    if weight == 0:
+        # The base rendition is returned unchanged when the display cannot
+        # apply any gain. Offsets only participate in gain-map application.
+        return base_linear * 203.0, metadata
     channels = metadata["channels"] * (3 if len(metadata["channels"]) == 1 else 1)
     result = np.empty_like(base_linear)
     for channel, parameters in enumerate(channels):

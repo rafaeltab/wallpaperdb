@@ -108,9 +108,12 @@ APNG and AVIF, plus explicit SDR APNG, gamma-2.2 AVIF and gamma-2.2 ICC WebP.
 HDR APNG signals CICP; native SDR APNG uses the standard sRGB chunk. The unchanged
 SDR reference uses one declared sequence peak, 4000 nits for PQ or 1000 nits for
 the HLG reference display. Original-byte and unsupported-composition controls
-remain separate from codec qualification. A real native partial-rectangle
-animation is rejected; partial rectangles, OVER blending, disposal, orientation,
-static extraction and other geometries remain unqualified in this APNG subset.
+remain separate from codec qualification. Two native partial-rectangle fixtures
+verify exact SOURCE replacement, including fractional alpha and stored RGB under
+zero alpha. The independent reader checks rectangle bounds and requires the
+first default-image frame to fill the canvas. OVER blending, disposal,
+orientation, static extraction and other geometries remain unqualified in this
+APNG subset.
 Browser, viewer and wallpaper interpretation remains pending manual review for
 every emitted representation.
 

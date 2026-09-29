@@ -1,4 +1,4 @@
-"""Native APNG proof for full-canvas SOURCE frames with no disposal.
+"""Native APNG proof for bounded SOURCE rectangles with no disposal.
 
 The independent reader keeps compressed frame data unchanged and delegates
 sample decoding to native libpng. It rejects composition modes it cannot prove.
@@ -80,11 +80,15 @@ def _inspect(path):
                 if not animation_seen or not color_seen or len(payload) != 26:
                     raise ValueError('Invalid frame control order or size')
                 number, fw, fh, x, y, numerator, denominator, dispose, blend = struct.unpack('>IIIIIHHBB', payload)
-                if (number != sequence or (fw, fh, x, y) != (width, height, 0, 0)
+                if (number != sequence or not 0 < fw <= width or not 0 < fh <= height
+                        or x + fw > width or y + fh > height
                         or dispose != 0 or blend != 0 or numerator == 0):
-                    raise ValueError('Only ordered full-canvas SOURCE frames, no disposal and positive timing are proved')
+                    raise ValueError('Only ordered bounded SOURCE rectangles, no disposal and positive timing are proved')
+                if not frames and (fw, fh, x, y) != (width, height, 0, 0):
+                    raise ValueError('The first default-image frame must fill the canvas')
                 sequence += 1
-                current = {'duration': Fraction(numerator, denominator or 100), 'chunks': []}
+                current = {'duration': Fraction(numerator, denominator or 100), 'chunks': [],
+                           'rectangle': [x, y, fw, fh]}
                 frames.append(current)
             elif kind in (b'IDAT', b'fdAT'):
                 if current is None:
@@ -116,7 +120,8 @@ def _inspect(path):
              'duration_fractions': [[frame['duration'].numerator, frame['duration'].denominator] for frame in frames],
              'alpha': color_type == 6, 'orientation': 1,
              'color_signaling': 'cICP' if cicp_signaled else 'sRGB chunk',
-             'composition': 'full-canvas SOURCE, no disposal',
+             'composition': 'bounded SOURCE rectangles, no disposal',
+             'frame_rectangles': [frame['rectangle'] for frame in frames],
              'exiftool': {key: value for key, value in exif.items() if key not in (
                  'SourceFile', 'Directory', 'FileModifyDate', 'FileAccessDate', 'FileInodeChangeDate')},
              'sha256': avif.digest(path)}
@@ -128,11 +133,26 @@ def inspect_and_decode(path, directory):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     pixels, paths = [], []
+    canvas = np.zeros((facts['height'], facts['width'], 4), dtype=float)
     for index, frame in enumerate(frames):
+        x, y, width, height = frame['rectangle']
         output = directory/f'frame-{index}.png'
-        output.write_bytes(pack_chunks([(b'IHDR', header), color]
+        rectangle = directory/f'rectangle-{index}.png'
+        rectangle_header = struct.pack('>II', width, height) + header[8:]
+        rectangle.write_bytes(pack_chunks([(b'IHDR', rectangle_header), color]
                                       + frame['chunks'] + [(b'IEND', b'')]))
-        pixels.append(avif.read_png(output))
+        decoded = avif.read_png(rectangle)
+        # SOURCE replaces all channels, including RGB below zero alpha. There
+        # is no blending arithmetic or disposal in this independently checked
+        # subset. The first full-canvas frame also resets every repeated play.
+        canvas[y:y+height, x:x+width] = decoded
+        pixels.append(canvas.copy())
+        if (x, y, width, height) == (0, 0, facts['width'], facts['height']):
+            output.write_bytes(rectangle.read_bytes())
+        else:
+            # This native PNG is only a composed decoder intermediate for the
+            # candidate pipeline. Verification above reads libpng's samples.
+            avif.write_png(output, canvas)
         paths.append(str(output))
     facts['decoder'] = 'independent APNG chunk reader and native libpng'
     facts['decoded_paths'] = paths
@@ -182,7 +202,7 @@ def _rejection_controls(source, directory):
     chunks = _png_chunks(source.read_bytes())
     controls = []
     for variant, field, value in (('over-blend', 8, 1), ('previous-disposal', 7, 2),
-                                   ('partial-frame', 1, 95)):
+                                   ('partial-default-frame', 1, 95)):
         changed, modified = False, []
         for kind, payload in chunks:
             if kind == b'fcTL' and not changed:

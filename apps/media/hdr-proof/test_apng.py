@@ -42,17 +42,20 @@ class ApngTests(unittest.TestCase):
             directory = Path(temporary)
             source, _, _ = apng.generate_fixture(next(apng.fixture_specs()), directory)
             chunks = _png_chunks(source.read_bytes())
-            variants = ('over-blend', 'previous-disposal', 'partial-frame',
-                        'bad-sequence', 'frame-count', 'zero-duration', 'duplicate-cicp')
+            variants = ('over-blend', 'previous-disposal', 'partial-default-frame',
+                        'bad-sequence', 'frame-count', 'zero-duration', 'duplicate-cicp',
+                        'rectangle-outside-canvas')
             for variant in variants:
                 modified = []
                 changed = False
                 for kind, payload in chunks:
-                    if kind == b'fcTL' and not changed:
+                    if (kind == b'fcTL' and not changed
+                            and (variant != 'rectangle-outside-canvas' or struct.unpack_from('>I', payload)[0] != 0)):
                         values = list(struct.unpack('>IIIIIHHBB', payload))
                         if variant == 'over-blend': values[8] = 1
                         if variant == 'previous-disposal': values[7] = 2
-                        if variant == 'partial-frame': values[1] -= 1
+                        if variant == 'partial-default-frame': values[1] -= 1
+                        if variant == 'rectangle-outside-canvas': values[3] = 1
                         if variant == 'bad-sequence': values[0] = 7
                         if variant == 'zero-duration': values[5] = 0
                         payload = struct.pack('>IIIIIHHBB', *values)
@@ -87,7 +90,7 @@ class ApngTests(unittest.TestCase):
         self.assertTrue(result['controls'])
         self.assertTrue(all(control['passed'] for control in result['controls']))
 
-    def test_real_native_partial_rectangle_remains_unqualified(self):
+    def test_real_native_source_rectangle_reconstructs_exact_full_frames(self):
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
             first = avif.make_scene(True)
@@ -105,8 +108,38 @@ class ApngTests(unittest.TestCase):
             controls = [struct.unpack('>IIIIIHHBB', payload)
                         for kind, payload in _png_chunks(source.read_bytes()) if kind == b'fcTL']
             self.assertEqual(controls[1][1:5], (96, 32, 0, 32))
-            with self.assertRaisesRegex(ValueError, 'full-canvas SOURCE'):
-                apng.inspect_and_decode(source, folder/'decoded')
+            facts, frames = apng.inspect_and_decode(source, folder/'decoded')
+            self.assertEqual(facts['frame_rectangles'], [[0, 0, 96, 64], [0, 32, 96, 32]])
+            self.assertEqual(facts['durations_ms'], [300, 700])
+            for index, actual in enumerate(frames):
+                expected = avif.read_png(paths[index])
+                np.testing.assert_array_equal(actual, expected)
+                np.testing.assert_array_equal(avif.read_png(facts['decoded_paths'][index]), expected)
+            self.assertTrue(np.any(frames[1][32:, :, 3] == 0))
+            self.assertTrue(np.any((frames[1][32:, :, 3] > 0) & (frames[1][32:, :, 3] < 1)))
+
+    def test_offset_rectangle_replaces_rgb_and_alpha_without_blending(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            first = avif.make_scene(True)
+            second = first.copy()
+            second[40:56, 20:60, :3] = [400, 200, 15]
+            second[40:56, 20:60, 3] = 2/3
+            second[45:48, 30:33, 3] = 0
+            paths = []
+            for index, frame in enumerate((first, second)):
+                signal = frame.copy()
+                signal[..., :3] = avif.encode_transfer(frame[..., :3], 'hlg', 'rec2020')
+                path = folder/f'frame-{index}.png'
+                avif.write_png(path, signal)
+                paths.append(path)
+            source = folder/'offset-source.png'
+            apng.encode(paths, source, 'hlg', 'rec2020')
+            facts, frames = apng.inspect_and_decode(source, folder/'decoded')
+            self.assertEqual(facts['frame_rectangles'][1], [20, 40, 40, 16])
+            np.testing.assert_array_equal(frames[1], avif.read_png(paths[1]))
+            self.assertTrue(np.all(frames[1][45:48, 30:33, :3] > 0))
+            self.assertTrue(np.all(frames[1][45:48, 30:33, 3] == 0))
 
     def test_inspected_animation_candidates_are_prepared_for_pending_manual_review(self):
         import suite

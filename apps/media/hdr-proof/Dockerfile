@@ -7,7 +7,7 @@ RUN cp /opt/proof/environment/package.json /opt/proof/environment/package-lock.j
     && cd /opt/proof && npm ci --no-audit --no-fund
 ENV NODE_PATH=/opt/proof/node_modules
 ENV VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
-COPY gainmap-build.sh libavif-sequence-transform.patch libavif-full-range-gain.patch libavif-small-offset-gain.patch /opt/proof/
+COPY gainmap-build.sh libavif-sequence-transform.patch libavif-full-range-gain.patch libavif-small-offset-gain.patch libavif-identity-gain.patch /opt/proof/
 RUN sh /opt/proof/gainmap-build.sh
 COPY native-gainmap-build.sh native_gainmap.cpp libultrahdr-xmp-arrays.patch libultrahdr-rgb-jpeg.patch libultrahdr-precise-transfer.patch /opt/proof/
 RUN sh /opt/proof/native-gainmap-build.sh

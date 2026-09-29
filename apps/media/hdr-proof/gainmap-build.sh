@@ -40,4 +40,12 @@ cmake --build build --target avifgainmaputil --parallel 4
 mkdir -p /opt/proof/libavif/smalloffset
 cp build/avifgainmaputil /opt/proof/libavif/smalloffset/
 sha256sum /opt/proof/libavif/smalloffset/avifgainmaputil > /opt/proof/libavif/smalloffset/binary-sha256.txt
+# Keep every prior stage. This encoder additionally stores the gain-map RGB
+# codes with the identity matrix, avoiding RGB/YCbCr rounding before AV1.
+echo 'acfda7ed7e3e9f4db747801d9cc99f8fc9ba767f45ec9f682618c804fcd5adaf  /opt/proof/libavif-identity-gain.patch' | sha256sum -c -
+patch -d libavif-1.4.1 -p1 < /opt/proof/libavif-identity-gain.patch
+cmake --build build --target avifgainmaputil --parallel 4
+mkdir -p /opt/proof/libavif/identity
+cp build/avifgainmaputil /opt/proof/libavif/identity/
+sha256sum /opt/proof/libavif/identity/avifgainmaputil > /opt/proof/libavif/identity/binary-sha256.txt
 rm -rf /tmp/gainmap-build

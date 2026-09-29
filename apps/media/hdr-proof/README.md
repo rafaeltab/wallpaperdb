@@ -197,6 +197,13 @@ zimg expansion preserves every RGB and alpha sample exactly before conversion.
 Its candidates use distinct IDs and the same references and output gates;
 the original bytes, measurements and failures remain unchanged. The complete
 suite includes both candidates, exact-byte no-ops and unknown-CICP controls.
+The [additional geometry proof](hdr_png8_geometry.py) extends the normalized
+candidate to cover, fill, upscale and real EXIF-8 orientation. Its eight
+orientation sources have a [separate reviewed hash lock](fixtures/png8-orientation-sha256.json).
+It checks unchanged coded samples after resetting orientation metadata, exact
+native precision expansion, and one native rotation against independent decoded
+pixels before resizing. These cases retain the containment appearance and alpha
+limits. No existing source hashes or failed containment results change.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

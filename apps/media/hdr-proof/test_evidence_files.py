@@ -9,7 +9,7 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
-    def test_manual_bundle_covers_every_png8_source_and_containment_representation(self):
+    def test_manual_bundle_covers_every_png8_source_containment_and_orientation_representation(self):
         from hdr_png8 import fixture_specs
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -22,12 +22,13 @@ class EvidenceFileTests(unittest.TestCase):
                 for dynamic_range in ('hdr', 'sdr'):
                     for extension in ('png', 'avif'):
                         for candidate in ('direct', 'normalized-source16'):
-                            cases.append({'case_id': f'{spec["id"]}:{dynamic_range}:{extension}:contain:{candidate}',
-                                'fixture_id': spec['id'], 'geometry': 'contain', 'status': 'tested and failed',
-                                'artifacts': {'output': str(source)}})
+                            for geometry in ('contain', 'orientation'):
+                                cases.append({'case_id': f'{spec["id"]}:{dynamic_range}:{extension}:{geometry}:{candidate}',
+                                    'fixture_id': spec['id'], 'geometry': geometry, 'status': 'tested and failed',
+                                    'artifacts': {'output': str(source)}})
             with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
                 files = suite.candidate_files(cases, fixtures)
-            self.assertEqual(len(files), 72)
+            self.assertEqual(len(files), 136)
             self.assertEqual({entry['case_id'] for entry in files if entry['case_id']},
                              {case['case_id'] for case in cases})
             self.assertTrue(all(entry['consumer_status'] == 'pending manual review' for entry in files))

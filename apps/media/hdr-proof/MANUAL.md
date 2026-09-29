@@ -21,6 +21,11 @@ Test Android/ISO, Android XMP, old Apple and new Apple JPEG separately. Test eve
 The inspected bundle includes all 24 static AVIF source combinations and their
 contain derivatives, including opaque and fractional-alpha variants. Use each
 file's manifest status; the bundle also retains failed candidates for diagnosis.
+The optional PNG8 bundle covers all eight PQ/HLG, P3/Rec.2020 and alpha sources,
+their separately hashed EXIF-8 variants, and inspected containment/orientation
+outputs. Test HDR PNG8 and AVIF8 separately from explicit SDR PNG16 and AVIF8.
+The direct-input failures remain diagnostic files; use the manifest to select
+the separately qualified native-normalization candidates for consumer review.
 
 Combined HDR JPEG candidates use SOF3 predictive RGB8 base and gain-map coding.
 The pinned libavif reader rejects this coding; the suite's validated native

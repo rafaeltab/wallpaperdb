@@ -120,6 +120,8 @@ def candidate_files(evidence, fixtures):
                  expected_sha256=fixture['sha256'])
     selected = [case for case in evidence
         if (case.get('fixture_id', '').startswith('avif-') and case.get('geometry') == 'contain')
+        or (case.get('fixture_id') == 'avif-gainmap-from-android-xmp'
+            and case.get('geometry') in ('cover', 'fill', 'upscale'))
         or (case.get('fixture_id', '').startswith('png-') and '-8-' in case['fixture_id']
             and case.get('geometry') in ('contain', 'orientation'))
         or (case.get('fixture_id') in ('animated-pq-alpha', 'animated-hlg-alpha',

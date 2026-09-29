@@ -10,6 +10,30 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_keeps_all_gainmap_avif_geometry_pairs(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            output, reference = root/'candidate.avif', root/'reference.png'
+            output.write_bytes(b'output-copy-test-only')
+            reference.write_bytes(b'reference-copy-test-only')
+            cases = [{'case_id': f'avif-gainmap-from-android-xmp:sdr:avif:{geometry}',
+                'fixture_id': 'avif-gainmap-from-android-xmp', 'geometry': geometry,
+                'status': 'qualified',
+                'artifacts': {'output': str(output), 'sha256': suite.avif.digest(output)},
+                'reference_sdr': {'path': str(reference), 'sha256': suite.avif.digest(reference)}}
+                for geometry in ('contain', 'cover', 'fill', 'upscale')]
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files(cases, [])
+            self.assertEqual(len(files), 8)
+            self.assertEqual(len({entry['file'] for entry in files}), 8)
+            for case in cases:
+                pair = [entry for entry in files if entry['case_id'] == case['case_id']
+                        or (entry.get('facts') or {}).get('case_id') == case['case_id']]
+                self.assertEqual({entry['sha256'] for entry in pair},
+                                 {suite.avif.digest(output), suite.avif.digest(reference)})
+            self.assertTrue(all(entry['consumer_status'] == 'pending manual review' for entry in files))
+
     def test_manual_bundle_includes_verified_gainmap_avif_without_a_synthetic_scene_spec(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

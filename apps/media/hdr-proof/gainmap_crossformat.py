@@ -94,7 +94,7 @@ def run(directory, combined_cases):
                         'depth': facts['coded_depth'] == depth,
                         'color': cicp == [avif.PRIMARIES[gamut], 16, 0, 1],
                         'orientation': tags.get('IFD0:Orientation', 1) == 1,
-                        'static_opaque': facts['frame_count'] == 1 and facts['opaque'] and np.all(actual[..., 3] == 1)}
+                        'static_opaque': facts['frame_count'] == 1 and facts['opaque'] and bool(np.all(actual[..., 3] == 1))}
                     private = facts['private_tags']
                     decoder = 'Independent native libpng samples; ExifTool signaling'
                 else:
@@ -102,7 +102,7 @@ def run(directory, combined_cases):
                     actual = avif.decode_avif(target, folder, 1)[0]
                     expected_alpha = np.concatenate((expected, np.ones((*expected.shape[:2], 1))), axis=-1)
                     structure = avif.structure_checks(facts, [actual], {}, [expected_alpha], 'pq', gamut, depth, 1)
-                    structure['static_opaque'] = facts['alpha'] == 'Absent' and np.all(actual[..., 3] == 1)
+                    structure['static_opaque'] = facts['alpha'] == 'Absent' and bool(np.all(actual[..., 3] == 1))
                     inspected = gainmap.inspect(target, folder/'inspection')
                     private = inspected['private_tags']
                     decoder = 'Independent dav1d AV1 decode and native libpng samples; ExifTool signaling'

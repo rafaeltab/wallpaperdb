@@ -46,6 +46,14 @@ to independently verified identity or two-times axes. Missing or conflicting
 color signaling, unknown ICC facts, nonidentity map orientation and unproved map
 ratios reject transformation.
 
+The [gain-map cross-format proof](gainmap_crossformat.py) separately evaluates
+single-layer PQ PNG16 and AVIF12 outputs from the native HDR intent. Independent
+libpng or dav1d decoding compares each emitted file with the reconstructed
+source at matched geometry. The requests explicitly select output depth and
+preserve primaries. Original base/map depths remain recorded as source facts;
+explicit SDR conversions continue to use the authored base. These additional
+HDR candidates do not establish browser or wallpaper compatibility.
+
 Its [versioned geometry reference](gainmap_reference.py) filters and clips in the
 requested gamut before conversion to metric coordinates. Clipping Lanczos
 excursions in Rec.2020 can create colors outside the requested P3 or sRGB gamut.
@@ -100,6 +108,10 @@ limits. Their case IDs identify the representation; earlier gamma-2.2 failures
 remain visible. This includes the two PQ APNG static orientation cases, which
 pass with the new representation. GIF still requires explicit coercion of
 fractional alpha to binary transparency.
+Optional animated APNG-to-GIF candidates also verify both fully composed frames,
+300/700 ms timing and three total plays. GIF encodes that as two repeats after
+the initial play. An exact binary-alpha mismatch is a failure, even when it
+comes from one half-opacity sample rounded across the cutoff by an intermediate.
 
 The [authored SDR JPEG proof](authored_sdr_proof.py) also evaluates gamma-3.2
 ICC encodings against the same independently decoded authored SDR base. These

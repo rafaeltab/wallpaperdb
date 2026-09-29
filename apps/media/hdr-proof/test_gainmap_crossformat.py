@@ -1,5 +1,6 @@
 """Cross-format HDR evidence must decode the emitted native bytes independently."""
 from pathlib import Path
+import json
 import tempfile
 import unittest
 
@@ -14,6 +15,7 @@ class GainMapCrossformatTests(unittest.TestCase):
             combined = run_combined(root/'combined', names=('gainmap-android-iso',),
                                     geometries=('contain', 'orientation'), policies=('moderateoffset',))
             cases = run(root/'crossformat', combined)
+            json.dumps(cases, allow_nan=False)
             self.assertEqual(len(cases), 4)
             for case in cases:
                 with self.subTest(case=case['case_id']):

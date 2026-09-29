@@ -96,10 +96,70 @@ async function nativeRetain(job) {
     retained_parts: { base: transformedBase, map: transformedMap } };
 }
 
+async function nativeRegenerate(job) {
+  if (job.format !== 'jpg' || job.gamut !== 'preserve') {
+    throw new Error('Native regenerated-map candidate requires JPEG and gamut=preserve');
+  }
+  const executable = '/opt/proof/ultrahdr/both/hdr-proof-uhdr';
+  const directory = path.join(path.dirname(job.output), 'native-regenerated-parts-both');
+  fs.mkdirSync(directory, { recursive: true });
+  const commands = [];
+  const commandLog = path.join(directory, 'native-commands.json');
+  function run(command, args) {
+    try {
+      const stdout = execFileSync(command, args.map(String), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      commands.push({ argv: [command, ...args.map(String)], exit_code: 0, stdout });
+      return stdout;
+    } catch (error) {
+      commands.push({ argv: [command, ...args.map(String)], exit_code: error.status, stderr: error.stderr?.toString() });
+      throw error;
+    } finally {
+      fs.writeFileSync(commandLog, `${JSON.stringify(commands, null, 2)}\n`);
+    }
+  }
+  const base = path.join(directory, 'source-base.jpg');
+  const map = path.join(directory, 'source-map.jpg');
+  const retainedBase = path.join(directory, 'authored-base.jpg');
+  const sourceFloat = path.join(directory, 'source-linear.gbrpf32');
+  const resizedFloat = path.join(directory, 'resized-linear.gbrpf32');
+  const metadata = JSON.parse(run(executable, ['extract', job.input, base, map]));
+  const basePipeline = await outputColor(geometry(sharp(base), job.geometry), job);
+  await basePipeline.jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toFile(retainedBase);
+  const target = await sharp(retainedBase).metadata();
+  const source = JSON.parse(run(executable, ['decode-linear', job.input, sourceFloat]));
+  const filters = [];
+  if (job.geometry === 'orientation') {
+    const orientation = (await sharp(base).metadata()).orientation || 1;
+    const effects = { 2: ['hflip'], 3: ['hflip', 'vflip'], 4: ['vflip'],
+      5: ['transpose=clock', 'hflip'], 6: ['transpose=clock'],
+      7: ['transpose=clock', 'vflip'], 8: ['transpose=cclock'] };
+    filters.push(...(effects[orientation] || []));
+  }
+  if (job.geometry === 'cover') filters.push('crop=min(iw\\,ih):min(iw\\,ih):(iw-ow)/2:(ih-oh)/2');
+  if (job.geometry === 'crop') filters.push('crop=271:239:13:17');
+  filters.push(`zscale=w=${target.width}:h=${target.height}:filter=lanczos:rangein=full:range=full`);
+  run('ffmpeg', ['-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'gbrpf32le',
+    '-s', `${source.width}x${source.height}`, '-i', sourceFloat, '-vf', filters.join(','),
+    '-frames:v', '1', '-pix_fmt', 'gbrpf32le', '-f', 'rawvideo', '-y', resizedFloat]);
+  run(executable, ['regenerate-linear', resizedFloat, target.width, target.height, source.gamut,
+    retainedBase, job.output, source.headroom]);
+  return { native_variant: 'both', source_gainmap_metadata: metadata,
+    native_commands: commandLog, retained_parts: { base: retainedBase },
+    native_hdr_source: { ...source, path: sourceFloat, format: 'planar GBR float32 little-endian',
+      transfer: 'linear', reference_white_nits: 203 },
+    regeneration: { gainmap_scale: 1, gainmap_channels: 3, gainmap_quality: 100,
+      hdr_geometry: filters, authored_base_quality: 95, source_display_headroom_preserved: true } };
+}
+
 async function main() {
   const jobs = JSON.parse(fs.readFileSync(0, 'utf8'));
   for (const job of jobs) {
     try {
+      if (job.mode === 'native-regenerate') {
+        const result = await nativeRegenerate(job);
+        process.stdout.write(`${JSON.stringify({ case_id: job.case_id, ok: true, ...result })}\n`);
+        continue;
+      }
       if (job.mode === 'native-retain') {
         const result = await nativeRetain(job);
         process.stdout.write(`${JSON.stringify({ case_id: job.case_id, ok: true, ...result })}\n`);

@@ -37,7 +37,7 @@ for variant in baseline pr484 pr491 both; do
         -DUHDR_WRITE_XMP=ON -DUHDR_WRITE_ISO=ON
     cmake --build "$variant/build" --target uhdr --parallel 4
     cp -P "$variant/build"/libuhdr.so* "/opt/proof/ultrahdr/$variant/"
-    c++ -std=c++17 -O2 -Wall -Wextra -Werror -I "$variant/source" \
+    c++ -std=c++17 -O2 -Wall -Wextra -Werror -I "$variant/source" -I "$variant/source/lib/include" \
         -DPROOF_VARIANT="\"$variant\"" /opt/proof/native_gainmap.cpp \
         -L "$variant/build" -luhdr -Wl,-rpath,\$ORIGIN \
         -o "/opt/proof/ultrahdr/$variant/hdr-proof-uhdr"

@@ -31,3 +31,5 @@
 !libavif-gamma2-gain.patch
 !libavif-gamma15-gain.patch
 !libavif-midpoint-offset-gain.patch
+!gainmap-capacity-build.sh
+!native_gainmap_capacity.cpp

@@ -1,4 +1,5 @@
 """Native HDR reconstruction keeps the original gain-map sampling failures visible."""
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -21,6 +22,44 @@ class GainMapAvifHdrTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temporary.cleanup()
 
+    def test_additional_geometries_preserve_containment_and_source_evidence(self):
+        expanded = gainmap_avif_hdr.run(self.root/'geometries', geometries=('contain', 'cover', 'fill', 'upscale'))
+        self.assertEqual(len(expanded['evidence']), 8)
+        self.assertEqual(len({case['case_id'] for case in expanded['evidence']}), 8)
+        self.assertEqual(len(expanded['source_reconstruction_profiles']), 2)
+        originals = {case['candidate']: case for case in self.result['evidence']}
+        sizes = {'contain': (173, 130), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 576)}
+        for case in expanded['evidence']:
+            with self.subTest(candidate=case['candidate'], geometry=case['geometry']):
+                original = originals[case['candidate']]
+                self.assertEqual(case['source_sha256'], original['source_sha256'])
+                self.assertEqual(json.dumps(case['source_facts']).replace(str(self.root/'geometries'), '<work>'),
+                                 json.dumps(original['source_facts']).replace(str(self.root/'proof'), '<work>'))
+                self.assertEqual(case['measurements']['source'], original['measurements']['source'])
+                self.assertEqual(case['status'], original['status'], case['blockers'])
+                self.assertEqual((case['facts']['width'], case['facts']['height']), sizes[case['geometry']])
+                self.assertTrue(all(case['structural_checks'].values()))
+                self.assertEqual(case['native_geometry']['normalization_nits'], original['native_geometry']['normalization_nits'])
+                self.assertEqual(case['selectors']['depth'], '12')
+                self.assertEqual(case['selectors']['gamut'], 'preserve')
+                self.assertEqual(case['selectors']['range'], 'hdr')
+                self.assertEqual(case['privacy_measurement']['private_tags'], [])
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+                if case['geometry'] == 'contain':
+                    for key in ('case_id', 'selectors', 'status', 'measurements', 'threshold_scope'):
+                        self.assertEqual(case[key], original[key])
+                    self.assertEqual(case['artifacts']['sha256'], original['artifacts']['sha256'])
+        self.assertEqual([(item['case_id'], item['status']) for item in expanded['controls']],
+                         [(item['case_id'], item['status']) for item in self.result['controls']])
+
+    def test_unknown_duplicate_and_orientation_geometries_stop_before_native_work(self):
+        for operations in ((), ('contain', 'contain'), ('orientation',), ('crop',), ('arbitrary',)):
+            with self.subTest(geometries=operations):
+                start = len(avif.COMMANDS)
+                with self.assertRaisesRegex(ValueError, 'geometries'):
+                    gainmap_avif_hdr.run(self.root/'unknown-geometry', geometries=operations)
+                self.assertEqual(len(avif.COMMANDS), start)
+
     def test_native_baseline_source_and_derivative_failures_remain_measured(self):
         baseline, candidate = self.result['evidence']
         self.assertEqual(baseline['candidate'], 'libavif-native-map-sampling-pq12')
@@ -33,11 +72,14 @@ class GainMapAvifHdrTests(unittest.TestCase):
                                29.16577260748179, places=6)
         self.assertEqual(baseline['selectors'], candidate['selectors'])
         self.assertEqual(baseline['threshold_scope'], candidate['threshold_scope'])
+        hashes = {'libavif-native-map-sampling-pq12': 'da2e3570ac0ee11aeb6be9cad2967a8eff57aa4cbeab8d31aaa5ecdb3f29eb20',
+                  'native-antialiased-bilinear8-float32': '449358082c55eb2f89d4b3074807dce9cd83143fb7c5147109b360979f0d4cff'}
         for case in self.result['evidence']:
             self.assertEqual(set(case['measurements']), {'source', 'linear_geometry', 'hdr'})
             self.assertTrue(case['commands'])
             self.assertTrue(case['native_log_artifacts'])
             self.assertEqual(avif.digest(case['artifacts']['output']), case['artifacts']['sha256'])
+            self.assertEqual(case['artifacts']['sha256'], hashes[case['candidate']])
             self.assertEqual(case['consumer_status'], 'pending manual review')
 
     def test_native_resampling_and_float_gain_application_pass_existing_gates(self):

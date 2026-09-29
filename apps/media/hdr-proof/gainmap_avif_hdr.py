@@ -1,4 +1,4 @@
-"""Explicit PQ AVIF12 containment from one locked gain-map AVIF source.
+"""Explicit PQ AVIF12 geometries from one locked gain-map AVIF source.
 
 The original failed experiment declared Pillow RGB8 antialiased bilinear map
 sampling, followed by linear-light Pillow float Lanczos geometry. That renderer
@@ -14,6 +14,7 @@ with no claim about gain-map-preserving output or display interoperability.
 """
 import hashlib
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -25,10 +26,12 @@ from appearance import compare_appearance, sdr_signal_to_nits
 from gainmap import array_geometry, private_metadata_tags
 from gainmap_hdr import read_linear, resample_pq
 from gainmap_linear import resample_linear
+from matrix import GAINMAP_GEOMETRIES
 
 
 SELECTORS = {'format': 'avif', 'range': 'hdr', 'gamut': 'preserve', 'depth': '12',
              'motion': 'preserve', 'transparency': 'preserve', 'w': 173, 'fit': 'contain'}
+GEOMETRIES = ('contain', 'cover', 'fill', 'upscale')
 POLICY = {
     'declared_before_native_measurements': True,
     'profile': 'gainmap-hdr',
@@ -56,11 +59,22 @@ POLICY = {
     ],
     'native_source_archive_sha256': 'd4aea31a4becb3273ba7968221be2e48148ba05eb8a68d14e671963e17785648',
 }
+GEOMETRY_POLICY = {**POLICY,
+    'geometry_reference': 'Pillow float linear-light Lanczos with matched contain 173x130, fractional centered cover 173x173, fill 173x211 and upscale 769x576; negative components clamped to zero',
+    'orientation_scope': 'Only the original identity-oriented locked source; unverified transformed sources remain original-only'}
 
 
-def validate_selectors(selectors):
-    if selectors != SELECTORS:
-        raise ValueError('Only the exact explicit PQ AVIF12 containment selectors are admitted')
+def _selectors(operation):
+    return {**{key: value for key, value in SELECTORS.items() if key not in ('w', 'fit')},
+            **GAINMAP_GEOMETRIES[operation]}
+
+
+def validate_selectors(selectors, *, operation='contain'):
+    if operation not in GEOMETRIES:
+        raise ValueError('Unsupported explicit HDR geometry')
+    if selectors != _selectors(operation):
+        label = 'containment' if operation == 'contain' else operation
+        raise ValueError(f'Only the exact explicit PQ AVIF12 {label} selectors are admitted')
 
 
 def _admit_source(source, directory, source_lock):
@@ -216,15 +230,18 @@ def _pixel_aspect(path):
             'scope': 'The bounded output omits pixel-aspect properties; independent ffprobe must also report square pixels'}
 
 
-def _case(source, facts, inspection, reference, mapped_reference, folder, candidate):
+def _case(source, facts, inspection, reference, mapped_reference, folder, candidate, operation):
+    selectors = _selectors(operation)
+    validate_selectors(selectors, operation=operation)
     folder.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
-    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:hdr:avif:preserve:12:contain:{candidate}',
+    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:hdr:avif:preserve:12:{operation}:{candidate}',
             'cell_id': 'avif-gainmap:hdr:avif', 'fixture_id': gainmap_avif.FIXTURE_ID,
-            'selectors': SELECTORS.copy(), 'geometry': 'contain', 'candidate': candidate,
+            'selectors': selectors, 'geometry': operation, 'candidate': candidate,
             'source_facts': facts, 'source_sha256': avif.digest(source),
             'status': 'tested and failed', 'consumer_status': 'pending manual review',
-            'threshold_scope': {**POLICY, 'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
+            'threshold_scope': {**(POLICY if operation == 'contain' else GEOMETRY_POLICY),
+                                'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
             'checks': {key: False for key in ('known_source', 'native_encoder', 'independent_decoder', 'map_sampling',
                                              'source_appearance', 'linear_geometry_appearance', 'structure', 'appearance', 'privacy')},
             'blockers': [], 'measurements': {}, 'artifacts': {}}
@@ -239,14 +256,15 @@ def _case(source, facts, inspection, reference, mapped_reference, folder, candid
                              'display_headroom_log2': 4, 'precision': 'Pinned libavif native map sampling, gain application and PQ12 PNG output',
                              'sampling_scope': 'Valid distinct native sampling convention; measured against the unchanged predeclared reference',
                              'map_sampling': {'passed': True, 'pass_scope': 'Known native sampler and RGB8 source map precision from the pinned implementation; no claim of equal reference samples'}}
-            linear = resample_pq(png, folder/'hdr-linear.gbrapf32', 'contain', gamut='srgb')
+            linear = resample_pq(png, folder/'hdr-linear.gbrapf32', operation, gamut='srgb')
             case['checks']['map_sampling'] = True
         else:
             native_source, actual_source = _reconstruct(source, facts, inspection, mapped_reference, folder)
             case['checks']['map_sampling'] = native_source['map_sampling']['passed']
-            linear = resample_linear(native_source, folder/'hdr-linear.gbrapf32', 'contain')
+            linear = resample_linear(native_source, folder/'hdr-linear.gbrapf32', operation)
         case['native_source'] = native_source
-        reference_geometry = array_geometry(reference, 'contain')
+        reference_geometry = array_geometry(reference, operation)
+        height, width = reference_geometry.shape[:2]
         for name, expected, actual in (('source', reference, actual_source), ('linear_geometry', reference_geometry, read_linear(linear))):
             case['measurements'][name] = compare_appearance(expected, actual, reference_gamut='srgb', actual_gamut='srgb', fixture_class='gainmap-hdr')
         case['checks']['source_appearance'] = case['measurements']['source']['passed']
@@ -265,12 +283,12 @@ def _case(source, facts, inspection, reference, mapped_reference, folder, candid
             '-of', 'json', output]))
         streams = packet.get('streams', [])
         checks['native_av1_depth_color_frames'] = len(streams) == 1 and all(streams[0].get(key) == value for key, value in
-            {'codec_name': 'av1', 'width': 173, 'height': 130, 'pix_fmt': 'gbrp12le', 'color_space': 'gbr',
+            {'codec_name': 'av1', 'width': width, 'height': height, 'pix_fmt': 'gbrp12le', 'color_space': 'gbr',
              'color_transfer': 'smpte2084', 'color_primaries': 'bt709', 'color_range': 'pc', 'nb_read_frames': '1'}.items())
         aspect = _pixel_aspect(output)
         checks['square_pixels'] = (aspect['passed'] and len(streams) == 1
                                    and streams[0].get('sample_aspect_ratio') == '1:1'
-                                   and streams[0].get('display_aspect_ratio') == '173:130')
+                                   and streams[0].get('display_aspect_ratio') == f'{width//math.gcd(width, height)}:{height//math.gcd(width, height)}')
         tags = json.loads(avif.native(['exiftool', '-j', '-n', '-G1', '-s', output]))[0]
         tags = {key: value for key, value in tags.items() if key != 'SourceFile' and not key.startswith('System:')}
         private = private_metadata_tags(tags)
@@ -324,8 +342,14 @@ def _controls(source, root):
     return [{**item, 'status': 'passed' if item['passed'] else 'tested and failed'} for item in controls]
 
 
-def run(output_directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
-    validate_selectors(SELECTORS if selectors is None else selectors)
+def run(output_directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, geometries=('contain',)):
+    geometries = tuple(geometries)
+    if not geometries or len(set(geometries)) != len(geometries) or any(item not in GEOMETRIES for item in geometries):
+        raise ValueError('Expected distinct contain, cover, fill or upscale geometries')
+    if selectors is not None:
+        if len(geometries) != 1:
+            raise ValueError('Explicit selectors require one declared geometry')
+        validate_selectors(selectors, operation=geometries[0])
     root = Path(output_directory)
     root.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
@@ -338,11 +362,16 @@ def run(output_directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=Non
     fixture.update({'facts': facts, 'source_valid': True,
                     'valid_scope': 'Actual locked source facts; HDR appearance established separately for each named reconstruction profile'})
     candidates = ('libavif-native-map-sampling-pq12', 'native-antialiased-bilinear8-float32')
-    cases = [_case(source, facts, inspection, reference, mapped, root/name, name) for name in candidates]
-    profiles = []
+    cases = [_case(source, facts, inspection, reference, mapped,
+                   root/name if operation == 'contain' else root/operation/name, name, operation)
+             for operation in geometries for name in candidates]
+    profiles, source_candidates = [], set()
     for case in cases:
         case['reference_hdr'] = {'path': str(reference_path), 'sha256': avif.digest(reference_path), 'gamut': 'srgb',
                                  'normalization_nits': 203, 'revision': POLICY['reference_revision'], 'usage': 'Independent reference only; never encoder input'}
+        if case['candidate'] in source_candidates:
+            continue
+        source_candidates.add(case['candidate'])
         profiles.append({'candidate': case['candidate'], 'reference_revision': POLICY['reference_revision'],
                          'status': 'qualified' if case['checks']['known_source'] and case['checks']['map_sampling'] and case['checks']['source_appearance'] else 'tested and failed',
                          'measurement': case['measurements'].get('source'), 'native_source': case.get('native_source'),
@@ -350,5 +379,5 @@ def run(output_directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=Non
     fixture['source_reconstruction_profiles'] = profiles
     controls = _controls(source, root/'controls')
     return {'evidence': cases, 'source_fixtures': [fixture], 'fixtures': [], 'controls': controls,
-            'commands': avif.COMMANDS[start:], 'scope': POLICY,
+            'commands': avif.COMMANDS[start:], 'scope': POLICY if geometries == ('contain',) else GEOMETRY_POLICY,
             'source_reconstruction_profiles': profiles, 'consumer_status': 'pending manual review'}

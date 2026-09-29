@@ -23,6 +23,47 @@ class GainMapAvifHdrPngTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temporary.cleanup()
 
+    def test_additional_geometries_preserve_containment_and_failed_metadata_cases(self):
+        expanded = gainmap_avif_hdr_png.run(self.root/'geometries', geometries=('contain', 'cover', 'fill', 'upscale'))
+        self.assertEqual(len(expanded['evidence']), 8)
+        self.assertEqual(len({case['case_id'] for case in expanded['evidence']}), 8)
+        self.assertEqual(len(expanded['source_reconstruction_profiles']), 1)
+        originals = {case['candidate']: case for case in self.result['evidence']}
+        sizes = {'contain': (173, 130), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 576)}
+        for case in expanded['evidence']:
+            with self.subTest(candidate=case['candidate'], geometry=case['geometry']):
+                original = originals[case['candidate']]
+                self.assertEqual(case['source_sha256'], original['source_sha256'])
+                self.assertEqual(case['measurements']['source'], original['measurements']['source'])
+                self.assertEqual(case['native_geometry']['normalization_nits'], 203)
+                self.assertEqual(case['status'], original['status'], case['blockers'])
+                self.assertEqual(case['checks'], original['checks'])
+                self.assertEqual((case['facts']['width'], case['facts']['height']), sizes[case['geometry']])
+                self.assertEqual(case['facts']['lossless_metadata_correction']['mismatched_rgba_samples'], 0)
+                self.assertEqual(case['selectors']['depth'], '16')
+                self.assertEqual(case['selectors']['gamut'], 'preserve')
+                self.assertEqual(case['selectors']['range'], 'hdr')
+                self.assertEqual(case['privacy_measurement']['private_tags'], [])
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+                if case['geometry'] == 'contain':
+                    for key in ('case_id', 'selectors', 'status', 'checks', 'measurements', 'threshold_scope'):
+                        self.assertEqual(case[key], original[key])
+                    self.assertEqual(case['artifacts']['sha256'], original['artifacts']['sha256'])
+        for operation in sizes:
+            pair = [case for case in expanded['evidence'] if case['geometry'] == operation]
+            self.assertEqual(pair[0]['measurements'], pair[1]['measurements'])
+            self.assertEqual(pair[0]['facts']['rgba16_sha256'], pair[1]['facts']['rgba16_sha256'])
+        self.assertEqual([(item['case_id'], item['status']) for item in expanded['controls']],
+                         [(item['case_id'], item['status']) for item in self.result['controls']])
+
+    def test_unknown_duplicate_and_orientation_geometries_stop_before_native_work(self):
+        for operations in ((), ('contain', 'contain'), ('orientation',), ('crop',), ('arbitrary',)):
+            with self.subTest(geometries=operations):
+                before = len(avif.COMMANDS)
+                with self.assertRaisesRegex(ValueError, 'geometries'):
+                    gainmap_avif_hdr_png.run(self.root/'unknown-geometry', geometries=operations)
+                self.assertEqual(len(avif.COMMANDS), before)
+
     def test_original_aspect_failure_and_corrected_native_png_are_separate(self):
         baseline, corrected = self.result['evidence']
         self.assertEqual(baseline['candidate'], 'native-pq16-unspecified-aspect')

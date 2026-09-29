@@ -129,13 +129,45 @@ async function proxy() {
 }
 
 describe('quota storage contract', () => {
-  it('atomically shares windows across live Redis adapters and keeps keys isolated', async () => {
+  it('refills continuously and denies weighted reservations without debiting the balance', async () => {
+    const adapter = await distributed();
+    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    try {
+      expect(
+        await Effect.runPromise(adapter.quota.take('weighted-refill', 1000, 100000, 800))
+      ).toMatchObject({ _tag: 'Allowed', remaining: 200 });
+      const denied = await Effect.runPromise(
+        adapter.quota.take('weighted-refill', 1000, 100000, 500)
+      );
+      expect(denied._tag).toBe('Limited');
+      if (denied._tag !== 'Limited') throw new Error('Expected quota denial');
+      expect(denied.retryAfter).toBeGreaterThan(29000);
+      expect(denied.retryAfter).toBeLessThanOrEqual(30000);
+      expect(
+        await Effect.runPromise(adapter.quota.take('weighted-refill', 1000, 100000, 200))
+      ).toMatchObject({ _tag: 'Allowed', remaining: 0 });
+      const [seconds, micros] = await control.time();
+      const now = Number(seconds) * 1000 + Math.floor(Number(micros) / 1000);
+      await control.hset('graphql:quota:weighted-refill', 'updated', now - 50000, 'tokens', 0);
+      const refilled = await Effect.runPromise(
+        adapter.quota.take('weighted-refill', 1000, 100000, 400)
+      );
+      expect(refilled).toMatchObject({ _tag: 'Allowed', remaining: 100 });
+      expect(await control.pttl('graphql:quota:weighted-refill')).toBeGreaterThan(0);
+    } finally {
+      control.disconnect();
+      await adapter.dispose();
+    }
+  });
+  it('atomically shares weighted reservations across live Redis adapters and keeps keys isolated', async () => {
     const a = await distributed();
     const b = await distributed();
     try {
       const results = await Effect.runPromise(
         Effect.all(
-          Array.from({ length: 8 }, (_, i) => (i % 2 ? a : b).quota.take('shared', 3, 60000, 1)),
+          Array.from({ length: 8 }, (_, i) =>
+            (i % 2 ? a : b).quota.take('shared', 300, 60000000, 100)
+          ),
           { concurrency: 'unbounded' }
         )
       );
@@ -191,19 +223,28 @@ describe('quota storage contract', () => {
         )
       );
       await expect
-        .poll(() => control.get('graphql:ratelimit:healthy-saturation'), { interval: 5 })
-        .toBe('64');
+        .poll(
+          async () => Number(await control.hget('graphql:quota:healthy-saturation', 'tokens')),
+          { interval: 5 }
+        )
+        .toBeCloseTo(36, 0);
       expect(await control.ping()).toBe('PONG');
       expect(
         await Effect.runPromise(adapter.quota.take('healthy-saturation', 100, 60000, 1))
       ).toMatchObject({ _tag: 'Allowed', remaining: 100 });
-      expect(await control.get('graphql:ratelimit:healthy-saturation')).toBe('64');
+      expect(Number(await control.hget('graphql:quota:healthy-saturation', 'tokens'))).toBeCloseTo(
+        36,
+        0
+      );
       bridge.releaseReplies();
       const decisions = await pending;
       expect(
         decisions.every((decision) => decision._tag === 'Allowed' && decision.remaining < 100)
       ).toBe(true);
-      expect(await control.get('graphql:ratelimit:healthy-saturation')).toBe('64');
+      expect(Number(await control.hget('graphql:quota:healthy-saturation', 'tokens'))).toBeCloseTo(
+        36,
+        0
+      );
       expect(await observed.read()).toEqual([{ attributes: { reason: 'saturated' }, value: 1 }]);
     } finally {
       bridge.releaseReplies();
@@ -237,8 +278,10 @@ describe('quota storage contract', () => {
         { signal: controller.signal }
       );
       await expect
-        .poll(() => control.get('graphql:ratelimit:cancel-held'), { interval: 5 })
-        .toBe('64');
+        .poll(async () => Number(await control.hget('graphql:quota:cancel-held', 'tokens')), {
+          interval: 5,
+        })
+        .toBeCloseTo(36, 0);
       controller.abort();
       expect(await control.ping()).toBe('PONG');
       expect(
@@ -248,7 +291,7 @@ describe('quota storage contract', () => {
         remaining: 100,
       });
       expect(await observed.read()).toEqual([{ attributes: { reason: 'saturated' }, value: 1 }]);
-      expect(await control.get('graphql:ratelimit:cancel-held')).toBe('64');
+      expect(Number(await control.hget('graphql:quota:cancel-held', 'tokens'))).toBeCloseTo(36, 0);
       bridge.releaseReplies();
       expect(await pending).toMatchObject({ _tag: 'Failure' });
       expect(
@@ -271,7 +314,7 @@ describe('quota storage contract', () => {
     const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
     const observed = observeQuotaMetrics();
     try {
-      await control.lpush('graphql:ratelimit:wrong-type', 'invalid-quota-storage');
+      await control.lpush('graphql:quota:wrong-type', 'invalid-quota-storage');
       expect(await Effect.runPromise(adapter.quota.take('wrong-type', 1, 60000, 1))).toMatchObject({
         _tag: 'Allowed',
         remaining: 1,
@@ -285,14 +328,14 @@ describe('quota storage contract', () => {
       await observed.close();
     }
   });
-  it('allows requests when a successful command returns an invalid quota window and recovers', async () => {
+  it('handles corrupt quota state and recovers', async () => {
     const adapter = await distributed();
     const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
     const observed = observeQuotaMetrics();
     try {
-      // An existing counter without an expiry makes the successful Lua reply [-1, -1].
-      await control.set('graphql:ratelimit:missing-expiry', '1');
-      expect(await control.pttl('graphql:ratelimit:missing-expiry')).toBe(-1);
+      // Corrupt stored state must fail admission storage rather than invent a balance.
+      await control.set('graphql:quota:missing-expiry', '1');
+      expect(await control.pttl('graphql:quota:missing-expiry')).toBe(-1);
       expect(
         await Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000, 1))
       ).toMatchObject({
@@ -302,7 +345,7 @@ describe('quota storage contract', () => {
       expect(await observed.read()).toEqual([
         { attributes: { reason: 'command_failure' }, value: 1 },
       ]);
-      await control.del('graphql:ratelimit:missing-expiry');
+      await control.del('graphql:quota:missing-expiry');
       await expect
         .poll(() => Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000, 1)))
         .toMatchObject({ _tag: 'Allowed', remaining: 0 });
@@ -325,13 +368,13 @@ describe('quota storage contract', () => {
         _tag: 'Allowed',
         remaining: 0,
       });
-      const ttl = await control.pttl('graphql:ratelimit:window');
+      const ttl = await control.pttl('graphql:quota:window');
       expect(await Effect.runPromise(adapter.quota.take('window', 1, 60000, 1))).toMatchObject({
         _tag: 'Limited',
       });
-      expect(await control.pttl('graphql:ratelimit:window')).toBeLessThanOrEqual(ttl);
-      await control.pexpire('graphql:ratelimit:window', 1);
-      await expect.poll(() => control.exists('graphql:ratelimit:window')).toBe(0);
+      expect(await control.pttl('graphql:quota:window')).toBeLessThanOrEqual(ttl);
+      await control.pexpire('graphql:quota:window', 1);
+      await expect.poll(() => control.exists('graphql:quota:window')).toBe(0);
       expect(await Effect.runPromise(adapter.quota.take('window', 1, 60000, 1))).toMatchObject({
         _tag: 'Allowed',
         remaining: 0,
@@ -402,7 +445,7 @@ describe('quota storage contract', () => {
       );
       expect(decisions.every((decision) => decision._tag === 'Allowed')).toBe(true);
       expect(bridge.evals).toBeLessThanOrEqual(64);
-      const committed = Number(await control.get('graphql:ratelimit:stalled'));
+      const committed = 500 - Number(await control.hget('graphql:quota:stalled', 'tokens'));
       expect(committed).toBeGreaterThan(0);
       expect(committed).toBeLessThanOrEqual(64);
       bridge.restore();
@@ -411,7 +454,7 @@ describe('quota storage contract', () => {
           timeout: 5000,
         })
         .toMatchObject({ _tag: 'Allowed', remaining: 0 });
-      expect(Number(await control.get('graphql:ratelimit:stalled'))).toBe(committed);
+      expect(500 - Number(await control.hget('graphql:quota:stalled', 'tokens'))).toBe(committed);
       await adapter.dispose();
       await expect.poll(() => bridge.sockets).toBe(0);
     } finally {

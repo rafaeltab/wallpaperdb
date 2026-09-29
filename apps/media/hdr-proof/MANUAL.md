@@ -83,9 +83,10 @@ RGB8 SOF0 coding. Its standard-sRGB upscale remains a failed diagnostic.
 Compare its inspected file with the same authored SDR reference and the lossless
 variants. The JPEG has no separate aspect declaration; check the recorded
 raster dimensions and consumer geometry independently.
-The inspected SDR GIF containment is a failed palette diagnostic. Its metadata
-privacy, actual sRGB ICC, opacity and one-frame structure pass, but its shadow
-and midtone color errors exceed the file gates. Do not use it as a qualified
+The inspected SDR GIF containments from FFmpeg and libimagequant are failed
+palette diagnostics. Their metadata
+privacy, actual sRGB ICC, opacity and one-frame structure pass, but their shadow
+and midtone color errors exceed the file gates. Do not use either as a qualified
 SDR fallback even if the consumer opens it.
 The separately named HDR candidates emit single-layer PQ AVIF12 for containment,
 crop, stretch and upscale. The original

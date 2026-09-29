@@ -356,6 +356,11 @@ but exceeds the unchanged shadow and midtone appearance gates. A read-only
 comparison finds 900 reference pixels with no color in this exact palette
 within the maximum error of 8. Changing dithering alone cannot fix those pixels;
 this does not prove other palettes or GIF encoders impossible.
+A separate native libimagequant palette also fails. It improves regional means
+but raises the shadow maximum to 62.97; 951 pixels cannot meet the maximum gate
+with that exact palette. Both native outputs remain failed, with distinct
+case IDs and unchanged references. The native package version, library hash
+and its different version-API report are recorded separately.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

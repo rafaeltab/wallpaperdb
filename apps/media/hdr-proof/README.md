@@ -22,7 +22,8 @@ The Python color equations and request oracle exist only in this proof. FFmpeg/l
 
 The proof image includes explicitly pinned experimental native patches. Apple
 retained-map experiments isolate libultrahdr PR484 and PR491 separately and
-together; the final candidate uses both. A local libavif sequence-writing patch
+together; the final candidate uses both plus a local per-channel XMP patch.
+A local libavif sequence-writing patch
 fixes animated orientation serialization. These patches do not upgrade Media's
 production dependencies. Their source, patch, recipe and binary hashes are
 recorded by the build and [native version evidence](results/native-versions.json).
@@ -59,3 +60,11 @@ then encodes and independently decodes an exact-code counterexample. Its bounds
 apply only to that transfer, matrix, grade and per-pixel metric. They do not
 declare a format impossible or qualify a conversion. Additional native YUV
 trials and all reference hashes remain in the generated `results/precision.json`.
+
+Separate gamma-2.2 candidates encode the same SDR grade with sRGB primaries.
+AVIF declares CICP `1/4/0`. JPEG and WebP embed a deterministic native LittleCMS
+profile whose actual curves, colorants and adaptation are independently checked.
+These are gamma-2.2 SDR files, not standard sRGB-transfer files. The accepted
+contract defines `gamut=srgb` as primaries, so these candidates retain the same
+selectors while recording different representation IDs. Profile-aware physical
+review remains mandatory; existing failed sRGB-transfer files stay failed.

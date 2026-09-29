@@ -26,6 +26,7 @@ Test Android/ISO, Android XMP, old Apple and new Apple JPEG separately. Test eve
 - [ ] Compare the HDR candidate with the source at matched geometry, then with its explicit SDR counterpart. Confirm highlights visibly exceed ordinary white where the source does; inspect shadow detail, midtones, ordinary white and bright highlight texture. Record any exposure shift, clipping, banding, color shift or halo.
 - [ ] Compare each gain-map JPEG's SDR rendering with its authored SDR base. Confirm a visibly changed SDR grade is not being mistaken for a successful HDR transform.
 - [ ] Check the saturated art and gamut patches for hue shifts or flat clipping. Compare the sRGB SDR reference independently from the preserved-gamut reference.
+- [ ] Test gamma-2.2 SDR candidates separately from standard sRGB-transfer candidates. Verify their inspected CICP `1/4/0` or embedded ICC profile, then compare the same SDR reference on each browser, viewer and wallpaper setter. A consumer that ignores the declared transfer can change shadows and contrast despite using the correct primaries.
 - [ ] Play animated PQ AVIF over both dark and light checkerboard backgrounds. Verify fractional alpha and edges, first fully composed frame, frame order, frame durations, loop behavior and steady exposure across frames. Repeat playback and reload to detect adaptation or rerun exposure shifts.
 - [ ] Test static extraction against the animation's first fully composed frame, with the same crop and background.
 - [ ] If Safari's HDR AVIF animation fails, test the separately inspected animated SDR WebP with `range=sdr&gamut=srgb&depth=8`. Record its motion/alpha result independently. Keep the HDR AVIF download available; do not relabel the SDR fallback HDR.
@@ -60,6 +61,7 @@ HDR and display settings / power / ambient light:
 Input filename / SHA-256:
 Output filename / SHA-256:
 Conversion case ID and exact selectors:
+Declared transfer / CICP / ICC profile hash:
 View: thumbnail / full / downloaded native viewer / wallpaper
 Decode: pass / fail / pending
 Visible HDR relative to ordinary white: pass / fail / pending / SDR requested

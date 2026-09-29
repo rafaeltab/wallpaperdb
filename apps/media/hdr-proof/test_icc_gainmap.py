@@ -447,6 +447,52 @@ class IccGainmapTests(unittest.TestCase):
             self.assertEqual(case['consumer_status'], 'pending manual review')
             self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
 
+    def test_float_base_is_bounded_to_new_apple_upscale_with_float_gamma15_map(self):
+        import avif
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            for changed in ({'source_id': 'gainmap-android-iso'}, {'source_id': 'gainmap-android-xmp'},
+                    {'source_id': 'gainmap-apple-old'}, {'operation': 'contain'}, {'operation': 'cover'},
+                    {'map_method': 'islow'}, {'map_gamma': 2}, {'map_policy': 'smalloffset'},
+                    {'base_method': 'ifast'}):
+                arguments = {'source_id': 'gainmap-apple-new', 'operation': 'upscale',
+                             'map_policy': 'midpointoffset', 'map_gamma': 1.5,
+                             'map_method': 'float', 'base_method': 'float', **changed}
+                before = len(avif.COMMANDS)
+                with self.subTest(arguments=arguments), self.assertRaises(ValueError):
+                    run(Path(temporary), **arguments)
+                self.assertEqual(len(avif.COMMANDS), before)
+            self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_new_apple_float_base_qualifies_from_identical_native_gamma_input_and_icc(self):
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            case = run(Path(temporary), source_id='gainmap-apple-new', operation='upscale',
+                       map_policy='midpointoffset', map_gamma=1.5, base_method='float')['cases'][0]
+            self.assertEqual(case['status'], 'qualified', case['blockers'])
+            self.assertTrue(all(case['checks'].values()))
+            self.assertTrue(all(value['passed'] for value in case['measurements'].values()))
+            encoding = case['native_candidate']['base_encoding']
+            self.assertEqual(encoding['dct_encoding']['method'], 'float')
+            self.assertEqual(encoding['dct_encoding']['input_sha256'],
+                             'b982285d8a105e995636e771dba403f0b247eb559838154c9721766cb131a949')
+            self.assertEqual(encoding['icc_sha256'],
+                             '2515f8942127a705efdd516a77a8eac81a84a364a195cbe72de0a7184ef420db')
+            self.assertEqual(encoding['preparation_islow_base']['sha256'],
+                             'd235565259e4348657c42acca6c50d94b9aa16e51c8fcc76b91e5233a6d356ea')
+            self.assertNotEqual(case['native_candidate']['base_sha256'], encoding['preparation_islow_base']['sha256'])
+            self.assertEqual(case['native_candidate']['base_sha256'],
+                             '6fd817503458547b1981284f72db9965a92b5dd7fb8eea0dcdf1ed706a080173')
+            self.assertEqual(case['native_candidate']['computed_map_sha256'],
+                             '605612c86176c65a7a8b0a0547b37cd8bca6e6e9c56ad5eb7d2a5fd55ec45cfb')
+            self.assertEqual(case['artifacts']['sha256'],
+                             '1a62ee6cd3a58a12eeb6a149b8b5a0fe9e27b184d6e347f740c7b12ba8691c6d')
+            self.assertEqual(case['native_candidate']['map_encoding']['method'], 'float')
+            self.assertEqual(case['native_candidate']['map_gamma'], 1.5)
+            self.assertIn('base-dct-float', case['case_id'])
+            self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
+
     def test_new_apple_xmp_headroom_is_authoritative_and_unknown_models_are_rejected(self):
         import avif
         import gainmap

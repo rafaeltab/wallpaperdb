@@ -158,7 +158,7 @@ def _new_apple_source_model(source_facts, map_path):
 
 
 def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='float',
-        source_id='gainmap-android-iso', operation='upscale'):
+        source_id='gainmap-android-iso', operation='upscale', base_method='islow'):
     """Bounded ISO experiments, XMP upscale, and Apple contain/upscale."""
     import gainmap_combine
     import gainmap_hdr
@@ -169,6 +169,10 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
     _encoder(map_policy, map_gamma, map_method)
     if source_id not in ('gainmap-android-iso', 'gainmap-android-xmp', 'gainmap-apple-old', 'gainmap-apple-new'):
         raise ValueError('Only the four pinned ISO, XMP and Apple sources are supported')
+    if (base_method not in ('islow', 'float') or base_method == 'float' and
+            (source_id, operation, map_policy, map_gamma, map_method) !=
+            ('gainmap-apple-new', 'upscale', 'midpointoffset', 1.5, 'float')):
+        raise ValueError('FLOAT base coding is bounded to new Apple upscale with midpointoffset gamma1.5 FLOAT map')
     new_apple_islow = (source_id, operation, map_policy, map_gamma, map_method) == (
         'gainmap-apple-new', 'upscale', 'midpointoffset', 1.5, 'islow')
     if map_gamma == 1.5 and map_method == 'islow' and not new_apple_islow:
@@ -193,6 +197,8 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
     candidate = f'native-combine-icc-gamma32-{map_policy}-dct-{map_method}-map-source-{source_precision}'
     if map_gamma != 1:
         candidate += f'-map-gamma{map_gamma:g}'
+    if base_method != 'islow':
+        candidate += f'-base-dct-{base_method}'
     case = {'case_id': f'{name}:hdr:jpg:preserve:preserve:{operation}:{candidate}:{revision}',
         'fixture_id': name, 'source_sha256': fixture['sha256'], 'cell_id': 'gainmap-jpeg:hdr:jpg',
         'candidate': candidate, 'geometry': operation, 'source_reference_revision': revision,
@@ -244,6 +250,20 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
             map_policy='moderateoffset', geometry_revision=revision, source_precision=source_precision)
         base, output = folder/'gamma32-base.jpg', folder/'output.jpg'
         base_encoding = gainmap_sdr.encode(source, base, operation, gamut=gamut, gamma=3.2)
+        if base_method == 'float':
+            from dct_jpeg import encode
+            # Preserve the existing native pixel/ICC preparation and its
+            # original JPEG. Only the baseline DCT arithmetic changes.
+            control = folder/'gamma32-base-islow-control.jpg'
+            base.rename(control)
+            with Image.open(control) as image:
+                base_profile = image.info['icc_profile']
+            dct_encoding = encode(folder/'gamma32-base-gamma32.png', base,
+                                  icc_profile=base_profile, method='float')
+            base_encoding = {**base_encoding, 'native_encoder': dct_encoding['native_encoder'],
+                'output_sha256': dct_encoding['output_sha256'], 'dct_encoding': dct_encoding,
+                'preparation_islow_base': {'path': str(control), 'sha256': avif.digest(control),
+                    'purpose': 'Unchanged native gamma3.2 preparation control; not the packed base'}}
         case['native_candidate'] = pack(base, preparation['hdr_intent_pq_png'], output,
             map_policy=map_policy, map_gamma=map_gamma, map_method=map_method)
         case['native_candidate'].update({'base_encoding': base_encoding, 'source_preparation': preparation})
@@ -359,8 +379,10 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
     report = {'scope': f'One predeclared {name}-{operation} ICC-aware native HDR candidate; unchanged appearance gates',
         'source_policy': {'fixture': name, 'geometry': operation, 'native_precision': source_precision,
             'reference_revision': revision, 'gamut': gamut,
+            'base_method': base_method,
             'declaration': 'XMP upscale and old/new Apple contain/upscale admit the unchanged midpointoffset gamma1.5 FLOAT map recipe; '
                 'one separate ISLOW map candidate is admitted only for new Apple upscale. '
+                'One separate FLOAT-base/FLOAT-map candidate is also admitted only for new Apple upscale. '
                 'the ISO-only float32 source guard remains unchanged. Source, geometry, native HDR intent, '
                 'authored SDR and both final HDR readers must pass the existing gates.'},
         'map_representation': {'policy': map_policy, 'encoding_gamma': map_gamma, 'coded_depth': 8,
@@ -381,6 +403,11 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
                 'the compressed base decodes [82,70,60] natively and [82,71,60] independently. '
                 'Each isolated error passes, but together they reach 8.082252. One ISLOW map trial '
                 'preserves the exact compressed base and pre-JPEG map to test native DCT quantization.',
+            'new_apple_float_base_rationale': 'Declared before encoding: both map DCT methods retain '
+                'the same 70/71 base-reader difference at the sole failing shadow pixel. One native '
+                'FLOAT-DCT base trial keeps the native gamma3.2 PNG and actual P3 ICC byte-identical '
+                'and recomputes the original midpointoffset gamma1.5 FLOAT map against that compressed base. '
+                'No source pixel, reference, transfer, offset, gamma or threshold changes.',
             'gamma15_rationale': 'Declared before encoding: at the retained midpoint gamma2 worst black '
                 'pixel, normalized gain 0.020102 makes the local inverse code sensitivity for gamma1.5 '
                 '18.9% of gamma2. At the measured highlight median 0.613469 it rises 4.43%. '

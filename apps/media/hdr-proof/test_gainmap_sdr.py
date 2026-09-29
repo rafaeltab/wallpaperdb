@@ -47,7 +47,7 @@ class AuthoredSdrTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)/'out.jpg'
             with self.assertRaises(ValueError):
-                encode('unused.jpg', output, 'cover')
+                encode('unused.jpg', output, 'unknown')
             with self.assertRaises(ValueError):
                 encode('unused.jpg', output, 'contain', gamut='unknown')
 
@@ -109,6 +109,27 @@ class AuthoredSdrTests(unittest.TestCase):
             self.assertEqual(actual.shape, reference.shape)
             self.assertEqual(evidence['source_orientation'], 6)
             self.assertNotIn('IFD0:Orientation', facts['metadata'])
+
+    def test_native_fractional_cover_preserves_all_authored_bases(self):
+        from gainmap_sdr import decode_linear
+        for name in ('android-xmp', 'android-iso', 'apple-old', 'apple-new'):
+            for selector in ('preserve', 'srgb'):
+                with self.subTest(source=name, gamut=selector), tempfile.TemporaryDirectory() as temporary:
+                    source = Path(__file__).parent/f'fixtures/gainmap/gainmap-{name}.jpg'
+                    gamut = 'srgb' if selector == 'srgb' or name == 'android-xmp' else 'p3'
+                    output = Path(temporary)/'cover.jpg'
+                    evidence = encode(source, output, 'cover', gamut=gamut, gamma=3.2)
+                    actual, facts = decode_linear(output, gamut=gamut, gamma=3.2)
+                    reference = np.asarray(geometry(source_image(source, selector), 'cover')) / 255
+                    measured = compare_appearance(sdr_signal_to_nits(reference), actual,
+                        reference_gamut=gamut, actual_gamut='rec2020', fixture_class='gainmap-sdr')
+                    self.assertTrue(measured['passed'], measured)
+                    self.assertEqual(actual.shape, (173, 173, 3))
+                    self.assertEqual(len(evidence['native_window_axes']), 2)
+                    self.assertEqual(facts['gamut'], gamut)
+                    self.assertEqual(facts['transfer'], 'gamma3.2')
+                    self.assertEqual(facts['depth'], 8)
+                    self.assertTrue(facts['privacy'])
 
 
 if __name__ == '__main__':

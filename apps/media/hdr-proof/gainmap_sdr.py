@@ -56,7 +56,7 @@ def _axis(source_arguments, output, width, height, *, before=''):
 
 def prepare(source, output, operation, *, gamut='srgb'):
     """Create an 8-bit authored SDR PNG through the proven native geometry."""
-    if operation not in ('identity', 'contain', 'fill', 'upscale', 'crop', 'orientation') or gamut not in ('srgb', 'p3'):
+    if operation not in ('identity', 'contain', 'cover', 'fill', 'upscale', 'crop', 'orientation') or gamut not in ('srgb', 'p3'):
         raise ValueError('Unsupported native authored-SDR geometry or gamut')
     source, output = Path(source), Path(output)
     if gamut == 'p3' and _base_color_facts(source.read_bytes())['gamut'] != 'p3':
@@ -104,14 +104,18 @@ def prepare(source, output, operation, *, gamut='srgb'):
     target_height = int(height * target_width / width + .5)
     if operation in ('fill', 'crop'):
         target_height = 211 if operation == 'fill' else 153
-    intermediate = output.with_name(output.stem + '-horizontal.png')
-    first = _axis(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{raw_width}x{raw_height}', '-i', raw],
-                  intermediate, target_width, height, before=before)
-    second = _axis(['-i', intermediate], output, target_width, target_height)
+    if operation == 'cover':
+        from native_zimg import cover
+        geometry_evidence = cover(raw, output, width, height, size=173)
+    else:
+        intermediate = output.with_name(output.stem + '-horizontal.png')
+        first = _axis(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{raw_width}x{raw_height}', '-i', raw],
+                      intermediate, target_width, height, before=before)
+        second = _axis(['-i', intermediate], output, target_width, target_height)
+        geometry_evidence = {'dimensions': [target_width, target_height], 'native_filters': [first, second]}
     return {'geometry': operation, 'source_dimensions': [raw_width, raw_height], 'source_orientation': orientation,
-            'dimensions': [target_width, target_height], 'gamut': gamut,
+            **geometry_evidence, 'gamut': gamut,
             'source_color_conversion': source_color_conversion,
-            'native_filters': [first, second],
             'geometry_precision': '8-bit coded sRGB after each normalized native Lanczos axis',
             'source_sha256': hashlib.sha256(source.read_bytes()).hexdigest()}
 

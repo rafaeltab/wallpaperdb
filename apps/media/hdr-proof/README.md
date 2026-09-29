@@ -102,6 +102,10 @@ headroom controls verify the reciprocal decoding exponent. This allocates more
 of the existing eight-bit map precision to the measured gain range; it changes
 neither image grade nor reference. Highlight error improves, but regional means
 and shadow error still fail. The earlier gamma-1 bytes remain pinned.
+A separate gamma-2 candidate uses the logarithmic midpoint offset, 1/16384.
+It passes midtone and highlight limits but fails both readers' shadow maxima
+and their cross-comparison. Exact emitted offsets, metadata agreement and
+headroom controls remain mandatory; this failure does not qualify the path.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

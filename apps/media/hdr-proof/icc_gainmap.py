@@ -22,12 +22,13 @@ TOOL = '/opt/proof/icc-gainmap/hdr-proof-icc-gainmap'
 
 
 def _encoder(map_policy, map_gamma):
-    if map_policy not in ('moderateoffset', 'smalloffset'):
-        raise ValueError('Only the two predeclared native offset policies are supported')
+    if map_policy not in ('moderateoffset', 'smalloffset', 'midpointoffset'):
+        raise ValueError('Only the three predeclared native offset policies are supported')
     if (type(map_gamma) not in (int, float) or map_gamma not in (1, 2)
-            or map_gamma == 2 and map_policy != 'smalloffset'):
-        raise ValueError('Only map gamma1 and the separate smalloffset gamma2 candidate are supported')
-    variant = ('smalloffset-gamma2' if map_gamma == 2 else 'smalloffset')
+            or map_gamma == 2 and map_policy == 'moderateoffset'
+            or map_policy == 'midpointoffset' and map_gamma != 2):
+        raise ValueError('Only the declared gamma1 and separate smalloffset/midpointoffset gamma2 candidates are supported')
+    variant = f'{map_policy}-gamma2' if map_gamma == 2 else 'smalloffset'
     return TOOL if map_policy == 'moderateoffset' else str(Path(TOOL).parent/variant/Path(TOOL).name)
 
 
@@ -42,7 +43,8 @@ def pack(base, hdr_intent, output, *, map_policy='moderateoffset', map_gamma=1):
     facts = json.loads(avif.native([tool, 'compute', base, hdr_intent, combined]))
     avif.native(['avifgainmaputil', 'extractgainmap', combined, png])
     map_encoding = encode(png, jpg, method='float')
-    packer = ([tool, 'pack-gamma2'] if map_gamma == 2 else
+    mode = 'pack-gamma2-midpoint' if map_policy == 'midpointoffset' else 'pack-gamma2'
+    packer = ([tool, mode] if map_gamma == 2 else
               ['/opt/proof/ultrahdr/precise/hdr-proof-uhdr', 'pack-avif'])
     avif.native([*packer, combined, base, jpg, output])
     return {'native_icc': facts, 'map_encoding': map_encoding,
@@ -208,6 +210,9 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1):
             'dual_metadata': bool(facts['iso_identifier'] and facts['android_xmp_properties']),
             'metadata_agreement': all(agreement['checks'].values()),
             'requested_map_gamma': probe['gamma'] == [map_gamma]*3,
+            'requested_map_offsets': all(channel[field] == {'moderateoffset': 1/4096,
+                'smalloffset': 1/65536, 'midpointoffset': 1/16384}[map_policy]
+                for channel in facts['iso_metadata']['channels'] for field in ('base_offset', 'alternate_offset')),
             'actual_base_icc': sdr_facts['icc_sha256'] == base_encoding['icc_sha256']}
         case['checks'].update({'independent_decoder': cross['passed'],
             'structure': all(case['structural_checks'].values()),
@@ -269,6 +274,9 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1):
             'gamma2_rationale': 'Smalloffset gamma1 measured highlight median normalized log gain 0.590619. '
                 'Local quantization sensitivity is log-gain interval/(gamma*u**(gamma-1)); '
                 'gamma2 is the single predeclared option near the local optimum 1.90, without pixel prebias.',
+            'midpoint_rationale': 'The single 1/16384 offset is the logarithmic midpoint of retained '
+                '1/4096 and 1/65536 candidates. It tests a narrower log-gain quantization interval '
+                'while limiting near-black offset amplification. All previous candidates and gates remain unchanged.',
             'upstream_sources': [
                 'https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.4.1/src/gainmap.c',
                 'https://raw.githubusercontent.com/google/libultrahdr/e5f5a022fe96fc4dc2ee35c19f733a50df807abe/lib/src/gainmapmath.cpp']},
@@ -276,7 +284,7 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1):
         'gainmap_commands': logged_commands,
         'source_hashes': {name: avif.digest(Path(__file__).with_name(name)) for name in
             ('icc_gainmap.py', 'native_icc_gainmap.cpp', 'icc-gainmap-build.sh', 'libavif-icc-linear-base.patch',
-             'libavif-gamma2-gain.patch')},
+             'libavif-gamma2-gain.patch', 'libavif-midpoint-offset-gain.patch')},
         'native_hashes': Path('/opt/proof/icc-gainmap/binary-sha256.txt').read_text(),
         'native_source_hashes': Path('/opt/proof/icc-gainmap/source-sha256.txt').read_text()}
     (folder/'results.json').write_text(json.dumps(report, indent=2)+'\n')

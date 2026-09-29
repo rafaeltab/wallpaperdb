@@ -23,6 +23,9 @@ class IccGainmapTests(unittest.TestCase):
     def test_smalloffset_gamma2_uses_real_metadata_at_all_display_headrooms(self):
         self._headroom_control('smalloffset', map_gamma=2)
 
+    def test_midpointoffset_gamma2_uses_real_metadata_at_all_display_headrooms(self):
+        self._headroom_control('midpointoffset', map_gamma=2)
+
     def _headroom_control(self, map_policy, *, map_gamma=1):
         from avif import encode_transfer
         from icc_gainmap import pack, independent_decode, native_decode
@@ -53,6 +56,9 @@ class IccGainmapTests(unittest.TestCase):
             self.assertTrue(all(check_metadata(facts, probe)['checks'].values()))
             self.assertEqual(probe['gamma'], [map_gamma]*3)
             self.assertTrue(all(channel['gamma'] == map_gamma for channel in facts['iso_metadata']['channels']))
+            expected_offset = {'moderateoffset': 1/4096, 'smalloffset': 1/65536, 'midpointoffset': 1/16384}[map_policy]
+            self.assertTrue(all(channel[field] == expected_offset for channel in facts['iso_metadata']['channels']
+                                for field in ('base_offset', 'alternate_offset')))
             if map_gamma == 2:
                 from avif import decode_transfer, read_png
                 metadata = facts['iso_metadata']['channels']
@@ -73,10 +79,16 @@ class IccGainmapTests(unittest.TestCase):
                 gamma1 = folder/'gamma1.avif'
                 native([TOOL.replace('/hdr-proof-', '/smalloffset/hdr-proof-'),
                         'compute', base, hdr, gamma1])
-                gamma2_tool = TOOL.replace('/hdr-proof-', '/smalloffset-gamma2/hdr-proof-')
+                gamma2_tool = TOOL.replace('/hdr-proof-', f'/{map_policy}-gamma2/hdr-proof-')
+                mode = 'pack-gamma2-midpoint' if map_policy == 'midpointoffset' else 'pack-gamma2'
                 rejected = folder/'wrong-gamma.jpg'
-                with self.assertRaisesRegex(RuntimeError, 'gamma2/smalloffset'):
-                    native([gamma2_tool, 'pack-gamma2', gamma1, base,
+                with self.assertRaisesRegex(RuntimeError, 'gamma2/offset'):
+                    native([gamma2_tool, mode, gamma1, base,
+                            folder/'output-icc-parts/map.jpg', rejected])
+                self.assertFalse(rejected.exists())
+                wrong_mode = 'pack-gamma2' if map_policy == 'midpointoffset' else 'pack-gamma2-midpoint'
+                with self.assertRaisesRegex(RuntimeError, 'gamma2/offset'):
+                    native([gamma2_tool, wrong_mode, folder/'output-icc-parts/combined.avif', base,
                             folder/'output-icc-parts/map.jpg', rejected])
                 self.assertFalse(rejected.exists())
                 with self.assertRaisesRegex(RuntimeError, 'gamma 1'):
@@ -130,7 +142,7 @@ class IccGainmapTests(unittest.TestCase):
             output = Path(temporary)/'unknown.jpg'
             for policy, gamma in (('moderateoffset', 2), ('smalloffset', 0),
                                   ('smalloffset', 3), ('smalloffset', True),
-                                  ('unknown', 1), ('smalloffset', float('nan'))):
+                                  ('unknown', 1), ('smalloffset', float('nan')), ('midpointoffset', 1)):
                 before = len(avif.COMMANDS)
                 with self.subTest(policy=policy, gamma=gamma), self.assertRaises(ValueError):
                     pack('missing-base.jpg', 'missing-intent.png', output,
@@ -235,6 +247,24 @@ class IccGainmapTests(unittest.TestCase):
             self.assertEqual(case['consumer_status'], 'pending manual review')
             self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
             self.assertTrue(case['case_id'].endswith('map-gamma2:gainmap-hdr-target-gamut-v1'))
+
+    def test_midpoint_gamma2_retains_shadow_and_reader_failures(self):
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            report = run(Path(temporary), map_policy='midpointoffset', map_gamma=2)
+            case = report['cases'][0]
+            self.assertEqual(case['status'], 'tested and failed', case['blockers'])
+            self.assertEqual(case['blockers'], ['Failed independent_decoder check', 'Failed appearance check'])
+            self.assertTrue(case['checks']['structure'])
+            self.assertTrue(case['checks']['privacy'])
+            self.assertTrue(case['structural_checks']['requested_map_offsets'])
+            self.assertTrue(case['measurements']['authored_sdr_base']['passed'])
+            for decoder in ('reconstructed_hdr', 'independent_hdr', 'independent_hdr_cross_decoder'):
+                self.assertEqual(case['measurements'][decoder]['failures'], ['shadow.delta_e_max'])
+            self.assertEqual(case['artifacts']['sha256'], 'b1d0e22f2c31f7c328c13e713f750a26115f3de7f3c3db28b4166fa463e175d7')
+            self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
+            self.assertIn('midpointoffset', case['case_id'])
 
 
 if __name__ == '__main__':

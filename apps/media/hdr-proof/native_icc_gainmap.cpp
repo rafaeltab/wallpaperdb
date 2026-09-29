@@ -299,7 +299,8 @@ static Linear decode(const Bytes& bytes, Raster& raster, float boost) {
   }
   return result;
 }
-static void pack_gamma2(const char* avif_path, const char* base_path, const char* map_path, const char* output) {
+static void pack_gamma2(const char* avif_path, const char* base_path, const char* map_path, const char* output,
+                        float expected_offset) {
   using Image = std::unique_ptr<avifImage, decltype(&avifImageDestroy)>;
   using Decoder = std::unique_ptr<avifDecoder, decltype(&avifDecoderDestroy)>;
   Image intent(avifImageCreateEmpty(), avifImageDestroy);
@@ -323,9 +324,9 @@ static void pack_gamma2(const char* avif_path, const char* base_path, const char
     metadata.gamma[channel] = fraction(map->gainMapGamma[channel]);
     metadata.offset_sdr[channel] = fraction(map->baseOffset[channel]);
     metadata.offset_hdr[channel] = fraction(map->alternateOffset[channel]);
-    if (metadata.gamma[channel] != 2 || metadata.offset_sdr[channel] != 1.f/65536 ||
-        metadata.offset_hdr[channel] != 1.f/65536)
-      throw std::runtime_error("Gamma2 packing requires the predeclared gamma2/smalloffset metadata");
+    if (metadata.gamma[channel] != 2 || metadata.offset_sdr[channel] != expected_offset ||
+        metadata.offset_hdr[channel] != expected_offset)
+      throw std::runtime_error("Gamma2 packing requires the selected gamma2/offset metadata");
   }
   metadata.hdr_capacity_min = std::exp2(fraction(map->baseHdrHeadroom));
   metadata.hdr_capacity_max = std::exp2(fraction(map->alternateHdrHeadroom));
@@ -360,7 +361,10 @@ int main(int argc, char** argv) {
   try {
     const std::string mode = argc > 1 ? argv[1] : "";
     if (mode == "pack-gamma2" && argc == 6) {
-      pack_gamma2(argv[2], argv[3], argv[4], argv[5]); return 0;
+      pack_gamma2(argv[2], argv[3], argv[4], argv[5], 1.f/65536); return 0;
+    }
+    if (mode == "pack-gamma2-midpoint" && argc == 6) {
+      pack_gamma2(argv[2], argv[3], argv[4], argv[5], 1.f/16384); return 0;
     }
     if (mode == "jpeg-samples" && argc == 4) {
       auto raster = jpeg(read(argv[2]));

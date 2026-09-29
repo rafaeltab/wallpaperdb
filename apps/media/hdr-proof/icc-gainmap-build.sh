@@ -61,9 +61,19 @@ mkdir -p /opt/proof/icc-gainmap/smalloffset-gamma2
 c++ -std=c++17 -O2 -Wall -Wextra -Werror -I . -I libavif-1.4.1/include -I uhdr -I uhdr/lib/include \
     /opt/proof/native_icc_gainmap.cpp avif-build/libavif_internal.a uhdr-build/libuhdr.a \
     /usr/lib/liblcms2.so.2 -ljpeg -lpng -laom -ldav1d -pthread -lm -o /opt/proof/icc-gainmap/smalloffset-gamma2/hdr-proof-icc-gainmap
+# One separate offset at the logarithmic midpoint of the prior native floors.
+# Apply after all three retained representations have been built.
+echo '6339d3d2e255586b414780314c9dfe20baa3ad6f79eded515f8dbb28c554eb39  /opt/proof/libavif-midpoint-offset-gain.patch' | sha256sum -c -
+patch -d libavif-1.4.1 -p1 < /opt/proof/libavif-midpoint-offset-gain.patch
+cmake --build avif-build --target avif --parallel 4
+mkdir -p /opt/proof/icc-gainmap/midpointoffset-gamma2
+c++ -std=c++17 -O2 -Wall -Wextra -Werror -I . -I libavif-1.4.1/include -I uhdr -I uhdr/lib/include \
+    /opt/proof/native_icc_gainmap.cpp avif-build/libavif_internal.a uhdr-build/libuhdr.a \
+    /usr/lib/liblcms2.so.2 -ljpeg -lpng -laom -ldav1d -pthread -lm -o /opt/proof/icc-gainmap/midpointoffset-gamma2/hdr-proof-icc-gainmap
 sha256sum lcms2.h /usr/lib/liblcms2.so.2 /opt/proof/icc-gainmap/hdr-proof-icc-gainmap \
     /opt/proof/icc-gainmap/smalloffset/hdr-proof-icc-gainmap \
     /opt/proof/icc-gainmap/smalloffset-gamma2/hdr-proof-icc-gainmap \
+    /opt/proof/icc-gainmap/midpointoffset-gamma2/hdr-proof-icc-gainmap \
     > /opt/proof/icc-gainmap/binary-sha256.txt
 sha256sum lcms2.h avif.tar.gz uhdr.tar.gz pr*.patch /opt/proof/libavif-*-gain.patch \
     /opt/proof/libavif-icc-linear-base.patch /opt/proof/libultrahdr-*.patch \

@@ -115,5 +115,105 @@ class XmpContainmentHeadroomTests(unittest.TestCase):
         self.assertTrue(all(avif.digest(case['artifacts']['output']) == self.module.OUTPUT_SHA256 for case in report['cases']))
 
 
+class XmpGeometryHeadroomTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import xmp_containment_headroom
+        cls.module = xmp_containment_headroom
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.root = Path(cls.temporary.name)
+        cls.result = cls.module.run(cls.root/'proof', geometries=('cover', 'fill', 'upscale', 'orientation'))
+
+    def test_opt_in_geometries_keep_exact_native_files_and_independent_boosts(self):
+        result = self.result
+        self.assertEqual(len(result['cases']), 8)
+        expected = {
+                'cover': 'aed2f914ed445a66f2b70f08d8bb7d6f79d26d06296e1b580aed66011f6dc75e',
+                'fill': 'c1e02b8b74c05d17d660d2834c947abba99348ecf01dc3bdad6bd92286933229',
+                'upscale': 'a3a9191c6e6854b3cf5e982f9364d3448bb548ca7c85a2ba600e2cc411e51e53',
+                'orientation': 'e9ca24d9fc94e33c16516423626a892b3fb9e3d719fc78fe1943d3b2ef2c2a96',
+        }
+        for operation, digest in expected.items():
+            cases = [case for case in result['cases'] if case['geometry'] == operation]
+            self.assertEqual(len(cases), 2)
+            self.assertEqual({case['rendering_scope']['display_boost'] for case in cases}, {2, 16})
+            self.assertEqual({case['artifacts']['sha256'] for case in cases}, {digest})
+            self.assertEqual([case['status'] for case in cases], ['tested and failed', 'qualified'])
+            self.assertEqual(cases[0]['blockers'], ['Failed appearance check at display boost 2'])
+            self.assertTrue(all(value for key, value in cases[0]['checks'].items() if key != 'appearance'))
+            self.assertTrue(all(cases[1]['checks'].values()))
+
+    def test_each_boost_keeps_its_own_reference_and_measured_errors(self):
+        expected = {
+            'cover': ([173, 173], ('8852076d8d5ebf97cddf023caf06acc8d6fe8afb33c11efc004483b38163db26',
+                                 'b670e8631afcbfacbd87a38b7a735d0af8c0256c36279e3fec19d16751b1ca99'), 81.43343623662018, 6.086112533740057),
+            'fill': ([173, 211], ('19c1f77ab1fc409bfaada22477211fd364215954a39c9ac5d9a916f97ad1f9e9',
+                                'c954d29cf766261a70f721269ce5c44c8abea3aec01f728cbf58334bd39e0599'), 90.21768570448246, 3.886404937623788),
+            'upscale': ([769, 576], ('97fa9209284d1d031a881323d715c5a8a37d89d8c4d72b45834b0a4a1bfa80c0',
+                                   'f150785fd3242969c801ae407c31d8827f192b620992685b537bb03fe32e725c'), 93.56703713159487, 6.926390192785285),
+            'orientation': ([173, 231], ('0b80f2f6ae1ea4423073d0b2ec67210e914a4a1061c04a4c8ec376590a82fb0a',
+                                       'a80d01eaf4c48949f37f88eace2374530649257382bd5b259842fd819d784c23'), 81.45474247964277, 5.95016406279426),
+        }
+        for operation, (dimensions, hashes, low_maximum, high_maximum) in expected.items():
+            cases = [case for case in self.result['cases'] if case['geometry'] == operation]
+            for index, case in enumerate(cases):
+                self.assertEqual(case['reference_hdr']['dimensions'], dimensions)
+                self.assertEqual(case['reference_hdr']['sha256'], hashes[index])
+                self.assertEqual(avif.digest(case['reference_hdr']['path']), hashes[index])
+                measurement = case['measurements']['independent_hdr']
+                maximum = max(region['delta_e_itp']['maximum'] for region in measurement['regions'].values()
+                              if 'delta_e_itp' in region)
+                self.assertAlmostEqual(maximum, (low_maximum, high_maximum)[index], places=6)
+                self.assertTrue(case['measurements']['authored_sdr_base']['passed'])
+                self.assertTrue(case['measurements']['independent_hdr_cross_decoder']['passed'])
+                self.assertEqual(case['source_decoder_evidence']['headroom_log2'], (1, 4)[index])
+                self.assertEqual(case['rendering_scope']['display_boost'], (2, 16)[index])
+                self.assertNotIn('display_boost', case['selectors'])
+
+    def test_real_exif_source_is_bound_while_canonical_reference_rotates_once(self):
+        import numpy as np
+        import gainmap_xmp
+        from gainmap_reference import reference
+        source = self.result['source_renderer']['source']
+        for case in self.result['cases']:
+            if case['geometry'] != 'orientation':
+                self.assertNotIn('orientation_source', case)
+                continue
+            self.assertEqual(case['orientation_source']['orientation'], 6)
+            self.assertEqual(case['orientation_source']['sha256'], self.module.ORIENTATION_SHA256)
+            self.assertEqual(avif.digest(case['orientation_source']['path']), self.module.ORIENTATION_SHA256)
+            self.assertTrue(case['orientation_correspondence']['original_coded_samples_equal'])
+            self.assertEqual(case['orientation_correspondence']['gain_map_sha256'], gainmap_xmp.MAP_SHA256)
+            self.assertEqual(case['reference_method']['orientation'], 6)
+            decoded = gainmap_xmp.decode_xmp_source(Path(source['path']).read_bytes(),
+                Path(source['evidence']['map_path']).read_bytes(), headroom=case['rendering_scope']['headroom_log2'])
+            # Explicit clockwise rotation of original identity pixels, then ordinary
+            # containment, independently verifies the declared EXIF6 reference order.
+            expected, _ = reference(np.rot90(decoded['linear_rgb_nits'], -1), 'srgb', 'srgb', 'contain')
+            actual = np.fromfile(case['reference_hdr']['path'], '<f8').reshape(231, 173, 3)
+            self.assertTrue(np.array_equal(actual, expected))
+
+    def test_actual_matrix_preserves_all_four_failed_same_file_requirements(self):
+        from matrix import build_matrix
+        matrix = build_matrix(self.result['cases'])
+        self.assertFalse(matrix['evidence_errors'])
+        rows = [row for row in matrix['rendering_coverage']['same_file_requirements']
+                if row['fixture_id'] == 'gainmap-android-xmp' and row['geometry'] != 'contain']
+        self.assertEqual(len(rows), 4)
+        for row in rows:
+            self.assertEqual(row['status'], 'tested and failed')
+            self.assertEqual(row['qualified_output_sha256'], [])
+            self.assertEqual(row['tested_output_sha256'], [self.module.OUTPUTS[row['geometry']]])
+            self.assertEqual([point['status'] for point in row['points']], ['tested and failed', 'qualified'])
+
+    def test_only_bounded_unique_geometry_tuples_are_admitted_before_native_work(self):
+        for geometries in ((), ('crop',), ('fill', 'fill'), ['contain'], ('contain', []), (None,)):
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                self.module.run(self.root/'rejected', geometries=geometries)
+            self.assertEqual(len(avif.COMMANDS), start)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -218,7 +218,7 @@ the first precise containment retain their exact bytes and measurements. Only
 the five separately named precise outputs enter the matrix as new evidence;
 nested baseline records are not counted twice. Fractional alpha, other gamuts
 and depths require their own proof.
-The [AVIF12 precision containment](apple_hdr_avif_precision.py) feeds that
+The [AVIF precision candidates](apple_hdr_avif_precision.py) feed that
 strictly inspected native PQ16 PNG to AOM and independently decodes with dav1d.
 Its maximum HDR error falls from 0.350934 to 0.174863; regional color means,
 p95 values and maxima also improve against the same documented P3 reference.
@@ -231,9 +231,13 @@ tradeoffs recorded. At 10 bits, maximum HDR error falls from 0.734999 to
 maximum HDR error rises from 2.648045 to 2.686236; six regional error statistics
 increase. Every signed regional change is retained. More precise input does
 not guarantee that every metric improves after coarse output quantization.
-Only the three separately named candidates enter the matrix; earlier files
-and measurements remain exact. Other geometries, intermediate adaptation and
-physical consumers remain outside this increment.
+Four further AVIF12 candidates cover crop, stretch, upscale and actual EXIF6
+orientation. Their maximum HDR errors fall from 0.335492, 0.322892, 0.334609
+and 0.360346 to 0.174007, 0.173835, 0.178738 and 0.166216. Three regional
+luminance statistics increase; their signed changes remain visible in the
+report. Only the seven separately named candidates enter the matrix; earlier
+files and measurements remain exact. Non-containment AVIF8/10 selectors,
+intermediate adaptation and physical consumers remain outside this increment.
 New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native

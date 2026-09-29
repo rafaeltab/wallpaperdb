@@ -99,6 +99,10 @@ at matched size, retaining each hash, measurement record and pending physical
 status. Its SDR companion is still a separate comparison image. Some 8/10-bit
 statistics worsen despite passing the same limits; use the recorded regional
 changes when inspecting shadow gradients and colored edges.
+The precise AVIF12 files also cover crop, stretch, upscale and actual EXIF6
+orientation. Compare each with its same-geometry baseline and verify the
+orientation is applied once. Three regional luminance statistics worsen;
+retain those comparisons alongside the improved maximum color errors.
 The explicit Rec.2020 AVIF files cover all five geometries at 8/10/12 bits.
 Compare them with the corresponding P3 output and the same authored SDR
 companion. Record color interpretation and visible brightness for each exact

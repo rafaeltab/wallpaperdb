@@ -44,10 +44,13 @@ class EvidenceFileTests(unittest.TestCase):
                 for depth in depths for operation in ('contain', 'cover', 'fill', 'upscale', 'orientation')]
             cases += [{**case, 'case_id': case['case_id']+'-precision', 'proof_module': 'apple_hdr_png_precision'}
                       for case in cases if case['proof_module'] == 'apple_hdr_png']
+            cases += [{**case, 'case_id': case['case_id']+'-precision', 'proof_module': 'apple_hdr_avif_precision'}
+                      for case in cases if case['proof_module'] == 'apple_hdr_avif'
+                      and ('-12-' in case['case_id'] or case['geometry'] == 'contain')]
             with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
                 files = suite.candidate_files(cases, [])
             self.assertEqual({row['case_id'] for row in files}, {case['case_id'] for case in cases})
-            self.assertEqual(len(files), 25)
+            self.assertEqual(len(files), 32)
             for row in files:
                 self.assertFalse(row['rendering_scope']['intermediate_adaptation_qualified'])
                 self.assertEqual(row['consumer_status'], 'pending manual review')

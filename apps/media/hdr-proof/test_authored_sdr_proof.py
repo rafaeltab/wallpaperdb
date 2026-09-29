@@ -8,6 +8,19 @@ from matrix import build_matrix
 
 
 class AuthoredSdrEvidenceTests(unittest.TestCase):
+    def test_lossless_formats_keep_separate_measured_ledger_cells(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = run(Path(temporary), names=('gainmap-apple-new',), geometries=('contain',),
+                           gamuts=('preserve',), formats=('png', 'webp'))
+            self.assertEqual(len(evidence), 2)
+            self.assertEqual({case['cell_id'] for case in evidence},
+                             {'gainmap-jpeg:sdr:png', 'gainmap-jpeg:sdr:webp'})
+            for case in evidence:
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+                self.assertTrue(case['facts']['privacy'])
+            self.assertEqual(build_matrix(evidence)['evidence_errors'], [])
+
     def test_native_standard_rgb_jpeg_can_fulfill_only_its_measured_request(self):
         with tempfile.TemporaryDirectory() as temporary:
             evidence = run(Path(temporary), names=('gainmap-android-xmp',),

@@ -14,7 +14,9 @@ from matrix import GAINMAP_GEOMETRIES
 
 def run(directory, *, names=gainmap.NAMES,
         geometries=('identity', *gainmap.GEOMETRIES),
-        gamuts=('preserve', 'srgb'), gammas=(None, 3.2)):
+        gamuts=('preserve', 'srgb'), gammas=(None, 3.2), formats=('jpg',)):
+    if not formats or any(fmt not in ('jpg', 'png', 'webp') for fmt in formats):
+        raise ValueError('Authored SDR candidates support JPEG, PNG, and WebP')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     provenance = json.loads((gainmap.FIXTURES/'manifest.json').read_text())
@@ -27,18 +29,20 @@ def run(directory, *, names=gainmap.NAMES,
         source_gamut = sources[name]['expected']['gamut']
         for gamut_selector in gamuts:
             gamut = source_gamut if gamut_selector == 'preserve' else gamut_selector
-            for gamma in gammas:
-                representation = 'rgb-jpeg-srgb-transfer' if gamma is None else f'rgb-jpeg-gamma{gamma}'
+            representations = [(fmt, gamma) for fmt in formats for gamma in (gammas if fmt == 'jpg' else (None,))]
+            for fmt, gamma in representations:
+                representation = (('rgb-jpeg-srgb-transfer' if gamma is None else f'rgb-jpeg-gamma{gamma}')
+                                  if fmt == 'jpg' else f'lossless-{fmt}-srgb-transfer')
                 for operation in geometries:
-                    case_id = f'{name}:sdr:jpg:{gamut_selector}:preserve:{operation}:{representation}'
+                    case_id = f'{name}:sdr:{fmt}:{gamut_selector}:preserve:{operation}:{representation}'
                     folder = directory/case_id.replace(':', '-')
                     folder.mkdir(exist_ok=True)
-                    selectors = {'format': 'jpg', 'range': 'sdr', 'gamut': gamut_selector,
+                    selectors = {'format': fmt, 'range': 'sdr', 'gamut': gamut_selector,
                                  'depth': 'preserve', 'motion': 'preserve', 'transparency': 'preserve'}
                     selectors.update(GAINMAP_GEOMETRIES.get(operation, {}))
                     if operation == 'crop':
                         selectors.update({'w': 173, 'h': 153, 'fit': 'fill'})
-                    case = {'case_id': case_id, 'fixture_id': name, 'cell_id': 'gainmap-jpeg:sdr:jpg',
+                    case = {'case_id': case_id, 'fixture_id': name, 'cell_id': f'gainmap-jpeg:sdr:{fmt}',
                             'selectors': selectors, 'geometry': operation, 'candidate': representation,
                             'status': 'tested and failed', 'consumer_status': 'pending manual review',
                             'checks': {key: False for key in ('native_encoder', 'independent_decoder',
@@ -66,13 +70,18 @@ def run(directory, *, names=gainmap.NAMES,
                         case['reference_sdr'] = {'path': str(reference_path), 'sha256': avif.digest(reference_path),
                                                 'gamut': gamut, 'transfer': 'srgb',
                                                 'purpose': 'Unchanged independent matched-geometry authored SDR base'}
-                        target = folder/'output.jpg'
+                        target = folder/f'output.{fmt}'
                         arguments = {'gamut': gamut}
                         if gamma is not None:
                             arguments['gamma'] = gamma
-                        encoded = gainmap_sdr.encode(source, target, operation, **arguments)
+                        if fmt == 'jpg':
+                            codec = gainmap_sdr
+                        else:
+                            import authored_lossless
+                            codec = authored_lossless
+                        encoded = codec.encode(source, target, operation, **arguments)
                         case['checks']['native_encoder'] = True
-                        actual, facts = gainmap_sdr.decode_linear(target, gamut=gamut, gamma=gamma)
+                        actual, facts = codec.decode_linear(target, **arguments)
                         case['checks']['independent_decoder'] = True
                         reference = sdr_signal_to_nits(np.asarray(reference_image) / 255)
                         measured = compare_appearance(reference, actual, reference_gamut=gamut,

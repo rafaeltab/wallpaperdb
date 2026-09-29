@@ -98,14 +98,18 @@ class GainMapReportTests(unittest.TestCase):
         precision = {**single, 'proof_module': 'apple_hdr_png_precision', 'geometry': 'contain',
                      'selectors': {'format': 'png', 'gamut': 'preserve', 'depth': '16'},
                      'artifacts': {'sha256': 'c'*64}, 'measurements': {'hdr': measurement(.001, .01089, .001)}}
+        avif_precision = {**precision, 'proof_module': 'apple_hdr_avif_precision',
+                          'selectors': {'format': 'avif', 'gamut': 'preserve', 'depth': '12'},
+                          'artifacts': {'sha256': 'd'*64}, 'measurements': {'hdr': measurement(.01, .2, .01)}}
         legacy = {**case, 'source_reference_revision': 'legacy-convention'}
-        rendered = '\n'.join(apple_documented_report([case, failed, single, wide, precision, legacy]))
+        rendered = '\n'.join(apple_documented_report([case, failed, single, wide, precision, avif_precision, legacy]))
         self.assertIn('| contain | jpg | preserve | preserve | 4.528920 | 4.640900 | `aaaaaaaaaaaa` | qualified |', rendered)
         self.assertIn('| orientation | jpg | preserve | preserve | 12.450000 | missing | missing | tested and failed |', rendered)
         self.assertIn('| cover | avif | preserve | 10 | 0.820000 | not embedded | `aaaaaaaaaaaa` | qualified |', rendered)
         self.assertIn('| cover | avif | rec2020 | 10 | 1.020000 | not embedded | `bbbbbbbbbbbb` | qualified |', rendered)
         self.assertIn('| contain | png | preserve | 16 | 0.010890 | not embedded | `cccccccccccc` | qualified |', rendered)
-        self.assertEqual(rendered.count('| contain |'), 2)
+        self.assertIn('| contain | avif | preserve | 12 | 0.200000 | not embedded | `dddddddddddd` | qualified |', rendered)
+        self.assertEqual(rendered.count('| contain |'), 3)
         self.assertIn('Current recorded rows only', rendered)
         self.assertIn('does not qualify intermediate Apple adaptation', rendered)
         self.assertIn('pending manual review', rendered)

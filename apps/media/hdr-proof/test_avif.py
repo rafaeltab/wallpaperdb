@@ -264,6 +264,18 @@ class FixtureTests(unittest.TestCase):
                 self.assertEqual(gif['selectors']['transparency'], 'coerce')
                 self.assertEqual(len(gif['measurements']['frames']), 1)
                 self.assertEqual(gif['facts']['alpha_measurement']['maximum_absolute_error'], 0)
+                animated_id = f'{spec["id"]}:sdr:gif:srgb:preserve:{geometry}:transfer-gamma32-animation-alpha16'
+                animated = cases[animated_id]
+                self.assertEqual(animated['status'], 'qualified', animated['blockers'])
+                self.assertEqual(animated['selectors']['motion'], 'preserve')
+                self.assertEqual(animated['selectors']['transparency'], 'coerce')
+                self.assertEqual(animated['facts']['durations_ms'], [300, 700])
+                self.assertEqual(animated['facts']['loop'], 2)
+                self.assertEqual(animated['facts']['plays'], 3)
+                self.assertEqual(animated['facts']['alpha_measurement']['frame_maximum_absolute_errors'], [0, 0])
+                self.assertEqual(len(animated['measurements']['frames']), 2)
+                self.assertTrue(all(frame['passed'] for frame in animated['measurements']['frames']))
+                self.assertTrue(all(check['passed'] for check in animated['measurements']['alpha_geometry']))
 
     def test_native_sixteen_bit_png_rejects_eight_bit_fractional_alpha_precision(self):
         from avif import encode_other

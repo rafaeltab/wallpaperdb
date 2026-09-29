@@ -369,8 +369,12 @@ def run(output_dir, *, specs=None):
                        for g in ('identity','contain','cover','fill','upscale','orientation')]
         if spec['frames'] == 2:
             operations += [('sdr', 'webp', 'preserve', g, None, 'gamma22') for g in ('contain','cover','fill','upscale','orientation')]
+            operations += [('sdr', 'gif', 'preserve', g, None, variant)
+                           for variant in ('gamma32-animation', 'gamma32-animation-alpha16')
+                           for g in ('contain','cover','fill','upscale','orientation')]
         for dynamic_range, ext, motion, geometry, depth_variant, transfer_variant in operations:
             sdr = dynamic_range == 'sdr'
+            gamma32 = transfer_variant is not None and transfer_variant.startswith('gamma32')
             target_gamut = 'srgb' if sdr else spec['gamut']
             target_transfer = 'srgb' if sdr else spec['transfer']
             if transfer_variant is not None:
@@ -402,11 +406,11 @@ def run(output_dir, *, specs=None):
             if transfer_variant is not None:
                 item['optional_transfer_variant'] = True
                 item['representation'] = {'primaries': 'srgb',
-                                          'transfer': 'gamma 3.2' if transfer_variant == 'gamma32-nearest' else 'gamma 2.2',
+                                          'transfer': 'gamma 3.2' if gamma32 else 'gamma 2.2',
                                           'signaling': 'CICP 1/4/0' if ext == 'avif' else 'Verified ICC matrix/TRC profile', 'coded_depth': depth,
                                           'reference_grade': 'Unchanged independent SDR tone/gamut reference',
                                           'consumer_status': 'pending manual review'}
-                if transfer_variant == 'gamma32-nearest':
+                if gamma32:
                     item['representation']['quantization'] = 'nearest native zimg'
             try:
                 count = 1 if motion == 'static' else spec['frames']
@@ -421,11 +425,24 @@ def run(output_dir, *, specs=None):
                     decode_avif(oriented, case_dir, count)
                     inputs = [case_dir/f'decoded-{i}.png' for i in range(count)]
                     item['orientation_source'] = {'sha256': digest(oriented), 'facts': orient_facts}
-                converted = []
+                converted, alpha_geometry = [], []
                 for i, input_file in enumerate(inputs):
                     png = case_dir/f'converted-{i}.png'
                     convert_frame(input_file, png, spec['transfer'], spec['gamut'], geometry,
                                   sdr=sdr, peak_nits=peak_nits if sdr else None)
+                    if transfer_variant == 'gamma32-animation-alpha16':
+                        from gif_alpha import apply_alpha_geometry
+                        precise = case_dir/f'converted-alpha16-{i}.png'
+                        apply_alpha_geometry(input_file, png, precise, geometry)
+                        actual_pixels = read_png(precise)
+                        unchanged_rgb = bool(np.array_equal(actual_pixels[..., :3], read_png(png)[..., :3]))
+                        alpha_error = float(np.max(np.abs(actual_pixels[..., 3] - refs[i][..., 3])))
+                        alpha_geometry.append({'method': 'native separable zimg; normalized edges; RGB16 channel transport',
+                            'maximum_absolute_error': alpha_error, 'absolute_error_limit': 2 / 65535,
+                            'threshold_scope': 'Existing PNG16 ceiling bounds two native axis-rounding steps; final binary alpha remains exact',
+                            'rgb_codes_unchanged': unchanged_rgb,
+                            'passed': unchanged_rgb and alpha_error <= 2 / 65535})
+                        png = precise
                     converted.append(png)
                 target = case_dir/f'output.{ext}'
                 if ext == 'avif':
@@ -439,13 +456,16 @@ def run(output_dir, *, specs=None):
                     detail = structure_checks(facts, actual, spec, refs, target_transfer, target_gamut, depth, count)
                 elif transfer_variant is not None:
                     gif_options = ({'gif_gamma': 3.2, 'gif_quantization': 'nearest'}
-                                   if transfer_variant == 'gamma32-nearest' else {})
+                                   if gamma32 else {})
                     facts, actual, detail, output_profile = encode_gamma_other(
                         converted, target, ext, refs, count, **gif_options)
                 else:
                     facts, actual, detail = encode_other(converted, target, ext, target_transfer, target_gamut, refs, count, spec)
                 item['checks']['native_encoder'] = True
                 item['checks']['independent_decoder'] = True
+                if alpha_geometry:
+                    detail['alpha_geometry'] = all(check['passed'] for check in alpha_geometry)
+                    item['measurements']['alpha_geometry'] = alpha_geometry
                 item['facts'] = facts
                 item['structural_checks'] = detail
                 item['checks']['structure'] = source_valid and all(detail.values())
@@ -463,7 +483,7 @@ def run(output_dir, *, specs=None):
                         actual_gamut = 'srgb'
                         if transfer_variant is not None and ext != 'avif':
                             actual_nits = gamma_icc.decode_signal_to_nits(decoded[..., :3], output_profile,
-                                expected_gamma=3.2 if transfer_variant == 'gamma32-nearest' else 2.2)
+                                expected_gamma=3.2 if gamma32 else 2.2)
                             actual_gamut = 'rec2020'
                         else:
                             actual_nits = (gamma_sdr.decode_signal_to_nits(decoded[..., :3]) if transfer_variant is not None

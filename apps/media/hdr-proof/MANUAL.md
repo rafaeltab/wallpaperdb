@@ -79,8 +79,10 @@ The corrected native old Apple full-source preparation passes the documented
 source comparison. It is encoder-input evidence only. Check each derivative's
 separately named source model and file qualification before drawing a conclusion
 from its visible appearance.
-The separately named corrected old Apple containment, crop, stretch and upscale
-have qualified boost-16 file comparisons against the documented full effect.
+The separately named corrected old Apple containment, crop, stretch, upscale
+and EXIF6 orientation have qualified boost-16 file comparisons against the
+documented full effect. The bundle includes the generated EXIF6 source; check
+its display orientation against the baked 173-by-130 derivative.
 Each manual entry includes its HDR JPEG, matched authored SDR reference and inspected native PQ16 HDR
 intent. The intent is encoder input, not an independent source reference.
 Keep its documented-model label separate from earlier legacy-model files.

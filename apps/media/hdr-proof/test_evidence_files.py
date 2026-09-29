@@ -10,6 +10,24 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_actual_orientation_source_facts_and_hash_are_kept_for_manual_review(self):
+        from apple_orientation_source import SOURCE_SHA256
+        case = {'fixture_id': 'gainmap-apple-old', 'geometry': 'orientation',
+            'orientation_source': {'path': '/generated/old-exif6.jpg', 'sha256': SOURCE_SHA256, 'orientation': 6},
+            'source_facts': {'metadata': {'IFD0:Orientation': 6}, 'base': {'depth': 8}, 'map': {'depth': 8}}}
+        fixtures = suite.apple_orientation_fixtures([case, case])
+        self.assertEqual(len(fixtures), 1)
+        self.assertEqual(fixtures[0]['id'], 'gainmap-apple-old-exif6')
+        self.assertEqual(fixtures[0]['path'], case['orientation_source']['path'])
+        self.assertEqual(fixtures[0]['sha256'], SOURCE_SHA256)
+        self.assertEqual(fixtures[0]['facts'], case['source_facts'])
+        self.assertEqual(suite.apple_orientation_fixtures([]), [])
+        with self.assertRaises(ValueError):
+            suite.apple_orientation_fixtures([{**case, 'orientation_source': {
+                **case['orientation_source'], 'sha256': 'a'*64}}])
+        with self.assertRaises(ValueError):
+            suite.apple_orientation_fixtures([{**case, 'source_facts': {'metadata': {'IFD0:Orientation': 1}}}])
+
     def test_manual_bundle_keeps_each_explicit_apple_avif_tuple(self):
         # Only copy/scoping behavior is tested; these bytes never qualify a codec.
         with tempfile.TemporaryDirectory() as temporary:

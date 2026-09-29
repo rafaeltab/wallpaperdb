@@ -161,8 +161,12 @@ reference. Its gamma3.2 base still requires the experimental ICC-aware readers;
 stock-reader and physical results remain separate. Separately encoded crop,
 stretch and upscale pass with independent HDR maxima 4.84060, 4.69820 and
 7.34111. Containment retains its exact bytes and measurements. The default
-replay includes all four geometries and their inspected manual files. No partial
-Apple adaptation or orientation is qualified by these full-effect results.
+replay also includes a real EXIF6 orientation case, with independent HDR maximum
+5.33441. A locked native metadata edit preserves original coded base/map, ICC
+and MakerNotes. Both geometry paths rotate clockwise once after full source
+reconstruction; the output is 173 by 130 with identity orientation. The manual
+bundle includes this actual source and all five derivatives. Partial Apple
+adaptation remains unqualified by these full-effect results.
 The separate [explicit PQ P3 AVIF proofs](apple_hdr_avif.py) preserve that
 documented full image at 10 and 12 bits after containment, crop, stretch and
 upscale. All eight tuples pass; maximum Delta E ITP is 0.350935 at 12 bits and

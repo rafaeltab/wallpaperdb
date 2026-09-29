@@ -180,6 +180,30 @@ def candidate_files(evidence, fixtures):
     return entries
 
 
+def apple_orientation_fixtures(cases):
+    """Keep the generated source's actual facts for later hash-checked copying."""
+    from apple_orientation_source import SOURCE_SHA256, LOCK_PATH
+    from apple_source_model import SOURCE_SHA256 as PARENT_SHA256
+    result = []
+    for case in cases:
+        source = case.get('orientation_source')
+        if not source or case.get('fixture_id') != 'gainmap-apple-old':
+            continue
+        facts = case.get('source_facts', {})
+        if (case.get('geometry') != 'orientation' or source.get('sha256') != SOURCE_SHA256
+                or source.get('orientation') != 6 or facts.get('metadata', {}).get('IFD0:Orientation') != 6):
+            raise ValueError('Actual old Apple EXIF6 source correspondence is missing')
+        if result:
+            if result[0]['facts'] != facts:
+                raise ValueError('Conflicting actual old Apple EXIF6 source facts')
+            continue
+        result.append({'id': 'gainmap-apple-old-exif6', 'path': source['path'], 'sha256': SOURCE_SHA256,
+            'facts': facts, 'parent_sha256': PARENT_SHA256, 'generator': 'apple_orientation_source.generate',
+            'generator_lock_sha256': avif.digest(LOCK_PATH),
+            'provenance': 'Native ExifTool EXIF6 edit; source proof preserves coded base/map, ICC and Apple MakerNotes.'})
+    return result
+
+
 def merge_reconstruction_profiles(fixtures, source_records):
     known = {fixture['id']: fixture for fixture in fixtures}
     records = {record['id']: record for record in source_records}
@@ -525,7 +549,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- The gain-map AVIF authored SDR GIF containment remains failed despite valid native encoding, actual sRGB ICC, opaque one-frame structure and independent decoding. Palette-only and full-reference errors both exceed the fixed photographic gates. The read-only exact-palette lower bound identifies 900 pixels for which changing dithering cannot meet the existing maximum; it makes no claim about other palettes or encoders. A separate native libimagequant candidate also fails, with 951 pixels outside the fixed maximum for its exact palette. Its native package version and differing library API report are recorded separately. The separate gamma3.2 ICC/libimagequant palette improves shadow maximum to 46.78 and its bound to 794 pixels, but still fails the fixed shadow and midtone gates. All three photographic palettes remain unqualified.',
               '- The [integer-DCT map alternative](icc-gainmap-midpointoffset-gamma2-islow.json) retains the exact midpoint gamma-2 compressed base and native pre-JPEG map. It changes only native map JPEG coding. Both HDR readers still fail shadow maxima and their agreement worsens; its original floating-DCT counterpart remains separate.',
               '- The [corrected native old Apple source](apple-native-source.json) applies the documented full model with native JPEG samples, bilinear8 map expansion and FFmpeg float32 arithmetic. It passes the independent photographic gates with maximum Delta E ITP 0.000027853. Analytic controls cover all 65,536 base/map code pairs at full-effect headrooms 1 and 8; maximum numeric error is 0.000466684 nits. Unknown source facts reject preparation. This qualifies encoder input only; derivatives, intermediate adaptation and the newer Apple model require separate evidence. The legacy source-model failures remain recorded.',
-              '- The [corrected old Apple derivatives](apple-hdr-jpeg-contain.json) use the independently established documented full source, native P3 float geometry and checked PQ16 intent. Containment, crop, stretch and upscale pass the unchanged file gates at boost 16, with independent HDR maxima 4.52892, 4.84060, 4.69820 and 7.34111. Containment preserves its prior output bytes and measurements, including authored SDR maximum 4.64090. The source headroom is 8 and both full gain weights equal one. Each manual entry contains its own JPEG, SDR reference and native HDR intent. ICC-aware interpretation remains required; stock-reader limitations, intermediate Apple adaptation, orientation and physical consumers remain unqualified.',
+              '- The [corrected old Apple derivatives](apple-hdr-jpeg-contain.json) use the independently established documented full source, native P3 float geometry and checked PQ16 intent. Containment, crop, stretch, upscale and real EXIF6 orientation pass the unchanged file gates at boost 16, with independent HDR maxima 4.52892, 4.84060, 4.69820, 7.34111 and 5.33441. Containment preserves its prior output bytes and measurements, including authored SDR maximum 4.64090. The source headroom is 8 and both full gain weights equal one. Each manual entry contains its own JPEG, SDR reference and native HDR intent. The deterministic EXIF6 source is separately copied with its actual facts and hash; stored base/map/ICC/MakerNotes stay exact, then both geometry paths rotate clockwise once. ICC-aware interpretation remains required; stock-reader limitations, intermediate Apple adaptation and physical consumers remain unqualified.',
               '- The [corrected old Apple PQ AVIFs](apple-hdr-avif-contain.json) independently preserve the documented full image at explicit 10/12-bit depths after containment, crop, stretch and upscale. All eight tuples pass the unchanged photographic gates; maximum Delta E ITP is 0.350935 at 12 bits and 0.821563 at 10 bits. The original containment12 file and measurements remain exact. Native float source and geometry feed FFmpeg/zimg then AOM; dav1d separately decodes actual PQ/P3 samples. Emitted depth, CICP, dimensions, square pixels, opacity, identity orientation and metadata privacy pass. Each single-layer output contains no authored SDR base or gain map, with an inspected manual entry containing the authored SDR comparison and native HDR intent. Other depths/orientation, automatic display tone mapping and physical consumers require separate evidence.',
               '- Separately regenerated gain-map AVIF containment, crop, stretch and upscale check actual base, map and alternate precision against the source. Each native moderate-offset depth-8 candidate passes authored SDR and both HDR readers at log2 display headroom 4. The four stock depth-8 results fail; all eight automatic-depth variants declare alternate depth 12 and remain incompatible with the requested preservation selectors. Regenerated headroom and offsets differ from the source, so intermediate display adaptation remains untested. This is a declared endpoint proof, with physical consumers pending.',
               '- The [logarithmic midpoint-offset candidate](icc-gainmap-midpointoffset-gamma2.json) fixes the gamma-2 trial at ISO offsets 1/16384. Both HDR readers pass the existing midtone/highlight gates but fail their shadow maxima; their cross-comparison also fails in shadows. This separate result narrows the precision tradeoff without qualifying the JPEG or changing the original gates.',
@@ -712,7 +736,7 @@ def main():
     write_json(RESULTS/'apple-native-source.json', apple_native_source)
     from apple_hdr_jpeg import run as run_apple_hdr_jpeg
     apple_hdr_jpeg = run_apple_hdr_jpeg(WORK/'apple-hdr-jpeg-contain',
-                                      geometries=('contain', 'cover', 'fill', 'upscale'))
+                                      geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
     write_json(RESULTS/'apple-hdr-jpeg-contain.json', apple_hdr_jpeg)
     icc_results.extend(apple_hdr_jpeg['cases'])
     from apple_hdr_avif import run as run_apple_hdr_avif
@@ -824,6 +848,7 @@ def main():
     # the original generated corpus lock, including its PNG16 hashes.
     generated_fixtures = locked_fixtures + png8_result['fixtures'] + png8_geometry_result['fixtures'] + gainmap_avif_result['source_fixtures']
     generated_fixtures = merge_reconstruction_profiles(generated_fixtures, gainmap_avif_hdr_result['source_fixtures'])
+    generated_fixtures += apple_orientation_fixtures(apple_hdr_jpeg['cases'])
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
     errors = matrix['evidence_errors'] + fixture_lock(locked_fixtures,args.update_fixture_lock)

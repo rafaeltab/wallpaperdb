@@ -1,11 +1,15 @@
 import { recordCounter } from '@wallpaperdb/core/telemetry';
-import { Clock, Effect, Layer, Queue, Schema, Semaphore, Stream } from 'effect';
+import { Clock, Context, Effect, Layer, Queue, Schema, Semaphore, Stream } from 'effect';
 import Redis from 'ioredis';
 import {
   type AdmissionResult,
   Quota,
   QuotaUnavailable,
+  QuotaUsage,
+  type QuotaUsageSnapshot,
 } from '../../capabilities/admission/index.js';
+
+import { accountUsage, readUsage, decodeUsage } from './usage.js';
 
 const consume = `
 local capacity = tonumber(ARGV[1])
@@ -29,6 +33,7 @@ local refill = math.ceil((capacity - tokens) * period / capacity)
 if cost > 0 then
   redis.call('HSET', KEYS[1], 'tokens', tokens, 'updated', now)
   redis.call('PEXPIRE', KEYS[1], math.max(1, refill))
+  ${accountUsage}
 end
 return {1, math.floor(tokens), refill}
 `;
@@ -46,7 +51,8 @@ export interface RedisQuotaConfig {
   readonly redisPort: number;
   readonly redisPassword?: string;
 }
-class RedisQuota implements Quota {
+class RedisQuota implements Quota, QuotaUsage {
+  private readingUsage = false;
   private available = false;
   constructor(
     private readonly client: Redis | undefined,
@@ -63,6 +69,34 @@ class RedisQuota implements Quota {
     this.setAvailable(false);
     this.client?.disconnect(true);
   };
+  readonly read = Effect.fn('admission.read_usage')(function* (
+    this: RedisQuota
+  ): Effect.fn.Return<QuotaUsageSnapshot> {
+    if (!this.available || !this.client || this.readingUsage) return { _tag: 'Unavailable' };
+    const client = this.client;
+    this.readingUsage = true;
+    return yield* Effect.tryPromise(() => client.eval(readUsage, 0)).pipe(
+      Effect.flatMap(decodeUsage),
+      Effect.map(
+        ([minute, sampledAt, points, activeIps]): QuotaUsageSnapshot =>
+          minute < 0
+            ? { _tag: 'Unavailable' }
+            : { _tag: 'Available', minute, sampledAt, points, activeIps }
+      ),
+      Effect.catch((cause) =>
+        Effect.logWarning('Shared quota usage unavailable', { cause }).pipe(
+          Effect.as<QuotaUsageSnapshot>({ _tag: 'Unavailable' })
+        )
+      ),
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.readingUsage = false;
+        })
+      ),
+      // One telemetry command at most, independent of admission permits; socket deadlines bound it.
+      Effect.uninterruptible
+    );
+  });
   readonly take = Effect.fn('admission.consume_quota')(function* (
     this: RedisQuota,
     visitor: string,
@@ -76,7 +110,8 @@ class RedisQuota implements Quota {
         if (!this.available) return unavailable('unavailable');
         const client = this.client;
         return Effect.tryPromise({
-          try: () => client.eval(consume, 1, `graphql:quota:${visitor}`, limit, windowMs, cost),
+          try: () =>
+            client.eval(consume, 1, `graphql:quota:${visitor}`, limit, windowMs, cost, visitor),
           catch: (cause) => cause,
         }).pipe(
           Effect.flatMap((response) =>
@@ -126,9 +161,8 @@ const unavailable = Effect.fnUntraced(function* (
   );
   return yield* Effect.fail(new QuotaUnavailable({ reason }));
 });
-export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota> {
-  return Layer.effect(
-    Quota,
+export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota | QuotaUsage> {
+  return Layer.effectContext(
     Effect.gen(function* () {
       const health = yield* Queue.make<boolean>({ capacity: 1, strategy: 'sliding' });
       yield* Stream.fromQueue(health).pipe(
@@ -143,7 +177,8 @@ export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota> {
       const permits = yield* Semaphore.make(64);
       if (!config.redisEnabled) {
         yield* Effect.logInfo('Distributed quota enforcement disabled');
-        return new RedisQuota(undefined, permits, health);
+        const quota = new RedisQuota(undefined, permits, health);
+        return Context.make(Quota, quota).pipe(Context.add(QuotaUsage, quota));
       }
       const client = yield* Effect.acquireRelease(
         Effect.sync(
@@ -189,7 +224,7 @@ export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota> {
           Effect.logWarning('Distributed quota unavailable at startup; local admission required')
         )
       );
-      return quota;
+      return Context.make(Quota, quota).pipe(Context.add(QuotaUsage, quota));
     })
   );
 }

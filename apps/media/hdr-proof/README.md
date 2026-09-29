@@ -127,7 +127,7 @@ Old Apple containment and upscale also pass the exact same map recipe.
 Its native source path requires the original headroom MakerNotes, and a real
 source stripped of those facts remains original-only. These two cases retain
 their PQ source precision evidence and separate final HDR-reader measurements.
-New Apple containment also passes, while its upscale remains failed at an
+New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native
 reconstruction remains byte-identical after removing unused MakerNotes;
@@ -136,6 +136,13 @@ A separate integer-DCT map retains the same new Apple upscale base, HDR intent
 and pre-JPEG gain samples. The shadow maximum stays at 8.08225, and both HDR
 readers also exceed the highlight p95 limit of 3. Both map encodings remain
 failed evidence under unchanged thresholds.
+A separate FLOAT-DCT base uses the identical native gamma-3.2 input and P3 ICC
+profile, then regenerates the original floating-DCT map against that compressed
+base. This new Apple upscale passes, with maximum HDR error 6.77896 and
+cross-reader error 5.73114. Together, the observed SOF0 alternatives cover all
+24 tested source/geometry tuples, including all 20 required tuples. This is
+file qualification within the declared decoder scope; stock-reader limitations
+and pending physical review remain unchanged.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

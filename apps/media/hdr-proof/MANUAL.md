@@ -59,9 +59,11 @@ gates with experimental ICC-aware readers, as does the separate Android XMP
 upscale. Old Apple containment and upscale have their own qualified ICC-aware
 file candidates with the same pending consumer limitations. Their original
 source needs its headroom MakerNotes; a source missing those facts remains
-original-only. New Apple containment also passes the file gates, while its
+original-only. New Apple containment also passes the file gates. Its original
 upscale remains a failed diagnostic with either floating- or integer-DCT map
-coding. Its source headroom comes from the verified
+coding; the separately named FLOAT-base/FLOAT-map upscale passes. Check that
+exact file against its matched SDR base and native HDR intent, retaining its
+ICC-aware reader scope. Its source headroom comes from the verified
 auxiliary XMP; unknown required XMP facts remain original-only. The five earlier
 ISO variants remain failed diagnostics. Stock native readers assume sRGB transfer or reject ICC
 in this path. Each manifest entry retains this qualification scope and its

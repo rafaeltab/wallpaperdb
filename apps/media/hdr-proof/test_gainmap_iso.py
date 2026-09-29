@@ -159,7 +159,10 @@ class IsoGainMapTests(unittest.TestCase):
             self.assertEqual(extracted.returncode, 0, extracted.stderr)
             original_base, original_gain = base.read_bytes(), gain.read_bytes()
             expected_metadata = iso_metadata(original_gain)
-            expected, _ = reconstruct(original_base, original_gain, headroom=4)
+            from gainmap_iso import decode_iso_source
+            decoded = decode_iso_source(original_base, original_gain, headroom=4)
+            self.assertEqual(decoded['gamut'], 'p3')
+            expected = decoded['linear_rgb_nits']
             # The packer writes fresh ISO/XMP packets. Remove only the old ISO
             # APP2 packet; preserve every other byte, including JPEG entropy.
             data, clean, position = original_gain, original_gain[:2], 2
@@ -184,6 +187,95 @@ class IsoGainMapTests(unittest.TestCase):
             measured = compare_appearance(expected, actual, reference_gamut='p3',
                 actual_gamut='rec2020', fixture_class='gainmap-hdr')
             self.assertTrue(measured['passed'], measured)
+
+
+class IsoSourceDecoderTests(unittest.TestCase):
+    def parts(self, directory):
+        from test_native_gainmap import native
+        source = Path(__file__).parent/'fixtures/gainmap/gainmap-android-iso.jpg'
+        base, gain = directory/'base.jpg', directory/'gain.jpg'
+        result = native('both', 'extract', source, base, gain)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return base.read_bytes(), gain.read_bytes()
+
+    def test_pinned_source_returns_verified_color_and_independent_evidence(self):
+        from gainmap_iso import decode_iso_source
+        with tempfile.TemporaryDirectory() as temporary:
+            base, gain = self.parts(Path(temporary))
+        decoded = decode_iso_source(base, gain)
+        self.assertEqual(decoded['gamut'], 'p3')
+        self.assertEqual(decoded['linear_rgb_nits'].shape, (512, 384, 3))
+        self.assertEqual(decoded['evidence']['base_color']['transfer'], 'srgb')
+        self.assertEqual(decoded['evidence']['base_color']['icc_sha256'],
+                         '33c92020023a0b41f7a963445d69e07a49f770d7b98ef3422d3983d2f5efbf70')
+        self.assertEqual(decoded['evidence']['base']['components'], 3)
+        self.assertEqual(decoded['evidence']['gain_map']['components'], 1)
+        self.assertEqual(decoded['evidence']['headroom_log2'], 4)
+        self.assertTrue(np.all(np.isfinite(decoded['linear_rgb_nits'])))
+        self.assertEqual(len(decoded['evidence']['base_sha256']), 64)
+        self.assertEqual(len(decoded['evidence']['gain_map_sha256']), 64)
+
+    def test_native_srgb_matrix_profile_is_verified_from_its_color_tags(self):
+        from gainmap_iso import decode_iso_source
+        profile = ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes()
+        buffer = io.BytesIO()
+        Image.new('RGB', (8, 8), 'white').save(buffer, format='JPEG', quality=100, icc_profile=profile)
+        decoded = decode_iso_source(buffer.getvalue(), metadata_jpeg(jpeg(255)))
+        self.assertEqual(decoded['gamut'], 'srgb')
+        np.testing.assert_allclose(decoded['linear_rgb_nits'], 812, atol=1e-9)
+
+    def test_missing_or_changed_icc_facts_fail_closed(self):
+        from gainmap_iso import decode_iso_source
+        with tempfile.TemporaryDirectory() as temporary:
+            base, gain = self.parts(Path(temporary))
+        image = Image.open(io.BytesIO(base))
+        original_profile = image.info['icc_profile']
+        count = struct.unpack_from('>I', original_profile, 128)[0]
+        offsets = {name: offset for name, offset, size in
+                   (struct.unpack_from('>4sII', original_profile, 132 + index * 12) for index in range(count))}
+        variants = [None]
+        for tag in (b'rTRC', b'rXYZ'):
+            changed = bytearray(original_profile)
+            # Preserve profile description while changing actual transfer or
+            # colorant facts; a name-based classifier would falsely accept it.
+            struct.pack_into('>i', changed, offsets[tag] + (12 if tag == b'rTRC' else 8), 65536)
+            variants.append(bytes(changed))
+        for offset, value in ((44, 1), (68, 65536)):
+            changed = bytearray(original_profile)
+            struct.pack_into('>I', changed, offset, value)
+            variants.append(bytes(changed))
+        for profile in variants:
+            with self.subTest(profile_present=profile is not None):
+                buffer = io.BytesIO()
+                image.save(buffer, format='JPEG', quality=100, icc_profile=profile)
+                with self.assertRaises(ValueError):
+                    decode_iso_source(buffer.getvalue(), gain)
+
+    def test_unsupported_base_and_gain_map_semantics_are_rejected(self):
+        from gainmap_iso import decode_iso_source
+        profile = ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes()
+        buffer = io.BytesIO()
+        Image.new('RGB', (8, 8), 'white').save(buffer, format='JPEG', quality=100, icc_profile=profile)
+        base = buffer.getvalue()
+        alternate_color_space = bytearray(metadata_jpeg(jpeg(255)))
+        flags_offset = alternate_color_space.index(ISO_ID) + len(ISO_ID) + 4
+        alternate_color_space[flags_offset] &= ~64
+        for gain in (metadata_jpeg(jpeg(255), flags=4),
+                     metadata_jpeg(jpeg(255), alternate=0), bytes(alternate_color_space)):
+            with self.assertRaises(ValueError):
+                decode_iso_source(base, gain)
+        with self.assertRaises(ValueError):
+            decode_iso_source(jpeg(255), metadata_jpeg(jpeg(255)))
+
+    def test_unhandled_source_orientation_is_not_silently_ignored(self):
+        from gainmap_iso import decode_iso_source
+        profile = ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes()
+        image, buffer = Image.new('RGB', (8, 8), 'white'), io.BytesIO()
+        exif = Image.Exif()
+        exif[274] = 6
+        image.save(buffer, format='JPEG', quality=100, icc_profile=profile, exif=exif)
+        with self.assertRaisesRegex(ValueError, 'orientation'):
+            decode_iso_source(buffer.getvalue(), metadata_jpeg(jpeg(255)))
 
 
 if __name__ == '__main__':

@@ -1,20 +1,163 @@
 """Independent proof-only ISO 21496 metadata reader and reconstruction oracle.
 
-JPEG entropy decoding uses Pillow's native libjpeg. This narrow numerical oracle
-does not qualify ISO interoperability. A second maintained ISO decoder is still
-required, and unsupported metadata fails closed. Byte layout reference:
+JPEG entropy decoding uses Pillow's native libjpeg. The public source decoder
+validates actual ICC color facts and the supported ISO layout before returning
+pixels. Analytic vectors and independent native libavif/XMP controls validate
+its narrow scope; this is not general ISO or display interoperability. Reference:
 https://github.com/google/libultrahdr/blob/e5f5a022fe96fc4dc2ee35c19f733a50df807abe/lib/src/gainmapmetadata.cpp
 The reconstruction equation is also implemented independently in libavif:
 https://github.com/AOMediaCodec/libavif/blob/v1.4.1/src/gainmap.c
 """
 
 import io
+import hashlib
+from pathlib import Path
 import struct
 
 import numpy as np
-from PIL import Image
+from PIL import Image, features
 
 ISO_ID = b"urn:iso:std:iso:ts:21496:-1\0"
+
+
+def _base_color_facts(base_bytes):
+    """Validate supported ICC matrix/TRC semantics, never profile names."""
+    chunks = [value[12:] for marker, value in segments(base_bytes)
+              if marker == 0xE2 and value.startswith(b'ICC_PROFILE\0')]
+    if not chunks or any(len(chunk) < 2 for chunk in chunks):
+        raise ValueError('Base JPEG has no complete ICC profile')
+    count = chunks[0][1]
+    if (count != len(chunks) or any(chunk[1] != count for chunk in chunks)
+            or sorted(chunk[0] for chunk in chunks) != list(range(1, count + 1))):
+        raise ValueError('Incomplete or duplicate base ICC chunks')
+    profile = b''.join(chunk[2:] for chunk in sorted(chunks, key=lambda chunk: chunk[0]))
+    if (len(profile) < 132 or profile[36:40] != b'acsp' or profile[8] != 4
+            or profile[12:24] != b'mntrRGB XYZ '
+            or struct.unpack_from('>I', profile)[0] != len(profile)):
+        raise ValueError('Expected an ICC v4 RGB/XYZ display matrix profile')
+    illuminant = np.array(struct.unpack_from('>3i', profile, 68)) / 65536
+    if (profile[44:48] != bytes(4)
+            or not np.allclose(illuminant, [.9642, 1, .8249], atol=2/65536, rtol=0)):
+        raise ValueError('Unsupported ICC header flags or PCS illuminant')
+    tags = {}
+    count = struct.unpack_from('>I', profile, 128)[0]
+    if 132 + count * 12 > len(profile):
+        raise ValueError('Truncated ICC tag table')
+    supported = {b'desc', b'cprt', b'rXYZ', b'gXYZ', b'bXYZ', b'rTRC', b'gTRC', b'bTRC',
+                 b'wtpt', b'chad', b'chrm'}
+    for index in range(count):
+        name, offset, length = struct.unpack_from('>4sII', profile, 132 + index * 12)
+        if name in tags or name not in supported or offset < 132 + count * 12 or offset + length > len(profile):
+            raise ValueError('Unsupported, duplicate, or invalid ICC tag')
+        tags[name] = profile[offset:offset + length]
+
+    def xyz(name):
+        value = tags.get(name, b'')
+        if len(value) != 20 or value[:4] != b'XYZ ':
+            raise ValueError('ICC XYZ color facts missing')
+        return np.array(struct.unpack_from('>3i', value, 8), dtype=float) / 65536
+
+    expected_curve = [2.4, 1/1.055, .055/1.055, 1/12.92, .04045, 0, 0]
+    curves = []
+    for channel in (b'r', b'g', b'b'):
+        value = tags.get(channel + b'TRC', b'')
+        if len(value) < 12 or value[:4] != b'para':
+            raise ValueError('ICC transfer facts missing')
+        kind = struct.unpack_from('>H', value, 8)[0]
+        parameters = 5 if kind == 3 else 7 if kind == 4 else 0
+        if not parameters or len(value) != 12 + 4 * parameters:
+            raise ValueError('Only sRGB parametric ICC transfers are supported')
+        curve = [number/65536 for number in struct.unpack_from(f'>{parameters}i', value, 12)]
+        curve += [0] * (7 - len(curve))
+        # One ICC16.16 unit is metadata serialization precision, not an
+        # appearance tolerance. All three actual curves must match sRGB.
+        if not np.allclose(curve, expected_curve, atol=1/65536 + 1e-12, rtol=0):
+            raise ValueError('Unsupported base ICC transfer')
+        curves.append(curve)
+    white = xyz(b'wtpt')
+    if not np.allclose(white, [.9642, 1, .8249], atol=2/65536, rtol=0):
+        raise ValueError('Unsupported ICC media white')
+    matrix = np.stack([xyz(channel + b'XYZ') for channel in (b'r', b'g', b'b')], axis=1)
+    from appearance import RGB_TO_XYZ
+    if b'chad' in tags:
+        value = tags[b'chad']
+        if len(value) != 44 or value[:4] != b'sf32':
+            raise ValueError('Invalid ICC chromatic adaptation')
+        adaptation = np.array(struct.unpack_from('>9i', value, 8)).reshape(3, 3) / 65536
+        try:
+            d65 = np.linalg.solve(adaptation, matrix)
+        except np.linalg.LinAlgError as error:
+            raise ValueError('Singular ICC chromatic adaptation') from error
+        matches = [gamut for gamut in ('srgb', 'p3')
+                   if np.allclose(d65, RGB_TO_XYZ[gamut], atol=3/65536, rtol=0)]
+        basis = 'ICC colorants and explicit chromatic adaptation match D65 primaries'
+    else:
+        # These exact D50 colorant definitions are the pinned libultrahdr ICC
+        # dialect. No arbitrary absent-chad profile is assigned D65 primaries.
+        # https://github.com/google/libultrahdr/blob/e5f5a022fe96fc4dc2ee35c19f733a50df807abe/lib/include/ultrahdr/icc.h
+        canonical = {
+            'srgb': np.array([[0x6fa2, 0x6299, 0x24a0], [0x38f5, 0xb785, 0x0f84],
+                              [0x0390, 0x18da, 0xb6cf]]) / 65536,
+            'p3': np.array([[.515102, .291965, .157153], [.241182, .692236, .0665819],
+                            [-.00104941, .0418818, .784378]]),
+        }
+        matches = [gamut for gamut, expected in canonical.items()
+                   if np.allclose(matrix, expected, atol=1/65536, rtol=0)]
+        basis = 'ICC D50 colorants match the pinned canonical libultrahdr matrix dialect'
+    if len(matches) != 1:
+        raise ValueError('Unsupported or ambiguous ICC gamut')
+    return {'gamut': matches[0], 'transfer': 'srgb', 'icc_sha256': hashlib.sha256(profile).hexdigest(),
+            'icc_version_major': profile[8], 'rgb_to_xyz_d50': matrix.tolist(),
+            'channel_transfer_parameters': curves, 'media_white_xyz': white.tolist(),
+            'header_flags': 0, 'pcs_illuminant_xyz': illuminant.tolist(),
+            'gamut_basis': basis}
+
+
+def decode_iso_source(base_bytes, map_bytes, *, headroom=4.0):
+    """Independently decode a supported ISO JPEG pair with established facts.
+
+    The caller supplies the two compressed JPEG parts, obtained independently
+    from the container. The result is the stored raster at 203-nit SDR white;
+    no production source admission or physical-display qualification is implied.
+    """
+    base, gain = jpeg_facts(base_bytes), jpeg_facts(map_bytes)
+    if base['depth'] != 8 or base['components'] != 3 or min(base['width'], base['height']) <= 0:
+        raise ValueError('Only 8-bit RGB JPEG bases are supported')
+    if gain['depth'] != 8 or gain['components'] not in (1, 3) or min(gain['width'], gain['height']) <= 0:
+        raise ValueError('Only 8-bit grayscale/RGB JPEG gain maps are supported')
+    color = _base_color_facts(base_bytes)
+    with Image.open(io.BytesIO(base_bytes)) as image:
+        orientation = image.getexif().get(274, 1)
+        if (image.mode != 'RGB' or orientation != 1
+                or image.size != (base['width'], base['height'])):
+            raise ValueError('Only RGB stored rasters with identity base orientation are supported')
+    with Image.open(io.BytesIO(map_bytes)) as image:
+        if (image.mode not in ('L', 'RGB') or image.getexif().get(274, 1) != 1
+                or image.size != (gain['width'], gain['height'])):
+            raise ValueError('Unsupported gain-map JPEG sample model')
+    try:
+        with np.errstate(over='raise', invalid='raise'):
+            linear, metadata = reconstruct(base_bytes, map_bytes, headroom=headroom)
+    except FloatingPointError as error:
+        raise ValueError('ISO reconstruction exceeded finite numeric range') from error
+    if not np.all(np.isfinite(linear)):
+        raise ValueError('ISO reconstruction produced nonfinite pixels')
+    return {'linear_rgb_nits': linear, 'gamut': color['gamut'], 'evidence': {
+        'decoder': 'Pillow/native libjpeg plus independent ISO parsing and reconstruction',
+        'base_sha256': hashlib.sha256(base_bytes).hexdigest(),
+        'gain_map_sha256': hashlib.sha256(map_bytes).hexdigest(),
+        'oracle_source_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        'native_libjpeg_version': Image.core.jpeglib_version,
+        'native_libjpeg_turbo_version': features.version_feature('libjpeg_turbo'),
+        'base': base, 'gain_map': gain, 'base_color': color, 'iso_metadata': metadata,
+        'headroom_log2': headroom, 'sdr_white_nits': 203, 'orientation': orientation,
+        'validation': 'Analytic native-JPEG vectors and independent libavif XMP reconstruction controls in test_gainmap_iso.py',
+        'limitations': ['Forward ISO version-0 layout in base color space only; one nonambiguous metadata packet.',
+                        'Verified sRGB transfer with sRGB/P3 matrix ICC dialects; unknown color facts are rejected.',
+                        '8-bit RGB base and grayscale/RGB map; gain-map samples use metadata gamma, without ICC conversion.',
+                        'Pillow bilinear map resizing at JPEG sample precision; only the committed corpus and controls are proven.',
+                        'Identity source orientation only; no physical HDR display or whole-format interoperability claim.'],
+    }}
 
 
 def segments(data):

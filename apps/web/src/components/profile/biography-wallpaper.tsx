@@ -15,7 +15,7 @@ export function BiographyWallpaper({
 }) {
   const query = useWallpaperQuery(wallpaperId, { staleTime: 0 });
   const [retries, setRetries] = useState(0);
-  const error = query.error ?? query.failureReason;
+  const error = query.failureReason ?? query.error;
   const admissionFailed = error instanceof GatewayAdmissionError;
   const wallpaper = query.data;
   const variant = wallpaper?.variants?.[0];

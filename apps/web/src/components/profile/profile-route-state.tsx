@@ -31,7 +31,7 @@ export function ProfileQueryStatus({ pending = false }: { pending?: boolean }) {
     [client, profileId, handle]
   );
   const state = useSyncExternalStore(subscribe, snapshot, snapshot);
-  const error = state?.error ?? state?.fetchFailureReason;
+  const error = state?.fetchFailureReason ?? state?.error;
   if (!error) return pending ? <output>Loading Profile…</output> : null;
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">

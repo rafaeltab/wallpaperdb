@@ -375,3 +375,15 @@ describe('HomePage admission failures', () => {
     expect(refetch).toHaveBeenCalledOnce();
   });
 });
+
+it('shows the new quota denial while retrying a previously overloaded cached page', () => {
+  vi.mocked(useWallpaperInfiniteQuery).mockReturnValue({
+    data: { pages: [{ edges: [{ node: { wallpaperId: 'loaded' } }] }] },
+    error: new GatewayAdmissionError(503, 1000),
+    failureReason: new GatewayAdmissionError(429, 2000),
+    isFetching: true, isFetchingNextPage: true,
+  } as unknown as ReturnType<typeof useWallpaperInfiniteQuery>);
+  render(<HomePage />);
+  expect(screen.getByRole('alert')).toHaveTextContent('network');
+  expect(screen.getByRole('alert')).toHaveTextContent('automatically');
+});

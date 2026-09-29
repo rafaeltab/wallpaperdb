@@ -67,7 +67,7 @@ export function HomePage() {
     sort: buildWallpaperSort(color),
   });
 
-  const error = queryError ?? failureReason;
+  const error = failureReason ?? queryError;
   const handleLoadMore = useCallback(() => {
     fetchNextPage();
   }, [fetchNextPage]);

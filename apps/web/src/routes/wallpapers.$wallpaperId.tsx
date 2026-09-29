@@ -48,7 +48,7 @@ export function WallpaperDetailPage() {
     refetch,
     isFetching,
   } = useWallpaperQuery(wallpaperId);
-  const error = queryError ?? failureReason;
+  const error = failureReason ?? queryError;
 
   // Auto-collapse panel on mobile
   useEffect(() => {

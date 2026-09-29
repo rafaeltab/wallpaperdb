@@ -36,8 +36,8 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
     enabled: Boolean(profileId),
   });
 
-  const selectedError = selected.error ?? selected.failureReason;
-  const resultsError = results.error ?? results.failureReason;
+  const selectedError = selected.failureReason ?? selected.error;
+  const resultsError = results.failureReason ?? results.error;
   const nextPageFailed = results.isFetchNextPageError || results.isFetchingNextPage;
 
   return (

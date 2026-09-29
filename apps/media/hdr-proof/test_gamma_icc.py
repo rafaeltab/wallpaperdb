@@ -60,6 +60,25 @@ class GammaIccTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Duplicate'):
             profile_facts(profile)
 
+    def test_profile_rejects_changed_class_flags_or_d50_white_assumptions(self):
+        import struct
+        for offset, value in ((12, b'link'), (44, struct.pack('>I', 1)),
+                              (68, struct.pack('>i', 32768))):
+            with self.subTest(offset=offset):
+                profile = bytearray(make_profile())
+                profile[offset:offset + len(value)] = value
+                with self.assertRaises(ValueError):
+                    profile_facts(profile)
+        profile = bytearray(make_profile())
+        count = struct.unpack_from('>I', profile, 128)[0]
+        for index in range(count):
+            name, offset, length = struct.unpack_from('>4sII', profile, 132 + index * 12)
+            if name == b'wtpt':
+                struct.pack_into('>i', profile, offset + 8, 32768)
+                break
+        with self.assertRaises(ValueError):
+            profile_facts(profile)
+
     def test_profile_equations_match_independent_native_lcms_double_xyz_decode(self):
         import ctypes
         profile = make_profile()

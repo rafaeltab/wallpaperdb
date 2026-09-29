@@ -77,6 +77,14 @@ def profile_facts(profile):
             or profile[16:24] != b'RGB XYZ ' or profile[8] != 4
             or struct.unpack_from('>I', profile)[0] != len(profile)):
         raise ValueError('Expected a complete ICC v4 RGB/XYZ matrix profile')
+    d50 = np.array([.9642, 1, .8249])
+    header_white = np.array(struct.unpack_from('>3i', profile, 68)) / 65536
+    if (profile[12:16] != b'mntr' or struct.unpack_from('>I', profile, 44)[0] != 0
+            or not np.allclose(header_white, d50, atol=2 / 65536, rtol=0)):
+        raise ValueError('Expected an unrestricted monitor profile with the D50 PCS illuminant')
+    supported_types = {b'desc': b'mluc', b'cprt': b'mluc', b'wtpt': b'XYZ ',
+        b'chad': b'sf32', b'rXYZ': b'XYZ ', b'gXYZ': b'XYZ ', b'bXYZ': b'XYZ ',
+        b'rTRC': b'para', b'gTRC': b'para', b'bTRC': b'para', b'chrm': b'chrm'}
     tags = {}
     count = struct.unpack_from('>I', profile, 128)[0]
     if 132 + count * 12 > len(profile):
@@ -89,8 +97,14 @@ def profile_facts(profile):
             raise ValueError('ICC transform tables can override matrix/curve interpretation')
         if offset < 132 + count * 12 or offset + length > len(profile):
             raise ValueError('Invalid ICC tag bounds')
+        if name not in supported_types or profile[offset:offset + 4] != supported_types[name]:
+            raise ValueError('ICC tag semantics are outside the proved matrix-profile subset')
         tags[name] = profile[offset:offset + length]
     try:
+        white = tags[b'wtpt']
+        if len(white) != 20 or not np.allclose(np.array(struct.unpack_from('>3i', white, 8)) / 65536,
+                                              d50, atol=2 / 65536, rtol=0):
+            raise ValueError('Expected the ICC v4 D50 media white point')
         gammas, columns = [], []
         for channel in (b'r', b'g', b'b'):
             curve = tags[channel + b'TRC']

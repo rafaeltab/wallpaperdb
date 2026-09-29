@@ -201,7 +201,7 @@ class FixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             result = run(temporary, specs=[spec])
             cases = {case['case_id']: case for case in result['evidence']}
-            self.assertEqual(len(cases), 45)
+            self.assertEqual(len(cases), 51)
             for geometry in ('contain', 'cover', 'fill', 'upscale', 'orientation'):
                 baseline_id = f'{spec["id"]}:sdr:avif:srgb:preserve:{geometry}'
                 baseline, candidate = cases[baseline_id], cases[baseline_id + ':depth-12']
@@ -224,6 +224,14 @@ class FixtureTests(unittest.TestCase):
                 self.assertEqual(gif['status'], 'qualified', gif['blockers'])
                 self.assertEqual(gif['facts']['format'], 'GIF')
                 self.assertTrue(gif['facts']['icc']['gamma22_srgb_primaries'])
+                alternative = cases[f'{spec["id"]}:sdr:gif:srgb:preserve:{geometry}:transfer-gamma32-nearest']
+                self.assertEqual(alternative['selectors'], gif['selectors'])
+                self.assertEqual(alternative['status'], 'qualified', alternative['blockers'])
+                self.assertEqual(alternative['facts']['format'], 'GIF')
+                self.assertEqual(alternative['facts']['icc']['gamut'], 'srgb')
+                np.testing.assert_allclose(alternative['facts']['icc']['gammas'], [3.2] * 3, atol=1/65536, rtol=0)
+                self.assertEqual(alternative['representation']['transfer'], 'gamma 3.2')
+                self.assertEqual(alternative['representation']['quantization'], 'nearest native zimg')
             failed_eight = cases[f'{spec["id"]}:sdr:avif:srgb:preserve:contain']
             self.assertEqual(failed_eight['status'], 'tested and failed')
             matrix = build_matrix(result['evidence'])
@@ -249,6 +257,13 @@ class FixtureTests(unittest.TestCase):
                 self.assertTrue(case['facts']['icc']['gamma22_srgb_primaries'])
                 self.assertTrue(case['structural_checks']['alpha'])
                 self.assertTrue(case['checks']['privacy'])
+                gif_id = f'{spec["id"]}:sdr:gif:srgb:static:{geometry}:transfer-gamma32-nearest'
+                gif = cases[gif_id]
+                self.assertEqual(gif['status'], 'qualified', gif['blockers'])
+                self.assertEqual(gif['selectors']['motion'], 'static')
+                self.assertEqual(gif['selectors']['transparency'], 'coerce')
+                self.assertEqual(len(gif['measurements']['frames']), 1)
+                self.assertEqual(gif['facts']['alpha_measurement']['maximum_absolute_error'], 0)
 
     def test_native_sixteen_bit_png_rejects_eight_bit_fractional_alpha_precision(self):
         from avif import encode_other

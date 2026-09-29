@@ -197,6 +197,26 @@ describe('GraphQL security driving contract', () => {
     ).toEqual(['1', '0']);
     expect(responses[2]?.json().errors[0].extensions.code).toBe('RATE_LIMIT_EXCEEDED');
   });
+  it('accepts forwarded client identity only through configured proxy peers', async () => {
+    const app = await build({
+      rateLimitMaxAnonymous: 1,
+      trustedProxies: ['10.0.0.1', '10.0.1.0/24'],
+    });
+    const request = (remoteAddress: string, forwarded: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/graphql',
+        remoteAddress,
+        headers: { 'x-forwarded-for': forwarded },
+        payload: { query },
+      });
+    expect((await request('10.0.0.1', '198.51.100.1')).statusCode).toBe(200);
+    expect((await request('10.0.1.2', '198.51.100.1, 10.0.0.1')).statusCode).toBe(429);
+    expect((await request('10.0.0.1', '198.51.100.2')).statusCode).toBe(200);
+    expect((await request('198.51.100.3', '198.51.100.4')).statusCode).toBe(200);
+    expect((await request('198.51.100.3', '198.51.100.5')).statusCode).toBe(429);
+    expect((await request('10.0.0.1', '198.51.100.6, 198.51.100.2')).statusCode).toBe(429);
+  });
   it('rejects queries over the depth limit', async () => {
     const app = await build({ graphqlMaxDepth: 4 });
     expect((await execute(app)).json().errors).toBeDefined();
@@ -205,6 +225,7 @@ describe('GraphQL security driving contract', () => {
     const catalogue = new ObservedCatalogue();
     const config = loadConfig({
       NODE_ENV: 'production',
+      TRUSTED_PROXIES: '10.0.0.1',
       OPENSEARCH_URL: 'http://127.0.0.1:9200',
       NATS_URL: 'nats://127.0.0.1:4222',
       MEDIA_SERVICE_URL: 'http://127.0.0.1:3003',

@@ -15,6 +15,7 @@ import { inspectQuery } from './security.js';
 
 export interface HttpConfig {
   readonly port: number;
+  readonly trustedProxies: readonly string[];
   readonly nodeEnv: 'development' | 'production' | 'test';
   readonly mediaServiceUrl: string;
   readonly mediaPublicBaseUrl?: string;
@@ -258,7 +259,11 @@ export async function createHttpApp<E>(
   options: { logger?: boolean; shutdownTimeoutMs?: number; signal?: AbortSignal } = {}
 ): Promise<FastifyInstance> {
   const runtime = ManagedRuntime.make(httpExecutionLayer.pipe(Layer.provide(services)));
-  const app = Fastify({ logger: options.logger ?? false, forceCloseConnections: 'idle' });
+  const app = Fastify({
+    logger: options.logger ?? false,
+    forceCloseConnections: 'idle',
+    trustProxy: [...config.trustedProxies],
+  });
   app.decorate('connectionsState', { isShuttingDown: false, connectionsInitialized: false });
   app.addHook('onClose', () => runtime.dispose());
   try {

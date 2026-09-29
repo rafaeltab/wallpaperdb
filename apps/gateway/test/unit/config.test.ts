@@ -9,6 +9,43 @@ const environment = {
   REDIS_ENABLED: 'false',
 };
 describe('startup configuration', () => {
+  it('allows direct development access and parses explicit proxy addresses', () => {
+    expect(loadConfig(environment).trustedProxies).toEqual([]);
+    expect(
+      loadConfig({
+        ...environment,
+        TRUSTED_PROXIES: ' 10.0.0.1, 192.0.2.0/24, ::1, 2001:db8::/32 ',
+      }).trustedProxies
+    ).toEqual(['10.0.0.1', '192.0.2.0/24', '::1', '2001:db8::/32']);
+  });
+  it.each([
+    undefined,
+    '',
+    '   ',
+    'true',
+    '*',
+    'loopback',
+    '0.0.0.0/0',
+    '::/0',
+    '10.0.0.1/33',
+    '::1/129',
+    'proxy.example',
+    '10.0.0.1,',
+  ])('rejects unsafe or missing production proxy configuration: %s', async (proxies) => {
+    const error = await Effect.runPromise(
+      gatewayConfig.pipe(
+        Effect.provideService(
+          ConfigProvider.ConfigProvider,
+          ConfigProvider.fromUnknown(
+            { ...environment, NODE_ENV: 'production', TRUSTED_PROXIES: proxies },
+            { preserveEmptyStrings: true }
+          )
+        ),
+        Effect.flip
+      )
+    );
+    expect(error.fields).toContain('TRUSTED_PROXIES');
+  });
   it('identifies invalid configuration fields without retaining supplied secrets', async () => {
     const secret = 'private';
     const error = await Effect.runPromise(
@@ -63,6 +100,7 @@ describe('startup configuration', () => {
       loadConfig({
         ...environment,
         NODE_ENV: 'production',
+        TRUSTED_PROXIES: '10.0.0.1',
         PORT: '7000',
         OPENSEARCH_PROFILE_INDEX: 'custom_profiles',
         COLOR_SPREAD_STRATEGY: 'exact',
@@ -83,9 +121,10 @@ describe('startup configuration', () => {
       graphqlMaxComplexity: 1505,
       redisEnabled: true,
     });
-    expect(loadConfig({ ...environment, NODE_ENV: 'production' }).graphqlIntrospectionEnabled).toBe(
-      false
-    );
+    expect(
+      loadConfig({ ...environment, NODE_ENV: 'production', TRUSTED_PROXIES: '10.0.0.1' })
+        .graphqlIntrospectionEnabled
+    ).toBe(false);
   });
   it.each([
     { PORT: '10garbage' },

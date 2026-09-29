@@ -170,7 +170,7 @@ adaptation remains unqualified by these full-effect results.
 The separate [explicit PQ P3 AVIF proofs](apple_hdr_avif.py) preserve that
 documented full image at 8, 10 and 12 bits after containment, crop, stretch,
 upscale and real EXIF6 orientation. All fifteen tuples pass; maximum Delta E
-ITP is 0.360347 at 12 bits, 0.821563 at 10 bits and 2.843321 at 8 bits. Containment12 retains its original bytes and measurements.
+ITP is 0.360346 at 12 bits, 0.821563 at 10 bits and 2.843320 at 8 bits. Containment12 retains its original bytes and measurements.
 They use the unchanged photographic gates without a source precision allowance.
 Native float preparation and geometry feed FFmpeg/zimg then AOM; dav1d
 independently decodes the emitted AV1. Actual depth, PQ/P3 signaling, geometry,

@@ -150,16 +150,19 @@ error 0.000466684 nits. Source admission rejects unknown model, color or hashes.
 This establishes encoder input for a separate candidate; it does not qualify
 any derivative, intermediate adaptation or newer Apple model. The six legacy
 source-model failures remain recorded alongside it.
-The [corrected containment derivative](apple_hdr_jpeg.py) now uses that native
+The [corrected derivatives](apple_hdr_jpeg.py) now use that native
 full source, native P3 float geometry and a checked PQ16 intent to regenerate
-the map against the actual compressed authored SDR base. Its RGB8 SOF0 base
+the map against the actual compressed authored SDR base. Their RGB8 SOF0 base
 and map pass metadata, privacy, source precision and appearance gates at boost
 16. Independent HDR maximum is 4.52892 and native maximum is 4.22494 against
 the unchanged limit of 8. Authored SDR maximum remains exactly 4.64090, as in
 the legacy control. This separately named file uses the documented source
 reference. Its gamma3.2 base still requires the experimental ICC-aware readers;
-stock-reader and physical results remain separate. No partial Apple adaptation
-or other geometry is qualified by this containment result.
+stock-reader and physical results remain separate. Separately encoded crop,
+stretch and upscale pass with independent HDR maxima 4.84060, 4.69820 and
+7.34111. Containment retains its exact bytes and measurements. The default
+replay includes all four geometries and their inspected manual files. No partial
+Apple adaptation or orientation is qualified by these full-effect results.
 New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native

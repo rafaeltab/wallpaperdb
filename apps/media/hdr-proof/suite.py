@@ -513,7 +513,7 @@ def apple_documented_report(evidence):
     from apple_source_model import REFERENCE_REVISION
     cases = [case for case in evidence if case.get('fixture_id') == 'gainmap-apple-old'
              and case.get('proof_module') in ('apple_hdr_jpeg', 'apple_hdr_avif', 'apple_hdr_png',
-                                              'apple_hdr_png_precision', 'apple_hdr_avif_precision')
+                                              'apple_hdr_png_precision', 'apple_hdr_avif_precision', 'apple_hdr_png8')
              and case.get('source_reference_revision') == REFERENCE_REVISION]
     lines = ['## Corrected old Apple full-effect conversions', '',
         'Current recorded rows only, using the independently documented full source model. The table keeps each exact output gamut, depth and geometry separate. The output SHA-256 prefix distinguishes alternative encodings of the same request; full hashes and regional color/luminance statistics remain in [measurements](measurements.json). Independent HDR and authored SDR maxima use the unchanged photographic gates.', '',
@@ -538,29 +538,36 @@ def apple_documented_report(evidence):
 
 
 def apple_precision_tradeoffs(evidence):
-    cases = [case for case in evidence if case.get('proof_module') == 'apple_hdr_avif_precision'
-             and 'regional_change_from_baseline' in case]
-    if not cases:
-        return []
-    lines = ['## Measured AVIF precision tradeoffs', '',
-        'More precise encoder input is not a universal improvement after output quantization. Every positive regional error change is listed below as candidate minus its exact earlier baseline. The unchanged appearance gates decide qualification; a qualified alternative can still worsen individual statistics. Full signed changes and both measurements remain in the machine-readable evidence. A none row means no measured error statistic increased.', '',
-        '| Geometry | Depth | Region | Error metric | Statistic | Positive change | Case status |',
-        '| --- | --- | --- | --- | --- | ---: | --- |']
-    for case in cases:
-        count = 0
-        for region, measurements in case['regional_change_from_baseline']['regions'].items():
-            if not measurements['samples']:
-                continue
-            for metric, statistics in measurements.items():
-                if metric == 'samples':
+    lines = []
+    groups = (
+        ('Measured AVIF precision tradeoffs', 'apple_hdr_avif_precision', 'regional_change_from_baseline',
+         'More precise encoder input is not a universal improvement after output quantization.'),
+        ('Requested PNG8 depth tradeoffs', 'apple_hdr_png8', 'regional_change_from_depth16',
+         'Explicit PNG8 has a different requested depth from its precise PNG16 baseline. This comparison records the loss from coarser storage; it does not claim a same-selector precision improvement.'))
+    for title, module, key, scope in groups:
+        cases = [case for case in evidence if case.get('proof_module') == module and key in case]
+        if not cases:
+            continue
+        lines += [f'## {title}', '', scope+
+            ' Every positive regional error change is listed below as candidate minus its exact earlier baseline. The unchanged appearance gates decide qualification; a qualified alternative can still worsen individual statistics. Full signed changes and both measurements remain in the machine-readable evidence. A none row means no measured error statistic increased.', '',
+            '| Geometry | Depth | Region | Error metric | Statistic | Positive change | Case status |',
+            '| --- | --- | --- | --- | --- | ---: | --- |']
+        for case in cases:
+            count = 0
+            for region, measurements in case[key]['regions'].items():
+                if not measurements['samples']:
                     continue
-                for statistic, difference in statistics.items():
-                    if difference > 0:
-                        lines.append(f'| {case["geometry"]} | {case["selectors"]["depth"]} | {region} | {metric} | {statistic} | +{difference:.9f} | {case["status"]} |')
-                        count += 1
-        if not count:
-            lines.append(f'| {case["geometry"]} | {case["selectors"]["depth"]} | none | none | none | 0 | {case["status"]} |')
-    return lines + ['']
+                for metric, statistics in measurements.items():
+                    if metric == 'samples':
+                        continue
+                    for statistic, difference in statistics.items():
+                        if difference > 0:
+                            lines.append(f'| {case["geometry"]} | {case["selectors"]["depth"]} | {region} | {metric} | {statistic} | +{difference:.9f} | {case["status"]} |')
+                            count += 1
+            if not count:
+                lines.append(f'| {case["geometry"]} | {case["selectors"]["depth"]} | none | none | none | 0 | {case["status"]} |')
+        lines.append('')
+    return lines
 
 
 def optional_gainmap_report(evidence):
@@ -889,6 +896,10 @@ def main():
         geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
     write_json(RESULTS/'apple-hdr-png-precision-contain.json', apple_hdr_png_precision)
     icc_results.extend(apple_hdr_png_precision['cases'])
+    from apple_hdr_png8 import run as run_apple_hdr_png8
+    apple_hdr_png8 = run_apple_hdr_png8(WORK/'apple-hdr-png8-contain')
+    write_json(RESULTS/'apple-hdr-png8-contain.json', apple_hdr_png8)
+    icc_results.extend(apple_hdr_png8['cases'])
     from apple_hdr_avif_precision import run as run_apple_hdr_avif_precision
     apple_hdr_avif_precision = run_apple_hdr_avif_precision(WORK/'apple-hdr-avif-precision-contain', depths=(12, 10, 8))
     write_json(RESULTS/'apple-hdr-avif-precision-contain.json', apple_hdr_avif_precision)

@@ -116,6 +116,11 @@ The separately named `precision-opaque-planar16` PNGs cover all five geometries,
 each with its own hash and measurements. Compare each with the earlier PNG at matched size,
 especially shadow gradients and dark colored edges. Both use the same source
 reference and remain pending physical review despite different measured errors.
+The explicit old Apple PNG8 containment is a separate lower-depth request.
+Compare it with both PNG16 containment files at matched geometry, especially
+dark gradients and colored edges. All measured regional error statistics rise
+at eight bits; its passing thresholds do not imply equal precision or visible
+HDR support in the consumer.
 The gain-map JPEG endpoint comparisons use display boost 16. Check the separate
 ISO upscale boost-2 rendering record before selecting a download; its measured
 adaptation failure cannot be overridden by a successful endpoint or a physical

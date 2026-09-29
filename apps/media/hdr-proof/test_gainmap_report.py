@@ -97,6 +97,18 @@ class GainMapReportTests(unittest.TestCase):
         self.assertIn('not a universal improvement', rendered)
         self.assertEqual(apple_precision_tradeoffs([]), [])
 
+    def test_png8_report_distinguishes_requested_depth_from_encoder_precision(self):
+        from suite import apple_precision_tradeoffs
+        case = {'proof_module': 'apple_hdr_png8', 'geometry': 'contain',
+            'selectors': {'depth': '8'}, 'status': 'qualified',
+            'regional_change_from_depth16': {'regions': {'shadow': {'samples': 10,
+                'delta_e_itp': {'mean': .1, 'p95': .2, 'maximum': 2.6}}}}}
+        rendered = '\n'.join(apple_precision_tradeoffs([case]))
+        self.assertIn('## Requested PNG8 depth tradeoffs', rendered)
+        self.assertIn('different requested depth', rendered)
+        self.assertIn('| contain | 8 | shadow | delta_e_itp | maximum | +2.600000000 | qualified |', rendered)
+        self.assertNotIn('## Measured AVIF precision tradeoffs', rendered)
+
     def test_capacity_report_keeps_zero_weight_models_and_native_admission_separate(self):
         from suite import iso_capacity_report
         diagnostic = {'constraints': {'authored_base_bypass_model_excluded': True,
@@ -169,15 +181,19 @@ class GainMapReportTests(unittest.TestCase):
         avif_precision = {**precision, 'proof_module': 'apple_hdr_avif_precision',
                           'selectors': {'format': 'avif', 'gamut': 'preserve', 'depth': '12'},
                           'artifacts': {'sha256': 'd'*64}, 'measurements': {'hdr': measurement(.01, .2, .01)}}
+        png8 = {**precision, 'proof_module': 'apple_hdr_png8',
+                'selectors': {'format': 'png', 'gamut': 'preserve', 'depth': '8'},
+                'artifacts': {'sha256': 'e'*64}, 'measurements': {'hdr': measurement(.2, 2.686236, .01)}}
         legacy = {**case, 'source_reference_revision': 'legacy-convention'}
-        rendered = '\n'.join(apple_documented_report([case, failed, single, wide, precision, avif_precision, legacy]))
+        rendered = '\n'.join(apple_documented_report([case, failed, single, wide, precision, avif_precision, png8, legacy]))
         self.assertIn('| contain | jpg | preserve | preserve | 4.528920 | 4.640900 | `aaaaaaaaaaaa` | qualified |', rendered)
         self.assertIn('| orientation | jpg | preserve | preserve | 12.450000 | missing | missing | tested and failed |', rendered)
         self.assertIn('| cover | avif | preserve | 10 | 0.820000 | not embedded | `aaaaaaaaaaaa` | qualified |', rendered)
         self.assertIn('| cover | avif | rec2020 | 10 | 1.020000 | not embedded | `bbbbbbbbbbbb` | qualified |', rendered)
         self.assertIn('| contain | png | preserve | 16 | 0.010890 | not embedded | `cccccccccccc` | qualified |', rendered)
         self.assertIn('| contain | avif | preserve | 12 | 0.200000 | not embedded | `dddddddddddd` | qualified |', rendered)
-        self.assertEqual(rendered.count('| contain |'), 3)
+        self.assertIn('| contain | png | preserve | 8 | 2.686236 | not embedded | `eeeeeeeeeeee` | qualified |', rendered)
+        self.assertEqual(rendered.count('| contain |'), 4)
         self.assertIn('Current recorded rows only', rendered)
         self.assertIn('does not qualify intermediate Apple adaptation', rendered)
         self.assertIn('pending manual review', rendered)

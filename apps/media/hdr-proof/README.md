@@ -218,6 +218,15 @@ the first precise containment retain their exact bytes and measurements. Only
 the five separately named precise outputs enter the matrix as new evidence;
 nested baseline records are not counted twice. Fractional alpha, other gamuts
 and depths require their own proof.
+The separate [explicit PNG8 containment](apple_hdr_png8.py) uses native
+nearest-code quantization of the inspected precise PNG16 intent. Its actual
+RGB8/P3/PQ signaling, square pixels, opaque structure and privacy pass; libpng,
+FFmpeg and native packed RGB8 samples agree exactly. Maximum HDR error rises
+from 0.010890 at 16 bits to 2.686236 at 8 bits, still within the unchanged
+photographic gates. All 27 regional error statistics increase and remain
+visible in the report. This is a different requested depth, with both PNG16
+baselines retained exactly, and no claim of improved precision or physical
+display compatibility.
 The [AVIF precision candidates](apple_hdr_avif_precision.py) feed that
 strictly inspected native PQ16 PNG to AOM and independently decodes with dav1d.
 Its maximum HDR error falls from 0.350934 to 0.174863; regional color means,

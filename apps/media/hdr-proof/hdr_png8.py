@@ -57,7 +57,7 @@ def _authored_samples(spec):
     return scene, signal, codes
 
 
-def inspect_and_decode(path):
+def inspect_and_decode(path, *, allow_exif8=False):
     rejection = 'Source is outside the recognized eight-bit HDR PNG proof subset; keep it original-only'
     try:
         chunks = _png_chunks(Path(path).read_bytes())
@@ -76,7 +76,9 @@ def inspect_and_decode(path):
         expected = {'FileType': 'PNG', 'ImageWidth': width, 'ImageHeight': height, 'BitDepth': depth,
                     'ColorType': color_type, 'ColorPrimaries': primaries, 'TransferCharacteristics': transfer,
                     'MatrixCoefficients': matrix, 'VideoFullRangeFlag': full_range}
-        if any(exif.get(key) != value for key, value in expected.items()) or exif.get('Orientation', 1) != 1:
+        orientation = exif.get('Orientation', 1)
+        if (any(exif.get(key) != value for key, value in expected.items())
+                or orientation not in ((1, 8) if allow_exif8 else (1,))):
             raise ValueError('Independent ExifTool signaling disagrees or source orientation is not proved')
     except (ValueError, struct.error) as error:
         raise ValueError(f'{rejection}: {error}') from error
@@ -87,7 +89,7 @@ def inspect_and_decode(path):
     if np.any(samples % 257) or (color_type == 2 and np.any(samples[..., 3] != 65535)):
         raise ValueError('Independent libpng did not return exact expanded eight-bit source codes')
     facts = {'format': 'png', 'range': 'hdr', 'width': width, 'height': height, 'depth': depth,
-             'color_type': color_type, 'alpha_channel': color_type == 6, 'orientation': 1,
+             'color_type': color_type, 'alpha_channel': color_type == 6, 'orientation': orientation,
              'primaries': primaries, 'transfer': transfer, 'matrix': matrix, 'full_range': bool(full_range),
              'gamut': {9: 'rec2020', 12: 'p3'}[primaries],
              'transfer_name': {16: 'pq', 18: 'hlg'}[transfer],

@@ -1,0 +1,15 @@
+{
+  "generator": "hdr_png8_geometry.py:generate_orientation_fixture; native locked PNG8 source plus ExifTool EXIF8",
+  "scope": "Real EXIF8 orientation source hashes; coded RGB/alpha and HDR signaling equal the base PNG8 fixture",
+  "base_lock": "png8-source-sha256.json",
+  "sha256": {
+    "png-pq-p3-8-opaque-orientation-8": "9550db209d253802fc8acd301ac8b15456bc87541bd057815de319d0cb3dcd8a",
+    "png-pq-p3-8-alpha-orientation-8": "9d7e111a41c79133b0f951ed1a589a27333e941c66e660c83a2d6449a59751e0",
+    "png-pq-rec2020-8-opaque-orientation-8": "8a30a79f6bfb443e54fbca4012a2f5a95a60f05678368db2c30c61a47709cd06",
+    "png-pq-rec2020-8-alpha-orientation-8": "42596937d6f632501d8677ec9f1935b7d772a805cf45aad77255e4f2e58f05dc",
+    "png-hlg-p3-8-opaque-orientation-8": "7138d6cb37931222ac6c07d3fc423199dceedfa51840eb28087eb63758599aa1",
+    "png-hlg-p3-8-alpha-orientation-8": "9dd347453439f1c4d678c121fdbcabc46b333dbaf4d103987d2385e81c0793d0",
+    "png-hlg-rec2020-8-opaque-orientation-8": "9064b0f8fd13776cf660d842dda0d1dced4f27f8b0809117d2e31af7e93ac164",
+    "png-hlg-rec2020-8-alpha-orientation-8": "2ba047df86b47d30f3d1b425f7b565ea1d06c4569ba88b3ff9f046765ff1ba91"
+  }
+}

@@ -1,4 +1,4 @@
-"""Explicit PQ8/PQ10/PQ12 P3 AVIF geometries from documented old Apple full HDR.
+"""Explicit PQ8/PQ10/PQ12 AVIFs from documented old Apple full HDR.
 
 Declared before measurements: unchanged photographic gainmap-hdr regional
 gates apply to source, float Lanczos geometry, native PQ intent and final AV1
@@ -7,6 +7,9 @@ FFmpeg/zimg and AOM; the documented reference is used only for measurement.
 Only contain, cover, fill, upscale and a separately locked EXIF6 variant are
 admitted at explicit 8/10/12-bit depth. Orientation applies exactly once after
 the documented full effect in original stored raster coordinates.
+Explicit Rec.2020 is a separate containment-only candidate at each depth.
+Native zimg converts P3 geometry; the independent P3 reference and photographic
+gates stay unchanged for the cross-gamut intent and final appearance checks.
 This single-layer output measures full HDR only. It neither preserves an
 authored SDR base inside the output nor establishes intermediate adaptation.
 """
@@ -37,18 +40,20 @@ DEPENDENCIES = ('apple_hdr_avif.py', 'test_apple_hdr_avif.py', *apple_native_sou
                 *apple_orientation_source.DEPENDENCIES)
 
 
-def _selectors(operation, depth):
+def _selectors(operation, depth, gamut='preserve'):
     return {**{key: value for key, value in SELECTORS.items() if key not in ('w', 'fit')},
-            **GAINMAP_GEOMETRIES[operation], 'depth': str(depth)}
+            **GAINMAP_GEOMETRIES[operation], 'depth': str(depth), 'gamut': gamut}
 
 
-def _measure(expected, actual):
-    return compare_appearance(expected, actual, reference_gamut='p3', actual_gamut='p3', fixture_class='gainmap-hdr')
+def _measure(expected, actual, actual_gamut='p3'):
+    return compare_appearance(expected, actual, reference_gamut='p3', actual_gamut=actual_gamut, fixture_class='gainmap-hdr')
 
 
-def _encode(linear, directory, *, operation='contain', depth=12):
-    if operation not in SIZES or type(depth) is not int or depth not in DEPTHS:
+def _encode(linear, directory, *, operation='contain', depth=12, gamut='preserve'):
+    if (operation not in SIZES or type(depth) is not int or depth not in DEPTHS
+            or gamut not in ('preserve', 'rec2020') or gamut == 'rec2020' and operation != 'contain'):
         raise ValueError('Only the declared explicit8/10/12-bit native geometries are admitted')
+    output_gamut, primaries = ('p3', 12) if gamut == 'preserve' else ('rec2020', 9)
     width, height = SIZES[operation]
     if (linear.get('format') != 'gbrapf32le' or linear.get('gamut') != 'p3'
             or linear.get('normalization_nits') != 203
@@ -56,40 +61,41 @@ def _encode(linear, directory, *, operation='contain', depth=12):
         raise ValueError('Only the declared P3 float geometry is admitted')
     png, output = directory/'native-intent-pq.png', directory/'output.avif'
     filters = ('setparams=alpha_mode=premultiplied,zscale=agamma=0:transferin=linear:transfer=16:'
-        'primariesin=12:primaries=12:matrixin=0:matrix=0:rangein=full:range=full:npl=203,'
+        f'primariesin=12:primaries={primaries}:matrixin=0:matrix=0:rangein=full:range=full:npl=203,'
         'format=gbrapf32le:alpha_modes=premultiplied,format=gbrpf32le,'
-        'zscale=agamma=0:transferin=16:transfer=16:primariesin=12:primaries=12:'
+        f'zscale=agamma=0:transferin=16:transfer=16:primariesin={primaries}:primaries={primaries}:'
         'matrixin=0:matrix=0:rangein=full:range=full:npl=10000,format=rgb48le,setsar=1')
     avif.native(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'gbrapf32le',
         '-s', f'{width}x{height}', '-i', linear['path'], '-vf', filters, '-frames:v', '1',
         '-map_metadata', '-1', '-threads', '1', png])
     facts, pixels = hdr_png8_precision.inspect_hdr_png16(png)
-    if ((facts['primaries'], facts['transfer'], facts['color_type']) != (12, 16, 2)
+    if ((facts['primaries'], facts['transfer'], facts['color_type']) != (primaries, 16, 2)
             or pixels.shape != (height, width, 4) or not np.all(pixels[..., 3] == 1)):
         raise ValueError('Native PQ intent signaling, dimensions or opacity differ')
-    avif.encode_avif([png], output, 'pq', 'p3', depth)
+    avif.encode_avif([png], output, 'pq', output_gamut, depth)
     return output, {'path': str(png), 'sha256': avif.digest(png), 'facts': facts,
         'filters': filters, 'purpose': 'Native encoding intent, not independent reference'}, pixels
 
 
-def _run_one(directory, *, source, selectors, operation, depth):
+def _run_one(directory, *, source, selectors, operation, depth, gamut='preserve'):
     source = Path(source)
-    requested = _selectors(operation, depth)
+    requested = _selectors(operation, depth, gamut)
+    output_gamut = 'p3' if gamut == 'preserve' else 'rec2020'
     width, height = SIZES[operation]
     if ((selectors is not None and selectors != requested)
             or avif.digest(source) != apple_source_model.SOURCE_SHA256):
-        raise ValueError('Only the locked source and exact explicit-depth P3 selectors are admitted; original only otherwise')
+        raise ValueError('Only the locked source and exact explicit-depth/gamut selectors are admitted; original only otherwise')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
     hashes = {name: avif.digest(Path(__file__).parent/name) for name in DEPENDENCIES}
-    case = {'case_id': f'gainmap-apple-old:hdr:avif:preserve:{depth}:{operation}:documented-full-native',
+    case = {'case_id': f'gainmap-apple-old:hdr:avif:{gamut}:{depth}:{operation}:documented-full-native',
         'cell_id': 'gainmap-jpeg:hdr:avif', 'fixture_id': 'gainmap-apple-old',
         'source_sha256': apple_source_model.SOURCE_SHA256, 'source_reference_revision': apple_source_model.REFERENCE_REVISION,
-        'proof_module': 'apple_hdr_avif', 'candidate': f'documented-full-native-pq{depth}',
+        'proof_module': 'apple_hdr_avif', 'candidate': f'documented-full-native-pq{depth}' + ('-rec2020' if gamut == 'rec2020' else ''),
         'geometry': operation, 'selectors': requested, 'status': 'tested and failed',
         'consumer_status': 'pending manual review',
-        'qualification_scope': f'One explicit single-layer PQ{depth} P3 AVIF at documented full Apple effect, after '
+        'qualification_scope': f'One explicit single-layer PQ{depth} ' + ('P3' if gamut == 'preserve' else 'Rec.2020') + ' AVIF at documented full Apple effect, after '
             + ('containment. ' if operation == 'contain' else operation+'. ') +
             'Other depths, geometries, source models and physical consumers require separate evidence.',
         'known_consumer_limitations': ['The output has no embedded authored SDR base or gain map. '
@@ -136,7 +142,7 @@ def _run_one(directory, *, source, selectors, operation, depth):
         sdr_path = directory/'reference-sdr.png'
         sdr.save(sdr_path, icc_profile=profile)
         linear = gainmap_linear.resample_linear(prepared['native_source'], directory/'native-geometry.gbrapf32', operation, orientation)
-        output, intent, intent_pixels = _encode(linear, directory, operation=operation, depth=depth)
+        output, intent, intent_pixels = _encode(linear, directory, operation=operation, depth=depth, gamut=gamut)
         bound = {**prepared['bound_files'], str(source): apple_source_model.SOURCE_SHA256,
             str(actual_source): source_hash,
             str(output): avif.digest(output), str(reference_path): avif.digest(reference_path),
@@ -150,7 +156,7 @@ def _run_one(directory, *, source, selectors, operation, depth):
         if avif.digest(output) != bound[str(output)]:
             raise ValueError('Emitted output integrity changed during native decoding')
         rgba = np.concatenate((reference, np.ones((*reference.shape[:2], 1))), axis=-1)
-        structural = avif.structure_checks(facts, frames, {}, [rgba], 'pq', 'p3', depth, 1)
+        structural = avif.structure_checks(facts, frames, {}, [rgba], 'pq', output_gamut, depth, 1)
         structural['opaque'] = bool(facts['alpha'] == 'Absent' and np.all(frames[0][..., 3] == 1))
         packet = json.loads(avif.native(['ffprobe', '-v', 'error', '-c:v', 'libdav1d', '-count_frames',
             '-show_entries', 'stream=codec_name,width,height,pix_fmt,color_space,color_transfer,color_primaries,color_range,nb_read_frames,sample_aspect_ratio,display_aspect_ratio',
@@ -159,7 +165,7 @@ def _run_one(directory, *, source, selectors, operation, depth):
         structural['independent_packet_facts'] = len(streams) == 1 and all(streams[0].get(key) == value
             for key, value in {'codec_name': 'av1', 'width': width, 'height': height,
                 'pix_fmt': 'gbrp' if depth == 8 else f'gbrp{depth}le',
-                'color_space': 'gbr', 'color_transfer': 'smpte2084', 'color_primaries': 'smpte432',
+                'color_space': 'gbr', 'color_transfer': 'smpte2084', 'color_primaries': 'smpte432' if gamut == 'preserve' else 'bt2020',
                 'color_range': 'pc', 'nb_read_frames': '1', 'sample_aspect_ratio': '1:1',
                 'display_aspect_ratio': f'{width}:{height}' if width != height else '1:1'}.items())
         structural['pixel_aspect'] = _pixel_aspect(output)['passed']
@@ -168,8 +174,8 @@ def _run_one(directory, *, source, selectors, operation, depth):
         privacy = not private and 'XMP Metadata   : Absent' in facts['info'] and 'Exif Metadata  : Absent' in facts['info']
         measurements = {'native_source': prepared['measurement'],
             'native_geometry': _measure(reference, gainmap_hdr.read_linear(linear)),
-            'native_intent': _measure(reference, avif.decode_transfer(intent_pixels[..., :3], 'pq', 'p3')),
-            'hdr': _measure(reference, avif.decode_transfer(frames[0][..., :3], 'pq', 'p3'))}
+            'native_intent': _measure(reference, avif.decode_transfer(intent_pixels[..., :3], 'pq', output_gamut), output_gamut),
+            'hdr': _measure(reference, avif.decode_transfer(frames[0][..., :3], 'pq', output_gamut), output_gamut)}
         case.update({'source_facts': prepared['native_source']['source_facts']['facts'],
             'source_decoder_evidence': prepared, 'native_geometry': linear, 'hdr_intent': intent,
             'reference_hdr': {'path': str(reference_path), 'sha256': bound[str(reference_path)],
@@ -200,18 +206,20 @@ def _run_one(directory, *, source, selectors, operation, depth):
     return report
 
 
-def run(directory, *, source=apple_source_model.SOURCE, selectors=None, depths=(12,), geometries=('contain',)):
+def run(directory, *, source=apple_source_model.SOURCE, selectors=None, depths=(12,), geometries=('contain',), gamut='preserve'):
     depths, geometries = tuple(depths), tuple(geometries)
-    if (not depths or any(type(depth) is not int or depth not in DEPTHS for depth in depths)
+    if (type(gamut) is not str or gamut not in ('preserve', 'rec2020')
+            or gamut == 'rec2020' and geometries != ('contain',)
+            or not depths or any(type(depth) is not int or depth not in DEPTHS for depth in depths)
             or len(set(depths)) != len(depths)
             or not geometries or any(type(operation) is not str or operation not in SIZES for operation in geometries)
             or len(set(geometries)) != len(geometries)
             or selectors is not None and (len(depths) != 1 or len(geometries) != 1
-                                         or selectors != _selectors(geometries[0], depths[0]))):
+                                         or selectors != _selectors(geometries[0], depths[0], gamut))):
         raise ValueError('Expected distinct proved depths/geometries and at most one exact selector request')
     directory = Path(directory)
     reports = [_run_one(directory if (depth, operation) == (12, 'contain') else directory/f'{operation}-{depth}',
-                        source=source, selectors=selectors, operation=operation, depth=depth)
+                        source=source, selectors=selectors, operation=operation, depth=depth, gamut=gamut)
                for depth in depths for operation in geometries]
     report = reports[0]
     if len(reports) > 1:

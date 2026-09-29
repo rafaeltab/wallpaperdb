@@ -258,5 +258,82 @@ class AppleHdrAvifTests(unittest.TestCase):
         self.assertEqual(case['artifacts']['source_sha256'], self.module.apple_orientation_source.SOURCE_SHA256)
 
 
+class AppleHdrAvifRec2020Tests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import apple_hdr_avif
+        cls.module = apple_hdr_avif
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.root = Path(cls.temporary.name)
+        cls.report = cls.module.run(cls.root/'rec2020', gamut='rec2020', depths=(12, 10, 8))
+
+    def test_native_rec2020_containment_retains_the_original_p3_reference_and_gates(self):
+        outputs = {12: '1b801104d13fdaca83e847b2464acd9541a5af1444a5a6b576f4b04ac5eff011',
+                   10: 'dc01444fdf689123f292586df43349eb136aa2ede86d3d3b79295c041d3cb35a',
+                   8: '7b8cdc2b28520fdf994b1a58cf276f20a22ed3193e2a37d5a75ee5a855f1b942'}
+        self.assertEqual(len(self.report['cases']), 3)
+        for case in self.report['cases']:
+            depth = int(case['selectors']['depth'])
+            with self.subTest(depth=depth):
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertTrue(all(case['checks'].values()))
+                self.assertTrue(all(case['structural_checks'].values()))
+                self.assertEqual(case['selectors']['gamut'], 'rec2020')
+                self.assertIn(':rec2020:', case['case_id'])
+                self.assertEqual(case['artifacts']['sha256'], outputs[depth])
+                self.assertEqual((case['facts']['primaries'], case['facts']['transfer'], case['facts']['matrix']), (9,16,0))
+                self.assertEqual(case['facts']['depth'], depth)
+                self.assertEqual(case['output_packet_facts']['streams'][0]['color_primaries'], 'bt2020')
+                self.assertEqual(case['hdr_intent']['facts']['primaries'], 9)
+                self.assertEqual(case['reference_hdr']['gamut'], 'p3')
+                self.assertEqual(case['reference_hdr']['sha256'], 'e35748a2624ddc61cd57d7f7e4b3796bc4a5d503f4a32484e33a2d19aa53253a')
+                self.assertEqual(case['native_geometry']['gamut'], 'p3')
+                self.assertEqual(case['native_geometry']['output_sha256'], '353d025843645deb4f36680f9229f72b42e9050d098df9eeb3e8dafc96676822')
+                self.assertEqual(case['threshold_scope']['profile'], 'gainmap-hdr')
+                self.assertEqual(case['threshold_scope']['source_quantization_allowance'], 0)
+                self.assertFalse(case['rendering_scope']['intermediate_adaptation_qualified'])
+                for path, sha in case['bound_files'].items():
+                    self.assertEqual(avif.digest(path), sha)
+        from matrix import build_matrix
+        matrix = build_matrix(self.report['cases'])
+        self.assertEqual(matrix['evidence_errors'], [])
+        self.assertEqual(matrix['rendering_coverage']['same_file_qualified_count'], 0)
+
+    def test_unproved_gamut_geometry_and_selector_combinations_reject_before_native_work(self):
+        options = ({'gamut': 'p3'}, {'gamut': 'srgb'}, {'gamut': ['rec2020']},
+                   {'gamut': 'rec2020', 'geometries': ('cover',)},
+                   {'gamut': 'rec2020', 'geometries': ('orientation',)},
+                   {'gamut': 'rec2020', 'selectors': dict(self.module.SELECTORS)})
+        for kwargs in options:
+            before = len(avif.COMMANDS)
+            with self.subTest(options=kwargs), self.assertRaises(ValueError):
+                self.module.run(self.root/'rejected', **kwargs)
+            self.assertEqual(len(avif.COMMANDS), before)
+
+    def test_actual_p3_file_cannot_satisfy_explicit_rec2020_signaling(self):
+        original = self.module._encode
+        def encode_other_primaries(*args, **kwargs):
+            return original(*args, **{**kwargs, 'gamut': 'preserve'})
+        with patch.object(self.module, '_encode', side_effect=encode_other_primaries):
+            case = self.module.run(self.root/'wrong-output-gamut', gamut='rec2020')['cases'][0]
+        self.assertEqual(case['status'], 'tested and failed')
+        self.assertFalse(case['checks']['structure'])
+        self.assertEqual(case['facts']['primaries'], 12)
+
+    def test_rec2020_actual_native_intent_drift_cannot_qualify(self):
+        original = self.module.avif.decode_avif
+        def decode_then_change(path, *args, **kwargs):
+            pixels = original(path, *args, **kwargs)
+            intent = Path(path).with_name('native-intent-pq.png')
+            intent.write_bytes(intent.read_bytes()+b'late native intent drift')
+            return pixels
+        with patch.object(self.module.avif, 'decode_avif', side_effect=decode_then_change):
+            case = self.module.run(self.root/'changed-intent', gamut='rec2020')['cases'][0]
+        self.assertEqual(case['status'], 'tested and failed')
+        self.assertFalse(case['checks']['integrity'])
+        self.assertTrue(any('integrity' in message for message in case['blockers']))
+
+
 if __name__ == '__main__':
     unittest.main()

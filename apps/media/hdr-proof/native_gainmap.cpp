@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
     }
     if (argc < 3) throw std::runtime_error("Usage: hdr-proof-uhdr probe input | extract input base map | roundtrip input output | pack metadata-source base map output");
     const std::string mode(argv[1]);
-    const bool decode = mode == "decode-linear" && argc == 4;
+    const bool decode = mode == "decode-linear" && (argc == 4 || argc == 5);
     const bool probe = mode == "probe" && argc == 3;
     const bool extract = mode == "extract" && argc == 5;
     const bool roundtrip = mode == "roundtrip" && argc == 4;
@@ -218,6 +218,14 @@ int main(int argc, char** argv) {
     if (!decoder) throw std::runtime_error("Cannot allocate native decoder");
     check(uhdr_dec_set_image(decoder.get(), &compressed), "set source");
     if (decode) {
+      float requested_boost = 0;
+      if (argc == 5) {
+        size_t consumed = 0;
+        requested_boost = std::stof(argv[4], &consumed);
+        if (consumed != std::string(argv[4]).size() || !std::isfinite(requested_boost) || requested_boost < 1)
+          throw std::runtime_error("Display boost must be finite and at least one");
+        check(uhdr_dec_set_out_max_display_boost(decoder.get(), requested_boost), "set display boost");
+      }
       check(uhdr_dec_set_out_img_format(decoder.get(), UHDR_IMG_FMT_64bppRGBAHalfFloat), "set HDR float format");
       check(uhdr_dec_set_out_color_transfer(decoder.get(), UHDR_CT_LINEAR), "set HDR linear transfer");
       check(uhdr_decode(decoder.get()), "decode HDR intent");
@@ -235,7 +243,11 @@ int main(int argc, char** argv) {
       }
       if (!stream) throw std::runtime_error("Cannot write decoded HDR");
       std::cout << std::setprecision(9) << "{\"width\":" << decoded->w << ",\"height\":" << decoded->h
-                << ",\"gamut\":" << decoded->cg << ",\"headroom\":" << uhdr_dec_get_gainmap_metadata(decoder.get())->hdr_capacity_max << "}\n";
+                << ",\"gamut\":" << decoded->cg << ",\"headroom\":" << uhdr_dec_get_gainmap_metadata(decoder.get())->hdr_capacity_max
+                << ",\"requested_display_boost\":";
+      if (requested_boost) std::cout << requested_boost;
+      else std::cout << "null";
+      std::cout << "}\n";
       return 0;
     }
     check(uhdr_dec_probe(decoder.get()), "probe source");

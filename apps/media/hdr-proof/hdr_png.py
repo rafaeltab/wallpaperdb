@@ -8,6 +8,8 @@ all SDR representations retain the existing tone policy and sdr-8 gate.
 import json
 from pathlib import Path
 import re
+import struct
+import zlib
 
 import numpy as np
 
@@ -29,16 +31,53 @@ def fixture_specs():
                        'alpha': alpha, 'frames': 1}
 
 
+def _png_chunks(data):
+    if data[:8] != b'\x89PNG\r\n\x1a\n':
+        raise ValueError('Invalid PNG signature')
+    position, chunks = 8, []
+    while position < len(data):
+        if position + 12 > len(data):
+            raise ValueError('Truncated PNG chunk')
+        length = struct.unpack_from('>I', data, position)[0]
+        end = position + 12 + length
+        if end > len(data):
+            raise ValueError('Truncated PNG chunk payload')
+        kind, payload = data[position+4:position+8], data[position+8:end-4]
+        if zlib.crc32(kind + payload) != struct.unpack_from('>I', data, end-4)[0]:
+            raise ValueError('Invalid PNG chunk CRC')
+        chunks.append((kind, payload))
+        position = end
+    if not chunks or chunks[0][0] != b'IHDR' or chunks[-1] != (b'IEND', b''):
+        raise ValueError('Incomplete PNG structure')
+    return chunks
+
+
 def inspect_source(path):
+    rejection = 'The PNG lacks this proof subset\'s recognized HDR signaling; keep it original-only'
+    try:
+        chunks = _png_chunks(Path(path).read_bytes())
+    except ValueError as error:
+        raise ValueError(f'{rejection}: {error}') from error
+    color_chunks = [payload for kind, payload in chunks if kind == b'cICP']
+    if (len(color_chunks) != 1 or len(color_chunks[0]) != 4
+            or any(kind in (b'iCCP', b'sRGB') for kind, _ in chunks)):
+        raise ValueError(rejection)
     exif = json.loads(avif.native(['exiftool', '-j', '-n', path]))[0]
     if (exif.get('FileType') != 'PNG' or exif.get('BitDepth') != 16
             or exif.get('ColorPrimaries') not in (9, 12)
             or exif.get('TransferCharacteristics') not in (16, 18)
             or exif.get('MatrixCoefficients') != 0 or exif.get('VideoFullRangeFlag') != 1
-            or exif.get('ColorType') not in (2, 6) or exif.get('Orientation', 1) != 1
+            or exif.get('ColorType') not in (2, 6) or exif.get('Orientation', 1) not in (1, 8)
             or 'SRGBRendering' in exif or 'ProfileDescription' in exif):
-        raise ValueError('The PNG lacks this proof subset\'s recognized HDR signaling; keep it original-only')
-    return {'width': exif['ImageWidth'], 'height': exif['ImageHeight'], 'depth': exif['BitDepth'],
+        raise ValueError(rejection)
+    if tuple(color_chunks[0]) != tuple(exif[key] for key in (
+            'ColorPrimaries', 'TransferCharacteristics', 'MatrixCoefficients', 'VideoFullRangeFlag')):
+        raise ValueError(rejection)
+    orientation = exif.get('Orientation', 1)
+    width, height = exif['ImageWidth'], exif['ImageHeight']
+    return {'width': width, 'height': height, 'depth': exif['BitDepth'],
+            'orientation': orientation, 'display_width': height if orientation == 8 else width,
+            'display_height': width if orientation == 8 else height,
             'primaries': exif['ColorPrimaries'], 'transfer': exif['TransferCharacteristics'],
             'matrix': 0, 'full_range': True,
             'gamut': {9: 'rec2020', 12: 'p3'}[exif['ColorPrimaries']],
@@ -68,6 +107,83 @@ def generate_fixture(spec, directory):
                  '-GPSLongitude=4.5', '-GPSLongitudeRef=E', '-Model=Test Camera',
                  '-SerialNumber=987654', source])
     return source, inspect_source(source), scene
+
+
+def generate_orientation_fixture(source, output):
+    """Add a distinct EXIF8 source without modifying the locked base fixture."""
+    output = Path(output)
+    output.write_bytes(Path(source).read_bytes())
+    avif.native(['exiftool', '-overwrite_original', '-Orientation#=8', output])
+    return output, inspect_source(output)
+
+
+def bake_orientation(source, output, facts):
+    if facts['orientation'] != 8:
+        raise ValueError('This native orientation proof requires an EXIF8 source')
+    # Disable FFmpeg's implicit autorotation; both direction and sample
+    # preservation are compared independently against numpy.rot90 below.
+    filters = ('transpose=cclock,sidedata=mode=delete,'
+               f'setparams=color_primaries={facts["primaries"]}:'
+               f'color_trc={facts["transfer"]}:colorspace=gbr:range=full')
+    avif.native(['ffmpeg', '-v', 'error', '-y', '-noautorotate', '-i', source,
+                 '-vf', filters, '-pix_fmt', 'rgba64be', '-map_metadata', '-1',
+                 '-frames:v', '1', '-threads', '1', output])
+
+
+def source_rejection_controls(source, directory):
+    """Mutate metadata only; none of these negative files qualifies a codec."""
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    chunks = _png_chunks(Path(source).read_bytes())
+    cicp = next(payload for kind, payload in chunks if kind == b'cICP')
+    index = next(i for i, (kind, _) in enumerate(chunks) if kind == b'cICP')
+    variants = {
+        'unknown-transfer': chunks[:index] + [(b'cICP', bytes((cicp[0], 2, 0, 1)))] + chunks[index+1:],
+        'conflicting-cicp': chunks[:index] + [(b'cICP', bytes((9 if cicp[0] == 12 else 12, cicp[1], 0, 1)))] + chunks[index:],
+        'duplicate-cicp': chunks[:index] + [(b'cICP', cicp)] + chunks[index:],
+        'invalid-cicp-crc': chunks,
+        'conflicting-icc': chunks[:index] + [(b'iCCP', b'sRGB gamma2.2\x00\x00' + zlib.compress(gamma_icc.make_profile()))] + chunks[index:],
+        'conflicting-srgb': chunks[:index] + [(b'sRGB', b'\x00')] + chunks[index:],
+    }
+    controls = []
+    for variant, modified in variants.items():
+        data = bytearray(b'\x89PNG\r\n\x1a\n')
+        for kind, payload in modified:
+            crc = zlib.crc32(kind + payload)
+            if variant == 'invalid-cicp-crc' and kind == b'cICP':
+                crc ^= 1
+            data.extend(struct.pack('>I', len(payload)) + kind + payload + struct.pack('>I', crc))
+        path = directory/f'{variant}.png'
+        path.write_bytes(data)
+        start = len(avif.COMMANDS)
+        rejection = None
+        try:
+            inspect_source(path)
+        except ValueError as error:
+            rejection = str(error)
+        # Unknown/conflicting required facts must not be inferred from the
+        # expected fixture label. Only its container family remains known.
+        facts = {'format': 'png', 'range': None}
+        original = request_decision(facts, {})
+        transformed = request_decision(facts, {'format': 'avif', 'range': 'hdr', 'w': 58})
+        output = directory/f'{variant}-original.png'
+        output.write_bytes(exact_original(path.read_bytes(), original))
+        commands = avif.COMMANDS[start:]
+        checks = {'unrecognized_source_rejected': rejection is not None,
+                  'exact_original_bytes': output.read_bytes() == path.read_bytes(),
+                  'coded_pixels_unchanged': [payload for kind, payload in modified if kind == b'IDAT']
+                                            == [payload for kind, payload in chunks if kind == b'IDAT'],
+                  'transformations_withheld': transformed['action'] == 'metadata-pending',
+                  'no_converter_calls': all(command['argv'][0] == 'exiftool' for command in commands)}
+        name = f'hdr-png:source-signaling:{variant}'
+        controls.append({'case_id': name, 'name': name, 'variant': variant,
+            'status': 'passed' if all(checks.values()) else 'failed', 'passed': all(checks.values()),
+            'checks': checks, 'codec_qualification': False, 'source': str(path),
+            'source_sha256': avif.digest(path), 'original_sha256': avif.digest(output),
+            'parent_source_sha256': avif.digest(source), 'source_rejection': rejection,
+            'original_decision': original, 'transformed_decision': transformed,
+            'provenance': 'Metadata-only mutations of native fixture PNG; compressed pixel data is unchanged'})
+    return controls
 
 
 def _original_control(source, output, facts):
@@ -127,7 +243,8 @@ def _icc_output(paths, target, extension, reference):
     return facts, frames, detail, gamma_icc.decode_signal_to_nits(frames[0][..., :3], profile)
 
 
-def run(output_directory, *, specs=None, geometries=('identity', 'contain')):
+def run(output_directory, *, specs=None,
+        geometries=('identity', 'contain', 'cover', 'fill', 'upscale', 'orientation')):
     output_directory = Path(output_directory)
     output_directory.mkdir(parents=True, exist_ok=True)
     start_commands = len(avif.COMMANDS)
@@ -135,6 +252,8 @@ def run(output_directory, *, specs=None, geometries=('identity', 'contain')):
     for spec in (fixture_specs() if specs is None else specs):
         folder = output_directory/spec['id']
         source, source_facts, analytic = generate_fixture(spec, folder)
+        if not fixtures:
+            controls.extend(source_rejection_controls(source, output_directory/'source-signaling-controls'))
         decoded_source = avif.read_png(source)
         reference_source = decoded_source.copy()
         reference_source[..., :3] = avif.decode_transfer(decoded_source[..., :3], spec['transfer'], spec['gamut'])
@@ -155,8 +274,33 @@ def run(output_directory, *, specs=None, geometries=('identity', 'contain')):
         tone_control = avif.sdr_tone_control(source, folder/'sdr-control.png', reference_source,
             analytic, spec['transfer'], spec['gamut'], peak_nits=1000)
         for geometry in geometries:
-            if geometry not in ('identity', 'contain'):
-                raise ValueError('This PNG-source increment covers identity and contain geometry only')
+            selectors_geometry = {'identity': {}, 'contain': {'w': 58, 'h': 38, 'fit': 'contain'},
+                'cover': {'w': 40, 'h': 40, 'fit': 'cover'}, 'fill': {'w': 40, 'h': 48, 'fit': 'fill'},
+                'upscale': {'w': 120, 'h': 80, 'fit': 'contain'}, 'orientation': {'w': 58, 'fit': 'contain'}}
+            if geometry not in selectors_geometry:
+                raise ValueError('Unknown PNG proof geometry')
+            actual_source, conversion_source, actual_facts, actual_known = source, source, source_facts, known
+            actual_fixture_id, orientation_evidence = spec['id'], None
+            geometry_valid = source_valid
+            if geometry == 'orientation':
+                actual_fixture_id = spec['id'] + '-orientation-8'
+                actual_source, actual_facts = generate_orientation_fixture(source, folder/f'{actual_fixture_id}.png')
+                conversion_source = folder/'orientation-baked.png'
+                bake_orientation(actual_source, conversion_source, actual_facts)
+                baked_facts = inspect_source(conversion_source)
+                exact_rotation = np.array_equal(avif.read_png(conversion_source), np.rot90(decoded_source))
+                geometry_valid = bool(source_valid and exact_rotation and baked_facts['orientation'] == 1
+                                      and baked_facts['gamut'] == spec['gamut']
+                                      and baked_facts['transfer_name'] == spec['transfer'])
+                actual_known = {**known, 'orientation': 8, 'width': 64, 'height': 96}
+                orientation_evidence = {'sha256': avif.digest(actual_source), 'facts': actual_facts,
+                    'exact_rotation': bool(exact_rotation), 'baked_sha256': avif.digest(conversion_source),
+                    'independent_reference': 'numpy.rot90 of independently libpng-decoded coded samples',
+                    'baked_facts': baked_facts}
+                fixtures.append({'id': actual_fixture_id, 'path': str(actual_source),
+                    'sha256': avif.digest(actual_source), 'spec': {**spec, 'id': actual_fixture_id, 'orientation': 8},
+                    'generator': 'hdr_png.py:generate_orientation_fixture', 'base_sha256': avif.digest(source),
+                    'facts': actual_facts, 'source_valid': geometry_valid, 'orientation': orientation_evidence})
             reference = avif.geometry_reference(reference_source, geometry)
             for dynamic_range, extension in (('hdr', 'avif'), ('hdr', 'png'),
                 ('sdr', 'avif'), ('sdr', 'png'), ('sdr', 'jpg'), ('sdr', 'webp'), ('sdr', 'gif')):
@@ -166,25 +310,26 @@ def run(output_directory, *, specs=None, geometries=('identity', 'contain')):
                 sdr = dynamic_range == 'sdr'
                 depth = 16 if extension == 'png' else 12 if not sdr else 8
                 gamut, transfer = ('srgb', 'gamma22' if extension != 'png' else 'srgb') if sdr else (spec['gamut'], spec['transfer'])
-                case_id = f'{spec["id"]}:{dynamic_range}:{extension}:{"srgb" if sdr else "preserve"}:preserve:{geometry}'
+                case_id = f'{actual_fixture_id}:{dynamic_range}:{extension}:{"srgb" if sdr else "preserve"}:preserve:{geometry}'
                 case_directory = folder/case_id.replace(':', '-')
                 case_directory.mkdir(exist_ok=True)
                 selectors = {'format': extension, 'range': dynamic_range,
                     'gamut': 'srgb' if sdr else 'preserve', 'depth': str(depth), 'motion': 'preserve',
                     'transparency': 'coerce' if spec['alpha'] and extension in ('jpg', 'gif') else 'preserve'}
-                if geometry == 'contain':
-                    selectors.update({'w': 58, 'h': 38, 'fit': 'contain'})
-                item = {'case_id': case_id, 'fixture_id': spec['id'], 'cell_id': f'hdr-png:{dynamic_range}:{extension}',
+                selectors.update(selectors_geometry[geometry])
+                item = {'case_id': case_id, 'fixture_id': actual_fixture_id, 'cell_id': f'hdr-png:{dynamic_range}:{extension}',
                         'selectors': selectors, 'geometry': geometry, 'status': 'tested and failed',
                         'checks': {key: False for key in ('native_encoder', 'independent_decoder', 'structure', 'appearance', 'privacy')},
                         'blockers': [], 'measurements': {}, 'artifacts': {},
-                        'source_facts': source_facts, 'consumer_status': 'pending manual review'}
+                        'source_facts': actual_facts, 'consumer_status': 'pending manual review'}
+                if orientation_evidence is not None:
+                    item['orientation_source'] = orientation_evidence
                 try:
-                    decision = request_decision(known, selectors)
+                    decision = request_decision(actual_known, selectors)
                     if decision['action'] != 'unqualified':
                         raise ValueError('The tuple is not an eligible native conversion experiment')
                     converted = case_directory/'converted.png'
-                    avif.convert_frame(source, converted, spec['transfer'], spec['gamut'], geometry,
+                    avif.convert_frame(conversion_source, converted, spec['transfer'], spec['gamut'], geometry,
                                        sdr=sdr, peak_nits=1000 if sdr else None)
                     target = case_directory/f'output.{extension}'
                     if extension == 'avif':
@@ -201,6 +346,7 @@ def run(output_directory, *, specs=None, geometries=('identity', 'contain')):
                     elif extension == 'png':
                         facts, frames, detail = avif.encode_other([converted], target, extension,
                             transfer, gamut, [reference], 1, spec)
+                        detail['orientation_baked'] = facts['exiftool'].get('Orientation', 1) == 1
                         linear = avif.decode_transfer(frames[0][..., :3], transfer, gamut)
                         actual_gamut = gamut
                     else:
@@ -209,7 +355,7 @@ def run(output_directory, *, specs=None, geometries=('identity', 'contain')):
                     privacy = inspect_privacy(target, facts, extension)
                     item['privacy_measurement'] = privacy
                     item['checks'].update({'native_encoder': True, 'independent_decoder': True,
-                        'structure': bool(source_valid and all(detail.values())), 'privacy': privacy['passed']})
+                        'structure': bool(geometry_valid and all(detail.values())), 'privacy': privacy['passed']})
                     visibility = (None if extension == 'jpg' else
                                   (reference[..., 3] >= .5).astype(float) if extension == 'gif' else reference[..., 3])
                     expected = sdr_signal_to_nits(reference_srgb(reference[..., :3], spec['gamut'], peak_nits=1000)) if sdr else reference[..., :3]
@@ -226,8 +372,8 @@ def run(output_directory, *, specs=None, geometries=('identity', 'contain')):
                     item['checks']['appearance'] = bool(measured['passed'])
                     item['facts'], item['structural_checks'] = facts, detail
                     item['artifacts'] = {'output': str(target), 'sha256': avif.digest(target),
-                                         'source': str(source), 'source_sha256': avif.digest(source)}
-                    if not source_valid:
+                                         'source': str(actual_source), 'source_sha256': avif.digest(actual_source)}
+                    if not geometry_valid:
                         item['blockers'].append('Source signaling or independent analytic fixture checks failed')
                     item['blockers'] += [f'Failed {key} check' for key, passed in item['checks'].items() if not passed]
                     if all(item['checks'].values()) and not item['blockers']:
@@ -235,6 +381,6 @@ def run(output_directory, *, specs=None, geometries=('identity', 'contain')):
                 except Exception as error:
                     item['blockers'].append(str(error))
                 evidence.append(item)
-        print(f'HDR PNG {spec["id"]}: native identity/contain evidence recorded', flush=True)
+        print(f'HDR PNG {spec["id"]}: native {"/".join(geometries)} evidence recorded', flush=True)
     return {'evidence': evidence, 'fixtures': fixtures, 'controls': controls,
             'commands': avif.COMMANDS[start_commands:]}

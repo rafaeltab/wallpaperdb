@@ -75,8 +75,20 @@ encoding writes CICP; ExifTool checks signaling and the separate libpng reader
 decodes samples. Source and HDR derivative appearance use the existing stricter
 `avif-12` ceiling because their 16-bit precision exceeds the 12-bit fixture
 precision. SDR derivatives keep the existing `sdr-8` gates and independent tone
-reference. The initial scope covers identity and contain geometry. Matching
+reference. The scope covers identity, contain, cover, fill, upscale and a real
+EXIF-8 orientation variant. The eight orientation sources have separate hashes;
+native rotation is checked against an independent exact pixel rotation. Matching
 HDR PNG identity requests are exact-byte controls, including original metadata,
 and do not count as encoder evidence. Converted files must remove the source's
-numeric GPS, camera model, serial, EXIF and XMP data. APNG and unlisted geometry
-remain untested; this proof does not change source admission.
+numeric GPS, camera model, serial, EXIF and XMP data. Six metadata-only negative
+controls cover unknown transfer, conflicting or duplicate CICP, invalid CRC,
+and conflicting ICC/sRGB signaling. They retain exact originals and withhold
+transformation. APNG and unlisted cross-products remain untested; this proof does
+not change source admission.
+
+The appearance metric keeps signed color coordinates when a valid color lies
+outside an intermediate RGB gamut. P3 red, for example, has a negative blue
+coordinate in Rec.2020. It checks finite values, nonnegative luminance and the
+BT.2124 LMS domain without clipping those coordinates. Tests require identical
+measurements for the same color expressed in either gamut. Color-error and
+luminance-error thresholds remain unchanged.

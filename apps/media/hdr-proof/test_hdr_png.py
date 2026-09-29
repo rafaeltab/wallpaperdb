@@ -53,7 +53,7 @@ class HdrPngTests(unittest.TestCase):
                 'gamut': 'p3', 'depth': 16, 'alpha': False, 'frames': 1}
         with tempfile.TemporaryDirectory() as directory:
             result = run(Path(directory), specs=[spec], geometries=('identity',))
-        controls = result['controls']
+        controls = [control for control in result['controls'] if 'variant' not in control]
         self.assertEqual(len(controls), 1)
         self.assertTrue(controls[0]['passed'])
         self.assertTrue(controls[0]['exact_bytes'])
@@ -76,6 +76,65 @@ class HdrPngTests(unittest.TestCase):
             result = inspect_privacy(path, {'exiftool': {}}, 'png')
             self.assertFalse(result['passed'])
             self.assertTrue(result['exif_xmp_tags'])
+
+    def test_nonidentity_exif_orientation_is_baked_once_with_native_pixels(self):
+        from hdr_png import generate_orientation_fixture, bake_orientation
+        spec = next(spec for spec in fixture_specs() if spec['alpha'])
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            source, _, _ = generate_fixture(spec, directory)
+            original = source.read_bytes()
+            oriented, facts = generate_orientation_fixture(source, directory/'orientation-8.png')
+            self.assertEqual(facts['orientation'], 8)
+            self.assertEqual((facts['width'], facts['height']), (96, 64))
+            self.assertEqual((facts['display_width'], facts['display_height']), (64, 96))
+            self.assertEqual(source.read_bytes(), original)
+            self.assertNotEqual(oriented.read_bytes(), original)
+            np.testing.assert_array_equal(read_png(oriented), read_png(source))
+            baked = directory/'baked.png'
+            bake_orientation(oriented, baked, facts)
+            baked_facts = inspect_source(baked)
+            self.assertEqual(baked_facts['orientation'], 1)
+            self.assertEqual((baked_facts['width'], baked_facts['height']), (64, 96))
+            np.testing.assert_array_equal(read_png(baked), np.rot90(read_png(source)))
+
+    def test_remaining_geometries_measure_real_native_outputs(self):
+        spec = {'id': 'png-hlg-p3-16-alpha', 'transfer': 'hlg',
+                'gamut': 'p3', 'depth': 16, 'alpha': True, 'frames': 1}
+        with tempfile.TemporaryDirectory() as directory:
+            result = run(Path(directory), specs=[spec],
+                         geometries=('cover', 'fill', 'upscale', 'orientation'))
+        self.assertEqual(len(result['evidence']), 28)
+        self.assertEqual(len(result['fixtures']), 2)
+        for case in result['evidence']:
+            with self.subTest(case=case['case_id']):
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                if case['geometry'] == 'orientation':
+                    self.assertEqual(case['source_facts']['orientation'], 8)
+                    self.assertTrue(case['orientation_source']['exact_rotation'])
+                    self.assertTrue(case['fixture_id'].endswith('-orientation-8'))
+                    self.assertEqual(case['source_facts']['display_width'], 64)
+                    self.assertTrue(case['structural_checks']['orientation_baked'])
+
+    def test_conflicting_and_unknown_png_signaling_keeps_only_exact_originals(self):
+        from hdr_png import source_rejection_controls
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            source, _, _ = generate_fixture(next(fixture_specs()), directory)
+            controls = source_rejection_controls(source, directory/'negative')
+            self.assertEqual({control['variant'] for control in controls}, {
+                'unknown-transfer', 'conflicting-cicp', 'duplicate-cicp',
+                'invalid-cicp-crc', 'conflicting-icc', 'conflicting-srgb'})
+            for control in controls:
+                with self.subTest(variant=control['variant']):
+                    self.assertEqual(control['status'], 'passed')
+                    self.assertTrue(all(control['checks'].values()), control)
+                    self.assertEqual(control['transformed_decision']['action'], 'metadata-pending')
+                    self.assertEqual(control['original_decision']['action'], 'original')
+                    self.assertEqual(control['source_sha256'], control['original_sha256'])
+                    self.assertFalse(control['codec_qualification'])
+                    with self.assertRaisesRegex(ValueError, 'recognized HDR signaling'):
+                        inspect_source(Path(control['source']))
 
 
 if __name__ == '__main__':

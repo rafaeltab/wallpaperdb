@@ -36,6 +36,14 @@
     "png-hlg-p3-16-opaque": "ad2f331e8b9fa459dfee6dd799ac7ff38674c51586f9c886fe0549a424973660",
     "png-hlg-p3-16-alpha": "28206591ad66fed77c2728e3c6f1060986857a7a4d0090dc780dd8825df6eb57",
     "png-hlg-rec2020-16-opaque": "1ce805b339cc4d3fadd870c04fb947749d6792d2a090dc70174b8649a5332ef7",
-    "png-hlg-rec2020-16-alpha": "17820b92a2114bff7677a62e89ce3b891c3d80d7c0153c6c8e7bf58bf35b44d9"
+    "png-hlg-rec2020-16-alpha": "17820b92a2114bff7677a62e89ce3b891c3d80d7c0153c6c8e7bf58bf35b44d9",
+    "png-pq-p3-16-opaque-orientation-8": "ae6feb427fe12fea96c4680a592f5cfe2e907a76d5ab5f4e2b9fb37461bbbf4c",
+    "png-pq-p3-16-alpha-orientation-8": "23bc4a589f1cdcc28ef6473a5bbd70b73f22842149b62915781879fd4273e6f8",
+    "png-pq-rec2020-16-opaque-orientation-8": "0402a4569351469de6d124382b41c1cc2dbf48e436061106ff6a4739d8fe66a4",
+    "png-pq-rec2020-16-alpha-orientation-8": "7238c1fa0c9c916389c5dfea8a8bc6a651453de74602573ebd05d7a02d59b713",
+    "png-hlg-p3-16-opaque-orientation-8": "32e54b52da91b38cc90f8eeae2b411e69b42af43bd10371451eaf95955d1f123",
+    "png-hlg-p3-16-alpha-orientation-8": "e889b8f9fd8d4d460987e706b5f9bfa92360b4e7e82a885647c1535b5c02ca72",
+    "png-hlg-rec2020-16-opaque-orientation-8": "9f4d1d5d66ade09a2762e328bec4a07d21d008c64140e5c78b0d3a555b1f9419",
+    "png-hlg-rec2020-16-alpha-orientation-8": "5fb994f254241961e709fc3a2209b90dbfbe040a832ac8133d345707aa58b42b"
   }
 }

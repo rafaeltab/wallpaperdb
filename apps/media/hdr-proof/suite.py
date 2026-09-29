@@ -485,6 +485,28 @@ def iso_continuous_base_report(diagnostic):
         'The search retains unresolved boxes at its budget or gap limit; the result is an outer bound, not an exact optimum. Disjoint D bounds exclude a shared pair of nonnegative offsets at the current positive ordered weights, even with arbitrary per-pixel gains and map precision. Other colorants, HDR color interpretation, source references, geometry, capacities and gain equations remain outside this result. Guarded float64 arithmetic is not a formal directed-rounding or native LCMS certificate. This diagnostic cannot qualify a conversion or physical consumer.', '']
 
 
+def iso_capacity_report(diagnostic):
+    bound = diagnostic['constraints']
+    lines = ['## Forward capacity-family diagnostic', '',
+        'The [capacity diagnostic](iso-capacity-bound.json) extends the same ISO-upscale continuous P3 color/base model to finite forward log2 endpoints `0 <= a < b`, with clamped weights at absolute display boosts 2, 16 and 64. It retains the source, geometry and appearance gates. The finite-grid checks are not the real-domain proof; the separate case argument covers zero weights, an equal-weight plateau and ordered positive weights.', '',
+        '| Zero-weight model | Capacity-family exclusion |', '| --- | --- |']
+    for name, key in (('authored-base bypass', 'authored_base_bypass_model_excluded'),
+                      ('offsets applied at zero', 'offset_at_zero_model_excluded')):
+        lines.append(f'| {name} | {"excluded" if bound[key] else "not established"} |')
+    lines += ['',
+        f'The authored-base zero branch has a {bound["zero_weight_bypass_separation_nits"]:.6f}-nit separation from the required black enclosure. Other branches use strict gain directions and the {bound["shared_offset_separation_nits"]:.6f}-nit shared-offset contradiction. The argument allows arbitrary nonnegative continuous base values, nonnegative shared offsets and per-pixel gain within this exact model.', '',
+        'Actual unequal-offset white controls distinguish the pinned decoders. Imported AVIF metadata fractions and native base/map samples are checked, and a positive-weight rendering verifies gain application. These scalar controls do not establish general ICC support.', '',
+        '| Base log2 headroom | Display boost | libavif minimum, nits | UltraHDR minimum, nits | ICC-aware native minimum, nits |',
+        '| ---: | ---: | ---: | ---: | --- |']
+    for row in diagnostic['native_controls']['records']:
+        for rendering in row['renderings']:
+            icc = rendering.get('icc_native_and_independent', {}).get('native_minimum_nits')
+            icc_text = f'{icc:.6f}' if icc is not None else 'rejected' if rendering.get('icc_native_rejection') else 'missing'
+            lines.append(f'| {row["base_headroom_log2"]} | {rendering["display_boost"]} | {rendering["libavif"]["minimum_nits"]:.6f} | {rendering["ultrahdr_precise"]["minimum_nits"]:.6f} | {icc_text} |')
+    return lines + ['',
+        'The ICC-aware converter still rejects positive base headroom; this diagnostic does not widen native admission. Other color models, negative offsets, reverse HDR bases and different gain equations remain outside the argument. Guarded float64 appearance bounds are not a formal native-rounding certificate. This diagnostic cannot qualify a conversion or physical consumer.', '']
+
+
 def apple_documented_report(evidence):
     from apple_source_model import REFERENCE_REVISION
     cases = [case for case in evidence if case.get('fixture_id') == 'gainmap-apple-old'
@@ -513,7 +535,7 @@ def apple_documented_report(evidence):
         'Each row measures the full effect only; a passing row does not qualify intermediate Apple adaptation. JPEG retains its declared ICC-aware reader scope and separate stock-reader diagnostics. Single-layer AVIF/PNG has no embedded authored SDR base or adaptive gain map. The inspected manual entries preserve each output, authored SDR comparison, source hash and rendering scope. Browser, native viewer and OS wallpaper results remain pending manual review.', '']
 
 
-def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound, global_bound, base_bound, continuous_bound):
+def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound, global_bound, base_bound, continuous_bound, capacity_bound):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
@@ -530,6 +552,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              *iso_global_offset_report(global_bound),
              *iso_base_code_report(base_bound),
              *iso_continuous_base_report(continuous_bound),
+             *iso_capacity_report(capacity_bound),
              *apple_documented_report(evidence),
              '## Environment and reproducibility','',
              'The image uses the same Node 22 Alpine/musl deployment shape as Media. This is a proposed native proof pipeline, not the existing Sharp 0.33 production worker. No service dependency was upgraded. HDR geometry uses native FFmpeg/zimg float processing and luminance-coupled HLG transforms. The calibrated SDR candidate uses the native CPU Mobius filter. CPU lavapipe runs the retained libplacebo comparison trials without a host GPU. Network access is disabled during tests.','',
@@ -852,6 +875,9 @@ def main():
     from iso_continuous_base_bound import run as run_iso_continuous_base_bound
     iso_continuous_bound = run_iso_continuous_base_bound(WORK/'iso-continuous-base-bound', map_code_report=iso_map_bound)
     write_json(RESULTS/'iso-continuous-base-bound.json', iso_continuous_bound)
+    from iso_capacity_bound import run as run_iso_capacity_bound
+    iso_capacity_bound = run_iso_capacity_bound(WORK/'iso-capacity-bound', map_code_report=iso_map_bound)
+    write_json(RESULTS/'iso-capacity-bound.json', iso_capacity_bound)
     from iso_geometry_headroom import run as run_iso_geometry_headroom
     iso_geometry_headroom = run_iso_geometry_headroom(WORK/'iso-geometry-headroom')
     write_json(RESULTS/'iso-geometry-headroom.json', iso_geometry_headroom)
@@ -933,7 +959,7 @@ def main():
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,generated_fixtures)
-    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas,mozjpeg_diagnosis,iso_map_bound,iso_global_bound,iso_base_bound,iso_continuous_bound))
+    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas,mozjpeg_diagnosis,iso_map_bound,iso_global_bound,iso_base_bound,iso_continuous_bound,iso_capacity_bound))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))
     return 1 if errors else 2

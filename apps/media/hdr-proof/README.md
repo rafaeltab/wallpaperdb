@@ -339,6 +339,22 @@ formal directed-rounding or native LittleCMS certificate. Other colorants,
 HDR color interpretation, references, geometry, capacities and gain equations
 remain outside this result. The default replay records the diagnostic without
 adding or qualifying any conversion case.
+The [forward-capacity diagnostic](iso_capacity_bound.py) separately extends
+that ISO-upscale model to finite log2 capacity endpoints `0 <= a < b`. The
+unchanged boost-2 black requirement conflicts with an authored-base bypass
+by 2.467253 nits. Equal boost-16/64 weights violate a strict direction; other
+positive weights retain the shared-offset contradiction. Applying offsets
+at zero weight has its own complete case argument and the same contradiction.
+Actual unequal-offset white files distinguish pinned libavif's bypass from
+UltraHDR's offset application. Every imported metadata fraction and base/map
+sample is checked, and a positive-weight control verifies that gain metadata
+is active. These scalar controls do not establish general ICC support.
+The ICC-aware readers still reject positive base headroom. Finite-grid checks
+illustrate the real-domain argument; they do not establish its completeness.
+The diagnostic retains the continuous bound's guarded-float limitations and
+does not qualify a conversion or widen native admission. Other color models,
+negative offsets, reverse HDR bases and different gain equations remain
+outside this result.
 The [four other ISO geometries](iso_geometry_headroom.py) rerun their exact
 qualified recipes and preserve every original endpoint measurement. Each
 containment, crop, stretch and EXIF6 orientation file passes at boost 16 and

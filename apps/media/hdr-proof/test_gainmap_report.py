@@ -57,6 +57,34 @@ def native_case(candidate, geometry, qualified):
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_capacity_report_keeps_zero_weight_models_and_native_admission_separate(self):
+        from suite import iso_capacity_report
+        diagnostic = {'constraints': {'authored_base_bypass_model_excluded': True,
+            'offset_at_zero_model_excluded': True, 'zero_weight_bypass_separation_nits': 2.4672534196,
+            'shared_offset_separation_nits': 1.1922884980}, 'native_controls': {'records': [
+                {'base_headroom_log2': 0, 'renderings': [{'display_boost': 1,
+                    'libavif': {'minimum_nits': 203.046064},
+                    'ultrahdr_precise': {'minimum_nits': 228.375},
+                    'icc_native_and_independent': {'native_minimum_nits': 203}}]},
+                {'base_headroom_log2': 1, 'renderings': [{'display_boost': 2,
+                    'libavif': {'minimum_nits': 203.046064},
+                    'ultrahdr_precise': {'minimum_nits': 228.375},
+                    'icc_native_rejection': 'Only SDR base gain application'}]}]}}
+        rendered = '\n'.join(iso_capacity_report(diagnostic))
+        self.assertIn('| authored-base bypass | excluded |', rendered)
+        self.assertIn('| offsets applied at zero | excluded |', rendered)
+        self.assertIn('2.467253', rendered)
+        self.assertIn('1.192288', rendered)
+        self.assertIn('| 0 | 1 | 203.046064 | 228.375000 | 203.000000 |', rendered)
+        self.assertIn('| 1 | 2 | 203.046064 | 228.375000 | rejected |', rendered)
+        self.assertIn('0 <= a < b', rendered)
+        self.assertIn('finite-grid checks are not the real-domain proof', rendered)
+        self.assertIn('does not widen native admission', rendered)
+        self.assertIn('cannot qualify a conversion', rendered)
+        self.assertIn('(iso-capacity-bound.json)', rendered)
+        diagnostic['constraints']['offset_at_zero_model_excluded'] = False
+        self.assertIn('| offsets applied at zero | not established |', '\n'.join(iso_capacity_report(diagnostic)))
+
     def test_continuous_base_bound_keeps_its_color_models_and_unresolved_search_visible(self):
         from suite import iso_continuous_base_report
         diagnostic = {'sdr_maximum_gate': 8, 'hdr_maximum_gate': 8,

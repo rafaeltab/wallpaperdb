@@ -89,6 +89,33 @@ def geometry_reference(rgba, mode):
     return resized
 
 
+def sequence_white_control(frames, references, geometry):
+    """Check the fixture's unchanged white neighborhood after matched geometry.
+
+    Every selected filter tap must come from the unchanged source neighborhood.
+    The decoded references must independently agree there before equal encoded
+    samples can establish stability. Full-frame appearance checks still apply.
+    """
+    if len(frames) != 2 or len(references) != 2:
+        raise ValueError('White-stability control requires two decoded frames and references')
+    coverage = np.zeros((64, 96, 4))
+    coverage[..., 3] = 1
+    coverage[2:28, 44:51, :3] = 1
+    mask = geometry_reference(coverage, geometry)[..., 0] == 1
+    if geometry == 'contain':
+        # Keep the original APNG control's exact 48-pixel region unchanged.
+        mask[:] = False
+        mask[:16, 27:30] = True
+    identical = np.array_equal(references[0][..., :3][mask], references[1][..., :3][mask])
+    difference = float(np.max(np.abs(frames[0][..., :3][mask] - frames[1][..., :3][mask]))) if np.any(mask) else None
+    return {'source_region_xywh': [44, 0, 8, 28] if geometry == 'contain' else [44, 2, 7, 26],
+            'region_xywh': [27, 0, 3, 16] if geometry == 'contain' else None, 'geometry': geometry,
+            'samples': int(np.count_nonzero(mask)), 'reference_samples_identical': bool(identical),
+            'maximum_signal_difference': difference,
+            'passed': bool(np.any(mask) and identical and difference == 0),
+            'scope': 'Exact unchanged ordinary-white filter neighborhood; no frame-adaptive grade'}
+
+
 def write_png(path, signal):
     h, w = signal.shape[:2]
     raw = np.rint(np.clip(signal, 0, 1)*65535).astype('<u2').tobytes()
@@ -502,7 +529,10 @@ def run(output_dir, *, specs=None):
                         measured = compare_appearance(ref[..., :3], decode_transfer(decoded[..., :3], target_transfer, target_gamut), reference_gamut=spec['gamut'], actual_gamut=target_gamut, fixture_class=f'avif-{spec["depth"]}', alpha=None if ext=='jpg' else ref[..., 3])
                     measurements.append(measured)
                 item['measurements']['frames'] = measurements
-                item['checks']['appearance'] = all(m['passed'] for m in measurements)
+                white_control = sequence_white_control(actual, refs, geometry) if count == 2 else None
+                item['measurements']['sequence_white_control'] = white_control
+                item['checks']['appearance'] = (all(m['passed'] for m in measurements)
+                    and (white_control is None or white_control['passed']))
                 if sdr:
                     from sdr_candidate import recipe
                     parameters = recipe(peak_nits)

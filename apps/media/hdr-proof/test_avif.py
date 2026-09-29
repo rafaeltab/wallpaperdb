@@ -9,6 +9,26 @@ from sdr_reference import reference_srgb
 
 
 class FixtureTests(unittest.TestCase):
+    def test_white_stability_requires_unchanged_reference_samples_and_encoded_signal(self):
+        from avif import sequence_white_control
+        reference = geometry_reference(make_scene(True), 'contain')
+        frame = np.full_like(reference, .5)
+        unchanged = sequence_white_control([frame, frame], [reference, reference], 'contain')
+        self.assertTrue(unchanged['passed'])
+        self.assertEqual(unchanged['samples'], 48)
+        changed_signal = frame.copy()
+        changed_signal[0, 28, 0] += 1 / 255
+        changed = sequence_white_control([frame, changed_signal], [reference, reference], 'contain')
+        self.assertFalse(changed['passed'])
+        self.assertTrue(changed['reference_samples_identical'])
+        self.assertGreater(changed['maximum_signal_difference'], 0)
+        changed_reference = reference.copy()
+        changed_reference[0, 28, 0] += 1
+        invalid = sequence_white_control([frame, frame], [reference, changed_reference], 'contain')
+        self.assertFalse(invalid['passed'])
+        self.assertFalse(invalid['reference_samples_identical'])
+        self.assertEqual(invalid['maximum_signal_difference'], 0)
+
     def test_sdr_without_geometry_retains_hidden_rgb_for_explicit_alpha_removal(self):
         for transfer in ('pq', 'hlg'):
             for gamut in ('p3', 'rec2020'):
@@ -247,6 +267,14 @@ class FixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             result = run(temporary, specs=[spec])
             cases = {case['case_id']: case for case in result['evidence']}
+            preserved = [case for case in cases.values() if case['selectors']['motion'] == 'preserve']
+            self.assertEqual(len(preserved), 40)
+            for case in preserved:
+                control = case['measurements']['sequence_white_control']
+                self.assertTrue(control['passed'], (case['case_id'], control))
+                self.assertTrue(control['reference_samples_identical'])
+                self.assertGreater(control['samples'], 0)
+                self.assertEqual(control['maximum_signal_difference'], 0)
             for geometry in ('contain', 'cover', 'fill', 'upscale', 'orientation'):
                 case_id = f'{spec["id"]}:sdr:webp:srgb:preserve:{geometry}:transfer-gamma22'
                 self.assertTrue(case_id in cases, case_id)

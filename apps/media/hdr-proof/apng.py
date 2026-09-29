@@ -179,28 +179,6 @@ def generate_orientation_fixture(source, directory):
     return output, facts, frames
 
 
-def _sequence_white_control(frames, references, geometry):
-    # Every tap must come from the unchanged neutral neighborhood in source
-    # coordinates. The independent geometry oracle maps its coverage. This
-    # region check supplements, and never masks, full-frame appearance tests.
-    coverage = np.zeros((64, 96, 4))
-    coverage[..., 3] = 1
-    coverage[2:28, 44:51, :3] = 1
-    mask = avif.geometry_reference(coverage, geometry)[..., 0] == 1
-    if geometry == 'contain':
-        # Keep the original contain control's exact 48-pixel region unchanged.
-        mask[:] = False
-        mask[:16, 27:30] = True
-    identical = np.array_equal(references[0][..., :3][mask], references[1][..., :3][mask])
-    difference = float(np.max(np.abs(frames[0][..., :3][mask] - frames[1][..., :3][mask]))) if np.any(mask) else None
-    return {'source_region_xywh': [44, 0, 8, 28] if geometry == 'contain' else [44, 2, 7, 26],
-            'region_xywh': [27, 0, 3, 16] if geometry == 'contain' else None, 'geometry': geometry,
-            'samples': int(np.count_nonzero(mask)), 'reference_samples_identical': bool(identical),
-            'maximum_signal_difference': difference,
-            'passed': bool(np.any(mask) and identical and difference == 0),
-            'scope': 'Exact unchanged ordinary-white filter neighborhood; no frame-adaptive grade'}
-
-
 def generate_fixture(spec, directory):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -475,7 +453,7 @@ def run(output_directory, *, specs=None,
                     privacy = inspect_privacy(target, facts, extension)
                     if alpha_geometry:
                         detail['alpha_geometry'] = all(check['passed'] for check in alpha_geometry)
-                    white_control = _sequence_white_control(frames, resized_references, geometry) if count == 2 else None
+                    white_control = avif.sequence_white_control(frames, resized_references, geometry) if count == 2 else None
                     measurements = []
                     for reference, actual in zip(selected_references, linear):
                         expected = (sdr_signal_to_nits(reference_srgb(reference[..., :3], spec['gamut'], peak_nits=spec['peak_nits']))

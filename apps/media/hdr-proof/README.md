@@ -75,6 +75,11 @@ error diagnostics before any such raster can qualify.
 The `mozjpeg-base-dct-float-map` ISO crop candidate independently checks a complete
 HDR JPEG using the compressed native base, a regenerated floating-DCT gain map
 and the unchanged SDR/HDR gates. Native file success leaves consumer review pending.
+The complete replay also retains a bounded native trellis-precision experiment
+on the six remaining source/geometry cases. It raises the coefficient-distortion
+penalty under fixed quality-100 quantizers and unchanged source samples. Its
+default controls must reproduce their earlier JPEG bytes exactly; all failures
+remain in [their own measurements](results/mozjpeg-lambda-experiment.json).
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

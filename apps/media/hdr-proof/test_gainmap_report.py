@@ -24,9 +24,11 @@ class MozjpegReportTests(unittest.TestCase):
         concealed = {'status': 'tested and failed', 'facts': {'decoder_diagnostics': [
             {'exit_code': 0, 'stderr': 'overread'}]}}
         rendered = '\n'.join(mozjpeg_experiment_report({'cases': [valid, measured]},
-                                                       {'cases': [concealed, measured]}))
+                                                       {'cases': [concealed, measured]},
+                                                       {'cases': [measured]}))
         self.assertIn('| Optimized Huffman | 2 | 1 | 1 | 0 |', rendered)
         self.assertIn('| Retained standard Huffman | 2 | 0 | 1 | 1 |', rendered)
+        self.assertIn('| Bounded trellis precision | 1 | 0 | 1 | 0 |', rendered)
         self.assertIn('excluded from the conversion-attempt counts', rendered)
         self.assertIn('pending manual review', rendered)
 

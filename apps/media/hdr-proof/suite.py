@@ -327,12 +327,13 @@ def jpegli_experiment_report(base, quality):
     ]
 
 
-def mozjpeg_experiment_report(base, historical):
+def mozjpeg_experiment_report(base, historical, lambdas):
     lines = ['## Native MozJPEG base experiments', '',
         'These separate authored-SDR base experiments are excluded from the conversion-attempt counts. A passing base still needs a regenerated gain map and complete independent HDR qualification. Every physical consumer remains pending manual review.', '',
         '| Native setup | Trials | Qualified SDR bases | Measured appearance failures | Decoder errors |',
         '| --- | ---: | ---: | ---: | ---: |']
-    for name, result in (('Optimized Huffman', base), ('Retained standard Huffman', historical)):
+    for name, result in (('Optimized Huffman', base), ('Retained standard Huffman', historical),
+                         ('Bounded trellis precision', lambdas)):
         cases = result['cases']
         passed = sum(case['status'] == 'qualified' for case in cases)
         appearance_failed = sum(case.get('measurement', {}).get('passed') is False for case in cases)
@@ -340,10 +341,11 @@ def mozjpeg_experiment_report(base, historical):
             for command in case.get('facts', {}).get('decoder_diagnostics', [])) for case in cases)
         lines.append(f'| {name} | {len(cases)} | {passed} | {appearance_failed} | {decoder_failed} |')
     return lines + ['',
-        'The [optimized-Huffman trials](mozjpeg-base-experiment.json) retain every declared DCT/trellis/deringing option. The [initial standard-Huffman setup](mozjpeg-standard-huffman-experiment.json) remains reproducible, including malformed streams that FFmpeg conceals despite exiting zero. Both native command runners now reject error-level decoder diagnostics; concealed rasters cannot supply appearance evidence.', '']
+        'The [optimized-Huffman trials](mozjpeg-base-experiment.json) retain every declared DCT/trellis/deringing option. The [initial standard-Huffman setup](mozjpeg-standard-huffman-experiment.json) remains reproducible, including malformed streams that FFmpeg conceals despite exiting zero. Both native command runners now reject error-level decoder diagnostics; concealed rasters cannot supply appearance evidence.', '',
+        'The [bounded trellis-precision follow-up](mozjpeg-lambda-experiment.json) increases the native coefficient-distortion penalty for the remaining six source/geometry cases. It retains default controls, unchanged quality-100 quantizers, authored samples and appearance gates. Failure of these declared options does not prove every baseline JPEG encoder impossible.', '']
 
 
-def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical):
+def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
@@ -404,7 +406,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
     lines += ['', 'The tunable Mobius and Reinhard trials use maintained native functions with fixed parameters. Their failures do not change the white target. Adaptive peak detection is disabled in the candidate conversion path; separate controls record frame-to-frame white shifts and repeat hashes with it enabled and disabled. Persistent temporal-filter history is not qualified by these per-frame trials.', '',
               *gainmap_candidate_report(evidence),
               *jpegli_experiment_report(jpegli, jpegli_quality),
-              *mozjpeg_experiment_report(mozjpeg, mozjpeg_historical),
+              *mozjpeg_experiment_report(mozjpeg, mozjpeg_historical, mozjpeg_lambdas),
               '## Blockers and scope limits','',
               '- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.',
               '- The separately versioned gainmap-hdr-target-gamut-v1 reference filters and clips negative Lanczos excursions in the requested output primaries. Clipping in the earlier Rec.2020 decoder coordinates could create negative components in the requested P3 or sRGB gamut. Analytic commutation, out-of-gamut and identity controls verify this correction. Old references and failed case IDs remain visible; new cases record the reference revision and diagnostic differences. Appearance thresholds are unchanged.',
@@ -482,11 +484,14 @@ def main():
     jpegli_quality_result = run_jpegli(WORK/'jpegli-quality-experiment',
                                      corpus=QUALITY_CORPUS, options=QUALITY_OPTIONS)
     write_json(RESULTS/'jpegli-quality-experiment.json', jpegli_quality_result)
-    from mozjpeg_proof import run as run_mozjpeg
+    from mozjpeg_proof import LAMBDA_CORPUS, LAMBDA_OPTIONS, LAMBDAS, run as run_mozjpeg
     mozjpeg_result = run_mozjpeg(WORK/'mozjpeg-base-experiment')
     write_json(RESULTS/'mozjpeg-base-experiment.json', mozjpeg_result)
     mozjpeg_historical = run_mozjpeg(WORK/'mozjpeg-standard-huffman-experiment', optimized_huffman=False)
     write_json(RESULTS/'mozjpeg-standard-huffman-experiment.json', mozjpeg_historical)
+    mozjpeg_lambdas = run_mozjpeg(WORK/'mozjpeg-lambda-experiment',
+        corpus=LAMBDA_CORPUS, options=LAMBDA_OPTIONS, lambdas=LAMBDAS)
+    write_json(RESULTS/'mozjpeg-lambda-experiment.json', mozjpeg_lambdas)
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))
@@ -537,7 +542,7 @@ def main():
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,generated_fixtures)
-    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical))
+    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))
     return 1 if errors else 2

@@ -124,6 +124,25 @@ class EvidenceFileTests(unittest.TestCase):
             self.assertEqual(files[0]['case_id'], case['case_id'])
             self.assertEqual(files[0]['consumer_status'], 'pending manual review')
 
+    def test_manual_bundle_labels_icc_hdr_failures_as_diagnostic(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            source = root/'failed.jpg'
+            source.write_bytes(b'file-copy-test-only')
+            cases = [{'case_id': 'iso-upscale-icc-'+policy,
+                'fixture_id': 'gainmap-android-iso', 'geometry': 'upscale', 'status': 'tested and failed',
+                'candidate': 'native-combine-icc-gamma32-'+policy,
+                'artifacts': {'output': str(source), 'sha256': suite.avif.digest(source)}}
+                for policy in ('moderateoffset', 'smalloffset')]
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files(cases, [])
+            self.assertEqual(len(files), 2)
+            for entry in files:
+                self.assertEqual(entry['codec_status'], 'tested and failed')
+                self.assertIn('not an approved download', entry['warning'])
+                self.assertEqual(entry['consumer_status'], 'pending manual review')
+
     def test_manual_bundle_rejects_missing_inspected_output(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

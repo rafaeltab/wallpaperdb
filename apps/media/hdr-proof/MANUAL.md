@@ -53,6 +53,10 @@ Separate SOF0 DCT JPEG candidates have their own manifest entries. Some retain
 measured shadow failures and are only diagnostic files. Test a qualified SOF0
 file separately from the SOF3 file; neither result establishes the other's
 decoder, gain-map interpretation or HDR presentation behavior.
+The two gamma-3.2 ICC-aware HDR JPEG experiments remain failed diagnostic
+files. Their SDR base and reconstructed HDR have separate measurements.
+Stock native readers assume sRGB transfer or reject ICC in this path; record
+that interpretation separately from a consumer's ability to open the JPEG.
 
 The optional gain-map AVIF source has separately inspected authored-SDR AVIF
 derivatives for containment, crop, stretch and upscale. Compare them with the
@@ -70,6 +74,10 @@ convention. Compare the exact files independently on each device. A browser may
 sample the source gain map differently, so record the source rendering as well
 as the derivative. No gain-map-preserving AVIF output or physical HDR presentation
 has been qualified by these automated results.
+Single-layer HDR PNG16 candidates use the same declared renderer convention.
+Keep the original ambiguous-aspect diagnostic separate from the square-pixel
+candidate, and compare each qualified PNG with the corresponding PQ AVIF12 and
+authored SDR pair. Opening a 16-bit PNG does not establish visible HDR output.
 
 The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
 two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit

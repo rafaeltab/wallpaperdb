@@ -94,6 +94,8 @@ policies retain distinct failures: 1/4096 amplifies small JPEG decoder differenc
 in shadows, while 1/65536 exceeds the fixed midtone and highlight limits. Both
 remain unqualified. Stock readers that assume sRGB transfer or reject ICC also
 remain separate limitations; this experiment does not establish interoperability.
+The complete command reproduces both experiments and includes their failed
+cases in the matrix, with separate measurements and inspected diagnostic files.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
@@ -284,6 +286,13 @@ Containment, crop, stretch and upscale keep separate candidate results; the
 original source-sampling failures remain visible at every geometry.
 Named reconstruction profiles remain bound to the source hash. Gain-map-preserving
 output and physical consumer interoperability remain unqualified.
+The separate [HDR PNG16 proof](gainmap_avif_hdr_png.py) checks the same native
+source reconstruction and unchanged HDR reference. Its original PNG does not
+establish requested square pixels: pHYs reports 0:1. A native rewrite declares
+1:1 while preserving every decoded RGB16 and alpha sample. Independent libpng,
+FFmpeg and ExifTool verify storage, PQ signaling, dimensions and privacy;
+source, geometry and final appearance must still pass. The original aspect
+failure stays visible beside the corrected candidate.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

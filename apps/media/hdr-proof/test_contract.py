@@ -198,6 +198,19 @@ class ProductCoverageTests(unittest.TestCase):
             report = build_matrix([evidence])
             self.assertEqual(report['product_coverage']['qualified_count'], 0)
 
+    def test_same_dimensions_do_not_substitute_contain_for_source_orientation(self):
+        planned = next(case for case in required_cases()
+                       if case['cell_id'] == 'gainmap-jpeg:sdr:jpg' and case['geometry'] == 'contain')
+        evidence = {**planned, 'case_id': planned['case_id'] + ':alternative', 'status': 'qualified',
+                    'checks': {key: True for key in ('native_encoder', 'independent_decoder',
+                               'structure', 'appearance', 'privacy')}}
+        report = build_matrix([evidence])
+        self.assertEqual(report['product_coverage']['qualified_count'], 1)
+        orientation = next(item for item in report['product_coverage']['requirements']
+                           if item['fixture_id'] == planned['fixture_id']
+                           and item['cell_id'] == planned['cell_id'] and item['geometry'] == 'orientation')
+        self.assertEqual(orientation['qualified_evidence'], [])
+
     def test_webp_requirement_retains_eight_bit_depth_and_full_alpha(self):
         report = build_matrix([])
         webp = [item for item in report['product_coverage']['requirements'] if item['cell_id'] == 'animated-pq:sdr:webp']

@@ -229,7 +229,8 @@ def _product_coverage(cells, plan):
         expected = validate_selectors(selectors)
         matching = []
         for evidence in by_cell[planned['cell_id']]['evidence']:
-            if evidence.get('fixture_id') != planned['fixture_id']:
+            if (evidence.get('fixture_id') != planned['fixture_id']
+                    or evidence.get('geometry') != planned['geometry']):
                 continue
             try:
                 actual = validate_selectors(evidence.get('selectors', {}))
@@ -293,7 +294,9 @@ def build_matrix(evidence):
         expected = planned.get(item.get("case_id"))
         if expected:
             try:
-                matches_plan = item.get("fixture_id") == expected["fixture_id"] and validate_selectors(item.get("selectors", {})) == validate_selectors(expected["selectors"])
+                matches_plan = (item.get("fixture_id") == expected["fixture_id"]
+                                and item.get("geometry") == expected["geometry"]
+                                and validate_selectors(item.get("selectors", {})) == validate_selectors(expected["selectors"]))
             except ProofRequestError:
                 matches_plan = False
             item["matches_coverage_plan"] = matches_plan

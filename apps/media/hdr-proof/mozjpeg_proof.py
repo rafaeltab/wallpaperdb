@@ -24,12 +24,25 @@ CORPUS = (
     ('gainmap-apple-new', 'upscale'),
 )
 OPTIONS = tuple(itertools.product(('islow', 'float'), (False, True), (False, True)))
+# Bounded follow-up declared before measuring: unchanged q100 and samples;
+# increase the native cost of coefficient distortion for the remaining six.
+LAMBDA_CORPUS = CORPUS[1:]
+LAMBDA_OPTIONS = (('islow', True, False), ('float', True, False))
+LAMBDAS = ((14.75, 16.5), (18.75, 16.5), (22.75, 16.5))
+LAMBDA_RATIONALE = {
+    'source': 'https://github.com/mozilla/mozjpeg/blob/v4.1.5/README-mozilla.txt',
+    'implementation': 'https://github.com/mozilla/mozjpeg/blob/v4.1.5/jcdctmgr.c',
+    'native_objective': 'R + lambda * D; scale1 raises the native coefficient-distortion penalty',
+    'hypothesis': 'More coefficient precision may avoid measured one-code near-black errors; '
+        'it does not change authored samples, reference grade, transfer, depth or acceptance gates',
+    'scope': 'Three predeclared lambda settings; every result is retained, including default controls',
+}
 UPSTREAM = {'version': '4.1.5',
     'url': 'https://codeload.github.com/mozilla/mozjpeg/tar.gz/refs/tags/v4.1.5',
     'sha256': '9fcbb7171f6ac383f5b391175d6fb3acde5e64c4c4727274eade84ed0998fcc1'}
 
 
-def run(directory, *, corpus=CORPUS, options=OPTIONS, optimized_huffman=True):
+def run(directory, *, corpus=CORPUS, options=OPTIONS, optimized_huffman=True, lambdas=((14.75, 16.5),)):
     command_start = len(avif.COMMANDS)
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -56,14 +69,17 @@ def run(directory, *, corpus=CORPUS, options=OPTIONS, optimized_huffman=True):
             profile = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
         profile[24:36] = struct.pack('>6H', 2020, 1, 1, 0, 0, 0)
         profile[84:100] = bytes(16)
-        for method, trellis, deringing in options:
+        for (method, trellis, deringing), (lambda_scale1, lambda_scale2) in itertools.product(options, lambdas):
             trial = f'mozjpeg-q100-{method}-trellis{int(trellis)}-deringing{int(deringing)}'
             trial += '-huffman-' + ('optimized' if optimized_huffman else 'standard')
+            if (lambda_scale1, lambda_scale2) != (14.75, 16.5):
+                trial += f'-lambda-{lambda_scale1}-{lambda_scale2}'
             output = folder/f'{trial}.jpg'
             case = {'case_id': f'{name}:{geometry}:{trial}', 'fixture_id': name, 'geometry': geometry,
                 'source_sha256': gainmap.digest(source), 'gamut': gamut,
                 'options': {'method': method, 'trellis': trellis, 'deringing': deringing, 'quality': 100,
-                            'optimized_huffman': optimized_huffman},
+                            'optimized_huffman': optimized_huffman,
+                            'lambda_scale1': lambda_scale1, 'lambda_scale2': lambda_scale2},
                 'status': 'tested and failed', 'consumer_status': 'pending manual review',
                 'qualification_scope': 'Authored SDR base codec experiment only; no gain-map or HDR derivative qualification',
                 'reference_sdr': {'path': str(reference_path), 'sha256': gainmap.digest(reference_path),
@@ -74,7 +90,8 @@ def run(directory, *, corpus=CORPUS, options=OPTIONS, optimized_huffman=True):
             decoder_start = None
             try:
                 encoded = mozjpeg.encode(authored, output, icc_profile=bytes(profile), method=method,
-                                         trellis=trellis, deringing=deringing, optimized_huffman=optimized_huffman)
+                                         trellis=trellis, deringing=deringing, optimized_huffman=optimized_huffman,
+                                         lambda_scale1=lambda_scale1, lambda_scale2=lambda_scale2)
                 case.update({'native_candidate': encoded,
                     'artifacts': {'output': str(output), 'sha256': gainmap.digest(output)}})
                 case['checks']['native_encoder'] = True
@@ -114,9 +131,10 @@ def run(directory, *, corpus=CORPUS, options=OPTIONS, optimized_huffman=True):
         'declared_trial_plan': {'corpus': corpus, 'native_options': options,
             'option_fields': ['method', 'trellis', 'deringing'], 'quality': 100,
             'optimized_huffman': optimized_huffman,
+            'lambdas': lambdas, 'lambda_fields': ['lambda_scale1', 'lambda_scale2'],
             'reference': 'Unchanged independently decoded authored SDR with matched geometry',
             'selection': 'Every declared option is recorded, including failures'},
-        'upstream_source': UPSTREAM,
+        'upstream_source': UPSTREAM, 'lambda_rationale': LAMBDA_RATIONALE,
         'native_versions': {'mozjpeg': '4.1.5; static, SIMD disabled',
                             'ffmpeg': avif.native(['ffmpeg', '-version']).decode().splitlines()[0]},
         'source_hashes': {name: gainmap.digest(root/name) for name in (
@@ -135,8 +153,13 @@ if __name__ == '__main__':
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--standard-huffman', action='store_true',
                         help='Replay the retained failed initial Huffman-table setup')
+    parser.add_argument('--lambda-sweep', action='store_true',
+                        help='Run the predeclared 36 native trellis lambda trials on six remaining failures')
     args = parser.parse_args()
-    result = run(args.output, optimized_huffman=not args.standard_huffman)
+    if args.lambda_sweep and args.standard_huffman:
+        parser.error('The declared lambda experiment requires optimized Huffman tables')
+    result = (run(args.output, corpus=LAMBDA_CORPUS, options=LAMBDA_OPTIONS, lambdas=LAMBDAS)
+              if args.lambda_sweep else run(args.output, optimized_huffman=not args.standard_huffman))
     (args.output/'results.json').write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
     print(json.dumps({'qualified_sdr_base_trials': sum(case['status'] == 'qualified' for case in result['cases']),
                       'total_trials': len(result['cases']), 'results': str(args.output/'results.json')}))

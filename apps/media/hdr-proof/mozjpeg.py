@@ -13,11 +13,14 @@ HELPER = Path('/opt/proof/mozjpeg/hdr-proof-mozjpeg')
 
 
 def encode(source, output, *, icc_profile=b'', method='islow', trellis=False, deringing=False,
-           optimized_huffman=True):
+           optimized_huffman=True, lambda_scale1=14.75, lambda_scale2=16.5):
     if method not in ('islow', 'float'):
         raise ValueError('Unknown native MozJPEG DCT method')
     if any(not isinstance(value, bool) for value in (trellis, deringing, optimized_huffman)):
         raise ValueError('Native MozJPEG controls must be boolean')
+    if (type(lambda_scale1) not in (int, float) or lambda_scale1 not in (14.75, 18.75, 22.75)
+            or type(lambda_scale2) not in (int, float) or lambda_scale2 != 16.5):
+        raise ValueError('Native lambda experiment requires scale1 in {14.75,18.75,22.75} and scale2=16.5')
     source, output = Path(source), Path(output)
     data = source.read_bytes()
     if len(data) < 29 or data[:8] != b'\x89PNG\r\n\x1a\n' or data[12:16] != b'IHDR':
@@ -37,7 +40,7 @@ def encode(source, output, *, icc_profile=b'', method='islow', trellis=False, de
         profile.write_bytes(icc_profile)
     evidence = json.loads(native([HELPER, raw, output, str(width), str(height), profile,
                                   method, '1' if trellis else '0', '1' if deringing else '0',
-                                  '1' if optimized_huffman else '0']))
+                                  '1' if optimized_huffman else '0', str(lambda_scale1), str(lambda_scale2)]))
     emitted = output.read_bytes()
     facts = jpeg_facts(emitted)
     sof = next(value for marker, value in segments(emitted) if marker == 0xC0)

@@ -20,16 +20,29 @@ static boolean flag(const char *text) {
   exit(2);
 }
 
+static float lambda_scale(const char *text, boolean first) {
+  char *end;
+  double value = strtod(text, &end);
+  if (!*text || *end || (first ? (value != 14.75 && value != 18.75 && value != 22.75)
+                              : value != 16.5)) {
+    fprintf(stderr, "Native lambda experiment requires scale1 in {14.75,18.75,22.75} and scale2=16.5\n");
+    exit(2);
+  }
+  return (float)value;
+}
+
 int main(int argc, char **argv) {
-  if (argc != 9 && argc != 10) {
-    fprintf(stderr, "input.raw output.jpg width height profile.icc-or-dash islow|float trellis0|1 deringing0|1 [optimized-huffman0|1]\n");
+  if (argc != 9 && argc != 10 && argc != 12) {
+    fprintf(stderr, "input.raw output.jpg width height profile.icc-or-dash islow|float trellis0|1 deringing0|1 [optimized-huffman0|1 [lambda-scale1 lambda-scale2]]\n");
     return 2;
   }
   unsigned width = dimension(argv[3]), height = dimension(argv[4]);
   boolean floating = strcmp(argv[6], "float") == 0;
   if (!floating && strcmp(argv[6], "islow")) return 2;
   boolean trellis = flag(argv[7]), deringing = flag(argv[8]);
-  boolean optimized_huffman = argc == 10 ? flag(argv[9]) : TRUE;
+  boolean optimized_huffman = argc >= 10 ? flag(argv[9]) : TRUE;
+  float lambda_scale1 = argc == 12 ? lambda_scale(argv[10], TRUE) : 14.75f;
+  float lambda_scale2 = argc == 12 ? lambda_scale(argv[11], FALSE) : 16.5f;
   size_t size = (size_t)width * height * 3;
   unsigned char *pixels = malloc(size), *profile = NULL;
   unsigned long profile_size = 0;
@@ -79,6 +92,8 @@ int main(int argc, char **argv) {
   jpeg_c_set_bool_param(&encoder, JBOOLEAN_OVERSHOOT_DERINGING, deringing);
   jpeg_c_set_bool_param(&encoder, JBOOLEAN_TRELLIS_Q_OPT, FALSE);
   jpeg_c_set_bool_param(&encoder, JBOOLEAN_USE_SCANS_IN_TRELLIS, FALSE);
+  jpeg_c_set_float_param(&encoder, JFLOAT_LAMBDA_LOG_SCALE1, lambda_scale1);
+  jpeg_c_set_float_param(&encoder, JFLOAT_LAMBDA_LOG_SCALE2, lambda_scale2);
   jpeg_start_compress(&encoder, TRUE);
   if (profile_size) jpeg_write_icc_profile(&encoder, profile, profile_size);
   while (encoder.next_scanline < height) {
@@ -92,8 +107,9 @@ int main(int argc, char **argv) {
   free(profile);
   printf("{\"native_encoder\":\"MozJPEG 4.1.5\",\"method\":\"%s\","
          "\"trellis\":%s,\"deringing\":%s,\"optimized_huffman\":%s,"
+         "\"lambda_scale1\":%.2f,\"lambda_scale2\":%.2f,"
          "\"quality\":100,\"coded_depth\":8,\"simd\":false}\n",
          argv[6], trellis ? "true" : "false", deringing ? "true" : "false",
-         optimized_huffman ? "true" : "false");
+         optimized_huffman ? "true" : "false", lambda_scale1, lambda_scale2);
   return 0;
 }

@@ -1,0 +1,11 @@
+--- a/src/gainmap.c
++++ b/src/gainmap.c
+@@ -13,7 +13,7 @@
+         gainMap->gainMapMax[i] = (avifSignedFraction) { 1, 1 };
+         gainMap->baseOffset[i] = (avifSignedFraction) { 1, 16384 };
+         gainMap->alternateOffset[i] = (avifSignedFraction) { 1, 16384 };
+-        gainMap->gainMapGamma[i] = (avifUnsignedFraction) { 2, 1 };
++        gainMap->gainMapGamma[i] = (avifUnsignedFraction) { 3, 2 };
+     }
+     gainMap->baseHdrHeadroom = (avifUnsignedFraction) { 0, 1 };
+     gainMap->alternateHdrHeadroom = (avifUnsignedFraction) { 1, 1 };

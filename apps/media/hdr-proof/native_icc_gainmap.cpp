@@ -299,20 +299,20 @@ static Linear decode(const Bytes& bytes, Raster& raster, float boost) {
   }
   return result;
 }
-static void pack_gamma2(const char* avif_path, const char* base_path, const char* map_path, const char* output,
-                        float expected_offset) {
+static void pack_fractional_gamma(const char* avif_path, const char* base_path, const char* map_path, const char* output,
+                                  float expected_gamma, float expected_offset) {
   using Image = std::unique_ptr<avifImage, decltype(&avifImageDestroy)>;
   using Decoder = std::unique_ptr<avifDecoder, decltype(&avifDecoderDestroy)>;
   Image intent(avifImageCreateEmpty(), avifImageDestroy);
   Decoder decoder(avifDecoderCreate(), avifDecoderDestroy);
-  if (!intent || !decoder) throw std::runtime_error("Cannot allocate native gamma2 decoder");
+  if (!intent || !decoder) throw std::runtime_error("Cannot allocate native gain-map decoder");
   decoder->imageContentToDecode = AVIF_IMAGE_CONTENT_ALL;
   check(avifDecoderReadFile(decoder.get(), intent.get(), avif_path), decoder->diag);
   const auto* map = intent->gainMap;
   if (!map || !map->image || intent->depth != 8 || map->image->depth != 8 || !map->useBaseColorSpace ||
       intent->yuvFormat != AVIF_PIXEL_FORMAT_YUV444 || map->image->yuvFormat != AVIF_PIXEL_FORMAT_YUV444 ||
       intent->alphaPlane || map->image->alphaPlane || intent->transformFlags || map->image->transformFlags)
-    throw std::runtime_error("Gamma2 packing requires opaque RGB8 base/map and identity orientation");
+    throw std::runtime_error("Native packing requires opaque RGB8 base/map and identity orientation");
   const auto fraction = [](auto value) {
     if (!value.d) throw std::runtime_error("Invalid gain-map fraction");
     return static_cast<float>(value.n)/value.d;
@@ -324,9 +324,9 @@ static void pack_gamma2(const char* avif_path, const char* base_path, const char
     metadata.gamma[channel] = fraction(map->gainMapGamma[channel]);
     metadata.offset_sdr[channel] = fraction(map->baseOffset[channel]);
     metadata.offset_hdr[channel] = fraction(map->alternateOffset[channel]);
-    if (metadata.gamma[channel] != 2 || metadata.offset_sdr[channel] != expected_offset ||
+    if (metadata.gamma[channel] != expected_gamma || metadata.offset_sdr[channel] != expected_offset ||
         metadata.offset_hdr[channel] != expected_offset)
-      throw std::runtime_error("Gamma2 packing requires the selected gamma2/offset metadata");
+      throw std::runtime_error("Native packing requires the selected gamma/offset metadata");
   }
   metadata.hdr_capacity_min = std::exp2(fraction(map->baseHdrHeadroom));
   metadata.hdr_capacity_max = std::exp2(fraction(map->alternateHdrHeadroom));
@@ -334,26 +334,26 @@ static void pack_gamma2(const char* avif_path, const char* base_path, const char
   ultrahdr::uhdr_gainmap_metadata_ext_t validated(metadata, ultrahdr::kJpegrVersion);
   check(ultrahdr::uhdr_validate_gainmap_metadata_descriptor(&validated));
   if (metadata.hdr_capacity_min != 1 || metadata.hdr_capacity_max <= 1)
-    throw std::runtime_error("Gamma2 packing requires forward SDR-base gain application");
+    throw std::runtime_error("Native packing requires forward SDR-base gain application");
   Bytes base_bytes = read(base_path), map_bytes = read(map_path);
   const Raster base = jpeg(base_bytes), gain = jpeg(map_bytes);
   const Linear color = linearize(base);
   if (base.width != intent->width || base.height != intent->height || gain.width != map->image->width ||
       gain.height != map->image->height || gain.width != base.width || gain.height != base.height || !gain.icc.empty() ||
       base.icc.size() != intent->icc.size || std::memcmp(base.icc.data(), intent->icc.data, base.icc.size()))
-    throw std::runtime_error("Compressed gamma2 base/map facts disagree with the native AVIF intent");
+    throw std::runtime_error("Compressed base/map facts disagree with the native AVIF intent");
   auto base_image = uhdr_compressed_image_t{base_bytes.data(), base_bytes.size(), base_bytes.size(),
       UHDR_CG_UNSPECIFIED, UHDR_CT_UNSPECIFIED, UHDR_CR_UNSPECIFIED};
   auto gain_image = uhdr_compressed_image_t{map_bytes.data(), map_bytes.size(), map_bytes.size(),
       UHDR_CG_UNSPECIFIED, UHDR_CT_UNSPECIFIED, UHDR_CR_UNSPECIFIED};
   using Encoder = std::unique_ptr<uhdr_codec_private_t, decltype(&uhdr_release_encoder)>;
   Encoder encoder(uhdr_create_encoder(), uhdr_release_encoder);
-  if (!encoder) throw std::runtime_error("Cannot allocate native gamma2 encoder");
+  if (!encoder) throw std::runtime_error("Cannot allocate native gain-map encoder");
   check(uhdr_enc_set_compressed_image(encoder.get(), &base_image, UHDR_BASE_IMG));
   check(uhdr_enc_set_gainmap_image(encoder.get(), &gain_image, &metadata));
   check(uhdr_encode(encoder.get()));
   const auto* stream = uhdr_get_encoded_stream(encoder.get());
-  if (!stream) throw std::runtime_error("Native gamma2 encoder produced no bytes");
+  if (!stream) throw std::runtime_error("Native gain-map encoder produced no bytes");
   write(output, stream->data, stream->data_sz);
   describe(base, color);
 }
@@ -361,10 +361,13 @@ int main(int argc, char** argv) {
   try {
     const std::string mode = argc > 1 ? argv[1] : "";
     if (mode == "pack-gamma2" && argc == 6) {
-      pack_gamma2(argv[2], argv[3], argv[4], argv[5], 1.f/65536); return 0;
+      pack_fractional_gamma(argv[2], argv[3], argv[4], argv[5], 2, 1.f/65536); return 0;
     }
     if (mode == "pack-gamma2-midpoint" && argc == 6) {
-      pack_gamma2(argv[2], argv[3], argv[4], argv[5], 1.f/16384); return 0;
+      pack_fractional_gamma(argv[2], argv[3], argv[4], argv[5], 2, 1.f/16384); return 0;
+    }
+    if (mode == "pack-gamma15-midpoint" && argc == 6) {
+      pack_fractional_gamma(argv[2], argv[3], argv[4], argv[5], 1.5f, 1.f/16384); return 0;
     }
     if (mode == "jpeg-samples" && argc == 4) {
       auto raster = jpeg(read(argv[2]));

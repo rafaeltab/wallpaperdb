@@ -29,6 +29,9 @@ class IccGainmapTests(unittest.TestCase):
     def test_midpointoffset_gamma2_islow_map_preserves_headroom_controls(self):
         self._headroom_control('midpointoffset', map_gamma=2, map_method='islow')
 
+    def test_midpointoffset_gamma15_preserves_fractional_metadata_and_headroom(self):
+        self._headroom_control('midpointoffset', map_gamma=1.5)
+
     def _headroom_control(self, map_policy, *, map_gamma=1, map_method='float'):
         from avif import encode_transfer
         from icc_gainmap import pack, independent_decode, native_decode
@@ -62,7 +65,7 @@ class IccGainmapTests(unittest.TestCase):
             expected_offset = {'moderateoffset': 1/4096, 'smalloffset': 1/65536, 'midpointoffset': 1/16384}[map_policy]
             self.assertTrue(all(channel[field] == expected_offset for channel in facts['iso_metadata']['channels']
                                 for field in ('base_offset', 'alternate_offset')))
-            if map_gamma == 2:
+            if map_gamma != 1:
                 from avif import decode_transfer, read_png
                 metadata = facts['iso_metadata']['channels']
                 metadata *= 3 if len(metadata) == 1 else 1
@@ -71,29 +74,33 @@ class IccGainmapTests(unittest.TestCase):
                 offset = np.array([channel['base_offset'] for channel in metadata])
                 target = decode_transfer(read_png(hdr)[..., :3], 'pq', 'p3')/203
                 normalized = np.clip((np.log2((target+offset)/(linear+offset))-minimum)/(maximum-minimum), 0, 1)
-                expected_codes = normalized**2*255
+                expected_codes = normalized**map_gamma*255
                 map_codes = np.asarray(Image.open(evidence['computed_map']).convert('RGB'))
                 self.assertTrue(np.any((expected_codes > 16) & (expected_codes < 239)))
                 # Half a code is nearest-integer quantization. The extra
                 # 0.01 code bounds native float PQ/ICC and metadata rounding.
                 self.assertLessEqual(float(np.max(np.abs(map_codes-expected_codes))), .51)
-                # A gamma2 packer must reject gamma1 native metadata, even
+                # A fractional-gamma packer must reject gamma1 metadata, even
                 # though both sets of JPEG sample arrays are decodable.
                 gamma1 = folder/'gamma1.avif'
                 native([TOOL.replace('/hdr-proof-', '/smalloffset/hdr-proof-'),
                         'compute', base, hdr, gamma1])
-                gamma2_tool = TOOL.replace('/hdr-proof-', f'/{map_policy}-gamma2/hdr-proof-')
-                mode = 'pack-gamma2-midpoint' if map_policy == 'midpointoffset' else 'pack-gamma2'
+                variant = 'midpointoffset-gamma15' if map_gamma == 1.5 else f'{map_policy}-gamma2'
+                gamma_tool = TOOL.replace('/hdr-proof-', f'/{variant}/hdr-proof-')
+                mode = ('pack-gamma15-midpoint' if map_gamma == 1.5 else
+                        'pack-gamma2-midpoint' if map_policy == 'midpointoffset' else 'pack-gamma2')
                 rejected = folder/'wrong-gamma.jpg'
-                with self.assertRaisesRegex(RuntimeError, 'gamma2/offset'):
-                    native([gamma2_tool, mode, gamma1, base,
+                with self.assertRaisesRegex(RuntimeError, 'gamma/offset'):
+                    native([gamma_tool, mode, gamma1, base,
                             folder/'output-icc-parts/map.jpg', rejected])
                 self.assertFalse(rejected.exists())
-                wrong_mode = 'pack-gamma2' if map_policy == 'midpointoffset' else 'pack-gamma2-midpoint'
-                with self.assertRaisesRegex(RuntimeError, 'gamma2/offset'):
-                    native([gamma2_tool, wrong_mode, folder/'output-icc-parts/combined.avif', base,
-                            folder/'output-icc-parts/map.jpg', rejected])
-                self.assertFalse(rejected.exists())
+                for wrong_mode in ('pack-gamma2', 'pack-gamma2-midpoint', 'pack-gamma15-midpoint'):
+                    if wrong_mode == mode:
+                        continue
+                    with self.subTest(mode=wrong_mode), self.assertRaisesRegex(RuntimeError, 'gamma/offset'):
+                        native([gamma_tool, wrong_mode, folder/'output-icc-parts/combined.avif', base,
+                                folder/'output-icc-parts/map.jpg', rejected])
+                    self.assertFalse(rejected.exists())
                 with self.assertRaisesRegex(RuntimeError, 'gamma 1'):
                     native(['/opt/proof/ultrahdr/precise/hdr-proof-uhdr', 'pack-avif',
                             folder/'output-icc-parts/combined.avif', base,
@@ -145,7 +152,8 @@ class IccGainmapTests(unittest.TestCase):
             output = Path(temporary)/'unknown.jpg'
             for policy, gamma in (('moderateoffset', 2), ('smalloffset', 0),
                                   ('smalloffset', 3), ('smalloffset', True),
-                                  ('unknown', 1), ('smalloffset', float('nan')), ('midpointoffset', 1)):
+                                  ('unknown', 1), ('smalloffset', float('nan')), ('midpointoffset', 1),
+                                  ('smalloffset', 1.5), ('moderateoffset', 1.5)):
                 before = len(avif.COMMANDS)
                 with self.subTest(policy=policy, gamma=gamma), self.assertRaises(ValueError):
                     pack('missing-base.jpg', 'missing-intent.png', output,
@@ -153,7 +161,7 @@ class IccGainmapTests(unittest.TestCase):
                 self.assertEqual(len(avif.COMMANDS), before)
                 self.assertFalse(output.exists())
             for policy, gamma, method in (('smalloffset', 2, 'islow'),
-                    ('moderateoffset', 1, 'islow'), ('midpointoffset', 2, 'unknown')):
+                    ('moderateoffset', 1, 'islow'), ('midpointoffset', 2, 'unknown'), ('midpointoffset', 1.5, 'islow')):
                 before = len(avif.COMMANDS)
                 with self.subTest(policy=policy, method=method), self.assertRaises(ValueError):
                     pack('missing-base.jpg', 'missing-intent.png', output,
@@ -295,6 +303,25 @@ class IccGainmapTests(unittest.TestCase):
             self.assertEqual(case['native_candidate']['computed_map_sha256'], '0fda8bd2d28eaa61d02e39657f2405d34af28556e45fd77b3b6abd24749d496d')
             self.assertEqual(case['native_candidate']['map_encoding']['method'], 'islow')
             self.assertIn('dct-islow-map', case['case_id'])
+            self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
+
+    def test_gamma15_midpoint_qualifies_only_the_explicit_icc_aware_file_path(self):
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            report = run(Path(temporary), map_policy='midpointoffset', map_gamma=1.5)
+            case = report['cases'][0]
+            self.assertEqual(case['status'], 'qualified', case['blockers'])
+            self.assertTrue(all(case['checks'].values()))
+            self.assertTrue(all(value['passed'] for value in case['measurements'].values()))
+            self.assertTrue(case['structural_checks']['requested_map_gamma'])
+            self.assertTrue(case['structural_checks']['requested_map_offsets'])
+            self.assertEqual(case['native_metadata_probe']['gamma'], [1.5]*3)
+            self.assertEqual(case['artifacts']['sha256'], '37376e5629f11d61debb2664cd2568fd1965d30268e1d0acc76810e01e6826a2')
+            self.assertEqual(case['native_candidate']['base_sha256'], '5177870d6a7e34011d293ec0da6758d0b02778c095958d024d6a700ef32fff4a')
+            self.assertEqual(case['native_candidate']['computed_map_sha256'], 'cfac5baf0333f8db5c9ef6fc40e9809035d3594de18fe3ce6a2495d5fe062d25')
+            self.assertTrue(case['case_id'].endswith('map-gamma1.5:gainmap-hdr-target-gamut-v1'))
+            self.assertIn('Experimental native ICC-aware file path only', case['qualification_scope'])
             self.assertEqual(case['consumer_status'], 'pending manual review')
             self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
 

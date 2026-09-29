@@ -17,4 +17,3 @@ OpenSearch supports the catalogue's filtered and ranked searches. Mercurius expo
 Read the [domain context](CONTEXT.md) for ownership and the [recovery guide](../docs/content/docs/guides/service-upgrades.mdx) before rebuilding projections or replaying messages.
 
 The [admission contract](../docs/content/docs/guides/gateway-admission.mdx) explains quota and overload responses, degraded operation, and required production ingress controls. [Load evidence](docs/admission-load-test.md) records initial limits and the checks required before deployment.
-

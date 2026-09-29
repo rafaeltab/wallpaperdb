@@ -54,8 +54,10 @@ measured shadow failures and are only diagnostic files. Test a qualified SOF0
 file separately from the SOF3 file; neither result establishes the other's
 decoder, gain-map interpretation or HDR presentation behavior.
 
-The optional gain-map AVIF source has a separately inspected authored-SDR AVIF
-derivative. Compare it with the matched SDR base and verify privacy and geometry.
+The optional gain-map AVIF source has separately inspected authored-SDR AVIF
+derivatives for containment, crop, stretch and upscale. Compare them with the
+matched SDR bases and verify privacy and geometry. Nonidentity orientation
+remains unqualified.
 Its native HDR reconstruction remains unqualified; the SDR result does not
 establish HDR support for that source or container.
 

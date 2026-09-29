@@ -73,6 +73,10 @@ wallpaper setter.
 The authored SDR WebP files cover the same four geometries with lossless RGB8
 and a standard sRGB ICC profile. Compare its exact file with the matched authored SDR reference and
 the PNG/AVIF versions; do not infer ICC interpretation from successful decoding.
+The separate SDR JPEG containment uses standard sRGB ICC and RGB8 SOF0 coding.
+Compare its inspected file with the same authored SDR reference and the lossless
+variants. The JPEG has no separate aspect declaration; check the recorded
+raster dimensions and consumer geometry independently.
 The separately named HDR candidates emit single-layer PQ AVIF12 for containment,
 crop, stretch and upscale. The original
 native-map-sampling candidate remains failed; the antialiased-map candidate has

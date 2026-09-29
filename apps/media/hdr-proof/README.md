@@ -333,6 +333,13 @@ appearance checks. Stock depth-8 failures and automatic-depth-12 incompatibility
 remain visible. Qualification covers the declared full-headroom endpoints only:
 regenerated offsets and headroom differ from the source, so intermediate display
 adaptation remains untested. Physical consumers remain pending.
+The separate [authored SDR JPEG proof](gainmap_avif_jpeg.py) checks containment
+from the same gain-map AVIF source. Standard sRGB RGB8 quality-100 JPEG passes
+the unchanged photographic limits. Independent inspection establishes color
+from actual ICC, RGB components and Adobe transform fields; decoder-guessed
+color defaults remain diagnostics. Actual dimensions are checked without
+inventing an absent JPEG aspect declaration. Physical interpretation remains
+pending independently from the lossless PNG, WebP and AVIF versions.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

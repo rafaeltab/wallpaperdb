@@ -435,6 +435,426 @@
           "measurement_case_id": "gainmap-android-iso:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-float32-map-gamma1.5:gainmap-hdr-target-gamut-v1"
         },
         {
+          "case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-new",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-new",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "tested and failed",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": false,
+            "privacy": true
+          },
+          "blockers": [
+            "Failed appearance check"
+          ],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.independent_hdr"
+              }
+            ],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-islow-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-new",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "tested and failed",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": false,
+            "privacy": true
+          },
+          "blockers": [
+            "Failed appearance check"
+          ],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [
+              {
+                "gate": "appearance",
+                "check": "highlight.delta_e_p95",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "highlight.delta_e_p95",
+                "location": "measurements.independent_hdr"
+              }
+            ],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-islow-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5-base-dct-float:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-new",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5-base-dct-float:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-android-iso:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-float32-map-gamma1.5:gainmap-hdr-target-gamut-v1:render-boost2",
+          "fixture_id": "gainmap-android-iso",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "tested and failed",
+          "checks": {
+            "native_encoder": true,
+            "converter_endpoint": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": false,
+            "privacy": true
+          },
+          "blockers": [
+            "Failed appearance check at display boost 2"
+          ],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_mean",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_mean",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_p95",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_max",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.luminance_relative_p95",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "highlight.delta_e_mean",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "highlight.delta_e_p95",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "highlight.delta_e_max",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "highlight.luminance_relative_p95",
+                "location": "measurements.reconstructed_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_mean",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_p95",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_mean",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_p95",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_max",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.luminance_relative_p95",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "highlight.delta_e_mean",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "highlight.delta_e_p95",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "highlight.delta_e_max",
+                "location": "measurements.independent_hdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "highlight.luminance_relative_p95",
+                "location": "measurements.independent_hdr"
+              }
+            ],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-iso-intermediate-boost2-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-android-iso:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-float32-map-gamma1.5:gainmap-hdr-target-gamut-v1:render-boost2"
+        },
+        {
           "case_id": "gainmap-android-iso:hdr:jpg:preserve:preserve:contain",
           "fixture_id": "gainmap-android-iso",
           "selectors": {
@@ -20592,6 +21012,186 @@
           "measurement_case_id": "gainmap-android-iso:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-float32-map-gamma1.5:gainmap-hdr-target-gamut-v1"
         },
         {
+          "case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-old",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-new",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1"
+        },
+        {
+          "case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5-base-dct-float:gainmap-hdr-target-gamut-v1",
+          "fixture_id": "gainmap-apple-new",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "independent_source_decoder": true,
+            "native_source_precision": true,
+            "native_geometry": true,
+            "hdr_intent": true,
+            "independent_decoder": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "source_reference_revision": "gainmap-hdr-target-gamut-v1",
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5-base-dct-float:gainmap-hdr-target-gamut-v1"
+        },
+        {
           "case_id": "gainmap-android-iso:hdr:jpg:preserve:preserve:contain:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "fixture_id": "gainmap-android-iso",
           "selectors": {
@@ -23861,6 +24461,7 @@
         "Command failed: avifgainmaputil convert /proof/fixtures/gainmap/gainmap-android-iso.jpg /proof/work/gainmap/cases/gainmap-android-iso-hdr-jpg-preserve-preserve-upscale-native-regenerate-avif/native-regenerated-parts-both/source-lossless.avif --cicp 12/13/0 --ignore-profile -d 8 -y 444 -q 100 --qgain-map 100 -s 10\nInput image /proof/fixtures/gainmap/gainmap-android-iso.jpg does not contain a gain map\n",
         "Command failed: avifgainmaputil convert /proof/work/gainmap/cases/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-regenerate-avif/input-orientation-6.jpg /proof/work/gainmap/cases/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-regenerate-avif/native-regenerated-parts-both/source-lossless.avif --cicp 12/13/0 --ignore-profile -d 8 -y 444 -q 100 --qgain-map 100 -s 10\nInput image /proof/work/gainmap/cases/gainmap-android-iso-hdr-jpg-preserve-preserve-orientation-native-regenerate-avif/input-orientation-6.jpg does not contain a gain map\n",
         "Failed appearance check",
+        "Failed appearance check at display boost 2",
         "Failed independent_decoder check",
         "Independent ExifTool parsed no Android hdrgm XMP properties on the emitted map; dual ISO/Android metadata interoperability is unqualified.",
         "No independently reconstructable HDR output",
@@ -202184,18 +202785,304 @@
         "motion": "preserve",
         "transparency": "preserve"
       },
-      "status": "untested",
+      "status": "qualified",
       "reason": "Requires accepted input, gain-map recognition, independent reconstruction and exact conversion proof.",
       "advertisable": false,
       "original_available_if_accepted": true,
       "consumer_status": "pending manual review",
       "qualification_scope": "Only listed exact fixture/selector cases; no inferred cross-product.",
       "alternative_selectors": [],
-      "evidence": [],
-      "qualified_cases": [],
+      "evidence": [
+        {
+          "case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:contain:icc-midpoint-gamma15-float",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_hdr_preparation": true,
+            "native_sdr_preparation": true,
+            "native_transfer": true,
+            "native_encoder": true,
+            "independent_decoder": true,
+            "full_headroom": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:contain:icc-midpoint-gamma15-float"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:cover:icc-midpoint-gamma15-float",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_hdr_preparation": true,
+            "native_sdr_preparation": true,
+            "native_transfer": true,
+            "native_encoder": true,
+            "independent_decoder": true,
+            "full_headroom": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:cover:icc-midpoint-gamma15-float"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:fill:icc-midpoint-gamma15-float",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_hdr_preparation": true,
+            "native_sdr_preparation": true,
+            "native_transfer": true,
+            "native_encoder": true,
+            "independent_decoder": true,
+            "full_headroom": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:fill:icc-midpoint-gamma15-float"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:upscale:icc-midpoint-gamma15-float",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_hdr_preparation": true,
+            "native_sdr_preparation": true,
+            "native_transfer": true,
+            "native_encoder": true,
+            "independent_decoder": true,
+            "full_headroom": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:upscale:icc-midpoint-gamma15-float"
+        }
+      ],
+      "qualified_cases": [
+        {
+          "case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:contain:icc-midpoint-gamma15-float",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_hdr_preparation": true,
+            "native_sdr_preparation": true,
+            "native_transfer": true,
+            "native_encoder": true,
+            "independent_decoder": true,
+            "full_headroom": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:contain:icc-midpoint-gamma15-float"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:cover:icc-midpoint-gamma15-float",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_hdr_preparation": true,
+            "native_sdr_preparation": true,
+            "native_transfer": true,
+            "native_encoder": true,
+            "independent_decoder": true,
+            "full_headroom": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:cover:icc-midpoint-gamma15-float"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:fill:icc-midpoint-gamma15-float",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_hdr_preparation": true,
+            "native_sdr_preparation": true,
+            "native_transfer": true,
+            "native_encoder": true,
+            "independent_decoder": true,
+            "full_headroom": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:fill:icc-midpoint-gamma15-float"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:upscale:icc-midpoint-gamma15-float",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "hdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_hdr_preparation": true,
+            "native_sdr_preparation": true,
+            "native_transfer": true,
+            "native_encoder": true,
+            "independent_decoder": true,
+            "full_headroom": true,
+            "structure": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:hdr:jpg:preserve:preserve:upscale:icc-midpoint-gamma15-float"
+        }
+      ],
       "missing_cases": [],
       "blockers": [],
-      "codec_qualified": false
+      "codec_qualified": true
     },
     {
       "id": "avif-gainmap:hdr:avif",
@@ -204439,17 +205326,348 @@
         "motion": "preserve",
         "transparency": "preserve"
       },
-      "status": "untested",
+      "status": "tested and failed",
       "reason": "Requires accepted input, gain-map recognition, independent reconstruction and exact conversion proof.",
       "advertisable": false,
       "original_available_if_accepted": true,
       "consumer_status": "pending manual review",
       "qualification_scope": "Only listed exact fixture/selector cases; no inferred cross-product.",
       "alternative_selectors": [],
-      "evidence": [],
-      "qualified_cases": [],
+      "evidence": [
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:contain:authored-srgb-rgb8",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_storage_appearance": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:contain:authored-srgb-rgb8"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:cover:authored-srgb-rgb8",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_storage_appearance": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:cover:authored-srgb-rgb8"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:fill:authored-srgb-rgb8",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_storage_appearance": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:fill:authored-srgb-rgb8"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:upscale:authored-srgb-rgb8",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "tested and failed",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_storage_appearance": false,
+            "appearance": false,
+            "privacy": true
+          },
+          "blockers": [
+            "Failed native_storage_appearance check",
+            "Failed appearance check"
+          ],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.native_storage"
+              }
+            ],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:upscale:authored-srgb-rgb8"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:upscale:authored-gamma32-rgb8",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_storage_appearance": true,
+            "appearance": true,
+            "privacy": true,
+            "native_transfer": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:upscale:authored-gamma32-rgb8"
+        }
+      ],
+      "qualified_cases": [
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:contain:authored-srgb-rgb8",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_storage_appearance": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:contain:authored-srgb-rgb8"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:cover:authored-srgb-rgb8",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 173,
+            "fit": "cover"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_storage_appearance": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:cover:authored-srgb-rgb8"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:fill:authored-srgb-rgb8",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "h": 211,
+            "fit": "fill"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_storage_appearance": true,
+            "appearance": true,
+            "privacy": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:fill:authored-srgb-rgb8"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:upscale:authored-gamma32-rgb8",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "jpg",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 769,
+            "fit": "contain"
+          },
+          "status": "qualified",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_storage_appearance": true,
+            "appearance": true,
+            "privacy": true,
+            "native_transfer": true
+          },
+          "blockers": [],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:upscale:authored-gamma32-rgb8"
+        }
+      ],
       "missing_cases": [],
-      "blockers": [],
+      "blockers": [
+        "Failed appearance check",
+        "Failed native_storage_appearance check"
+      ],
       "codec_qualified": false
     },
     {
@@ -205357,17 +206575,336 @@
         "motion": "preserve",
         "transparency": "preserve"
       },
-      "status": "untested",
+      "status": "tested and failed",
       "reason": "SDR only; fractional alpha requires explicit coercion; motion and 8-bit output limits apply.",
       "advertisable": false,
       "original_available_if_accepted": true,
       "consumer_status": "pending manual review",
       "qualification_scope": "Only listed exact fixture/selector cases; no inferred cross-product.",
       "alternative_selectors": [],
-      "evidence": [],
+      "evidence": [
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:gif:preserve:preserve:contain:authored-srgb256-sierra24",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "gif",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "tested and failed",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_palette": false,
+            "appearance": false,
+            "privacy": true
+          },
+          "blockers": [
+            "Failed native_palette check",
+            "Failed appearance check"
+          ],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_mean",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_p95",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.luminance_relative_p95",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_mean",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_p95",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_max",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_mean",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_p95",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.luminance_relative_p95",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_mean",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_p95",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_max",
+                "location": "measurements.palette"
+              }
+            ],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:gif:preserve:preserve:contain:authored-srgb256-sierra24"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:gif:preserve:preserve:contain:authored-srgb256-libimagequant",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "gif",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "tested and failed",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_palette": false,
+            "appearance": false,
+            "privacy": true
+          },
+          "blockers": [
+            "Failed native_palette check",
+            "Failed appearance check"
+          ],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_mean",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_p95",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.luminance_relative_p95",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_mean",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_p95",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_max",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_mean",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_p95",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.luminance_relative_p95",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_mean",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_p95",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_max",
+                "location": "measurements.palette"
+              }
+            ],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:gif:preserve:preserve:contain:authored-srgb256-libimagequant"
+        },
+        {
+          "case_id": "avif-gainmap-from-android-xmp:sdr:gif:preserve:preserve:contain:authored-gamma32-256-libimagequant",
+          "fixture_id": "avif-gainmap-from-android-xmp",
+          "selectors": {
+            "format": "gif",
+            "range": "sdr",
+            "gamut": "preserve",
+            "depth": "preserve",
+            "motion": "preserve",
+            "transparency": "preserve",
+            "w": 173,
+            "fit": "contain"
+          },
+          "status": "tested and failed",
+          "checks": {
+            "native_encoder": true,
+            "native_preparation": true,
+            "independent_source_decoder": true,
+            "independent_decoder": true,
+            "structure": true,
+            "native_palette": false,
+            "appearance": false,
+            "privacy": true,
+            "native_transfer": true
+          },
+          "blockers": [
+            "Failed native_palette check",
+            "Failed appearance check"
+          ],
+          "diagnostics": {
+            "native_outcome": "completed",
+            "measured_failures": [
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_mean",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_p95",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_mean",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_p95",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_max",
+                "location": "measurements.sdr"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_mean",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_p95",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "shadow.delta_e_max",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_mean",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_p95",
+                "location": "measurements.palette"
+              },
+              {
+                "gate": "appearance",
+                "check": "midtone.delta_e_max",
+                "location": "measurements.palette"
+              }
+            ],
+            "missing_evidence": [],
+            "not_evaluated": []
+          },
+          "measurements_file": "measurements.json",
+          "measurement_case_id": "avif-gainmap-from-android-xmp:sdr:gif:preserve:preserve:contain:authored-gamma32-256-libimagequant"
+        }
+      ],
       "qualified_cases": [],
       "missing_cases": [],
-      "blockers": [],
+      "blockers": [
+        "Failed appearance check",
+        "Failed native_palette check"
+      ],
       "codec_qualified": false
     },
     {
@@ -206275,19 +207812,21 @@
       "missing_evidence_checks": {}
     },
     "all_cases": {
-      "cases": 3152,
-      "native_completed": 3142,
+      "cases": 3172,
+      "native_completed": 3162,
       "native_operation_failures": 10,
       "native_not_established": 0,
-      "qualified": 2492,
-      "measured_failure_cases": 621,
+      "qualified": 2505,
+      "measured_failure_cases": 628,
       "missing_evidence_cases": 60,
       "failed_gates_after_native_completion": {
-        "appearance": 638,
+        "appearance": 645,
         "independent_decoder": 33,
         "independent_hdr": 8,
         "linear_geometry_appearance": 4,
         "native_hdr": 8,
+        "native_palette": 3,
+        "native_storage_appearance": 1,
         "selectors": 8,
         "source_appearance": 4,
         "structure": 155
@@ -206296,19 +207835,19 @@
         "alpha": 8,
         "color_signaling": 78,
         "gamut": 78,
-        "highlight.delta_e_max": 146,
-        "highlight.delta_e_mean": 189,
-        "highlight.delta_e_p95": 170,
-        "highlight.luminance_relative_p95": 112,
+        "highlight.delta_e_max": 147,
+        "highlight.delta_e_mean": 190,
+        "highlight.delta_e_p95": 172,
+        "highlight.luminance_relative_p95": 113,
         "known_map_matrix": 8,
-        "midtone.delta_e_max": 287,
-        "midtone.delta_e_mean": 295,
-        "midtone.delta_e_p95": 265,
-        "midtone.luminance_relative_p95": 146,
-        "shadow.delta_e_max": 548,
-        "shadow.delta_e_mean": 447,
-        "shadow.delta_e_p95": 458,
-        "shadow.luminance_relative_p95": 168,
+        "midtone.delta_e_max": 291,
+        "midtone.delta_e_mean": 299,
+        "midtone.delta_e_p95": 269,
+        "midtone.luminance_relative_p95": 147,
+        "shadow.delta_e_max": 555,
+        "shadow.delta_e_mean": 451,
+        "shadow.delta_e_p95": 462,
+        "shadow.luminance_relative_p95": 170,
         "square_pixels": 4
       },
       "missing_evidence_checks": {
@@ -206465,7 +208004,7 @@
     ]
   },
   "product_coverage": {
-    "scope": "Accepted product requests across the declared fixture/geometry plan. Numeric-depth failures remain separate exact-case evidence. This does not implement runtime depth selection or qualify physical consumers.",
+    "scope": "Accepted product requests across the declared fixture/geometry plan. Gain-map HDR counts describe the original display-boost-16 endpoint corpus, not general adaptation; separate rendering_coverage must also pass. Numeric-depth failures remain separate exact-case evidence. This does not implement runtime depth selection or qualify physical consumers.",
     "required_count": 320,
     "qualified_count": 320,
     "untested_count": 0,
@@ -207099,11 +208638,13 @@
         "depth_policy": "Exact requested depth promise.",
         "status": "qualified",
         "qualified_evidence": [
+          "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-lossless-rgb:gainmap-hdr-target-gamut-v1"
         ],
         "tested_evidence": [
           "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale",
+          "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-android-xmp:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -207470,11 +209011,13 @@
         "depth_policy": "Exact requested depth promise.",
         "status": "qualified",
         "qualified_evidence": [
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-lossless-rgb:gainmap-hdr-target-gamut-v1"
         ],
         "tested_evidence": [
           "gainmap-apple-old:hdr:jpg:preserve:preserve:contain",
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -207581,10 +209124,12 @@
         "depth_policy": "Exact requested depth promise.",
         "status": "qualified",
         "qualified_evidence": [
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-lossless-rgb:gainmap-hdr-target-gamut-v1"
         ],
         "tested_evidence": [
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale",
+          "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-old:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -207947,11 +209492,13 @@
         "depth_policy": "Exact requested depth promise.",
         "status": "qualified",
         "qualified_evidence": [
+          "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-lossless-rgb:gainmap-hdr-target-gamut-v1"
         ],
         "tested_evidence": [
           "gainmap-apple-new:hdr:jpg:preserve:preserve:contain",
+          "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-new:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -208058,10 +209605,14 @@
         "depth_policy": "Exact requested depth promise.",
         "status": "qualified",
         "qualified_evidence": [
+          "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5-base-dct-float:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-lossless-rgb:gainmap-hdr-target-gamut-v1"
         ],
         "tested_evidence": [
           "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale",
+          "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5-base-dct-float:gainmap-hdr-target-gamut-v1",
+          "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+          "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-islow-map-source-pq16-map-gamma1.5:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-identity-lossless-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
           "gainmap-apple-new:hdr:jpg:preserve:preserve:upscale:native-combine-moderateoffset-dct-rgb:gainmap-hdr-target-gamut-v1",
@@ -215862,9 +217413,41 @@
       }
     ]
   },
+  "rendering_coverage": {
+    "scope": "Additional faithful-HDR appearance requirement at the same source/output display boost. It is separate from the original 320 endpoint cases and adds no product selector. Passing this one point would not qualify untested headroom values or physical consumers.",
+    "required_count": 1,
+    "qualified_count": 0,
+    "requirements": [
+      {
+        "requirement_id": "gainmap-android-iso:hdr:jpg:upscale:display-boost2",
+        "cell_id": "gainmap-jpeg:hdr:jpg",
+        "fixture_id": "gainmap-android-iso",
+        "source_sha256": "f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e",
+        "geometry": "upscale",
+        "display_boost": 2,
+        "source_reference_revision": "gainmap-iso-intermediate-boost2-v1",
+        "selectors": {
+          "format": "jpg",
+          "range": "hdr",
+          "gamut": "preserve",
+          "depth": "preserve",
+          "motion": "preserve",
+          "transparency": "preserve",
+          "w": 769,
+          "fit": "contain"
+        },
+        "status": "tested and failed",
+        "qualified_evidence": [],
+        "tested_evidence": [
+          "gainmap-android-iso:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-float32-map-gamma1.5:gainmap-hdr-target-gamut-v1:render-boost2"
+        ]
+      }
+    ]
+  },
   "milestone_qualified": false,
   "milestone_blockers": [
-    "Physical browser/native viewer/OS wallpaper checks remain pending manual review."
+    "Physical browser/native viewer/OS wallpaper checks remain pending manual review.",
+    "gainmap-android-iso:hdr:jpg:upscale:display-boost2"
   ],
   "policy_sources": [
     "https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153",
@@ -215876,7 +217459,7 @@
   "suite_integrity_errors": [],
   "native_run_completed": true,
   "unit_tests": {
-    "run": 396,
+    "run": 447,
     "failures": 0,
     "errors": 0
   }

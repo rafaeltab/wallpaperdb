@@ -22,6 +22,8 @@ A full or unavailable quarantine leaves the original delivery pending. Repair th
 
 ## Quotas stopped being enforced
 
+The [gateway admission contract](/docs/guides/gateway-admission) covers client responses, tuning, ingress requirements, and the healthy shared-usage mean. Consult the [load evidence](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/docs/admission-load-test.md) before treating development limits as suitable for a production topology.
+
 Gateway falls back to a smaller weighted cost budget per trusted IP per replica when Redis is unavailable or a quota command fails. `admission.quota.fallback` has bounded `reason` values of `disabled`, `unavailable`, and `command_failure`. Local exhaustion returns HTTP 429 with retry timing; `X-RateLimit-Cost-Limit` reports the local capacity in this mode. `admission.quota.saturated` identifies HTTP 503 rejections from occupied Redis command slots or a full local identity store. Active-work limits remain independent and apply in every mode.
 
 `admission.quota.recovery` counts returns to shared Redis admission. Recovery does not merge outage charges into Redis, and an ambiguous failed command may already have reserved shared points. Replica restarts lose local state; routing the same IP to another replica during an outage provides another local budget. The fleet-wide quota guarantee is unavailable until Redis recovers. Fully refilled local budgets are reclaimed; depleted budgets are never evicted to admit new IPs.

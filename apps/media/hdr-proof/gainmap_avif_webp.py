@@ -1,9 +1,9 @@
-"""Authored SDR WebP containment from the locked gain-map AVIF source.
+"""Authored SDR WebP geometries from the locked gain-map AVIF source.
 
 The existing native PNG stage supplies candidate pixels, never reference
 pixels. Native libwebp stores them losslessly with an actual sRGB ICC profile.
 FFmpeg's independent WebP decoder, strict container/ICC parsing and the same
-photographic SDR reference must all pass. This is one opaque static tuple;
+photographic SDR reference must all pass. These are bounded opaque static tuples;
 HDR rendering and physical consumer behavior are separate qualifications.
 """
 import hashlib
@@ -18,6 +18,7 @@ import avif
 import gainmap_avif
 import gainmap_avif_png
 from appearance import compare_appearance, sdr_signal_to_nits
+from matrix import GAINMAP_GEOMETRIES
 
 
 SELECTORS = {**gainmap_avif_png.SELECTORS, 'format': 'webp'}
@@ -26,11 +27,19 @@ POLICY = {**gainmap_avif_png.POLICY,
     'scope': 'Only explicit authored SDR WebP containment from the identity-oriented locked source',
     'color_signaling': 'Actual native LittleCMS sRGB matrix/TRC profile; no new tone grade',
     'storage_gate': 'Native FFmpeg WebP decoding must match native libwebp and the inspected PNG intermediate in every RGB8 sample'}
+GEOMETRIES = ('contain', 'cover', 'fill', 'upscale')
+GEOMETRY_POLICY = {**POLICY,
+    'geometry': gainmap_avif_png.GEOMETRY_POLICY['geometry'],
+    'scope': 'Only listed authored SDR WebP geometries from the identity-oriented locked source'}
 
 
-def validate_selectors(selectors):
-    if selectors != SELECTORS:
-        raise ValueError('Only the exact authored SDR WebP containment selectors are admitted')
+def validate_selectors(selectors, *, operation='contain'):
+    if operation not in GEOMETRIES:
+        raise ValueError('Unsupported authored SDR WebP geometry')
+    expected = {**{key: value for key, value in SELECTORS.items() if key not in ('w', 'fit')},
+                **GAINMAP_GEOMETRIES[operation]}
+    if selectors != expected:
+        raise ValueError('Only the exact authored SDR WebP geometry selectors are admitted')
 
 
 def inspect_and_decode(path):
@@ -66,19 +75,19 @@ def _encode(source, output):
             'output_sha256': avif.digest(output)}
 
 
-def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
-    validate_selectors(SELECTORS if selectors is None else selectors)
-    root = Path(directory)
+def _case(root, original):
+    operation = original['geometry']
+    selectors = {**original['selectors'], 'format': 'webp'}
+    validate_selectors(selectors, operation=operation)
+    root = root if operation == 'contain' else root/operation
     root.mkdir(parents=True, exist_ok=True)
-    start = len(avif.COMMANDS)
-    prepared = gainmap_avif_png.run(root/'native-png', source_lock=source_lock)
-    original = prepared['evidence'][0]
-    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:sdr:webp:preserve:preserve:contain:authored-rgb8',
+    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:sdr:webp:preserve:preserve:{operation}:authored-rgb8',
         'cell_id': 'avif-gainmap:sdr:webp', 'fixture_id': gainmap_avif.FIXTURE_ID,
-        'candidate': 'native-authored-base-webp8', 'selectors': SELECTORS.copy(), 'geometry': 'contain',
+        'candidate': 'native-authored-base-webp8', 'selectors': selectors, 'geometry': operation,
         'source_facts': original['source_facts'], 'source_sha256': original['source_sha256'],
         'status': 'tested and failed', 'consumer_status': 'pending manual review',
-        'threshold_scope': {**POLICY, 'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
+        'threshold_scope': {**(POLICY if operation == 'contain' else GEOMETRY_POLICY),
+                            'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
         'checks': {key: False for key in ('native_encoder', 'native_preparation', 'independent_source_decoder',
             'independent_decoder', 'structure', 'native_storage', 'appearance', 'privacy')},
         'measurements': {}, 'artifacts': {}, 'blockers': []}
@@ -111,7 +120,8 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
         measured = compare_appearance(expected, linear, reference_gamut='srgb', actual_gamut='rec2020',
                                      fixture_class='gainmap-sdr')
         case['checks'].update({'independent_decoder': True, 'native_storage': mismatch == 0,
-            'structure': (facts['width'], facts['height'], facts['depth'], facts['orientation'], facts['frames']) == (173, 130, 8, 1, 1)
+            'structure': (facts['width'], facts['height'], facts['depth'], facts['orientation'], facts['frames'])
+                == (expected.shape[1], expected.shape[0], 8, 1, 1)
                 and facts['opaque'] and facts['square_pixels'] and facts['gamut'] == facts['transfer'] == 'srgb'
                 and facts['icc_sha256'] == case['native_candidate']['icc_sha256'],
             'appearance': measured['passed'], 'privacy': facts['privacy']})
@@ -121,6 +131,22 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
             case['status'] = 'qualified'
     except Exception as error:
         case['blockers'].append(str(error))
+    return case
+
+
+def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, geometries=('contain',)):
+    geometries = tuple(geometries)
+    if not geometries or len(set(geometries)) != len(geometries) or any(item not in GEOMETRIES for item in geometries):
+        raise ValueError('Expected distinct contain, cover, fill or upscale geometries')
+    if selectors is not None:
+        if len(geometries) != 1:
+            raise ValueError('An explicit selector tuple requires one exact geometry')
+        validate_selectors(selectors, operation=geometries[0])
+    root = Path(directory)
+    root.mkdir(parents=True, exist_ok=True)
+    start = len(avif.COMMANDS)
+    prepared = gainmap_avif_png.run(root/'native-png', source_lock=source_lock, geometries=geometries)
+    cases = [_case(root, original) for original in prepared['evidence']]
     # The source controls execute before the WebP encoder in the shared native
     # preparation. Do not inherit that module's PNG-specific selector claims.
     controls = [{**row, 'case_id': row['case_id'].replace('gainmap-avif-png-', 'gainmap-avif-webp-')}
@@ -134,6 +160,7 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
             rejected = True
         controls.append({'case_id': 'gainmap-avif-webp-'+label+'-withheld', 'passed': rejected,
                          'status': 'passed' if rejected else 'tested and failed'})
-    return {'evidence': [case], 'source_fixtures': prepared['source_fixtures'], 'fixtures': [],
-            'controls': controls, 'commands': avif.COMMANDS[start:], 'scope': POLICY,
+    return {'evidence': cases, 'source_fixtures': prepared['source_fixtures'], 'fixtures': [],
+            'controls': controls, 'commands': avif.COMMANDS[start:],
+            'scope': POLICY if geometries == ('contain',) else GEOMETRY_POLICY,
             'consumer_status': 'pending manual review'}

@@ -1,4 +1,4 @@
-"""Native WebP containment keeps the authored SDR base and exact storage."""
+"""Native WebP geometries keep the authored SDR base and exact storage."""
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,6 +9,29 @@ from gamma_icc import make_profile
 
 
 class GainmapAvifWebpTests(unittest.TestCase):
+    def test_native_geometry_outputs_keep_the_same_storage_and_appearance_gates(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result = gainmap_avif_webp.run(Path(temporary), geometries=('contain', 'cover', 'fill', 'upscale'))
+            self.assertEqual(len(result['evidence']), 4)
+            for case, operation, dimensions in zip(result['evidence'],
+                    ('contain', 'cover', 'fill', 'upscale'), ((173, 130), (173, 173), (173, 211), (769, 576))):
+                self.assertEqual(case['geometry'], operation)
+                self.assertEqual((case['facts']['width'], case['facts']['height']), dimensions)
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertEqual(case['storage_measurement']['mismatched_samples'], 0)
+                self.assertTrue(all(case['checks'].values()))
+                self.assertEqual(case['threshold_scope']['profile'], 'gainmap-sdr')
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertEqual(result['evidence'][0]['artifacts']['sha256'],
+                             '2b33147c1df616e87ed67f986aaa0da2f8383cf2fad7bddf4c50bbd9c12ccc20')
+
+    def test_unproved_or_duplicate_geometry_is_rejected_before_encoding(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for geometries in ((), ('orientation',), ('contain', 'contain')):
+                with self.subTest(geometries=geometries), self.assertRaisesRegex(ValueError, 'distinct'):
+                    gainmap_avif_webp.run(Path(temporary), geometries=geometries)
+            self.assertEqual(list(Path(temporary).iterdir()), [])
+
     def test_actual_native_containment_passes_every_gate(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = gainmap_avif_webp.run(Path(temporary))

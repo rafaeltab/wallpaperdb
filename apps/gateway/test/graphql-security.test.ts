@@ -882,3 +882,23 @@ describe('GraphQL security driving contract', () => {
     });
   });
 });
+
+it('translates saturated quota commands into safe overload without executing catalogue work', async () => {
+  const catalogue = new ObservedCatalogue();
+  const app = await build(
+    {},
+    { catalogue, admission: { admit: () => Effect.succeed({ _tag: 'Saturated' }) } }
+  );
+  const response = await execute(app);
+  expect(response.statusCode).toBe(503);
+  expect(response.headers['retry-after']).toBe('1');
+  expect(response.json()).toMatchObject({
+    errors: [
+      {
+        message: 'The gateway is busy. Please try again.',
+        extensions: { code: 'GATEWAY_OVERLOADED' },
+      },
+    ],
+  });
+  expect(catalogue.calls).toEqual([]);
+});

@@ -354,7 +354,19 @@ export async function createHttpApp<E>(
         ),
         { signal: request.gatewaySignal }
       );
-      context.reply.header('X-RateLimit-Cost-Limit', String(config.quotaCapacity));
+      if (decision._tag === 'Saturated') {
+        context.reply.header('Retry-After', '1');
+        throw Object.assign(
+          new GraphQLError('The gateway is busy. Please try again.', {
+            extensions: { code: 'GATEWAY_OVERLOADED', retryAfter: 1000 },
+          }),
+          { statusCode: 503 }
+        );
+      }
+      context.reply.header(
+        'X-RateLimit-Cost-Limit',
+        String(decision.limit ?? config.quotaCapacity)
+      );
       if (decision._tag === 'Limited') {
         recordTelemetry(() => recordCounter('graphql.security.rate_limited', 1));
         context.reply.header(

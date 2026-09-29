@@ -1,10 +1,16 @@
 import { describe, expect, it } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { TestClock } from 'effect/testing';
-import { Admission, Quota, admissionLayer } from '../../src/capabilities/admission/index.js';
+import {
+  Admission,
+  Quota,
+  QuotaUnavailable,
+  admissionLayer,
+} from '../../src/capabilities/admission/index.js';
 import { memoryQuotaLayer } from '../helpers/quota.js';
 
-const policy = { enabled: true, limit: 2, windowMs: 1000 };
+const fallback = { capacity: 100000, refillMs: 60000, maxVisitors: 10000 };
+const policy = { fallback, enabled: true, limit: 2, windowMs: 1000 };
 const layer = admissionLayer(policy).pipe(Layer.provide(memoryQuotaLayer));
 describe('request admission', () => {
   it.effect('charges resolved cost and 100 points for inspection rejection without refunds', () =>
@@ -31,7 +37,7 @@ describe('request admission', () => {
       });
     }).pipe(
       Effect.provide(
-        admissionLayer({ enabled: true, limit: 300, windowMs: 1000 }).pipe(
+        admissionLayer({ enabled: true, limit: 300, windowMs: 1000, fallback }).pipe(
           Layer.provide(memoryQuotaLayer)
         )
       )
@@ -57,7 +63,7 @@ describe('request admission', () => {
       });
     }).pipe(
       Effect.provide(
-        admissionLayer({ enabled: true, limit: 300, windowMs: 1000 }).pipe(
+        admissionLayer({ enabled: true, limit: 300, windowMs: 1000, fallback }).pipe(
           Layer.provide(memoryQuotaLayer)
         )
       )
@@ -137,3 +143,129 @@ describe('request admission', () => {
     })
   );
 });
+
+describe('degraded admission', () => {
+  it.effect('charges local weighted cost, refills, and resumes shared state without merging', () =>
+    Effect.gen(function* () {
+      let available = false;
+      const sharedCosts: number[] = [];
+      const admission = yield* Admission.pipe(
+        Effect.provide(
+          admissionLayer({
+            enabled: true,
+            limit: 1000,
+            windowMs: 1000,
+            fallback: { capacity: 300, refillMs: 1000, maxVisitors: 2 },
+          }).pipe(
+            Layer.provide(
+              Layer.succeed(Quota, {
+                take: (_visitor, _limit, _period, cost) =>
+                  available
+                    ? Effect.sync(() => {
+                        sharedCosts.push(cost);
+                        return { _tag: 'Allowed', remaining: 1000 - cost, reset: 1000 };
+                      })
+                    : Effect.fail(new QuotaUnavailable({ reason: 'unavailable' })),
+              })
+            )
+          )
+        )
+      );
+      expect(yield* admission.admit('a', { _tag: 'Valid', cost: 200 })).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 100,
+        limit: 300,
+      });
+      expect(yield* admission.admit('a', { _tag: 'Valid', cost: 200 })).toMatchObject({
+        _tag: 'Limited',
+        retryAfter: 334,
+        limit: 300,
+      });
+      expect(yield* admission.admit('a', { _tag: 'Rejected' })).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 0,
+      });
+      yield* TestClock.adjust('500 millis');
+      expect(yield* admission.admit('a', { _tag: 'Valid', cost: 150 })).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 0,
+      });
+      available = true;
+      expect(yield* admission.admit('a', { _tag: 'Valid', cost: 300 })).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 700,
+      });
+      expect(sharedCosts).toEqual([300]);
+    })
+  );
+  it.effect(
+    'bounds local identities without evicting depleted budgets and expires full buckets',
+    () =>
+      Effect.gen(function* () {
+        const admission = yield* Admission;
+        expect(yield* admission.admit('a', { _tag: 'Valid', cost: 100 })).toMatchObject({
+          _tag: 'Allowed',
+        });
+        expect(yield* admission.admit('b', { _tag: 'Valid', cost: 100 })).toMatchObject({
+          _tag: 'Saturated',
+        });
+        expect(yield* admission.admit('a', { _tag: 'Valid', cost: 100 })).toMatchObject({
+          _tag: 'Limited',
+        });
+        yield* TestClock.adjust('1 second');
+        expect(yield* admission.admit('b', { _tag: 'Valid', cost: 100 })).toMatchObject({
+          _tag: 'Allowed',
+        });
+      }).pipe(
+        Effect.provide(
+          admissionLayer({
+            enabled: true,
+            limit: 1000,
+            windowMs: 1000,
+            fallback: { capacity: 100, refillMs: 1000, maxVisitors: 1 },
+          }).pipe(
+            Layer.provide(
+              Layer.succeed(Quota, {
+                take: () => Effect.fail(new QuotaUnavailable({ reason: 'command_failure' })),
+              })
+            )
+          )
+        )
+      )
+  );
+});
+
+it.effect(
+  'uses independent per-replica outage state and never falls back on command saturation',
+  () =>
+    Effect.gen(function* () {
+      let saturated = false;
+      const localLayer = admissionLayer({
+        ...policy,
+        fallback: { capacity: 100, refillMs: 1000, maxVisitors: 2 },
+      }).pipe(
+        Layer.provide(
+          Layer.succeed(Quota, {
+            take: () =>
+              saturated
+                ? Effect.succeed({ _tag: 'Saturated' })
+                : Effect.fail(new QuotaUnavailable({ reason: 'unavailable' })),
+          })
+        )
+      );
+      const a = yield* Admission.pipe(Effect.provide(Layer.fresh(localLayer)));
+      const b = yield* Admission.pipe(Effect.provide(Layer.fresh(localLayer)));
+      saturated = true;
+      expect(yield* a.admit('same', { _tag: 'Rejected' })).toEqual({ _tag: 'Saturated' });
+      saturated = false;
+      expect(yield* a.admit('same', { _tag: 'Rejected' })).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 0,
+      });
+      expect(yield* a.admit('same', { _tag: 'Rejected' })).toMatchObject({ _tag: 'Limited' });
+      expect(yield* b.admit('same', { _tag: 'Rejected' })).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 0,
+      });
+    })
+);

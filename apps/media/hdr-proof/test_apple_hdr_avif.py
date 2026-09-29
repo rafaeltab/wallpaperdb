@@ -114,6 +114,70 @@ class AppleHdrAvifTests(unittest.TestCase):
                 self.module._encode({**self.case['native_geometry'], field: value}, self.root/'bad-intent')
             self.assertEqual(len(avif.COMMANDS), before)
 
+    def test_explicit_depth_and_geometry_matrix_preserves_containment12(self):
+        report = self.module.run(self.root/'expanded', depths=(12, 10),
+                                 geometries=('contain', 'cover', 'fill', 'upscale'))
+        self.assertEqual(len(report['cases']), 8)
+        self.assertEqual(len({case['case_id'] for case in report['cases']}), 8)
+        sizes = {'contain': (173, 231), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 1025)}
+        output_hashes = {
+            (12, 'contain'): '0df05ebcaec55271c6ba09724f3cf55339c6859d55ea6441468dfd9cc400e9be',
+            (12, 'cover'): '1ba4744cb41e5041543745f40ec2a7115ad0e7cd9460803420462bc827bb51dd',
+            (12, 'fill'): '4dcebfdebd655e690207fef515b879e3b1c4dd33d2e1984a5007f40f906ea274',
+            (12, 'upscale'): 'b9c3a115a4dd9bddeb664310aa1d548f60b0560e739c3c74ecfd11cb46b175c9',
+            (10, 'contain'): '76ac61a5f83de9e8f70555d50ffb270a2ea2a7a84667dcc04cba7e36bd7eefb8',
+            (10, 'cover'): '0b58c98184b52e8c22496f60ef57365ccace174a3df11d8eb91a1a20148fba5d',
+            (10, 'fill'): 'e8fd4d64e651dbc7f5fb63e47638c3d8be7b8a6e3dc3131d9abb38baf85e576d',
+            (10, 'upscale'): 'e62ae256df08591ca5f3b9b092536e908e6d1346921889c70ee5b58a433d08c9'}
+        for case in report['cases']:
+            depth, operation = int(case['selectors']['depth']), case['geometry']
+            with self.subTest(depth=depth, geometry=operation):
+                self.assertEqual(case['status'] == 'qualified', all(case['checks'].values()))
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertEqual(case['artifacts']['sha256'], output_hashes[(depth, operation)])
+                self.assertTrue(case['checks']['structure'], case['blockers'])
+                self.assertTrue(case['checks']['integrity'], case['blockers'])
+                self.assertEqual(case['facts']['depth'], depth)
+                self.assertEqual(case['reference_hdr']['dimensions'], list(sizes[operation]))
+                self.assertEqual(case['output_packet_facts']['streams'][0]['pix_fmt'], f'gbrp{depth}le')
+                self.assertEqual(case['threshold_scope']['profile'], 'gainmap-hdr')
+                self.assertEqual(case['threshold_scope']['source_quantization_allowance'], 0)
+                self.assertFalse(case['rendering_scope']['intermediate_adaptation_qualified'])
+        retained = next(case for case in report['cases'] if case['case_id'] == self.case['case_id'])
+        for key in ('case_id', 'selectors', 'status', 'checks', 'measurements', 'threshold_scope',
+                    'rendering_scope', 'qualification_scope', 'known_consumer_limitations'):
+            self.assertEqual(retained[key], self.case[key], key)
+        # avifdec's diagnostic includes the absolute artifact path, which
+        # changes between these independent native runs; all content is kept.
+        def stable_facts(case):
+            return {**case['facts'], 'info': case['facts']['info'].replace(case['artifacts']['output'], '<output>')}
+        self.assertEqual(stable_facts(retained), stable_facts(self.case))
+        self.assertEqual(retained['artifacts']['sha256'], self.case['artifacts']['sha256'])
+        self.assertEqual(retained['reference_hdr']['sha256'], self.case['reference_hdr']['sha256'])
+        from matrix import build_matrix
+        matrix = build_matrix(report['cases'])
+        self.assertEqual(matrix['evidence_errors'], [])
+        self.assertEqual(matrix['rendering_coverage']['same_file_qualified_count'], 0)
+
+    def test_unproved_depth_geometry_and_mismatched_selector_tuples_reject_before_native_work(self):
+        options = ({'depths': ()}, {'depths': (8,)}, {'depths': (10, 10)}, {'depths': (True,)},
+                   {'depths': ('10',)}, {'depths': ([10],)}, {'geometries': ()},
+                   {'geometries': ('contain', 'contain')}, {'geometries': ('orientation',)},
+                   {'geometries': ('crop',)}, {'geometries': (['contain'],)},
+                   {'depths': (10,), 'selectors': dict(self.module.SELECTORS)},
+                   {'geometries': ('cover',), 'selectors': dict(self.module.SELECTORS)},
+                   {'depths': (12, 10), 'selectors': dict(self.module.SELECTORS)})
+        for kwargs in options:
+            with self.subTest(options=kwargs):
+                before = len(avif.COMMANDS)
+                with self.assertRaises(ValueError):
+                    self.module.run(self.root/'unsupported-tuples', **kwargs)
+                self.assertEqual(len(avif.COMMANDS), before)
+        before = len(avif.COMMANDS)
+        with self.assertRaises(ValueError):
+            self.module._encode(self.case['native_geometry'], self.root/'wrong-geometry', operation='cover')
+        self.assertEqual(len(avif.COMMANDS), before)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -289,6 +289,20 @@ or higher-precision bases, capacities and gain equations remain outside this
 result. Ignoring JPEG coupling and the other regional gates enlarges the
 admissible set. Numerical cutoff checks do not provide a formal
 directed-rounding certificate or change any conversion qualification.
+The [continuous-base diagnostic](iso_continuous_base_bound.py) admits every
+nonnegative own-primary base color, with no upper component cap or restriction
+to a transfer curve or bit depth. It retains the actual serialized P3 ICC
+colorants for SDR measurement at 100 nits and the existing nominal P3 HDR
+interpretation at 203 nits. Correlated color-distance bounds leave a
+1.192288-nit contradiction in the same shared offset difference. Arbitrary
+per-pixel gains, map precision and nonnegative offsets cannot satisfy these
+two pixels at the current positive ordered display weights. The search keeps
+unresolved boxes when its budget is exhausted, so its extrema are conservative
+outer bounds rather than exact optima. Guarded float64 arithmetic is not a
+formal directed-rounding or native LittleCMS certificate. Other colorants,
+HDR color interpretation, references, geometry, capacities and gain equations
+remain outside this result. The default replay records the diagnostic without
+adding or qualifying any conversion case.
 The [four other ISO geometries](iso_geometry_headroom.py) rerun their exact
 qualified recipes and preserve every original endpoint measurement. Each
 containment, crop, stretch and EXIF6 orientation file passes at boost 16 and

@@ -512,7 +512,7 @@ def apple_documented_report(evidence):
         'Each row measures the full effect only; a passing row does not qualify intermediate Apple adaptation. JPEG retains its declared ICC-aware reader scope and separate stock-reader diagnostics. Single-layer AVIF/PNG has no embedded authored SDR base or adaptive gain map. The inspected manual entries preserve each output, authored SDR comparison, source hash and rendering scope. Browser, native viewer and OS wallpaper results remain pending manual review.', '']
 
 
-def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound, global_bound, base_bound):
+def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound, global_bound, base_bound, continuous_bound):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
@@ -528,6 +528,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              *iso_map_bound_report(map_bound),
              *iso_global_offset_report(global_bound),
              *iso_base_code_report(base_bound),
+             *iso_continuous_base_report(continuous_bound),
              *apple_documented_report(evidence),
              '## Environment and reproducibility','',
              'The image uses the same Node 22 Alpine/musl deployment shape as Media. This is a proposed native proof pipeline, not the existing Sharp 0.33 production worker. No service dependency was upgraded. HDR geometry uses native FFmpeg/zimg float processing and luminance-coupled HLG transforms. The calibrated SDR candidate uses the native CPU Mobius filter. CPU lavapipe runs the retained libplacebo comparison trials without a host GPU. Network access is disabled during tests.','',
@@ -834,6 +835,9 @@ def main():
     from iso_base_code_bound import run as run_iso_base_code_bound
     iso_base_bound = run_iso_base_code_bound(WORK/'iso-base-code-bound', map_code_report=iso_map_bound)
     write_json(RESULTS/'iso-base-code-bound.json', iso_base_bound)
+    from iso_continuous_base_bound import run as run_iso_continuous_base_bound
+    iso_continuous_bound = run_iso_continuous_base_bound(WORK/'iso-continuous-base-bound', map_code_report=iso_map_bound)
+    write_json(RESULTS/'iso-continuous-base-bound.json', iso_continuous_bound)
     from iso_geometry_headroom import run as run_iso_geometry_headroom
     iso_geometry_headroom = run_iso_geometry_headroom(WORK/'iso-geometry-headroom')
     write_json(RESULTS/'iso-geometry-headroom.json', iso_geometry_headroom)
@@ -914,7 +918,7 @@ def main():
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,generated_fixtures)
-    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas,mozjpeg_diagnosis,iso_map_bound,iso_global_bound,iso_base_bound))
+    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas,mozjpeg_diagnosis,iso_map_bound,iso_global_bound,iso_base_bound,iso_continuous_bound))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))
     return 1 if errors else 2

@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import {
   Config as Configuration,
   ConfigProvider,
@@ -21,6 +22,20 @@ const boolean = (name: string, fallback: boolean) =>
   );
 const optional = <A>(config: Configuration.Config<A>) =>
   config.pipe(Configuration.option, Configuration.map(Option.getOrUndefined));
+
+function proxyAddresses(value: string): string[] {
+  return value.trim() === '' ? [] : value.split(',').map((address) => address.trim());
+}
+function isProxyAddress(value: string): boolean {
+  const [address, prefix, ...extra] = value.split('/');
+  if (!address || extra.length > 0) return false;
+  const version = isIP(address);
+  if (version === 0) return false;
+  return (
+    prefix === undefined ||
+    (/^\d+$/.test(prefix) && Number(prefix) > 0 && Number(prefix) <= (version === 4 ? 32 : 128))
+  );
+}
 
 export class GatewayConfigurationError extends Schema.TaggedError<GatewayConfigurationError>()(
   'GatewayConfigurationError',
@@ -50,8 +65,27 @@ export const gatewayConfig = Effect.gen(function* () {
     ['development', 'production', 'test'],
     'NODE_ENV'
   ).pipe(Configuration.withDefault('development'));
+  const proxies = Configuration.schema(
+    Schema.String.check(
+      Schema.makeFilter(
+        (value) => {
+          const addresses = proxyAddresses(value);
+          return (
+            (nodeEnv !== 'production' || addresses.length > 0) && addresses.every(isProxyAddress)
+          );
+        },
+        {
+          expected:
+            'explicit trusted proxy IP addresses or nonzero CIDR ranges; required in production',
+        }
+      )
+    ),
+    'TRUSTED_PROXIES'
+  ).pipe(Configuration.map(proxyAddresses));
   return yield* Configuration.all({
     nodeEnv: Configuration.succeed(nodeEnv),
+    trustedProxies:
+      nodeEnv === 'production' ? proxies : proxies.pipe(Configuration.withDefault([])),
     port: Configuration.schema(boundedPort, 'PORT').pipe(Configuration.withDefault(3004)),
     opensearchUrl: Configuration.schema(urlString, 'OPENSEARCH_URL'),
     opensearchIndex: Configuration.NonEmptyString('OPENSEARCH_INDEX').pipe(

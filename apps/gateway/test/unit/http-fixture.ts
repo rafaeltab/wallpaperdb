@@ -16,6 +16,7 @@ export interface HttpTestServices {
 }
 export const httpConfig: HttpConfig = {
   port: 3004,
+  trustedProxies: [],
   nodeEnv: 'test',
   mediaServiceUrl: 'http://media.example.com',
   mediaPublicPath: '/media',

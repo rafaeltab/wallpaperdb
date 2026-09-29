@@ -57,8 +57,9 @@ def versions():
                    'native_lossless_jpeg_binary_sha256':avif.digest(Path('/usr/local/bin/hdr-proof-lossless-jpeg')),
                    'native_dct_jpeg_source_sha256':avif.digest(ROOT/'native_dct_jpeg.c'),
                    'native_dct_jpeg_binary_sha256':avif.digest(Path('/usr/local/bin/hdr-proof-dct-jpeg')),
+                   'native_jpegli_binary_sha256':avif.digest(Path('/opt/proof/jpegli/hdr-proof-jpegli')),
                    'proof_source_sha256':{path.name:avif.digest(path) for path in sorted(ROOT.iterdir())
-                       if path.is_file() and (path.name == 'Dockerfile' or path.suffix in ('.py','.c','.cpp','.cjs','.sh','.patch'))},
+                       if path.is_file() and (path.name == 'Dockerfile' or path.suffix in ('.py','.c','.cpp','.cjs','.sh','.patch','.cmake'))},
                    'libultrahdr_variant_binaries':Path('/opt/proof/ultrahdr/binary-sha256.txt').read_text(),
                    'libavif_variant_binaries':{str(path.relative_to('/opt/proof/libavif')):avif.digest(path)
                        for path in sorted(Path('/opt/proof/libavif').glob('*/avifgainmaputil'))},
@@ -254,7 +255,7 @@ def gainmap_candidate_report(evidence):
     return lines + ['']
 
 
-def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision):
+def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
@@ -313,7 +314,9 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
             if values.get('samples', 0):
                 lines.append(f"| `{case['case_id']}` | {region} | {values['delta_e_itp']['p95']:.4f} | {values['luminance_absolute_error_nits']['mean']:.4f} |")
     lines += ['', 'The tunable Mobius and Reinhard trials use maintained native functions with fixed parameters. Their failures do not change the white target. Adaptive peak detection is disabled in the candidate conversion path; separate controls record frame-to-frame white shifts and repeat hashes with it enabled and disabled. Persistent temporal-filter history is not qualified by these per-frame trials.', '',
-              *gainmap_candidate_report(evidence), '## Blockers and scope limits','',
+              *gainmap_candidate_report(evidence),
+              f'The separate [JPEGli base experiment](jpegli-base-experiment.json) records {len(jpegli["cases"])} native SOF0 RGB8 trials, of which {sum(case["status"] == "qualified" for case in jpegli["cases"])} pass the unchanged authored-SDR base checks. Each failed trial retains its regional measurements. These base experiments do not qualify an HDR derivative and are excluded from the conversion-attempt counts above. A JPEGli HDR candidate must independently regenerate and validate its gain map and reconstructed HDR output.', '',
+              '## Blockers and scope limits','',
               '- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.',
               '- The separately versioned gainmap-hdr-target-gamut-v1 reference filters and clips negative Lanczos excursions in the requested output primaries. Clipping in the earlier Rec.2020 decoder coordinates could create negative components in the requested P3 or sRGB gamut. Analytic commutation, out-of-gamut and identity controls verify this correction. Old references and failed case IDs remain visible; new cases record the reference revision and diagnostic differences. Appearance thresholds are unchanged.',
               '- Combined gain-map candidates use JPEG SOF3 predictive RGB8 coding and proof-local native patches. The pinned libavif JPEG reader rejects SOF3, while the separately tested native JPEG/ISO and patched libultrahdr readers decode it. File qualification does not establish browser or wallpaper compatibility. Every exact representation still requires the listed physical consumer checks.',
@@ -373,6 +376,9 @@ def main():
     from precision import run as run_precision
     precision = run_precision(WORK, WORK/'precision')
     write_json(RESULTS/'precision.json', precision)
+    from jpegli_proof import run as run_jpegli
+    jpegli_result = run_jpegli(WORK/'jpegli-base-experiment')
+    write_json(RESULTS/'jpegli-base-experiment.json', jpegli_result)
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))
@@ -414,7 +420,7 @@ def main():
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,generated_fixtures)
-    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision))
+    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))
     return 1 if errors else 2

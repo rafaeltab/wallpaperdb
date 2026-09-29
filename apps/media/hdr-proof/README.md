@@ -53,6 +53,14 @@ changes the conversion gates.
 Both independent JPEG/ISO and native libultrahdr reconstruction must pass the
 unchanged file gates. Every physical consumer remains pending.
 
+The separate [JPEGli experiment](jpegli_proof.py) tests another pinned native
+encoder against the same authored SDR bases. It records all combinations of
+uint8/float32 input transport, standard/JPEGli quantization tables and adaptive
+quantization, with unchanged RGB8 output depth and sRGB transfer. The complete
+suite regenerates [all trial measurements](results/jpegli-base-experiment.json),
+including failures, native commands and build/source hashes. A passing SDR base
+alone does not qualify a gain-map JPEG or establish physical compatibility.
+
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
 the same HDR intent and fixed appearance limits. Analytic near-black controls

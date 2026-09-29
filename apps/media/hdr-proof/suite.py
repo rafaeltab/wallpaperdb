@@ -438,6 +438,9 @@ def main():
     from hdr_png8_geometry import run as run_hdr_png8_geometry
     png8_geometry_result = run_hdr_png8_geometry(WORK/'hdr-png8-geometry')
     write_json(WORK/'hdr-png8-geometry-evidence.json',png8_geometry_result)
+    from hdr_png8_precision import run as run_hdr_png8_precision
+    png8_precision_result = run_hdr_png8_precision(WORK/'hdr-png8-precision')
+    write_json(WORK/'hdr-png8-precision-evidence.json',png8_precision_result)
     from apng import run as run_apng
     apng_result = run_apng(WORK/'apng', animated_gif=True)
     write_json(WORK/'apng-evidence.json',apng_result)
@@ -476,7 +479,7 @@ def main():
     controls['controls'].extend(png_result['controls'])
     controls['controls'].extend(png8_result['controls'])
     controls['controls'].extend(apng_result['controls'])
-    evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
+    evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + png8_precision_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
     locked_fixtures = avif_result['fixtures'] + png_result['fixtures'] + apng_result['fixtures'] + controls.get('fixtures',[])
     # PNG8 validates its separate source lock before any conversion. Preserve
     # the original generated corpus lock, including its PNG16 hashes.

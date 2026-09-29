@@ -204,6 +204,12 @@ It checks unchanged coded samples after resetting orientation metadata, exact
 native precision expansion, and one native rotation against independent decoded
 pixels before resizing. These cases retain the containment appearance and alpha
 limits. No existing source hashes or failed containment results change.
+The [higher-depth candidates](hdr_png8_precision.py) separately test explicit
+HDR PNG16 and AVIF12 requests from these eight-bit sources. Both outputs use the
+existing, stricter `avif-12` appearance ceiling against decoded-source geometry.
+Source quantization remains separate. Alpha error must stay within two codes
+at the actual output depth. The complete suite includes these measurements and
+their inspected containment files for pending physical review.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

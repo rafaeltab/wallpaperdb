@@ -24,6 +24,9 @@ file's manifest status; the bundle also retains failed candidates for diagnosis.
 The optional PNG8 bundle covers all eight PQ/HLG, P3/Rec.2020 and alpha sources,
 their separately hashed EXIF-8 variants, and inspected containment/orientation
 outputs. Test HDR PNG8 and AVIF8 separately from explicit SDR PNG16 and AVIF8.
+The higher-depth HDR PNG16 and AVIF12 candidates are separate files. Compare
+their gradients and fractional alpha against the same eight-bit source intent;
+increased output precision cannot recover detail absent from that source.
 The direct-input failures remain diagnostic files; use the manifest to select
 the separately qualified native-normalization candidates for consumer review.
 

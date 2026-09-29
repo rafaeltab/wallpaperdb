@@ -29,6 +29,13 @@ class CombinedDctGainMapTests(unittest.TestCase):
             self.assertTrue(diagnostic['decoded'])
             self.assertEqual(diagnostic['status'], 'tested and failed')
             self.assertIn('highlight.delta_e_mean', diagnostic['measurement']['failures'])
+            rgb_reader = case['consumer_decoder_diagnostics']['rgb_libavif']
+            self.assertTrue(rgb_reader['decoded'])
+            self.assertEqual(rgb_reader['status'], 'qualified', rgb_reader)
+            self.assertEqual(rgb_reader['facts']['cicp'], [1, 16, 0, 1])
+            self.assertEqual(rgb_reader['consumer_status'], 'pending manual review')
+            self.assertEqual(rgb_reader['qualification_scope'], 'decoder appearance diagnostic only')
+            self.assertFalse(any('libavif' in check for check in case['checks']))
 
     def test_apple_dct_shadow_error_remains_unqualified(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -36,6 +43,8 @@ class CombinedDctGainMapTests(unittest.TestCase):
                        policies=('moderateoffset',), coding='dct-rgb')[0]
             self.assertEqual(case['status'], 'tested and failed')
             self.assertIn('shadow.delta_e_max', case['measurements']['authored_sdr_base']['failures'])
+            self.assertIn('rgb_libavif', case['consumer_decoder_diagnostics'])
+            self.assertIn('Failed appearance check', case['blockers'])
 
     def test_ycbcr_component_identifiers_cannot_enter_rgb_header_scope(self):
         with tempfile.TemporaryDirectory() as temporary:

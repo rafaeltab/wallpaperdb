@@ -10,6 +10,7 @@ import gainmap
 import gainmap_combine
 import gainmap_hdr
 import gainmap_sdr
+import rgb_gainmap_reader
 from gainmap_iso import decode_iso_source
 from gainmap_metadata import check_metadata
 from appearance import compare_appearance, sdr_signal_to_nits
@@ -200,6 +201,24 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                         except Exception as error:
                             diagnostic['failure'] = str(error)
                         case['consumer_decoder_diagnostics'] = {'baseline_libavif': diagnostic}
+                        rgb_diagnostic = {'decoded': False, 'status': 'tested and failed',
+                            'qualification_scope': 'decoder appearance diagnostic only',
+                            'consumer_status': 'pending manual review',
+                            'scope': 'Separate native libavif reader preserves JPEG-decoded RGB gain samples. '
+                                     'The original reader result and all codec qualification checks remain independent.'}
+                        try:
+                            rgb_hdr, rgb_facts = rgb_gainmap_reader.decode(
+                                target, folder/'rgb-libavif-decoder', gamut=gamut)
+                            rgb_diagnostic['decoded'] = True
+                            rgb_diagnostic['facts'] = rgb_facts
+                            rgb_diagnostic['measurement'] = compare_appearance(hdr_reference, rgb_hdr,
+                                reference_gamut=reference_gamut, actual_gamut=rgb_facts['gamut'],
+                                fixture_class='gainmap-hdr')
+                            if rgb_diagnostic['measurement']['passed']:
+                                rgb_diagnostic['status'] = 'qualified'
+                        except Exception as error:
+                            rgb_diagnostic['failure'] = str(error)
+                        case['consumer_decoder_diagnostics']['rgb_libavif'] = rgb_diagnostic
                     case['blockers'] = [f'Failed {key} check' for key, passed in case['checks'].items() if not passed]
                     if all(case['checks'].values()):
                         case['status'] = 'qualified'

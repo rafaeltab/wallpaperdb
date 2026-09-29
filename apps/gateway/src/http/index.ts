@@ -437,7 +437,14 @@ function installRequestLifecycle(
   app.addHook('onRequest', async (request, reply) => {
     if (closing) {
       if (isGraphql(request.routeOptions.url ?? request.url))
-        return reply.code(503).send(graphqlError('SERVICE_UNAVAILABLE', 'Service unavailable'));
+        return reply
+          .code(503)
+          .header('Retry-After', '1')
+          .send(
+            graphqlError('GATEWAY_OVERLOADED', 'The gateway is restarting. Please try again.', {
+              reason: 'shutdown',
+            })
+          );
       return reply
         .code(503)
         .type('application/problem+json')

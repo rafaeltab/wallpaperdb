@@ -160,5 +160,66 @@ class AppleHdrJpegTests(unittest.TestCase):
         self.assertEqual(case['artifacts']['source_sha256'], apple_source_model.SOURCE_SHA256)
 
 
+class AppleHdrJpegGeometryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import apple_hdr_jpeg
+        cls.module = apple_hdr_jpeg
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.root = Path(cls.temporary.name)
+        cls.report = cls.module.run(cls.root/'proof', geometries=('contain', 'cover', 'fill', 'upscale'))
+
+    def test_four_geometries_keep_separate_actual_depth_dimensions_selectors_and_measurements(self):
+        cases = self.report['cases']
+        self.assertEqual([case['geometry'] for case in cases], ['contain', 'cover', 'fill', 'upscale'])
+        self.assertEqual(len({case['case_id'] for case in cases}), 4)
+        expected_hashes = {'contain': '2d8a2db64b65c2a377fd62a94edaa447259164cf2f7cfb1747bd3bb5bd27b010',
+            'cover': '85a4381a362af0e35d9aafc16e53fba7ff32cc9b4f7d3022eec3831957690049',
+            'fill': 'f27b9f13c3a7b2078ca2a9867d67d28653c0dbe7621b2796885582c46989ac87',
+            'upscale': 'b89920e58f380b371099299480690292b71a64a855e61547e6e26726a6b6d94e'}
+        for case in cases:
+            with self.subTest(geometry=case['geometry']):
+                size = self.module.SIZES[case['geometry']]
+                for layer in ('base', 'map'):
+                    self.assertEqual((case['facts'][layer]['width'], case['facts'][layer]['height']), size)
+                    self.assertEqual(case['facts'][layer]['depth'], 8)
+                self.assertEqual(case['selectors'], self.module._selectors(case['geometry']))
+                self.assertEqual(case['source_reference_revision'], apple_source_model.REFERENCE_REVISION)
+                self.assertEqual(case['rendering_scope']['display_boost'], 16)
+                self.assertEqual(case['status'] == 'qualified', all(case['checks'].values()))
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertEqual(case['artifacts']['sha256'], expected_hashes[case['geometry']])
+                for name in ('native_source_precision', 'native_geometry', 'hdr_intent', 'structure', 'privacy', 'full_headroom', 'integrity'):
+                    self.assertTrue(case['checks'][name], (name, case['blockers']))
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+                self.assertEqual(avif.digest(case['artifacts']['output']), case['artifacts']['sha256'])
+                self.assertTrue(case['measurements']['authored_sdr_base']['passed'])
+        matrix = build_matrix(cases)
+        self.assertEqual(matrix['evidence_errors'], [])
+        rows = next(cell for cell in matrix['cells'] if cell['id'] == 'gainmap-jpeg:hdr:jpg')['evidence']
+        self.assertEqual([(row['case_id'], row['status']) for row in rows],
+                         [(row['case_id'], row['status']) for row in cases])
+
+    def test_containment_bytes_facts_checks_and_measurements_match_default(self):
+        baseline = self.module.run(self.root/'default')['cases'][0]
+        contained = self.report['cases'][0]
+        for key in ('case_id', 'candidate', 'selectors', 'facts', 'checks', 'measurements',
+                    'threshold_scope', 'rendering_scope', 'qualification_scope', 'known_consumer_limitations'):
+            self.assertEqual(contained[key], baseline[key], key)
+        self.assertEqual(contained['artifacts']['sha256'], '2d8a2db64b65c2a377fd62a94edaa447259164cf2f7cfb1747bd3bb5bd27b010')
+        self.assertEqual(contained['reference_hdr']['sha256'], baseline['reference_hdr']['sha256'])
+        self.assertEqual(contained['reference_sdr']['sha256'], baseline['reference_sdr']['sha256'])
+
+    def test_unproved_geometry_and_ambiguous_selector_lists_stop_before_native_work(self):
+        for geometries in ((), ('contain', 'contain'), ('orientation',), ('crop',), ('identity',)):
+            before = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                self.module.run(self.root/'rejected', geometries=geometries)
+            self.assertEqual(len(avif.COMMANDS), before)
+        with self.assertRaises(ValueError):
+            self.module.run(self.root/'ambiguous', geometries=('contain', 'cover'), selectors=self.module.SELECTORS)
+
+
 if __name__ == '__main__':
     unittest.main()

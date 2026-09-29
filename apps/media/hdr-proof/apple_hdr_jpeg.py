@@ -1,6 +1,6 @@
-"""One old Apple HDR JPEG using the independently documented full effect.
+"""Old Apple HDR JPEG geometries using the independently documented full effect.
 
-Only containment at display boost 16 is measured. The source's full headroom
+Only contain, cover, fill and upscale at display boost 16 are measured. The source's full headroom
 is 8, and no intermediate Apple adaptation model is inferred. Native float
 source preparation, native geometry and PQ intent are separately checked
 before the existing midpoint-offset/gamma1.5 FLOAT map encoder. The original
@@ -26,23 +26,33 @@ from appearance import compare_appearance, sdr_signal_to_nits, THRESHOLDS_SHA256
 from gainmap_avif_hdr_jpeg import _layer_structure
 from gainmap_metadata import check_metadata
 from gamma_icc import decode_signal_to_nits, profile_facts
+from matrix import GAINMAP_GEOMETRIES
 
 SELECTORS = {'format': 'jpg', 'range': 'hdr', 'gamut': 'preserve', 'depth': 'preserve',
              'motion': 'preserve', 'transparency': 'preserve', 'w': 173, 'fit': 'contain'}
+SIZES = {'contain': (173, 231), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 1025)}
 REVISION = apple_source_model.REFERENCE_REVISION
 DEPENDENCIES = ('apple_hdr_jpeg.py', 'test_apple_hdr_jpeg.py', *apple_native_source.DEPENDENCIES,
                 'gainmap_linear.py', 'gainmap_hdr.py', 'icc_gainmap.py', 'gainmap_metadata.py',
                 'gainmap_avif_hdr_jpeg.py', 'gamma_icc.py', 'dct_jpeg.py', 'native_icc_gainmap.cpp',
-                'native_dct_jpeg.c', 'gainmap_combine.py', 'gainmap_reference.py')
+                'native_dct_jpeg.c', 'gainmap_combine.py', 'gainmap_reference.py', 'matrix.py')
+
+
+def _selectors(operation):
+    return {**{key: value for key, value in SELECTORS.items() if key not in ('w', 'fit')},
+            **GAINMAP_GEOMETRIES[operation]}
 
 
 def _measure(expected, actual):
     return compare_appearance(expected, actual, reference_gamut='p3', actual_gamut='p3', fixture_class='gainmap-hdr')
 
 
-def _intent(geometry, path):
+def _intent(geometry, path, *, operation='contain'):
+    if operation not in SIZES:
+        raise ValueError('Unproved native HDR geometry')
+    width, height = SIZES[operation]
     if (geometry.get('format') != 'gbrapf32le' or geometry.get('gamut') != 'p3'
-            or geometry.get('normalization_nits') != 203 or (geometry.get('width'), geometry.get('height')) != (173, 231)):
+            or geometry.get('normalization_nits') != 203 or (geometry.get('width'), geometry.get('height')) != (width, height)):
         raise ValueError('Known P3 float geometry and 203-nit normalization are required')
     filters = ('setparams=alpha_mode=premultiplied,zscale=agamma=0:transferin=linear:transfer=16:'
         'primariesin=12:primaries=12:matrixin=0:matrix=0:rangein=full:range=full:npl=203,'
@@ -50,12 +60,15 @@ def _intent(geometry, path):
         'zscale=agamma=0:transferin=16:transfer=16:primariesin=12:primaries=12:'
         'matrixin=0:matrix=0:rangein=full:range=full:npl=10000,format=rgb48le,setsar=1')
     avif.native(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'gbrapf32le',
-        '-s', '173x231', '-i', geometry['path'], '-vf', filters, '-frames:v', '1',
+        '-s', f'{width}x{height}', '-i', geometry['path'], '-vf', filters, '-frames:v', '1',
         '-map_metadata', '-1', '-threads', '1', path])
     return filters
 
 
-def inspect_intent(path, directory):
+def inspect_intent(path, directory, *, dimensions=(173, 231)):
+    if tuple(dimensions) not in SIZES.values():
+        raise ValueError('Unproved native HDR intent dimensions')
+    width, height = dimensions
     color = hdr_png.inspect_source(path)
     chunks = hdr_png._png_chunks(Path(path).read_bytes())
     kinds = [kind for kind, _ in chunks]
@@ -65,30 +78,33 @@ def inspect_intent(path, directory):
             or any(kinds.index(kind) > kinds.index(b'IDAT') for kind in required[:-1])):
         raise ValueError('Unknown native HDR PNG structure or private metadata')
     fields = {kind: payload for kind, payload in chunks if kind != b'IDAT'}
-    if (fields[b'IHDR'] != struct.pack('>IIBBBBB', 173, 231, 16, 2, 0, 0, 0)
+    if (fields[b'IHDR'] != struct.pack('>IIBBBBB', width, height, 16, 2, 0, 0, 0)
             or fields[b'pHYs'] != struct.pack('>IIB', 1, 1, 0)
             or fields[b'cICP'] != bytes((12, 16, 0, 1))
             or fields[b'cHRM'] != struct.pack('>8I', 31270, 32900, 68000, 32000, 26500, 69000, 15000, 6000)
-            or any(color.get(key) != value for key, value in {'width': 173, 'height': 231,
+            or any(color.get(key) != value for key, value in {'width': width, 'height': height,
                 'depth': 16, 'primaries': 12, 'transfer': 16, 'orientation': 1}.items())):
         raise ValueError('Native HDR intent has unknown color, depth, geometry or pixel aspect')
     facts = gainmap.inspect(Path(path), Path(directory))
     pixels = avif.read_png(path)
     if (facts['private_tags'] or facts['frame_count'] != 1 or not facts['opaque']
             or [facts['metadata'].get('PNG-pHYs:'+key) for key in ('PixelsPerUnitX', 'PixelsPerUnitY', 'PixelUnits')] != [1, 1, 0]
-            or pixels.shape != (231, 173, 4) or not np.all(pixels[..., 3] == 1)):
+            or pixels.shape != (height, width, 4) or not np.all(pixels[..., 3] == 1)):
         raise ValueError('Independent PNG reader does not establish private-metadata-free static opaque intent')
     return {'path': str(path), 'sha256': avif.digest(path), 'color': color, 'facts': facts,
             'square_pixels': True, 'purpose': 'Native PQ16 encoding intent, not independent reference'}, avif.decode_transfer(pixels[..., :3], 'pq', 'p3')
 
 
-def inspect_output(path, directory):
+def inspect_output(path, directory, *, dimensions=(173, 231)):
+    if tuple(dimensions) not in SIZES.values():
+        raise ValueError('Unproved HDR JPEG dimensions')
+    width, height = dimensions
     path, directory = Path(path), Path(directory)
     facts = gainmap.inspect(path, directory)
     if (not facts.get('gain_map_present') or not facts.get('iso_metadata') or not facts.get('android_xmp_properties')
             or facts['private_tags'] or facts['frame_count'] != 1 or not facts['opaque']):
         raise ValueError('Unknown HDR JPEG gain metadata, privacy, motion or alpha')
-    expected = {'depth': 8, 'width': 173, 'height': 231, 'components': 3, 'sof': 0}
+    expected = {'depth': 8, 'width': width, 'height': height, 'components': 3, 'sof': 0}
     if any(facts[layer] != expected for layer in ('base', 'map')):
         raise ValueError('Expected actual contained baseline RGB8 base and map')
     data, gain = path.read_bytes(), (directory/'map.jpg').read_bytes()
@@ -102,8 +118,8 @@ def inspect_output(path, directory):
             or tags.get('XMP-GContainer:DirectoryItemMime') != ['image/jpeg']*2
             or tags.get('XMP-GContainer:DirectoryItemLength') != map_size):
         raise ValueError('Emitted file does not establish exactly two declared JPEG layers')
-    facts['layer_structure'] = {'base': _layer_structure(data[:base_size], (173, 231)),
-                               'map': _layer_structure(gain, (173, 231))}
+    facts['layer_structure'] = {'base': _layer_structure(data[:base_size], dimensions),
+                               'map': _layer_structure(gain, dimensions)}
     with Image.open(path) as image:
         profile = image.info.get('icc_profile', b'')
     decode_signal_to_nits(np.zeros((1, 3)), profile, expected_gamma=3.2, expected_gamut='p3')
@@ -122,21 +138,47 @@ def inspect_output(path, directory):
     return facts
 
 
-def run(directory, *, source=apple_source_model.SOURCE, selectors=None):
+def _control(directory, operation):
+    if operation in ('contain', 'upscale'):
+        return icc_gainmap.run(directory, source_id='gainmap-apple-old', operation=operation,
+                              map_policy='midpointoffset', map_gamma=1.5, map_method='float')
+    # The legacy ICC experiment did not admit cover/fill. Preserve that scope
+    # and independently check only the established native authored-SDR stage.
+    directory.mkdir(parents=True, exist_ok=True)
+    source, base = apple_source_model.SOURCE, directory/'gamma32-base.jpg'
+    encoding = gainmap_sdr.encode(source, base, operation, gamut='p3', gamma=3.2)
+    reference = gainmap.geometry(gainmap.source_image(source, 'preserve'), operation, 1)
+    profile = reference.info.get('icc_profile')
+    reference.info.clear()
+    ref_path = directory/'reference-sdr.png'
+    reference.save(ref_path, icc_profile=profile)
+    actual, facts = gainmap_sdr.decode_linear(base, gamut='p3', gamma=3.2)
+    measure = compare_appearance(sdr_signal_to_nits(np.asarray(reference)/255), actual,
+        reference_gamut='p3', actual_gamut='rec2020', fixture_class='gainmap-sdr')
+    return {'scope': 'Authored SDR control only; no additional legacy HDR interpretation or endpoint is qualified',
+        'cases': [{'status': 'qualified' if measure['passed'] and facts['privacy'] else 'tested and failed',
+            'geometry': operation, 'native_candidate': {'base': str(base), 'base_sha256': avif.digest(base), 'base_encoding': encoding},
+            'measurements': {'authored_sdr_base': measure}, 'sdr_decoder_evidence': facts,
+            'reference_sdr': {'path': str(ref_path), 'sha256': avif.digest(ref_path), 'gamut': 'p3',
+                'transfer': 'srgb', 'purpose': 'Independent matched-geometry authored SDR base'}}]}
+
+
+def _run_one(directory, *, source, selectors=None, operation='contain'):
     source, directory = Path(source), Path(directory)
     admitted_source_hash = avif.digest(source)
-    if (selectors is not None and selectors != SELECTORS) or admitted_source_hash != apple_source_model.SOURCE_SHA256:
-        raise ValueError('Only the locked old Apple source and exact HDR JPEG containment selectors are admitted')
+    if (operation not in SIZES or (selectors is not None and selectors != _selectors(operation))
+            or admitted_source_hash != apple_source_model.SOURCE_SHA256):
+        raise ValueError('Only the locked old Apple source and exact declared HDR JPEG selectors are admitted')
+    width, height = SIZES[operation]
     directory.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
     hashes = {name: avif.digest(Path(__file__).with_name(name)) for name in DEPENDENCIES}
-    control = icc_gainmap.run(directory/'legacy-converter', source_id='gainmap-apple-old', operation='contain',
-                             map_policy='midpointoffset', map_gamma=1.5, map_method='float')
+    control = _control(directory/'legacy-converter', operation)
     legacy = control['cases'][0]
     candidate = 'native-combine-icc-gamma32-midpointoffset-dct-float-map-source-apple-documented-full'
-    case = {'case_id': f'gainmap-apple-old:hdr:jpg:preserve:preserve:contain:{candidate}:{REVISION}:render-boost16',
+    case = {'case_id': f'gainmap-apple-old:hdr:jpg:preserve:preserve:{operation}:{candidate}:{REVISION}:render-boost16',
         'cell_id': 'gainmap-jpeg:hdr:jpg', 'fixture_id': 'gainmap-apple-old', 'proof_module': 'apple_hdr_jpeg',
-        'candidate': candidate, 'geometry': 'contain', 'selectors': dict(SELECTORS),
+        'candidate': candidate, 'geometry': operation, 'selectors': _selectors(operation),
         'source_sha256': apple_source_model.SOURCE_SHA256, 'source_reference_revision': REVISION,
         'source_precision': 'documented full-effect float32', 'status': 'tested and failed',
         'consumer_status': 'pending manual review',
@@ -150,13 +192,14 @@ def run(directory, *, source=apple_source_model.SOURCE, selectors=None):
         'threshold_scope': {'source_reference_revision': REVISION, 'thresholds_sha256': THRESHOLDS_SHA256,
             'hdr_profile': 'gainmap-hdr', 'sdr_profile': 'gainmap-sdr',
             'geometry': 'Unchanged independent float32 Lanczos in P3 after full source reconstruction',
-            'base': 'Unchanged native authored SDR containment, actual gamma3.2 P3 ICC, baseline RGB8 JPEG',
+            'base': ('Unchanged native authored SDR containment, actual gamma3.2 P3 ICC, baseline RGB8 JPEG'
+                     if operation == 'contain' else 'Established native authored SDR geometry, actual gamma3.2 P3 ICC, baseline RGB8 JPEG'),
             'recipe': 'Existing native midpointoffset1/16384, gamma1.5, FLOAT DCT RGB8 map against actual compressed base'},
         'checks': {name: False for name in ('native_encoder', 'independent_source_decoder', 'native_source_precision',
             'native_geometry', 'hdr_intent', 'independent_decoder', 'structure', 'appearance', 'privacy',
             'full_headroom', 'integrity')}, 'measurements': {}, 'artifacts': {}, 'blockers': []}
     report = {'converter_control': control, 'cases': [case], 'reference_revision': REVISION,
-              'scope': 'One separately encoded old Apple containment under the documented full model; legacy evidence is unchanged'}
+              'scope': f'One separately encoded old Apple {operation} under the documented full model; legacy evidence is unchanged'}
     try:
         prepared = apple_native_source.run(directory/'documented-source')
         report['native_source_preparation'] = prepared
@@ -165,10 +208,10 @@ def run(directory, *, source=apple_source_model.SOURCE, selectors=None):
         if not legacy['measurements']['authored_sdr_base']['passed']:
             raise ValueError('Unchanged authored SDR preparation control failed')
         native = prepared['native_source']
-        geometry = gainmap_linear.resample_linear(native, directory/'geometry.gbrapf32', 'contain')
+        geometry = gainmap_linear.resample_linear(native, directory/'geometry.gbrapf32', operation)
         intent = directory/'native-intent-pq.png'
-        filters = _intent(geometry, intent)
-        intent_facts, intent_nits = inspect_intent(intent, directory/'intent-inspection')
+        filters = _intent(geometry, intent, operation=operation)
+        intent_facts, intent_nits = inspect_intent(intent, directory/'intent-inspection', dimensions=(width, height))
         base, output = Path(legacy['native_candidate']['base']), directory/'output.jpg'
         if avif.digest(base) != legacy['native_candidate']['base_sha256']:
             raise ValueError('Native authored SDR base integrity changed')
@@ -176,13 +219,13 @@ def run(directory, *, source=apple_source_model.SOURCE, selectors=None):
         case['checks']['native_encoder'] = True
         case['artifacts'] = {'source': str(source), 'source_sha256': admitted_source_hash,
                              'output': str(output), 'sha256': avif.digest(output)}
-        expected = gainmap.array_geometry(np.load(prepared['reference']['path']), 'contain')
+        expected = gainmap.array_geometry(np.load(prepared['reference']['path']), operation)
         reference_path = directory/'independent-documented-full.npy'
         np.save(reference_path, expected)
         reference = {'path': str(reference_path), 'sha256': avif.digest(reference_path), 'gamut': 'p3',
-            'transfer': 'linear', 'units': 'cd/m2', 'dimensions': [173, 231], 'display_boost': 16,
+            'transfer': 'linear', 'units': 'cd/m2', 'dimensions': [width, height], 'display_boost': 16,
             'source_reference_revision': REVISION, 'purpose': 'Independent documented full effect, then unchanged matched geometry'}
-        facts = inspect_output(output, directory/'inspection')
+        facts = inspect_output(output, directory/'inspection', dimensions=(width, height))
         output_map = directory/'inspection/map.jpg'
         bound = {**prepared['bound_files'], str(source): admitted_source_hash,
             str(base): candidate_facts['base_sha256'], str(output): avif.digest(output),
@@ -202,7 +245,7 @@ def run(directory, *, source=apple_source_model.SOURCE, selectors=None):
             'reconstructed_hdr': _measure(expected, actual_hdr), 'independent_hdr': _measure(expected, independent),
             'independent_hdr_cross_decoder': _measure(independent, actual_hdr)}
         probe = facts['native_metadata_probe']
-        structural = {'dimensions': actual_sdr.shape == actual_hdr.shape == independent.shape == expected.shape == (231, 173, 3),
+        structural = {'dimensions': actual_sdr.shape == actual_hdr.shape == independent.shape == expected.shape == (height, width, 3),
             'gamut': native_facts['gamut'] == independent_facts['gamut'] == sdr_facts['gamut'] == 'p3',
             'actual_base_icc': sdr_facts['icc_sha256'] == legacy['native_candidate']['base_encoding']['icc_sha256'],
             'source_coded_depths': all(native['source_facts']['facts'][layer]['depth'] == 8 for layer in ('base', 'map')),
@@ -258,5 +301,23 @@ def run(directory, *, source=apple_source_model.SOURCE, selectors=None):
                 report['gainmap_commands'].append({'log': str(log), **record})
         except (UnicodeError, json.JSONDecodeError):
             pass
+    (directory/'results.json').write_text(json.dumps(report, indent=2)+'\n')
+    return report
+
+
+def run(directory, *, source=apple_source_model.SOURCE, selectors=None, geometries=('contain',)):
+    geometries = tuple(geometries)
+    if (not geometries or len(set(geometries)) != len(geometries) or any(operation not in SIZES for operation in geometries)
+            or selectors is not None and (len(geometries) != 1 or selectors != _selectors(geometries[0]))):
+        raise ValueError('Expected distinct proved geometries and at most one exact selector request')
+    directory = Path(directory)
+    reports = [_run_one(directory if operation == 'contain' else directory/operation,
+                        source=source, selectors=selectors, operation=operation) for operation in geometries]
+    report = reports[0]
+    if len(reports) > 1:
+        report['additional_geometry_results'] = reports[1:]
+        report['cases'] = [case for result in reports for case in result['cases']]
+        report['commands'] = [command for result in reports for command in result['commands']]
+        report['gainmap_commands'] = [command for result in reports for command in result['gainmap_commands']]
     (directory/'results.json').write_text(json.dumps(report, indent=2)+'\n')
     return report

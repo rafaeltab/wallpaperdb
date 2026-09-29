@@ -558,7 +558,8 @@ def main():
         geometries=('contain', 'cover', 'fill', 'upscale'))
     write_json(WORK/'gainmap-avif-hdr-evidence.json', gainmap_avif_hdr_result)
     from gainmap_avif_hdr_png import run as run_gainmap_avif_hdr_png
-    gainmap_avif_hdr_png_result = run_gainmap_avif_hdr_png(WORK/'gainmap-avif-hdr-png')
+    gainmap_avif_hdr_png_result = run_gainmap_avif_hdr_png(WORK/'gainmap-avif-hdr-png-geometries',
+        geometries=('contain', 'cover', 'fill', 'upscale'))
     write_json(WORK/'gainmap-avif-hdr-png-evidence.json', gainmap_avif_hdr_png_result)
     from icc_gainmap import run as run_icc_gainmap
     icc_results = []

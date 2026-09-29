@@ -31,6 +31,11 @@ def _base_color_facts(base_bytes):
             or sorted(chunk[0] for chunk in chunks) != list(range(1, count + 1))):
         raise ValueError('Incomplete or duplicate base ICC chunks')
     profile = b''.join(chunk[2:] for chunk in sorted(chunks, key=lambda chunk: chunk[0]))
+    return srgb_profile_facts(profile)
+
+
+def srgb_profile_facts(profile):
+    """Read the supported sRGB-transfer ICC matrix subset in any container."""
     if (len(profile) < 132 or profile[36:40] != b'acsp' or profile[8] != 4
             or profile[12:24] != b'mntrRGB XYZ '
             or struct.unpack_from('>I', profile)[0] != len(profile)):

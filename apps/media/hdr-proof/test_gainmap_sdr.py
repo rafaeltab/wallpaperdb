@@ -41,6 +41,7 @@ class AuthoredSdrTests(unittest.TestCase):
             self.assertTrue(facts['privacy'])
             self.assertEqual(facts['decoder'], 'FFmpeg native MJPEG decoder')
             self.assertEqual(evidence['coding'], 'RGB JPEG quality100; sRGB transfer and primaries')
+            self.assertEqual(evidence['icc_sha256'], facts['icc_sha256'])
 
     def test_unproven_geometry_and_gamut_requests_fail_closed(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -48,7 +49,73 @@ class AuthoredSdrTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 encode('unused.jpg', output, 'cover')
             with self.assertRaises(ValueError):
-                encode('unused.jpg', output, 'contain', gamut='p3')
+                encode('unused.jpg', output, 'contain', gamut='unknown')
+
+    def test_gamma32_rgb_jpeg_preserves_authored_sdr_in_srgb_and_p3(self):
+        from gainmap_sdr import decode_linear
+        for name in ('android-xmp', 'apple-new', 'android-iso'):
+            for gamut in (('srgb',) if name == 'android-xmp' else ('srgb', 'p3')):
+                with self.subTest(source=name, gamut=gamut), tempfile.TemporaryDirectory() as temporary:
+                    source = Path(__file__).parent/f'fixtures/gainmap/gainmap-{name}.jpg'
+                    output = Path(temporary)/'gamma32.jpg'
+                    evidence = encode(source, output, 'contain', gamut=gamut, gamma=3.2)
+                    actual, facts = decode_linear(output, gamut=gamut, gamma=3.2)
+                    reference = np.asarray(geometry(source_image(source, 'srgb' if gamut == 'srgb' else 'preserve'), 'contain')) / 255
+                    measured = compare_appearance(sdr_signal_to_nits(reference), actual,
+                        reference_gamut=gamut, actual_gamut='rec2020', fixture_class='gainmap-sdr')
+                    self.assertTrue(measured['passed'], measured)
+                    self.assertEqual(evidence['gamma'], 3.2)
+                    self.assertEqual(facts['color']['gamut'], gamut)
+                    self.assertEqual(facts['jpeg_color_transform'], 0)
+                    self.assertTrue(facts['privacy'])
+                    self.assertEqual(evidence['icc_sha256'], facts['icc_sha256'])
+                    with Image.open(output) as image:
+                        self.assertEqual(image.info['icc_profile'][84:100], bytes(16))
+
+    def test_gamma32_native_geometry_records_current_fidelity(self):
+        from gainmap_sdr import decode_linear
+        for gamut in ('srgb', 'p3'):
+            for operation in ('identity', 'fill', 'upscale', 'crop'):
+                with self.subTest(gamut=gamut, operation=operation), tempfile.TemporaryDirectory() as temporary:
+                    source = Path(__file__).parent/'fixtures/gainmap/gainmap-apple-new.jpg'
+                    output = Path(temporary)/'derivative.jpg'
+                    encode(source, output, operation, gamut=gamut, gamma=3.2)
+                    actual, facts = decode_linear(output, gamut=gamut, gamma=3.2)
+                    authored = source_image(source, 'srgb' if gamut == 'srgb' else 'preserve')
+                    reference = np.asarray(authored if operation == 'identity' else geometry(authored, operation)) / 255
+                    measured = compare_appearance(sdr_signal_to_nits(reference), actual,
+                        reference_gamut=gamut, actual_gamut='rec2020', fixture_class='gainmap-sdr')
+                    if gamut == 'srgb' and operation == 'upscale':
+                        # The native source CMS currently differs by one code
+                        # at a near-black green sample. This candidate remains
+                        # unqualified; passing other regions cannot hide it.
+                        self.assertFalse(measured['passed'], measured)
+                        self.assertEqual(measured['failures'], ['shadow.delta_e_max'])
+                    else:
+                        self.assertTrue(measured['passed'], measured)
+                    self.assertEqual(actual.shape, reference.shape)
+                    self.assertEqual(facts['gamut'], gamut)
+                    self.assertEqual(facts['transfer'], 'gamma3.2')
+
+    def test_native_orientation_uses_actual_exif_and_strips_it_from_output(self):
+        import shutil
+        from avif import native
+        from gainmap_sdr import decode_linear
+        source = Path(__file__).parent/'fixtures/gainmap/gainmap-apple-new.jpg'
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            oriented, output = directory/'orientation6.jpg', directory/'baked.jpg'
+            shutil.copyfile(source, oriented)
+            native(['exiftool', '-overwrite_original', '-Orientation#=6', oriented])
+            evidence = encode(oriented, output, 'orientation', gamut='p3', gamma=3.2)
+            actual, facts = decode_linear(output, gamut='p3', gamma=3.2)
+            reference = np.asarray(geometry(source_image(oriented, 'preserve'), 'orientation', 6)) / 255
+            measured = compare_appearance(sdr_signal_to_nits(reference), actual,
+                reference_gamut='p3', actual_gamut='rec2020', fixture_class='gainmap-sdr')
+            self.assertTrue(measured['passed'], measured)
+            self.assertEqual(actual.shape, reference.shape)
+            self.assertEqual(evidence['source_orientation'], 6)
+            self.assertNotIn('IFD0:Orientation', facts['metadata'])
 
 
 if __name__ == '__main__':

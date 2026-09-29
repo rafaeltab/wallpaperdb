@@ -25,15 +25,17 @@ const fs = require('node:fs');
   const job = JSON.parse(fs.readFileSync(0, 'utf8'));
   const metadata = await sharp(job.input).metadata();
   if (metadata.hasAlpha) throw new Error('Authored JPEG base must be opaque');
-  const image = await sharp(job.input).pipelineColourspace('srgb')
-    .withIccProfile('srgb').removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let pipeline = sharp(job.input);
+  pipeline = job.gamut === 'p3' ? pipeline.keepIccProfile()
+    : pipeline.pipelineColourspace('srgb').withIccProfile('srgb');
+  const image = await pipeline.removeAlpha().raw().toBuffer({ resolveWithObject: true });
   fs.writeFileSync(job.output, image.data);
   process.stdout.write(JSON.stringify(image.info));
 })().catch((error) => { console.error(error); process.exitCode = 1; });
 """
 
 
-def _axis(source_arguments, output, width, height):
+def _axis(source_arguments, output, width, height, *, before=''):
     # Direct swscale RGB8→float converts white255 to approximately253.98
     # code-equivalent in the pinned build. Explicit planar/zimg boundaries
     # preserve normalized codes. Pixel and coverage paths share native weights.
@@ -41,7 +43,8 @@ def _axis(source_arguments, output, width, height):
              f'format=gbrpf32le,crop={width}:{height}:{width}:{height}')
     mask = 'between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)'
     coverage = 'geq=' + ':'.join(f"{channel}='{mask}'" for channel in 'rgb')
-    filters = ('[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,'
+    filters = ('[0:v]' + (before + ',' if before else '') +
+               'pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,'
                'zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];'
                f'[pixels]{scale}[p];[coverage]{coverage},{scale}[c];'
                "[p][c]blend=all_expr='if(gt(B,0),A/B,0)',"
@@ -54,50 +57,105 @@ def _axis(source_arguments, output, width, height):
 
 def prepare(source, output, operation, *, gamut='srgb'):
     """Create an 8-bit authored SDR PNG through the proven native geometry."""
-    if operation not in ('identity', 'contain') or gamut != 'srgb':
-        raise ValueError('This candidate currently covers identity/contain with explicit sRGB gamut')
+    if operation not in ('identity', 'contain', 'fill', 'upscale', 'crop', 'orientation') or gamut not in ('srgb', 'p3'):
+        raise ValueError('Unsupported native authored-SDR geometry or gamut')
     source, output = Path(source), Path(output)
+    if gamut == 'p3' and _base_color_facts(source.read_bytes())['gamut'] != 'p3':
+        raise ValueError('P3 preservation requires verified P3 source color facts')
     raw = output.with_name(output.stem + '-source.rgb')
     information = json.loads(native(['node', '-e', _SOURCE_RGB], data=json.dumps({
-        'input': str(source), 'output': str(raw)}).encode()))
+        'input': str(source), 'output': str(raw), 'gamut': gamut}).encode()))
     width, height = information['width'], information['height']
-    target_width = 173 if operation == 'contain' else width
+    raw_width, raw_height = width, height
+    before, orientation = '', 1
+    if operation == 'orientation':
+        with Image.open(source) as image:
+            orientation = image.getexif().get(274, 1)
+        effects = {1: '', 2: 'hflip', 3: 'hflip,vflip', 4: 'vflip',
+                   5: 'transpose=clock,hflip', 6: 'transpose=clock',
+                   7: 'transpose=clock,vflip', 8: 'transpose=cclock'}
+        if orientation not in effects:
+            raise ValueError('Unsupported source EXIF orientation')
+        before = effects[orientation]
+        if orientation >= 5:
+            width, height = height, width
+    if operation == 'crop':
+        if width < 284 or height < 256:
+            raise ValueError('The declared proof crop must fit the source raster')
+        before, width, height = 'crop=271:239:13:17', 271, 239
+    target_width = width if operation == 'identity' else 769 if operation == 'upscale' else 173
     target_height = int(height * target_width / width + .5)
+    if operation in ('fill', 'crop'):
+        target_height = 211 if operation == 'fill' else 153
     intermediate = output.with_name(output.stem + '-horizontal.png')
-    first = _axis(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{width}x{height}', '-i', raw],
-                  intermediate, target_width, height)
+    first = _axis(['-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{raw_width}x{raw_height}', '-i', raw],
+                  intermediate, target_width, height, before=before)
     second = _axis(['-i', intermediate], output, target_width, target_height)
-    return {'geometry': operation, 'source_dimensions': [width, height],
+    return {'geometry': operation, 'source_dimensions': [raw_width, raw_height], 'source_orientation': orientation,
             'dimensions': [target_width, target_height], 'gamut': gamut,
             'native_filters': [first, second],
             'geometry_precision': '8-bit coded sRGB after each normalized native Lanczos axis',
             'source_sha256': hashlib.sha256(source.read_bytes()).hexdigest()}
 
 
-def encode(source, output, operation, *, gamut='srgb'):
+def encode(source, output, operation, *, gamut='srgb', gamma=None):
+    if gamma not in (None, 3.2):
+        raise ValueError('Supported JPEG candidates use sRGB transfer or explicitly declared gamma3.2')
     output = Path(output)
     png = output.with_name(output.stem + '-authored.png')
     evidence = prepare(source, png, operation, gamut=gamut)
-    profile = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
+    if gamma is not None:
+        from gamma_icc import make_profile
+        encoded = output.with_name(output.stem + '-gamma32.png')
+        value = '(val/maxval)'
+        linear = f'if(lte({value},0.04045),{value}/12.92,pow(({value}+0.055)/1.055,2.4))'
+        curve = f'maxval*pow({linear},1/{gamma})'
+        filters = ('format=gbrp,zscale=rangein=full:range=full,format=gbrp16le,format=rgb48le,'
+                   'lutrgb=' + ':'.join(f"{channel}='{curve}'" for channel in 'rgb') + ','
+                   'format=gbrp16le,zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24')
+        native(['ffmpeg', '-v', 'error', '-y', '-i', png, '-vf', filters, '-frames:v', '1',
+                '-map_metadata', '-1', '-threads', '1', encoded])
+        png = encoded
+        profile = bytearray(make_profile(gamma=gamma, gamut=gamut))
+    elif gamut == 'p3':
+        with Image.open(source) as image:
+            profile = bytearray(image.info['icc_profile'])
+    else:
+        profile = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
     profile[24:36] = struct.pack('>6H', 2020, 1, 1, 0, 0, 0)
+    # The serialized timestamp changed; an inherited profile ID would no
+    # longer describe these bytes. A zero ID is permitted by ICC v4.
+    profile[84:100] = bytes(16)
     with Image.open(png) as image:
         image.convert('RGB').save(output, format='JPEG', quality=100, subsampling=0,
                                   keep_rgb=True, icc_profile=bytes(profile))
-    return {**evidence, 'coding': 'RGB JPEG quality100; sRGB transfer and primaries',
+    coding = ('RGB JPEG quality100; sRGB transfer and primaries' if gamma is None and gamut == 'srgb'
+              else f'RGB JPEG quality100; {"sRGB" if gamma is None else "gamma"+str(gamma)} transfer; {gamut} primaries')
+    return {**evidence, 'coding': coding, 'gamma': gamma,
+            'icc_sha256': hashlib.sha256(profile).hexdigest(),
             'native_encoder': f'Pillow/native libjpeg {Image.core.jpeglib_version}',
             'output_sha256': hashlib.sha256(output.read_bytes()).hexdigest()}
 
 
-def decode(path):
+def decode(path, *, gamut='srgb', gamma=None):
     """Independently decode real JPEG samples and verify its emitted color facts."""
     path = Path(path)
     data = path.read_bytes()
     facts = jpeg_facts(data)
     if facts['depth'] != 8 or facts['components'] != 3:
         raise ValueError('Expected an 8-bit three-component RGB JPEG')
-    color = _base_color_facts(data)
-    if color['gamut'] != 'srgb':
-        raise ValueError('Expected explicit sRGB output primaries')
+    with Image.open(path) as image:
+        profile = image.info.get('icc_profile', b'')
+    if gamma is None:
+        color = _base_color_facts(data)
+    else:
+        from gamma_icc import profile_facts, decode_signal_to_nits
+        # Validate actual profile semantics against the explicitly requested
+        # coding before treating any decoded sample as display luminance.
+        decode_signal_to_nits(np.zeros((1, 3)), profile, expected_gamma=gamma, expected_gamut=gamut)
+        color = {**profile_facts(profile), 'transfer': f'gamma{gamma}'}
+    if color['gamut'] != gamut:
+        raise ValueError('Emitted JPEG gamut does not match the requested primaries')
     raw = native(['ffmpeg', '-v', 'error', '-c:v', 'mjpeg', '-i', path, '-frames:v', '1',
                   '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1'])
     pixels = np.frombuffer(raw, dtype=np.uint8).reshape(facts['height'], facts['width'], 3) / 255
@@ -106,7 +164,23 @@ def decode(path):
         raise ValueError('RGB JPEG coding was not independently signaled')
     from gainmap import private_metadata_tags
     return pixels, {**facts, 'color': color, 'decoder': 'FFmpeg native MJPEG decoder',
+                    'icc_sha256': hashlib.sha256(profile).hexdigest(),
                     'jpeg_color_transform': tags['Adobe:ColorTransform'],
+                    'gamut': gamut, 'transfer': 'srgb' if gamma is None else f'gamma{gamma}',
                     'privacy': not private_metadata_tags(tags),
                     'metadata': {key: value for key, value in tags.items()
                                  if key != 'SourceFile' and not key.startswith('System:')}}
+
+
+def decode_linear(path, *, gamut='srgb', gamma=None):
+    """Return independently decoded display-linear Rec.2020 at100-nit SDR white."""
+    pixels, facts = decode(path, gamut=gamut, gamma=gamma)
+    if gamma is not None:
+        from gamma_icc import decode_signal_to_nits
+        with Image.open(path) as image:
+            profile = image.info['icc_profile']
+        linear = decode_signal_to_nits(pixels, profile, expected_gamma=gamma, expected_gamut=gamut)
+    else:
+        from appearance import sdr_signal_to_nits, RGB_TO_XYZ
+        linear = sdr_signal_to_nits(pixels) @ RGB_TO_XYZ[gamut].T @ np.linalg.inv(RGB_TO_XYZ['rec2020']).T
+    return linear, facts

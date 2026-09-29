@@ -8,10 +8,12 @@ Gateway lets visitors discover wallpapers and contributor Profiles through a cat
 - Retrieve wallpapers with their contributor Profiles and media URLs.
 - Find Profiles by Handle, active alias, or Display name, and resolve earlier Handles to the current Profile address.
 - Keep the catalogue up to date as wallpapers, variants, colors, and Profiles are published, without allowing replayed events to undo newer state.
-- Limit query complexity and visitor request rates to protect public discovery.
+- Limit query complexity, visitor cost budgets, and active GraphQL work to protect public discovery.
 
 ## Technology choices
 
 OpenSearch supports the catalogue's filtered and ranked searches. Mercurius exposes the catalogue through GraphQL, and Redis coordinates visitor quotas across Gateway replicas.
 
 Read the [domain context](CONTEXT.md) for ownership and the [recovery guide](../docs/content/docs/guides/service-upgrades.mdx) before rebuilding projections or replaying messages.
+
+See the [active-work load test](docs/admission-load-test.md) for the measured initial concurrency and deadline choices and their deployment limits.

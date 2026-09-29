@@ -18,7 +18,8 @@
     "check": "biome check --write .",
     "test": "vitest run",
     "test:integration": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "load:admission": "node scripts/load-admission.mjs"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

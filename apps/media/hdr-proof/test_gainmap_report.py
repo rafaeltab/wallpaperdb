@@ -57,6 +57,30 @@ def native_case(candidate, geometry, qualified):
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_corrected_apple_report_uses_current_results_and_keeps_failed_rows(self):
+        from suite import apple_documented_report
+        from apple_source_model import REFERENCE_REVISION
+        case = {'fixture_id': 'gainmap-apple-old', 'proof_module': 'apple_hdr_jpeg',
+            'source_reference_revision': REFERENCE_REVISION, 'geometry': 'contain',
+            'selectors': {'format': 'jpg', 'depth': 'preserve'}, 'status': 'qualified',
+            'measurements': {'independent_hdr': measurement(.1, 4.52892, .2),
+                             'authored_sdr_base': measurement(.1, 4.64090, .1)}}
+        failed = {**case, 'geometry': 'orientation', 'status': 'tested and failed',
+            'measurements': {'independent_hdr': measurement(3, 12.45, 2)}}
+        single = {**case, 'proof_module': 'apple_hdr_avif', 'geometry': 'cover',
+            'selectors': {'format': 'avif', 'depth': '10'},
+            'measurements': {'hdr': measurement(.1, .82, .2)}}
+        legacy = {**case, 'source_reference_revision': 'legacy-convention'}
+        rendered = '\n'.join(apple_documented_report([case, failed, single, legacy]))
+        self.assertIn('| contain | jpg | preserve | 4.528920 | 4.640900 | qualified |', rendered)
+        self.assertIn('| orientation | jpg | preserve | 12.450000 | missing | tested and failed |', rendered)
+        self.assertIn('| cover | avif | 10 | 0.820000 | not embedded | qualified |', rendered)
+        self.assertEqual(rendered.count('| contain |'), 1)
+        self.assertIn('Current recorded rows only', rendered)
+        self.assertIn('does not qualify intermediate Apple adaptation', rendered)
+        self.assertIn('pending manual review', rendered)
+        self.assertIn('No current corrected-source conversion evidence.', '\n'.join(apple_documented_report([])))
+
     def test_rgb8_base_bound_reports_its_exact_admission_and_normalization(self):
         from suite import iso_base_code_report
         diagnostic = {'sdr_maximum_gate': 8, 'hdr_maximum_gate': 8,

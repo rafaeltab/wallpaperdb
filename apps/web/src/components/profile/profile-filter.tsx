@@ -1,3 +1,4 @@
+import { graphqlQueryOptions } from '@/lib/graphql/admission';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { ProfilePicture } from '@/components/profile/profile-picture';
@@ -22,17 +23,16 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
     return () => window.clearTimeout(timeout);
   }, [query]);
   const results = useInfiniteQuery({
+    ...graphqlQueryOptions,
     queryKey: ['profile-search', debouncedQuery],
     queryFn: ({ pageParam }) => searchProfiles(debouncedQuery, pageParam),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => (page.pageInfo.hasNextPage ? page.pageInfo.endCursor : undefined),
     enabled: Boolean(debouncedQuery),
-    retry: false,
   });
   const selected = useQuery({
     ...profileByIdQueryOptions(profileId ?? ''),
     enabled: Boolean(profileId),
-    retry: false,
   });
 
   return (

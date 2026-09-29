@@ -1,8 +1,10 @@
+import { graphqlQueryOptions } from '@/lib/graphql/admission';
 import { queryOptions } from '@tanstack/react-query';
 import { fetchProfileByHandle, fetchProfileById } from '@/lib/graphql/profiles';
 
 export function profileByHandleQueryOptions(handle: string) {
   return queryOptions({
+    ...graphqlQueryOptions,
     queryKey: ['public-profile', 'handle', handle] as const,
     queryFn: () => fetchProfileByHandle(handle),
     staleTime: 0,
@@ -11,6 +13,7 @@ export function profileByHandleQueryOptions(handle: string) {
 
 export function profileByIdQueryOptions(profileId: string) {
   return queryOptions({
+    ...graphqlQueryOptions,
     queryKey: ['public-profile', 'id', profileId] as const,
     queryFn: () => fetchProfileById(profileId),
   });

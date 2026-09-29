@@ -1,3 +1,4 @@
+import { graphqlQueryOptions } from '@/lib/graphql/admission';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { graphqlClient } from '@/lib/graphql/client';
 import { SEARCH_WALLPAPERS } from '@/lib/graphql/queries';
@@ -21,6 +22,7 @@ export function useWallpaperInfiniteQuery({
   pageSize = 20,
 }: UseWallpaperInfiniteQueryOptions = {}) {
   return useInfiniteQuery({
+    ...graphqlQueryOptions,
     queryKey: ['wallpapers', 'infinite', { filter, initialCursor, sort }],
     queryFn: async ({ pageParam }) => {
       const response = await graphqlClient.request<SearchWallpapersResponse>(SEARCH_WALLPAPERS, {

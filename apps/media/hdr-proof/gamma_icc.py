@@ -28,8 +28,10 @@ class _Primaries(ctypes.Structure):
     _fields_ = [('red', _XyY), ('green', _XyY), ('blue', _XyY)]
 
 
-def make_profile():
+def make_profile(*, gamma=2.2, gamut='srgb'):
     """Generate native ICC v4 bytes with a fixed creation date and empty ID."""
+    if not np.isfinite(gamma) or not 0 < gamma < 32768 or gamut not in ('srgb', 'p3'):
+        raise ValueError('Expected positive ICC16.16 gamma and sRGB or P3 primaries')
     library = ctypes.CDLL('liblcms2.so.2')
     library.cmsBuildGamma.argtypes = [ctypes.c_void_p, ctypes.c_double]
     library.cmsBuildGamma.restype = ctypes.c_void_p
@@ -41,13 +43,15 @@ def make_profile():
                                           ctypes.POINTER(ctypes.c_uint32)]
     library.cmsCloseProfile.argtypes = [ctypes.c_void_p]
     library.cmsFreeToneCurve.argtypes = [ctypes.c_void_p]
-    curve = library.cmsBuildGamma(None, 2.2)
+    curve = library.cmsBuildGamma(None, gamma)
     if not curve:
         raise RuntimeError('LittleCMS could not build the gamma curve')
     profile = None
     try:
         white = _XyY(.3127, .329, 1)
-        primaries = _Primaries(_XyY(.64, .33, 1), _XyY(.30, .60, 1), _XyY(.15, .06, 1))
+        primaries = (_Primaries(_XyY(.64, .33, 1), _XyY(.30, .60, 1), _XyY(.15, .06, 1))
+                     if gamut == 'srgb' else
+                     _Primaries(_XyY(.68, .32, 1), _XyY(.265, .69, 1), _XyY(.15, .06, 1)))
         curves = (ctypes.c_void_p * 3)(curve, curve, curve)
         profile = library.cmsCreateRGBProfile(ctypes.byref(white), ctypes.byref(primaries), curves)
         if not profile:
@@ -125,18 +129,24 @@ def profile_facts(profile):
         raise ValueError('Incomplete or invalid ICC matrix profile') from error
     expected = bool(np.allclose(gammas, [2.2] * 3, atol=1 / 65536, rtol=0)
                     and np.allclose(d65_matrix, RGB_TO_XYZ['srgb'], atol=3e-5, rtol=0))
+    gamuts = [gamut for gamut in ('srgb', 'p3')
+              if np.allclose(d65_matrix, RGB_TO_XYZ[gamut], atol=3e-5, rtol=0)]
     return {'sha256': hashlib.sha256(profile).hexdigest(),
             'gammas': gammas, 'rgb_to_xyz_d50': d50_matrix.tolist(),
             'chromatic_adaptation': chad.tolist(), 'rgb_to_xyz_d65': d65_matrix.tolist(),
             'gamma22_srgb_primaries': expected,
+            'gamut': gamuts[0] if len(gamuts) == 1 else None,
             'creation_date': list(struct.unpack_from('>6H', profile, 24))}
 
 
-def decode_signal_to_nits(signal, profile):
+def decode_signal_to_nits(signal, profile, *, expected_gamma=2.2, expected_gamut='srgb'):
     """Decode actual ICC semantics into linear Rec.2020 at nominal SDR 100 nits."""
     facts = profile_facts(profile)
-    if not facts['gamma22_srgb_primaries']:
-        raise ValueError('Expected gamma-2.2 encoding with sRGB primaries')
+    if (not np.isfinite(expected_gamma) or expected_gamma <= 0
+            or expected_gamut not in ('srgb', 'p3')
+            or not np.allclose(facts['gammas'], [expected_gamma] * 3, atol=1/65536, rtol=0)
+            or facts['gamut'] != expected_gamut):
+        raise ValueError(f'Expected gamma-{expected_gamma} encoding with {expected_gamut} primaries')
     signal = np.asarray(signal, dtype=np.float64)
     if (signal.ndim < 1 or signal.shape[-1] != 3 or not np.all(np.isfinite(signal))
             or np.any((signal < 0) | (signal > 1))):

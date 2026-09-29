@@ -11,6 +11,33 @@ from gamma_icc import make_profile, profile_facts, encode, inspect_and_decode, d
 
 
 class GammaIccTests(unittest.TestCase):
+    def test_new_explicit_gamma_and_gamut_profiles_preserve_legacy_default_bytes(self):
+        import hashlib
+        self.assertEqual(hashlib.sha256(make_profile()).hexdigest(),
+                         'd7b8387fdd626cc24b118014a6b7fb03396fe2486b262661e61f5658f92a8e45')
+        signal = np.array([[.5, .5, .5], [.1, .3, .7], [1, 0, 0]])
+        for gamut in ('srgb', 'p3'):
+            with self.subTest(gamut=gamut):
+                profile = make_profile(gamma=3.2, gamut=gamut)
+                facts = profile_facts(profile)
+                self.assertFalse(facts['gamma22_srgb_primaries'])
+                self.assertEqual(facts['gamut'], gamut)
+                np.testing.assert_allclose(facts['gammas'], [3.2] * 3, atol=1/65536)
+                expected = (100 * signal ** 3.2) @ RGB_TO_XYZ[gamut].T @ np.linalg.inv(RGB_TO_XYZ['rec2020']).T
+                actual = decode_signal_to_nits(signal, profile, expected_gamma=3.2, expected_gamut=gamut)
+                np.testing.assert_allclose(actual, expected, atol=.003, rtol=3e-5)
+                with self.assertRaises(ValueError):
+                    decode_signal_to_nits(signal, profile)
+                with self.assertRaises(ValueError):
+                    decode_signal_to_nits(signal, profile, expected_gamma=2.8, expected_gamut=gamut)
+
+    def test_invalid_requested_profile_parameters_are_rejected(self):
+        for gamma in (0, -1, float('nan'), float('inf')):
+            with self.subTest(gamma=gamma), self.assertRaises(ValueError):
+                make_profile(gamma=gamma)
+        with self.assertRaises(ValueError):
+            make_profile(gamut='unknown')
+
     def test_native_profile_is_deterministic_with_verified_gamma_and_colorants(self):
         first, second = make_profile(), make_profile()
         self.assertEqual(first, second)
@@ -81,36 +108,37 @@ class GammaIccTests(unittest.TestCase):
 
     def test_profile_equations_match_independent_native_lcms_double_xyz_decode(self):
         import ctypes
-        profile = make_profile()
-        facts = profile_facts(profile)
-        library = ctypes.CDLL('liblcms2.so.2')
-        library.cmsOpenProfileFromMem.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
-        library.cmsOpenProfileFromMem.restype = ctypes.c_void_p
-        library.cmsCreateXYZProfile.restype = ctypes.c_void_p
-        library.cmsCreateTransform.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
-            ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32]
-        library.cmsCreateTransform.restype = ctypes.c_void_p
-        library.cmsDoTransform.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32]
-        library.cmsDeleteTransform.argtypes = [ctypes.c_void_p]
-        library.cmsCloseProfile.argtypes = [ctypes.c_void_p]
-        source_profile = library.cmsOpenProfileFromMem(profile, len(profile))
-        target_profile = library.cmsCreateXYZProfile()
-        # lcms2.h TYPE_RGB_DBL / TYPE_XYZ_DBL. Disable interpolation optimization
-        # and caches so this control measures the actual profile equations.
-        transform = library.cmsCreateTransform(source_profile, 0x440018,
-            target_profile, 0x490018, 1, 0x100 | 0x40)
-        self.assertTrue(transform)
-        signal = np.array([[0, 0, 0], [1, 1, 1], [.5, .5, .5],
-                           [1, 0, 0], [0, 1, 0], [0, 0, 1], [.001, .3, .8]], dtype=np.float64)
-        actual = np.empty_like(signal)
-        try:
-            library.cmsDoTransform(transform, signal.ctypes.data, actual.ctypes.data, len(signal))
-        finally:
-            library.cmsDeleteTransform(transform)
-            library.cmsCloseProfile(source_profile)
-            library.cmsCloseProfile(target_profile)
-        expected = signal ** np.asarray(facts['gammas']) @ np.asarray(facts['rgb_to_xyz_d50']).T
-        np.testing.assert_allclose(actual, expected, atol=1e-6)
+        for gamma, gamut in ((2.2, 'srgb'), (3.2, 'srgb'), (3.2, 'p3')):
+            profile = make_profile(gamma=gamma, gamut=gamut)
+            facts = profile_facts(profile)
+            library = ctypes.CDLL('liblcms2.so.2')
+            library.cmsOpenProfileFromMem.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+            library.cmsOpenProfileFromMem.restype = ctypes.c_void_p
+            library.cmsCreateXYZProfile.restype = ctypes.c_void_p
+            library.cmsCreateTransform.argtypes = [ctypes.c_void_p, ctypes.c_uint32,
+                ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32]
+            library.cmsCreateTransform.restype = ctypes.c_void_p
+            library.cmsDoTransform.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32]
+            library.cmsDeleteTransform.argtypes = [ctypes.c_void_p]
+            library.cmsCloseProfile.argtypes = [ctypes.c_void_p]
+            source_profile = library.cmsOpenProfileFromMem(profile, len(profile))
+            target_profile = library.cmsCreateXYZProfile()
+            # lcms2.h TYPE_RGB_DBL / TYPE_XYZ_DBL. Disable interpolation optimization
+            # and caches so this control measures the actual profile equations.
+            transform = library.cmsCreateTransform(source_profile, 0x440018,
+                target_profile, 0x490018, 1, 0x100 | 0x40)
+            self.assertTrue(transform)
+            signal = np.array([[0, 0, 0], [1, 1, 1], [.5, .5, .5],
+                               [1, 0, 0], [0, 1, 0], [0, 0, 1], [.001, .3, .8]], dtype=np.float64)
+            actual = np.empty_like(signal)
+            try:
+                library.cmsDoTransform(transform, signal.ctypes.data, actual.ctypes.data, len(signal))
+            finally:
+                library.cmsDeleteTransform(transform)
+                library.cmsCloseProfile(source_profile)
+                library.cmsCloseProfile(target_profile)
+            expected = signal ** np.asarray(facts['gammas']) @ np.asarray(facts['rgb_to_xyz_d50']).T
+            np.testing.assert_allclose(actual, expected, atol=1e-6)
 
     def test_jpeg_and_webp_retain_the_same_sdr_grade_with_actual_profile_signaling(self):
         rgba = np.ones((16, 32, 4))

@@ -57,6 +57,28 @@ def native_case(candidate, geometry, qualified):
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_continuous_base_bound_keeps_its_color_models_and_unresolved_search_visible(self):
+        from suite import iso_continuous_base_report
+        diagnostic = {'sdr_maximum_gate': 8, 'hdr_maximum_gate': 8,
+            'normalization': {'sdr_nominal_white_nits': 100, 'hdr_reference_white_nits': 203},
+            'extrema': {'sdr_A_min': {'direction': 'minimum', 'outer_green_nits': 1.218613832,
+                'bound_witness_gap_nits': .00072, 'visited_child_boxes': 100000, 'budget_exhausted': True}},
+            'analytic_bound': {'contradiction_established': True, 'D_upper_bound_nits': -2.234397607,
+                'D_lower_bound_nits': -1.042109109, 'contradiction_margin_nits': 1.192288498}}
+        rendered = '\n'.join(iso_continuous_base_report(diagnostic))
+        self.assertIn('| sdr_A_min | minimum | 1.218614 | 0.000720 | 100,000 | True |', rendered)
+        self.assertIn('| -2.234398 | -1.042109 | 1.192288 | established |', rendered)
+        self.assertIn('serialized ICC colorants', rendered)
+        self.assertIn('nominal P3', rendered)
+        self.assertIn('no upper component cap', rendered)
+        self.assertIn('nonnegative offsets', rendered)
+        self.assertIn('unresolved boxes', rendered)
+        self.assertIn('not an exact optimum', rendered)
+        self.assertIn('cannot qualify a conversion', rendered)
+        self.assertIn('(iso-continuous-base-bound.json)', rendered)
+        diagnostic['analytic_bound']['contradiction_established'] = False
+        self.assertIn('| not established |', '\n'.join(iso_continuous_base_report(diagnostic)))
+
     def test_corrected_apple_report_uses_current_results_and_keeps_failed_rows(self):
         from suite import apple_documented_report
         from apple_source_model import REFERENCE_REVISION

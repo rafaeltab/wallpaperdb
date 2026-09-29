@@ -467,6 +467,24 @@ def iso_base_code_report(diagnostic):
         f'The HDR maximum remains {diagnostic["hdr_maximum_gate"]}. This optimistic bound ignores JPEG neighborhood coupling and the other regional SDR gates, and permits arbitrary per-pixel gains and map precision at the current positive ordered weights. Other ICC transfers or colorants, continuous or higher-precision bases, capacities, reference models and gain equations remain outside the result. Float64 classification checks its distance from the unchanged gate but is not a formal directed-rounding certificate. This diagnostic cannot qualify a conversion or physical consumer.', '']
 
 
+def iso_continuous_base_report(diagnostic):
+    bound = diagnostic['analytic_bound']
+    conclusion = 'established' if bound['contradiction_established'] else 'not established'
+    normalization = diagnostic['normalization']
+    lines = ['## Continuous-base ISO bound', '',
+        'The [continuous-base diagnostic](iso-continuous-base-bound.json) admits all nonnegative continuous own-primary base values, with no upper component cap or coded-depth restriction. Its SDR gate uses the actual serialized ICC colorants and chromatic adaptation; its existing HDR gate uses nominal P3. Those matrices remain explicit and are not assumed identical.', '',
+        f'The unchanged SDR/HDR maximum gates are {diagnostic["sdr_maximum_gate"]}/{diagnostic["hdr_maximum_gate"]}. SDR at {normalization["sdr_nominal_white_nits"]} nits is scaled to own-primary HDR at {normalization["hdr_reference_white_nits"]} nits for the offset argument. Complete ITP-ball coverage yields outer component bounds; sampled feasible colors supply incumbents only.', '',
+        '| Component query | Direction | Outer bound, nits | Bound-to-witness gap, nits | Visited child boxes | Budget exhausted |',
+        '| --- | --- | ---: | ---: | ---: | --- |']
+    for name, row in diagnostic['extrema'].items():
+        lines.append(f'| {name} | {row["direction"]} | {row["outer_green_nits"]:.6f} | {row["bound_witness_gap_nits"]:.6f} | {row["visited_child_boxes"]:,} | {row["budget_exhausted"]} |')
+    return lines + ['',
+        '| D upper bound, nits | D lower bound, nits | Contradiction margin, nits | Contradiction |',
+        '| ---: | ---: | ---: | --- |',
+        f'| {bound["D_upper_bound_nits"]:.6f} | {bound["D_lower_bound_nits"]:.6f} | {bound["contradiction_margin_nits"]:.6f} | {conclusion} |', '',
+        'The search retains unresolved boxes at its budget or gap limit; the result is an outer bound, not an exact optimum. Disjoint D bounds exclude a shared pair of nonnegative offsets at the current positive ordered weights, even with arbitrary per-pixel gains and map precision. Other colorants, HDR color interpretation, source references, geometry, capacities and gain equations remain outside this result. Guarded float64 arithmetic is not a formal directed-rounding or native LCMS certificate. This diagnostic cannot qualify a conversion or physical consumer.', '']
+
+
 def apple_documented_report(evidence):
     from apple_source_model import REFERENCE_REVISION
     cases = [case for case in evidence if case.get('fixture_id') == 'gainmap-apple-old'

@@ -25,11 +25,14 @@ describe('Gateway telemetry bootstrap', () => {
 
   it('owns log export through the configured collector instead of an implicit SDK transport', async () => {
     const requests: string[] = [];
+    const payloads: Buffer[] = [];
     const collector = createServer((request, response) => {
       requests.push(request.url ?? '');
-      request.resume();
-      response.writeHead(200);
-      response.end();
+      request.on('data', (chunk: Buffer) => payloads.push(chunk));
+      request.on('end', () => {
+        response.writeHead(200);
+        response.end();
+      });
     });
     await new Promise<void>((resolve, reject) => {
       collector.once('error', reject);
@@ -55,6 +58,7 @@ describe('Gateway telemetry bootstrap', () => {
         )
       ).toEqual({ _tag: 'Started' });
       expect(requests).toContain('/v1/logs');
+      expect(Buffer.concat(payloads).toString()).toContain('service.instance.id');
     } finally {
       vi.unstubAllEnvs();
       logs.disable();

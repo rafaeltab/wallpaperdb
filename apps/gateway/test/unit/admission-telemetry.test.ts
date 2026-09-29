@@ -136,6 +136,7 @@ it('collects current shared usage while idle, hides unavailable values and unreg
       { name: 'admission.usage.active_ips', value: Number.NaN, attributes: {} },
       { name: 'admission.usage.minute', value: 0, attributes: {} },
       { name: 'admission.usage.sampled_at', value: 0, attributes: {} },
+      { name: 'admission.usage.observed_at', value: expect.any(Number), attributes: {} },
     ]);
     snapshot = { _tag: 'Available', minute: 180, sampledAt: 185, points: 0, activeIps: 0 };
     expect(await observed.read()).toContainEqual({

@@ -505,6 +505,44 @@
       ],
       "title": "Rate Limit Violations vs Total Traffic",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 12,
+      "title": "Distributed quota fallback, recovery, and saturation",
+      "description": "Fallback uses independent replica budgets. Recovery resumes Redis without merging outage charges. Saturation rejects with 503. No identity labels are exported.",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(admission_quota_fallback_total[$__rate_interval]))",
+          "legendFormat": "Fallback {{reason}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(admission_quota_recovery_total[$__rate_interval]))",
+          "legendFormat": "Recovery",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (reason) (rate(admission_quota_saturated_total[$__rate_interval]))",
+          "legendFormat": "Saturation {{reason}}",
+          "refId": "C"
+        },
+        {
+          "expr": "sum(rate(admission_quota_disabled_total[$__rate_interval]))",
+          "legendFormat": "Disabled enforcement",
+          "refId": "D"
+        }
+      ]
     }
   ],
   "refresh": "5s",

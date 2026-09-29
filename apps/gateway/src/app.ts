@@ -1,3 +1,4 @@
+import { admissionTelemetryLayer } from './adapters/admission-telemetry/index.js';
 import { Effect, Layer, Redacted } from 'effect';
 import type { FastifyInstance } from 'fastify';
 import { availabilityProbeLayer } from './adapters/availability/index.js';
@@ -61,13 +62,16 @@ export function gatewayLayer(config: Config, options: AppOptions = {}) {
     },
   }).pipe(
     Layer.provide(
-      redisQuotaLayer({
-        redisEnabled: config.redisEnabled,
-        redisHost: config.redisHost,
-        redisPort: config.redisPort,
-        redisPassword:
-          config.redisPassword === undefined ? undefined : Redacted.value(config.redisPassword),
-      })
+      Layer.merge(
+        admissionTelemetryLayer,
+        redisQuotaLayer({
+          redisEnabled: config.redisEnabled,
+          redisHost: config.redisHost,
+          redisPort: config.redisPort,
+          redisPassword:
+            config.redisPassword === undefined ? undefined : Redacted.value(config.redisPassword),
+        })
+      )
     )
   );
   const probe = Layer.unwrap(

@@ -1,11 +1,14 @@
 import { Effect, Layer } from 'effect';
-import { Admission, admissionLayer } from '../../src/capabilities/admission/index.js';
+import {
+  Admission,
+  admissionLayer as makeAdmissionLayer,
+} from '../../src/capabilities/admission/index.js';
 import {
   Availability,
   AvailabilityProbe,
   availabilityLayer,
 } from '../../src/capabilities/availability/index.js';
-import { memoryQuotaLayer } from '../helpers/quota.js';
+import { memoryQuotaLayer, quietAdmissionTelemetry } from '../helpers/quota.js';
 import { Catalogue } from '../../src/capabilities/catalogue/index.js';
 import { createHttpApp, type HttpConfig } from '../../src/http/index.js';
 
@@ -103,4 +106,8 @@ export function createTestHttpApp(
   ports: Partial<HttpTestServices> = {}
 ) {
   return createHttpApp(config, httpTestLayer(config, ports));
+}
+
+function admissionLayer(policy: Parameters<typeof makeAdmissionLayer>[0]) {
+  return makeAdmissionLayer(policy).pipe(Layer.provide(quietAdmissionTelemetry));
 }

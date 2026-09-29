@@ -70,38 +70,40 @@ class RedisQuota implements Quota {
     windowMs: number,
     cost: number
   ): Effect.fn.Return<AdmissionResult, QuotaUnavailable> {
-    if (!this.client) return yield* unavailable('disabled');
-    if (!this.available) return yield* unavailable('unavailable');
-    const client = this.client;
     const reply = yield* this.permits.withPermitsIfAvailable(1)(
-      Effect.tryPromise({
-        try: () => client.eval(consume, 1, `graphql:quota:${visitor}`, limit, windowMs, cost),
-        catch: (cause) => cause,
-      }).pipe(
-        Effect.flatMap((response) =>
-          decodeResponse(response).pipe(
-            Effect.tapError((error) =>
-              Effect.logWarning('Invalid distributed quota response', {
-                operation: 'decode_quota_response',
-                detail: error.message,
-              })
+      Effect.suspend(() => {
+        if (!this.client) return unavailable('disabled');
+        if (!this.available) return unavailable('unavailable');
+        const client = this.client;
+        return Effect.tryPromise({
+          try: () => client.eval(consume, 1, `graphql:quota:${visitor}`, limit, windowMs, cost),
+          catch: (cause) => cause,
+        }).pipe(
+          Effect.flatMap((response) =>
+            decodeResponse(response).pipe(
+              Effect.tapError((error) =>
+                Effect.logWarning('Invalid distributed quota response', {
+                  operation: 'decode_quota_response',
+                  detail: error.message,
+                })
+              )
             )
-          )
-        ),
-        Effect.catch((cause) =>
-          Effect.logWarning('Distributed quota command failed', { cause }).pipe(
-            Effect.andThen(
-              Effect.sync(() => {
-                this.disconnect();
-                return undefined;
-              })
+          ),
+          Effect.catch((cause) =>
+            Effect.logWarning('Distributed quota command failed', { cause }).pipe(
+              Effect.andThen(
+                Effect.sync(() => {
+                  this.disconnect();
+                  return undefined;
+                })
+              )
             )
-          )
-        ),
-        // Redis cannot cancel an issued command. Keep its permit until the command
-        // settles under the client's one-second deadline, including on caller cancellation.
-        Effect.uninterruptible
-      )
+          ),
+          // Redis cannot cancel an issued command. Keep its permit until the command
+          // settles under the client's one-second deadline, including on caller cancellation.
+          Effect.uninterruptible
+        );
+      })
     );
     if (reply._tag === 'None') {
       yield* Effect.try(() =>

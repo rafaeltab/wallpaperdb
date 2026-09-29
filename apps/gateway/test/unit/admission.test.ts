@@ -37,13 +37,39 @@ describe('request admission', () => {
       )
     )
   );
+  it.effect('refills cost continuously and bases retry on the missing points', () =>
+    Effect.gen(function* () {
+      const admission = yield* Admission;
+      yield* admission.admit('refill', { _tag: 'Valid', cost: 300 });
+      yield* TestClock.adjust('250 millis');
+      expect(yield* admission.admit('refill', { _tag: 'Valid', cost: 150 })).toEqual({
+        _tag: 'Limited',
+        retryAfter: 250,
+      });
+      expect(yield* admission.admit('refill', { _tag: 'Valid', cost: 75 })).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 0,
+      });
+      yield* TestClock.adjust('2 seconds');
+      expect(yield* admission.admit('refill', { _tag: 'Valid', cost: 300 })).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 0,
+      });
+    }).pipe(
+      Effect.provide(
+        admissionLayer({ enabled: true, limit: 300, windowMs: 1000 }).pipe(
+          Layer.provide(memoryQuotaLayer)
+        )
+      )
+    )
+  );
   it.effect('passes the configured policy to the quota adapter and forwards its decisions', () =>
     Effect.gen(function* () {
       const admission = yield* Admission;
       expect(yield* admission.admit('visitor', { _tag: 'Valid', cost: 1 })).toEqual({
         _tag: 'Allowed',
         remaining: 1,
-        reset: 1000,
+        reset: 500,
       });
       expect(yield* admission.admit('visitor', { _tag: 'Valid', cost: 1 })).toEqual({
         _tag: 'Allowed',
@@ -52,13 +78,13 @@ describe('request admission', () => {
       });
       expect(yield* admission.admit('visitor', { _tag: 'Valid', cost: 1 })).toEqual({
         _tag: 'Limited',
-        retryAfter: 1000,
+        retryAfter: 500,
       });
       yield* TestClock.adjust('1 second');
       expect(yield* admission.admit('visitor', { _tag: 'Valid', cost: 1 })).toEqual({
         _tag: 'Allowed',
         remaining: 1,
-        reset: 2000,
+        reset: 1500,
       });
     }).pipe(Effect.provide(layer))
   );

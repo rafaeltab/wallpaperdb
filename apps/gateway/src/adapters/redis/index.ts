@@ -4,14 +4,36 @@ import Redis from 'ioredis';
 import { type AdmissionResult, Quota } from '../../capabilities/admission/index.js';
 
 const consume = `
-local count = tonumber(redis.call('GET', KEYS[1]) or '0')
-if count + tonumber(ARGV[3]) > tonumber(ARGV[1]) then return {-1, redis.call('PTTL', KEYS[1])} end
-count = redis.call('INCRBY', KEYS[1], ARGV[3])
-if count == tonumber(ARGV[3]) then redis.call('PEXPIRE', KEYS[1], ARGV[2]) end
-return {count, redis.call('PTTL', KEYS[1])}
+local capacity = tonumber(ARGV[1])
+local period = tonumber(ARGV[2])
+local cost = tonumber(ARGV[3])
+local clock = redis.call('TIME')
+local now = tonumber(clock[1]) * 1000 + math.floor(tonumber(clock[2]) / 1000)
+local state = redis.call('HMGET', KEYS[1], 'tokens', 'updated')
+local tokens = capacity
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  if not tonumber(state[1]) or not tonumber(state[2]) or redis.call('PTTL', KEYS[1]) < 0 then
+    return redis.error_reply('Invalid quota state')
+  end
+  tokens = math.min(capacity, tonumber(state[1]) + math.max(0, now - tonumber(state[2])) * capacity / period)
+end
+if tokens < cost then
+  return {0, math.floor(tokens), math.ceil((cost - tokens) * period / capacity)}
+end
+tokens = tokens - cost
+local refill = math.ceil((capacity - tokens) * period / capacity)
+if cost > 0 then
+  redis.call('HSET', KEYS[1], 'tokens', tokens, 'updated', now)
+  redis.call('PEXPIRE', KEYS[1], math.max(1, refill))
+end
+return {1, math.floor(tokens), refill}
 `;
 const decodeResponse = Schema.decodeUnknownEffect(
-  Schema.Tuple([Schema.Int, Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))]),
+  Schema.Tuple([
+    Schema.Literals([0, 1]),
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  ]),
   { reportInput: false }
 );
 export interface RedisQuotaConfig {
@@ -49,7 +71,7 @@ class RedisQuota implements Quota {
     const client = this.client;
     const reply = yield* this.permits.withPermitsIfAvailable(1)(
       Effect.tryPromise({
-        try: () => client.eval(consume, 1, `graphql:ratelimit:${visitor}`, limit, windowMs, cost),
+        try: () => client.eval(consume, 1, `graphql:quota:${visitor}`, limit, windowMs, cost),
         catch: (cause) => cause,
       }).pipe(
         Effect.flatMap((response) =>
@@ -76,10 +98,10 @@ class RedisQuota implements Quota {
     if (reply._tag === 'None') return yield* allowWithoutQuota(limit, windowMs, 'saturated');
     if (reply.value === undefined)
       return yield* allowWithoutQuota(limit, windowMs, 'command_failure');
-    const [count, ttl] = reply.value;
-    if (count === -1) return { _tag: 'Limited', retryAfter: ttl };
+    const [allowed, remaining, refill] = reply.value;
+    if (allowed === 0) return { _tag: 'Limited', retryAfter: refill };
     const now = yield* Clock.currentTimeMillis;
-    return { _tag: 'Allowed', remaining: Math.max(0, limit - count), reset: now + ttl };
+    return { _tag: 'Allowed', remaining, reset: now + refill };
   });
 }
 const allowWithoutQuota = Effect.fnUntraced(function* (

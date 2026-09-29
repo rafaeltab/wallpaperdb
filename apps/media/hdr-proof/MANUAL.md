@@ -89,6 +89,9 @@ The matrix inventories adaptation for every required gain-map geometry and
 source dialect. It requires the same file at boosts 2 and 16, plus 64 for the
 ISO source. Keep the untested XMP and Apple intermediate comparisons pending;
 the separate ISO measurements cannot qualify another source dialect.
+The separate ISO containment, crop, stretch and EXIF6 rendering entries retain
+the same file across boosts 2, 16 and 64. Each passes only at 16. Their matched
+SDR references and failed-rendering labels remain in the manual bundle.
 
 The optional gain-map AVIF source has separately inspected authored-SDR AVIF
 derivatives for containment, crop, stretch and upscale. Compare them with the
@@ -124,6 +127,10 @@ The same containment JPEG has a separate failed boost-2 record with its own
 matched source reference. Keep its passing boost-16 endpoint and failed
 intermediate rendering separate in the checklist; a successful endpoint does
 not clear that appearance failure.
+The separately resized original-map candidate has correct source capacity and
+gain metadata, but fails at boost 2, source-full headroom and boost 16. All three
+entries point to the same diagnostic file. Matching metadata does not make it
+an approved HDR derivative.
 The separately named HDR candidates emit single-layer PQ AVIF12 for containment,
 crop, stretch and upscale. The original
 native-map-sampling candidate remains failed; the antialiased-map candidate has

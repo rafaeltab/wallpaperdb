@@ -138,6 +138,7 @@ def candidate_files(evidence, fixtures):
         or (case.get('fixture_id') in gainmap.NAMES and case.get('geometry') == 'contain')
         or case.get('candidate') == 'native-combine-moderateoffset-mozjpeg-base-dct-float-map'
         or case.get('candidate', '').startswith('native-combine-icc-gamma32-')
+        or case.get('proof_module') == 'iso_geometry_headroom'
         or (case.get('fixture_id', '').startswith('apng-') and case.get('geometry') in ('contain', 'orientation'))]
     for case in selected:
         artifacts = case.get('artifacts')
@@ -466,6 +467,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- The [ISO intermediate-headroom proof](iso-intermediate-boost2.json) fails at display boost 2 against an independently reconstructed source at that same boost. Both actual output readers agree within the existing limits, but reconstructed appearance does not. The source capacity is about 49.26 times SDR white; the regenerated file is about 4.47. Read-only pre-JPEG-map and ideal-gain diagnostics retain large errors. A normalized-weight diagnostic reduces broad bias but still fails; normalizing capacity to the boost-16 reference endpoint is insufficient in that diagnostic. Other capacity choices remain untested. The separate display-boost-16 endpoint remains measured; the boost-2 rendering requirement blocks faithful-HDR qualification independently of endpoint counts and physical review.',
               '- The [ISO full-source-headroom proof](iso-full-headroom-boost64.json) also fails. At display boost 64 both source and output gain weights equal one, but the output remains identical to its boost-16 rendering while the source becomes brighter. Its shadow maximum is 129.3897 Delta E ITP and highlight mean is 25.0703. The matrix requires one identical output file to pass boosts 2, 16 and 64; different files cannot jointly qualify adaptation.',
               '- A separate [native full-source candidate](iso-full-source-candidate.json) reconstructs the ISO source at boost 64 before geometry and gain-map regeneration. That full-source rendering passes, with independent shadow maximum 7.79985 under the unchanged limit of 8. The exact same output fails boosts 2 and 16, so it does not clear the joint adaptation requirement. Its regenerated capacity is 3.089498 log2 versus the source 5.622376. The original output and all earlier failures remain separate evidence.',
+              '- The [ISO geometry rendering proof](iso-geometry-headroom.json) reruns the existing qualified containment, crop, stretch and EXIF6 orientation recipes. It preserves their exact files and every original endpoint measurement. Each passes display boost 16 and fails appearance at 2 and 64; all other gates pass. The twelve rendering records retain their separate references and manual-file labels. These measurements cover all five required ISO geometries together with the upscale proofs, while XMP and Apple intermediate rendering remains untested.',
               '- The [fractional map-gamma-1.5 candidate](icc-gainmap-midpointoffset-gamma1.5.json) passes the unchanged SDR, native HDR, independent HDR and cross-reader gates for ISO JPEG upscale. It retains the gamma-3.2 compressed base, eight-bit SOF0 layers and midpoint offsets. Qualification requires the experimental ICC-aware readers at display boost 16; the stock sRGB-assuming reader still fails and physical consumers remain pending. All five preceding failed representations remain separate.',
               '- The [Android XMP fractional-gamma upscale](icc-gainmap-xmp-midpointoffset-gamma1.5.json) passes the same file gates using the existing PQ16 source bridge with requested native depth 12. Its source reference shares libavif gain application; source transport agreement is not a claim of a second source-renderer implementation. Independent final HDR readers still qualify the output. The ISO-only float32 guard, stock-reader failure and pending physical status are unchanged.',
               '- New Apple containment passes the same ICC-aware JPEG recipe, while the original upscale remains failed at independent HDR shadow maximum 8.08225 against the unchanged limit 8. Native source/geometry/intent, SDR appearance and cross-reader agreement pass. A separate integer-DCT map keeps that shadow failure and adds highlight p95 failures in both HDR readers, with identical base and pre-JPEG map samples. A separately named FLOAT-base/FLOAT-map upscale preserves native gamma3.2 input and P3 ICC bytes, regenerates the map against its actual compressed base, and passes all gates at maximum HDR error 6.77896. The observed SOF0 union now covers 24/24 tuples, including 20/20 required, within the declared reader scope. Exact auxiliary XMP model/version/headroom facts govern this source; removing its non-authoritative MakerNotes leaves native reconstruction byte-identical, while unknown required XMP facts reject transformation.',
@@ -480,6 +482,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- The locked gain-map AVIF source has separately qualified standard-sRGB RGB8 JPEG containment, crop and stretch. Its standard-sRGB upscale remains failed at shadow maximum 25.49485 in both native-input and full-reference comparisons. A separate gamma-3.2 ICC upscale passes the same gates with shadow maximum 3.83562. Exhaustive native transfer checks preserve the authored SDR reference and primaries; regional mean errors increase but stay within their unchanged limits. Actual ICC semantics, RGB components and Adobe transform establish color; raw decoder defaults remain diagnostics. Native JPEG coding error and full authored-reference error must both pass unchanged photographic gates. No separate JPEG aspect declaration is invented, and physical compatibility remains pending.',
               '- The gain-map AVIF source has separately qualified HDR JPEG containment, crop, stretch and upscale through ICC-aware readers at display boost 16. Native authored SDR and corrected PQ16 HDR preparations supply encoder pixels; direct dav1d source samples and parsed tmap metadata supply the independent reference. Actual RGB8 SOF0 layers, ISO/XMP/native agreement, privacy and both endpoint appearances pass unchanged gates. Independent HDR maximum across these geometries is 6.10543; original containment bytes and measurements remain exact. These endpoint measurements retain stock-reader limitations; separate intermediate rendering and physical consumer checks remain necessary.',
               '- A separate gain-map AVIF-to-HDR-JPEG containment proof renders that exact file at display boost 2. Both readers agree but fail the unchanged appearance gates, with independent shadow maximum 75.26896. Capacity-normalized and uncompressed-map diagnostics retain shadow errors. The original authored SDR geometry remains fixed; replacing it with linear-light geometry would fail its existing reference. This measured adaptation failure does not create an additional required product path or change the passing boost-16 endpoint.',
+              '- A separate native AVIF-to-HDR-JPEG trial retains original source gain metadata while resizing its map and authored base separately. It restores matching source/output weights and preserves the SDR measurement exactly, but fails HDR appearance at boost 2, source-full headroom and boost 16. Independent shadow maxima are 146.7847 at boost 2 and 171.395 at full headroom. Read-only reference diagnostics identify exact nonmonotonic channel samples that an equal-offset gain curve cannot reproduce exactly; they do not prove that every approximate encoding must fail the regional limits.',
               '- Authored SDR WebP containment, crop, stretch and upscale from the locked gain-map AVIF uses the same verified native source/geometry preparation. Actual lossless RGB8 WebP and native sRGB ICC semantics are independently inspected. FFmpeg and libwebp must recover every native input sample exactly; the independent authored SDR reference and unchanged photographic limits still determine appearance qualification. HDR and physical consumer interpretation are separate.',
               '- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.',
               '- The separately versioned gainmap-hdr-target-gamut-v1 reference filters and clips negative Lanczos excursions in the requested output primaries. Clipping in the earlier Rec.2020 decoder coordinates could create negative components in the requested P3 or sRGB gamut. Analytic commutation, out-of-gamut and identity controls verify this correction. Old references and failed case IDs remain visible; new cases record the reference revision and diagnostic differences. Appearance thresholds are unchanged.',
@@ -612,6 +615,9 @@ def main():
     from gainmap_avif_hdr_jpeg_headroom import run as run_gainmap_avif_hdr_jpeg_headroom
     gainmap_avif_hdr_jpeg_headroom_result = run_gainmap_avif_hdr_jpeg_headroom(WORK/'gainmap-avif-hdr-jpeg-boost2')
     write_json(WORK/'gainmap-avif-hdr-jpeg-boost2-evidence.json', gainmap_avif_hdr_jpeg_headroom_result)
+    from gainmap_avif_separate_map import run as run_gainmap_avif_separate_map
+    gainmap_avif_separate_map_result = run_gainmap_avif_separate_map(WORK/'gainmap-avif-separate-map')
+    write_json(WORK/'gainmap-avif-separate-map-evidence.json', gainmap_avif_separate_map_result)
     from gainmap_avif_gif import run as run_gainmap_avif_gif
     gainmap_avif_gif_result = run_gainmap_avif_gif(WORK/'gainmap-avif-gif')
     write_json(WORK/'gainmap-avif-gif-evidence.json', gainmap_avif_gif_result)
@@ -661,6 +667,10 @@ def main():
     iso_full_source = run_iso_full_source(WORK/'iso-full-source-candidate')
     write_json(RESULTS/'iso-full-source-candidate.json', iso_full_source)
     icc_results.extend(iso_full_source['cases'])
+    from iso_geometry_headroom import run as run_iso_geometry_headroom
+    iso_geometry_headroom = run_iso_geometry_headroom(WORK/'iso-geometry-headroom')
+    write_json(RESULTS/'iso-geometry-headroom.json', iso_geometry_headroom)
+    icc_results.extend(iso_geometry_headroom['cases'])
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))
@@ -698,6 +708,7 @@ def main():
     controls['controls'].extend(gainmap_avif_jpeg_result['controls'])
     controls['controls'].extend(gainmap_avif_hdr_jpeg_result['controls'])
     controls['controls'].extend(gainmap_avif_hdr_jpeg_headroom_result['controls'])
+    controls['controls'].extend(gainmap_avif_separate_map_result['controls'])
     controls['controls'].extend(gainmap_avif_gif_result['controls'])
     controls['controls'].extend(gainmap_avif_gif_liq['controls'])
     controls['controls'].extend(gainmap_avif_gif_gamma32['controls'])
@@ -708,6 +719,7 @@ def main():
     evidence += gainmap_avif_jpeg_result['evidence']
     evidence += gainmap_avif_hdr_jpeg_result['evidence']
     evidence += gainmap_avif_hdr_jpeg_headroom_result['evidence']
+    evidence += gainmap_avif_separate_map_result['evidence']
     evidence += gainmap_avif_gif_result['evidence']
     evidence += gainmap_avif_gif_liq['evidence']
     evidence += gainmap_avif_gif_gamma32['evidence']

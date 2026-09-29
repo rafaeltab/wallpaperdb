@@ -10,6 +10,29 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_keeps_each_iso_geometry_rendering_scope(self):
+        # Bookkeeping only; these bytes cannot qualify a conversion.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            output = root/'same-file.jpg'
+            output.write_bytes(b'file-copy-test-only')
+            cases = [{'case_id': f'iso-{geometry}-boost{boost}', 'fixture_id': 'gainmap-android-iso',
+                      'geometry': geometry, 'proof_module': 'iso_geometry_headroom',
+                      'status': 'qualified' if boost == 16 else 'tested and failed',
+                      'qualification_scope': f'One actual file at boost {boost}',
+                      'artifacts': {'output': str(output), 'sha256': suite.avif.digest(output)}}
+                     for geometry in ('contain', 'cover', 'fill', 'orientation') for boost in (2, 16, 64)]
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files(cases, [])
+            self.assertEqual(len(files), 12)
+            for case, entry in zip(cases, files):
+                self.assertEqual(entry['case_id'], case['case_id'])
+                self.assertEqual(entry['qualification_scope'], case['qualification_scope'])
+                self.assertEqual(entry['codec_status'], case['status'])
+                self.assertEqual(entry['sha256'], suite.avif.digest(output))
+                self.assertEqual(entry['consumer_status'], 'pending manual review')
+
     def test_reconstruction_profiles_extend_only_the_exact_source_record(self):
         fixture = {'id': 'source', 'sha256': 'a'*64, 'facts': {'hdr_reconstruction': 'untested'}}
         profiles = [{'candidate': 'original', 'status': 'tested and failed'},

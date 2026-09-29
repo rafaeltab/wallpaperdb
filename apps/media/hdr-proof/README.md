@@ -181,6 +181,14 @@ Its native regenerated capacity is 3.089498 log2, while the source is 5.622376.
 This improves the full-source endpoint but leaves the joint same-file adaptation
 requirement failed. It retains the exact compressed SDR base and every earlier
 candidate's evidence.
+The [four other ISO geometries](iso_geometry_headroom.py) rerun their exact
+qualified recipes and preserve every original endpoint measurement. Each
+containment, crop, stretch and EXIF6 orientation file passes at boost 16 and
+fails appearance at 2 and 64. The independent reference reconstructs the
+canonical source at the requested boost before geometry, with one rotation
+for the orientation case. The extracted source map is hash-bound before and
+after decoding. All five required ISO geometries now have measured adaptation
+failures; XMP and Apple intermediate rendering remains untested.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
@@ -422,6 +430,15 @@ SDR gate, so that reference remains unchanged. These are optional conversion
 measurements, not an additional required product path. Stock-reader failure and
 measured adaptation failure remain explicit; browser and wallpaper results are
 pending.
+The [separate-map experiment](gainmap_avif_separate_map.py) uses native map
+sampling and geometry with the original gain metadata. Its checked metadata
+carrier supplies no image pixels. Source and output weights match, and the
+actual-ICC authored SDR measurement stays exact, but all three renderings fail.
+Shadow maxima reach 146.7847 at boost 2 and 171.395 at source-full headroom.
+Uncompressed-map diagnostics retain those errors. The fixed references contain
+809 pixels with an exact channel-order violation for an equal-offset monotonic
+gain curve. This identifies a representation constraint, not proof that no
+approximate file can meet the regional limits.
 The [authored SDR GIF containment](gainmap_avif_gif.py) remains failed. Its real
 256-color native palette passes structure, ICC, opacity and independent decoding
 but exceeds the unchanged shadow and midtone appearance gates. A read-only

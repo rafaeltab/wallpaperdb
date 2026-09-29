@@ -7,6 +7,7 @@ FFmpeg's separate MJPEG decoder supplies the measured samples. The image keeps
 its authored SDR grade. No HDR tone mapping or reference pixels feed the encoder.
 """
 import hashlib
+import io
 import json
 from pathlib import Path
 import struct
@@ -25,9 +26,7 @@ const fs = require('node:fs');
   const job = JSON.parse(fs.readFileSync(0, 'utf8'));
   const metadata = await sharp(job.input).metadata();
   if (metadata.hasAlpha) throw new Error('Authored JPEG base must be opaque');
-  let pipeline = sharp(job.input);
-  pipeline = job.gamut === 'p3' ? pipeline.keepIccProfile()
-    : pipeline.pipelineColourspace('srgb').withIccProfile('srgb');
+  const pipeline = sharp(job.input).keepIccProfile();
   const image = await pipeline.removeAlpha().raw().toBuffer({ resolveWithObject: true });
   fs.writeFileSync(job.output, image.data);
   process.stdout.write(JSON.stringify(image.info));
@@ -66,6 +65,24 @@ def prepare(source, output, operation, *, gamut='srgb'):
     information = json.loads(native(['node', '-e', _SOURCE_RGB], data=json.dumps({
         'input': str(source), 'output': str(raw), 'gamut': gamut}).encode()))
     width, height = information['width'], information['height']
+    source_color_conversion = 'Preserve decoded source RGB and its verified primaries'
+    if gamut == 'srgb':
+        with Image.open(source) as image:
+            profile = image.info.get('icc_profile')
+        if profile:
+            # Sharp independently decodes the authored JPEG samples. Invoke
+            # system LittleCMS explicitly so this transform uses the declared
+            # perceptual intent and in-memory sRGB destination. Reopening a
+            # serialized destination quantizes its colorants before conversion
+            # and changes near-black resampling results. No reference pixels
+            # or reference geometry enter this native candidate pipeline.
+            decoded = Image.frombytes('RGB', (width, height), raw.read_bytes())
+            converted = ImageCms.profileToProfile(decoded, ImageCms.ImageCmsProfile(io.BytesIO(profile)),
+                ImageCms.createProfile('sRGB'), renderingIntent=0, outputMode='RGB')
+            raw.write_bytes(converted.tobytes())
+            source_color_conversion = 'Native system LittleCMS perceptual transform to in-memory sRGB'
+        else:
+            source_color_conversion = 'Fixture-declared sRGB source without an embedded ICC profile'
     raw_width, raw_height = width, height
     before, orientation = '', 1
     if operation == 'orientation':
@@ -93,6 +110,7 @@ def prepare(source, output, operation, *, gamut='srgb'):
     second = _axis(['-i', intermediate], output, target_width, target_height)
     return {'geometry': operation, 'source_dimensions': [raw_width, raw_height], 'source_orientation': orientation,
             'dimensions': [target_width, target_height], 'gamut': gamut,
+            'source_color_conversion': source_color_conversion,
             'native_filters': [first, second],
             'geometry_precision': '8-bit coded sRGB after each normalized native Lanczos axis',
             'source_sha256': hashlib.sha256(source.read_bytes()).hexdigest()}

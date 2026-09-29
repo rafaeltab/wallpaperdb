@@ -85,14 +85,7 @@ class AuthoredSdrTests(unittest.TestCase):
                     reference = np.asarray(authored if operation == 'identity' else geometry(authored, operation)) / 255
                     measured = compare_appearance(sdr_signal_to_nits(reference), actual,
                         reference_gamut=gamut, actual_gamut='rec2020', fixture_class='gainmap-sdr')
-                    if gamut == 'srgb' and operation == 'upscale':
-                        # The native source CMS currently differs by one code
-                        # at a near-black green sample. This candidate remains
-                        # unqualified; passing other regions cannot hide it.
-                        self.assertFalse(measured['passed'], measured)
-                        self.assertEqual(measured['failures'], ['shadow.delta_e_max'])
-                    else:
-                        self.assertTrue(measured['passed'], measured)
+                    self.assertTrue(measured['passed'], measured)
                     self.assertEqual(actual.shape, reference.shape)
                     self.assertEqual(facts['gamut'], gamut)
                     self.assertEqual(facts['transfer'], 'gamma3.2')

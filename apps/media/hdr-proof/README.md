@@ -86,6 +86,15 @@ and output hashes. It distinguishes geometry error from coding error and counts
 failed shadow pixels in blocks with unchanged DC coefficients. This diagnostic
 does not qualify a conversion or prove every baseline JPEG encoder impossible.
 
+The separate [ICC-aware experiment](icc_gainmap.py) tests a gamma-3.2 RGB8 base
+with a regenerated RGB8 gain map. Native LittleCMS reads the actual compressed
+base's ICC profile before libavif computes gains; the independent reader uses
+FFmpeg JPEG samples and separate ICC/ISO equations. Two predeclared offset
+policies retain distinct failures: 1/4096 amplifies small JPEG decoder differences
+in shadows, while 1/65536 exceeds the fixed midtone and highlight limits. Both
+remain unqualified. Stock readers that assume sRGB transfer or reject ICC also
+remain separate limitations; this experiment does not establish interoperability.
+
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
 the same HDR intent and fixed appearance limits. Analytic near-black controls

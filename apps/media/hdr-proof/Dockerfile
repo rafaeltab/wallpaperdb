@@ -25,4 +25,6 @@ COPY mozjpeg-build.sh native_mozjpeg.c /opt/proof/
 RUN sh /opt/proof/mozjpeg-build.sh
 COPY native_jpeg_coefficients.c /opt/proof/native_jpeg_coefficients.c
 RUN cc -O2 -Wall -Wextra -Werror /opt/proof/native_jpeg_coefficients.c -ljpeg -o /usr/local/bin/hdr-proof-jpeg-coefficients
+COPY icc-gainmap-build.sh native_icc_gainmap.cpp libavif-icc-linear-base.patch /opt/proof/
+RUN sh /opt/proof/icc-gainmap-build.sh
 WORKDIR /proof

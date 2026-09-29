@@ -18,6 +18,9 @@ Record date, reviewer, OS build, browser version, monitor/display identity, disp
 | Chrome, Galaxy S26 Ultra | Pending | Pending | Pending | Pending |
 
 Test Android/ISO, Android XMP, old Apple and new Apple JPEG separately. Test every emitted PQ/HLG P3/Rec.2020 and 8/10/12-bit variant represented in the report. Do not infer one flavor's result from another flavor or assume wide gamut means HDR presentation. Animated HLG plus alpha and extra HDR PNG/APNG/WebP conversions remain optional candidates with separate records.
+The inspected bundle includes all 24 static AVIF source combinations and their
+contain derivatives, including opaque and fractional-alpha variants. Use each
+file's manifest status; the bundle also retains failed candidates for diagnosis.
 
 Combined HDR JPEG candidates use SOF3 predictive RGB8 base and gain-map coding.
 The pinned libavif reader rejects this coding; the suite's validated native

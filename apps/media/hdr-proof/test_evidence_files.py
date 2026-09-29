@@ -9,6 +9,27 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_covers_every_static_avif_transfer_gamut_depth_and_alpha(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            fixtures, cases = [], []
+            for spec in suite.avif.fixture_specs():
+                if spec['frames'] != 1:
+                    continue
+                source = root/f'{spec["id"]}.avif'
+                source.write_bytes(b'file-copy-test-only')
+                fixtures.append({'id': spec['id'], 'path': str(source), 'spec': spec, 'facts': spec})
+                cases.append({'case_id': spec['id']+':hdr:avif:contain:copy-test',
+                    'fixture_id': spec['id'], 'geometry': 'contain', 'status': 'tested and failed',
+                    'artifacts': {'output': str(source)}})
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files(cases, fixtures)
+            self.assertEqual(len(files), 48)
+            self.assertEqual({entry['case_id'] for entry in files if entry['case_id']},
+                             {case['case_id'] for case in cases})
+            self.assertTrue(all(entry['consumer_status'] == 'pending manual review' for entry in files))
+
     def test_manual_hdr_intent_keeps_inspection_and_distinguishes_native_comparison(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

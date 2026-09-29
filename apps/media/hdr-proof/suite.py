@@ -94,12 +94,18 @@ def candidate_files(evidence, fixtures):
                         'warning':'A failed candidate is a diagnostic comparison, not an approved download or SDR fallback.' if case and case['status']!='qualified' else None})
     for fixture in fixtures:
         spec = fixture.get('spec')
-        if spec and (spec['depth'] in (10,16) or spec['frames']==2):
+        if spec and (spec['depth'] in (8,10,12,16) or spec['frames']==2):
             suffix = Path(fixture['path']).suffix
             copy(fixture['path'], f'source-{fixture["id"]}{suffix}', 'Inspected synthetic HDR source', facts=fixture['facts'])
     for source in (ROOT/'fixtures/gainmap').glob('*.jpg'):
         copy(source,f'source-{source.name}','Provenance-documented gain-map source; exact original')
-    selected = [case for case in evidence if (case.get('fixture_id') in ('avif-pq-rec2020-10-opaque','avif-hlg-rec2020-10-opaque','animated-pq-alpha','png-pq-rec2020-16-alpha','png-hlg-p3-16-opaque') and case.get('geometry') in ('contain','identity')) or (case.get('fixture_id') in gainmap.NAMES and case.get('geometry')=='contain') or (case.get('fixture_id', '').startswith('apng-') and case.get('geometry') in ('contain','orientation'))]
+    selected = [case for case in evidence
+        if (case.get('fixture_id', '').startswith('avif-') and case.get('geometry') == 'contain')
+        or (case.get('fixture_id') in ('animated-pq-alpha', 'animated-hlg-alpha',
+                                     'png-pq-rec2020-16-alpha', 'png-hlg-p3-16-opaque')
+            and case.get('geometry') in ('contain', 'identity'))
+        or (case.get('fixture_id') in gainmap.NAMES and case.get('geometry') == 'contain')
+        or (case.get('fixture_id', '').startswith('apng-') and case.get('geometry') in ('contain', 'orientation'))]
     for case in selected:
         artifacts = case.get('artifacts')
         values = [artifacts.get('output')] if isinstance(artifacts,dict) else artifacts or []

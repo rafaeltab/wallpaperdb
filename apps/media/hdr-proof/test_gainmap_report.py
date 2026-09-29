@@ -57,6 +57,27 @@ def native_case(candidate, geometry, qualified):
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_optional_gainmap_report_keeps_failed_tone_and_exact_renderings(self):
+        from suite import optional_gainmap_report
+        case = {'proof_module': 'static_avif_hdr_jpeg', 'fixture_id': 'pq8',
+            'selectors': {'format': 'jpg'}, 'rendering_scope': {'display_boost': 16},
+            'artifacts': {'sha256': 'a'*64}, 'status': 'tested and failed',
+            'measurements': {'sdr': measurement(.1, 1.2, .2),
+                'independent_hdr': measurement(.2, 2.3, .4), 'native_hdr': measurement(.3, 3.4, .5),
+                'encoded_sdr_tone': {'passed': False, 'failures': ['highlight_flattening']}}}
+        identity = {**case, 'proof_module': 'xmp_identity_avif', 'fixture_id': 'xmp',
+            'selectors': {'format': 'avif'}, 'rendering_scope': {'display_boost': 2},
+            'status': 'qualified', 'measurements': {key: value for key, value in case['measurements'].items()
+                                                  if key != 'encoded_sdr_tone'}}
+        missing = {**case, 'measurements': {}, 'artifacts': {}}
+        rendered = '\n'.join(optional_gainmap_report([case, identity, missing]))
+        self.assertIn('| pq8 | jpg | 16 | 1.200000 | 2.300000 | 3.400000 | failed: highlight_flattening | `aaaaaaaaaaaa` | tested and failed |', rendered)
+        self.assertIn('| xmp | avif | 2 | 1.200000 | 2.300000 | 3.400000 | authored SDR |', rendered)
+        self.assertIn('| missing | missing | missing | missing | missing | tested and failed |', rendered)
+        self.assertIn('pending manual review', rendered)
+        self.assertIn('does not qualify resized adaptation', rendered)
+        self.assertEqual(optional_gainmap_report([]), [])
+
     def test_precision_tradeoff_report_preserves_positive_errors_without_requalifying(self):
         from suite import apple_precision_tradeoffs
         case = {'proof_module': 'apple_hdr_avif_precision', 'geometry': 'contain',

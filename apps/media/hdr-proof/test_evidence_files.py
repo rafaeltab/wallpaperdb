@@ -110,6 +110,34 @@ class EvidenceFileTests(unittest.TestCase):
                 self.assertEqual(entry['sha256'], suite.avif.digest(output))
                 self.assertEqual(entry['consumer_status'], 'pending manual review')
 
+    def test_manual_bundle_keeps_optional_identity_gainmap_conversions_and_failures(self):
+        # File-copy bookkeeping only. No encoder or qualification is replaced.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            cases = []
+            for module, fixture, extension, statuses in (
+                    ('static_avif_hdr_jpeg', 'avif-pq-p3-8-opaque', 'jpg', ('tested and failed', 'qualified')),
+                    ('xmp_identity_avif', 'gainmap-android-xmp', 'avif', ('qualified',)*3)):
+                output = root/('output.'+extension)
+                output.write_bytes(b'copy-bookkeeping-only')
+                for index, status in enumerate(statuses):
+                    cases.append({'case_id': f'{module}-{index}', 'fixture_id': fixture,
+                        'proof_module': module, 'geometry': 'identity', 'status': status,
+                        'qualification_scope': 'Only this source and rendering',
+                        'rendering_scope': {'display_boost': index+2},
+                        'artifacts': {'output': str(output), 'sha256': suite.avif.digest(output)}})
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files(cases, [])
+            self.assertEqual(len(files), 5)
+            for case, entry in zip(cases, files):
+                self.assertEqual(entry['case_id'], case['case_id'])
+                self.assertEqual(entry['codec_status'], case['status'])
+                self.assertEqual(entry['qualification_scope'], case['qualification_scope'])
+                self.assertEqual(entry['rendering_scope'], case['rendering_scope'])
+                self.assertEqual(entry['consumer_status'], 'pending manual review')
+                self.assertEqual(bool(entry['warning']), case['status'] != 'qualified')
+
     def test_reconstruction_profiles_extend_only_the_exact_source_record(self):
         fixture = {'id': 'source', 'sha256': 'a'*64, 'facts': {'hdr_reconstruction': 'untested'}}
         profiles = [{'candidate': 'original', 'status': 'tested and failed'},

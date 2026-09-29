@@ -216,6 +216,23 @@ and derivative at stable brightness, then repeat at another brightness setting
 and window size. Record any changing exposure or highlight difference separately
 from decoding, color signaling and the measured full-headroom result.
 
+The optional original-size XMP JPEG-to-gain-map AVIF keeps the original base,
+map and gain metadata. Its three rendering entries refer to one identical
+file at boosts 2, source-full and 16. Compare that AVIF with the original JPEG
+and authored SDR companion, recording whether each consumer recognizes the
+map and changes HDR presentation with available headroom. The original's
+legacy EXIF-sRGB convention remains explicit; automated sample preservation
+does not certify a consumer's interpretation.
+
+The static PQ8/P3 AVIF-to-HDR-JPEG pair contains a failed no-dither diagnostic
+and a separately qualified ordered-dither file. Compare both with the same
+SDR reference and native PQ16 intent at matched geometry. Inspect highlight
+steps, shadow noise, ordinary white, saturated colors and visible HDR brightness.
+The ordered file trades larger measured color errors for smoother highlight
+levels. Its file qualification requires ICC-aware readers at full boost 16;
+stock-reader failures and intermediate behavior remain separate. Record
+browser, native-viewer and wallpaper results independently for each exact hash.
+
 The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
 two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit
 SDR APNG counterparts carry a standard sRGB chunk; the SDR AVIF and WebP

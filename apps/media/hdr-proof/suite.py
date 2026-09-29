@@ -143,7 +143,8 @@ def candidate_files(evidence, fixtures):
         or case.get('candidate', '').startswith('native-combine-icc-gamma32-')
         or case.get('proof_module') in ('iso_geometry_headroom', 'gainmap_avif_identity_jpeg',
                                        'xmp_containment_headroom', 'apple_hdr_avif', 'apple_hdr_png',
-                                       'apple_hdr_png_precision', 'apple_hdr_avif_precision')
+                                       'apple_hdr_png_precision', 'apple_hdr_avif_precision',
+                                       'static_avif_hdr_jpeg', 'xmp_identity_avif')
         or (case.get('fixture_id', '').startswith('apng-') and case.get('geometry') in ('contain', 'orientation'))]
     for case in selected:
         artifacts = case.get('artifacts')
@@ -562,6 +563,30 @@ def apple_precision_tradeoffs(evidence):
     return lines + ['']
 
 
+def optional_gainmap_report(evidence):
+    cases = [case for case in evidence if case.get('proof_module') in ('static_avif_hdr_jpeg', 'xmp_identity_avif')]
+    if not cases:
+        return []
+    lines = ['## Additional original-size gain-map conversions', '',
+        'Each row retains its exact file and rendering scope. The static PQ8/P3 AVIF-to-JPEG experiment uses the unchanged avif-8 HDR and sdr-8 appearance limits, plus the encoded SDR tone gate. Its full-boost-16 result does not establish intermediate adaptation. The legacy XMP JPEG-to-AVIF preserves the authored SDR base and original map at three named boosts; it does not qualify resized adaptation. Browser, native viewer and wallpaper results remain pending manual review.', '',
+        '| Source fixture | Output | Display boost | SDR maximum Delta E ITP | Independent HDR maximum Delta E ITP | Native HDR maximum Delta E ITP | Encoded SDR tone | Output SHA-256 prefix | Status |',
+        '| --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |']
+    def maximum(measurement):
+        values = [region['delta_e_itp']['maximum'] for region in measurement.get('regions', {}).values()
+                  if region.get('samples', 0) and 'maximum' in region.get('delta_e_itp', {})]
+        return f'{max(values):.6f}' if values else 'missing'
+    for case in cases:
+        measured = case.get('measurements', {})
+        tone = measured.get('encoded_sdr_tone')
+        tone_text = ('passed' if tone['passed'] else 'failed: '+', '.join(tone.get('failures', []))) if tone else (
+            'authored SDR' if case['proof_module'] == 'xmp_identity_avif' else 'missing')
+        sha = (case.get('artifacts') or {}).get('sha256')
+        output = f'`{sha[:12]}`' if isinstance(sha, str) and re.fullmatch('[0-9a-f]{64}', sha) else 'missing'
+        sdr, independent, native = [maximum(measured.get(key, {})) for key in ('sdr', 'independent_hdr', 'native_hdr')]
+        lines.append(f'| {case["fixture_id"]} | {case["selectors"]["format"]} | {case["rendering_scope"]["display_boost"]} | {sdr} | {independent} | {native} | {tone_text} | {output} | {case["status"]} |')
+    return lines + ['', 'Regional color and luminance measurements, clipping diagnostics, source conventions and stock-reader failures remain in the machine-readable evidence. No-dither failures remain unqualified even when the separately encoded ordered-dither alternative passes.', '']
+
+
 def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound, global_bound, base_bound, continuous_bound, capacity_bound):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
@@ -582,6 +607,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              *iso_capacity_report(capacity_bound),
              *apple_documented_report(evidence),
              *apple_precision_tradeoffs(evidence),
+             *optional_gainmap_report(evidence),
              '## Environment and reproducibility','',
              'The image uses the same Node 22 Alpine/musl deployment shape as Media. This is a proposed native proof pipeline, not the existing Sharp 0.33 production worker. No service dependency was upgraded. HDR geometry uses native FFmpeg/zimg float processing and luminance-coupled HLG transforms. The calibrated SDR candidate uses the native CPU Mobius filter. CPU lavapipe runs the retained libplacebo comparison trials without a host GPU. Network access is disabled during tests.','',
              f'- Node: `{native_versions["node"]}`',
@@ -820,6 +846,14 @@ def main():
     from gainmap_xmp import run as run_xmp_source
     xmp_source = run_xmp_source(WORK/'xmp-independent-source')
     write_json(RESULTS/'xmp-source-reference.json', xmp_source)
+    from xmp_identity_avif import run as run_xmp_identity_avif
+    xmp_identity_avif = run_xmp_identity_avif(WORK/'xmp-identity-avif')
+    write_json(RESULTS/'xmp-identity-avif.json', xmp_identity_avif)
+    icc_results.extend(xmp_identity_avif['evidence'])
+    from static_avif_hdr_jpeg import run as run_static_avif_hdr_jpeg
+    static_avif_hdr_jpeg = run_static_avif_hdr_jpeg(WORK/'static-avif-hdr-jpeg')
+    write_json(RESULTS/'static-avif-hdr-jpeg.json', static_avif_hdr_jpeg)
+    icc_results.extend(static_avif_hdr_jpeg['cases'])
     from xmp_containment_headroom import run as run_xmp_headroom
     xmp_headroom = run_xmp_headroom(WORK/'xmp-containment-headroom',
                                   geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
@@ -953,6 +987,7 @@ def main():
     controls['controls'].extend(gainmap_avif_hdr_jpeg_headroom_result['controls'])
     controls['controls'].extend(gainmap_avif_separate_map_result['controls'])
     controls['controls'].extend(gainmap_avif_identity_jpeg_result['controls'])
+    controls['controls'].extend(xmp_identity_avif['controls'])
     controls['controls'].extend(gainmap_avif_gif_result['controls'])
     controls['controls'].extend(gainmap_avif_gif_liq['controls'])
     controls['controls'].extend(gainmap_avif_gif_gamma32['controls'])

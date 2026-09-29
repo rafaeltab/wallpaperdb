@@ -36,7 +36,7 @@
       "source_fixture": "gainmap-apple-new",
       "generator": "node gainmap-fixture.cjs <output.jpg>",
       "native_versions": { "sharp": "0.35.5", "libvips": "8.18.7", "libultrahdr": "2.0.2", "libc": "musl" },
-      "provenance": "Deterministically regenerated ISO 21496-1 representation from the Apple new fixture inside the pinned proof image. Its filename names the Android/ISO source class, not an Android camera origin. It has ISO binary metadata only. Android XMP interoperability is exercised by the separate XMP fixture; dual metadata emission remains unqualified.",
+      "provenance": "Deterministically regenerated ISO 21496-1 representation from the Apple new fixture inside the pinned proof image. Its filename names the Android/ISO source class, not an Android camera origin. It has ISO binary metadata only. Android XMP is exercised by the separate XMP fixture; emitted dual-metadata derivatives have separate file and reader qualifications in the conversion matrix.",
       "expected": { "width": 384, "height": 512, "base_depth": 8, "map_depth": 8, "gamut": "p3" }
     }
   ],

@@ -659,6 +659,30 @@ Actual ICC interpretation remains necessary. This optional identity conversion
 does not qualify resize, crop, orientation or other display headrooms. Its
 candidate and matched SDR reference are included for pending physical review;
 all failed resized experiments remain separate.
+The [original-size XMP JPEG-to-gain-map AVIF conversion](xmp_identity_avif.py)
+preserves the original 403-by-302 RGB8 base, 512-by-384 grayscale8 map and gain
+metadata. Independent parsing permits only the verified base/map/tmap item
+graph; dav1d decodes actual coded samples, and native whole-file readers must
+agree. One file passes authored SDR and HDR at boosts 2, source-full and 16,
+with exact source samples and maximum native HDR error 0.213356. The legacy
+source has EXIF-sRGB facts but lacks the ICC required by the Android container
+specification. That named source convention remains explicit. This optional
+conversion does not qualify resizing or physical gain-map AVIF presentation.
+
+The [static PQ8/P3 AVIF-to-HDR-JPEG experiment](static_avif_hdr_jpeg.py) compares
+two native RGB8 encodings at the original 96-by-64 geometry. Both use the
+existing 1000-nit Mobius SDR grade, P3 gamma3.2 ICC coding and regenerated
+dual ISO/XMP gain metadata. The no-dither file fails the emitted SDR base's
+highlight-flattening gate despite passing color comparisons. Native ordered
+dither resolves 30 of 37 highlight steps instead of 16 and passes every
+unchanged avif-8, sdr-8 and tone gate. Its SDR maximum error is 2.973248;
+native and independent HDR maxima are 2.790719 and 2.933713. These errors
+increase relative to no dither and remain recorded. Ordinary white is 0.885149
+SDR signal. Tone probes use an explicitly clipped nominal sRGB display, while
+SDR appearance compares unclipped actual ICC colors. Executable guards show
+clipping changes no white/shadow/midtone probe or neutral-curve decision.
+Only full boost 16 and ICC-aware readers qualify; stock-reader failures,
+intermediate adaptation and physical consumers remain separate.
 The [authored SDR GIF containment](gainmap_avif_gif.py) remains failed. Its real
 256-color native palette passes structure, ICC, opacity and independent decoding
 but exceeds the unchanged shadow and midtone appearance gates. A read-only

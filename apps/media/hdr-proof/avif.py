@@ -14,12 +14,25 @@ LUMA = {'srgb': [.2126, .7152, .0722], 'p3': [.2289746, .6917385, .0792869], 're
 COMMANDS = []
 
 
+def ffmpeg_error_diagnostics(argv, stderr):
+    """Only explicitly error-level FFmpeg diagnostics invalidate a zero exit."""
+    levels = [argv[index + 1] for index, argument in enumerate(argv[:-1])
+              if argument in ('-v', '-loglevel')]
+    return bool(Path(argv[0]).name == 'ffmpeg' and levels and levels[-1] == 'error' and stderr)
+
+
 def native(args, *, data=None):
-    result = subprocess.run([str(a) for a in args], input=data, capture_output=True, timeout=180)
-    COMMANDS.append({'argv': [str(a) for a in args], 'exit_code': result.returncode,
+    argv = [str(a) for a in args]
+    result = subprocess.run(argv, input=data, capture_output=True, timeout=180)
+    COMMANDS.append({'argv': argv, 'exit_code': result.returncode,
                      'stderr': re.sub(r'0x[0-9a-fA-F]+', '0xADDRESS', result.stderr.decode(errors='replace'))[-6000:]})
     if result.returncode:
         raise RuntimeError(f'{args[0]} exited {result.returncode}: {COMMANDS[-1]['stderr'][-3000:]}')
+    # FFmpeg may conceal damaged JPEG blocks, emit a complete raster and exit
+    # zero. At an explicit error log level, stderr still disqualifies that
+    # native operation. Preserve its actual return code and diagnostics above.
+    if ffmpeg_error_diagnostics(argv, result.stderr):
+        raise RuntimeError(f'FFmpeg reported error diagnostics despite exit 0: {COMMANDS[-1]["stderr"][-3000:]}')
     return result.stdout
 
 

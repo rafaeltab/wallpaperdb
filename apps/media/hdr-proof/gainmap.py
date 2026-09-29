@@ -14,6 +14,7 @@ import numpy as np
 from PIL import Image, ImageCms, ImageOps
 
 from appearance import compare_appearance, sdr_signal_to_nits
+from avif import ffmpeg_error_diagnostics
 from gainmap_iso import ISO_ID, iso_metadata, jpeg_facts, reconstruct, segments
 
 ROOT = Path(__file__).parent
@@ -36,17 +37,21 @@ NATIVE_RETAIN_BUILD = {
 
 
 def command(args, log, *, data=None, binary=False):
-    result = subprocess.run([str(value) for value in args], input=data, capture_output=True,
+    argv = [str(value) for value in args]
+    result = subprocess.run(argv, input=data, capture_output=True,
                             text=not binary, timeout=300)
     log.parent.mkdir(parents=True, exist_ok=True)
     if binary:
         log.write_bytes(result.stderr)
     else:
-        log.write_text(json.dumps({"command": [str(v) for v in args], "exit_code": result.returncode,
+        log.write_text(json.dumps({"command": argv, "exit_code": result.returncode,
                                    "stdout": result.stdout, "stderr": result.stderr}, indent=2) + "\n")
     if result.returncode:
         raise RuntimeError((result.stderr.decode() if binary else result.stderr) or
                            (result.stdout.decode(errors="replace") if binary else result.stdout))
+    if ffmpeg_error_diagnostics(argv, result.stderr):
+        detail = result.stderr.decode(errors='replace') if binary else result.stderr
+        raise RuntimeError(f'FFmpeg reported error diagnostics despite exit 0: {detail[-3000:]}')
     return result.stdout
 
 

@@ -1,4 +1,6 @@
 """Authored SDR JPEG evidence needs real pixels, actual ICC and native storage."""
+import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -132,6 +134,78 @@ class GainMapAvifJpegTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 gainmap_avif_jpeg.inspect_and_decode(path)
             self.assertEqual(len(avif.COMMANDS), start)
+
+
+class GainMapAvifJpegGeometryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.temporary.name)
+        cls.result = gainmap_avif_jpeg.run(cls.root/'proof', geometries=('contain', 'cover', 'fill', 'upscale'))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporary.cleanup()
+
+    def test_all_actual_geometries_keep_source_color_precision_and_matrix_evidence(self):
+        evidence = self.result['evidence']
+        self.assertEqual(len(evidence), 4)
+        self.assertEqual(len({case['case_id'] for case in evidence}), 4)
+        self.assertEqual(len(self.result['source_fixtures']), 1)
+        for case in evidence:
+            with self.subTest(geometry=case['geometry']):
+                self.assertIn('sdr', case['measurements'], case['blockers'])
+                dimensions = gainmap_avif_jpeg.SIZES[case['geometry']]
+                self.assertEqual((case['facts']['width'], case['facts']['height']), dimensions)
+                for name in ('native_encoder', 'native_preparation', 'independent_source_decoder', 'independent_decoder', 'structure', 'privacy'):
+                    self.assertTrue(case['checks'][name], case['blockers'])
+                self.assertEqual((case['facts']['sof'], case['facts']['depth']), (0, 8))
+                self.assertEqual((case['facts']['gamut'], case['facts']['transfer']), ('srgb', 'srgb'))
+                self.assertEqual(case['native_preparation']['geometry'], case['geometry'])
+                self.assertEqual(case['native_candidate']['input_sha256'], case['native_preparation']['artifacts']['sha256'])
+                self.assertEqual(case['threshold_scope']['thresholds_sha256'], '0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf')
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+        matrix = build_matrix(evidence)
+        self.assertEqual(matrix['evidence_errors'], [])
+        actual = next(cell for cell in matrix['cells'] if cell['id'] == 'avif-gainmap:sdr:jpg')['evidence']
+        self.assertEqual([(case['case_id'], case['status']) for case in actual], [(case['case_id'], case['status']) for case in evidence])
+        self.assertEqual([case['status'] for case in evidence], ['qualified', 'qualified', 'qualified', 'tested and failed'])
+        for case in evidence[:3]:
+            self.assertTrue(all(case['checks'].values()))
+        failed = evidence[3]
+        self.assertEqual(failed['geometry'], 'upscale')
+        self.assertEqual(failed['artifacts']['sha256'], 'f3be6e4c6e560ece389f853d484eb2470faaca6cbc2ec3ee9e58ffe89720f5b1')
+        self.assertFalse(failed['checks']['native_storage_appearance'])
+        self.assertFalse(failed['checks']['appearance'])
+        for name in ('sdr', 'native_storage'):
+            self.assertEqual(failed['measurements'][name]['failures'], ['shadow.delta_e_max'])
+            self.assertAlmostEqual(failed['measurements'][name]['regions']['shadow']['delta_e_itp']['maximum'], 25.494851450009584, places=6)
+
+    def test_invalid_geometry_lists_and_mismatched_selectors_stop_before_native_work(self):
+        for geometries in ((), ('contain', 'contain'), ('orientation',), ('crop',), ('unknown',)):
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                gainmap_avif_jpeg.run(self.root/'invalid', geometries=geometries)
+            self.assertEqual(len(avif.COMMANDS), start)
+        for geometries in (('contain', 'cover'), ('cover',), ('fill',), ('upscale',)):
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                gainmap_avif_jpeg.run(self.root/'invalid-selectors', geometries=geometries, selectors=gainmap_avif_jpeg.SELECTORS)
+            self.assertEqual(len(avif.COMMANDS), start)
+
+    def test_actual_cover_dimensions_cannot_borrow_containment_facts(self):
+        cover = next(case for case in self.result['evidence'] if case['geometry'] == 'cover')
+        start = len(avif.COMMANDS)
+        with self.assertRaisesRegex(ValueError, 'geometry'):
+            gainmap_avif_jpeg.inspect_and_decode(Path(cover['artifacts']['output']))
+        self.assertEqual(len(avif.COMMANDS), start)
+
+    def test_containment_bytes_status_and_every_measurement_remain_exact(self):
+        case = next(case for case in self.result['evidence'] if case['geometry'] == 'contain')
+        self.assertEqual(case['status'], 'qualified')
+        self.assertEqual(case['artifacts']['sha256'], 'fe78297586abb65828565ab94185a57898a9ec5926f6d8b30a8a2db555d5be5e')
+        measured_hash = hashlib.sha256(json.dumps(case['measurements'], sort_keys=True).encode()).hexdigest()
+        self.assertEqual(measured_hash, '9cb5b9a6773ad4f0f32e309087f39be4bd3e48b50fb3a058161aa3896fb306c9')
 
 
 if __name__ == '__main__':

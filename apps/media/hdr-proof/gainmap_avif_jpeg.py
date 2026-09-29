@@ -1,4 +1,4 @@
-"""One authored SDR JPEG containment from the locked gain-map AVIF source.
+"""Authored SDR JPEG geometries from the locked gain-map AVIF source.
 
 Keep the existing photographic gainmap-sdr reference and thresholds. The
 verified native PNG preparation supplies candidate pixels; Pillow's native
@@ -26,9 +26,11 @@ import gainmap_avif_png
 from appearance import compare_appearance, sdr_signal_to_nits
 from gainmap import private_metadata_tags
 from gainmap_iso import _base_color_facts
+from matrix import GAINMAP_GEOMETRIES
 
 
 SELECTORS = {**gainmap_avif_png.SELECTORS, 'format': 'jpg'}
+SIZES = {'contain': (173, 130), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 576)}
 POLICY = {**gainmap_avif_png.POLICY,
     'rationale': 'Existing authored photographic SDR gates at nominal100-nit white apply unchanged to this lossy native JPEG; no extra compression or source-import allowance',
     'output': 'Static opaque baseline SOF0 RGB8 JPEG, quality100, no chroma subsampling, actual sRGB matrix/TRC ICC',
@@ -38,11 +40,23 @@ POLICY = {**gainmap_avif_png.POLICY,
     'aspect_scope': 'Actual173x130 pixel raster without an aspect override; no explicit1:1 aspect declaration is claimed',
     'decoder_diagnostics': 'FFmpeg MJPEG defaults such as bt470bg are not emitted JPEG color declarations. Actual RGB component IDs, Adobe identity transform and ICC define color; exact planar-to-packed RGB agreement rejects an accidental conversion',
     'baseline_candidate': 'Standard sRGB transfer and native libjpeg quality100 RGB8; no alternate transfer candidate is implied'}
+GEOMETRY_POLICY = {**POLICY,
+    'geometry': gainmap_avif_png.GEOMETRY_POLICY['geometry'],
+    'scope': 'Only authored SDR JPEG contain, cover, fill and upscale from the identity-oriented locked source',
+    'aspect_scope': 'Actual requested pixel raster without an aspect override; no explicit1:1 aspect declaration is claimed'}
 
 
-def validate_selectors(selectors):
-    if selectors != SELECTORS:
-        raise ValueError('Only the exact authored SDR JPEG containment selectors are admitted')
+def _selectors(operation):
+    return {**{key: value for key, value in SELECTORS.items() if key not in ('w', 'fit')},
+            **GAINMAP_GEOMETRIES[operation]}
+
+
+def validate_selectors(selectors, *, operation='contain'):
+    if operation not in SIZES:
+        raise ValueError('Unsupported authored SDR JPEG geometry')
+    if selectors != _selectors(operation):
+        label = 'containment' if operation == 'contain' else operation
+        raise ValueError(f'Only the exact authored SDR JPEG {label} selectors are admitted')
 
 
 def source_decision(source, directory, *, source_lock=gainmap_avif.SOURCE_LOCK):
@@ -58,8 +72,11 @@ def source_decision(source, directory, *, source_lock=gainmap_avif.SOURCE_LOCK):
         return {'action': 'original only', 'source_valid': False, 'reason': str(error), 'sha256': avif.digest(source)}
 
 
-def _parse_jpeg(data):
+def _parse_jpeg(data, *, dimensions=(173, 130)):
     """Bounded generated SOF0/one-scan RGB JPEG; reject unknown APP metadata."""
+    if tuple(dimensions) not in SIZES.values():
+        raise ValueError('Expected a bounded authored SDR JPEG geometry')
+    width, height = dimensions
     if data[:2] != b'\xff\xd8':
         raise ValueError('Missing JPEG start marker')
     position, headers = 2, []
@@ -103,9 +120,9 @@ def _parse_jpeg(data):
             raise ValueError('Expected one unambiguous JPEG frame and RGB transform')
         return values[0]
     frame = one(0xC0)
-    if (len(frame) != 15 or struct.unpack('>BHHB', frame[:6]) != (8, 130, 173, 3)
+    if (len(frame) != 15 or struct.unpack('>BHHB', frame[:6]) != (8, height, width, 3)
             or frame[6::3] != b'RGB' or frame[7::3] != b'\x11\x11\x11'):
-        raise ValueError('Expected actual baseline RGB8 containment173x130 without subsampling')
+        raise ValueError('Expected actual baseline RGB8 geometry without subsampling')
     if one(0xEE) != b'Adobe\x00\x64'+bytes(5):
         raise ValueError('Expected the native Adobe RGB identity transform')
     if not all(any(marker == wanted for marker, _ in headers) for wanted in (0xDB, 0xC4)):
@@ -113,7 +130,7 @@ def _parse_jpeg(data):
     color = _base_color_facts(data)
     if color['gamut'] != 'srgb' or color['transfer'] != 'srgb':
         raise ValueError('Expected actual sRGB ICC matrix and transfer semantics')
-    return {'width': 173, 'height': 130, 'depth': 8, 'sof': 0, 'components': 3,
+    return {'width': width, 'height': height, 'depth': 8, 'sof': 0, 'components': 3,
             'gamut': 'srgb', 'transfer': 'srgb', 'color': color,
             'icc_sha256': color['icc_sha256'], 'orientation': 1, 'frames': 1, 'opaque': True,
             'no_aspect_override': True, 'aspect_ratio_explicitly_signaled': False,
@@ -122,16 +139,17 @@ def _parse_jpeg(data):
             'header_markers': [hex(marker) for marker, _ in headers], 'gain_map': 'absent', 'private_metadata_segments': []}
 
 
-def inspect_and_decode(path):
+def inspect_and_decode(path, *, dimensions=(173, 130)):
     path = Path(path)
-    facts = _parse_jpeg(path.read_bytes())
+    facts = _parse_jpeg(path.read_bytes(), dimensions=dimensions)
+    width, height = facts['width'], facts['height']
     packet = json.loads(avif.native(['ffprobe', '-v', 'error', '-c:v', 'mjpeg', '-count_frames',
                                      '-show_frames', '-show_streams', '-of', 'json', path]))
     frames, streams = packet.get('frames', []), packet.get('streams', [])
     if len(frames) != 1 or len(streams) != 1 or streams[0].get('codec_name') != 'mjpeg':
         raise ValueError('Expected exactly one independently decoded JPEG frame')
     for observed in (frames[0], streams[0]):
-        if (observed.get('width'), observed.get('height'), observed.get('pix_fmt')) != (173, 130, 'gbrp'):
+        if (observed.get('width'), observed.get('height'), observed.get('pix_fmt')) != (width, height, 'gbrp'):
             raise ValueError('Independent JPEG decoder disagrees with actual RGB8 geometry')
         if observed.get('sample_aspect_ratio') not in (None, '1:1'):
             raise ValueError('Independent JPEG decoder reports a conflicting aspect override')
@@ -141,17 +159,17 @@ def inspect_and_decode(path):
         raise ValueError('Unexpected JPEG precision, frame count or crop')
     raw = avif.native(['ffmpeg', '-v', 'error', '-c:v', 'mjpeg', '-i', path, '-frames:v', '1',
                        '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1'])
-    if len(raw) != 173*130*3:
+    if len(raw) != width*height*3:
         raise ValueError('Independent JPEG decoded sample count disagrees with actual dimensions')
-    codes = np.frombuffer(raw, np.uint8).reshape(130, 173, 3)
+    codes = np.frombuffer(raw, np.uint8).reshape(height, width, 3)
     planar = avif.native(['ffmpeg', '-v', 'error', '-c:v', 'mjpeg', '-i', path, '-frames:v', '1',
                           '-f', 'rawvideo', '-pix_fmt', 'gbrp', 'pipe:1'])
     if (len(planar) != len(raw) or not np.array_equal(codes,
-            np.moveaxis(np.frombuffer(planar, np.uint8).reshape(3, 130, 173)[[2, 0, 1]], 0, -1))):
+            np.moveaxis(np.frombuffer(planar, np.uint8).reshape(3, height, width)[[2, 0, 1]], 0, -1))):
         raise ValueError('Native planar-to-packed RGB decoding altered JPEG component samples')
     tags = json.loads(avif.native(['exiftool', '-j', '-n', '-G1', '-s', path]))[0]
     tags = {key: value for key, value in tags.items() if key != 'SourceFile' and not key.startswith('System:')}
-    expected = {'File:FileType': 'JPEG', 'File:ImageWidth': 173, 'File:ImageHeight': 130,
+    expected = {'File:FileType': 'JPEG', 'File:ImageWidth': width, 'File:ImageHeight': height,
                 'File:BitsPerSample': 8, 'File:ColorComponents': 3, 'Adobe:ColorTransform': 0}
     if any(tags.get(key) != value for key, value in expected.items()):
         raise ValueError('Independent ExifTool disagrees with actual JPEG structure or RGB transform')
@@ -182,12 +200,18 @@ def _encode(source, output):
 
 
 def _case(root, original):
-    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:sdr:jpg:preserve:preserve:contain:authored-srgb-rgb8',
+    operation = original['geometry']
+    selectors = {**original['selectors'], 'format': 'jpg'}
+    validate_selectors(selectors, operation=operation)
+    root = root if operation == 'contain' else root/operation
+    root.mkdir(parents=True, exist_ok=True)
+    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:sdr:jpg:preserve:preserve:{operation}:authored-srgb-rgb8',
         'cell_id': 'avif-gainmap:sdr:jpg', 'fixture_id': gainmap_avif.FIXTURE_ID,
-        'candidate': 'native-authored-base-jpeg-srgb', 'selectors': SELECTORS, 'geometry': 'contain',
+        'candidate': 'native-authored-base-jpeg-srgb', 'selectors': selectors, 'geometry': operation,
         'source_facts': original['source_facts'], 'source_sha256': original['source_sha256'],
         'status': 'tested and failed', 'consumer_status': 'pending manual review',
-        'threshold_scope': {**POLICY, 'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
+        'threshold_scope': {**(POLICY if operation == 'contain' else GEOMETRY_POLICY),
+                            'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
         'checks': {key: False for key in ('native_encoder', 'native_preparation', 'independent_source_decoder',
             'independent_decoder', 'structure', 'native_storage_appearance', 'appearance', 'privacy')},
         'measurements': {}, 'artifacts': {}, 'blockers': [], 'native_preparation': original}
@@ -205,7 +229,7 @@ def _case(root, original):
         case['checks']['native_encoder'] = True
         case['artifacts'] = {'output': str(output), 'sha256': avif.digest(output),
                              'source': original['artifacts']['source'], 'source_sha256': original['source_sha256']}
-        facts, codes = inspect_and_decode(output)
+        facts, codes = inspect_and_decode(output, dimensions=SIZES[operation])
         reference = original['reference_sdr']
         reference_path = Path(reference['path'])
         if avif.digest(reference_path) != reference['sha256']:
@@ -231,12 +255,18 @@ def _case(root, original):
     return case
 
 
-def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
-    validate_selectors(SELECTORS if selectors is None else selectors)
+def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, geometries=('contain',)):
+    geometries = tuple(geometries)
+    if not geometries or len(set(geometries)) != len(geometries) or any(operation not in SIZES for operation in geometries):
+        raise ValueError('Expected distinct contain, cover, fill or upscale geometries')
+    if selectors is not None:
+        if len(geometries) != 1:
+            raise ValueError('Explicit selectors require one declared geometry')
+        validate_selectors(selectors, operation=geometries[0])
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
-    prepared = gainmap_avif_png.run(root/'native-png', source_lock=source_lock)
+    prepared = gainmap_avif_png.run(root/'native-png', source_lock=source_lock, geometries=geometries)
     cases = [_case(root, original) for original in prepared['evidence']]
     controls = [{**row, 'case_id': row['case_id'].replace('gainmap-avif-png-', 'gainmap-avif-jpeg-')}
                 for row in prepared['controls'] if row.get('original')]
@@ -250,5 +280,5 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
         controls.append({'case_id': 'gainmap-avif-jpeg-'+label+'-withheld', 'passed': rejected,
                          'status': 'passed' if rejected else 'tested and failed'})
     return {'evidence': cases, 'source_fixtures': prepared['source_fixtures'], 'fixtures': [],
-            'controls': controls, 'commands': avif.COMMANDS[start:], 'scope': POLICY,
+            'controls': controls, 'commands': avif.COMMANDS[start:], 'scope': POLICY if geometries == ('contain',) else GEOMETRY_POLICY,
             'consumer_status': 'pending manual review'}

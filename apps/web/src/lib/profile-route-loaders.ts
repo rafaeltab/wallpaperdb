@@ -1,3 +1,4 @@
+import { GatewayAdmissionError } from '@/lib/graphql/admission';
 import type { QueryClient } from '@tanstack/react-query';
 import { notFound, redirect } from '@tanstack/react-router';
 import type { Profile } from '@/lib/graphql/types';
@@ -7,7 +8,12 @@ export async function loadCanonicalProfile(
   queryClient: QueryClient,
   handle: string
 ): Promise<Profile> {
-  const resolution = await queryClient.fetchQuery(profileByHandleQueryOptions(handle));
+  const options = profileByHandleQueryOptions(handle);
+  const resolution = await queryClient.fetchQuery(options).catch((error: unknown) => {
+    const cached = queryClient.getQueryData(options.queryKey);
+    if (error instanceof GatewayAdmissionError && cached) return cached;
+    throw error;
+  });
   if (!resolution) throw notFound();
 
   if (resolution.canonicalHandle !== handle) {

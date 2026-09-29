@@ -27,8 +27,8 @@ export function GraphQLError({
         <p>{admission?.message ?? 'Please try again later.'}</p>
         {admission?.status === 429 ? (
           <p>
-            We will try again automatically after {Math.ceil(admission.retryAfterMs / 1000)}{' '}
-            seconds, with a small additional delay.
+            {retrying ? 'We will try again automatically in about' : 'Try again in about'}{' '}
+            {Math.ceil(admission.retryAfterMs / 1000)} seconds.
           </p>
         ) : null}
         <Button variant="outline" size="sm" disabled={retrying} onClick={() => void retry()}>

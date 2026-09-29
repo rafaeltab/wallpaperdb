@@ -5,11 +5,13 @@ from pathlib import Path
 
 import numpy as np
 
+import avif
 import gainmap
 import gainmap_combine
 import gainmap_hdr
 import gainmap_sdr
 from gainmap_iso import decode_iso_source
+from gainmap_metadata import check_metadata
 from appearance import compare_appearance, sdr_signal_to_nits
 from matrix import GAINMAP_GEOMETRIES
 
@@ -93,6 +95,24 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                         fixture_class='gainmap-hdr')
                     case['measurements']['native_hdr_geometry'] = geometry_measurement
                     case['checks']['native_geometry'] = geometry_measurement['passed']
+                    hdr_intent = Path(encoded['hdr_intent_pq_png'])
+                    intent_facts = gainmap.inspect(hdr_intent, folder/'hdr-intent-inspection')
+                    intent_tags = intent_facts['metadata']
+                    intent_signal = avif.read_png(hdr_intent)
+                    intent_cicp = [intent_tags.get('PNG-cICP:'+field) for field in (
+                        'ColorPrimaries', 'TransferCharacteristics', 'MatrixCoefficients', 'VideoFullRangeFlag')]
+                    intent_structure = (intent_cicp == [{'srgb': 1, 'p3': 12}[gamut], 16, 0, 1]
+                        and intent_facts['coded_depth'] == 16
+                        and intent_signal.shape[:2] == hdr_reference.shape[:2]
+                        and intent_facts['frame_count'] == 1 and intent_facts['opaque']
+                        and intent_tags.get('IFD0:Orientation', 1) == 1 and not intent_facts['private_tags'])
+                    intent_measurement = compare_appearance(hdr_reference,
+                        avif.decode_transfer(intent_signal[..., :3], 'pq', gamut), reference_gamut=reference_gamut,
+                        actual_gamut=gamut, fixture_class='gainmap-hdr')
+                    case['measurements']['native_hdr_intent_png'] = intent_measurement
+                    case['hdr_intent'] = {'path': str(hdr_intent), 'sha256': gainmap.digest(hdr_intent),
+                        'facts': intent_facts, 'purpose': 'Native HDR intent comparison file; '
+                        'independently inspected and measured, not an independent reference or consumer qualification'}
                     facts = gainmap.inspect(target, folder/'inspection')
                     actual_sdr, sdr_facts = gainmap_sdr.decode(target, gamut=gamut)
                     sdr_measurement = compare_appearance(sdr_signal_to_nits(np.asarray(sdr_reference)/255),
@@ -112,13 +132,22 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                                                         actual_gamut=hdr_gamut, fixture_class='gainmap-hdr')
                     case['measurements'].update({'authored_sdr_base': sdr_measurement,
                         'reconstructed_hdr': hdr_measurement, 'independent_hdr_cross_decoder': cross_decoder})
-                    case['checks']['appearance'] = sdr_measurement['passed'] and hdr_measurement['passed']
+                    case['checks']['appearance'] = (sdr_measurement['passed'] and hdr_measurement['passed']
+                                                   and intent_measurement['passed'])
+                    native_metadata = json.loads(gainmap.command([
+                        '/opt/proof/ultrahdr/precise/hdr-proof-uhdr', 'probe', target],
+                        folder/'independent-native-metadata.log'))
+                    metadata_agreement = check_metadata(facts, native_metadata)
+                    case['gain_map_metadata_agreement'] = metadata_agreement
+                    case['native_metadata_probe'] = native_metadata
                     structure = {'dimensions': actual_hdr.shape == hdr_reference.shape and actual_sdr.shape == hdr_reference.shape,
                         'coded_depths': facts['base']['depth'] == 8 and facts['map']['depth'] == 8,
                         'gamut': sdr_facts['gamut'] == gamut and hdr_gamut == gamut and decoded_iso['gamut'] == gamut,
                         'orientation': facts['metadata'].get('IFD0:Orientation', 1) == 1,
                         'static_opaque': facts['frame_count'] == 1 and facts['opaque'],
+                        'hdr_intent_png': intent_structure,
                         'dual_metadata': bool(facts['iso_identifier'] and facts['android_xmp_properties']),
+                        'metadata_agreement': all(metadata_agreement['checks'].values()),
                         'hdr_capacity': facts['iso_metadata']['alternate_headroom'] > facts['iso_metadata']['base_headroom']}
                     case['structural_checks'] = structure
                     case['checks']['structure'] = all(structure.values())

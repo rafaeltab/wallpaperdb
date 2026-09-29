@@ -26,6 +26,11 @@ class CombinedGainMapProofTests(unittest.TestCase):
                     self.assertTrue(Path(case['reference_sdr']['path']).is_file())
                     self.assertEqual(case['reference_sdr']['sha256'], case['artifacts']['reference_sdr_sha256'])
                     self.assertIn('SOF3', case['known_consumer_limitations'][0])
+                    self.assertTrue(all(case['gain_map_metadata_agreement']['checks'].values()))
+                    self.assertTrue(case['structural_checks']['metadata_agreement'])
+                    self.assertTrue(case['structural_checks']['hdr_intent_png'])
+                    self.assertEqual(case['hdr_intent']['facts']['coded_depth'], 16)
+                    self.assertTrue(case['measurements']['native_hdr_intent_png']['passed'])
             matrix = build_matrix(cases)
             aggregated = {item['case_id']: item for cell in matrix['cells'] for item in cell['evidence']}
             for case in cases:

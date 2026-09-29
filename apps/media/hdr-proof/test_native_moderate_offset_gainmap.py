@@ -61,9 +61,9 @@ class NativeModerateOffsetGainMapTests(unittest.TestCase):
             with Image.open(output) as image:
                 np.testing.assert_array_equal(np.asarray(image), np.full((64, 64, 3), 40))
 
-    def test_apple_upscale_has_a_separate_qualified_representation(self):
+    def test_apple_and_iso_upscale_have_a_separate_qualified_representation(self):
         with tempfile.TemporaryDirectory() as temporary:
-            cases = run(Path(temporary), names=('gainmap-apple-old', 'gainmap-apple-new'),
+            cases = run(Path(temporary), names=('gainmap-apple-old', 'gainmap-apple-new', 'gainmap-android-iso'),
                         geometries=('upscale',), policies=('moderateoffset',))
             for case in cases:
                 with self.subTest(source=case['fixture_id']):

@@ -11,6 +11,37 @@ import hdr_png8_proof
 
 
 class PngEightBitConversionTests(unittest.TestCase):
+    def test_normalized_source_candidates_preserve_every_source_sample_and_baseline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = hdr_png8_proof.run(root/'baseline')
+            extended = hdr_png8_proof.run(root/'normalized', normalize_sources=True)
+            originals = {item['case_id']: item for item in baseline['evidence']}
+            candidates = [item for item in extended['evidence'] if 'source_normalization' in item]
+            self.assertEqual(len(extended['evidence']), 64)
+            self.assertEqual(len(candidates), 32)
+            self.assertEqual(len(extended['controls']), len(baseline['controls']))
+            for item in extended['evidence']:
+                with self.subTest(case=item['case_id']):
+                    if item['case_id'] in originals:
+                        before = originals[item['case_id']]
+                        self.assertEqual(item['artifacts']['sha256'], before['artifacts']['sha256'])
+                        self.assertEqual(item['status'], before['status'])
+                        self.assertEqual(item['measurements']['frames'], before['measurements']['frames'])
+                        continue
+                    normalization = item['source_normalization']
+                    self.assertTrue(normalization['passed'], normalization)
+                    self.assertEqual(normalization['mismatched_samples'], 0)
+                    self.assertEqual(normalization['maximum_rgb_error'], 0)
+                    self.assertEqual(normalization['maximum_alpha_error'], 0)
+                    self.assertEqual(normalization['source_depth'], 8)
+                    self.assertEqual(normalization['normalized_depth'], 16)
+                    self.assertEqual(item['status'], 'qualified', item['blockers'])
+                    self.assertTrue(all(item['checks'].values()))
+                    self.assertEqual(item['consumer_status'], 'pending manual review')
+                    self.assertIn(':normalized-source16', item['case_id'])
+                    self.assertEqual(normalization['source_sha256'], item['artifacts']['source_sha256'])
+
     def test_all_containment_outputs_have_independent_pixels_and_exact_scope(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = hdr_png8_proof.run(Path(temporary))

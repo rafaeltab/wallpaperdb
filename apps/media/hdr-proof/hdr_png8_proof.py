@@ -7,6 +7,11 @@ authored-source quantization is measured separately and is never added to the
 conversion budget. Explicit SDR outputs use the unchanged sdr-8 appearance and
 1000-nit tone/gamut policy. Alpha limits remain two output codes: 2/255 for
 eight-bit outputs and 2/65535 for SDR PNG16. No production admission changes.
+
+The optional normalized-source candidate adds a native exact eight-to-sixteen
+bit boundary before conversion. This changes storage precision only: independent
+libpng must recover every normalized RGBA sample exactly. Original direct-input
+candidates and their measured failures remain separate, unchanged evidence.
 """
 import json
 from pathlib import Path
@@ -34,6 +39,14 @@ OUTPUT_POLICY = {
                   'is separate. SDR retains the previously declared tone/gamut reference and ceiling.'),
     'alpha_limits': {'8': 2 / 255, '16': 2 / 65535},
     'scope': 'These exact fixture/containment/output tuples only; physical consumers remain pending',
+}
+
+NORMALIZATION_POLICY = {
+    'declared_before_native_measurements': True,
+    'method': 'Native planar RGB8/RGBA8 to zimg full-range, no-dither RGB16/RGBA16',
+    'requirement': 'Every independently decoded normalized RGB and alpha sample must equal its source sample exactly',
+    'maximum_sample_error': 0,
+    'scope': 'Exact storage expansion only; no transfer, gamut, geometry or alpha change',
 }
 
 
@@ -149,7 +162,43 @@ def _inspect_sdr_png16(path):
     return facts, pixels
 
 
-def run(output_directory, *, specs=None, source_lock=SOURCE_LOCK):
+def normalize_source(source, output):
+    """Validate an exact native precision boundary before attempting conversion."""
+    facts, pixels = hdr_png8.inspect_and_decode(source)
+    filters = ('format=gbrap,zscale=rangein=full:range=full:dither=none,format=gbrap16le,'
+               'sidedata=mode=delete,'
+               f'setparams=color_primaries={facts["primaries"]}:color_trc={facts["transfer"]}:'
+               'colorspace=gbr:range=full')
+    avif.native(['ffmpeg', '-v', 'error', '-y', '-i', source, '-vf', filters,
+                 '-pix_fmt', 'rgba64be', '-frames:v', '1', '-map_metadata', '-1', '-threads', '1', output])
+    normalized_facts = hdr_png.inspect_source(output)
+    headers = [payload for kind, payload in hdr_png._png_chunks(Path(output).read_bytes()) if kind == b'IHDR']
+    expected_header = (facts['width'], facts['height'], 16, 6, 0, 0, 0)
+    if len(headers) != 1 or len(headers[0]) != 13 or struct.unpack('>IIBBBBB', headers[0]) != expected_header:
+        raise ValueError('Native normalization changed the PNG dimensions, channel structure or precision')
+    raw = avif.native(['hdr-proof-png-decode', output])
+    if (len(raw) != 12 + facts['width'] * facts['height'] * 8
+            or struct.unpack('<III', raw[:12]) != (facts['width'], facts['height'], 16)):
+        raise ValueError('Independent native libpng did not establish normalized-source precision')
+    normalized = np.frombuffer(raw[12:], dtype='<u2').reshape(pixels.shape).astype(float)/65535
+    mismatches = int(np.count_nonzero(normalized != pixels))
+    checks = {'exact_rgba_samples': mismatches == 0,
+              'color_signaling': all(normalized_facts[key] == facts[key]
+                                    for key in ('primaries', 'transfer', 'matrix', 'full_range', 'orientation')),
+              'dimensions': (normalized_facts['width'], normalized_facts['height'])
+                            == (facts['width'], facts['height']),
+              'source_depth': facts['depth'] == 8, 'normalized_depth': normalized_facts['depth'] == 16}
+    return {'passed': all(checks.values()), 'checks': checks, 'policy': NORMALIZATION_POLICY,
+            'source': str(source), 'source_sha256': avif.digest(source),
+            'output': str(output), 'sha256': avif.digest(output),
+            'source_depth': facts['depth'], 'normalized_depth': normalized_facts['depth'],
+            'source_facts': facts, 'normalized_facts': normalized_facts,
+            'mismatched_samples': mismatches,
+            'maximum_rgb_error': float(np.max(np.abs(normalized[..., :3] - pixels[..., :3]))),
+            'maximum_alpha_error': float(np.max(np.abs(normalized[..., 3] - pixels[..., 3])))}
+
+
+def run(output_directory, *, specs=None, source_lock=SOURCE_LOCK, normalize_sources=False):
     output_directory = Path(output_directory)
     output_directory.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
@@ -187,13 +236,30 @@ def run(output_directory, *, specs=None, source_lock=SOURCE_LOCK):
                 avif.make_scene(source_facts['alpha_channel']), transfer, gamut, peak_nits=1000)
         except Exception as error:
             tone = {'passed': False, 'error': str(error)}
-        for dynamic_range, extension, depth in (('hdr', 'png', 8), ('hdr', 'avif', 8),
-                                                ('sdr', 'png', 16), ('sdr', 'avif', 8)):
+        normalized, normalization, normalized_tone = folder/'normalized-source.png', None, None
+        if normalize_sources:
+            try:
+                normalization = normalize_source(source, normalized)
+                if not normalization['passed']:
+                    raise ValueError('Native normalized-source samples or signaling changed; conversion withheld')
+                normalized_tone = avif.sdr_tone_control(normalized, folder/'normalized-source-sdr-control.png',
+                    reference_source, avif.make_scene(source_facts['alpha_channel']), transfer, gamut, peak_nits=1000)
+            except Exception as error:
+                if normalization is None:
+                    normalization = {'passed': False, 'error': str(error), 'policy': NORMALIZATION_POLICY}
+                normalized_tone = {'passed': False, 'error': str(error)}
+        operations = [(dynamic_range, extension, depth, False) for dynamic_range, extension, depth in (
+            ('hdr', 'png', 8), ('hdr', 'avif', 8), ('sdr', 'png', 16), ('sdr', 'avif', 8))]
+        if normalize_sources:
+            operations += [(dynamic_range, extension, depth, True) for dynamic_range, extension, depth, _ in operations]
+        for dynamic_range, extension, depth, use_normalized in operations:
             sdr = dynamic_range == 'sdr'
             out_gamut, out_transfer = ('srgb', 'gamma22' if extension == 'avif' else 'srgb') if sdr else (gamut, transfer)
             selectors = {'format': extension, 'range': dynamic_range, 'gamut': 'srgb' if sdr else 'preserve',
                 'depth': str(depth), 'motion': 'preserve', 'transparency': 'preserve', 'w': 58, 'h': 38, 'fit': 'contain'}
             case_id = f'{spec["id"]}:{dynamic_range}:{extension}:{selectors["gamut"]}:preserve:contain'
+            if use_normalized:
+                case_id += ':normalized-source16'
             directory = folder/case_id.replace(':', '-')
             directory.mkdir(exist_ok=True)
             item = {'case_id': case_id, 'fixture_id': spec['id'], 'cell_id': f'hdr-png:{dynamic_range}:{extension}',
@@ -202,12 +268,17 @@ def run(output_directory, *, specs=None, source_lock=SOURCE_LOCK):
                 'blockers': [], 'measurements': {}, 'artifacts': {}, 'source_facts': source_facts,
                 'threshold_scope': {**OUTPUT_POLICY, 'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
                 'consumer_status': 'pending manual review'}
+            if use_normalized:
+                item['source_normalization'] = normalization
             try:
+                if use_normalized and not normalization['passed']:
+                    raise ValueError('Exact normalized-source boundary failed; candidate conversion withheld')
                 item['request_decision'] = request_decision(known, selectors)
                 if item['request_decision']['action'] != 'unqualified':
                     raise ValueError('Requested tuple is outside this native conversion experiment')
                 converted, target = directory/'converted.png', directory/f'output.{extension}'
-                avif.convert_frame(source, converted, transfer, gamut, 'contain', sdr=sdr, peak_nits=1000 if sdr else None)
+                avif.convert_frame(normalized if use_normalized else source, converted, transfer, gamut,
+                                   'contain', sdr=sdr, peak_nits=1000 if sdr else None)
                 if extension == 'avif':
                     if sdr:
                         gamma_sdr.encode([converted], target, depth=depth)
@@ -247,9 +318,10 @@ def run(output_directory, *, specs=None, source_lock=SOURCE_LOCK):
                     fixture_class='sdr-8' if sdr else 'avif-8', alpha=reference[..., 3],
                     region_reference_luminance_nits=reference[..., :3] @ RGB_TO_XYZ[gamut][1])
                 if sdr:
-                    item['measurements']['tone_controls'] = [tone]
-                    measured['tone_control_passed'] = tone['passed']
-                    measured['passed'] &= tone['passed']
+                    actual_tone = normalized_tone if use_normalized else tone
+                    item['measurements']['tone_controls'] = [actual_tone]
+                    measured['tone_control_passed'] = actual_tone['passed']
+                    measured['passed'] &= actual_tone['passed']
                 item['measurements']['frames'] = [measured]
                 item['checks'].update({'independent_decoder': True, 'structure': all(detail.values()),
                                       'appearance': bool(measured['passed']), 'privacy': privacy['passed']})
@@ -263,6 +335,6 @@ def run(output_directory, *, specs=None, source_lock=SOURCE_LOCK):
             except Exception as error:
                 item['blockers'].append(str(error))
             evidence.append(item)
-        print(f'PNG8 {spec["id"]}: four native containment outputs measured', flush=True)
+        print(f'PNG8 {spec["id"]}: {len(operations)} native containment outputs measured', flush=True)
     return {'evidence': evidence, 'fixtures': fixtures, 'controls': controls,
             'commands': avif.COMMANDS[start:], 'scope': OUTPUT_POLICY}

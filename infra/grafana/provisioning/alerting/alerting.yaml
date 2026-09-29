@@ -275,7 +275,7 @@ groups:
           service: gateway
 
       - uid: gateway-quota-saturated
-        title: Gateway Admission Capacity Saturated
+        title: Gateway Admission Overloaded
         condition: B
         data:
           - refId: A
@@ -284,7 +284,7 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              expr: sum(increase(admission_quota_saturated_total[5m])) or vector(0)
+              expr: (sum(increase(admission_quota_saturated_total[5m])) or vector(0)) + (sum(increase(graphql_active_work_rejected_total[5m])) or vector(0))
               instant: true
               range: false
               intervalMs: 1000
@@ -322,8 +322,8 @@ groups:
         execErrState: Error
         for: 1m
         annotations:
-          summary: Gateway rejects requests because admission capacity is saturated
-          description: "Requests receive HTTP 503. Inspect admission_quota_saturated_total by reason: saturated means all 64 Redis command slots are occupied; local_state means the bounded per-replica fallback identity store is full. Existing depleted budgets remain enforced. Check command latency, Redis connectivity, and source-IP volume."
+          summary: Gateway rejects requests because admission is saturated or active work exceeds its deadline
+          description: "Requests receive HTTP 503. Inspect admission_quota_saturated_total by reason: saturated means all 64 Redis command slots are occupied; local_state means the bounded per-replica fallback identity store is full. Inspect graphql_active_work_rejected_total by reason: capacity means all active GraphQL slots are occupied; timeout means work reached its configured deadline. Existing depleted budgets remain enforced. Check backend latency, command latency, Redis connectivity, and source-IP volume."
         labels:
           severity: critical
           service: gateway

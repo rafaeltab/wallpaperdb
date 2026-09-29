@@ -57,6 +57,24 @@ def native_case(candidate, geometry, qualified):
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_global_offset_bound_reports_only_the_declared_fixed_base_contradiction(self):
+        from suite import iso_global_offset_report
+        diagnostic = {'fixed_maximum_gate': 8, 'analytic_bound': {
+            'contradiction_established': True, 'D_upper_bound_nits': -2.76414504335,
+            'D_lower_bound_nits': -1.46816776674, 'contradiction_margin_nits': 1.29597727661}}
+        rendered = '\n'.join(iso_global_offset_report(diagnostic))
+        self.assertIn('| -2.764145 | -1.468168 | 1.295977 | established |', rendered)
+        self.assertIn('same decoded P3 base', rendered)
+        self.assertIn('positive ordered display weights', rendered)
+        self.assertIn('arbitrary map precision', rendered)
+        self.assertIn('unchanged maximum of 8', rendered)
+        self.assertIn('not a formal directed-rounding certificate', rendered)
+        self.assertIn('Other bases, capacities, reference models', rendered)
+        self.assertIn('cannot qualify a conversion', rendered)
+        self.assertIn('(iso-global-offset-bound.json)', rendered)
+        diagnostic['analytic_bound']['contradiction_established'] = False
+        self.assertIn('| not established |', '\n'.join(iso_global_offset_report(diagnostic)))
+
     def test_fixed_map_bound_keeps_its_measured_scope_and_cannot_qualify_a_path(self):
         from suite import iso_map_bound_report
         rendered = '\n'.join(iso_map_bound_report({'fixed_maximum_gate': 8,

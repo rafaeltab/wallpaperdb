@@ -223,6 +223,18 @@ optimistically ignores JPEG neighborhood coupling and does not bound other
 bases, offsets, capacities, metadata or representations. It records no
 conversion qualification. The default replay validates the native capacity
 report before reuse and writes its own hashed diagnostic record.
+The [shared-offset diagnostic](iso_global_offset_bound.py) then bounds all
+nonnegative global offset pairs for the same decoded P3 base and current
+positive ordered weights. Conservative RGB intervals enclosing the unchanged
+Delta E limit force contradictory green-offset differences at those two
+pixels, separated by 1.295977 nits. This also permits arbitrary per-pixel gains
+and map precision. It rules out an offset-only correction within this fixed
+model. Other bases, capacities, references and gain equations remain outside
+the bound. Linear support, monotone PQ inversion and signed matrix intervals
+supply the analytic argument; sampled probes only check the implementation.
+Float64 outward guards do not constitute a formal directed-rounding
+certificate or change the appearance gate. The diagnostic cannot qualify a
+conversion or physical consumer.
 The [four other ISO geometries](iso_geometry_headroom.py) rerun their exact
 qualified recipes and preserve every original endpoint measurement. Each
 containment, crop, stretch and EXIF6 orientation file passes at boost 16 and

@@ -414,7 +414,18 @@ def iso_map_bound_report(diagnostic):
         f'A minimum above the unchanged maximum of {diagnostic["fixed_maximum_gate"]} rules out a map-code-only correction for that fixed representation. The float64 search optimistically ignores JPEG neighborhood coupling; it is not a formal interval-arithmetic certificate. Other base pixels, offsets, capacities, metadata, map precision, geometry and representations remain outside this bound. A feasible pixel code would still need actual native encoding and all regional gates. This diagnostic cannot qualify a conversion or physical consumer.', '']
 
 
-def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound):
+def iso_global_offset_report(diagnostic):
+    bound = diagnostic['analytic_bound']
+    conclusion = 'established' if bound['contradiction_established'] else 'not established'
+    return ['## Fixed-base ISO offset bound', '',
+        'The [shared-offset diagnostic](iso-global-offset-bound.json) keeps the same decoded P3 base and positive ordered display weights. It encloses the unchanged maximum-error balls in conservative RGB intervals. Two pixels constrain the same green-channel offset difference `D = 203 * (base offset - alternate offset)`.', '',
+        '| D upper bound, nits | D lower bound, nits | Contradiction margin, nits | Contradiction |',
+        '| ---: | ---: | ---: | --- |',
+        f'| {bound["D_upper_bound_nits"]:.6f} | {bound["D_lower_bound_nits"]:.6f} | {bound["contradiction_margin_nits"]:.6f} | {conclusion} |', '',
+        f'The unchanged maximum of {diagnostic["fixed_maximum_gate"]} supplies the error-ball radius. Disjoint offset bounds rule out every shared nonnegative offset pair for this fixed model, including arbitrary map precision and per-pixel gains. The analytic enclosure uses linear support, monotone PQ inversion and signed matrix intervals. Numerical sampling only checks the implementation. Guarded float64 arithmetic is not a formal directed-rounding certificate. Other bases, capacities, reference models, geometry, gain equations and physical consumers remain outside this result. This diagnostic cannot qualify a conversion.', '']
+
+
+def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound, global_bound):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
@@ -428,6 +439,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              *diagnostic_report(matrix),
              *precision_report(precision),
              *iso_map_bound_report(map_bound),
+             *iso_global_offset_report(global_bound),
              '## Environment and reproducibility','',
              'The image uses the same Node 22 Alpine/musl deployment shape as Media. This is a proposed native proof pipeline, not the existing Sharp 0.33 production worker. No service dependency was upgraded. HDR geometry uses native FFmpeg/zimg float processing and luminance-coupled HLG transforms. The calibrated SDR candidate uses the native CPU Mobius filter. CPU lavapipe runs the retained libplacebo comparison trials without a host GPU. Network access is disabled during tests.','',
              f'- Node: `{native_versions["node"]}`',
@@ -712,6 +724,9 @@ def main():
     from iso_map_code_bound import run as run_iso_map_bound
     iso_map_bound = run_iso_map_bound(WORK/'iso-map-code-bound', capacity_report=iso_source_capacity)
     write_json(RESULTS/'iso-map-code-bound.json', iso_map_bound)
+    from iso_global_offset_bound import run as run_iso_global_offset_bound
+    iso_global_bound = run_iso_global_offset_bound(WORK/'iso-global-offset-bound', map_code_report=iso_map_bound)
+    write_json(RESULTS/'iso-global-offset-bound.json', iso_global_bound)
     from iso_geometry_headroom import run as run_iso_geometry_headroom
     iso_geometry_headroom = run_iso_geometry_headroom(WORK/'iso-geometry-headroom')
     write_json(RESULTS/'iso-geometry-headroom.json', iso_geometry_headroom)
@@ -791,7 +806,7 @@ def main():
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,generated_fixtures)
-    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas,mozjpeg_diagnosis,iso_map_bound))
+    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas,mozjpeg_diagnosis,iso_map_bound,iso_global_bound))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))
     return 1 if errors else 2

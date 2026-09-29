@@ -19,3 +19,6 @@
 !native_lossless_jpeg.c
 !native_dct_jpeg.c
 !libavif-rgb-reader.patch
+!jpegli-build.sh
+!jpegli.cmake
+!native_jpegli.cpp

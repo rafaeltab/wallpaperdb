@@ -14,6 +14,22 @@ ROOT = Path(__file__).parent
 
 
 class GainMapProofTests(unittest.TestCase):
+    def test_orientation_evidence_reads_actual_native_source_tag(self):
+        from gainmap import orientation_source
+        source = ROOT/'fixtures/gainmap/gainmap-apple-new.jpg'
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            for value in (2, 6):
+                with self.subTest(orientation=value):
+                    changed = directory/f'orientation-{value}.jpg'
+                    changed.write_bytes(source.read_bytes())
+                    subprocess.run(['exiftool', '-overwrite_original', f'-Orientation#={value}', str(changed)],
+                                   check=True, capture_output=True)
+                    observed = orientation_source(changed, directory/f'inspect-{value}.json')
+                    self.assertEqual(observed['orientation'], value)
+                    self.assertEqual(observed['facts']['metadata']['IFD0:Orientation'], value)
+                    self.assertEqual(observed['sha256'], hashlib.sha256(changed.read_bytes()).hexdigest())
+
     def test_iso_fixture_native_generation_reproduces_committed_hash(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "iso.jpg"

@@ -122,6 +122,9 @@ def required_cases():
                 "required": True, "checks_required": list(CHECKS),
                 "orientation_requirement": "fixtures with nonidentity orientation; baked geometry and equivalent display orientation",
             })
+            if geometry == 'orientation':
+                cases[-1]['source_transform_requirement'] = ({'exif_orientation': 6}
+                    if source == 'gainmap-jpeg' else {'irot': 1, 'imir': None})
 
     for fixture in ("gainmap-android-iso", "gainmap-android-xmp", "gainmap-apple-old", "gainmap-apple-new"):
         add(fixture, "gainmap-jpeg", "hdr", "jpg", "preserve")
@@ -151,6 +154,15 @@ def _measurement_failures(value, path="measurements"):
     elif isinstance(value, list):
         for index, child in enumerate(value):
             yield from _measurement_failures(child, f"{path}[{index}]")
+
+
+def _has_rejected_measurement(value):
+    if isinstance(value, dict):
+        return (value.get('passed') is False or bool(value.get('failures'))
+                or any(_has_rejected_measurement(child) for child in value.values()))
+    if isinstance(value, list):
+        return any(_has_rejected_measurement(child) for child in value)
+    return False
 
 
 def _case_diagnostics(case):
@@ -217,6 +229,38 @@ def _diagnostic_summary(cells, plan):
     }
 
 
+def _source_transform_matches(evidence, planned):
+    """Different source transforms cannot substitute for the declared probe."""
+    expected = planned.get('source_transform_requirement')
+    if not expected:
+        return True
+    source = evidence.get('orientation_source')
+    if not isinstance(source, dict) or not re.fullmatch(r'[0-9a-f]{64}', str(source.get('sha256', ''))):
+        return False
+    facts = source.get('facts', {})
+    if not isinstance(facts, dict) or facts.get('sha256', source['sha256']) != source['sha256']:
+        return False
+    if 'exif_orientation' in expected:
+        observed = [source['orientation']] if 'orientation' in source else []
+        if 'metadata' in facts:
+            tags = facts['metadata']
+            if not isinstance(tags, dict):
+                return False
+            observed.append(tags.get('IFD0:Orientation', tags.get('Orientation', 1)))
+        native = evidence.get('native_candidate', {})
+        if isinstance(native, dict) and 'source_orientation' in native:
+            observed.append(native['source_orientation'])
+        return bool(observed) and all(type(value) is int and value == expected['exif_orientation']
+                                      for value in observed)
+    info = facts.get('info', '')
+    if not isinstance(info, str):
+        return False
+    rotations = re.findall(r'\birot\s*\(Rotation\)\s*:\s*([0-3])\b', info)
+    tags = facts.get('exiftool', {})
+    return (rotations == [str(expected['irot'])] and not re.search(r'\bimir\b', info)
+            and isinstance(tags, dict) and tags.get('Rotation', expected['irot']) == expected['irot'])
+
+
 def _product_coverage(cells, plan):
     """Match accepted product requests to independently qualified exact tuples."""
     by_cell = {cell['id']: cell for cell in cells}
@@ -230,7 +274,8 @@ def _product_coverage(cells, plan):
         matching = []
         for evidence in by_cell[planned['cell_id']]['evidence']:
             if (evidence.get('fixture_id') != planned['fixture_id']
-                    or evidence.get('geometry') != planned['geometry']):
+                    or evidence.get('geometry') != planned['geometry']
+                    or not _source_transform_matches(evidence, planned)):
                 continue
             try:
                 actual = validate_selectors(evidence.get('selectors', {}))
@@ -249,6 +294,7 @@ def _product_coverage(cells, plan):
             'coverage_case_id': planned['case_id'], 'cell_id': planned['cell_id'],
             'fixture_id': planned['fixture_id'], 'geometry': planned['geometry'],
             'selectors': selectors,
+            'source_transform_requirement': planned.get('source_transform_requirement'),
             'depth_policy': 'Omitted depth permits a qualified supported AVIF depth.' if selectable_depth else 'Exact requested depth promise.',
             'status': 'qualified' if qualified else 'tested and failed' if matching else 'untested',
             'qualified_evidence': qualified,
@@ -282,6 +328,10 @@ def build_matrix(evidence):
     grouped = {cell["id"]: [] for cell in cells}
     plan = required_cases()
     planned = {case["case_id"]: case for case in plan}
+    evidence = list(evidence)
+    duplicates = {case_id for case_id, count in Counter(item.get('case_id') for item in evidence).items()
+                  if count > 1}
+    errors.extend(f'Duplicate evidence case_id: {case_id}' for case_id in sorted(duplicates))
     for original in evidence:
         item = copy.deepcopy(original)
         cell_id = item.get("cell_id")
@@ -291,25 +341,35 @@ def build_matrix(evidence):
         if item.get("status") not in STATUSES:
             errors.append(f"Invalid evidence status for {item.get('case_id')}: {item.get('status')}")
             item["status"] = "untested"
+        if item.get('case_id') in duplicates:
+            if item['status'] == 'qualified':
+                item['status'] = 'tested and failed'
+            item.setdefault('blockers', []).append('Duplicate case ID makes the native evidence ambiguous.')
         expected = planned.get(item.get("case_id"))
         if expected:
             try:
-                matches_plan = (item.get("fixture_id") == expected["fixture_id"]
+                matches_plan = (cell_id == expected['cell_id']
+                                and item.get("fixture_id") == expected["fixture_id"]
                                 and item.get("geometry") == expected["geometry"]
+                                and _source_transform_matches(item, expected)
                                 and validate_selectors(item.get("selectors", {})) == validate_selectors(expected["selectors"]))
             except ProofRequestError:
                 matches_plan = False
             item["matches_coverage_plan"] = matches_plan
             if not matches_plan:
-                errors.append(f"Evidence selectors or fixture do not match planned case: {item.get('case_id')}")
+                errors.append(f"Evidence cell, selectors, fixture, or source transform do not match planned case: {item.get('case_id')}")
                 item["status"] = "tested and failed"
-                item.setdefault("blockers", []).append("Evidence selectors or fixture do not match the declared coverage-plan case.")
+                item.setdefault("blockers", []).append("Evidence cell, selectors, fixture, or source transform do not match the declared coverage-plan case.")
         checks = item.get("checks", {})
         missing = [key for key in sorted(set(CHECKS) | set(checks)) if checks.get(key) is not True]
         if item["status"] == "qualified" and missing:
             errors.append(f"Unsubstantiated qualification for {item.get('case_id')}; missing checks: {', '.join(missing)}")
             item["status"] = "tested and failed"
             item.setdefault("blockers", []).append("Incomplete qualification evidence: " + ", ".join(missing))
+        if item['status'] == 'qualified' and (item.get('blockers') or _has_rejected_measurement(item.get('measurements', {}))):
+            errors.append(f"Qualification contradicts recorded blockers or failed measurements: {item.get('case_id')}")
+            item['status'] = 'tested and failed'
+            item.setdefault('blockers', []).append('Recorded blockers or failed measurements prevent qualification.')
         item["diagnostics"] = _case_diagnostics(item)
         grouped[cell_id].append(item)
     for cell in cells:

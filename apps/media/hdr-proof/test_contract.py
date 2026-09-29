@@ -225,6 +225,82 @@ class ProductCoverageTests(unittest.TestCase):
         self.assertEqual(report['product_coverage']['qualified_count'], 0)
         self.assertTrue(report['evidence_errors'])
 
+    def test_other_exif_orientations_do_not_fulfill_the_six_orientation_requirement(self):
+        planned = next(case for case in required_cases()
+                       if case['cell_id'] == 'gainmap-jpeg:sdr:jpg' and case['geometry'] == 'orientation')
+        for orientation in range(1, 9):
+            with self.subTest(orientation=orientation):
+                evidence = {**planned, 'case_id': planned['case_id'] + f':orientation-{orientation}',
+                    'status': 'qualified', 'checks': {key: True for key in
+                        ('native_encoder', 'independent_decoder', 'structure', 'appearance', 'privacy')},
+                    'orientation_source': {'orientation': orientation, 'sha256': 'a' * 64}}
+                report = build_matrix([evidence])
+                self.assertEqual(report['product_coverage']['qualified_count'], int(orientation == 6))
+                # Successful alternative orientations remain qualified for
+                # their own exact cases, but cannot replace the required6.
+                case = next(cell for cell in report['cells'] if cell['id'] == planned['cell_id'])['evidence'][0]
+                self.assertEqual(case['status'], 'qualified')
+
+    def test_missing_or_conflicting_source_orientation_facts_do_not_fulfill_coverage(self):
+        planned = next(case for case in required_cases()
+                       if case['cell_id'] == 'gainmap-jpeg:sdr:jpg' and case['geometry'] == 'orientation')
+        sources = [None, {'orientation': 6},
+                   {'orientation': 6, 'sha256': 'a' * 64, 'facts': {'metadata': {'IFD0:Orientation': 2}}}]
+        for source in sources:
+            with self.subTest(source=source):
+                evidence = {**planned, 'case_id': planned['case_id'] + ':alternative', 'status': 'qualified',
+                    'checks': {key: True for key in
+                        ('native_encoder', 'independent_decoder', 'structure', 'appearance', 'privacy')}}
+                if source is not None:
+                    evidence['orientation_source'] = source
+                self.assertEqual(build_matrix([evidence])['product_coverage']['qualified_count'], 0)
+
+    def test_avif_rotation_and_mirror_must_match_the_declared_source_transform(self):
+        planned = next(case for case in required_cases()
+                       if case['cell_id'] == 'static-avif:hdr:avif' and case['geometry'] == 'orientation')
+        for info, expected in [(' * irot (Rotation)      : 1\n', 1),
+                               (' * irot (Rotation)      : 3\n', 0),
+                               (' * irot (Rotation)      : 1\n * imir (Mirror) : 0\n', 0),
+                               ('Transformations: None\n', 0)]:
+            with self.subTest(info=info):
+                evidence = {**planned, 'case_id': planned['case_id'] + ':alternative', 'status': 'qualified',
+                    'checks': {key: True for key in
+                        ('native_encoder', 'independent_decoder', 'structure', 'appearance', 'privacy')},
+                    'orientation_source': {'sha256': 'a' * 64, 'facts': {'info': info}}}
+                self.assertEqual(build_matrix([evidence])['product_coverage']['qualified_count'], expected)
+
+    def test_duplicate_evidence_ids_cannot_provide_unambiguous_coverage(self):
+        evidence = self.sdr_case(depth=12, qualified=True)
+        report = build_matrix([evidence, dict(evidence)])
+        self.assertEqual(report['product_coverage']['qualified_count'], 0)
+        self.assertTrue(any('Duplicate' in error for error in report['evidence_errors']))
+
+    def test_failed_measurements_override_a_green_qualification_summary(self):
+        for measured in ({'passed': False, 'failures': ['shadow.delta_e_max']},
+                         {'passed': False}, {'failures': ['ordinary_white_signal']}):
+            with self.subTest(measured=measured):
+                evidence = self.sdr_case(depth=12, qualified=True)
+                evidence['measurements'] = {'frames': [measured]}
+                report = build_matrix([evidence])
+                self.assertEqual(report['product_coverage']['qualified_count'], 0)
+                self.assertTrue(report['evidence_errors'])
+
+    def test_a_qualified_record_with_blockers_remains_visibly_unqualified(self):
+        evidence = self.sdr_case(depth=12, qualified=True)
+        evidence['blockers'] = ['Required reconstruction unavailable']
+        report = build_matrix([evidence])
+        cell = next(cell for cell in report['cells'] if cell['id'] == evidence['cell_id'])
+        self.assertEqual(cell['evidence'][0]['status'], 'tested and failed')
+        self.assertEqual(cell['qualified_cases'], [])
+
+    def test_a_planned_id_cannot_move_its_evidence_to_another_ledger_cell(self):
+        evidence = self.sdr_case(depth=8, qualified=True)
+        evidence['cell_id'] = 'animated-pq:sdr:avif'
+        report = build_matrix([evidence])
+        cell = next(cell for cell in report['cells'] if cell['id'] == evidence['cell_id'])
+        self.assertFalse(cell['evidence'][0]['matches_coverage_plan'])
+        self.assertEqual(report['diagnostic_summary']['required_cases']['qualified'], 0)
+
 
 class ProofRequestTests(unittest.TestCase):
     def reject(self, selectors, status, facts=FACTS):

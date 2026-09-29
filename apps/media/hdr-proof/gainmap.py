@@ -54,6 +54,18 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def orientation_source(path, log):
+    """Retain independently inspected source orientation, not just its job label."""
+    path = Path(path)
+    tags = json.loads(command(['exiftool', '-json', '-n', '-G1', '-s', '-Orientation', path], Path(log)))[0]
+    metadata = {key: value for key, value in tags.items() if key != 'SourceFile'}
+    orientation = metadata.get('IFD0:Orientation', 1)
+    if type(orientation) is not int or orientation not in range(1, 9):
+        raise ValueError('Source EXIF orientation is not established')
+    return {'path': str(path), 'sha256': digest(path), 'orientation': orientation,
+            'facts': {'metadata': metadata}, 'inspector': 'ExifTool native source metadata inspection'}
+
+
 def private_metadata_tags(tags):
     private_names = ("GPS", "Make", "Model", "SerialNumber", "OwnerName", "Artist", "Copyright",
                      "DateTimeOriginal", "CreateDate", "ModifyDate", "UserComment", "DocumentID",
@@ -325,6 +337,8 @@ def run(output_dir):
                 "blockers": [], "artifacts": [], "measurements": {}}
         case["selectors"]["format"] = job["format"]
         case["established_source_gamut"] = job["source_gamut"]
+        if job['geometry'] == 'orientation':
+            case['orientation_source'] = orientation_source(job['input'], case_dir/'source-orientation-inspection.json')
         if job["mode"] in ("native-retain", "native-regenerate", "native-regenerate-avif"):
             case["candidate"] = "libultrahdr-2.0.2+PR484+PR491+XMP-arrays:retain-base-and-map:sharp-0.35.5-geometry"
             case["native_build"] = NATIVE_RETAIN_BUILD

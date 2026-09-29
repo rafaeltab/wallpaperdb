@@ -7,6 +7,7 @@ import { QuotaUsage } from '../../capabilities/admission/index.js';
 export const quotaUsageTelemetryLayer = Layer.effectDiscard(
   Effect.gen(function* () {
     const usage = yield* QuotaUsage;
+    const run = Effect.runPromiseWith(yield* Effect.context<never>());
     yield* Effect.acquireRelease(
       Effect.try(() => {
         const meter = getMeter();
@@ -19,7 +20,7 @@ export const quotaUsageTelemetryLayer = Layer.effectDiscard(
         let closed = false;
         const pending = new Set<Promise<void>>();
         const collect = async (result: BatchObservableResult) => {
-          const snapshot = await Effect.runPromise(usage.read());
+          const snapshot = await run(usage.read());
           if (closed) return;
           result.observe(observedAt, Date.now() / 1000);
           result.observe(available, snapshot._tag === 'Available' ? 1 : 0);

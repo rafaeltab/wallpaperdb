@@ -279,13 +279,16 @@ def main():
     precision = run_precision(WORK, WORK/'precision')
     write_json(RESULTS/'precision.json', precision)
     gainmap_result = gainmap.run(WORK)
+    from authored_sdr_proof import run as run_authored_sdr
+    authored_sdr_result = run_authored_sdr(WORK/'authored-sdr')
+    write_json(WORK/'authored-sdr-evidence.json',authored_sdr_result)
     from crossformat import run as run_crossformat
     crossformat_result = run_crossformat(WORK)
     from tone_probes import run as run_tone
     tone = run_tone(WORK)
     controls = run_selectors(WORK/'selectors')
     controls['controls'].extend(png_result['controls'])
-    evidence = avif_result['evidence'] + png_result['evidence'] + gainmap_result['cases'] + crossformat_result + controls.get('evidence',[])
+    evidence = avif_result['evidence'] + png_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + crossformat_result + controls.get('evidence',[])
     generated_fixtures = avif_result['fixtures'] + png_result['fixtures'] + controls.get('fixtures',[])
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)

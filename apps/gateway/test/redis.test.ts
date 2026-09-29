@@ -135,13 +135,13 @@ describe('quota storage contract', () => {
     try {
       const results = await Effect.runPromise(
         Effect.all(
-          Array.from({ length: 8 }, (_, i) => (i % 2 ? a : b).quota.take('shared', 3, 60000)),
+          Array.from({ length: 8 }, (_, i) => (i % 2 ? a : b).quota.take('shared', 3, 60000, 1)),
           { concurrency: 'unbounded' }
         )
       );
       expect(results.filter((r) => r._tag === 'Allowed')).toHaveLength(3);
       expect(results.filter((r) => r._tag === 'Limited')).toHaveLength(5);
-      expect(await Effect.runPromise(b.quota.take('other', 3, 60000))).toMatchObject({
+      expect(await Effect.runPromise(b.quota.take('other', 3, 60000, 1))).toMatchObject({
         _tag: 'Allowed',
         remaining: 2,
       });
@@ -158,7 +158,7 @@ describe('quota storage contract', () => {
         try {
           for (let i = 0; i < 3; i++) {
             expect(
-              await Effect.runPromise(adapter.quota.take('unavailable', 1, 60000))
+              await Effect.runPromise(adapter.quota.take('unavailable', 1, 60000, 1))
             ).toMatchObject({ _tag: 'Allowed', remaining: 1 });
           }
         } finally {
@@ -186,7 +186,7 @@ describe('quota storage contract', () => {
       bridge.holdReplies();
       pending = Effect.runPromise(
         Effect.all(
-          Array.from({ length: 64 }, () => adapter.quota.take('healthy-saturation', 100, 60000)),
+          Array.from({ length: 64 }, () => adapter.quota.take('healthy-saturation', 100, 60000, 1)),
           { concurrency: 'unbounded' }
         )
       );
@@ -195,7 +195,7 @@ describe('quota storage contract', () => {
         .toBe('64');
       expect(await control.ping()).toBe('PONG');
       expect(
-        await Effect.runPromise(adapter.quota.take('healthy-saturation', 100, 60000))
+        await Effect.runPromise(adapter.quota.take('healthy-saturation', 100, 60000, 1))
       ).toMatchObject({ _tag: 'Allowed', remaining: 100 });
       expect(await control.get('graphql:ratelimit:healthy-saturation')).toBe('64');
       bridge.releaseReplies();
@@ -222,14 +222,16 @@ describe('quota storage contract', () => {
     const controller = new AbortController();
     let pending: Promise<unknown> | undefined;
     try {
-      expect(await Effect.runPromise(adapter.quota.take('cancel-other', 1, 60000))).toMatchObject({
+      expect(
+        await Effect.runPromise(adapter.quota.take('cancel-other', 1, 60000, 1))
+      ).toMatchObject({
         _tag: 'Allowed',
         remaining: 0,
       });
       bridge.holdReplies();
       pending = Effect.runPromiseExit(
         Effect.all(
-          Array.from({ length: 64 }, () => adapter.quota.take('cancel-held', 100, 60000)),
+          Array.from({ length: 64 }, () => adapter.quota.take('cancel-held', 100, 60000, 1)),
           { concurrency: 'unbounded' }
         ),
         { signal: controller.signal }
@@ -239,7 +241,9 @@ describe('quota storage contract', () => {
         .toBe('64');
       controller.abort();
       expect(await control.ping()).toBe('PONG');
-      expect(await Effect.runPromise(adapter.quota.take('cancel-held', 100, 60000))).toMatchObject({
+      expect(
+        await Effect.runPromise(adapter.quota.take('cancel-held', 100, 60000, 1))
+      ).toMatchObject({
         _tag: 'Allowed',
         remaining: 100,
       });
@@ -247,7 +251,9 @@ describe('quota storage contract', () => {
       expect(await control.get('graphql:ratelimit:cancel-held')).toBe('64');
       bridge.releaseReplies();
       expect(await pending).toMatchObject({ _tag: 'Failure' });
-      expect(await Effect.runPromise(adapter.quota.take('cancel-other', 1, 60000))).toMatchObject({
+      expect(
+        await Effect.runPromise(adapter.quota.take('cancel-other', 1, 60000, 1))
+      ).toMatchObject({
         _tag: 'Limited',
       });
       expect(bridge.connections).toBe(1);
@@ -266,7 +272,7 @@ describe('quota storage contract', () => {
     const observed = observeQuotaMetrics();
     try {
       await control.lpush('graphql:ratelimit:wrong-type', 'invalid-quota-storage');
-      expect(await Effect.runPromise(adapter.quota.take('wrong-type', 1, 60000))).toMatchObject({
+      expect(await Effect.runPromise(adapter.quota.take('wrong-type', 1, 60000, 1))).toMatchObject({
         _tag: 'Allowed',
         remaining: 1,
       });
@@ -287,24 +293,24 @@ describe('quota storage contract', () => {
       // An existing counter without an expiry makes the successful Lua reply [-1, -1].
       await control.set('graphql:ratelimit:missing-expiry', '1');
       expect(await control.pttl('graphql:ratelimit:missing-expiry')).toBe(-1);
-      expect(await Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000))).toMatchObject(
-        {
-          _tag: 'Allowed',
-          remaining: 1,
-        }
-      );
+      expect(
+        await Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000, 1))
+      ).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 1,
+      });
       expect(await observed.read()).toEqual([
         { attributes: { reason: 'command_failure' }, value: 1 },
       ]);
       await control.del('graphql:ratelimit:missing-expiry');
       await expect
-        .poll(() => Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000)))
+        .poll(() => Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000, 1)))
         .toMatchObject({ _tag: 'Allowed', remaining: 0 });
-      expect(await Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000))).toMatchObject(
-        {
-          _tag: 'Limited',
-        }
-      );
+      expect(
+        await Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000, 1))
+      ).toMatchObject({
+        _tag: 'Limited',
+      });
     } finally {
       control.disconnect();
       await adapter.dispose();
@@ -315,18 +321,18 @@ describe('quota storage contract', () => {
     const adapter = await distributed();
     const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
     try {
-      expect(await Effect.runPromise(adapter.quota.take('window', 1, 60000))).toMatchObject({
+      expect(await Effect.runPromise(adapter.quota.take('window', 1, 60000, 1))).toMatchObject({
         _tag: 'Allowed',
         remaining: 0,
       });
       const ttl = await control.pttl('graphql:ratelimit:window');
-      expect(await Effect.runPromise(adapter.quota.take('window', 1, 60000))).toMatchObject({
+      expect(await Effect.runPromise(adapter.quota.take('window', 1, 60000, 1))).toMatchObject({
         _tag: 'Limited',
       });
       expect(await control.pttl('graphql:ratelimit:window')).toBeLessThanOrEqual(ttl);
       await control.pexpire('graphql:ratelimit:window', 1);
       await expect.poll(() => control.exists('graphql:ratelimit:window')).toBe(0);
-      expect(await Effect.runPromise(adapter.quota.take('window', 1, 60000))).toMatchObject({
+      expect(await Effect.runPromise(adapter.quota.take('window', 1, 60000, 1))).toMatchObject({
         _tag: 'Allowed',
         remaining: 0,
       });
@@ -339,17 +345,19 @@ describe('quota storage contract', () => {
     const bridge = await proxy();
     const adapter = await distributed(bridge.port);
     try {
-      expect(await Effect.runPromise(adapter.quota.take('reconnect', 1, 60000))).toMatchObject({
+      expect(await Effect.runPromise(adapter.quota.take('reconnect', 1, 60000, 1))).toMatchObject({
         _tag: 'Allowed',
         remaining: 0,
       });
       bridge.disconnect();
       await expect
-        .poll(() => Effect.runPromise(adapter.quota.take('reconnect', 1, 60000)))
+        .poll(() => Effect.runPromise(adapter.quota.take('reconnect', 1, 60000, 1)))
         .toMatchObject({ _tag: 'Allowed', remaining: 1 });
       bridge.restore();
       await expect
-        .poll(() => Effect.runPromise(adapter.quota.take('reconnect', 1, 60000)), { timeout: 5000 })
+        .poll(() => Effect.runPromise(adapter.quota.take('reconnect', 1, 60000, 1)), {
+          timeout: 5000,
+        })
         .toMatchObject({ _tag: 'Limited' });
       await adapter.dispose();
       await expect.poll(() => bridge.sockets).toBe(0);
@@ -363,18 +371,18 @@ describe('quota storage contract', () => {
     bridge.disconnect();
     const adapter = await distributed(bridge.port);
     try {
-      expect(await Effect.runPromise(adapter.quota.take('startup-outage', 1, 60000))).toMatchObject(
-        { _tag: 'Allowed', remaining: 1 }
-      );
+      expect(
+        await Effect.runPromise(adapter.quota.take('startup-outage', 1, 60000, 1))
+      ).toMatchObject({ _tag: 'Allowed', remaining: 1 });
       bridge.restore();
       await expect
-        .poll(() => Effect.runPromise(adapter.quota.take('startup-outage', 1, 60000)), {
+        .poll(() => Effect.runPromise(adapter.quota.take('startup-outage', 1, 60000, 1)), {
           timeout: 5000,
         })
         .toMatchObject({ _tag: 'Allowed', remaining: 0 });
-      expect(await Effect.runPromise(adapter.quota.take('startup-outage', 1, 60000))).toMatchObject(
-        { _tag: 'Limited' }
-      );
+      expect(
+        await Effect.runPromise(adapter.quota.take('startup-outage', 1, 60000, 1))
+      ).toMatchObject({ _tag: 'Limited' });
     } finally {
       await adapter.dispose();
       await bridge.close();
@@ -388,7 +396,7 @@ describe('quota storage contract', () => {
       bridge.stall();
       const decisions = await Effect.runPromise(
         Effect.all(
-          Array.from({ length: 256 }, () => adapter.quota.take('stalled', 500, 60000)),
+          Array.from({ length: 256 }, () => adapter.quota.take('stalled', 500, 60000, 1)),
           { concurrency: 'unbounded' }
         ).pipe(Effect.timeout('3 seconds'))
       );
@@ -399,7 +407,9 @@ describe('quota storage contract', () => {
       expect(committed).toBeLessThanOrEqual(64);
       bridge.restore();
       await expect
-        .poll(() => Effect.runPromise(adapter.quota.take('recovered', 1, 60000)), { timeout: 5000 })
+        .poll(() => Effect.runPromise(adapter.quota.take('recovered', 1, 60000, 1)), {
+          timeout: 5000,
+        })
         .toMatchObject({ _tag: 'Allowed', remaining: 0 });
       expect(Number(await control.get('graphql:ratelimit:stalled'))).toBe(committed);
       await adapter.dispose();

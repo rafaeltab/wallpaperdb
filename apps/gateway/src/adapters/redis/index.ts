@@ -5,9 +5,9 @@ import { type AdmissionResult, Quota } from '../../capabilities/admission/index.
 
 const consume = `
 local count = tonumber(redis.call('GET', KEYS[1]) or '0')
-if count >= tonumber(ARGV[1]) then return {-1, redis.call('PTTL', KEYS[1])} end
-count = redis.call('INCR', KEYS[1])
-if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[2]) end
+if count + tonumber(ARGV[3]) > tonumber(ARGV[1]) then return {-1, redis.call('PTTL', KEYS[1])} end
+count = redis.call('INCRBY', KEYS[1], ARGV[3])
+if count == tonumber(ARGV[3]) then redis.call('PEXPIRE', KEYS[1], ARGV[2]) end
 return {count, redis.call('PTTL', KEYS[1])}
 `;
 const decodeResponse = Schema.decodeUnknownEffect(
@@ -41,14 +41,15 @@ class RedisQuota implements Quota {
     this: RedisQuota,
     visitor: string,
     limit: number,
-    windowMs: number
+    windowMs: number,
+    cost: number
   ): Effect.fn.Return<AdmissionResult> {
     if (!this.client) return yield* allowWithoutQuota(limit, windowMs, 'disabled');
     if (!this.available) return yield* allowWithoutQuota(limit, windowMs, 'unavailable');
     const client = this.client;
     const reply = yield* this.permits.withPermitsIfAvailable(1)(
       Effect.tryPromise({
-        try: () => client.eval(consume, 1, `graphql:ratelimit:${visitor}`, limit, windowMs),
+        try: () => client.eval(consume, 1, `graphql:ratelimit:${visitor}`, limit, windowMs, cost),
         catch: (cause) => cause,
       }).pipe(
         Effect.flatMap((response) =>

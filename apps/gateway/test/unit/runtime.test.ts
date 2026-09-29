@@ -60,9 +60,11 @@ describe('HTTP execution ownership', () => {
       controller.abort();
       await rejected;
       expect(cancelled).toBe(true);
-      expect(await execution.run(Admission.use((admission) => admission.admit('a')))).toMatchObject(
-        { _tag: 'Allowed' }
-      );
+      expect(
+        await execution.run(
+          Admission.use((admission) => admission.admit('a', { _tag: 'Valid', cost: 1 }))
+        )
+      ).toMatchObject({ _tag: 'Allowed' });
     } finally {
       await runtime.dispose();
     }

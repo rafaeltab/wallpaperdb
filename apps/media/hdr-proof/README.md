@@ -114,10 +114,19 @@ the HLG reference display. Original-byte and unsupported-composition controls
 remain separate from codec qualification. Two native partial-rectangle fixtures
 verify exact SOURCE replacement, including fractional alpha and stored RGB under
 zero alpha. The independent reader checks rectangle bounds and requires the
-first default-image frame to fill the canvas. OVER blending, disposal, static
-extraction and unlisted geometries remain unqualified in this APNG subset.
+first default-image frame to fill the canvas. Explicit static extraction checks
+the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF
+at each tested geometry. JPEG opacity and GIF binary alpha require explicit
+coercion; preserve-alpha requests are rejected. The two PQ static GIF orientation
+cases exceed the fixed shadow color-error ceiling and remain unqualified.
+OVER blending, disposal and unlisted geometries remain unqualified in this APNG subset.
 Browser, viewer and wallpaper interpretation remains pending manual review for
 every emitted representation.
+
+Authored SDR lossless PNG and WebP candidates pass all four gain-map sources,
+two requested gamuts and seven geometries using 8-bit samples with independently
+verified gamma-3.2 ICC signaling. Their 112 cases keep the authored SDR grade and
+unchanged appearance gates; physical consumer interpretation remains pending.
 
 The appearance metric keeps signed color coordinates when a valid color lies
 outside an intermediate RGB gamut. P3 red, for example, has a negative blue

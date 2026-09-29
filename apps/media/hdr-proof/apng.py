@@ -271,16 +271,19 @@ def _rejection_controls(source, directory):
 
 
 def run(output_directory, *, specs=None,
-        geometries=('contain', 'cover', 'fill', 'upscale', 'orientation')):
+        geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'),
+        motions=('preserve', 'static')):
     from appearance import RGB_TO_XYZ, compare_appearance, sdr_signal_to_nits
     import gamma_icc
     import gamma_sdr
-    from matrix import exact_original, request_decision
+    from matrix import ProofRequestError, exact_original, request_decision
     from sdr_reference import reference_srgb
     output_directory = Path(output_directory)
     output_directory.mkdir(parents=True, exist_ok=True)
     evidence, fixtures, controls = [], [], []
     start_commands = len(avif.COMMANDS)
+    if not motions or any(motion not in ('preserve', 'static') for motion in motions):
+        raise ValueError('Unknown APNG proof motion selector')
     for spec in (fixture_specs() if specs is None else specs):
         folder = output_directory/spec['id']
         source, source_facts, analytic = generate_fixture(spec, folder)
@@ -321,6 +324,21 @@ def run(output_directory, *, specs=None,
             'decision': original_decision, 'source_sha256': avif.digest(source), 'output_sha256': avif.digest(original)})
         if len(fixtures) == 1:
             controls.extend(_rejection_controls(source, output_directory/'source-composition-controls'))
+            for extension in ('jpg', 'gif'):
+                selectors = {'format': extension, 'range': 'sdr', 'gamut': 'srgb',
+                    'motion': 'static', 'depth': '8', 'transparency': 'preserve', 'w': 58}
+                before, status, reason = len(avif.COMMANDS), None, None
+                try:
+                    request_decision(known, selectors)
+                except ProofRequestError as error:
+                    status, reason = error.status, str(error)
+                checks = {'preserve_alpha_rejected': status == 422,
+                          'no_native_calls': len(avif.COMMANDS) == before}
+                name = f'apng:static:{extension}:preserve-alpha'
+                controls.append({'case_id': name, 'name': name, 'variant': f'{extension}-preserve-alpha',
+                    'status': 'passed' if all(checks.values()) else 'failed', 'passed': all(checks.values()),
+                    'checks': checks, 'codec_qualification': False, 'selectors': selectors,
+                    'http_status': status, 'reason': reason})
         geometry_selectors = {'contain': {'w': 58, 'h': 38, 'fit': 'contain'},
             'cover': {'w': 40, 'h': 40, 'fit': 'cover'}, 'fill': {'w': 40, 'h': 48, 'fit': 'fill'},
             'upscale': {'w': 120, 'h': 80, 'fit': 'contain'}, 'orientation': {'w': 58, 'fit': 'contain'}}
@@ -354,17 +372,24 @@ def run(output_directory, *, specs=None,
                     'generator': 'apng.py:generate_orientation_fixture', 'source_valid': geometry_valid,
                     'base_sha256': avif.digest(source), 'orientation': orientation_evidence})
             resized_references = [avif.geometry_reference(reference, geometry) for reference in references]
-            for dynamic_range, extension in (('hdr', 'png'), ('hdr', 'avif'),
-                                             ('sdr', 'png'), ('sdr', 'avif'), ('sdr', 'webp')):
+            operations = [(dynamic_range, extension, motion) for motion in motions
+                for dynamic_range, extension in (('hdr', 'png'), ('hdr', 'avif'),
+                    ('sdr', 'png'), ('sdr', 'avif'), ('sdr', 'webp'))]
+            if 'static' in motions:
+                operations.extend([('sdr', 'jpg', 'static'), ('sdr', 'gif', 'static')])
+            for dynamic_range, extension, motion in operations:
+                count = 1 if motion == 'static' else 2
+                selected_references = resized_references[:count]
                 sdr = dynamic_range == 'sdr'
                 depth = 16 if extension == 'png' else 8 if sdr else 12
                 transfer, gamut = (('srgb' if extension == 'png' else 'gamma22'), 'srgb') if sdr else (spec['transfer'], spec['gamut'])
-                case_id = f'{actual_id}:{dynamic_range}:{extension}:preserve:{geometry}'
+                case_id = f'{actual_id}:{dynamic_range}:{extension}:{motion}:{geometry}'
                 case_directory = folder/case_id.replace(':', '-')
                 case_directory.mkdir(exist_ok=True)
                 selectors = {'format': extension, 'range': dynamic_range, 'depth': str(depth),
-                             'gamut': 'srgb' if sdr else 'preserve', 'motion': 'preserve',
-                             'transparency': 'preserve', **geometry_selectors[geometry]}
+                             'gamut': 'srgb' if sdr else 'preserve', 'motion': motion,
+                             'transparency': 'coerce' if extension in ('jpg', 'gif') else 'preserve',
+                             **geometry_selectors[geometry]}
                 item = {'case_id': case_id, 'fixture_id': actual_id, 'cell_id': f'hdr-png:{dynamic_range}:{extension}',
                         'selectors': selectors, 'geometry': geometry, 'status': 'tested and failed',
                         'checks': {key: False for key in ('native_encoder', 'independent_decoder', 'structure', 'appearance', 'privacy')},
@@ -373,16 +398,26 @@ def run(output_directory, *, specs=None,
                 if orientation_evidence is not None:
                     item['orientation_source'] = orientation_evidence
                 try:
-                    if request_decision(actual_known, selectors)['action'] != 'unqualified':
+                    decision = request_decision(actual_known, selectors)
+                    if decision['action'] != 'unqualified':
                         raise ValueError('Tuple is not eligible for a native conversion experiment')
+                    item['frame_selection'] = decision['frame_selection']
                     converted = []
-                    for index, path in enumerate(conversion_paths):
+                    for index, path in enumerate(conversion_paths[:count]):
                         output = case_directory/f'converted-{index}.png'
                         avif.convert_frame(path, output, spec['transfer'], spec['gamut'], geometry,
                                            sdr=sdr, peak_nits=spec['peak_nits'] if sdr else None)
                         converted.append(output)
                     target = case_directory/f'output.{extension}'
-                    if extension == 'png':
+                    if extension == 'png' and count == 1:
+                        facts, frames, detail = avif.encode_other(converted, target, extension,
+                            transfer, gamut, selected_references, 1, spec)
+                        item['checks']['native_encoder'] = True
+                        item['checks']['independent_decoder'] = True
+                        detail['orientation_baked'] = facts['exiftool'].get('Orientation', 1) == 1
+                        linear = [avif.decode_transfer(frames[0][..., :3], transfer, gamut)]
+                        actual_gamut = gamut
+                    elif extension == 'png':
                         encode(converted, target, transfer, gamut)
                         item['checks']['native_encoder'] = True
                         facts, frames = inspect_and_decode(target, case_directory/'decoded')
@@ -403,31 +438,33 @@ def run(output_directory, *, specs=None,
                             avif.encode_avif(converted, target, transfer, gamut, depth)
                         item['checks']['native_encoder'] = True
                         facts = avif.inspect_avif(target)
-                        frames = avif.decode_avif(target, case_directory, 2)
+                        frames = avif.decode_avif(target, case_directory, count)
                         item['checks']['independent_decoder'] = True
-                        detail = avif.structure_checks(facts, frames, spec, resized_references, transfer, gamut, depth, 2)
+                        detail = avif.structure_checks(facts, frames, spec, selected_references, transfer, gamut, depth, count)
                         linear = [(gamma_sdr.decode_signal_to_nits(frame[..., :3]) if sdr else
                                    avif.decode_transfer(frame[..., :3], transfer, gamut)) for frame in frames]
                         actual_gamut = gamut
                     else:
-                        facts, frames, detail, profile = avif.encode_gamma_other(converted, target, extension, resized_references, 2)
+                        facts, frames, detail, profile = avif.encode_gamma_other(converted, target, extension, selected_references, count)
                         linear = [gamma_icc.decode_signal_to_nits(frame[..., :3], profile) for frame in frames]
                         actual_gamut = 'rec2020'
                     privacy = inspect_privacy(target, facts, extension)
-                    white_control = _sequence_white_control(frames, resized_references, geometry)
+                    white_control = _sequence_white_control(frames, resized_references, geometry) if count == 2 else None
                     measurements = []
-                    for reference, actual in zip(resized_references, linear):
+                    for reference, actual in zip(selected_references, linear):
                         expected = (sdr_signal_to_nits(reference_srgb(reference[..., :3], spec['gamut'], peak_nits=spec['peak_nits']))
                                     if sdr else reference[..., :3])
                         measurements.append(compare_appearance(expected, actual,
                             reference_gamut='srgb' if sdr else gamut, actual_gamut=actual_gamut,
-                            fixture_class='sdr-8' if sdr else 'avif-12', alpha=reference[..., 3],
+                            fixture_class='sdr-8' if sdr else 'avif-12',
+                            alpha=(None if extension == 'jpg' else (reference[..., 3] >= .5).astype(float)
+                                   if extension == 'gif' else reference[..., 3]),
                             region_reference_luminance_nits=reference[..., :3] @ RGB_TO_XYZ[spec['gamut']][1]))
                     item['privacy_measurement'] = privacy
                     item['checks'].update({'native_encoder': True, 'independent_decoder': True,
                         'structure': bool(geometry_valid and all(detail.values())), 'privacy': privacy['passed'],
                         'appearance': all(measurement['passed'] for measurement in measurements)
-                                      and white_control['passed']
+                                      and (white_control is None or white_control['passed'])
                                       and (not sdr or all(control['passed'] for control in tone_controls))})
                     item['measurements'] = {'frames': measurements, 'tone_controls': tone_controls if sdr else [],
                                             'sequence_white_control': white_control}

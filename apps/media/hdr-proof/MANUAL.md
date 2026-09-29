@@ -27,6 +27,9 @@ viewer and wallpaper results pending independently on all four devices. The
 separate EXIF-8 source variants exercise animation orientation; their inspected
 derivatives bake the rotation into every frame. Check both frames' dimensions
 and orientation independently from a still preview.
+The inspected static extracts select the first fully composed frame. JPEG
+opacity and GIF binary alpha use explicit coercion. The failed PQ GIF orientation
+files are diagnostics and must not be recorded as qualified fallbacks.
 
 ## Browser procedure
 

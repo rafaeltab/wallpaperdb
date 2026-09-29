@@ -78,7 +78,7 @@ class ApngTests(unittest.TestCase):
     def test_contain_hdr_and_explicit_sdr_sequences_meet_existing_gates(self):
         spec = next(apng.fixture_specs())
         with tempfile.TemporaryDirectory() as temporary:
-            result = apng.run(Path(temporary), specs=[spec], geometries=('contain',))
+            result = apng.run(Path(temporary), specs=[spec], geometries=('contain',), motions=('preserve',))
         self.assertEqual(len(result['evidence']), 5)
         for case in result['evidence']:
             with self.subTest(case=case['case_id']):
@@ -149,7 +149,8 @@ class ApngTests(unittest.TestCase):
         import suite
         with tempfile.TemporaryDirectory() as temporary:
             folder = Path(temporary)
-            result = apng.run(folder/'work', specs=[next(apng.fixture_specs())], geometries=('contain', 'orientation'))
+            result = apng.run(folder/'work', specs=[next(apng.fixture_specs())],
+                              geometries=('contain', 'orientation'), motions=('preserve',))
             (folder/'results').mkdir()
             # Only the evidence destination changes; every fixture and candidate
             # above uses its real native encoder and independent decoder.
@@ -167,7 +168,7 @@ class ApngTests(unittest.TestCase):
                     if spec['transfer'] == 'hlg' and spec['gamut'] == 'rec2020')
         with tempfile.TemporaryDirectory() as temporary:
             result = apng.run(Path(temporary), specs=[spec],
-                              geometries=('cover', 'fill', 'upscale', 'orientation'))
+                              geometries=('cover', 'fill', 'upscale', 'orientation'), motions=('preserve',))
         self.assertEqual(len(result['evidence']), 20)
         self.assertEqual(len(result['fixtures']), 2)
         for case in result['evidence']:
@@ -181,6 +182,44 @@ class ApngTests(unittest.TestCase):
                     self.assertEqual(case['source_facts']['display_width'], 64)
                     self.assertTrue(case['fixture_id'].endswith('-orientation-8'))
                     self.assertTrue(all(case['orientation_source']['exact_rotation_frames']))
+
+    def test_explicit_static_extraction_selects_first_frame_and_coerces_alpha(self):
+        spec = next(apng.fixture_specs())
+        with tempfile.TemporaryDirectory() as temporary:
+            result = apng.run(Path(temporary), specs=[spec],
+                              geometries=('contain', 'orientation'), motions=('static',))
+            png = next(case for case in result['evidence']
+                       if case['geometry'] == 'contain' and case['cell_id'] == 'hdr-png:hdr:png')
+            actual = avif.decode_transfer(avif.read_png(png['artifacts']['output'])[..., :3], 'pq', 'p3')
+            # The first source frame peaks at 1000 nits; frame 2 contains 4000 nits.
+            # This binds selection to real decoded pixels, not a reported label.
+            self.assertLess(float(np.max(actual)), 1001)
+        self.assertEqual(len(result['evidence']), 14)
+        for case in result['evidence']:
+            with self.subTest(case=case['case_id']):
+                if case['selectors']['format'] == 'gif' and case['geometry'] == 'orientation':
+                    self.assertEqual(case['status'], 'tested and failed')
+                    self.assertEqual(case['blockers'], ['Failed appearance check'])
+                    self.assertTrue(all(case['checks'][key] for key in
+                        ('native_encoder', 'independent_decoder', 'structure', 'privacy')))
+                    self.assertFalse(case['checks']['appearance'])
+                    self.assertGreater(case['measurements']['frames'][0]['regions']['shadow']['delta_e_itp']['mean'], 1)
+                else:
+                    self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertEqual(case['selectors']['motion'], 'static')
+                self.assertEqual(case['frame_selection'], 'first fully composed frame')
+                self.assertEqual(len(case['measurements']['frames']), 1)
+                self.assertIsNone(case['measurements']['sequence_white_control'])
+                self.assertTrue(case['structural_checks']['frames'])
+                self.assertTrue(case['structural_checks']['alpha'])
+                if case['selectors']['format'] in ('jpg', 'gif'):
+                    self.assertEqual(case['selectors']['transparency'], 'coerce')
+                    self.assertEqual(case['facts']['alpha_measurement']['maximum_absolute_error'], 0)
+                else:
+                    self.assertEqual(case['selectors']['transparency'], 'preserve')
+        rejected = [control for control in result['controls'] if control.get('variant', '').endswith('preserve-alpha')]
+        self.assertEqual(len(rejected), 2)
+        self.assertTrue(all(control['passed'] for control in rejected))
 
 
 if __name__ == '__main__':

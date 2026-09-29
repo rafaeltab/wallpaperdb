@@ -18,4 +18,3 @@ Read the [domain context](CONTEXT.md) for ownership and the [recovery guide](../
 
 The [admission contract](../docs/content/docs/guides/gateway-admission.mdx) explains quota and overload responses, degraded operation, and required production ingress controls. [Load evidence](docs/admission-load-test.md) records initial limits and the checks required before deployment.
 
-See the [active-work load test](docs/admission-load-test.md) for the measured initial concurrency and deadline choices and their deployment limits.

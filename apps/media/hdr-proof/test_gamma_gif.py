@@ -12,6 +12,39 @@ from gamma_icc import decode_signal_to_nits
 
 
 class GammaGifTests(unittest.TestCase):
+    def test_native_animation_clears_new_transparency_and_preserves_total_plays(self):
+        rgba = np.ones((8, 32, 4))
+        rgba[..., :3] = np.geomspace(.0001, 1, 32)[None, :, None]
+        rgba[:4, :, 3] = 32767 / 65535
+        rgba[4:, :, 3] = 32768 / 65535
+        second = rgba.copy()
+        second[..., 3] = np.flip(rgba[..., 3], axis=0)
+        second[..., :3] = np.roll(rgba[..., :3], 8, axis=1)
+        references = [rgba, second]
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            paths = []
+            for index, frame in enumerate(references):
+                path = directory/f'source-{index}.png'
+                write_png(path, frame)
+                native(['exiftool', '-overwrite_original', '-Artist=HDR-PROOF-PRIVATE', path])
+                paths.append(path)
+            output = directory/'animated.gif'
+            encode(paths, output, gamma=3.2, quantization='nearest', animated=True)
+            facts, frames, profile = inspect_and_decode(output)
+        self.assertEqual(len(frames), 2)
+        self.assertEqual(facts['durations_ms'], [300, 700])
+        self.assertEqual(facts['loop'], 2)
+        self.assertEqual(facts['plays'], 3)
+        self.assertTrue(facts['privacy'])
+        for reference, actual in zip(references, frames):
+            expected_alpha = (reference[..., 3] >= .5).astype(float)
+            np.testing.assert_array_equal(actual[..., 3], expected_alpha)
+            measured = compare_appearance(sdr_signal_to_nits(reference[..., :3]),
+                decode_signal_to_nits(actual[..., :3], profile, expected_gamma=3.2),
+                reference_gamut='srgb', actual_gamut='rec2020', fixture_class='sdr-8', alpha=expected_alpha)
+            self.assertTrue(measured['passed'], measured)
+
     def test_gamma32_nearest_palette_declares_actual_transfer_and_keeps_binary_alpha(self):
         rgba = np.ones((8, 32, 4))
         rgba[..., :3] = np.geomspace(.0001, 1, 32)[None, :, None]

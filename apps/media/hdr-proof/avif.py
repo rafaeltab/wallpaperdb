@@ -508,7 +508,7 @@ def encode_gamma_other(paths, target, ext, refs, count, *, gif_gamma=2.2, gif_qu
     import gamma_icc
     if ext == 'gif':
         import gamma_gif
-        gamma_gif.encode(paths, target, gamma=gif_gamma, quantization=gif_quantization)
+        gamma_gif.encode(paths, target, gamma=gif_gamma, quantization=gif_quantization, animated=count == 2)
         facts, actual, profile = gamma_gif.inspect_and_decode(target)
     else:
         gamma_icc.encode(paths, target, ext)
@@ -519,6 +519,18 @@ def encode_gamma_other(paths, target, ext, refs, count, *, gif_gamma=2.2, gif_qu
     facts['alpha_measurement'] = {'comparison': 'explicit opaque coercion' if ext == 'jpg' else 'explicit binary coercion' if ext == 'gif' else 'preserved fractional alpha',
                                   'absolute_error_limit': alpha_limit, 'frame_maximum_absolute_errors': errors,
                                   'maximum_absolute_error': max(errors, default=None)}
+    if ext == 'gif':
+        threshold_frames = []
+        for path, frame, reference in zip(paths, actual, refs):
+            source_alpha = read_png(path)[..., 3]
+            mismatches = np.argwhere(frame[..., 3] != (reference[..., 3] >= .5))
+            threshold_frames.append({'mismatch_count': len(mismatches), 'examples': [
+                {'x': int(x), 'y': int(y), 'reference_alpha': float(reference[y, x, 3]),
+                 'encoder_input_alpha': float(source_alpha[y, x]),
+                 'expected_alpha': int(reference[y, x, 3] >= .5),
+                 'decoded_alpha': float(frame[y, x, 3])} for y, x in mismatches[:8]]})
+        facts['binary_coercion'] = {'threshold': .5, 'decision': 'alpha >= threshold',
+                                    'example_limit_per_frame': 8, 'frames': threshold_frames}
     facts['sha256'] = digest(target)
     exif = facts['exiftool']
     depth_verified = (exif.get('BitsPerSample') == 8 if ext == 'jpg' else
@@ -535,7 +547,7 @@ def encode_gamma_other(paths, target, ext, refs, count, *, gif_gamma=2.2, gif_qu
               'depth': depth_verified,
               'alpha': bool(errors) and all(error <= alpha_limit for error in errors),
               'timing': facts['durations_ms'] == [300, 700] if count == 2 else True,
-              'loop': facts['loop'] == 3 if count == 2 else True}
+              'loop': (facts['plays'] == 3 if ext == 'gif' else facts['loop'] == 3) if count == 2 else True}
     return facts, actual, detail, profile
 
 

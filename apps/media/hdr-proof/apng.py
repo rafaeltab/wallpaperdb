@@ -272,7 +272,7 @@ def _rejection_controls(source, directory):
 
 def run(output_directory, *, specs=None,
         geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'),
-        motions=('preserve', 'static')):
+        motions=('preserve', 'static'), animated_gif=False):
     from appearance import RGB_TO_XYZ, compare_appearance, sdr_signal_to_nits
     import gamma_icc
     import gamma_sdr
@@ -378,6 +378,8 @@ def run(output_directory, *, specs=None,
             if 'static' in motions:
                 operations.extend([('sdr', 'jpg', 'static', None), ('sdr', 'gif', 'static', None),
                                    ('sdr', 'gif', 'static', 'gamma3.2-nearest')])
+            if animated_gif and 'preserve' in motions:
+                operations.append(('sdr', 'gif', 'preserve', 'gamma3.2-nearest-animation'))
             for dynamic_range, extension, motion, representation in operations:
                 count = 1 if motion == 'static' else 2
                 selected_references = resized_references[:count]

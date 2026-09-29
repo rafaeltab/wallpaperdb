@@ -13,6 +13,34 @@ from hdr_png import _png_chunks
 
 
 class ApngTests(unittest.TestCase):
+    def test_animated_gif_retains_quantized_half_alpha_failure_and_exact_play_count(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result = apng.run(Path(temporary), specs=[next(apng.fixture_specs())],
+                              geometries=('contain',), motions=('preserve',), animated_gif=True)
+        cases = [case for case in result['evidence'] if case['selectors']['format'] == 'gif']
+        self.assertEqual(len(cases), 1)
+        case = cases[0]
+        self.assertTrue(case['case_id'].endswith(':gamma3.2-nearest-animation'))
+        self.assertEqual(case['status'], 'tested and failed')
+        self.assertEqual(case['selectors']['transparency'], 'coerce')
+        self.assertEqual(case['selectors']['motion'], 'preserve')
+        self.assertEqual(case['facts']['durations_ms'], [300, 700])
+        self.assertEqual(case['facts']['loop'], 2)
+        self.assertEqual(case['facts']['plays'], 3)
+        self.assertTrue(case['structural_checks']['timing'])
+        self.assertTrue(case['structural_checks']['loop'])
+        self.assertFalse(case['structural_checks']['alpha'])
+        self.assertEqual(case['facts']['alpha_measurement']['frame_maximum_absolute_errors'], [0, 1])
+        threshold = case['facts']['binary_coercion']['frames'][1]
+        self.assertEqual(threshold['mismatch_count'], 1)
+        self.assertEqual(threshold['examples'][0]['reference_alpha'], .5)
+        self.assertEqual(threshold['examples'][0]['encoder_input_alpha'], 32767 / 65535)
+        self.assertTrue(case['measurements']['frames'][0]['passed'])
+        self.assertFalse(case['measurements']['frames'][1]['passed'])
+        self.assertTrue(case['checks']['native_encoder'])
+        self.assertTrue(case['checks']['independent_decoder'])
+        self.assertTrue(case['checks']['privacy'])
+
     def test_native_hdr_fixtures_preserve_16bit_pixels_alpha_and_timing(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)

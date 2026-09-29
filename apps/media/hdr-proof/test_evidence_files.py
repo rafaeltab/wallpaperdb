@@ -75,6 +75,39 @@ class EvidenceFileTests(unittest.TestCase):
             self.assertNotIn('synthetic', files[0]['role'])
             self.assertEqual(files[0]['consumer_status'], 'pending manual review')
 
+    def test_manual_selector_sources_preserve_native_inspection_and_hashes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            fixtures = []
+            for dynamic_range in ('sdr', 'hdr'):
+                source = root/f'{dynamic_range}.avif'
+                source.write_bytes(b'file-copy-test-only-'+dynamic_range.encode())
+                fixtures.append({'id': 'selector-'+dynamic_range, 'path': str(source),
+                    'sha256': suite.avif.digest(source), 'generator': 'selector_probes.alpha_scene',
+                    'native_facts': {'depth': 12, 'transfer': 16 if dynamic_range == 'hdr' else 13}})
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files([], fixtures)
+                self.assertEqual(len(files), 2)
+                for entry, fixture in zip(files, fixtures):
+                    self.assertEqual(entry['facts'], fixture['native_facts'])
+                    self.assertEqual(entry['sha256'], fixture['sha256'])
+                    self.assertEqual(entry['consumer_status'], 'pending manual review')
+                Path(fixtures[0]['path']).write_bytes(b'changed-after-inspection')
+                with self.assertRaisesRegex(ValueError, 'changed after inspection'):
+                    suite.candidate_files([], fixtures)
+
+    def test_manual_source_without_inspection_facts_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            source = root/'source.avif'
+            source.write_bytes(b'file-copy-test-only')
+            fixture = {'id': 'uninspected', 'path': str(source), 'sha256': suite.avif.digest(source)}
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                with self.assertRaisesRegex(ValueError, 'Missing source inspection facts'):
+                    suite.candidate_files([], [fixture])
+
     def test_manual_bundle_includes_complete_mozjpeg_hdr_crop(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

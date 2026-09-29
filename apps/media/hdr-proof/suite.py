@@ -107,8 +107,11 @@ def candidate_files(evidence, fixtures):
     for fixture in fixtures:
         suffix = Path(fixture['path']).suffix
         if suffix in ('.jpg', '.avif', '.png', '.webp', '.gif'):
+            facts = fixture.get('facts', fixture.get('native_facts'))
+            if not isinstance(facts, dict):
+                raise ValueError(f'Missing source inspection facts: {fixture["id"]}')
             copy(fixture['path'], f'source-{fixture["id"]}{suffix}', 'Inspected source fixture',
-                 facts=fixture['facts'], expected_sha256=fixture.get('sha256'))
+                 facts=facts, expected_sha256=fixture.get('sha256'))
     gainmap_directory = ROOT/'fixtures/gainmap'
     if gainmap_directory.exists():
         for fixture in json.loads((gainmap_directory/'manifest.json').read_text())['fixtures']:

@@ -24,3 +24,4 @@
 !native_jpegli.cpp
 !mozjpeg-build.sh
 !native_mozjpeg.c
+!native_jpeg_coefficients.c

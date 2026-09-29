@@ -5,7 +5,7 @@ import {
   MeterProvider,
   PeriodicExportingMetricReader,
 } from '@opentelemetry/sdk-metrics';
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime, Tracer } from 'effect';
 import { expect, it } from 'vitest';
 import {
   admissionTelemetryLayer,
@@ -20,6 +20,7 @@ import {
   type QuotaUsageSnapshot,
 } from '../../src/capabilities/admission/index.js';
 import { memoryQuotaLayer } from '../helpers/quota.js';
+import { gatewayTracingLayer } from '../../src/runtime.js';
 
 function observe() {
   const reader = new PeriodicExportingMetricReader({
@@ -148,6 +149,37 @@ it('collects current shared usage while idle, hides unavailable values and unreg
     const before = reads;
     await observed.read();
     expect(reads).toBe(before);
+  } finally {
+    await runtime.dispose();
+    await observed.close();
+  }
+});
+
+it('preserves the configured gateway tracer when collection invokes an Effect port', async () => {
+  const observed = observe();
+  let configuredTracer: Tracer.Tracer | undefined;
+  let collectedTracer: Tracer.Tracer | undefined;
+  const usage = Layer.effect(
+    QuotaUsage,
+    Effect.gen(function* () {
+      configuredTracer = yield* Tracer.Tracer;
+      return QuotaUsage.of({
+        read: () =>
+          Effect.gen(function* () {
+            collectedTracer = yield* Tracer.Tracer;
+            return { _tag: 'Unavailable' };
+          }),
+      });
+    })
+  );
+  const runtime = ManagedRuntime.make(
+    quotaUsageTelemetryLayer.pipe(Layer.provide(usage), Layer.provide(gatewayTracingLayer))
+  );
+  try {
+    await runtime.runPromise(Effect.void);
+    await observed.read();
+    expect(configuredTracer).toBeDefined();
+    expect(collectedTracer).toBe(configuredTracer);
   } finally {
     await runtime.dispose();
     await observed.close();

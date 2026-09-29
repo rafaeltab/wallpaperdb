@@ -57,6 +57,20 @@ def native_case(candidate, geometry, qualified):
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_fixed_map_bound_keeps_its_measured_scope_and_cannot_qualify_a_path(self):
+        from suite import iso_map_bound_report
+        rendered = '\n'.join(iso_map_bound_report({'fixed_maximum_gate': 8,
+            'records': [{'xy': [236, 822], 'enumerated_codes': 256**3,
+                         'minimum_joint_max_delta_e': 109.491281,
+                         'joint_minimum_codes': [0, 0, 0], 'joint_code_count_under_maximum': 0}]}))
+        self.assertIn('| [236, 822] | 16,777,216 | 109.491281 | [0, 0, 0] | 0 |', rendered)
+        self.assertIn('fixed decoded base and actual gain metadata', rendered)
+        self.assertIn('unchanged maximum of 8', rendered)
+        self.assertIn('ignores JPEG neighborhood coupling', rendered)
+        self.assertIn('Other base pixels, offsets, capacities', rendered)
+        self.assertIn('cannot qualify a conversion', rendered)
+        self.assertIn('(iso-map-code-bound.json)', rendered)
+
     def test_endpoint_report_exposes_additional_required_rendering_gap(self):
         rendered = '\n'.join(product_coverage_report(build_matrix([])))
         self.assertIn('display boost 16', rendered)

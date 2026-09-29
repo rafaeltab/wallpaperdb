@@ -190,6 +190,16 @@ midtone maxima still fail, so the same-file adaptation requirement remains
 failed. Full-source pixels and measurements stay exactly equal to the passing
 boost-64 control. The native packer header, library, source and binary are
 checksum-recorded; existing codec binaries remain unchanged.
+The [fixed-map diagnostic](iso_map_code_bound.py) then enumerates every RGB8
+map triple at the two worst shadow pixels across boosts 2 and 16. The same
+triple must meet the unchanged maximum gate at 2, 16 and 64. Minimum joint
+maximum errors are 109.491281 and 54.101789 against the limit of 8, after
+verifying the emitted-code model against actual independent decoding. This
+rules out map-code changes alone for this fixed base and metadata. The search
+optimistically ignores JPEG neighborhood coupling and does not bound other
+bases, offsets, capacities, metadata or representations. It records no
+conversion qualification. The default replay validates the native capacity
+report before reuse and writes its own hashed diagnostic record.
 The [four other ISO geometries](iso_geometry_headroom.py) rerun their exact
 qualified recipes and preserve every original endpoint measurement. Each
 containment, crop, stretch and EXIF6 orientation file passes at boost 16 and

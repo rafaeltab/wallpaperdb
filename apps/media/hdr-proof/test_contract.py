@@ -166,6 +166,29 @@ class RenderingCoverageTests(unittest.TestCase):
         legacy['source_reference_revision'] = 'gainmap-hdr-target-gamut-v1'
         self.assertEqual(build_matrix([legacy])['product_coverage']['qualified_count'], 1)
 
+    def test_old_apple_full_point_requires_the_documented_source_model(self):
+        from matrix import GAINMAP_RENDERING_SOURCES
+        planned = next(row for row in required_cases() if row['fixture_id'] == 'gainmap-apple-old'
+                       and row['geometry'] == 'contain' and row['cell_id'] == 'gainmap-jpeg:hdr:jpg')
+        case = {**self.case(), **planned, 'case_id': 'bookkeeping-only-apple-documented-full',
+                'source_sha256': GAINMAP_RENDERING_SOURCES[planned['fixture_id']][0],
+                'source_reference_revision': 'apple-old-documented-full-rec709-linear-bilinear8-v1',
+                'rendering_scope': {'display_boost': 16}, 'status': 'qualified',
+                'checks': {key: True for key in self.case()['checks']}, 'measurements': {}, 'blockers': [],
+                'artifacts': {'sha256': 'a'*64}}
+        def joined(row):
+            return next(item for item in build_matrix([row])['rendering_coverage']['same_file_requirements']
+                        if item['fixture_id'] == planned['fixture_id'] and item['geometry'] == 'contain')
+        result = joined(case)
+        self.assertEqual(result['points'][1]['status'], 'qualified')
+        self.assertEqual(result['status'], 'untested')
+        self.assertEqual(result['points'][0]['status'], 'untested')
+        for revision in ('gainmap-hdr-target-gamut-v1', 'gainmap-xmp-independent-boost16-v1'):
+            with self.subTest(revision=revision):
+                self.assertEqual(joined({**case, 'source_reference_revision': revision})['points'][1]['status'], 'untested')
+        legacy = {**case, 'source_reference_revision': 'gainmap-hdr-target-gamut-v1'}
+        self.assertEqual(build_matrix([legacy])['product_coverage']['qualified_count'], 1)
+
     def test_orientation_rendering_requires_the_declared_source_transform(self):
         from copy import deepcopy
         planned = next(row for row in required_cases() if row['fixture_id'] == 'gainmap-android-iso'

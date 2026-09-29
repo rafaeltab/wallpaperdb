@@ -123,10 +123,23 @@ reference shares libavif gain application. The source comparison verifies that
 transport, while separate final HDR readers establish output accuracy.
 The ISO-only float32 source decoder remains narrowly scoped. Stock-reader
 failure and pending consumer review also apply to this XMP output.
-Old Apple containment and upscale also pass the exact same map recipe.
+Old Apple containment and upscale pass the same map recipe against the retained
+libavif source convention.
 Its native source path requires the original headroom MakerNotes, and a real
 source stripped of those facts remains original-only. These two cases retain
 their PQ source precision evidence and separate final HDR-reader measurements.
+The separate [source-model diagnostic](apple_source_model.py) finds that this
+legacy convention fails six unchanged regional gates against
+[Apple's documented full effect](https://developer.apple.com/documentation/appkit/applying-apple-hdr-effect-to-your-photos).
+That effect linearizes the stored map with inverse Rec.709, then multiplies the
+linear SDR base by a linear gain using the actual MakerNote headroom of 8.
+Native libavif preserves the original map samples but applies an exponential
+coded-map gain. Midtone mean/p95 errors are 2.45608/6.41030; highlight mean/p95
+errors are 4.34848/6.23720. Both relative-luminance p95 gates also fail. The
+documented reference has its own revision and is required by the old Apple
+full-rendering gate. Earlier measurements remain evidence for their named
+legacy convention. This article does not establish intermediate adaptation or
+the newer fixture's transplanted XMP headroom precedence.
 New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native

@@ -69,6 +69,12 @@ ISO variants remain failed diagnostics. Stock native readers assume sRGB transfe
 in this path. Each manifest entry retains this qualification scope and its
 reader limitations. Check ICC interpretation and HDR reconstruction separately
 from a consumer's ability to open the JPEG; keep physical results pending.
+The old Apple source-model diagnostic finds that the retained libavif source
+convention fails Apple's documented full-effect comparison. Its earlier
+endpoint passes establish accuracy against that legacy convention only.
+Keep this source-model blocker separate from output decoding and visible HDR.
+The documented full reference has a new revision; it supplies no asserted
+boost-2 interpretation and does not establish the newer XMP variant's semantics.
 The gain-map JPEG endpoint comparisons use display boost 16. Check the separate
 ISO upscale boost-2 rendering record before selecting a download; its measured
 adaptation failure cannot be overridden by a successful endpoint or a physical
@@ -218,6 +224,8 @@ HDR and display settings / power / ambient light:
 Input filename / SHA-256:
 Output filename / SHA-256:
 Conversion case ID and exact selectors:
+Automated rendering scope / source-reference revision:
+Actual consumer headroom: measured value and method / unknown
 Declared transfer / CICP / ICC profile hash:
 View: thumbnail / full / downloaded native viewer / wallpaper
 Decode: pass / fail / pending

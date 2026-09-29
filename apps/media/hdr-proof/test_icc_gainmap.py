@@ -26,7 +26,10 @@ class IccGainmapTests(unittest.TestCase):
     def test_midpointoffset_gamma2_uses_real_metadata_at_all_display_headrooms(self):
         self._headroom_control('midpointoffset', map_gamma=2)
 
-    def _headroom_control(self, map_policy, *, map_gamma=1):
+    def test_midpointoffset_gamma2_islow_map_preserves_headroom_controls(self):
+        self._headroom_control('midpointoffset', map_gamma=2, map_method='islow')
+
+    def _headroom_control(self, map_policy, *, map_gamma=1, map_method='float'):
         from avif import encode_transfer
         from icc_gainmap import pack, independent_decode, native_decode
         from appearance import compare_appearance
@@ -46,7 +49,7 @@ class IccGainmapTests(unittest.TestCase):
                 '-s', '48x8', '-i', 'pipe:0', '-vf', 'format=gbrp16le,zscale=transferin=16:transfer=16:primariesin=12:primaries=12:matrixin=0:matrix=0:rangein=full:range=full,format=rgb48le',
                 '-frames:v', '1', '-color_primaries', '12',
                 '-color_trc', '16', '-colorspace', '0', '-color_range', '2', hdr], data=pq.tobytes())
-            evidence = pack(base, hdr, output, map_policy=map_policy, map_gamma=map_gamma)
+            evidence = pack(base, hdr, output, map_policy=map_policy, map_gamma=map_gamma, map_method=map_method)
             facts = gainmap.inspect(output, folder/'inspection')
             self.assertEqual((facts['base']['sof'], facts['map']['sof']), (0, 0))
             self.assertEqual((evidence['coded_base_depth'], evidence['coded_map_depth']), (8, 8))
@@ -127,7 +130,7 @@ class IccGainmapTests(unittest.TestCase):
                 wrong = folder/f'{label}.png'
                 wrong.write_bytes(modified)
                 with self.subTest(label=label), self.assertRaisesRegex(RuntimeError, 'PNG'):
-                    pack(base, wrong, folder/f'{label}.jpg', map_policy=map_policy, map_gamma=map_gamma)
+                    pack(base, wrong, folder/f'{label}.jpg', map_policy=map_policy, map_gamma=map_gamma, map_method=map_method)
                 self.assertFalse((folder/f'{label}.jpg').exists())
             # Without HDR output qualification, an unknown ICC must still
             # stop the native HDR decoder before applying gain.
@@ -147,6 +150,14 @@ class IccGainmapTests(unittest.TestCase):
                 with self.subTest(policy=policy, gamma=gamma), self.assertRaises(ValueError):
                     pack('missing-base.jpg', 'missing-intent.png', output,
                          map_policy=policy, map_gamma=gamma)
+                self.assertEqual(len(avif.COMMANDS), before)
+                self.assertFalse(output.exists())
+            for policy, gamma, method in (('smalloffset', 2, 'islow'),
+                    ('moderateoffset', 1, 'islow'), ('midpointoffset', 2, 'unknown')):
+                before = len(avif.COMMANDS)
+                with self.subTest(policy=policy, method=method), self.assertRaises(ValueError):
+                    pack('missing-base.jpg', 'missing-intent.png', output,
+                         map_policy=policy, map_gamma=gamma, map_method=method)
                 self.assertEqual(len(avif.COMMANDS), before)
                 self.assertFalse(output.exists())
 
@@ -262,9 +273,30 @@ class IccGainmapTests(unittest.TestCase):
             for decoder in ('reconstructed_hdr', 'independent_hdr', 'independent_hdr_cross_decoder'):
                 self.assertEqual(case['measurements'][decoder]['failures'], ['shadow.delta_e_max'])
             self.assertEqual(case['artifacts']['sha256'], 'b1d0e22f2c31f7c328c13e713f750a26115f3de7f3c3db28b4166fa463e175d7')
+            self.assertEqual(case['native_candidate']['base_sha256'], '5177870d6a7e34011d293ec0da6758d0b02778c095958d024d6a700ef32fff4a')
+            self.assertEqual(case['native_candidate']['computed_map_sha256'], '0fda8bd2d28eaa61d02e39657f2405d34af28556e45fd77b3b6abd24749d496d')
             self.assertEqual(case['consumer_status'], 'pending manual review')
             self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
             self.assertIn('midpointoffset', case['case_id'])
+
+    def test_islow_map_retains_failure_with_identical_base_and_native_map_input(self):
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            case = run(Path(temporary), map_policy='midpointoffset', map_gamma=2, map_method='islow')['cases'][0]
+            self.assertEqual(case['status'], 'tested and failed', case['blockers'])
+            self.assertEqual(case['blockers'], ['Failed independent_decoder check', 'Failed appearance check'])
+            self.assertTrue(case['checks']['structure'])
+            self.assertTrue(case['checks']['privacy'])
+            self.assertTrue(case['measurements']['authored_sdr_base']['passed'])
+            for decoder in ('reconstructed_hdr', 'independent_hdr', 'independent_hdr_cross_decoder'):
+                self.assertEqual(case['measurements'][decoder]['failures'], ['shadow.delta_e_max'])
+            self.assertEqual(case['artifacts']['sha256'], 'c08d5f0e1f6c301dbc35730e51a064b3b40e7d0522b13ced6673811690309905')
+            self.assertEqual(case['native_candidate']['base_sha256'], '5177870d6a7e34011d293ec0da6758d0b02778c095958d024d6a700ef32fff4a')
+            self.assertEqual(case['native_candidate']['computed_map_sha256'], '0fda8bd2d28eaa61d02e39657f2405d34af28556e45fd77b3b6abd24749d496d')
+            self.assertEqual(case['native_candidate']['map_encoding']['method'], 'islow')
+            self.assertIn('dct-islow-map', case['case_id'])
+            self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
 
 
 if __name__ == '__main__':

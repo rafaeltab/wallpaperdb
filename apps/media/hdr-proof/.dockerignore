@@ -8,6 +8,7 @@
 !native_gainmap.cpp
 !libultrahdr-xmp-arrays.patch
 !libultrahdr-rgb-jpeg.patch
+!libultrahdr-precise-transfer.patch
 !libavif-sequence-transform.patch
 !libavif-full-range-gain.patch
 !native-zimg-build.sh

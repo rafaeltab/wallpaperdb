@@ -259,6 +259,12 @@ the native fractional-window filter and an independently cropped SDR reference.
 Unknown required facts preserve exact originals and withhold transformation.
 Nonidentity orientation, HDR reconstruction and gain-map AVIF HDR derivatives
 remain unqualified.
+The separate [SDR PNG8 candidate](gainmap_avif_png.py) retains the same authored
+base, containment geometry and photographic limits. Its actual native PNG
+uses standard sRGB/cHRM/gAMA signaling and explicitly square pixels. Independent
+libpng decoding must preserve the native encoder-input samples exactly;
+ExifTool and a strict chunk reader verify color, depth, geometry and privacy.
+Exact storage does not replace its regional appearance checks.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

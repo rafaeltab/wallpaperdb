@@ -58,6 +58,9 @@ The optional gain-map AVIF source has separately inspected authored-SDR AVIF
 derivatives for containment, crop, stretch and upscale. Compare them with the
 matched SDR bases and verify privacy and geometry. Nonidentity orientation
 remains unqualified.
+The separately inspected SDR PNG8 containment file uses standard PNG sRGB
+signaling and square pixels. Compare its authored SDR reference separately
+from the AVIF rendition in each browser, viewer and wallpaper setter.
 Its native HDR reconstruction remains unqualified; the SDR result does not
 establish HDR support for that source or container.
 

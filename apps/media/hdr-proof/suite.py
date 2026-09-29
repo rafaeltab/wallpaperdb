@@ -445,6 +445,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- Additional PNG8-to-HDR PNG16 and AVIF12 cases use the stricter existing avif-12 output gates across contain, cover, fill, upscale and real EXIF-8 orientation. Source quantization is measured separately. Native rotation must match the independently decoded original samples before geometry changes; alpha must remain within two codes at the actual output depth.',
               '- Separate PNG8-to-SDR WebP candidates cover containment, crop, stretch, upscale and real EXIF-8 orientation with both original and nearest-code quantization. They use the unchanged tone/gamut grade and gamma-2.2 ICC coding. The static VP8L reader checks dimensions, alpha signaling, metadata and chunk structure. Independent native FFmpeg decoding must match Pillow/libwebp and the actual encoder-input codes exactly. Nearest-code candidates must also match independently rounded input samples within half a code. Those exact storage checks do not replace appearance, tone or alpha thresholds.',
               '- One separately locked gain-map AVIF source has authored-SDR AVIF containment, crop, stretch and upscale candidates. Independent BMFF/tmap parsing, actual AV1 packet depth/signaling, dav1d samples and AOM candidate decoding establish the source base. Native metadata text repeats channel-zero gain values; the independently parsed per-channel fractions remain authoritative. Unknown color, depth, orientation or metadata withholds transformation and preserves exact originals. Nonidentity orientation remains original-only. This does not qualify source HDR reconstruction or any HDR derivative.',
+              '- An additional authored-SDR PNG8 containment candidate uses the same gain-map AVIF base and unchanged photographic SDR reference. Its native sRGB/cHRM/gAMA signaling and square-pixel pHYs are independently parsed and cross-checked with ExifTool. Native libpng must recover every actual encoder-input RGB8 sample exactly. Appearance and privacy remain separate gates; source import error receives no additional allowance.',
               '- Unlisted PNG/APNG cross-products, HDR WebP and other unexecuted accepted-source requests remain untested. Gain-map AVIF HDR candidates retain their independent reconstruction and geometry blockers. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
               '- These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.',
               '- The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.',
@@ -523,6 +524,9 @@ def main():
     gainmap_avif_result = run_gainmap_avif(WORK/'gainmap-avif-authored-sdr',
         geometries=('contain', 'cover', 'fill', 'upscale'))
     write_json(WORK/'gainmap-avif-evidence.json', gainmap_avif_result)
+    from gainmap_avif_png import run as run_gainmap_avif_png
+    gainmap_avif_png_result = run_gainmap_avif_png(WORK/'gainmap-avif-authored-png')
+    write_json(WORK/'gainmap-avif-png-evidence.json', gainmap_avif_png_result)
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))
@@ -552,8 +556,9 @@ def main():
     controls['controls'].extend(png_result['controls'])
     controls['controls'].extend(png8_result['controls'])
     controls['controls'].extend(gainmap_avif_result['controls'])
+    controls['controls'].extend(gainmap_avif_png_result['controls'])
     controls['controls'].extend(apng_result['controls'])
-    evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + png8_precision_result['evidence'] + png8_webp_result['evidence'] + gainmap_avif_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
+    evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + png8_precision_result['evidence'] + png8_webp_result['evidence'] + gainmap_avif_result['evidence'] + gainmap_avif_png_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
     locked_fixtures = avif_result['fixtures'] + png_result['fixtures'] + apng_result['fixtures'] + controls.get('fixtures',[])
     # PNG8 validates its separate source lock before any conversion. Preserve
     # the original generated corpus lock, including its PNG16 hashes.

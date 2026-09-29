@@ -70,7 +70,7 @@ class RenderingCoverageTests(unittest.TestCase):
             'source_sha256': 'f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e',
             'source_reference_revision': 'gainmap-iso-intermediate-boost2-v1',
             'rendering_scope': {'display_boost': 2}, 'status': 'tested and failed',
-            'checks': {key: key != 'appearance' for key in CHECKS},
+            'checks': {**{key: key != 'appearance' for key in CHECKS}, 'independent_source_decoder': True},
             'measurements': {'hdr': {'passed': False}}, 'blockers': ['Measured HDR appearance failure']}
 
     def test_required_intermediate_rendering_stays_separate_from_endpoint_counts(self):
@@ -81,7 +81,7 @@ class RenderingCoverageTests(unittest.TestCase):
         report = build_matrix([failed, endpoint])
         self.assertEqual(report['product_coverage']['qualified_count'], 1)
         rendering = report['rendering_coverage']
-        self.assertEqual((rendering['required_count'], rendering['qualified_count']), (2, 0))
+        self.assertEqual((rendering['required_count'], rendering['qualified_count']), (25, 0))
         requirement = rendering['requirements'][0]
         self.assertEqual(requirement['status'], 'tested and failed')
         self.assertEqual(requirement['tested_evidence'], [failed['case_id']])
@@ -107,6 +107,49 @@ class RenderingCoverageTests(unittest.TestCase):
                 changed = build_matrix([case, {**full, **change}])
                 self.assertEqual(changed['rendering_coverage']['qualified_count'], 1)
                 self.assertIn(requirement['requirement_id'], changed['milestone_blockers'])
+
+    def test_every_required_gainmap_geometry_keeps_its_adaptation_gap_visible(self):
+        import hashlib
+        from pathlib import Path
+        from matrix import GAINMAP_RENDERING_SOURCES
+        for fixture, (expected_hash, _) in GAINMAP_RENDERING_SOURCES.items():
+            path = Path(__file__).with_name('fixtures')/'gainmap'/(fixture+'.jpg')
+            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), expected_hash)
+        report = build_matrix([])
+        rendering = report['rendering_coverage']
+        requirements = rendering['requirements']
+        self.assertEqual(len(requirements), 25)
+        self.assertEqual(sum(row['display_boost'] == 2 for row in requirements), 20)
+        self.assertEqual(sum(row['display_boost'] == 64 for row in requirements), 5)
+        joints = rendering['same_file_requirements']
+        expected = {(row['fixture_id'], row['geometry']) for row in required_cases()
+                    if row['cell_id'] == 'gainmap-jpeg:hdr:jpg'}
+        self.assertEqual({(row['fixture_id'], row['geometry']) for row in joints}, expected)
+        self.assertEqual(len(joints), 20)
+        self.assertTrue(all(row['status'] == 'untested' for row in requirements+joints))
+        self.assertTrue(all(row['requirement_id'] in report['milestone_blockers'] for row in requirements+joints))
+        self.assertEqual(rendering['same_file_requirement'], next(row for row in joints
+            if row['fixture_id'] == 'gainmap-android-iso' and row['geometry'] == 'upscale'))
+        for row in joints:
+            self.assertEqual(row['display_boosts'], [2, 16, 64] if row['fixture_id'] == 'gainmap-android-iso' else [2, 16])
+
+    def test_orientation_rendering_requires_the_declared_source_transform(self):
+        from copy import deepcopy
+        planned = next(row for row in required_cases() if row['fixture_id'] == 'gainmap-android-iso'
+                       and row['geometry'] == 'orientation' and row['cell_id'] == 'gainmap-jpeg:hdr:jpg')
+        case = {**self.case(), **planned, 'case_id': 'bookkeeping-only-orientation-boost2',
+                'status': 'qualified', 'checks': {key: True for key in self.case()['checks']},
+                'measurements': {}, 'blockers': [], 'orientation_source': {'orientation': 6, 'sha256': 'a'*64}}
+        report = build_matrix([case])
+        matching = [row for row in report['rendering_coverage']['requirements']
+                    if row['qualified_evidence'] == [case['case_id']]]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual(matching[0]['geometry'], 'orientation')
+        for source in (None, {'orientation': 8, 'sha256': 'a'*64}, {'orientation': 6}):
+            changed = deepcopy(case)
+            changed['orientation_source'] = source
+            with self.subTest(source=source):
+                self.assertEqual(build_matrix([changed])['rendering_coverage']['qualified_count'], 0)
 
     def test_different_files_cannot_jointly_qualify_adaptation_without_a_headroom_selector(self):
         from copy import deepcopy
@@ -159,7 +202,7 @@ class RenderingCoverageTests(unittest.TestCase):
         self.assertEqual(report['product_coverage']['qualified_count'], 0)
         requirement = report['rendering_coverage']['requirements'][0]
         self.assertNotIn(requirement['requirement_id'], report['milestone_blockers'])
-        for mutation in ('source', 'hash', 'geometry', 'selectors', 'boost', 'missing-boost', 'revision', 'crop', 'orientation',
+        for mutation in ('source', 'hash', 'geometry', 'selectors', 'boost', 'missing-boost', 'revision', 'crop', 'orientation', 'missing-source-decoder',
                          'appearance', 'decoder', 'failed-measurement', 'blocker'):
             changed = deepcopy(case)
             if mutation == 'source':
@@ -180,6 +223,8 @@ class RenderingCoverageTests(unittest.TestCase):
                 changed['probe_crop_rectangle'] = [1, 2, 3, 4]
             elif mutation == 'orientation':
                 changed['orientation_source'] = {'sha256': 'a'*64, 'orientation': 8}
+            elif mutation == 'missing-source-decoder':
+                changed['checks'].pop('independent_source_decoder')
             elif mutation in ('appearance', 'decoder'):
                 changed['checks']['appearance' if mutation == 'appearance' else 'independent_decoder'] = False
             elif mutation == 'failed-measurement':

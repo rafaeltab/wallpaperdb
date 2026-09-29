@@ -152,6 +152,13 @@ output file must pass boosts 2, 16 and 64; different files at different headroom
 values cannot satisfy the joint requirement. Display headroom is not a product
 selector. An unqualified rendering blocks faithful-HDR qualification even when all
 320 original fixture/geometry requests have passing endpoint alternatives.
+The adaptation inventory covers all 20 required gain-map fixture/geometry
+tuples. Each needs the same file at boosts 2 and 16; all five ISO geometries also
+need boost 64. This makes 25 additional rendering points and 20 same-file joins.
+Untested XMP and Apple source models remain unqualified. Their existing boost-16
+successes cannot fill a missing intermediate reference. A rendering point also
+requires explicit independent-source-decoder evidence, and endpoint records
+without an explicit boost cannot enter the same-file join.
 The [boost-2 proof](iso_intermediate_headroom.py) reruns the exact native
 converter and records a large appearance failure while both output readers
 agree. Its source capacity is about 49.26 times SDR white, compared with 4.47

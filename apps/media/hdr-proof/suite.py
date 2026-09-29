@@ -250,6 +250,9 @@ def product_coverage_report(matrix):
     boosts = ', '.join(str(value) for value in same_file['display_boosts'])
     lines += [f'One identical output file at display boosts {boosts}: {same_file["status"]}. '
               'Different output files cannot jointly satisfy adaptive-HDR qualification; the matrix joins their actual SHA-256 hashes across every rendering point.', '']
+    lines += [f'{rendering["same_file_qualified_count"]} of {rendering["same_file_required_count"]} required gain-map fixture/geometry tuples pass every declared same-file rendering. '
+              'Every tuple needs boost 2 and 16; the ISO source also needs boost 64 to reach full source capacity. '
+              'Untested source models and geometries remain unqualified. Endpoint evidence without an explicit display boost cannot satisfy the same-file join.', '']
     return lines
 
 

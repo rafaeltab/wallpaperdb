@@ -60,7 +60,7 @@ class GainMapReportTests(unittest.TestCase):
     def test_endpoint_report_exposes_additional_required_rendering_gap(self):
         rendered = '\n'.join(product_coverage_report(build_matrix([])))
         self.assertIn('display boost 16', rendered)
-        self.assertIn('0 of 2 additional HDR rendering requirements qualify', rendered)
+        self.assertIn('0 of 25 additional HDR rendering requirements qualify', rendered)
         self.assertIn('gainmap-android-iso:hdr:jpg:upscale:display-boost2', rendered)
         self.assertIn('| 2 | untested |', rendered)
         self.assertIn('gainmap-android-iso:hdr:jpg:upscale:display-boost64', rendered)
@@ -68,6 +68,7 @@ class GainMapReportTests(unittest.TestCase):
         self.assertIn('blocks faithful-HDR qualification', rendered)
         self.assertIn('One identical output file at display boosts 2, 16, 64: untested', rendered)
         self.assertIn('Different output files cannot jointly satisfy', rendered)
+        self.assertIn('0 of 20 required gain-map fixture/geometry tuples pass every declared same-file rendering', rendered)
 
     def test_jpegli_quality_failures_remain_separate_from_hdr_qualification(self):
         base = {'cases': [{'status': 'qualified'}, {'status': 'tested and failed'}]}

@@ -329,15 +329,29 @@ def _product_coverage(cells, plan):
     }
 
 
-def _rendering_requirement(cells, boost, revision):
+GAINMAP_RENDERING_SOURCES = {
+    'gainmap-android-iso': ('f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e',
+                           'gainmap-iso-intermediate-boost2-v1'),
+    'gainmap-android-xmp': ('d22fd05e210df1067ebd6a1f63d0e5d94c5fa9042fe2ebd7067a10a301402271',
+                           'gainmap-xmp-intermediate-boost2-v1'),
+    'gainmap-apple-old': ('2e4310a0dd37a98678e057e25d936bbc4f936bb6fe17380c0ce99e58ecaa603b',
+                         'gainmap-apple-old-intermediate-boost2-v1'),
+    'gainmap-apple-new': ('492a94bd0636bcf15b3f560c68142a7783936c1597e78b0d0461d8be7fddc078',
+                         'gainmap-apple-new-intermediate-boost2-v1'),
+}
+
+
+def _rendering_requirement(cells, request, boost, revision):
+    fixture, geometry = request['fixture_id'], request['geometry']
     requirement = {
-        'requirement_id': f'gainmap-android-iso:hdr:jpg:upscale:display-boost{boost}',
-        'cell_id': 'gainmap-jpeg:hdr:jpg', 'fixture_id': 'gainmap-android-iso',
-        'source_sha256': 'f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e',
-        'geometry': 'upscale', 'display_boost': boost,
+        'requirement_id': f'{fixture}:hdr:jpg:{geometry}:display-boost{boost}',
+        'cell_id': request['cell_id'], 'fixture_id': fixture,
+        'source_sha256': GAINMAP_RENDERING_SOURCES[fixture][0],
+        'geometry': geometry, 'display_boost': boost,
         'source_reference_revision': revision,
-        'selectors': {'format': 'jpg', 'range': 'hdr', 'gamut': 'preserve', 'depth': 'preserve',
-                      'motion': 'preserve', 'transparency': 'preserve', **GAINMAP_GEOMETRIES['upscale']}}
+        'selectors': request['selectors']}
+    if request.get('source_transform_requirement'):
+        requirement['source_transform_requirement'] = request['source_transform_requirement']
     expected = validate_selectors(requirement['selectors'])
     matching = []
     for cell in cells:
@@ -355,17 +369,14 @@ def _rendering_requirement(cells, boost, revision):
                 continue
             if case['status'] in ('qualified', 'tested and failed'):
                 matching.append(case)
-    qualified = sorted({case['case_id'] for case in matching if case['status'] == 'qualified' and not case.get('blockers')})
+    qualified = sorted({case['case_id'] for case in matching if case['status'] == 'qualified'
+                        and not case.get('blockers') and case.get('checks', {}).get('independent_source_decoder') is True})
     requirement.update({'status': 'qualified' if qualified else 'tested and failed' if matching else 'untested',
         'qualified_evidence': qualified, 'tested_evidence': sorted({case['case_id'] for case in matching})})
     return requirement
 
 
-def _rendering_coverage(cells):
-    """Known HDR rendering gaps cannot disappear behind endpoint coverage."""
-    requirements = [_rendering_requirement(cells, boost, revision) for boost, revision in (
-        (2, 'gainmap-iso-intermediate-boost2-v1'), (64, 'gainmap-iso-full-headroom-boost64-v1'))]
-    points = [requirements[0], _rendering_requirement(cells, 16, 'gainmap-hdr-target-gamut-v1'), requirements[1]]
+def _same_file_requirement(cells, request, points):
     cases = {case['case_id']: case for cell in cells for case in cell['evidence']}
 
     def hashes(point, field):
@@ -379,20 +390,50 @@ def _rendering_coverage(cells):
 
     qualified_files = sorted(set.intersection(*(hashes(point, 'qualified_evidence') for point in points)))
     tested_files = sorted(set.intersection(*(hashes(point, 'tested_evidence') for point in points)))
-    same_file = {'requirement_id': 'gainmap-android-iso:hdr:jpg:upscale:same-output-boost2-16-64',
+    fixture, geometry = request['fixture_id'], request['geometry']
+    boosts = '-'.join(str(point['display_boost']) for point in points)
+    return {'requirement_id': f'{fixture}:hdr:jpg:{geometry}:same-output-boost{boosts}',
+        'fixture_id': fixture, 'geometry': geometry,
         'display_boosts': [point['display_boost'] for point in points],
         'scope': 'One emitted file must pass every named rendering; headroom is not a product selector. '
             'Joining different output files cannot qualify adaptive HDR delivery.',
         'status': 'qualified' if qualified_files else 'tested and failed' if tested_files else 'untested',
         'qualified_output_sha256': qualified_files, 'tested_output_sha256': tested_files,
         'points': points}
+
+
+def _rendering_coverage(cells):
+    """Every required gain-map tuple retains its own tested or untested gap."""
+    plan = [row for row in required_cases() if row['cell_id'] == 'gainmap-jpeg:hdr:jpg']
+    # Preserve the original ISO-upscale point ordering and singular record.
+    first = next(row for row in plan if row['fixture_id'] == 'gainmap-android-iso' and row['geometry'] == 'upscale')
+    plan = [first] + [row for row in plan if row is not first]
+    requirements, same_files = [], []
+    for request in plan:
+        fixture = request['fixture_id']
+        intermediate = _rendering_requirement(cells, request, 2, GAINMAP_RENDERING_SOURCES[fixture][1])
+        endpoint = _rendering_requirement(cells, request, 16, 'gainmap-hdr-target-gamut-v1')
+        points = [intermediate, endpoint]
+        requirements.append(intermediate)
+        if fixture == 'gainmap-android-iso':
+            full = _rendering_requirement(cells, request, 64, 'gainmap-iso-full-headroom-boost64-v1')
+            requirements.append(full)
+            points.append(full)
+        same_files.append(_same_file_requirement(cells, request, points))
     return {'scope': 'Additional faithful-HDR appearance requirement at the same source/output display boost. '
                 'It is separate from the original 320 endpoint cases and adds no product selector. '
-                'The boost64 point fully applies this source gain map; boost16 does not. '
+                'The boost64 points fully apply the ISO source gain map; boost16 does not. '
                 'Passing these points would not qualify untested headroom values or physical consumers.',
             'required_count': len(requirements),
             'qualified_count': sum(row['status'] == 'qualified' for row in requirements),
-            'requirements': requirements, 'same_file_requirement': same_file}
+            'requirements': requirements, 'same_file_requirement': same_files[0],
+            'same_file_requirements': same_files,
+            'same_file_required_count': len(same_files),
+            'same_file_qualified_count': sum(row['status'] == 'qualified' for row in same_files),
+            'reference_scope': 'ISO rendering uses the established independent source model. XMP and Apple '
+                'boost2 reference revisions declare pending work; assigning that name cannot qualify a file '
+                'without native source-model, independent-reference and actual-file proof. Existing endpoint '
+                'records without an explicit display boost remain separate from this same-file join.'}
 
 
 def build_matrix(evidence):
@@ -481,7 +522,7 @@ def build_matrix(evidence):
         "milestone_qualified": False,
         "milestone_blockers": ["Physical browser/native viewer/OS wallpaper checks remain pending manual review."]
             + [row['cell_id'] for row in product_coverage['cells'] if not row['codec_complete']]
-            + [row['requirement_id'] for row in [*rendering_coverage['requirements'], rendering_coverage['same_file_requirement']]
+            + [row['requirement_id'] for row in [*rendering_coverage['requirements'], *rendering_coverage['same_file_requirements']]
                if row['status'] != 'qualified'],
         "policy_sources": [
             "https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153",

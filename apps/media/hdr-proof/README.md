@@ -16,6 +16,11 @@ Read the generated [report](results/report.md), [conversion matrix](results/conv
 
 The complete run replaces the generated report and measurement files under `results/`; it leaves complete intermediates and native diagnostics in ignored `work/`. Selected inspected files and their hashes are committed under [results/manual](results/manual/manifest.json). Follow [MANUAL.md](MANUAL.md) on the agreed Mac, iPad, Windows PC, and Galaxy. Browser and OS qualification stays pending until those devices have been checked by the user. A diagnostic file marked failed is not an approved SDR fallback.
 
+Keep the checkout and generated intermediates on disk. A full replay can retain
+several gigabytes under `work/`; running several copies in a RAM-backed `/tmp`
+can exhaust host memory and cause native-operation timeouts. Such timeouts stay
+failed in the recorded run. A later successful replay supplies separate evidence.
+
 Changes to fixtures require an intentional `--update-fixture-lock` run and review of the changed source hashes. Dependency changes require new lock files and native qualification. The suite never downloads a floating fixture or silently refreshes an expected hash during normal execution. `fixtures/generated-sha256.json` covers generated AVIF, HDR PNG/APNG and selector inputs; the committed JPEG fixture manifest and fixture tests cover the camera corpus and regenerated ISO representation.
 
 The Python color equations and request oracle exist only in this proof. FFmpeg/libplacebo, Sharp/libvips/libultrahdr, and libavif/AOM perform the native candidate conversions. dav1d, ExifTool, Pillow/libjpeg, a small reader linked to libpng, and the independent gain-map reader check the bytes. Their precise limitations are recorded in every affected case. Unit tests of the proof-side request oracle do not claim production endpoint behavior. Media's existing dependency versions, source admission, UI, migrations, generation policy and caching are unchanged.
@@ -41,6 +46,10 @@ compressed SDR base. The pinned libavif reader can decode that coding form,
 but some files still exceed the fixed authored-SDR shadow limits. Its extra
 JPEG-to-AVIF-to-PQ reconstruction also introduces eight-bit YCbCr map rounding;
 those appearance failures remain visible as a separate decoder diagnostic.
+Another pinned native libavif reader preserves the decoded RGB gain samples
+with identity matrix coding. Its independent dav1d/PQ readback has separate
+appearance measurements; it never replaces the original reader's failures or
+changes the conversion gates.
 Both independent JPEG/ISO and native libultrahdr reconstruction must pass the
 unchanged file gates. Every physical consumer remains pending.
 
@@ -162,6 +171,14 @@ and conflicting ICC/sRGB signaling. They retain exact originals and withhold
 transformation. Unlisted cross-products remain untested; this proof does not
 change source admission.
 
+The separate [eight-bit PNG source proof](hdr_png8.py) generates the same eight
+PQ/HLG, P3/Rec.2020 and alpha combinations at eight coded bits. Its source
+quantization uses the existing `avif-8` ceiling, declared before measurement,
+plus exact native libpng code recovery and a half-code quantization bound.
+[Source hashes](fixtures/png8-source-sha256.json) are locked separately.
+These source checks do not qualify derivatives or change the sixteen-bit
+fixtures, their hashes or their stricter appearance gates.
+
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no
 disposal, 300/700 ms timing and three plays. Native FFmpeg encodes the animation;
@@ -181,8 +198,9 @@ zero alpha. The independent reader checks rectangle bounds and requires the
 first default-image frame to fill the canvas. Explicit static extraction checks
 the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF
 at each tested geometry. JPEG opacity and GIF binary alpha require explicit
-coercion; preserve-alpha requests are rejected. The two PQ static GIF orientation
-cases exceed the fixed shadow color-error ceiling and remain unqualified.
+coercion; preserve-alpha requests are rejected. The two original gamma-2.2 PQ
+static GIF orientation cases exceed the fixed shadow color-error ceiling and remain
+unqualified; their separately measured gamma-3.2 alternatives retain the same gates.
 OVER blending, disposal and unlisted geometries remain unqualified in this APNG subset.
 Browser, viewer and wallpaper interpretation remains pending manual review for
 every emitted representation.

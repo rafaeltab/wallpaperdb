@@ -4,11 +4,33 @@ import json
 import tempfile
 import unittest
 
+from PIL import ImageCms
+
+import avif
+
 from combined_gainmap_proof import run as run_combined
-from gainmap_crossformat import run
+from gainmap_crossformat import run, single_layer_avif_checks
 
 
 class GainMapCrossformatTests(unittest.TestCase):
+    def test_auxiliary_map_icc_and_disagreeing_matrix_cannot_qualify_single_layer_hdr(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            parent = run_combined(root/'combined', names=('gainmap-android-iso',),
+                                  geometries=('contain',), policies=('moderateoffset',))[0]
+            encoded = parent['native_candidate']
+            gainmapped = avif.inspect_avif(Path(encoded['parts_directory'])/'combined.avif')
+            self.assertFalse(single_layer_avif_checks(gainmapped)['gain_map_absent'])
+            profile = root/'conflicting.icc'
+            profile.write_bytes(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
+            output = root/'conflicting.avif'
+            avif.native(['avifenc', '-j', '1', '-s', '8', '-q', '100', '-y', '444', '-d', '12',
+                '--cicp', '12/16/0', '--icc', profile, encoded['hdr_intent_pq_png'], output])
+            facts = avif.inspect_avif(output)
+            self.assertFalse(single_layer_avif_checks(facts)['icc_absent'])
+            facts['exiftool']['MatrixCoefficients'] = 6
+            self.assertFalse(single_layer_avif_checks(facts)['independent_matrix'])
+
     def test_native_pq_outputs_preserve_iso_source_hdr_and_exact_selectors(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

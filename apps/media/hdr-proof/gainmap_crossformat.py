@@ -6,6 +6,7 @@ each output against the source again. No JPEG qualification is inherited.
 """
 import json
 from pathlib import Path
+import re
 import shutil
 
 import numpy as np
@@ -14,6 +15,12 @@ import avif
 import gainmap
 from appearance import compare_appearance
 from gainmap_reference import REVISION, reference
+
+
+def single_layer_avif_checks(facts):
+    return {'gain_map_absent': bool(re.search(r'Gain map\s*:\s*Absent', facts['info'])),
+            'icc_absent': bool(re.search(r'ICC Profile\s*:\s*Absent', facts['info'])),
+            'independent_matrix': facts['matrix'] == facts['exiftool'].get('MatrixCoefficients') == 0}
 
 
 def run(directory, combined_cases):
@@ -102,6 +109,7 @@ def run(directory, combined_cases):
                     actual = avif.decode_avif(target, folder, 1)[0]
                     expected_alpha = np.concatenate((expected, np.ones((*expected.shape[:2], 1))), axis=-1)
                     structure = avif.structure_checks(facts, [actual], {}, [expected_alpha], 'pq', gamut, depth, 1)
+                    structure.update(single_layer_avif_checks(facts))
                     structure['static_opaque'] = facts['alpha'] == 'Absent' and bool(np.all(actual[..., 3] == 1))
                     inspected = gainmap.inspect(target, folder/'inspection')
                     private = inspected['private_tags']

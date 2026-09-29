@@ -34,6 +34,12 @@ class GainmapAvifGifTests(unittest.TestCase):
             self.assertAlmostEqual(case['measurements']['sdr']['regions']['shadow']['delta_e_itp']['maximum'],
                                    45.019980562824735, places=8)
             self.assertEqual(case['measurements']['sdr']['regions']['highlight']['samples'], 0)
+            bound = case['palette_lower_bound']
+            self.assertEqual(bound['output_sha256'], case['artifacts']['sha256'])
+            self.assertEqual(bound['reference_sha256'], case['reference_sdr']['sha256'])
+            self.assertEqual(bound['pixels_above_fixed_maximum'], 900)
+            self.assertAlmostEqual(bound['minimum_error_max'], 45.019980562824735, places=8)
+            self.assertIn('this exact palette only', bound['scope'])
             from matrix import build_matrix
             matrix = build_matrix(result['evidence'])
             self.assertEqual(matrix['evidence_errors'], [])

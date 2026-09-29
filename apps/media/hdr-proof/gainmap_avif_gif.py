@@ -15,7 +15,7 @@ from PIL import Image, ImageCms
 import avif
 import gainmap_avif
 import gainmap_avif_png
-from appearance import compare_appearance, sdr_signal_to_nits
+from appearance import THRESHOLDS, compare_appearance, linear_rgb_to_itp, sdr_signal_to_nits
 from gainmap_iso import srgb_profile_facts
 
 SELECTORS = {**gainmap_avif_png.SELECTORS, 'format': 'gif'}
@@ -153,6 +153,24 @@ def _encode(source, output):
             'icc_sha256': hashlib.sha256(profile).hexdigest(), 'output_sha256': avif.digest(output)}
 
 
+def _palette_bound(output, reference, reference_path):
+    """Read-only lower bound; no candidate encoder uses these reference pixels."""
+    with Image.open(output) as image:
+        palette = np.asarray(image.getpalette(), dtype=float).reshape(-1, 3)/255
+    colors = linear_rgb_to_itp(sdr_signal_to_nits(palette), 'srgb')
+    pixels = linear_rgb_to_itp(reference, 'srgb').reshape(-1, 3)
+    minimum = np.concatenate([720*np.linalg.norm(
+        pixels[start:start+512, None, :]-colors[None, :, :], axis=-1).min(axis=1)
+        for start in range(0, len(pixels), 512)])
+    limit = THRESHOLDS['profiles']['gainmap-sdr']['delta_e_max']
+    return {'scope': 'Lower bound for this exact palette only, even with optimal per-pixel choice. '
+                'No converter qualification or impossibility claim for other palettes.',
+        'output_sha256': avif.digest(output), 'reference_sha256': avif.digest(reference_path),
+        'palette_entries': len(palette), 'total_pixels': len(pixels), 'fixed_maximum': limit,
+        'minimum_error_mean': float(minimum.mean()), 'minimum_error_p95': float(np.percentile(minimum, 95)),
+        'minimum_error_max': float(minimum.max()), 'pixels_above_fixed_maximum': int(np.count_nonzero(minimum > limit))}
+
+
 def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
     validate_selectors(SELECTORS if selectors is None else selectors)
     root = Path(directory)
@@ -193,6 +211,7 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
             expected = sdr_signal_to_nits(np.asarray(image).astype(float)/255)
         measured = compare_appearance(expected, linear, reference_gamut='srgb', actual_gamut='srgb',
                                      fixture_class='gainmap-sdr')
+        case['palette_lower_bound'] = _palette_bound(output, expected, reference_path)
         case['checks'].update({'independent_decoder': True, 'native_palette': palette['passed'],
             'structure': (facts['width'], facts['height'], facts['depth'], facts['orientation'], facts['frames'])
                 == (expected.shape[1], expected.shape[0], 8, 1, 1) and facts['opaque']

@@ -15,11 +15,13 @@ export const quotaUsageTelemetryLayer = Layer.effectDiscard(
         const activeIps = meter.createObservableGauge('admission.usage.active_ips');
         const minute = meter.createObservableGauge('admission.usage.minute');
         const sampledAt = meter.createObservableGauge('admission.usage.sampled_at');
+        const observedAt = meter.createObservableGauge('admission.usage.observed_at');
         let closed = false;
         const pending = new Set<Promise<void>>();
         const collect = async (result: BatchObservableResult) => {
           const snapshot = await Effect.runPromise(usage.read());
           if (closed) return;
+          result.observe(observedAt, Date.now() / 1000);
           result.observe(available, snapshot._tag === 'Available' ? 1 : 0);
           if (snapshot._tag === 'Unavailable') {
             result.observe(points, Number.NaN);
@@ -45,6 +47,7 @@ export const quotaUsageTelemetryLayer = Layer.effectDiscard(
           activeIps,
           minute,
           sampledAt,
+          observedAt,
         ]);
         return async () => {
           closed = true;
@@ -54,6 +57,7 @@ export const quotaUsageTelemetryLayer = Layer.effectDiscard(
             activeIps,
             minute,
             sampledAt,
+            observedAt,
           ]);
           // Storage commands have a deadline and stay owned until they settle.
           await Promise.allSettled(pending);

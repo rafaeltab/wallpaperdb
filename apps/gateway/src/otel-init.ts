@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import type { Agent } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
@@ -100,6 +102,7 @@ export const initializeOtel = Effect.fn('gateway.telemetry.initialize')(function
       try: () =>
         new NodeSDK({
           serviceName: config.otelServiceName,
+          resource: resourceFromAttributes({ 'service.instance.id': randomUUID() }),
           logRecordProcessors: [
             new sdkLogs.BatchLogRecordProcessor({
               exporter: new OTLPLogExporter({

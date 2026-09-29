@@ -15,21 +15,26 @@ echo 'eef6a88d8cb0d161399bd7014bf9210fc77eab34010c72ba2ea35a912d0d992a  pr484-te
 curl -fsSL https://github.com/google/libultrahdr/commit/2b058012b5bf4a8433c3593c3c9b15daf8cd7848.patch -o pr491.patch
 echo 'd21eb75d6aead59b0f148c59475507ce27519cc794773619083d054c1b2403b3  pr491.patch' | sha256sum -c -
 echo '1fa1ab115b8d27dd9fd409554db38adc280637f854b1339aa578fe7c25705383  /opt/proof/libultrahdr-xmp-arrays.patch' | sha256sum -c -
+echo '891f48831f53de60d78ec05133020bea6b29f102d3f9a02467c9bb3e6c5104a4  /opt/proof/libultrahdr-rgb-jpeg.patch' | sha256sum -c -
 
-for variant in baseline pr484 pr491 both; do
+for variant in baseline pr484 pr491 both rgb; do
     mkdir -p "$variant/source" "/opt/proof/ultrahdr/$variant"
     tar -xf source.tar.gz --strip-components=1 -C "$variant/source"
-    if [ "$variant" = pr484 ] || [ "$variant" = both ]; then
+    if [ "$variant" = pr484 ] || [ "$variant" = both ] || [ "$variant" = rgb ]; then
         patch -d "$variant/source" -p1 < pr484-code.patch
         patch -d "$variant/source" -p1 < pr484-tests.patch
     fi
-    if [ "$variant" = pr491 ] || [ "$variant" = both ]; then
+    if [ "$variant" = pr491 ] || [ "$variant" = both ] || [ "$variant" = rgb ]; then
         patch -d "$variant/source" -p1 < pr491.patch
     fi
-    if [ "$variant" = both ]; then
+    if [ "$variant" = both ] || [ "$variant" = rgb ]; then
         # Proof-local native parser/writer fix: preserve all three hdrgm RDF
         # channel values. Baseline and individual upstream variants stay intact.
         patch -d "$variant/source" -p1 < /opt/proof/libultrahdr-xmp-arrays.patch
+    fi
+    if [ "$variant" = rgb ]; then
+        # Separate decoder experiment. Retain the "both" rejection control.
+        patch -d "$variant/source" -p1 < /opt/proof/libultrahdr-rgb-jpeg.patch
     fi
     cmake -S "$variant/source" -B "$variant/build" -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=ON -DUHDR_BUILD_EXAMPLES=OFF -DUHDR_BUILD_TESTS=OFF \

@@ -1,0 +1,15 @@
+--- a/lib/src/jpegdecoderhelper.cpp
++++ b/lib/src/jpegdecoderhelper.cpp
+@@ -350,6 +350,12 @@
+       mode = cinfo.num_components == 1 ? DECODE_TO_YCBCR_CS : DECODE_TO_RGB_CS;
+     }
+ 
++    // A true RGB-coded JPEG needs no YCbCr conversion. The gain-map
++    // application already accepts the helper's packed RGB output.
++    if (DECODE_TO_YCBCR_CS == mode && cinfo.jpeg_color_space == JCS_RGB) {
++      mode = DECODE_TO_RGB_CS;
++    }
++
+     if (DECODE_TO_RGB_CS == mode) {
+       if (cinfo.jpeg_color_space != JCS_YCbCr && cinfo.jpeg_color_space != JCS_RGB) {
+         status.error_code = UHDR_CODEC_ERROR;

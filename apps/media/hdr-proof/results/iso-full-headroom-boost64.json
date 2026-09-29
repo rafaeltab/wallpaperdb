@@ -1,0 +1,2461 @@
+{
+  "scope": "One declared full-source ISO display-headroom requirement; unchanged boost16 endpoint qualification",
+  "converter_endpoint": {
+    "status": "qualified",
+    "case_id": "gainmap-android-iso:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-float32-map-gamma1.5:gainmap-hdr-target-gamut-v1",
+    "display_boost": 16,
+    "path": "/proof/work/iso-full-headroom-boost64/converter-endpoint/results.json",
+    "sha256": "3b1a61f7b7162cd6a4209b600843c68fd98d5a177d34e6fa0cfbb3ed54ac9ea1",
+    "gainmap_commands": [
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/inspection/exiftool.log",
+        "command": [
+          "exiftool",
+          "-json",
+          "-n",
+          "-G1",
+          "-s",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg"
+        ],
+        "exit_code": 0,
+        "stdout": "[{\n  \"SourceFile\": \"/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg\",\n  \"ExifTool:ExifToolVersion\": 13.55,\n  \"System:FileName\": \"output.jpg\",\n  \"System:Directory\": \"/proof/work/iso-full-headroom-boost64/converter-endpoint\",\n  \"System:FileSize\": 1031262,\n  \"System:FileModifyDate\": \"2026:09:29 18:59:47+00:00\",\n  \"System:FileAccessDate\": \"2026:09:29 18:59:47+00:00\",\n  \"System:FileInodeChangeDate\": \"2026:09:29 18:59:47+00:00\",\n  \"System:FilePermissions\": 100644,\n  \"File:FileType\": \"JPEG\",\n  \"File:FileTypeExtension\": \"JPG\",\n  \"File:MIMEType\": \"image/jpeg\",\n  \"File:ImageWidth\": 769,\n  \"File:ImageHeight\": 1025,\n  \"File:EncodingProcess\": 0,\n  \"File:BitsPerSample\": 8,\n  \"File:ColorComponents\": 3,\n  \"File:YCbCrSubSampling\": \"1 1\",\n  \"XMP-x:XMPToolkit\": \"Adobe XMP Core 5.1.2\",\n  \"XMP-hdrgm:Version\": 1.0,\n  \"XMP-GContainer:DirectoryItemSemantic\": [\"Primary\",\"GainMap\"],\n  \"XMP-GContainer:DirectoryItemMime\": [\"image/jpeg\",\"image/jpeg\"],\n  \"XMP-GContainer:DirectoryItemLength\": 496584,\n  \"ICC-header:ProfileCMMType\": \"lcms\",\n  \"ICC-header:ProfileVersion\": 1088,\n  \"ICC-header:ProfileClass\": \"mntr\",\n  \"ICC-header:ColorSpaceData\": \"RGB \",\n  \"ICC-header:ProfileConnectionSpace\": \"XYZ \",\n  \"ICC-header:ProfileDateTime\": \"2020:01:01 00:00:00\",\n  \"ICC-header:ProfileFileSignature\": \"acsp\",\n  \"ICC-header:PrimaryPlatform\": \"APPL\",\n  \"ICC-header:CMMFlags\": 0,\n  \"ICC-header:DeviceManufacturer\": \"\",\n  \"ICC-header:DeviceModel\": \"\",\n  \"ICC-header:DeviceAttributes\": \"0 0\",\n  \"ICC-header:RenderingIntent\": 0,\n  \"ICC-header:ConnectionSpaceIlluminant\": \"0.9642 1 0.82491\",\n  \"ICC-header:ProfileCreator\": \"lcms\",\n  \"ICC-header:ProfileID\": \"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\",\n  \"ICC_Profile:ProfileDescription\": \"RGB built-in\",\n  \"ICC_Profile:ProfileCopyright\": \"No copyright, use freely\",\n  \"ICC_Profile:MediaWhitePoint\": \"0.9642 1 0.82491\",\n  \"ICC_Profile:ChromaticAdaptation\": \"1.04788 0.02292 -0.05022 0.02959 0.99048 -0.01707 -0.00925 0.01508 0.75168\",\n  \"ICC_Profile:RedMatrixColumn\": \"0.51512 0.2412 -0.00105\",\n  \"ICC_Profile:BlueMatrixColumn\": \"0.1571 0.06657 0.78407\",\n  \"ICC_Profile:GreenMatrixColumn\": \"0.29198 0.69225 0.04189\",\n  \"ICC_Profile:RedTRC\": \"(Binary data 16 bytes, use -b option to extract)\",\n  \"ICC_Profile:GreenTRC\": \"(Binary data 16 bytes, use -b option to extract)\",\n  \"ICC_Profile:BlueTRC\": \"(Binary data 16 bytes, use -b option to extract)\",\n  \"ICC-chrm:ChromaticityChannels\": 3,\n  \"ICC-chrm:ChromaticityColorant\": 0,\n  \"ICC-chrm:ChromaticityChannel1\": \"0.67999 0.32001\",\n  \"ICC-chrm:ChromaticityChannel2\": \"0.265 0.69\",\n  \"ICC-chrm:ChromaticityChannel3\": \"0.14999 0.06\",\n  \"APP2:UniformResourceName\": \"urn:iso:std:iso:ts:21496:-1\",\n  \"MPF0:MPFVersion\": \"0100\",\n  \"MPF0:NumberOfImages\": 2,\n  \"MPImage1:MPImageFlags\": 0,\n  \"MPImage1:MPImageFormat\": 0,\n  \"MPImage1:MPImageType\": 196608,\n  \"MPImage1:MPImageLength\": 534678,\n  \"MPImage1:MPImageStart\": 0,\n  \"MPImage1:DependentImage1EntryNumber\": 0,\n  \"MPImage1:DependentImage2EntryNumber\": 0,\n  \"MPImage2:MPImageFlags\": 0,\n  \"MPImage2:MPImageFormat\": 0,\n  \"MPImage2:MPImageType\": 0,\n  \"MPImage2:MPImageLength\": 496584,\n  \"MPImage2:MPImageStart\": 534678,\n  \"MPImage2:DependentImage1EntryNumber\": 0,\n  \"MPImage2:DependentImage2EntryNumber\": 0,\n  \"MPImage2:MPImage2\": \"(Binary data 496584 bytes, use -b option to extract)\",\n  \"Google:GainMapImage\": \"(Binary data 496584 bytes, use -b option to extract)\",\n  \"Composite:ImageSize\": \"769 1025\",\n  \"Composite:Megapixels\": 0.788225\n}]\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/inspection/map-exiftool.log",
+        "command": [
+          "exiftool",
+          "-json",
+          "-G1",
+          "-s",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/inspection/map.jpg"
+        ],
+        "exit_code": 0,
+        "stdout": "[{\n  \"SourceFile\": \"/proof/work/iso-full-headroom-boost64/converter-endpoint/inspection/map.jpg\",\n  \"ExifTool:ExifToolVersion\": 13.55,\n  \"System:FileName\": \"map.jpg\",\n  \"System:Directory\": \"/proof/work/iso-full-headroom-boost64/converter-endpoint/inspection\",\n  \"System:FileSize\": \"497 kB\",\n  \"System:FileModifyDate\": \"2026:09:29 18:59:48+00:00\",\n  \"System:FileAccessDate\": \"2026:09:29 18:59:48+00:00\",\n  \"System:FileInodeChangeDate\": \"2026:09:29 18:59:48+00:00\",\n  \"System:FilePermissions\": \"-rw-r--r--\",\n  \"File:FileType\": \"JPEG\",\n  \"File:FileTypeExtension\": \"jpg\",\n  \"File:MIMEType\": \"image/jpeg\",\n  \"File:ImageWidth\": 769,\n  \"File:ImageHeight\": 1025,\n  \"File:EncodingProcess\": \"Baseline DCT, Huffman coding\",\n  \"File:BitsPerSample\": 8,\n  \"File:ColorComponents\": 3,\n  \"File:YCbCrSubSampling\": \"YCbCr4:4:4 (1 1)\",\n  \"XMP-x:XMPToolkit\": \"Adobe XMP Core 5.1.2\",\n  \"XMP-hdrgm:Version\": 1.0,\n  \"XMP-hdrgm:HDRCapacityMin\": 0,\n  \"XMP-hdrgm:HDRCapacityMax\": 2.15985,\n  \"XMP-hdrgm:BaseRenditionIsHDR\": false,\n  \"XMP-hdrgm:GainMapMin\": [-8.41567,-8.53526,-8.41567],\n  \"XMP-hdrgm:GainMapMax\": [7.16238,7.28143,7.34979],\n  \"XMP-hdrgm:Gamma\": [1.5,1.5,1.5],\n  \"XMP-hdrgm:OffsetSDR\": [6.10352e-05,6.10352e-05,6.10352e-05],\n  \"XMP-hdrgm:OffsetHDR\": [6.10352e-05,6.10352e-05,6.10352e-05],\n  \"APP2:UniformResourceName\": \"urn:iso:std:iso:ts:21496:-1?\\u0001E\\u001D? ??+-\\u0002\\u0003?\u0240\\u0003\\u0002\\u0001@\\u0001@????\\u0002?\\u0001? \\u0003\\u0002\\u0001@\\u0001@?yYg\\u0010u??\\u0010\\u0003\\u0002\\u0001@\\u0001@\",\n  \"Adobe:DCTEncodeVersion\": 100,\n  \"Adobe:APP14Flags0\": \"(none)\",\n  \"Adobe:APP14Flags1\": \"(none)\",\n  \"Adobe:ColorTransform\": \"Unknown (RGB or CMYK)\",\n  \"Composite:ImageSize\": \"769x1025\",\n  \"Composite:Megapixels\": 0.788\n}]\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/intent-inspection/exiftool.log",
+        "command": [
+          "exiftool",
+          "-json",
+          "-n",
+          "-G1",
+          "-s",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-intent-pq.png"
+        ],
+        "exit_code": 0,
+        "stdout": "[{\n  \"SourceFile\": \"/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-intent-pq.png\",\n  \"ExifTool:ExifToolVersion\": 13.55,\n  \"System:FileName\": \"hdr-intent-pq.png\",\n  \"System:Directory\": \"/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts\",\n  \"System:FileSize\": 2857941,\n  \"System:FileModifyDate\": \"2026:09:29 18:59:45+00:00\",\n  \"System:FileAccessDate\": \"2026:09:29 18:59:45+00:00\",\n  \"System:FileInodeChangeDate\": \"2026:09:29 18:59:45+00:00\",\n  \"System:FilePermissions\": 100644,\n  \"File:FileType\": \"PNG\",\n  \"File:FileTypeExtension\": \"PNG\",\n  \"File:MIMEType\": \"image/png\",\n  \"PNG:ImageWidth\": 769,\n  \"PNG:ImageHeight\": 1025,\n  \"PNG:BitDepth\": 16,\n  \"PNG:ColorType\": 2,\n  \"PNG:Compression\": 0,\n  \"PNG:Filter\": 0,\n  \"PNG:Interlace\": 0,\n  \"PNG:WhitePointX\": 0.3127,\n  \"PNG:WhitePointY\": 0.329,\n  \"PNG:RedX\": 0.68,\n  \"PNG:RedY\": 0.32,\n  \"PNG:GreenX\": 0.265,\n  \"PNG:GreenY\": 0.69,\n  \"PNG:BlueX\": 0.15,\n  \"PNG:BlueY\": 0.06,\n  \"PNG-pHYs:PixelsPerUnitX\": 0,\n  \"PNG-pHYs:PixelsPerUnitY\": 1,\n  \"PNG-pHYs:PixelUnits\": 0,\n  \"PNG-cICP:ColorPrimaries\": 12,\n  \"PNG-cICP:TransferCharacteristics\": 16,\n  \"PNG-cICP:MatrixCoefficients\": 0,\n  \"PNG-cICP:VideoFullRangeFlag\": 1,\n  \"Composite:ImageSize\": \"769 1025\",\n  \"Composite:Megapixels\": 0.788225\n}]\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-intent-encoding.log",
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "gbrapf32le",
+          "-s",
+          "769x1025",
+          "-i",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.gbrapf32",
+          "-vf",
+          "setparams=alpha_mode=premultiplied,zscale=agamma=0:transferin=linear:transfer=16:primariesin=12:primaries=12:matrixin=0:matrix=0:rangein=full:range=full:npl=203,format=gbrapf32le:alpha_modes=premultiplied,format=gbrpf32le,zscale=agamma=0:transferin=16:transfer=16:primariesin=12:primaries=12:matrixin=0:matrix=0:rangein=full:range=full:npl=10000,format=rgb48le",
+          "-frames:v",
+          "1",
+          "-map_metadata",
+          "-1",
+          "-y",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-intent-pq.png"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.normalize.log",
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-y",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "gbrpf32le",
+          "-s",
+          "769x1025",
+          "-i",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.numerator.raw",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "gbrpf32le",
+          "-s",
+          "769x1025",
+          "-i",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.weight.raw",
+          "-filter_complex_threads",
+          "1",
+          "-filter_complex",
+          "[0:v][1:v]blend=all_expr='if(gt(B,0),max(A/B,0),0)'[out]",
+          "-map",
+          "[out]",
+          "-frames:v",
+          "1",
+          "-pix_fmt",
+          "gbrpf32le",
+          "-f",
+          "rawvideo",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.gbrpf32"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.numerator.log",
+        "command": [
+          "hdr-proof-zimg-window",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.pixels.raw",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.numerator.raw",
+          "1152",
+          "1536",
+          "769",
+          "1025",
+          "384",
+          "512",
+          "384",
+          "512"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.padding.log",
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-y",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "gbrapf32le",
+          "-s",
+          "384x512",
+          "-i",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.input.gbrapf32",
+          "-filter_complex_threads",
+          "1",
+          "-filter_complex",
+          "[0:v]setparams=alpha_mode=premultiplied,format=gbrapf32le:alpha_modes=premultiplied,split[image][zero];[zero]geq=r=0:g=0:b=0:a=0,split=8[b1][b2][b3][b4][b5][b6][b7][b8];[b1][b2][b3]hstack=inputs=3[top];[b4][image][b5]hstack=inputs=3[middle];[b6][b7][b8]hstack=inputs=3[bottom];[top][middle][bottom]vstack=inputs=3,format=gbrapf32le:alpha_modes=premultiplied[out]",
+          "-map",
+          "[out]",
+          "-frames:v",
+          "1",
+          "-pix_fmt",
+          "gbrapf32le",
+          "-f",
+          "rawvideo",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.padded.gbrapf32"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.weight.log",
+        "command": [
+          "hdr-proof-zimg-window",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.coverage.raw",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-linear.weight.raw",
+          "1152",
+          "1536",
+          "769",
+          "1025",
+          "384",
+          "512",
+          "384",
+          "512"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/iso-decode.log",
+        "command": [
+          "/opt/proof/ultrahdr/precise/hdr-proof-uhdr",
+          "decode-linear",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/source-native.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/source-linear.gbrpf32",
+          "16"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"width\":384,\"height\":512,\"gamut\":1,\"headroom\":49.2610817,\"requested_display_boost\":16}\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/iso-extract.log",
+        "command": [
+          "/opt/proof/ultrahdr/precise/hdr-proof-uhdr",
+          "extract",
+          "/proof/fixtures/gainmap/gainmap-android-iso.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/source-base.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/source-map.jpg"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"variant\":\"precise\",\"version\":\"2.0.2\",\"width\":384,\"height\":512,\"map_width\":192,\"map_height\":256,\"use_base_cg\":true,\"hdr_capacity_min\":1,\"hdr_capacity_max\":49.2610817,\"maximum_boost\":[49.2610817,49.2610817,49.2610817],\"minimum_boost\":[1,1,1],\"gamma\":[1,1,1],\"sdr_offset\":[0,0,0],\"hdr_offset\":[0,0,0]}\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/iso-float32.log",
+        "command": [
+          "/opt/proof/ultrahdr/float32/hdr-proof-uhdr",
+          "decode-linear32",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/source-native.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/source-native-float32.gbrpf32",
+          "16"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"width\":384,\"height\":512,\"gamut\":1,\"headroom\":49.2610817,\"requested_display_boost\":16,\"gain_map_weight\":0.711442947,\"native_precision\":\"float32 gain application before half-float storage\"}\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/iso-map-decode.log",
+        "command": [
+          "node",
+          "-e",
+          "\nconst sharp = require('sharp');\nconst fs = require('node:fs');\n(async () => {\n  const job = JSON.parse(fs.readFileSync(0, 'utf8'));\n  const metadata = await sharp(job.input).metadata();\n  if (metadata.hasAlpha) throw new Error('Authored JPEG base must be opaque');\n  const pipeline = sharp(job.input).keepIccProfile();\n  const image = await pipeline.removeAlpha().raw().toBuffer({ resolveWithObject: true });\n  fs.writeFileSync(job.output, image.data);\n  process.stdout.write(JSON.stringify(image.info));\n})().catch((error) => { console.error(error); process.exitCode = 1; });\n"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"format\":\"raw\",\"width\":192,\"height\":256,\"channels\":3,\"depth\":\"uchar\",\"premultiplied\":false,\"hasAlpha\":false,\"size\":147456}",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/iso-pack.log",
+        "command": [
+          "/opt/proof/ultrahdr/precise/hdr-proof-uhdr",
+          "pack",
+          "/proof/fixtures/gainmap/gainmap-android-iso.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/base-lossless.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-lossless.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/source-native.jpg"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"variant\":\"precise\",\"version\":\"2.0.2\",\"width\":384,\"height\":512,\"map_width\":192,\"map_height\":256,\"use_base_cg\":true,\"hdr_capacity_min\":1,\"hdr_capacity_max\":49.2610817,\"maximum_boost\":[49.2610817,49.2610817,49.2610817],\"minimum_boost\":[1,1,1],\"gamma\":[1,1,1],\"sdr_offset\":[0,0,0],\"hdr_offset\":[0,0,0]}\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/iso-pq.log",
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-y",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "gbrpf32le",
+          "-s",
+          "384x512",
+          "-i",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/source-linear.gbrpf32",
+          "-vf",
+          "format=gbrpf32le,zscale=transferin=linear:transfer=16:primariesin=12:primaries=12:matrixin=0:matrix=0:rangein=full:range=full:npl=203,format=gbrp16le,format=rgb48be",
+          "-frames:v",
+          "1",
+          "-color_primaries",
+          "12",
+          "-color_trc",
+          "16",
+          "-colorspace",
+          "rgb",
+          "-color_range",
+          "pc",
+          "-map_metadata",
+          "-1",
+          "-threads",
+          "1",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/source-pq-p3.png"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-full.log",
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-y",
+          "-i",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-horizontal.png",
+          "-vf",
+          "format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,zscale=w=384:h=512:filter=bilinear:rangein=full:range=full,format=gbrpf32le,geq=r='floor(r(X,Y)*255+0.5001)/255':g='floor(g(X,Y)*255+0.5001)/255':b='floor(b(X,Y)*255+0.5001)/255',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24",
+          "-map_metadata",
+          "-1",
+          "-frames:v",
+          "1",
+          "-threads",
+          "1",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-full.png"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-horizontal.log",
+        "command": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-y",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "rgb24",
+          "-s",
+          "192x256",
+          "-i",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-native.rgb",
+          "-vf",
+          "format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,zscale=w=384:h=256:filter=bilinear:rangein=full:range=full,format=gbrpf32le,geq=r='floor(r(X,Y)*255+0.5001)/255':g='floor(g(X,Y)*255+0.5001)/255':b='floor(b(X,Y)*255+0.5001)/255',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24",
+          "-map_metadata",
+          "-1",
+          "-frames:v",
+          "1",
+          "-threads",
+          "1",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-horizontal.png"
+        ],
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/map-extraction.log",
+        "command": [
+          "avifgainmaputil",
+          "extractgainmap",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/combined.avif",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/map.png"
+        ],
+        "exit_code": 0,
+        "stdout": "Wrote PNG: /proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/map.png\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/native-map-generation.log",
+        "command": [
+          "/opt/proof/libavif/moderateoffset/avifgainmaputil",
+          "combine",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/authored-sdr.png",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-intent-pq.png",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/combined.avif",
+          "--cicp-base",
+          "12/13/0",
+          "--cicp-alternate",
+          "12/16/0",
+          "--ignore-profile",
+          "--downscaling",
+          "1",
+          "--depth-gain-map",
+          "8",
+          "--qgain-map",
+          "100",
+          "--yuv-gain-map",
+          "444",
+          "-y",
+          "444",
+          "-d",
+          "0",
+          "-q",
+          "100",
+          "-s",
+          "10"
+        ],
+        "exit_code": 0,
+        "stdout": "Creating a gain map of size 769 x 1025\nAVIF to be written:\n * Resolution     : 769x1025\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : 769x1025 pixels, 8 bit, YUV444, Full Range, Matrix Coeffs. 0, Base Headroom 0.00 (SDR), Alternate Headroom 2.16 (HDR)\n * Alternate image:\n    * Color Primaries: 12\n    * Transfer Char. : 16\n    * Matrix Coeffs. : 0\n    * ICC Profile    : Absent\n    * Bit Depth      : 12\n    * Planes         : 3\n\nEncoding AVIF at quality 100 speed 10, please wait...\nWrote AVIF: /proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/combined.avif\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/native-packing.log",
+        "command": [
+          "/opt/proof/ultrahdr/precise/hdr-proof-uhdr",
+          "pack-avif",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/combined.avif",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/base.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/map.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation.jpg"
+        ],
+        "exit_code": 0,
+        "stdout": "{\"libavif_version\":\"1.4.1\",\"libultrahdr_version\":\"2.0.2\",\"scope\":\"opaque RGB 8-bit base/map; native AVIF gamma-1 metadata; unchanged compressed JPEG samples\"}\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/source-inspection/exiftool.log",
+        "command": [
+          "exiftool",
+          "-json",
+          "-n",
+          "-G1",
+          "-s",
+          "/proof/fixtures/gainmap/gainmap-android-iso.jpg"
+        ],
+        "exit_code": 0,
+        "stdout": "[{\n  \"SourceFile\": \"/proof/fixtures/gainmap/gainmap-android-iso.jpg\",\n  \"ExifTool:ExifToolVersion\": 13.55,\n  \"System:FileName\": \"gainmap-android-iso.jpg\",\n  \"System:Directory\": \"/proof/fixtures/gainmap\",\n  \"System:FileSize\": 55337,\n  \"System:FileModifyDate\": \"2026:09:29 18:28:00+00:00\",\n  \"System:FileAccessDate\": \"2026:09:29 18:30:14+00:00\",\n  \"System:FileInodeChangeDate\": \"2026:09:29 18:28:00+00:00\",\n  \"System:FilePermissions\": 100600,\n  \"File:FileType\": \"JPEG\",\n  \"File:FileTypeExtension\": \"JPG\",\n  \"File:MIMEType\": \"image/jpeg\",\n  \"File:ExifByteOrder\": \"II\",\n  \"File:ImageWidth\": 384,\n  \"File:ImageHeight\": 512,\n  \"File:EncodingProcess\": 0,\n  \"File:BitsPerSample\": 8,\n  \"File:ColorComponents\": 3,\n  \"File:YCbCrSubSampling\": \"1 1\",\n  \"JFIF:JFIFVersion\": \"1 1\",\n  \"JFIF:ResolutionUnit\": 0,\n  \"JFIF:XResolution\": 1,\n  \"JFIF:YResolution\": 1,\n  \"IFD0:Orientation\": 1,\n  \"IFD0:XResolution\": 72,\n  \"IFD0:YResolution\": 72,\n  \"IFD0:ResolutionUnit\": 2,\n  \"IFD0:YCbCrPositioning\": 1,\n  \"ExifIFD:ExifVersion\": \"0210\",\n  \"ExifIFD:ComponentsConfiguration\": \"1 2 3 0\",\n  \"ExifIFD:FlashpixVersion\": \"0100\",\n  \"ExifIFD:ColorSpace\": 65535,\n  \"ExifIFD:ExifImageWidth\": 384,\n  \"ExifIFD:ExifImageHeight\": 512,\n  \"ICC-header:ProfileCMMType\": \"\",\n  \"ICC-header:ProfileVersion\": 1072,\n  \"ICC-header:ProfileClass\": \"mntr\",\n  \"ICC-header:ColorSpaceData\": \"RGB \",\n  \"ICC-header:ProfileConnectionSpace\": \"XYZ \",\n  \"ICC-header:ProfileDateTime\": \"0000:00:00 00:00:00\",\n  \"ICC-header:ProfileFileSignature\": \"acsp\",\n  \"ICC-header:PrimaryPlatform\": \"\",\n  \"ICC-header:CMMFlags\": 0,\n  \"ICC-header:DeviceManufacturer\": \"\",\n  \"ICC-header:DeviceModel\": \"\",\n  \"ICC-header:DeviceAttributes\": \"0 0\",\n  \"ICC-header:RenderingIntent\": 1,\n  \"ICC-header:ConnectionSpaceIlluminant\": \"0.9642 1 0.82491\",\n  \"ICC-header:ProfileCreator\": \"\",\n  \"ICC-header:ProfileID\": \"0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\",\n  \"ICC_Profile:ProfileDescription\": \"Display P3 Gamut with sRGB Transfer\",\n  \"ICC_Profile:RedMatrixColumn\": \"0.51511 0.24118 -0.00105\",\n  \"ICC_Profile:GreenMatrixColumn\": \"0.29196 0.69223 0.04189\",\n  \"ICC_Profile:BlueMatrixColumn\": \"0.15715 0.06659 0.78438\",\n  \"ICC_Profile:MediaWhitePoint\": \"0.9642 1 0.82491\",\n  \"ICC_Profile:RedTRC\": \"(Binary data 40 bytes, use -b option to extract)\",\n  \"ICC_Profile:GreenTRC\": \"(Binary data 40 bytes, use -b option to extract)\",\n  \"ICC_Profile:BlueTRC\": \"(Binary data 40 bytes, use -b option to extract)\",\n  \"ICC_Profile:ProfileCopyright\": \"Google Inc. 2022\",\n  \"APP2:UniformResourceName\": \"urn:iso:std:iso:ts:21496:-1\",\n  \"MPF0:MPFVersion\": \"0100\",\n  \"MPF0:NumberOfImages\": 2,\n  \"MPImage1:MPImageFlags\": 0,\n  \"MPImage1:MPImageFormat\": 0,\n  \"MPImage1:MPImageType\": 196608,\n  \"MPImage1:MPImageLength\": 46930,\n  \"MPImage1:MPImageStart\": 0,\n  \"MPImage1:DependentImage1EntryNumber\": 0,\n  \"MPImage1:DependentImage2EntryNumber\": 0,\n  \"MPImage2:MPImageFlags\": 0,\n  \"MPImage2:MPImageFormat\": 0,\n  \"MPImage2:MPImageType\": 0,\n  \"MPImage2:MPImageLength\": 8407,\n  \"MPImage2:MPImageStart\": 46930,\n  \"MPImage2:DependentImage1EntryNumber\": 0,\n  \"MPImage2:DependentImage2EntryNumber\": 0,\n  \"MPImage2:MPImage2\": \"(Binary data 8407 bytes, use -b option to extract)\",\n  \"Composite:ImageSize\": \"384 512\",\n  \"Composite:Megapixels\": 0.196608\n}]\n",
+        "stderr": ""
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/source-inspection/independent-hdr-convert.log",
+        "command": [
+          "avifgainmaputil",
+          "convert",
+          "/proof/fixtures/gainmap/gainmap-android-iso.jpg",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/source-inspection/oracle-lossless.avif",
+          "--cicp",
+          "12/13/0",
+          "--ignore-profile",
+          "-d",
+          "8",
+          "-y",
+          "444",
+          "-q",
+          "100",
+          "--qgain-map",
+          "100",
+          "-s",
+          "10"
+        ],
+        "exit_code": 1,
+        "stdout": "Directly copied JPEG pixel data (no YUV conversion): gain map\nusage: avifgainmaputil convert input_filename.jpg output_image.avif \n       [--swap-base] [--qgain-map QGAIN-MAP] [--cicp CICP] [--clli CLLI] \n       [-s SPEED] [-q QCOLOR] [--grid GRID] [-y {444, 422, 420, 400}] \n       [-d {0, 8, 10, 12}] [--ignore-profile] [-h]\n\nConvert a JPEG with a gain map to AVIF.\nIf features like --swap-base are not needed, avifenc can also be used to convert \nJPEGs to AVIF.\n\narguments:\n  input_filename.jpg\n                    \n  output_image.avif\n                    \n  --swap-base       Make the HDR image the base image (Default: false)\n  --qgain-map QGAIN-MAP\n                    Quality for the gain map (0-100, where 100 is lossless) (Default: 60)\n  --cicp CICP       Set the CICP values for the input image, expressed as P/T/M \n                    where P = color primaries, T = transfer characteristics, M = \n                    matrix coefficients.\n  --clli CLLI       Set the content light level information of the alternate \n                    image, expressed as:  MaxCLL,MaxPALL.\n  -s SPEED, --speed SPEED\n                    Encoder speed (0-10, slowest-fastest) (Default: 6)\n  -q QCOLOR, --qcolor QCOLOR\n                    Quality (0-100, where 100 is lossless) (Default: 60)\n  --grid GRID       Encode a grid AVIF with M cols and N rows, expressed as MxN (Default: 1x1)\n  -y {444, 422, 420, 400}, --yuv {444, 422, 420, 400}\n                    Output YUV format for avif (default = automatic)\n  -d {0, 8, 10, 12}, --depth {0, 8, 10, 12}\n                    Output depth (0 = automatic)\n  --ignore-profile  If the input file contains an embedded color profile, ignore \n                    it (no-op if absent) (Default: false)\n  -h, --help        Shows this help message\n\n\n",
+        "stderr": "Input image /proof/fixtures/gainmap/gainmap-android-iso.jpg does not contain a gain map\n"
+      },
+      {
+        "log": "/proof/work/iso-full-headroom-boost64/converter-endpoint/source-inspection/map-exiftool.log",
+        "command": [
+          "exiftool",
+          "-json",
+          "-G1",
+          "-s",
+          "/proof/work/iso-full-headroom-boost64/converter-endpoint/source-inspection/map.jpg"
+        ],
+        "exit_code": 0,
+        "stdout": "[{\n  \"SourceFile\": \"/proof/work/iso-full-headroom-boost64/converter-endpoint/source-inspection/map.jpg\",\n  \"ExifTool:ExifToolVersion\": 13.55,\n  \"System:FileName\": \"map.jpg\",\n  \"System:Directory\": \"/proof/work/iso-full-headroom-boost64/converter-endpoint/source-inspection\",\n  \"System:FileSize\": \"8.4 kB\",\n  \"System:FileModifyDate\": \"2026:09:29 18:59:42+00:00\",\n  \"System:FileAccessDate\": \"2026:09:29 18:59:42+00:00\",\n  \"System:FileInodeChangeDate\": \"2026:09:29 18:59:42+00:00\",\n  \"System:FilePermissions\": \"-rw-r--r--\",\n  \"File:FileType\": \"JPEG\",\n  \"File:FileTypeExtension\": \"jpg\",\n  \"File:MIMEType\": \"image/jpeg\",\n  \"File:Comment\": \"Source: google libuhdr v2.0.2, Coder: libjpeg v80, Attrib: GainMap Image\",\n  \"File:ImageWidth\": 192,\n  \"File:ImageHeight\": 256,\n  \"File:EncodingProcess\": \"Baseline DCT, Huffman coding\",\n  \"File:BitsPerSample\": 8,\n  \"File:ColorComponents\": 1,\n  \"APP2:UniformResourceName\": \"urn:iso:std:iso:ts:21496:-1@\\u0001Y?A\\u0010\\u0001Y?A\\u0010\\u0001\\u0001\\u0001\\u0001\",\n  \"JFIF:JFIFVersion\": 1.01,\n  \"JFIF:ResolutionUnit\": \"None\",\n  \"JFIF:XResolution\": 1,\n  \"JFIF:YResolution\": 1,\n  \"ICC-header:ProfileCMMType\": \"\",\n  \"ICC-header:ProfileVersion\": \"4.4.0\",\n  \"ICC-header:ProfileClass\": \"Display Device Profile\",\n  \"ICC-header:ColorSpaceData\": \"RGB \",\n  \"ICC-header:ProfileConnectionSpace\": \"XYZ \",\n  \"ICC-header:ProfileDateTime\": \"0000:00:00 00:00:00\",\n  \"ICC-header:ProfileFileSignature\": \"acsp\",\n  \"ICC-header:PrimaryPlatform\": \"Unknown ()\",\n  \"ICC-header:CMMFlags\": \"Not Embedded, Independent\",\n  \"ICC-header:DeviceManufacturer\": \"\",\n  \"ICC-header:DeviceModel\": \"\",\n  \"ICC-header:DeviceAttributes\": \"Reflective, Glossy, Positive, Color\",\n  \"ICC-header:RenderingIntent\": \"Media-Relative Colorimetric\",\n  \"ICC-header:ConnectionSpaceIlluminant\": \"0.9642 1 0.82491\",\n  \"ICC-header:ProfileCreator\": \"\",\n  \"ICC-header:ProfileID\": 0,\n  \"ICC_Profile:ProfileDescription\": \"sRGB Gamut with Linear Transfer\",\n  \"ICC_Profile:RedMatrixColumn\": \"0.43607 0.22249 0.01392\",\n  \"ICC_Profile:GreenMatrixColumn\": \"0.38515 0.71687 0.09708\",\n  \"ICC_Profile:BlueMatrixColumn\": \"0.14307 0.06061 0.7141\",\n  \"ICC_Profile:MediaWhitePoint\": \"0.9642 1 0.82491\",\n  \"ICC_Profile:RedTRC\": \"(Binary data 16 bytes, use -b option to extract)\",\n  \"ICC_Profile:GreenTRC\": \"(Binary data 16 bytes, use -b option to extract)\",\n  \"ICC_Profile:BlueTRC\": \"(Binary data 16 bytes, use -b option to extract)\",\n  \"ICC_Profile:ProfileCopyright\": \"Google Inc. 2022\",\n  \"ICC-cicp:ColorPrimaries\": \"BT.709\",\n  \"ICC-cicp:TransferCharacteristics\": \"Linear\",\n  \"ICC-cicp:MatrixCoefficients\": \"Identity matrix\",\n  \"ICC-cicp:VideoFullRangeFlag\": \"Full\",\n  \"Composite:ImageSize\": \"192x256\",\n  \"Composite:Megapixels\": 0.049\n}]\n",
+        "stderr": ""
+      }
+    ],
+    "scope": "Separate existing conversion proof evaluated at source reference display boost16"
+  },
+  "cases": [
+    {
+      "case_id": "gainmap-android-iso:hdr:jpg:preserve:preserve:upscale:native-combine-icc-gamma32-midpointoffset-dct-float-map-source-float32-map-gamma1.5:gainmap-hdr-target-gamut-v1:render-boost64",
+      "candidate": "native-combine-icc-gamma32-midpointoffset-dct-float-map-source-float32-map-gamma1.5-render-boost64",
+      "fixture_id": "gainmap-android-iso",
+      "source_sha256": "f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e",
+      "source_reference_revision": "gainmap-iso-full-headroom-boost64-v1",
+      "cell_id": "gainmap-jpeg:hdr:jpg",
+      "geometry": "upscale",
+      "selectors": {
+        "format": "jpg",
+        "range": "hdr",
+        "gamut": "preserve",
+        "depth": "preserve",
+        "motion": "preserve",
+        "transparency": "preserve",
+        "w": 769,
+        "fit": "contain"
+      },
+      "status": "tested and failed",
+      "consumer_status": "pending manual review",
+      "qualification_scope": "Only actual-file rendering at display boost64 against independently reconstructed ISO source at the same boost. Both source and output gain weights are full; the separate boost16 endpoint does not establish full-source HDR or physical-display qualification.",
+      "known_consumer_limitations": [
+        "Pinned libultrahdr assumes sRGB base transfer. Pinned libavif rejects ICC gain computation/application. These gamma3.2 files need ICC-aware gain application.",
+        "Intermediate display headroom is not qualified by the display-boost-16 endpoint measurement."
+      ],
+      "checks": {
+        "native_encoder": true,
+        "converter_endpoint": true,
+        "independent_source_decoder": true,
+        "independent_decoder": true,
+        "structure": true,
+        "appearance": false,
+        "privacy": true,
+        "full_headroom_weights": true
+      },
+      "rendering_scope": {
+        "display_boost": 64,
+        "headroom_log2": 6,
+        "source_reference_revision": "gainmap-iso-full-headroom-boost64-v1",
+        "sdr_white_nits": 203,
+        "converter_reference_display_boost": 16,
+        "headroom_is_product_selector": false,
+        "source_capacity_headroom_log2": 5.622376441955566,
+        "output_capacity_headroom_log2": 2.1598544120788574,
+        "source_gain_map_weight": 1,
+        "output_gain_map_weight": 1.0,
+        "source_weight_at_converter_reference_display_boost16": 0.7114429354375863
+      },
+      "measurements": {
+        "authored_sdr_base": {
+          "passed": true,
+          "metric": "BT.2124 Delta E ITP",
+          "fixture_class": "gainmap-sdr",
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "region_basis": "appearance_reference_luminance_nits",
+          "regions": {
+            "shadow": {
+              "samples": 455133,
+              "delta_e_itp": {
+                "mean": 0.8141689096963808,
+                "p95": 1.753615740953057,
+                "maximum": 5.227496253638329
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.013715331994051966,
+                "p95": 0.03874580894253414,
+                "maximum": 0.31791558751071847
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 5.108578984880329e-05,
+                "p95": 0.0,
+                "maximum": 0.02462748420501997
+              },
+              "reference_mean_nits": 2.1908571616585673,
+              "actual_mean_nits": 2.1965935565223775
+            },
+            "midtone": {
+              "samples": 333092,
+              "delta_e_itp": {
+                "mean": 0.5873528267563056,
+                "p95": 1.3080509455652964,
+                "maximum": 3.314280836999825
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.1187172764162132,
+                "p95": 0.3168436255290552,
+                "maximum": 1.3406445569219159
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.0013185192526684376,
+                "p95": 0.0056509823091615,
+                "maximum": 0.025936325798834026
+              },
+              "reference_mean_nits": 31.148189810908896,
+              "actual_mean_nits": 31.159537801623706
+            },
+            "highlight": {
+              "samples": 0,
+              "status": "not_present_in_reference"
+            }
+          },
+          "failures": [],
+          "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+        },
+        "reconstructed_hdr": {
+          "passed": false,
+          "metric": "BT.2124 Delta E ITP",
+          "fixture_class": "gainmap-hdr",
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "region_basis": "appearance_reference_luminance_nits",
+          "regions": {
+            "shadow": {
+              "samples": 417338,
+              "delta_e_itp": {
+                "mean": 1.0713182180362564,
+                "p95": 2.3037420414085457,
+                "maximum": 129.38972397929973
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.05129104458896775,
+                "p95": 0.17273623709628802,
+                "maximum": 5.715228664688503
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.003226317807632716,
+                "p95": 0.010986193656586365,
+                "maximum": 11.668338308398484
+              },
+              "reference_mean_nits": 3.837869831309767,
+              "actual_mean_nits": 3.7979348782567968
+            },
+            "midtone": {
+              "samples": 285692,
+              "delta_e_itp": {
+                "mean": 7.897914529883739,
+                "p95": 21.59972211539714,
+                "maximum": 35.16626690928063
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 10.63343994948102,
+                "p95": 45.96020493690843,
+                "maximum": 74.93694489555303
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.09814760868053844,
+                "p95": 0.2511632889233107,
+                "maximum": 0.37558787302530444
+              },
+              "reference_mean_nits": 73.10452678861367,
+              "actual_mean_nits": 62.472784552264244
+            },
+            "highlight": {
+              "samples": 85195,
+              "delta_e_itp": {
+                "mean": 25.070299901571154,
+                "p95": 36.83254435152398,
+                "maximum": 51.205723082957164
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 105.035200377892,
+                "p95": 295.1805296751782,
+                "maximum": 788.4240130303681
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.2780242840298531,
+                "p95": 0.3759369645611841,
+                "maximum": 0.47888220241383017
+              },
+              "reference_mean_nits": 352.3555178415507,
+              "actual_mean_nits": 247.32031746365865
+            }
+          },
+          "failures": [
+            "shadow.delta_e_max",
+            "midtone.delta_e_mean",
+            "midtone.delta_e_p95",
+            "midtone.delta_e_max",
+            "midtone.luminance_relative_p95",
+            "highlight.delta_e_mean",
+            "highlight.delta_e_p95",
+            "highlight.delta_e_max",
+            "highlight.luminance_relative_p95"
+          ],
+          "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+        },
+        "independent_hdr": {
+          "passed": false,
+          "metric": "BT.2124 Delta E ITP",
+          "fixture_class": "gainmap-hdr",
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "region_basis": "appearance_reference_luminance_nits",
+          "regions": {
+            "shadow": {
+              "samples": 417338,
+              "delta_e_itp": {
+                "mean": 1.0920914301271403,
+                "p95": 2.4360854054550622,
+                "maximum": 129.38971452516336
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.05188981602736594,
+                "p95": 0.17583887822411134,
+                "maximum": 5.715229786389932
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.003281257781945308,
+                "p95": 0.011463976383385473,
+                "maximum": 11.668334719982331
+              },
+              "reference_mean_nits": 3.837869831309767,
+              "actual_mean_nits": 3.7971900042263087
+            },
+            "midtone": {
+              "samples": 285692,
+              "delta_e_itp": {
+                "mean": 7.923873818531937,
+                "p95": 21.619688671624186,
+                "maximum": 34.48651667599246
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 10.655701450700155,
+                "p95": 45.99525871181747,
+                "maximum": 74.01006659166399
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.09848955092438981,
+                "p95": 0.25135066460073685,
+                "maximum": 0.3819515177030156
+              },
+              "reference_mean_nits": 73.10452678861367,
+              "actual_mean_nits": 62.45045881228369
+            },
+            "highlight": {
+              "samples": 85195,
+              "delta_e_itp": {
+                "mean": 25.10408246598652,
+                "p95": 36.87680420133107,
+                "maximum": 51.205719990194986
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 105.15094107592914,
+                "p95": 295.47015573040255,
+                "maximum": 788.4242385226646
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.27834707145974125,
+                "p95": 0.3762411520193355,
+                "maximum": 0.4788821721646256
+              },
+              "reference_mean_nits": 352.3555178415507,
+              "actual_mean_nits": 247.20457676562157
+            }
+          },
+          "failures": [
+            "shadow.delta_e_max",
+            "midtone.delta_e_mean",
+            "midtone.delta_e_p95",
+            "midtone.delta_e_max",
+            "midtone.luminance_relative_p95",
+            "highlight.delta_e_mean",
+            "highlight.delta_e_p95",
+            "highlight.delta_e_max",
+            "highlight.luminance_relative_p95"
+          ],
+          "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+        },
+        "independent_hdr_cross_decoder": {
+          "passed": true,
+          "metric": "BT.2124 Delta E ITP",
+          "fixture_class": "gainmap-hdr",
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "region_basis": "appearance_reference_luminance_nits",
+          "regions": {
+            "shadow": {
+              "samples": 418978,
+              "delta_e_itp": {
+                "mean": 0.07261059270988623,
+                "p95": 2.3548664088864034e-05,
+                "maximum": 5.527734531481579
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.0017052598139391056,
+                "p95": 1.965216736499179e-06,
+                "maximum": 0.4291887984541347
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 6.047761338041567e-05,
+                "p95": 0.0,
+                "maximum": 0.048960226072591574
+              },
+              "reference_mean_nits": 3.8199901461829153,
+              "actual_mean_nits": 3.8207685124166972
+            },
+            "midtone": {
+              "samples": 315175,
+              "delta_e_itp": {
+                "mean": 0.10532443891421624,
+                "p95": 1.0772886543266342,
+                "maximum": 4.79264999821094
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.04153172982344048,
+                "p95": 0.1264498249485491,
+                "maximum": 7.413483910362714
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.0004809120614226878,
+                "p95": 0.0004160297866335457,
+                "maximum": 0.04334960313687879
+              },
+              "reference_mean_nits": 74.10961160175715,
+              "actual_mean_nits": 74.13745361212162
+            },
+            "highlight": {
+              "samples": 54072,
+              "delta_e_itp": {
+                "mean": 0.12062694621066686,
+                "p95": 1.0170264595036997,
+                "maximum": 4.641363238541054
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.18700325420410022,
+                "p95": 0.8578716839289512,
+                "maximum": 21.462567327022725
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.0006063038956127874,
+                "p95": 0.0028593202551859776,
+                "maximum": 0.03613320181886635
+              },
+              "reference_mean_nits": 287.1895511628687,
+              "actual_mean_nits": 287.3273018354797
+            }
+          },
+          "failures": [],
+          "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+        }
+      },
+      "blockers": [
+        "Failed appearance check at display boost 64"
+      ],
+      "artifacts": {
+        "output": "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg",
+        "sha256": "37376e5629f11d61debb2664cd2568fd1965d30268e1d0acc76810e01e6826a2"
+      },
+      "source_decoder_evidence": {
+        "decoder": "Pillow/native libjpeg plus independent ISO parsing and reconstruction",
+        "base_sha256": "f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e",
+        "gain_map_sha256": "2ac281bd7a278f8967bd4cfb1d5ea905eef15cd78077cd42f581424dad41e209",
+        "oracle_source_sha256": "0d578029a968efed05247d34139a510d9f86d5c8d8b9d21b14fe3fb0085cd89d",
+        "native_libjpeg_version": "8.0",
+        "native_libjpeg_turbo_version": "3.1.3",
+        "base": {
+          "depth": 8,
+          "width": 384,
+          "height": 512,
+          "components": 3,
+          "sof": 0
+        },
+        "gain_map": {
+          "depth": 8,
+          "width": 192,
+          "height": 256,
+          "components": 1,
+          "sof": 0
+        },
+        "base_color": {
+          "gamut": "p3",
+          "transfer": "srgb",
+          "icc_sha256": "33c92020023a0b41f7a963445d69e07a49f770d7b98ef3422d3983d2f5efbf70",
+          "icc_version_major": 4,
+          "rgb_to_xyz_d50": [
+            [
+              0.515106201171875,
+              0.291961669921875,
+              0.1571502685546875
+            ],
+            [
+              0.241180419921875,
+              0.692230224609375,
+              0.06658935546875
+            ],
+            [
+              -0.0010528564453125,
+              0.0418853759765625,
+              0.7843780517578125
+            ]
+          ],
+          "channel_transfer_parameters": [
+            [
+              2.399993896484375,
+              0.9478607177734375,
+              0.0521392822265625,
+              0.077392578125,
+              0.0404510498046875,
+              0.0,
+              0.0
+            ],
+            [
+              2.399993896484375,
+              0.9478607177734375,
+              0.0521392822265625,
+              0.077392578125,
+              0.0404510498046875,
+              0.0,
+              0.0
+            ],
+            [
+              2.399993896484375,
+              0.9478607177734375,
+              0.0521392822265625,
+              0.077392578125,
+              0.0404510498046875,
+              0.0,
+              0.0
+            ]
+          ],
+          "media_white_xyz": [
+            0.964202880859375,
+            1.0,
+            0.8249053955078125
+          ],
+          "header_flags": 0,
+          "pcs_illuminant_xyz": [
+            0.964202880859375,
+            1.0,
+            0.8249053955078125
+          ],
+          "gamut_basis": "ICC D50 colorants match the pinned canonical libultrahdr matrix dialect"
+        },
+        "iso_metadata": {
+          "minimum_version": 0,
+          "writer_version": 0,
+          "use_base_colour_space": true,
+          "backward": false,
+          "base_headroom": 0.0,
+          "alternate_headroom": 5.622376441955566,
+          "channels": [
+            {
+              "minimum": 0.0,
+              "maximum": 5.622376441955566,
+              "gamma": 1.0,
+              "base_offset": 0.0,
+              "alternate_offset": 0.0
+            }
+          ]
+        },
+        "headroom_log2": 6,
+        "sdr_white_nits": 203,
+        "orientation": 1,
+        "validation": "Analytic native-JPEG/libavif controls in test_gainmap_iso.py; predictive RGB JPEG/native gain application controls in test_lossless_jpeg.py",
+        "limitations": [
+          "Forward ISO version-0 layout in base color space only; one nonambiguous metadata packet.",
+          "Verified sRGB transfer with sRGB/P3 matrix ICC dialects; unknown color facts are rejected.",
+          "8-bit RGB base and grayscale/RGB map; gain-map samples use metadata gamma, without ICC conversion.",
+          "SOF3 predictive JPEG has native sample/application controls; the pinned libavif reader rejects it.",
+          "Pillow bilinear map resizing at JPEG sample precision; only the committed corpus and controls are proven.",
+          "Identity source orientation only; no physical HDR display or whole-format interoperability claim."
+        ]
+      },
+      "source_facts": {
+        "sha256": "f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e",
+        "metadata": {
+          "ExifTool:ExifToolVersion": 13.55,
+          "File:FileType": "JPEG",
+          "File:FileTypeExtension": "JPG",
+          "File:MIMEType": "image/jpeg",
+          "File:ExifByteOrder": "II",
+          "File:ImageWidth": 384,
+          "File:ImageHeight": 512,
+          "File:EncodingProcess": 0,
+          "File:BitsPerSample": 8,
+          "File:ColorComponents": 3,
+          "File:YCbCrSubSampling": "1 1",
+          "JFIF:JFIFVersion": "1 1",
+          "JFIF:ResolutionUnit": 0,
+          "JFIF:XResolution": 1,
+          "JFIF:YResolution": 1,
+          "IFD0:Orientation": 1,
+          "IFD0:XResolution": 72,
+          "IFD0:YResolution": 72,
+          "IFD0:ResolutionUnit": 2,
+          "IFD0:YCbCrPositioning": 1,
+          "ExifIFD:ExifVersion": "0210",
+          "ExifIFD:ComponentsConfiguration": "1 2 3 0",
+          "ExifIFD:FlashpixVersion": "0100",
+          "ExifIFD:ColorSpace": 65535,
+          "ExifIFD:ExifImageWidth": 384,
+          "ExifIFD:ExifImageHeight": 512,
+          "ICC-header:ProfileCMMType": "",
+          "ICC-header:ProfileVersion": 1072,
+          "ICC-header:ProfileClass": "mntr",
+          "ICC-header:ColorSpaceData": "RGB ",
+          "ICC-header:ProfileConnectionSpace": "XYZ ",
+          "ICC-header:ProfileDateTime": "0000:00:00 00:00:00",
+          "ICC-header:ProfileFileSignature": "acsp",
+          "ICC-header:PrimaryPlatform": "",
+          "ICC-header:CMMFlags": 0,
+          "ICC-header:DeviceManufacturer": "",
+          "ICC-header:DeviceModel": "",
+          "ICC-header:DeviceAttributes": "0 0",
+          "ICC-header:RenderingIntent": 1,
+          "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ICC-header:ProfileCreator": "",
+          "ICC-header:ProfileID": "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+          "ICC_Profile:ProfileDescription": "Display P3 Gamut with sRGB Transfer",
+          "ICC_Profile:RedMatrixColumn": "0.51511 0.24118 -0.00105",
+          "ICC_Profile:GreenMatrixColumn": "0.29196 0.69223 0.04189",
+          "ICC_Profile:BlueMatrixColumn": "0.15715 0.06659 0.78438",
+          "ICC_Profile:MediaWhitePoint": "0.9642 1 0.82491",
+          "ICC_Profile:RedTRC": "(Binary data 40 bytes, use -b option to extract)",
+          "ICC_Profile:GreenTRC": "(Binary data 40 bytes, use -b option to extract)",
+          "ICC_Profile:BlueTRC": "(Binary data 40 bytes, use -b option to extract)",
+          "ICC_Profile:ProfileCopyright": "Google Inc. 2022",
+          "APP2:UniformResourceName": "urn:iso:std:iso:ts:21496:-1",
+          "MPF0:MPFVersion": "0100",
+          "MPF0:NumberOfImages": 2,
+          "MPImage1:MPImageFlags": 0,
+          "MPImage1:MPImageFormat": 0,
+          "MPImage1:MPImageType": 196608,
+          "MPImage1:MPImageLength": 46930,
+          "MPImage1:MPImageStart": 0,
+          "MPImage1:DependentImage1EntryNumber": 0,
+          "MPImage1:DependentImage2EntryNumber": 0,
+          "MPImage2:MPImageFlags": 0,
+          "MPImage2:MPImageFormat": 0,
+          "MPImage2:MPImageType": 0,
+          "MPImage2:MPImageLength": 8407,
+          "MPImage2:MPImageStart": 46930,
+          "MPImage2:DependentImage1EntryNumber": 0,
+          "MPImage2:DependentImage2EntryNumber": 0,
+          "MPImage2:MPImage2": "(Binary data 8407 bytes, use -b option to extract)",
+          "Composite:ImageSize": "384 512",
+          "Composite:Megapixels": 0.196608
+        },
+        "frame_count": 1,
+        "opaque": true,
+        "coded_depth": 8,
+        "private_tags": [],
+        "base": {
+          "depth": 8,
+          "width": 384,
+          "height": 512,
+          "components": 3,
+          "sof": 0
+        },
+        "gain_map_present": true,
+        "map": {
+          "depth": 8,
+          "width": 192,
+          "height": 256,
+          "components": 1,
+          "sof": 0
+        },
+        "iso_identifier": true,
+        "map_private_tags": [],
+        "android_xmp_properties": {},
+        "iso_metadata": {
+          "minimum_version": 0,
+          "writer_version": 0,
+          "use_base_colour_space": true,
+          "backward": false,
+          "base_headroom": 0.0,
+          "alternate_headroom": 5.622376441955566,
+          "channels": [
+            {
+              "minimum": 0.0,
+              "maximum": 5.622376441955566,
+              "gamma": 1.0,
+              "base_offset": 0.0,
+              "alternate_offset": 0.0
+            }
+          ]
+        }
+      },
+      "reference_method": {
+        "revision": "gainmap-hdr-target-gamut-v1",
+        "source_gamut": "p3",
+        "target_gamut": "p3",
+        "geometry": "upscale",
+        "orientation": 1,
+        "clipping_gamut": "p3",
+        "filter": "Existing independent Pillow float32 separable Lanczos and source-window geometry",
+        "clipping": "Clamp negative filtered RGB components to zero in requested output primaries; no highlight clamp",
+        "oracle_source_sha256": "666ffdd8080cdcb5e32cb7a12f32bd77c4e2596defc13396a30adee5e7097371",
+        "legacy_evidence": "Original gainmap.array_geometry measurements and case IDs remain unchanged",
+        "source_rendering_headroom_log2": 6,
+        "source_reference_revision": "gainmap-iso-full-headroom-boost64-v1",
+        "order": "Independently reconstruct source at display boost64, then apply established geometry"
+      },
+      "reference_hdr": {
+        "path": "/proof/work/iso-full-headroom-boost64/independent-source-boost64.rgbf64",
+        "sha256": "50afd592440c056149d6a1a785ea662ce92eeb430ac7eebd5ab3d55cafbcfdf9",
+        "gamut": "p3",
+        "transfer": "linear",
+        "units": "cd/m2",
+        "sample_format": "interleaved little-endian RGB float64",
+        "dimensions": [
+          769,
+          1025
+        ],
+        "display_boost": 64,
+        "purpose": "Independent same-boost matched-geometry source reference; not the boost16 native intent"
+      },
+      "hdr_decoder_evidence": {
+        "native": {
+          "width": 769,
+          "height": 1025,
+          "gamut": "p3",
+          "gamma": 3.199996948,
+          "base_depth": 8,
+          "lcms_version": 2190,
+          "libavif_version": "1.4.1",
+          "libultrahdr_version": "2.0.2",
+          "precision": "actual ICC to float32 linear RGB in its own primaries",
+          "requested_display_boost": 64
+        },
+        "independent": {
+          "gamut": "p3",
+          "icc": {
+            "sha256": "2515f8942127a705efdd516a77a8eac81a84a364a195cbe72de0a7184ef420db",
+            "gammas": [
+              3.1999969482421875,
+              3.1999969482421875,
+              3.1999969482421875
+            ],
+            "rgb_to_xyz_d50": [
+              [
+                0.5151214599609375,
+                0.2919769287109375,
+                0.1571044921875
+              ],
+              [
+                0.2411956787109375,
+                0.6922454833984375,
+                0.0665740966796875
+              ],
+              [
+                -0.0010528564453125,
+                0.0418853759765625,
+                0.7840728759765625
+              ]
+            ],
+            "chromatic_adaptation": [
+              [
+                1.047882080078125,
+                0.022918701171875,
+                -0.0502166748046875
+              ],
+              [
+                0.0295867919921875,
+                0.990478515625,
+                -0.0170745849609375
+              ],
+              [
+                -0.009246826171875,
+                0.01507568359375,
+                0.751678466796875
+              ]
+            ],
+            "rgb_to_xyz_d65": [
+              [
+                0.4865749500245903,
+                0.2656679906656881,
+                0.19821953182161284
+              ],
+              [
+                0.22897958507016605,
+                0.6917419843886891,
+                0.07928928363708614
+              ],
+              [
+                -7.458291064558737e-06,
+                0.04511700137565227,
+                1.0439442820845775
+              ]
+            ],
+            "gamma22_srgb_primaries": false,
+            "gamut": "p3",
+            "creation_date": [
+              2020,
+              1,
+              1,
+              0,
+              0,
+              0
+            ]
+          },
+          "iso_metadata": {
+            "minimum_version": 0,
+            "writer_version": 0,
+            "use_base_colour_space": true,
+            "backward": false,
+            "base_headroom": 0.0,
+            "alternate_headroom": 2.1598544120788574,
+            "channels": [
+              {
+                "minimum": -8.415672302246094,
+                "maximum": 7.162384033203125,
+                "gamma": 1.5,
+                "base_offset": 6.103515625e-05,
+                "alternate_offset": 6.103515625e-05
+              },
+              {
+                "minimum": -8.535255432128906,
+                "maximum": 7.281434535980225,
+                "gamma": 1.5,
+                "base_offset": 6.103515625e-05,
+                "alternate_offset": 6.103515625e-05
+              },
+              {
+                "minimum": -8.41567325592041,
+                "maximum": 7.349785804748535,
+                "gamma": 1.5,
+                "base_offset": 6.103515625e-05,
+                "alternate_offset": 6.103515625e-05
+              }
+            ]
+          },
+          "base": {
+            "depth": 8,
+            "width": 769,
+            "height": 1025,
+            "components": 3,
+            "sof": 0,
+            "color": {
+              "sha256": "2515f8942127a705efdd516a77a8eac81a84a364a195cbe72de0a7184ef420db",
+              "gammas": [
+                3.1999969482421875,
+                3.1999969482421875,
+                3.1999969482421875
+              ],
+              "rgb_to_xyz_d50": [
+                [
+                  0.5151214599609375,
+                  0.2919769287109375,
+                  0.1571044921875
+                ],
+                [
+                  0.2411956787109375,
+                  0.6922454833984375,
+                  0.0665740966796875
+                ],
+                [
+                  -0.0010528564453125,
+                  0.0418853759765625,
+                  0.7840728759765625
+                ]
+              ],
+              "chromatic_adaptation": [
+                [
+                  1.047882080078125,
+                  0.022918701171875,
+                  -0.0502166748046875
+                ],
+                [
+                  0.0295867919921875,
+                  0.990478515625,
+                  -0.0170745849609375
+                ],
+                [
+                  -0.009246826171875,
+                  0.01507568359375,
+                  0.751678466796875
+                ]
+              ],
+              "rgb_to_xyz_d65": [
+                [
+                  0.4865749500245903,
+                  0.2656679906656881,
+                  0.19821953182161284
+                ],
+                [
+                  0.22897958507016605,
+                  0.6917419843886891,
+                  0.07928928363708614
+                ],
+                [
+                  -7.458291064558737e-06,
+                  0.04511700137565227,
+                  1.0439442820845775
+                ]
+              ],
+              "gamma22_srgb_primaries": false,
+              "gamut": "p3",
+              "creation_date": [
+                2020,
+                1,
+                1,
+                0,
+                0,
+                0
+              ],
+              "transfer": "gamma3.2"
+            },
+            "decoder": "FFmpeg native MJPEG decoder",
+            "icc_sha256": "2515f8942127a705efdd516a77a8eac81a84a364a195cbe72de0a7184ef420db",
+            "jpeg_color_transform": null,
+            "jpeg_color_model": "SOF0 RGB component identifiers with verified RGB ICC",
+            "gamut": "p3",
+            "transfer": "gamma3.2",
+            "privacy": true,
+            "metadata": {
+              "ExifTool:ExifToolVersion": 13.55,
+              "File:FileType": "JPEG",
+              "File:FileTypeExtension": "JPG",
+              "File:MIMEType": "image/jpeg",
+              "File:ImageWidth": 769,
+              "File:ImageHeight": 1025,
+              "File:EncodingProcess": 0,
+              "File:BitsPerSample": 8,
+              "File:ColorComponents": 3,
+              "File:YCbCrSubSampling": "1 1",
+              "XMP-x:XMPToolkit": "Adobe XMP Core 5.1.2",
+              "XMP-hdrgm:Version": 1.0,
+              "XMP-GContainer:DirectoryItemSemantic": [
+                "Primary",
+                "GainMap"
+              ],
+              "XMP-GContainer:DirectoryItemMime": [
+                "image/jpeg",
+                "image/jpeg"
+              ],
+              "XMP-GContainer:DirectoryItemLength": 496584,
+              "ICC-header:ProfileCMMType": "lcms",
+              "ICC-header:ProfileVersion": 1088,
+              "ICC-header:ProfileClass": "mntr",
+              "ICC-header:ColorSpaceData": "RGB ",
+              "ICC-header:ProfileConnectionSpace": "XYZ ",
+              "ICC-header:ProfileDateTime": "2020:01:01 00:00:00",
+              "ICC-header:ProfileFileSignature": "acsp",
+              "ICC-header:PrimaryPlatform": "APPL",
+              "ICC-header:CMMFlags": 0,
+              "ICC-header:DeviceManufacturer": "",
+              "ICC-header:DeviceModel": "",
+              "ICC-header:DeviceAttributes": "0 0",
+              "ICC-header:RenderingIntent": 0,
+              "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+              "ICC-header:ProfileCreator": "lcms",
+              "ICC-header:ProfileID": "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+              "ICC_Profile:ProfileDescription": "RGB built-in",
+              "ICC_Profile:ProfileCopyright": "No copyright, use freely",
+              "ICC_Profile:MediaWhitePoint": "0.9642 1 0.82491",
+              "ICC_Profile:ChromaticAdaptation": "1.04788 0.02292 -0.05022 0.02959 0.99048 -0.01707 -0.00925 0.01508 0.75168",
+              "ICC_Profile:RedMatrixColumn": "0.51512 0.2412 -0.00105",
+              "ICC_Profile:BlueMatrixColumn": "0.1571 0.06657 0.78407",
+              "ICC_Profile:GreenMatrixColumn": "0.29198 0.69225 0.04189",
+              "ICC_Profile:RedTRC": "(Binary data 16 bytes, use -b option to extract)",
+              "ICC_Profile:GreenTRC": "(Binary data 16 bytes, use -b option to extract)",
+              "ICC_Profile:BlueTRC": "(Binary data 16 bytes, use -b option to extract)",
+              "ICC-chrm:ChromaticityChannels": 3,
+              "ICC-chrm:ChromaticityColorant": 0,
+              "ICC-chrm:ChromaticityChannel1": "0.67999 0.32001",
+              "ICC-chrm:ChromaticityChannel2": "0.265 0.69",
+              "ICC-chrm:ChromaticityChannel3": "0.14999 0.06",
+              "APP2:UniformResourceName": "urn:iso:std:iso:ts:21496:-1",
+              "MPF0:MPFVersion": "0100",
+              "MPF0:NumberOfImages": 2,
+              "MPImage1:MPImageFlags": 0,
+              "MPImage1:MPImageFormat": 0,
+              "MPImage1:MPImageType": 196608,
+              "MPImage1:MPImageLength": 534678,
+              "MPImage1:MPImageStart": 0,
+              "MPImage1:DependentImage1EntryNumber": 0,
+              "MPImage1:DependentImage2EntryNumber": 0,
+              "MPImage2:MPImageFlags": 0,
+              "MPImage2:MPImageFormat": 0,
+              "MPImage2:MPImageType": 0,
+              "MPImage2:MPImageLength": 496584,
+              "MPImage2:MPImageStart": 534678,
+              "MPImage2:DependentImage1EntryNumber": 0,
+              "MPImage2:DependentImage2EntryNumber": 0,
+              "MPImage2:MPImage2": "(Binary data 496584 bytes, use -b option to extract)",
+              "Google:GainMapImage": "(Binary data 496584 bytes, use -b option to extract)",
+              "Composite:ImageSize": "769 1025",
+              "Composite:Megapixels": 0.788225
+            }
+          },
+          "map": {
+            "depth": 8,
+            "width": 769,
+            "height": 1025,
+            "components": 3,
+            "sof": 0
+          },
+          "display_boost": 64,
+          "gain_map_weight": 1.0,
+          "decoder": "FFmpeg MJPEG plus independent matrix ICC/ISO parsing and gain equations"
+        }
+      },
+      "facts": {
+        "sha256": "37376e5629f11d61debb2664cd2568fd1965d30268e1d0acc76810e01e6826a2",
+        "metadata": {
+          "ExifTool:ExifToolVersion": 13.55,
+          "File:FileType": "JPEG",
+          "File:FileTypeExtension": "JPG",
+          "File:MIMEType": "image/jpeg",
+          "File:ImageWidth": 769,
+          "File:ImageHeight": 1025,
+          "File:EncodingProcess": 0,
+          "File:BitsPerSample": 8,
+          "File:ColorComponents": 3,
+          "File:YCbCrSubSampling": "1 1",
+          "XMP-x:XMPToolkit": "Adobe XMP Core 5.1.2",
+          "XMP-hdrgm:Version": 1.0,
+          "XMP-GContainer:DirectoryItemSemantic": [
+            "Primary",
+            "GainMap"
+          ],
+          "XMP-GContainer:DirectoryItemMime": [
+            "image/jpeg",
+            "image/jpeg"
+          ],
+          "XMP-GContainer:DirectoryItemLength": 496584,
+          "ICC-header:ProfileCMMType": "lcms",
+          "ICC-header:ProfileVersion": 1088,
+          "ICC-header:ProfileClass": "mntr",
+          "ICC-header:ColorSpaceData": "RGB ",
+          "ICC-header:ProfileConnectionSpace": "XYZ ",
+          "ICC-header:ProfileDateTime": "2020:01:01 00:00:00",
+          "ICC-header:ProfileFileSignature": "acsp",
+          "ICC-header:PrimaryPlatform": "APPL",
+          "ICC-header:CMMFlags": 0,
+          "ICC-header:DeviceManufacturer": "",
+          "ICC-header:DeviceModel": "",
+          "ICC-header:DeviceAttributes": "0 0",
+          "ICC-header:RenderingIntent": 0,
+          "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ICC-header:ProfileCreator": "lcms",
+          "ICC-header:ProfileID": "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+          "ICC_Profile:ProfileDescription": "RGB built-in",
+          "ICC_Profile:ProfileCopyright": "No copyright, use freely",
+          "ICC_Profile:MediaWhitePoint": "0.9642 1 0.82491",
+          "ICC_Profile:ChromaticAdaptation": "1.04788 0.02292 -0.05022 0.02959 0.99048 -0.01707 -0.00925 0.01508 0.75168",
+          "ICC_Profile:RedMatrixColumn": "0.51512 0.2412 -0.00105",
+          "ICC_Profile:BlueMatrixColumn": "0.1571 0.06657 0.78407",
+          "ICC_Profile:GreenMatrixColumn": "0.29198 0.69225 0.04189",
+          "ICC_Profile:RedTRC": "(Binary data 16 bytes, use -b option to extract)",
+          "ICC_Profile:GreenTRC": "(Binary data 16 bytes, use -b option to extract)",
+          "ICC_Profile:BlueTRC": "(Binary data 16 bytes, use -b option to extract)",
+          "ICC-chrm:ChromaticityChannels": 3,
+          "ICC-chrm:ChromaticityColorant": 0,
+          "ICC-chrm:ChromaticityChannel1": "0.67999 0.32001",
+          "ICC-chrm:ChromaticityChannel2": "0.265 0.69",
+          "ICC-chrm:ChromaticityChannel3": "0.14999 0.06",
+          "APP2:UniformResourceName": "urn:iso:std:iso:ts:21496:-1",
+          "MPF0:MPFVersion": "0100",
+          "MPF0:NumberOfImages": 2,
+          "MPImage1:MPImageFlags": 0,
+          "MPImage1:MPImageFormat": 0,
+          "MPImage1:MPImageType": 196608,
+          "MPImage1:MPImageLength": 534678,
+          "MPImage1:MPImageStart": 0,
+          "MPImage1:DependentImage1EntryNumber": 0,
+          "MPImage1:DependentImage2EntryNumber": 0,
+          "MPImage2:MPImageFlags": 0,
+          "MPImage2:MPImageFormat": 0,
+          "MPImage2:MPImageType": 0,
+          "MPImage2:MPImageLength": 496584,
+          "MPImage2:MPImageStart": 534678,
+          "MPImage2:DependentImage1EntryNumber": 0,
+          "MPImage2:DependentImage2EntryNumber": 0,
+          "MPImage2:MPImage2": "(Binary data 496584 bytes, use -b option to extract)",
+          "Google:GainMapImage": "(Binary data 496584 bytes, use -b option to extract)",
+          "Composite:ImageSize": "769 1025",
+          "Composite:Megapixels": 0.788225
+        },
+        "frame_count": 1,
+        "opaque": true,
+        "coded_depth": 8,
+        "private_tags": [],
+        "base": {
+          "depth": 8,
+          "width": 769,
+          "height": 1025,
+          "components": 3,
+          "sof": 0
+        },
+        "gain_map_present": true,
+        "map": {
+          "depth": 8,
+          "width": 769,
+          "height": 1025,
+          "components": 3,
+          "sof": 0
+        },
+        "iso_identifier": true,
+        "map_private_tags": [],
+        "android_xmp_properties": {
+          "XMP-hdrgm:Version": 1.0,
+          "XMP-hdrgm:HDRCapacityMin": 0,
+          "XMP-hdrgm:HDRCapacityMax": 2.15985,
+          "XMP-hdrgm:BaseRenditionIsHDR": false,
+          "XMP-hdrgm:GainMapMin": [
+            -8.41567,
+            -8.53526,
+            -8.41567
+          ],
+          "XMP-hdrgm:GainMapMax": [
+            7.16238,
+            7.28143,
+            7.34979
+          ],
+          "XMP-hdrgm:Gamma": [
+            1.5,
+            1.5,
+            1.5
+          ],
+          "XMP-hdrgm:OffsetSDR": [
+            6.10352e-05,
+            6.10352e-05,
+            6.10352e-05
+          ],
+          "XMP-hdrgm:OffsetHDR": [
+            6.10352e-05,
+            6.10352e-05,
+            6.10352e-05
+          ]
+        },
+        "iso_metadata": {
+          "minimum_version": 0,
+          "writer_version": 0,
+          "use_base_colour_space": true,
+          "backward": false,
+          "base_headroom": 0.0,
+          "alternate_headroom": 2.1598544120788574,
+          "channels": [
+            {
+              "minimum": -8.415672302246094,
+              "maximum": 7.162384033203125,
+              "gamma": 1.5,
+              "base_offset": 6.103515625e-05,
+              "alternate_offset": 6.103515625e-05
+            },
+            {
+              "minimum": -8.535255432128906,
+              "maximum": 7.281434535980225,
+              "gamma": 1.5,
+              "base_offset": 6.103515625e-05,
+              "alternate_offset": 6.103515625e-05
+            },
+            {
+              "minimum": -8.41567325592041,
+              "maximum": 7.349785804748535,
+              "gamma": 1.5,
+              "base_offset": 6.103515625e-05,
+              "alternate_offset": 6.103515625e-05
+            }
+          ]
+        }
+      },
+      "gain_map_metadata_agreement": {
+        "checks": {
+          "xmp_channel_values": true,
+          "native_channel_values": true,
+          "headroom": true,
+          "native_dimensions": true,
+          "forward_sdr_base": true
+        },
+        "precision": {
+          "xmp_relative": 5.1e-06,
+          "native_float_relative": 1e-06,
+          "absolute": 1e-12,
+          "basis": "Pinned native XMP six significant decimal digits, native probe nine digits and float boost exponentiation; only metadata serialization tolerance."
+        }
+      },
+      "native_metadata_probe": {
+        "variant": "precise",
+        "version": "2.0.2",
+        "width": 769,
+        "height": 1025,
+        "map_width": 769,
+        "map_height": 1025,
+        "use_base_cg": true,
+        "hdr_capacity_min": 1,
+        "hdr_capacity_max": 4.46869755,
+        "maximum_boost": [
+          143.249283,
+          155.571564,
+          163.119537
+        ],
+        "minimum_boost": [
+          0.00292839878,
+          0.00269545498,
+          0.00292839669
+        ],
+        "gamma": [
+          1.5,
+          1.5,
+          1.5
+        ],
+        "sdr_offset": [
+          6.10351562e-05,
+          6.10351562e-05,
+          6.10351562e-05
+        ],
+        "hdr_offset": [
+          6.10351562e-05,
+          6.10351562e-05,
+          6.10351562e-05
+        ]
+      }
+    }
+  ],
+  "attribution_diagnostics": {
+    "scope": "Read-only attribution only; these hypothetical pixels cannot qualify the actual file",
+    "base_linearization_model": "Actual parsed ICC TRCs evaluated in float64 in the profile own-primary coordinates. Native LCMS duplicates the same actual ICC and replaces only destination TRCs with gamma1, retaining its colorants, white point and adaptation matrix. This models that coordinate boundary without a second matrix conversion; it is not bit-exact LCMS readback and does not eliminate every color-interpretation or floating-point difference.",
+    "actual_weight": 1,
+    "measurements": {
+      "pre_jpeg_map_actual_weight": {
+        "passed": false,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "gainmap-hdr",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
+        "regions": {
+          "shadow": {
+            "samples": 417338,
+            "delta_e_itp": {
+              "mean": 0.9649456594614628,
+              "p95": 1.8079093334633187,
+              "maximum": 129.38971452516336
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.049326930312063,
+              "p95": 0.15983973255637177,
+              "maximum": 5.715229786389932
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0030636070168516744,
+              "p95": 0.008942886274178344,
+              "maximum": 11.668334719982331
+            },
+            "reference_mean_nits": 3.837869831309767,
+            "actual_mean_nits": 3.7977301499709344
+          },
+          "midtone": {
+            "samples": 285692,
+            "delta_e_itp": {
+              "mean": 7.838463847041641,
+              "p95": 21.58814569513214,
+              "maximum": 34.48651667599246
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 10.634141596122493,
+              "p95": 45.96195001469644,
+              "maximum": 74.01006659166399
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.09813502900409633,
+              "p95": 0.2511065687799994,
+              "maximum": 0.37479698770968667
+            },
+            "reference_mean_nits": 73.10452678861367,
+            "actual_mean_nits": 62.471696733589454
+          },
+          "highlight": {
+            "samples": 85195,
+            "delta_e_itp": {
+              "mean": 25.058790809345563,
+              "p95": 36.80432155896872,
+              "maximum": 51.188176486477374
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 105.03775411055491,
+              "p95": 295.37998267319426,
+              "maximum": 788.4478424566803
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.27803911998422376,
+              "p95": 0.37593221300890106,
+              "maximum": 0.47914974692745105
+            },
+            "reference_mean_nits": 352.3555178415507,
+            "actual_mean_nits": 247.31776373099575
+          }
+        },
+        "failures": [
+          "shadow.delta_e_max",
+          "midtone.delta_e_mean",
+          "midtone.delta_e_p95",
+          "midtone.delta_e_max",
+          "midtone.luminance_relative_p95",
+          "highlight.delta_e_mean",
+          "highlight.delta_e_p95",
+          "highlight.delta_e_max",
+          "highlight.luminance_relative_p95"
+        ],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      },
+      "ideal_gain_actual_weight": {
+        "passed": false,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "gainmap-hdr",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
+        "regions": {
+          "shadow": {
+            "samples": 417338,
+            "delta_e_itp": {
+              "mean": 0.5799134619906522,
+              "p95": 1.347632858019338,
+              "maximum": 130.04338353383235
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0546149583953755,
+              "p95": 0.13632272319542899,
+              "maximum": 5.699917361835714
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0027671838606369652,
+              "p95": 0.005761349341993801,
+              "maximum": 11.882910155847057
+            },
+            "reference_mean_nits": 3.837869831309767,
+            "actual_mean_nits": 3.785353148357157
+          },
+          "midtone": {
+            "samples": 285692,
+            "delta_e_itp": {
+              "mean": 7.736417604272085,
+              "p95": 21.62939744381127,
+              "maximum": 34.05589820293996
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 10.635984036847047,
+              "p95": 46.18751245298746,
+              "maximum": 73.26816236495775
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0981813431619189,
+              "p95": 0.25188684120662286,
+              "maximum": 0.3753547108669125
+            },
+            "reference_mean_nits": 73.10452678861367,
+            "actual_mean_nits": 62.4698306295924
+          },
+          "highlight": {
+            "samples": 85195,
+            "delta_e_itp": {
+              "mean": 25.037209818647913,
+              "p95": 36.83863710572697,
+              "maximum": 50.57469791240682
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 105.04906574103106,
+              "p95": 296.08830820593056,
+              "maximum": 787.4463386485
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.2780701022241098,
+              "p95": 0.3763399957183274,
+              "maximum": 0.4747831665074662
+            },
+            "reference_mean_nits": 352.3555178415507,
+            "actual_mean_nits": 247.30645210051955
+          }
+        },
+        "failures": [
+          "shadow.delta_e_max",
+          "midtone.delta_e_mean",
+          "midtone.delta_e_p95",
+          "midtone.delta_e_max",
+          "midtone.luminance_relative_p95",
+          "highlight.delta_e_mean",
+          "highlight.delta_e_p95",
+          "highlight.delta_e_max",
+          "highlight.luminance_relative_p95"
+        ],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    },
+    "worst_pixels": {
+      "pre_jpeg_map_actual_weight": {
+        "xy": [
+          242,
+          640
+        ],
+        "delta_e_itp": 129.38971452516336,
+        "reference_nits": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "actual_nits": [
+          1.9307053390532931,
+          1.1922873059775907,
+          0.0
+        ],
+        "compressed_base_nits": [
+          3.3930938421523202,
+          2.818438746028083,
+          2.0874920411071076
+        ],
+        "native_intent_at_display_boost16_nits": [
+          1.9561654167037517,
+          1.2148794168864732,
+          0.0
+        ]
+      },
+      "ideal_gain_actual_weight": {
+        "xy": [
+          242,
+          640
+        ],
+        "delta_e_itp": 130.04338353383235,
+        "reference_nits": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "actual_nits": [
+          1.9561654167037517,
+          1.2148794168864732,
+          0.0
+        ],
+        "compressed_base_nits": [
+          3.3930938421523202,
+          2.818438746028083,
+          2.0874920411071076
+        ],
+        "native_intent_at_display_boost16_nits": [
+          1.9561654167037517,
+          1.2148794168864732,
+          0.0
+        ]
+      }
+    },
+    "weight_scope": "Full source and output capacity at boost64; no hypothetical normalized-weight comparison above the converter boost16 endpoint"
+  },
+  "threshold_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+  "unchanged_output_rendering_diagnostics": {
+    "scope": "Read-only comparison; native boost16 intent is not the boost64 source reference",
+    "native_output_identical_to_boost16": true,
+    "reference_peak_channel_nits": 1729.3712158203125,
+    "output_peak_channel_nits": 918.9497241973877
+  },
+  "commands": [
+    {
+      "argv": [
+        "node",
+        "-e",
+        "\nconst sharp = require('sharp');\nconst fs = require('node:fs');\n(async () => {\n  const job = JSON.parse(fs.readFileSync(0, 'utf8'));\n  const metadata = await sharp(job.input).metadata();\n  if (metadata.hasAlpha) throw new Error('Authored JPEG base must be opaque');\n  const pipeline = sharp(job.input).keepIccProfile();\n  const image = await pipeline.removeAlpha().raw().toBuffer({ resolveWithObject: true });\n  fs.writeFileSync(job.output, image.data);\n  process.stdout.write(JSON.stringify(image.info));\n})().catch((error) => { console.error(error); process.exitCode = 1; });\n"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        "384x512",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/authored-sdr-source.rgb",
+        "-filter_complex",
+        "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
+        "-filter_complex_threads",
+        "1",
+        "-map",
+        "[out]",
+        "-frames:v",
+        "1",
+        "-map_metadata",
+        "-1",
+        "-threads",
+        "1",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/authored-sdr-horizontal.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/authored-sdr-horizontal.png",
+        "-filter_complex",
+        "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
+        "-filter_complex_threads",
+        "1",
+        "-map",
+        "[out]",
+        "-frames:v",
+        "1",
+        "-map_metadata",
+        "-1",
+        "-threads",
+        "1",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/authored-sdr.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "png",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/authored-sdr.png",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "hdr-proof-lossless-jpeg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/base-lossless-input.raw",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/base.jpg",
+        "769",
+        "1025",
+        "3",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/base-lossless.icc"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "node",
+        "-e",
+        "\nconst sharp = require('sharp');\nconst fs = require('node:fs');\n(async () => {\n  const job = JSON.parse(fs.readFileSync(0, 'utf8'));\n  const metadata = await sharp(job.input).metadata();\n  if (metadata.hasAlpha) throw new Error('Authored JPEG base must be opaque');\n  const pipeline = sharp(job.input).keepIccProfile();\n  const image = await pipeline.removeAlpha().raw().toBuffer({ resolveWithObject: true });\n  fs.writeFileSync(job.output, image.data);\n  process.stdout.write(JSON.stringify(image.info));\n})().catch((error) => { console.error(error); process.exitCode = 1; });\n"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        "384x512",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/base-native-source.rgb",
+        "-filter_complex",
+        "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=1152:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=384:512:384:512[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=1152:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=384:512:384:512[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
+        "-filter_complex_threads",
+        "1",
+        "-map",
+        "[out]",
+        "-frames:v",
+        "1",
+        "-map_metadata",
+        "-1",
+        "-threads",
+        "1",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/base-native-horizontal.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/base-native-horizontal.png",
+        "-filter_complex",
+        "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=1152:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=384:512:384:512[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=1152:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=384:512:384:512[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
+        "-filter_complex_threads",
+        "1",
+        "-map",
+        "[out]",
+        "-frames:v",
+        "1",
+        "-map_metadata",
+        "-1",
+        "-threads",
+        "1",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/base-native.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "png",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/base-native.png",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "hdr-proof-lossless-jpeg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/base-lossless-lossless-input.raw",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/base-lossless.jpg",
+        "384",
+        "512",
+        "3",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/base-lossless-lossless.icc"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "png",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-full.png",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "hdr-proof-lossless-jpeg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-lossless-lossless-input.raw",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-source/map-lossless.jpg",
+        "384",
+        "512",
+        "3",
+        "-"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "png",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/map.png",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "hdr-proof-lossless-jpeg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/map-lossless-input.raw",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/map.jpg",
+        "769",
+        "1025",
+        "3",
+        "-"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "node",
+        "-e",
+        "\nconst sharp = require('sharp');\nconst fs = require('node:fs');\n(async () => {\n  const job = JSON.parse(fs.readFileSync(0, 'utf8'));\n  const metadata = await sharp(job.input).metadata();\n  if (metadata.hasAlpha) throw new Error('Authored JPEG base must be opaque');\n  const pipeline = sharp(job.input).keepIccProfile();\n  const image = await pipeline.removeAlpha().raw().toBuffer({ resolveWithObject: true });\n  fs.writeFileSync(job.output, image.data);\n  process.stdout.write(JSON.stringify(image.info));\n})().catch((error) => { console.error(error); process.exitCode = 1; });\n"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "-s",
+        "384x512",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/gamma32-base-authored-source.rgb",
+        "-filter_complex",
+        "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
+        "-filter_complex_threads",
+        "1",
+        "-map",
+        "[out]",
+        "-frames:v",
+        "1",
+        "-map_metadata",
+        "-1",
+        "-threads",
+        "1",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/gamma32-base-authored-horizontal.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/gamma32-base-authored-horizontal.png",
+        "-filter_complex",
+        "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
+        "-filter_complex_threads",
+        "1",
+        "-map",
+        "[out]",
+        "-frames:v",
+        "1",
+        "-map_metadata",
+        "-1",
+        "-threads",
+        "1",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/gamma32-base-authored.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/gamma32-base-authored.png",
+        "-vf",
+        "format=gbrp,zscale=rangein=full:range=full,format=gbrp16le,format=rgb48le,lutrgb=r='maxval*pow(if(lte((val/maxval),0.04045),(val/maxval)/12.92,pow(((val/maxval)+0.055)/1.055,2.4)),1/3.2)':g='maxval*pow(if(lte((val/maxval),0.04045),(val/maxval)/12.92,pow(((val/maxval)+0.055)/1.055,2.4)),1/3.2)':b='maxval*pow(if(lte((val/maxval),0.04045),(val/maxval)/12.92,pow(((val/maxval)+0.055)/1.055,2.4)),1/3.2)',format=gbrp16le,zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24",
+        "-frames:v",
+        "1",
+        "-map_metadata",
+        "-1",
+        "-threads",
+        "1",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/gamma32-base-gamma32.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/proof/icc-gainmap/midpointoffset-gamma15/hdr-proof-icc-gainmap",
+        "compute",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/gamma32-base.jpg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-intent-pq.png",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output-icc-parts/combined.avif"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "avifgainmaputil",
+        "extractgainmap",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output-icc-parts/combined.avif",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output-icc-parts/map.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/local/bin/hdr-proof-dct-jpeg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output-icc-parts/map-dct-input.raw",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output-icc-parts/map.jpg",
+        "769",
+        "1025",
+        "3",
+        "-"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/proof/icc-gainmap/midpointoffset-gamma15/hdr-proof-icc-gainmap",
+        "pack-gamma15-midpoint",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output-icc-parts/combined.avif",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/gamma32-base.jpg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output-icc-parts/map.jpg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "hdr-proof-png-decode",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-intent-pq.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "mjpeg",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "exiftool",
+        "-json",
+        "-n",
+        "-G1",
+        "-s",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/proof/icc-gainmap/hdr-proof-icc-gainmap",
+        "decode",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/native.rgbf32",
+        "16"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "mjpeg",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "exiftool",
+        "-json",
+        "-n",
+        "-G1",
+        "-s",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "mjpeg",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/inspection/map.jpg",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/proof/ultrahdr/precise/hdr-proof-uhdr",
+        "probe",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/proof/icc-gainmap/hdr-proof-icc-gainmap",
+        "jpeg-samples",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/diagnostic-native-base.rgb8"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/proof/icc-gainmap/hdr-proof-icc-gainmap",
+        "jpeg-samples",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/inspection/map.jpg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/diagnostic-native-map.rgb8"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/inspection/map.jpg",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/proof/ultrahdr/precise/hdr-proof-uhdr",
+        "decode-linear",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/stock-native.gbrpf32",
+        "16"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/opt/proof/icc-gainmap/hdr-proof-icc-gainmap",
+        "decode",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg",
+        "/proof/work/iso-full-headroom-boost64/native-boost64.rgbf32",
+        "64"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "mjpeg",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "exiftool",
+        "-json",
+        "-n",
+        "-G1",
+        "-s",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/output.jpg"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-c:v",
+        "mjpeg",
+        "-i",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/inspection/map.jpg",
+        "-frames:v",
+        "1",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgb24",
+        "pipe:1"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "hdr-proof-png-decode",
+        "/proof/work/iso-full-headroom-boost64/converter-endpoint/preparation-parts/hdr-intent-pq.png"
+      ],
+      "exit_code": 0,
+      "stderr": ""
+    }
+  ],
+  "source_hashes": {
+    "icc_gainmap.py": "49d164bc0b86d39e0beb7093ebf96b5f34a7f48031841c81d0e2b8a2c22eb887",
+    "native_icc_gainmap.cpp": "d3e5e1ea2736c1fc0a18af49fb974b723a7fdddce570c03111ecb6669083daee",
+    "icc-gainmap-build.sh": "666a7565586c4c472ba36aff1e680837272d53d5a96467cd0c0e26383ef55ed6",
+    "libavif-icc-linear-base.patch": "5b2129a0377d2b60ef4274c8995ca69f88ee325327df98ed3cd9a370f8c16f44",
+    "libavif-gamma2-gain.patch": "f6b46b336722f3f0a967249144555458efec18b3c96f8ed71c359a091cb31948",
+    "libavif-midpoint-offset-gain.patch": "6339d3d2e255586b414780314c9dfe20baa3ad6f79eded515f8dbb28c554eb39",
+    "libavif-gamma15-gain.patch": "e4745a3f89297084dbb5d6293a5b0cf4f990040e3843b8d3e78c4e1a4a36dd87",
+    "dct_jpeg.py": "ea02386e252da6c7528726dc5671cf923ed648abde051ade4a2f21c447e06ec6",
+    "native_dct_jpeg.c": "36c3952c3148b567e8a317c5c1748390f2b673fc39189c501dbbb481d1cc02cd",
+    "gainmap_combine.py": "342bb28f03e113c5bb7b30c093ff4e3f19c0c72a819cfdcec72d00c9455b36d1",
+    "gainmap_hdr.py": "6272dccd3993a22c95b7ad087b14b670da1d1f928f094a4987fd98883dd46d2c",
+    "iso_intermediate_headroom.py": "60af4ce1bac2d6ceee4a098ebdfe959b4373c3f0d469e7c079f9bc6b7fd97482",
+    "gainmap_iso.py": "0d578029a968efed05247d34139a510d9f86d5c8d8b9d21b14fe3fb0085cd89d",
+    "gainmap_reference.py": "666ffdd8080cdcb5e32cb7a12f32bd77c4e2596defc13396a30adee5e7097371",
+    "appearance.py": "a0be551e0e7c27b9fb786c63d1fa72113c5f66415360ce3ae854c72aeb3809e8"
+  },
+  "native_hashes": "67f73413d7168a0cf7fa94ff3eb0d795fb75668b07d02e6ff583110166ca0f38  lcms2.h\nc66dc532ad8d7e060c97bc6bdf99604c230a68af2610881ddfadfd5fe3af2605  /usr/lib/liblcms2.so.2\n87271958fae0e789c95d3012f93f471445d8b76b7020ace901332bdc8a5e3580  /opt/proof/icc-gainmap/hdr-proof-icc-gainmap\ncac3c31fe9c7c4aef5471ae4be1af5155305012c41597aeb104a9954bc274cc3  /opt/proof/icc-gainmap/smalloffset/hdr-proof-icc-gainmap\n050515bf12797b782468c8c792004623519acc2d956e59d4a39467f6f4d489ed  /opt/proof/icc-gainmap/smalloffset-gamma2/hdr-proof-icc-gainmap\n4a90cb44391d3c60c2f2c96cb439d6eb6e7e9530d39c035d94747da37cfc5872  /opt/proof/icc-gainmap/midpointoffset-gamma2/hdr-proof-icc-gainmap\n7f3a8c640174a40bfc1a72075b9cba0e7f08ac0820f6129d4f037f3500e12efc  /opt/proof/icc-gainmap/midpointoffset-gamma15/hdr-proof-icc-gainmap\n",
+  "native_source_hashes": "67f73413d7168a0cf7fa94ff3eb0d795fb75668b07d02e6ff583110166ca0f38  lcms2.h\nd4aea31a4becb3273ba7968221be2e48148ba05eb8a68d14e671963e17785648  avif.tar.gz\n5a7b6347a4a32c6936b81392cd6394250649380202f86c8214042aa645cc385c  uhdr.tar.gz\n987c359cf47598f6b65dd9af6d198f9ed308c4cd190fe753a24fa171fbe244c7  pr484-code.patch\neef6a88d8cb0d161399bd7014bf9210fc77eab34010c72ba2ea35a912d0d992a  pr484-tests.patch\nd21eb75d6aead59b0f148c59475507ce27519cc794773619083d054c1b2403b3  pr491.patch\n4d7c364b56c95dde7225275fe50c12f9e39fbe97f4686080e8a9cc1983878fec  /opt/proof/libavif-full-range-gain.patch\ne4745a3f89297084dbb5d6293a5b0cf4f990040e3843b8d3e78c4e1a4a36dd87  /opt/proof/libavif-gamma15-gain.patch\nf6b46b336722f3f0a967249144555458efec18b3c96f8ed71c359a091cb31948  /opt/proof/libavif-gamma2-gain.patch\nacfda7ed7e3e9f4db747801d9cc99f8fc9ba767f45ec9f682618c804fcd5adaf  /opt/proof/libavif-identity-gain.patch\n6339d3d2e255586b414780314c9dfe20baa3ad6f79eded515f8dbb28c554eb39  /opt/proof/libavif-midpoint-offset-gain.patch\ndfbbe115d1fcfcae756b61bc5a1f023cd9cd1381c92dd59db345d398b29d86ea  /opt/proof/libavif-moderate-offset-gain.patch\n3ac99d201fb1ed56b2c73921702fe81c865e3b8fea2e3bc1c2089710dce16d93  /opt/proof/libavif-small-offset-gain.patch\n5b2129a0377d2b60ef4274c8995ca69f88ee325327df98ed3cd9a370f8c16f44  /opt/proof/libavif-icc-linear-base.patch\n69e67c71da69eeb74160d40b2b163c8d3050fecdfdcbe9d8744511581cd23f9f  /opt/proof/libultrahdr-precise-transfer.patch\n891f48831f53de60d78ec05133020bea6b29f102d3f9a02467c9bb3e6c5104a4  /opt/proof/libultrahdr-rgb-jpeg.patch\n1fa1ab115b8d27dd9fd409554db38adc280637f854b1339aa578fe7c25705383  /opt/proof/libultrahdr-xmp-arrays.patch\n"
+}

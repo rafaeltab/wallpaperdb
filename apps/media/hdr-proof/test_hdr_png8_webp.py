@@ -8,10 +8,63 @@ import unittest
 
 import avif
 import hdr_png8
+import hdr_png8_geometry
 import hdr_png8_webp
 
 
 class PngEightBitWebpTests(unittest.TestCase):
+    def test_geometry_candidates_preserve_all_sixteen_containment_results(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = hdr_png8_webp.run(root/'baseline', nearest_quantization=True)
+            expanded = hdr_png8_webp.run(root/'expanded', nearest_quantization=True,
+                geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
+            self.assertEqual(len(expanded['evidence']), 80)
+            self.assertEqual(expanded['fixtures'], [])
+            self.assertEqual(len(expanded['source_fixtures']), 16)
+            originals = {item['case_id']: item for item in baseline['evidence']}
+            sizes = {'contain': (57, 38), 'cover': (40, 40), 'fill': (40, 48),
+                     'upscale': (120, 80), 'orientation': (58, 87)}
+            for item in expanded['evidence']:
+                with self.subTest(case=item['case_id']):
+                    if item['case_id'] in originals:
+                        previous = originals[item['case_id']]
+                        self.assertEqual(item['artifacts']['sha256'], previous['artifacts']['sha256'])
+                        self.assertEqual(item['status'], previous['status'])
+                        self.assertEqual(item['measurements']['frames'], previous['measurements']['frames'])
+                    self.assertEqual((item['facts']['width'], item['facts']['height']), sizes[item['geometry']])
+                    self.assertTrue(all(item['checks'].values()), item['blockers'])
+                    self.assertEqual(item['measurements']['frames'][0]['fixture_class'], 'sdr-8')
+                    self.assertEqual(item['facts']['alpha_measurement']['absolute_error_limit'], 2 / 255)
+                    self.assertEqual(item['source_facts']['depth'], 8)
+                    self.assertEqual(item['facts']['depth'], 8)
+                    self.assertEqual(item['facts']['lossless_storage']['mismatched_rgba_samples'], 0)
+                    if item['case_id'].endswith(':nearest8'):
+                        self.assertEqual(item['quantization_measurement']['mismatched_nearest_codes'], 0)
+                        self.assertTrue(item['quantization_measurement']['passed'])
+                    if item['geometry'] == 'orientation':
+                        self.assertTrue(item['orientation_bake']['passed'])
+                        self.assertTrue(item['orientation_bake']['exact_rotated_samples'])
+                        self.assertEqual(item['source_facts']['orientation'], 8)
+                    self.assertEqual(item['consumer_status'], 'pending manual review')
+            self.assertEqual(Counter(item['status'] for item in expanded['evidence']), {'qualified': 80})
+
+    def test_changed_orientation_hash_stops_before_webp_converters(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            spec = next(hdr_png8.fixture_specs())
+            lock = json.loads(hdr_png8_geometry.ORIENTATION_LOCK.read_text())
+            lock['sha256'][spec['id'] + '-orientation-8'] = '0' * 64
+            changed = root/'changed-orientation-lock.json'
+            changed.write_text(json.dumps(lock))
+            start = len(avif.COMMANDS)
+            with self.assertRaisesRegex(ValueError, 'orientation source hash/qualification mismatch'):
+                hdr_png8_webp.run(root/'proof', specs=[spec], geometries=('orientation',),
+                                  orientation_lock=changed, nearest_quantization=True)
+            self.assertFalse(any(command['argv'][0] == 'node' or '-filter_complex' in command['argv']
+                                 for command in avif.COMMANDS[start:]))
+            self.assertFalse(list((root/'proof').rglob('output.*')))
+
     def test_nearest_candidates_keep_legacy_bytes_and_measurements(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

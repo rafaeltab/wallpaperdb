@@ -10,6 +10,37 @@ from gainmap_avif_gif import SELECTORS, inspect_and_decode, run
 
 
 class GainmapAvifGifTests(unittest.TestCase):
+    def test_gamma32_native_palette_keeps_reference_and_proves_actual_icc_transfer(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            result = run(Path(temporary), palette='libimagequant-gamma32')
+            case = result['evidence'][0]
+            for gate in ('native_encoder', 'native_transfer', 'independent_decoder', 'structure', 'privacy'):
+                self.assertTrue(case['checks'][gate], case['blockers'])
+            self.assertEqual(case['facts']['transfer'], 'gamma3.2')
+            self.assertEqual(case['reference_sdr']['sha256'],
+                             'b58ac4171554daab4ab1736bc37eb041681927999a46369b8b7117e4c0683731')
+            self.assertEqual(case['status'] == 'qualified', all(case['checks'].values()))
+            self.assertEqual(case['status'], 'tested and failed')
+            self.assertEqual(case['artifacts']['sha256'],
+                             'c0104036053dcfdde091082acd702901ca6f8f0f505a8bc87fad8ef179d3b4dc')
+            self.assertEqual(case['palette_lower_bound']['pixels_above_fixed_maximum'], 794)
+            self.assertAlmostEqual(case['measurements']['sdr']['regions']['shadow']['delta_e_itp']['maximum'],
+                                   46.784424724305694, places=8)
+            self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertIn('gamma3.2', case['qualification_scope'])
+            self.assertTrue(case['known_consumer_limitations'])
+            self.assertTrue(all(control['passed'] for control in result['controls']))
+            self.assertTrue(all(control['case_id'].endswith('-libimagequant-gamma32') for control in result['controls']))
+            output = Path(case['artifacts']['output'])
+            with self.assertRaises(ValueError):
+                inspect_and_decode(output)
+            from gamma_icc import make_profile
+            profile = Path(temporary)/'wrong-gamma.icc'
+            profile.write_bytes(make_profile(gamma=2.2))
+            avif.native(['exiftool', '-overwrite_original', f'-ICC_Profile<={profile}', output])
+            with self.assertRaises(ValueError):
+                inspect_and_decode(output, gamma32=True)
+
     def test_separate_native_quantizer_retains_the_same_authored_reference(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = run(Path(temporary), palette='libimagequant')

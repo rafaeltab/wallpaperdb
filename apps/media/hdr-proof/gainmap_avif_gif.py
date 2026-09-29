@@ -15,8 +15,9 @@ from PIL import Image, ImageCms, features
 import avif
 import gainmap_avif
 import gainmap_avif_png
-from appearance import THRESHOLDS, compare_appearance, linear_rgb_to_itp, sdr_signal_to_nits
+from appearance import RGB_TO_XYZ, THRESHOLDS, compare_appearance, linear_rgb_to_itp, sdr_signal_to_nits
 from gainmap_iso import srgb_profile_facts
+from gamma_icc import make_profile, profile_facts
 
 SELECTORS = {**gainmap_avif_png.SELECTORS, 'format': 'gif'}
 POLICY = {**gainmap_avif_png.POLICY,
@@ -109,11 +110,19 @@ def _structure(data):
             'durations_ms': delays or [None], 'loop': None, 'opaque': True}, profiles[0]
 
 
-def inspect_and_decode(path):
+def _linear_codes(codes, color, *, gamma32=False):
+    if not gamma32:
+        return sdr_signal_to_nits(codes/255), 'srgb'
+    xyz = (100*(codes/255)**np.asarray(color['gammas'])) @ np.asarray(color['rgb_to_xyz_d65']).T
+    return xyz @ np.linalg.inv(RGB_TO_XYZ['rec2020']).T, 'rec2020'
+
+
+def inspect_and_decode(path, *, gamma32=False):
     path = Path(path)
     facts, profile = _structure(path.read_bytes())
-    color = srgb_profile_facts(profile)
-    if color['gamut'] != 'srgb':
+    color = profile_facts(profile) if gamma32 else srgb_profile_facts(profile)
+    if (color['gamut'] != 'srgb' or gamma32 and
+            not np.allclose(color['gammas'], [3.2]*3, atol=1/65536, rtol=0)):
         raise ValueError('GIF requires actual sRGB ICC color facts')
     extracted = avif.native(['exiftool', '-b', '-ICC_Profile', path])
     if extracted != profile:
@@ -130,13 +139,23 @@ def inspect_and_decode(path):
     if not np.array_equal(codes, native) or not np.all(codes[..., 3] == 255):
         raise ValueError('Independent GIF pixels or opacity disagree')
     facts.update({'format': 'gif', 'depth': 8, 'depth_basis': 'RGB palette entries have eight-bit channels',
-        'gamut': 'srgb', 'transfer': 'srgb', 'icc': color, 'icc_sha256': hashlib.sha256(profile).hexdigest(),
+        'gamut': 'srgb', 'transfer': 'gamma3.2' if gamma32 else 'srgb',
+        'icc': color, 'icc_sha256': hashlib.sha256(profile).hexdigest(),
         'orientation': 1, 'privacy': True, 'decoder': 'Pillow GIF and native FFmpeg GIF with exact RGBA agreement',
         'rgb8_sha256': hashlib.sha256(codes[..., :3].tobytes()).hexdigest()})
-    return facts, codes, sdr_signal_to_nits(codes[..., :3]/255)
+    linear, _ = _linear_codes(codes[..., :3], color, gamma32=gamma32)
+    return facts, codes, linear
 
 
 def _encode(source, output, palette):
+    gamma32 = palette == 'libimagequant-gamma32'
+    transfer = None
+    if gamma32:
+        from gainmap_avif_jpeg import _gamma32_input
+        encoded = output.with_name('gamma32-coding.png')
+        transfer = _gamma32_input(source, encoded)
+        transfer['scope'] = 'Coding samples only; incidental PNG color tags do not define the final GIF. Its actual gamma ICC does'
+        source = encoded
     filters = ('[0:v]format=rgb24,split[image][palette];'
                '[palette]palettegen=max_colors=256:reserve_transparent=0[pal];'
                '[image][pal]paletteuse=dither=sierra2_4a')
@@ -156,24 +175,29 @@ def _encode(source, output, palette):
                                    if line.startswith('libimagequant-')),
             'native_version_api': features.version_feature('libimagequant'),
             'adapter_source': 'https://raw.githubusercontent.com/python-pillow/Pillow/12.2.0/src/libImaging/QuantPngQuant.c',
-            'native_quantizer_convention': 'Pillow native adapter uses input/output gamma0.45455 and dithering level1. Actual emitted sRGB interpretation is measured independently.',
+            'native_quantizer_convention': 'Pillow native adapter uses input/output gamma0.45455 and dithering level1. Actual emitted '+('gamma3.2 ICC' if gamma32 else 'sRGB')+' interpretation is measured independently.',
             'native_library_hashes': {str(path): avif.digest(path) for path in sorted(Path('/usr/lib').glob('libimagequant.so.*'))}}
-    profile = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
+    profile = bytearray(make_profile(gamma=3.2, gamut='srgb') if gamma32 else
+                        ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
     profile[24:36] = struct.pack('>6H', 2020, 1, 1, 0, 0, 0)
     profile[84:100] = bytes(16)
     icc = output.with_suffix('.icc')
     icc.write_bytes(profile)
     avif.native(['exiftool', '-overwrite_original', f'-ICC_Profile<={icc}', output])
-    return {'encoder': encoder, **options,
+    return {'encoder': encoder, **options, **({'transfer_stage': transfer} if gamma32 else {}),
             'input': str(source), 'input_sha256': avif.digest(source),
             'icc_sha256': hashlib.sha256(profile).hexdigest(), 'output_sha256': avif.digest(output)}
 
 
-def _palette_bound(output, reference, reference_path):
+def _palette_bound(output, reference, reference_path, *, gamma32=False):
     """Read-only lower bound; no candidate encoder uses these reference pixels."""
     with Image.open(output) as image:
-        palette = np.asarray(image.getpalette(), dtype=float).reshape(-1, 3)/255
-    colors = linear_rgb_to_itp(sdr_signal_to_nits(palette), 'srgb')
+        palette = np.asarray(image.getpalette(), dtype=float).reshape(-1, 3)
+    # Pillow supplies palette samples; the bounded GIF application-block
+    # parser supplies the actual ICC bytes even when Pillow omits that info.
+    color = profile_facts(_structure(Path(output).read_bytes())[1]) if gamma32 else None
+    linear, gamut = _linear_codes(palette, color, gamma32=gamma32)
+    colors = linear_rgb_to_itp(linear, gamut)
     pixels = linear_rgb_to_itp(reference, 'srgb').reshape(-1, 3)
     minimum = np.concatenate([720*np.linalg.norm(
         pixels[start:start+512, None, :]-colors[None, :, :], axis=-1).min(axis=1)
@@ -188,17 +212,26 @@ def _palette_bound(output, reference, reference_path):
 
 
 def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, palette='ffmpeg-sierra24'):
-    if palette not in ('ffmpeg-sierra24', 'libimagequant'):
-        raise ValueError('Only the two separately declared native palette candidates are supported')
+    if palette not in ('ffmpeg-sierra24', 'libimagequant', 'libimagequant-gamma32'):
+        raise ValueError('Only the three separately declared native palette candidates are supported')
+    gamma32 = palette == 'libimagequant-gamma32'
     validate_selectors(SELECTORS if selectors is None else selectors)
     root = Path(directory)
     start = len(avif.COMMANDS)
     prepared = gainmap_avif_png.run(root/'native-png', source_lock=source_lock)
     original = prepared['evidence'][0]
     suffix = 'srgb256-sierra24' if palette == 'ffmpeg-sierra24' else 'srgb256-libimagequant'
+    if gamma32:
+        suffix = 'gamma32-256-libimagequant'
     policy = POLICY if palette == 'ffmpeg-sierra24' else {**POLICY,
         'output': 'Native libimagequant256 palette and Pillow GIF writer; actual standard sRGB ICC',
         'palette_policy': 'Declared before measurement: the retained FFmpeg palette cannot meet the maximum gate for900pixels. Test one different native palette optimizer with unchanged source, reference and thresholds.'}
+    if gamma32:
+        policy = {**POLICY, 'output': 'Native libimagequant256 palette and Pillow GIF writer; actual gamma3.2 ICC with sRGB primaries',
+            'palette_policy': 'Declared before measurement: both standard-sRGB palettes exceed photographic shadow limits. '
+                'Test the existing native gamma3.2 coding transfer, which allocates more RGB8 codes to shadows, '
+                'with the same libimagequant adapter and dithering. The optimizer still assumes gamma0.45455; '
+                'actual ICC interpretation, the unchanged authored reference and fixed gates determine qualification.'}
     case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:sdr:gif:preserve:preserve:contain:authored-{suffix}',
         'cell_id': 'avif-gainmap:sdr:gif', 'fixture_id': gainmap_avif.FIXTURE_ID,
         'candidate': f'native-authored-base-gif-{suffix}', 'selectors': dict(SELECTORS), 'geometry': 'contain',
@@ -209,6 +242,11 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, pale
         'checks': {key: False for key in ('native_encoder', 'native_preparation', 'independent_source_decoder',
             'independent_decoder', 'structure', 'native_palette', 'appearance', 'privacy')},
         'measurements': {}, 'artifacts': {}, 'blockers': [], 'native_preparation': original}
+    if gamma32:
+        case['checks']['native_transfer'] = False
+        case['qualification_scope'] += '; actual gamma3.2 matrix ICC interpretation is required'
+        case['known_consumer_limitations'] = ['Consumers must interpret the actual gamma3.2 ICC profile. '
+            'Browser, native viewer and OS wallpaper interpretation remain pending manual review.']
     try:
         case['checks']['native_preparation'] = (original['status'] == 'qualified'
             and all(original['checks'].values()) and not original['blockers'])
@@ -221,19 +259,22 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, pale
         _, native_pixels = gainmap_avif_png.inspect_and_decode(source)
         case['native_candidate'] = _encode(source, output, palette)
         case['checks']['native_encoder'] = True
+        if gamma32:
+            case['checks']['native_transfer'] = case['native_candidate']['transfer_stage']['passed']
         case['artifacts'] = {'output': str(output), 'sha256': avif.digest(output)}
-        facts, _, linear = inspect_and_decode(output)
+        facts, _, linear = inspect_and_decode(output, gamma32=gamma32)
+        actual_gamut = 'rec2020' if gamma32 else 'srgb'
         palette_measure = compare_appearance(sdr_signal_to_nits(native_pixels[..., :3]), linear,
-            reference_gamut='srgb', actual_gamut='srgb', fixture_class='gainmap-sdr')
+            reference_gamut='srgb', actual_gamut=actual_gamut, fixture_class='gainmap-sdr')
         reference = original['reference_sdr']
         reference_path = Path(reference['path'])
         if avif.digest(reference_path) != reference['sha256']:
             raise ValueError('Independent authored SDR reference changed')
         with Image.open(reference_path) as image:
             expected = sdr_signal_to_nits(np.asarray(image).astype(float)/255)
-        measured = compare_appearance(expected, linear, reference_gamut='srgb', actual_gamut='srgb',
+        measured = compare_appearance(expected, linear, reference_gamut='srgb', actual_gamut=actual_gamut,
                                      fixture_class='gainmap-sdr')
-        case['palette_lower_bound'] = _palette_bound(output, expected, reference_path)
+        case['palette_lower_bound'] = _palette_bound(output, expected, reference_path, gamma32=gamma32)
         case['checks'].update({'independent_decoder': True, 'native_palette': palette_measure['passed'],
             'structure': (facts['width'], facts['height'], facts['depth'], facts['orientation'], facts['frames'])
                 == (expected.shape[1], expected.shape[0], 8, 1, 1) and facts['opaque']
@@ -262,5 +303,5 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, pale
             'controls': controls, 'commands': avif.COMMANDS[start:], 'scope': policy,
             'source_hashes': {name: avif.digest(Path(__file__).with_name(name)) for name in
                 ('gainmap_avif_gif.py', 'gainmap_avif_png.py', 'gainmap_avif.py', 'gainmap_iso.py',
-                 'appearance.py', 'thresholds.json')},
+                 'gainmap_avif_jpeg.py', 'gamma_icc.py', 'appearance.py', 'thresholds.json')},
             'consumer_status': 'pending manual review'}

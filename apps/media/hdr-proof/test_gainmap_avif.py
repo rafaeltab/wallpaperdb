@@ -10,6 +10,43 @@ import gainmap_avif_proof
 
 
 class GainMapAvifTests(unittest.TestCase):
+    def test_extra_sdr_geometries_retain_exact_containment_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = gainmap_avif_proof.run(root/'baseline')
+            expanded = gainmap_avif_proof.run(root/'expanded', geometries=('contain', 'cover', 'fill', 'upscale'))
+            self.assertEqual(len(expanded['evidence']), 4)
+            self.assertEqual(len(expanded['source_fixtures']), 1)
+            self.assertEqual(expanded['source_fixtures'][0]['sha256'], baseline['source_fixtures'][0]['sha256'])
+            original = baseline['evidence'][0]
+            sizes = {'contain': (173, 130), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 576)}
+            for case in expanded['evidence']:
+                with self.subTest(geometry=case['geometry']):
+                    self.assertEqual(case['status'], 'qualified', case['blockers'])
+                    self.assertTrue(all(case['checks'].values()))
+                    self.assertEqual((case['facts']['width'], case['facts']['height']), sizes[case['geometry']])
+                    self.assertEqual(case['measurements']['sdr']['fixture_class'], 'gainmap-sdr')
+                    self.assertEqual(case['consumer_status'], 'pending manual review')
+                    self.assertEqual(case['source_facts']['orientation'], 1)
+                    if case['geometry'] == 'contain':
+                        self.assertEqual(case['artifacts']['sha256'], 'd324dfdcaf20d7e985793f1b8f69cbeb26bbbb8a12fd84d820b150d20dceb81e')
+                        self.assertEqual(case['artifacts']['sha256'], original['artifacts']['sha256'])
+                        self.assertEqual(case['measurements'], original['measurements'])
+                        self.assertEqual(case['selectors'], original['selectors'])
+                        self.assertEqual(case['case_id'], original['case_id'])
+            self.assertEqual(expanded['hdr_status'], 'untested')
+            self.assertEqual([(control['case_id'], control['status']) for control in expanded['controls']],
+                             [(control['case_id'], control['status']) for control in baseline['controls']])
+
+    def test_unknown_and_orientation_geometries_stop_before_native_conversion(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for operations in ((), ('contain', 'contain'), ('orientation',), ('crop',), ('arbitrary',)):
+                with self.subTest(geometries=operations):
+                    start = len(avif.COMMANDS)
+                    with self.assertRaisesRegex(ValueError, 'geometries'):
+                        gainmap_avif_proof.run(Path(temporary), geometries=operations)
+                    self.assertEqual(len(avif.COMMANDS), start)
+
     def test_locked_native_source_and_authored_containment(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = gainmap_avif_proof.run(Path(temporary))

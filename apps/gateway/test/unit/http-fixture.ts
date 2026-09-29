@@ -26,7 +26,7 @@ export const httpConfig: HttpConfig = {
   graphqlMaxAliases: 20,
   graphqlMaxBatchSize: 10,
   graphqlIntrospectionEnabled: true,
-  rateLimitMaxAnonymous: 100,
+  quotaCapacity: 1000000,
 };
 export class EmptyCatalogue implements Catalogue {
   searchProfiles() {
@@ -81,7 +81,7 @@ export function httpTestLayer(
       ? Layer.succeed(Admission, ports.admission)
       : admissionLayer({
           enabled: true,
-          limit: config.rateLimitMaxAnonymous,
+          limit: config.quotaCapacity,
           windowMs: 60000,
         }).pipe(Layer.provide(memoryQuotaLayer)),
     ports.availability

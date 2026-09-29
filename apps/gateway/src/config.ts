@@ -126,15 +126,27 @@ export const gatewayConfig = Effect.gen(function* () {
     graphqlMaxBatchSize: positive('GRAPHQL_MAX_BATCH_SIZE', 10),
     graphqlIntrospectionEnabled: boolean('GRAPHQL_INTROSPECTION_ENABLED', nodeEnv !== 'production'),
     rateLimitEnabled: boolean('RATE_LIMIT_ENABLED', true),
-    rateLimitMaxAnonymous: positive('RATE_LIMIT_MAX_ANONYMOUS', 100),
-    rateLimitWindowMs: positive('RATE_LIMIT_WINDOW_MS', 60000),
+    quotaCapacity: positive('QUOTA_CAPACITY', 1000000),
+    quotaRefillMs: positive('QUOTA_REFILL_MS', 60000),
     cursorSecret: Configuration.schema(
       Schema.Redacted(Schema.String.check(Schema.isMinLength(32))),
       'CURSOR_SECRET'
     ),
     cursorExpirationMs: positive('CURSOR_EXPIRATION_MS', 7 * 24 * 60 * 60 * 1000),
   });
-}).pipe(Effect.mapError(configurationError));
+}).pipe(
+  Effect.mapError(configurationError),
+  Effect.flatMap((config) =>
+    config.quotaCapacity < Math.max(config.graphqlMaxComplexity, 100)
+      ? Effect.fail(
+          new GatewayConfigurationError({
+            message: 'Invalid gateway configuration',
+            fields: ['QUOTA_CAPACITY'],
+          })
+        )
+      : Effect.succeed(config)
+  )
+);
 
 export type Config = Effect.Success<typeof gatewayConfig>;
 

@@ -12,6 +12,10 @@ import type {
   SelectionSetNode,
 } from 'graphql';
 import {
+  parse,
+  validate,
+  specifiedRules,
+  NoSchemaIntrospectionCustomRule,
   getArgumentValues,
   getDirectiveValues,
   getNamedType,
@@ -258,4 +262,32 @@ export function inspectQuery(
   const inspection = new QueryInspection(schema, fragments, resolved.coerced, limits);
   inspection.inspect([operation.selectionSet], root);
   return { complexity: inspection.complexity, error: inspection.error };
+}
+
+/** Inspect every request before reserving quota, including cached invalid documents. */
+export function inspectOperation(
+  schema: GraphQLSchema,
+  source: string,
+  variables: unknown,
+  limits: QueryLimits,
+  introspectionEnabled: boolean,
+  operationName?: string
+): { complexity: number; error?: GraphQLError } {
+  let document: DocumentNode;
+  try {
+    document = parse(source);
+  } catch (error) {
+    if (!(error instanceof GraphQLError)) throw error;
+    return { complexity: 0, error: Object.assign(error, { statusCode: 400 }) };
+  }
+  const errors = validate(
+    schema,
+    document,
+    introspectionEnabled ? specifiedRules : [...specifiedRules, NoSchemaIntrospectionCustomRule]
+  );
+  if (errors[0]) return { complexity: 0, error: Object.assign(errors[0], { statusCode: 400 }) };
+  const variableRecord = Schema.is(Schema.Record(Schema.String, Schema.Unknown));
+  if (variables !== undefined && variables !== null && !variableRecord(variables))
+    return { complexity: 0, error: new GraphQLError('Invalid query variables') };
+  return inspectQuery(schema, document, variables ?? {}, limits, operationName);
 }

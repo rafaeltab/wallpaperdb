@@ -86,6 +86,11 @@ intent. The intent is encoder input, not an independent source reference.
 Keep its documented-model label separate from earlier legacy-model files.
 Their stock-reader failures and untested intermediate adaptation remain visible;
 Mac, iPad, Windows and Galaxy observations are still pending.
+The corrected old Apple PQ12 P3 AVIF containment is a separate fixed-luminance
+full-effect file. Its authored SDR companion is a comparison image; the AVIF
+has no embedded SDR base or adaptive gain map. Record the viewer's tone mapping
+and apparent brightness separately from the passing file comparison. Its PQ16
+companion is inspected encoder intent, not an independent reference.
 The gain-map JPEG endpoint comparisons use display boost 16. Check the separate
 ISO upscale boost-2 rendering record before selecting a download; its measured
 adaptation failure cannot be overridden by a successful endpoint or a physical

@@ -127,7 +127,10 @@ describe('HTTP request lifecycle', () => {
     );
   });
 
-  it('holds a disconnected request slot until its cancellation finalizer settles', async () => {
+  it.each([
+    'disconnect',
+    'timeout',
+  ])('holds a %s request slot until its cancellation finalizer settles', async (cause) => {
     const cleanup = Deferred.makeUnsafe<void>();
     let entered = false;
     let cancelling = false;
@@ -144,13 +147,22 @@ describe('HTTP request lifecycle', () => {
         )
       );
     });
-    const { address } = await serve(controlledCatalogue(read), 1000, { graphqlMaxActive: 1 });
+    const { address } = await serve(controlledCatalogue(read), 1000, {
+      graphqlMaxActive: 1,
+      graphqlDeadlineMs: cause === 'timeout' ? 50 : 5000,
+    });
     const abort = new AbortController();
     const pending = query(address, abort.signal).catch((error: unknown) => error);
     try {
       await expect.poll(() => entered).toBe(true);
-      abort.abort();
-      expect(await pending).toBeInstanceOf(Error);
+      if (cause === 'disconnect') {
+        abort.abort();
+        expect(await pending).toBeInstanceOf(Error);
+      } else {
+        const response = await pending;
+        expect(response).toBeInstanceOf(Response);
+        if (response instanceof Response) expect(response.status).toBe(503);
+      }
       await expect.poll(() => cancelling).toBe(true);
       expect((await query(address)).status).toBe(503);
       expect(calls).toBe(1);
@@ -158,6 +170,33 @@ describe('HTTP request lifecycle', () => {
       await Effect.runPromise(Deferred.succeed(cleanup, undefined));
     }
     await expect.poll(async () => (await query(address)).status).toBe(200);
+  });
+
+  it('limits each replica independently and keeps other HTTP routes available', async () => {
+    const release = Deferred.makeUnsafe<void>();
+    let entered = false;
+    const first = await serve(
+      controlledCatalogue(
+        Effect.sync(() => {
+          entered = true;
+        }).pipe(Effect.andThen(Deferred.await(release)), Effect.as(profile))
+      ),
+      1000,
+      { graphqlMaxActive: 1 }
+    );
+    const second = await serve(controlledCatalogue(Effect.succeed(profile)), 1000, {
+      graphqlMaxActive: 1,
+    });
+    const pending = query(first.address);
+    try {
+      await expect.poll(() => entered).toBe(true);
+      expect((await query(first.address)).status).toBe(503);
+      expect((await query(second.address)).status).toBe(200);
+      expect((await fetch(`${first.address}/health`)).status).toBe(200);
+    } finally {
+      await Effect.runPromise(Deferred.succeed(release, undefined));
+      await pending;
+    }
   });
 
   it('finishes a whole GraphQL response during shutdown grace, including later nested resolvers', async () => {

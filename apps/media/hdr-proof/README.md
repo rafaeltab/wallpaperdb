@@ -448,6 +448,15 @@ Uncompressed-map diagnostics retain those errors. The fixed references contain
 809 pixels with an exact channel-order violation for an equal-offset monotonic
 gain curve. This identifies a representation constraint, not proof that no
 approximate file can meet the regional limits.
+The [unresized format conversion](gainmap_avif_identity_jpeg.py) retains the
+original base raster, native sampled map and checked source gain metadata.
+One actual RGB8 HDR JPEG passes authored SDR and both HDR readers at boosts 2,
+source-full and 16. The independent HDR maximum across those renderings is
+4.666031, and the SDR maximum is 3.962015, under the unchanged regional gates.
+Actual ICC interpretation remains necessary. This optional identity conversion
+does not qualify resize, crop, orientation or other display headrooms. Its
+candidate and matched SDR reference are included for pending physical review;
+all failed resized experiments remain separate.
 The [authored SDR GIF containment](gainmap_avif_gif.py) remains failed. Its real
 256-color native palette passes structure, ICC, opacity and independent decoding
 but exceeds the unchanged shadow and midtone appearance gates. A read-only

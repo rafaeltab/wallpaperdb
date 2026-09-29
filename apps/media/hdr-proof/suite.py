@@ -140,7 +140,7 @@ def candidate_files(evidence, fixtures):
         or (case.get('fixture_id') in gainmap.NAMES and case.get('geometry') == 'contain')
         or case.get('candidate') == 'native-combine-moderateoffset-mozjpeg-base-dct-float-map'
         or case.get('candidate', '').startswith('native-combine-icc-gamma32-')
-        or case.get('proof_module') == 'iso_geometry_headroom'
+        or case.get('proof_module') in ('iso_geometry_headroom', 'gainmap_avif_identity_jpeg')
         or (case.get('fixture_id', '').startswith('apng-') and case.get('geometry') in ('contain', 'orientation'))]
     for case in selected:
         artifacts = case.get('artifacts')
@@ -485,6 +485,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- The locked gain-map AVIF source has separately qualified standard-sRGB RGB8 JPEG containment, crop and stretch. Its standard-sRGB upscale remains failed at shadow maximum 25.49485 in both native-input and full-reference comparisons. A separate gamma-3.2 ICC upscale passes the same gates with shadow maximum 3.83562. Exhaustive native transfer checks preserve the authored SDR reference and primaries; regional mean errors increase but stay within their unchanged limits. Actual ICC semantics, RGB components and Adobe transform establish color; raw decoder defaults remain diagnostics. Native JPEG coding error and full authored-reference error must both pass unchanged photographic gates. No separate JPEG aspect declaration is invented, and physical compatibility remains pending.',
               '- The gain-map AVIF source has separately qualified HDR JPEG containment, crop, stretch and upscale through ICC-aware readers at display boost 16. Native authored SDR and corrected PQ16 HDR preparations supply encoder pixels; direct dav1d source samples and parsed tmap metadata supply the independent reference. Actual RGB8 SOF0 layers, ISO/XMP/native agreement, privacy and both endpoint appearances pass unchanged gates. Independent HDR maximum across these geometries is 6.10543; original containment bytes and measurements remain exact. These endpoint measurements retain stock-reader limitations; separate intermediate rendering and physical consumer checks remain necessary.',
               '- A separate gain-map AVIF-to-HDR-JPEG containment proof renders that exact file at display boost 2. Both readers agree but fail the unchanged appearance gates, with independent shadow maximum 75.26896. Capacity-normalized and uncompressed-map diagnostics retain shadow errors. The original authored SDR geometry remains fixed; replacing it with linear-light geometry would fail its existing reference. This measured adaptation failure does not create an additional required product path or change the passing boost-16 endpoint.',
+              '- An optional unresized gain-map AVIF-to-HDR-JPEG conversion retains the original raster and checked source gain metadata. One actual RGB8 file passes authored SDR and both HDR readers at boosts 2, source-full and 16. Independent HDR maximum is 4.666031 across those renderings; SDR maximum is 3.962015. Actual ICC interpretation remains necessary. Candidate/reference pairs are prepared for physical review. This identity result does not qualify resizing, crop, orientation or unmeasured headrooms; the failed resized candidates remain unchanged.',
               '- A separate native AVIF-to-HDR-JPEG trial retains original source gain metadata while resizing its map and authored base separately. It restores matching source/output weights and preserves the SDR measurement exactly, but fails HDR appearance at boost 2, source-full headroom and boost 16. Independent shadow maxima are 146.7847 at boost 2 and 171.395 at full headroom. Read-only reference diagnostics identify exact nonmonotonic channel samples that an equal-offset gain curve cannot reproduce exactly; they do not prove that every approximate encoding must fail the regional limits.',
               '- Authored SDR WebP containment, crop, stretch and upscale from the locked gain-map AVIF uses the same verified native source/geometry preparation. Actual lossless RGB8 WebP and native sRGB ICC semantics are independently inspected. FFmpeg and libwebp must recover every native input sample exactly; the independent authored SDR reference and unchanged photographic limits still determine appearance qualification. HDR and physical consumer interpretation are separate.',
               '- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.',
@@ -621,6 +622,9 @@ def main():
     from gainmap_avif_separate_map import run as run_gainmap_avif_separate_map
     gainmap_avif_separate_map_result = run_gainmap_avif_separate_map(WORK/'gainmap-avif-separate-map')
     write_json(WORK/'gainmap-avif-separate-map-evidence.json', gainmap_avif_separate_map_result)
+    from gainmap_avif_identity_jpeg import run as run_gainmap_avif_identity_jpeg
+    gainmap_avif_identity_jpeg_result = run_gainmap_avif_identity_jpeg(WORK/'gainmap-avif-identity-jpeg')
+    write_json(WORK/'gainmap-avif-identity-jpeg-evidence.json', gainmap_avif_identity_jpeg_result)
     from gainmap_avif_gif import run as run_gainmap_avif_gif
     gainmap_avif_gif_result = run_gainmap_avif_gif(WORK/'gainmap-avif-gif')
     write_json(WORK/'gainmap-avif-gif-evidence.json', gainmap_avif_gif_result)
@@ -716,6 +720,7 @@ def main():
     controls['controls'].extend(gainmap_avif_hdr_jpeg_result['controls'])
     controls['controls'].extend(gainmap_avif_hdr_jpeg_headroom_result['controls'])
     controls['controls'].extend(gainmap_avif_separate_map_result['controls'])
+    controls['controls'].extend(gainmap_avif_identity_jpeg_result['controls'])
     controls['controls'].extend(gainmap_avif_gif_result['controls'])
     controls['controls'].extend(gainmap_avif_gif_liq['controls'])
     controls['controls'].extend(gainmap_avif_gif_gamma32['controls'])
@@ -727,6 +732,7 @@ def main():
     evidence += gainmap_avif_hdr_jpeg_result['evidence']
     evidence += gainmap_avif_hdr_jpeg_headroom_result['evidence']
     evidence += gainmap_avif_separate_map_result['evidence']
+    evidence += gainmap_avif_identity_jpeg_result['evidence']
     evidence += gainmap_avif_gif_result['evidence']
     evidence += gainmap_avif_gif_liq['evidence']
     evidence += gainmap_avif_gif_gamma32['evidence']

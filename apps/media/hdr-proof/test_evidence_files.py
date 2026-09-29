@@ -10,6 +10,33 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_keeps_identity_conversion_and_each_rendering_scope(self):
+        # Bookkeeping only; these bytes cannot qualify a conversion.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            output, reference = root/'identity.jpg', root/'reference.png'
+            output.write_bytes(b'output-copy-test-only')
+            reference.write_bytes(b'reference-copy-test-only')
+            cases = [{'case_id': f'identity-{label}', 'fixture_id': 'avif-gainmap-from-android-xmp',
+                      'geometry': 'identity', 'proof_module': 'gainmap_avif_identity_jpeg',
+                      'status': 'qualified', 'qualification_scope': f'No resize, rendering {label}',
+                      'known_consumer_limitations': ['Physical review pending'],
+                      'consumer_decoder_diagnostics': {'stock': {'status': 'tested and failed'}},
+                      'artifacts': {'output': str(output), 'sha256': suite.avif.digest(output)},
+                      'reference_sdr': {'path': str(reference), 'sha256': suite.avif.digest(reference)}}
+                     for label in ('boost2', 'source-full', 'boost16')]
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files(cases, [])
+            self.assertEqual(len(files), 6)
+            for case in cases:
+                candidate = next(entry for entry in files if entry['case_id'] == case['case_id'])
+                self.assertEqual(candidate['qualification_scope'], case['qualification_scope'])
+                self.assertEqual(candidate['known_consumer_limitations'], case['known_consumer_limitations'])
+                self.assertEqual(candidate['consumer_decoder_diagnostics'], case['consumer_decoder_diagnostics'])
+                self.assertEqual(candidate['sha256'], suite.avif.digest(output))
+                self.assertEqual(candidate['consumer_status'], 'pending manual review')
+
     def test_manual_bundle_keeps_each_iso_geometry_rendering_scope(self):
         # Bookkeeping only; these bytes cannot qualify a conversion.
         with tempfile.TemporaryDirectory() as temporary:

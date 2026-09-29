@@ -10,6 +10,31 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_reconstruction_profiles_extend_only_the_exact_source_record(self):
+        fixture = {'id': 'source', 'sha256': 'a'*64, 'facts': {'hdr_reconstruction': 'untested'}}
+        profiles = [{'candidate': 'original', 'status': 'tested and failed'},
+                    {'candidate': 'separate-native', 'status': 'qualified'}]
+        reconstructed = {**fixture, 'source_reconstruction_profiles': profiles}
+        enriched = suite.merge_reconstruction_profiles([fixture], [reconstructed])
+        self.assertEqual(len(enriched), 1)
+        self.assertEqual(enriched[0]['source_reconstruction_profiles'], profiles)
+        self.assertEqual(enriched[0]['facts'], fixture['facts'])
+        self.assertNotIn('source_reconstruction_profiles', fixture)
+        self.assertIn('named reconstruction profiles', enriched[0]['valid_scope'])
+
+    def test_reconstruction_profiles_reject_unknown_or_different_source_bytes(self):
+        fixture = {'id': 'source', 'sha256': 'a'*64}
+        for changed in ({'id': 'unknown', 'sha256': 'a'*64}, {'id': 'source', 'sha256': 'b'*64},
+                        {'id': 'source', 'sha256': None}):
+            with self.subTest(source=changed):
+                with self.assertRaisesRegex(ValueError, 'source identity'):
+                    suite.merge_reconstruction_profiles([fixture], [{**changed, 'source_reconstruction_profiles': []}])
+        reconstructed = {**fixture, 'source_reconstruction_profiles': []}
+        for fixtures, records in (([fixture, fixture], [reconstructed]),
+                                  ([fixture], [reconstructed, reconstructed])):
+            with self.assertRaisesRegex(ValueError, 'source identity'):
+                suite.merge_reconstruction_profiles(fixtures, records)
+
     def test_manual_bundle_keeps_all_gainmap_avif_geometry_pairs(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -166,6 +166,22 @@ def candidate_files(evidence, fixtures):
     return entries
 
 
+def merge_reconstruction_profiles(fixtures, source_records):
+    known = {fixture['id']: fixture for fixture in fixtures}
+    records = {record['id']: record for record in source_records}
+    if len(known) != len(fixtures) or len(records) != len(source_records):
+        raise ValueError('Ambiguous reconstruction source identity')
+    for identity, record in records.items():
+        digest = record.get('sha256')
+        if (identity not in known or not isinstance(digest, str)
+                or re.fullmatch('[0-9a-f]{64}', digest) is None or digest != known[identity].get('sha256')):
+            raise ValueError('Reconstruction source identity or inspected bytes differ')
+    return [{**fixture,
+             'source_reconstruction_profiles': records[fixture['id']]['source_reconstruction_profiles'],
+             'valid_scope': 'Established authored SDR base; HDR appearance is limited to the named reconstruction profiles, with output and consumer qualification separate'}
+            if fixture['id'] in records else fixture for fixture in fixtures]
+
+
 def fixture_lock(fixtures, update):
     generated = {f['id']:f['sha256'] for f in fixtures if f.get('spec') or f.get('generator')}
     path = ROOT/'fixtures/generated-sha256.json'
@@ -444,9 +460,10 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain, cover, fill, upscale and independently checked EXIF-8 orientation derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. Four orientation sources have distinct hashes and every native rotation matches the independently decoded frames exactly. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Native SOURCE rectangles are independently reconstructed by exact RGBA replacement; out-of-bounds rectangles, partial default images, OVER blending and disposal remain rejected. Static extraction checks the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF at each tested geometry. JPEG opacity and GIF binary alpha require explicit coercion; preserve-alpha requests are rejected. The two original gamma-2.2 PQ static GIF orientation cases exceed the fixed shadow color-error ceiling and remain unqualified. The newer gamma-3.2 cases retain separate measurements and qualification. Unlisted APNG geometries remain untested.',
               '- Additional PNG8-to-HDR PNG16 and AVIF12 cases use the stricter existing avif-12 output gates across contain, cover, fill, upscale and real EXIF-8 orientation. Source quantization is measured separately. Native rotation must match the independently decoded original samples before geometry changes; alpha must remain within two codes at the actual output depth.',
               '- Separate PNG8-to-SDR WebP candidates cover containment, crop, stretch, upscale and real EXIF-8 orientation with both original and nearest-code quantization. They use the unchanged tone/gamut grade and gamma-2.2 ICC coding. The static VP8L reader checks dimensions, alpha signaling, metadata and chunk structure. Independent native FFmpeg decoding must match Pillow/libwebp and the actual encoder-input codes exactly. Nearest-code candidates must also match independently rounded input samples within half a code. Those exact storage checks do not replace appearance, tone or alpha thresholds.',
-              '- One separately locked gain-map AVIF source has authored-SDR AVIF containment, crop, stretch and upscale candidates. Independent BMFF/tmap parsing, actual AV1 packet depth/signaling, dav1d samples and AOM candidate decoding establish the source base. Native metadata text repeats channel-zero gain values; the independently parsed per-channel fractions remain authoritative. Unknown color, depth, orientation or metadata withholds transformation and preserves exact originals. Nonidentity orientation remains original-only. This does not qualify source HDR reconstruction or any HDR derivative.',
+              '- One separately locked gain-map AVIF source has authored-SDR AVIF containment, crop, stretch and upscale candidates. Independent BMFF/tmap parsing, actual AV1 packet depth/signaling, dav1d samples and AOM candidate decoding establish the source base. Native metadata text repeats channel-zero gain values; the independently parsed per-channel fractions remain authoritative. Unknown color, depth, orientation or metadata withholds transformation and preserves exact originals. Nonidentity orientation remains original-only. The SDR result does not establish HDR qualification.',
               '- Additional authored-SDR PNG8 containment, crop, stretch and upscale candidates use the same gain-map AVIF base and unchanged photographic SDR reference. Their native sRGB/cHRM/gAMA signaling and square-pixel pHYs are independently parsed and cross-checked with ExifTool. Native libpng must recover every actual encoder-input RGB8 sample exactly. Appearance and privacy remain separate gates; source import error receives no additional allowance.',
-              '- Unlisted PNG/APNG cross-products, HDR WebP and other unexecuted accepted-source requests remain untested. Gain-map AVIF HDR candidates retain their independent reconstruction and geometry blockers. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
+              '- Gain-map AVIF HDR containment has two distinct native candidates against the same predeclared bilinear-map renderer convention. Original libavif source, linear-geometry and emitted-output failures remain recorded. The separate native antialiased-map and float32 gain candidate must pass all three unchanged appearance gates and independent single-layer PQ AVIF12 signaling, depth, opacity, square-pixel and privacy checks. Each input normalization is retained during PQ encoding. Its renderer convention is not claimed as a uniquely mandated ISO filter or as physical interoperability. Named source-reconstruction profiles are bound to the canonical fixture hash without changing the original SDR inspection facts.',
+              '- Unlisted PNG/APNG cross-products, HDR WebP and other unexecuted accepted-source requests remain untested. Gain-map-preserving AVIF output and untested gain-map AVIF selectors remain unqualified. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
               '- These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.',
               '- The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.',
               '- Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.', '',
@@ -528,6 +545,9 @@ def main():
     gainmap_avif_png_result = run_gainmap_avif_png(WORK/'gainmap-avif-authored-png',
         geometries=('contain', 'cover', 'fill', 'upscale'))
     write_json(WORK/'gainmap-avif-png-evidence.json', gainmap_avif_png_result)
+    from gainmap_avif_hdr import run as run_gainmap_avif_hdr
+    gainmap_avif_hdr_result = run_gainmap_avif_hdr(WORK/'gainmap-avif-hdr-containment')
+    write_json(WORK/'gainmap-avif-hdr-evidence.json', gainmap_avif_hdr_result)
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))
@@ -558,12 +578,14 @@ def main():
     controls['controls'].extend(png8_result['controls'])
     controls['controls'].extend(gainmap_avif_result['controls'])
     controls['controls'].extend(gainmap_avif_png_result['controls'])
+    controls['controls'].extend(gainmap_avif_hdr_result['controls'])
     controls['controls'].extend(apng_result['controls'])
-    evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + png8_precision_result['evidence'] + png8_webp_result['evidence'] + gainmap_avif_result['evidence'] + gainmap_avif_png_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
+    evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + png8_geometry_result['evidence'] + png8_precision_result['evidence'] + png8_webp_result['evidence'] + gainmap_avif_result['evidence'] + gainmap_avif_png_result['evidence'] + gainmap_avif_hdr_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
     locked_fixtures = avif_result['fixtures'] + png_result['fixtures'] + apng_result['fixtures'] + controls.get('fixtures',[])
     # PNG8 validates its separate source lock before any conversion. Preserve
     # the original generated corpus lock, including its PNG16 hashes.
     generated_fixtures = locked_fixtures + png8_result['fixtures'] + png8_geometry_result['fixtures'] + gainmap_avif_result['source_fixtures']
+    generated_fixtures = merge_reconstruction_profiles(generated_fixtures, gainmap_avif_hdr_result['source_fixtures'])
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
     errors = matrix['evidence_errors'] + fixture_lock(locked_fixtures,args.update_fixture_lock)

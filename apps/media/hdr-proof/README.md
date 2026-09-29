@@ -257,14 +257,22 @@ encoding, independent dav1d samples and unchanged photographic appearance gates.
 Containment, crop, stretch and upscale retain separate measurements. Cover uses
 the native fractional-window filter and an independently cropped SDR reference.
 Unknown required facts preserve exact originals and withhold transformation.
-Nonidentity orientation, HDR reconstruction and gain-map AVIF HDR derivatives
-remain unqualified.
+Nonidentity orientation and untested selector tuples remain unqualified.
 The separate [SDR PNG8 candidates](gainmap_avif_png.py) retain the same authored
 base and photographic limits for containment, crop, stretch and upscale.
 Their actual native PNGs use standard sRGB/cHRM/gAMA signaling and explicitly square pixels. Independent
 libpng decoding must preserve the native encoder-input samples exactly;
 ExifTool and a strict chunk reader verify color, depth, geometry and privacy.
 Exact storage does not replace its regional appearance checks.
+The separate [HDR AVIF12 proof](gainmap_avif_hdr.py) retains the original native
+sampling failures and tests native antialiased map resampling with float32 gain
+application. Both candidates use the same independently reconstructed source
+and unchanged photographic HDR gates. Source reconstruction, linear geometry
+and the emitted single-layer PQ12 AVIF must pass separately. PQ encoding honors
+each native input's actual luminance normalization. The map-sampling convention
+is fixed for this proof; it is not claimed as ISO's uniquely mandated filter.
+Named reconstruction profiles remain bound to the source hash. Gain-map-preserving
+output and physical consumer interoperability remain unqualified.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

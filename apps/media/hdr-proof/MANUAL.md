@@ -62,8 +62,13 @@ The separately inspected SDR PNG8 files cover the same four geometries with
 standard PNG sRGB signaling and square pixels. Compare their authored SDR
 references separately from the AVIF renditions in each browser, viewer and
 wallpaper setter.
-Its native HDR reconstruction remains unqualified; the SDR result does not
-establish HDR support for that source or container.
+The separately named HDR candidates emit single-layer PQ AVIF12. The original
+native-map-sampling candidate remains failed; the antialiased-map candidate has
+its own source, geometry and output measurements against the declared renderer
+convention. Compare the exact files independently on each device. A browser may
+sample the source gain map differently, so record the source rendering as well
+as the derivative. No gain-map-preserving AVIF output or physical HDR presentation
+has been qualified by these automated results.
 
 The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
 two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit

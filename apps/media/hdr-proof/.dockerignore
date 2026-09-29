@@ -22,3 +22,5 @@
 !jpegli-build.sh
 !jpegli.cmake
 !native_jpegli.cpp
+!mozjpeg-build.sh
+!native_mozjpeg.c

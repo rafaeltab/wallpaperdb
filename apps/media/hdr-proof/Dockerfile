@@ -21,4 +21,6 @@ COPY native_dct_jpeg.c /opt/proof/native_dct_jpeg.c
 RUN cc -O2 -Wall -Wextra -Werror /opt/proof/native_dct_jpeg.c -ljpeg -o /usr/local/bin/hdr-proof-dct-jpeg
 COPY jpegli-build.sh jpegli.cmake native_jpegli.cpp /opt/proof/
 RUN sh /opt/proof/jpegli-build.sh
+COPY mozjpeg-build.sh native_mozjpeg.c /opt/proof/
+RUN sh /opt/proof/mozjpeg-build.sh
 WORKDIR /proof

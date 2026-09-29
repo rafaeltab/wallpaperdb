@@ -27,6 +27,9 @@ outputs. Test HDR PNG8 and AVIF8 separately from explicit SDR PNG16 and AVIF8.
 The higher-depth HDR PNG16 and AVIF12 candidates are separate files. Compare
 their gradients and fractional alpha against the same eight-bit source intent;
 increased output precision cannot recover detail absent from that source.
+Separate PNG8-to-SDR WebP candidates use gamma-2.2 ICC coding and fractional
+alpha. Confirm that each consumer interprets the embedded profile and preserves
+the transparent edges against the same SDR reference.
 The separately named MozJPEG ISO crop uses baseline RGB8 JPEG coding for both
 the SDR base and gain map. Check its SDR appearance and HDR reconstruction in
 each consumer independently of the predictive-lossless JPEG candidates.

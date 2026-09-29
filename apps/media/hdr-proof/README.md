@@ -228,6 +228,11 @@ at the actual output depth. The complete suite includes these measurements and
 their inspected containment files for pending physical review.
 The same higher-depth cases also cover crop, fill, upscale and real EXIF-8
 orientation, with exact native rotation checked before resampling.
+The [SDR WebP cases](hdr_png8_webp.py) preserve the independently referenced SDR
+grade with gamma-2.2 ICC coding and fractional alpha. A restricted static VP8L
+reader checks container structure before native decoding. FFmpeg's native WebP
+decoder must match both Pillow/libwebp and the coded encoder input exactly;
+regional appearance, tone/gamut policy and privacy still have separate gates.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

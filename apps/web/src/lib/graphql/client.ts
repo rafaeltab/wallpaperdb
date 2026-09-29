@@ -1,4 +1,5 @@
 import { GraphQLClient, type RequestMiddleware } from 'graphql-request';
+import { admissionError } from '@/lib/graphql/admission';
 import { getAuthToken } from '@/lib/auth/token-provider';
 
 function resolveGatewayUrl(url: string): string {
@@ -9,9 +10,7 @@ function resolveGatewayUrl(url: string): string {
   return url;
 }
 
-const GATEWAY_URL = resolveGatewayUrl(
-  import.meta.env.VITE_GATEWAY_URL || '/gateway/graphql'
-);
+const GATEWAY_URL = resolveGatewayUrl(import.meta.env.VITE_GATEWAY_URL || '/gateway/graphql');
 
 const authMiddleware: RequestMiddleware = async (request) => {
   const token = await getAuthToken();
@@ -29,6 +28,12 @@ const authMiddleware: RequestMiddleware = async (request) => {
 
 export const graphqlClient = new GraphQLClient(GATEWAY_URL, {
   requestMiddleware: authMiddleware,
+  fetch: async (...args) => {
+    const response = await fetch(...args);
+    const error = admissionError(response);
+    if (error) throw error;
+    return response;
+  },
 });
 
 export const request = graphqlClient.request.bind(graphqlClient);

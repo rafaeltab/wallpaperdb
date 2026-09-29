@@ -1,3 +1,4 @@
+import { graphqlQueryOptions } from '@/lib/graphql/admission';
 import { useQuery } from '@tanstack/react-query';
 import { request } from '@/lib/graphql/client';
 import { GET_WALLPAPER } from '@/lib/graphql/queries';
@@ -18,6 +19,7 @@ export function useWallpaperQuery(
   options: { staleTime?: number; retry?: boolean | number } = {}
 ) {
   return useQuery({
+    ...graphqlQueryOptions,
     queryKey: ['wallpaper', wallpaperId],
     queryFn: async () => {
       const data = await request<GetWallpaperResponse>(GET_WALLPAPER, {
@@ -27,6 +29,5 @@ export function useWallpaperQuery(
     },
     staleTime: options.staleTime ?? 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: options.retry ?? 1,
   });
 }

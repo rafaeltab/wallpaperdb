@@ -194,10 +194,19 @@ class ApngTests(unittest.TestCase):
             # The first source frame peaks at 1000 nits; frame 2 contains 4000 nits.
             # This binds selection to real decoded pixels, not a reported label.
             self.assertLess(float(np.max(actual)), 1001)
-        self.assertEqual(len(result['evidence']), 14)
+        self.assertEqual(len(result['evidence']), 16)
+        alternatives = [case for case in result['evidence'] if case.get('representation') == 'gamma3.2-nearest']
+        self.assertEqual(len(alternatives), 2)
+        for case in alternatives:
+            self.assertEqual(case['status'], 'qualified', case['blockers'])
+            self.assertTrue(case['case_id'].endswith(':gamma3.2-nearest'))
+            np.testing.assert_allclose(case['facts']['icc']['gammas'], [3.2] * 3, atol=1 / 65536, rtol=0)
+            self.assertTrue(case['structural_checks']['color_signaling'])
+            self.assertEqual(case['facts']['icc']['gamut'], 'srgb')
         for case in result['evidence']:
             with self.subTest(case=case['case_id']):
-                if case['selectors']['format'] == 'gif' and case['geometry'] == 'orientation':
+                if (case['selectors']['format'] == 'gif' and case['geometry'] == 'orientation'
+                        and not case.get('representation')):
                     self.assertEqual(case['status'], 'tested and failed')
                     self.assertEqual(case['blockers'], ['Failed appearance check'])
                     self.assertTrue(all(case['checks'][key] for key in

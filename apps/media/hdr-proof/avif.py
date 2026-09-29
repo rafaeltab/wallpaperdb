@@ -495,11 +495,11 @@ def run(output_dir, *, specs=None):
     return {'evidence':evidence, 'fixtures':fixtures, 'commands':COMMANDS}
 
 
-def encode_gamma_other(paths, target, ext, refs, count):
+def encode_gamma_other(paths, target, ext, refs, count, *, gif_gamma=2.2, gif_quantization='native'):
     import gamma_icc
     if ext == 'gif':
         import gamma_gif
-        gamma_gif.encode(paths, target)
+        gamma_gif.encode(paths, target, gamma=gif_gamma, quantization=gif_quantization)
         facts, actual, profile = gamma_gif.inspect_and_decode(target)
     else:
         gamma_icc.encode(paths, target, ext)
@@ -515,10 +515,13 @@ def encode_gamma_other(paths, target, ext, refs, count):
     depth_verified = (exif.get('BitsPerSample') == 8 if ext == 'jpg' else
                       facts['format'] == 'GIF' and facts['depth'] == 8 if ext == 'gif' else
                       facts['format'] == 'WEBP' and 'WEBP' in str(exif.get('FileType', '')).upper())
+    gamma = gif_gamma if ext == 'gif' else 2.2
+    color_signaling = bool(facts['icc']['gamut'] == 'srgb' and np.allclose(
+        facts['icc']['gammas'], [gamma] * 3, atol=1 / 65536, rtol=0))
     detail = {'dimensions': all(frame.shape == ref.shape for frame, ref in zip(actual, refs)),
               'frames': len(actual) == count,
-              'color_signaling': facts['icc']['gamma22_srgb_primaries'],
-              'gamut': facts['icc']['gamma22_srgb_primaries'],
+              'color_signaling': color_signaling,
+              'gamut': facts['icc']['gamut'] == 'srgb',
               'orientation_baked': exif.get('Orientation', 1) == 1,
               'depth': depth_verified,
               'alpha': bool(errors) and all(error <= alpha_limit for error in errors),

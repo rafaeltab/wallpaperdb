@@ -372,18 +372,21 @@ def run(output_directory, *, specs=None,
                     'generator': 'apng.py:generate_orientation_fixture', 'source_valid': geometry_valid,
                     'base_sha256': avif.digest(source), 'orientation': orientation_evidence})
             resized_references = [avif.geometry_reference(reference, geometry) for reference in references]
-            operations = [(dynamic_range, extension, motion) for motion in motions
+            operations = [(dynamic_range, extension, motion, None) for motion in motions
                 for dynamic_range, extension in (('hdr', 'png'), ('hdr', 'avif'),
                     ('sdr', 'png'), ('sdr', 'avif'), ('sdr', 'webp'))]
             if 'static' in motions:
-                operations.extend([('sdr', 'jpg', 'static'), ('sdr', 'gif', 'static')])
-            for dynamic_range, extension, motion in operations:
+                operations.extend([('sdr', 'jpg', 'static', None), ('sdr', 'gif', 'static', None),
+                                   ('sdr', 'gif', 'static', 'gamma3.2-nearest')])
+            for dynamic_range, extension, motion, representation in operations:
                 count = 1 if motion == 'static' else 2
                 selected_references = resized_references[:count]
                 sdr = dynamic_range == 'sdr'
                 depth = 16 if extension == 'png' else 8 if sdr else 12
                 transfer, gamut = (('srgb' if extension == 'png' else 'gamma22'), 'srgb') if sdr else (spec['transfer'], spec['gamut'])
                 case_id = f'{actual_id}:{dynamic_range}:{extension}:{motion}:{geometry}'
+                if representation:
+                    case_id += ':' + representation
                 case_directory = folder/case_id.replace(':', '-')
                 case_directory.mkdir(exist_ok=True)
                 selectors = {'format': extension, 'range': dynamic_range, 'depth': str(depth),
@@ -395,6 +398,8 @@ def run(output_directory, *, specs=None,
                         'checks': {key: False for key in ('native_encoder', 'independent_decoder', 'structure', 'appearance', 'privacy')},
                         'blockers': [], 'measurements': {}, 'artifacts': {},
                         'source_facts': actual_facts, 'consumer_status': 'pending manual review'}
+                if representation:
+                    item['representation'] = representation
                 if orientation_evidence is not None:
                     item['orientation_source'] = orientation_evidence
                 try:
@@ -445,8 +450,11 @@ def run(output_directory, *, specs=None,
                                    avif.decode_transfer(frame[..., :3], transfer, gamut)) for frame in frames]
                         actual_gamut = gamut
                     else:
-                        facts, frames, detail, profile = avif.encode_gamma_other(converted, target, extension, selected_references, count)
-                        linear = [gamma_icc.decode_signal_to_nits(frame[..., :3], profile) for frame in frames]
+                        gif_options = {'gif_gamma': 3.2, 'gif_quantization': 'nearest'} if representation else {}
+                        facts, frames, detail, profile = avif.encode_gamma_other(
+                            converted, target, extension, selected_references, count, **gif_options)
+                        linear = [gamma_icc.decode_signal_to_nits(frame[..., :3], profile,
+                            expected_gamma=3.2 if representation else 2.2) for frame in frames]
                         actual_gamut = 'rec2020'
                     privacy = inspect_privacy(target, facts, extension)
                     white_control = _sequence_white_control(frames, resized_references, geometry) if count == 2 else None

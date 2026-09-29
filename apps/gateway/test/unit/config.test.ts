@@ -81,6 +81,8 @@ describe('startup configuration', () => {
       redisEnabled: false,
       graphqlIntrospectionEnabled: true,
       graphqlMaxComplexity: 2000,
+      quotaCapacity: 1000000,
+      quotaRefillMs: 60000,
       cursorExpirationMs: 604800000,
     });
   });
@@ -127,6 +129,9 @@ describe('startup configuration', () => {
     ).toBe(false);
   });
   it.each([
+    { QUOTA_CAPACITY: '99', GRAPHQL_MAX_COMPLEXITY: '10' },
+    { QUOTA_CAPACITY: '100', GRAPHQL_MAX_COMPLEXITY: '101' },
+    { QUOTA_REFILL_MS: '0' },
     { PORT: '10garbage' },
     { OPENSEARCH_PROFILE_INDEX: '' },
     { COLOR_SPREAD_STRATEGY: 'invalid' },

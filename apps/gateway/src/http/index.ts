@@ -11,7 +11,7 @@ import { Admission } from '../capabilities/admission/index.js';
 import { Availability } from '../capabilities/availability/index.js';
 import { createGraphql } from '../graphql/index.js';
 import { HttpExecution, httpExecutionLayer, type HttpServices } from '../runtime.js';
-import { inspectQuery } from './security.js';
+import { inspectOperation } from './security.js';
 
 export interface HttpConfig {
   readonly port: number;
@@ -26,7 +26,7 @@ export interface HttpConfig {
   readonly graphqlMaxAliases: number;
   readonly graphqlMaxBatchSize: number;
   readonly graphqlIntrospectionEnabled: boolean;
-  readonly rateLimitMaxAnonymous: number;
+  readonly quotaCapacity: number;
 }
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -56,11 +56,19 @@ function fingerprint(ip: string) {
 const operationRequest = Schema.is(
   Schema.Struct({
     operationName: Schema.optional(Schema.NullOr(Schema.String)),
+    variables: Schema.optional(Schema.Unknown),
   })
 );
-function requestOperationName(request: FastifyRequest): string | undefined {
+function requestOperation(request: FastifyRequest) {
   const input = request.method === 'GET' ? request.query : request.body;
-  return operationRequest(input) ? (input.operationName ?? undefined) : undefined;
+  if (!operationRequest(input)) return { operationName: undefined, variables: undefined };
+  return {
+    operationName: input.operationName ?? undefined,
+    variables:
+      request.method === 'GET' && typeof input.variables === 'string'
+        ? JSON.parse(input.variables)
+        : input.variables,
+  };
 }
 function installErrors(app: FastifyInstance) {
   app.setNotFoundHandler((_request, reply) =>
@@ -91,11 +99,7 @@ function installErrors(app: FastifyInstance) {
       .send(problem(status, status === 500 ? 'generic-server' : 'invalid-request', title));
   });
 }
-function installAdmission(
-  app: FastifyInstance,
-  config: HttpConfig,
-  execution: HttpExecution['Service']
-) {
+function installBatchLimit(app: FastifyInstance, config: HttpConfig) {
   app.addHook('preHandler', async (request, reply) => {
     if (request.routeOptions.url !== '/graphql') return;
     if (Array.isArray(request.body)) {
@@ -117,29 +121,6 @@ function installAdmission(
             exceeded ? 'Batch size exceeds maximum' : 'Batch requests are not supported'
           )
         );
-    }
-    const result = await execution.run(
-      Admission.use((admission) =>
-        admission.admit(fingerprint(request.ip), { _tag: 'Valid', cost: 1 })
-      ),
-      { signal: request.gatewaySignal }
-    );
-    switch (result._tag) {
-      case 'Allowed':
-        reply.header('X-RateLimit-Limit', String(config.rateLimitMaxAnonymous));
-        reply.header('X-RateLimit-Remaining', String(result.remaining));
-        reply.header('X-RateLimit-Reset', String(result.reset));
-        return;
-      case 'Limited':
-        recordTelemetry(() => recordCounter('graphql.security.rate_limited', 1));
-        return reply
-          .code(429)
-          .header('Retry-After', String(Math.ceil(result.retryAfter / 1000)))
-          .send(
-            graphqlError('RATE_LIMIT_EXCEEDED', 'Rate limit exceeded', {
-              retryAfter: result.retryAfter,
-            })
-          );
     }
   });
 }
@@ -285,6 +266,12 @@ export async function createHttpApp<E>(
           : false,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
+      exposedHeaders: [
+        'Retry-After',
+        'X-RateLimit-Cost-Limit',
+        'X-RateLimit-Cost-Remaining',
+        'X-RateLimit-Cost-Reset',
+      ],
       credentials: true,
     });
     await registerOpenAPI(app, {
@@ -292,7 +279,7 @@ export async function createHttpApp<E>(
       version: '1.0.0',
       description: 'GraphQL gateway for browsing wallpapers and public contributor Profiles.',
     });
-    installAdmission(app, config, execution);
+    installBatchLimit(app, config);
     const graphql = createGraphql(execution, config);
     await app.register(mercurius, {
       ...graphql,
@@ -303,7 +290,7 @@ export async function createHttpApp<E>(
           ? [NoSchemaIntrospectionCustomRule]
           : [],
       errorFormatter(execution) {
-        const first = execution.errors?.[0]?.originalError;
+        const first = execution.errors?.[0]?.originalError ?? execution.errors?.[0];
         const transportStatus =
           first &&
           'statusCode' in first &&
@@ -340,18 +327,46 @@ export async function createHttpApp<E>(
         return { statusCode, response: { data: execution.data ?? null, errors } };
       },
     });
-    app.graphql.addHook('preExecution', async (schema, document, context, variables) => {
+    app.graphql.addHook('preParsing', async (schema, source, context) => {
+      const request = context.reply.request;
+      const { variables, operationName } = requestOperation(request);
       const result = await execution.run(
         Effect.sync(() =>
-          inspectQuery(
+          inspectOperation(
             schema,
-            document,
-            variables ?? {},
+            source,
+            variables,
             config,
-            requestOperationName(context.reply.request)
+            config.nodeEnv !== 'production' && config.graphqlIntrospectionEnabled,
+            operationName
           )
         ).pipe(Effect.withSpan('admission.inspect_query'))
       );
+      const decision = await execution.run(
+        Admission.use((admission) =>
+          admission.admit(
+            fingerprint(request.ip),
+            result.error ? { _tag: 'Rejected' } : { _tag: 'Valid', cost: result.complexity }
+          )
+        ),
+        { signal: request.gatewaySignal }
+      );
+      context.reply.header('X-RateLimit-Cost-Limit', String(config.quotaCapacity));
+      if (decision._tag === 'Limited') {
+        recordTelemetry(() => recordCounter('graphql.security.rate_limited', 1));
+        context.reply.header(
+          'Retry-After',
+          String(Math.max(1, Math.ceil(decision.retryAfter / 1000)))
+        );
+        throw Object.assign(
+          new GraphQLError('Cost quota exceeded', {
+            extensions: { code: 'RATE_LIMIT_EXCEEDED', retryAfter: decision.retryAfter },
+          }),
+          { statusCode: 429 }
+        );
+      }
+      context.reply.header('X-RateLimit-Cost-Remaining', String(decision.remaining));
+      context.reply.header('X-RateLimit-Cost-Reset', String(decision.reset));
       recordTelemetry(() => recordHistogram('graphql.query.complexity', result.complexity));
       if (result.error) {
         const extensions = result.error.extensions;

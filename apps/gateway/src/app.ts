@@ -52,8 +52,8 @@ export function gatewayLayer(config: Config, options: AppOptions = {}) {
   );
   const admission = admissionLayer({
     enabled: config.rateLimitEnabled,
-    limit: config.rateLimitMaxAnonymous,
-    windowMs: config.rateLimitWindowMs,
+    limit: config.quotaCapacity,
+    windowMs: config.quotaRefillMs,
   }).pipe(
     Layer.provide(
       redisQuotaLayer({

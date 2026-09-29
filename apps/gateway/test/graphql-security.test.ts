@@ -72,6 +72,82 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 describe('GraphQL security driving contract', () => {
+  it('charges the selected operation with resolved default variables on repeated requests', async () => {
+    const charges: unknown[] = [];
+    const app = await build(
+      {},
+      {
+        admission: {
+          admit(_visitor, inspection) {
+            charges.push(inspection);
+            return Effect.succeed({ _tag: 'Allowed', remaining: 1000, reset: 0 });
+          },
+        },
+      }
+    );
+    const text =
+      'query Small($size:Int=2){searchWallpapers(first:$size){edges{node{wallpaperId}}}} query Large{searchWallpapers(first:100){edges{node{wallpaperId}}}}';
+    await execute(app, text, undefined, 'Small');
+    await execute(app, text, undefined, 'Small');
+    expect(charges).toEqual([
+      { _tag: 'Valid', cost: 25 },
+      { _tag: 'Valid', cost: 25 },
+    ]);
+  });
+  it.each([
+    '{broken',
+    '{unknown}',
+    '{searchWallpapers(first:101){edges{node{wallpaperId}}}}',
+    '{searchWallpapers(first:100){edges{node{wallpaperId variants{url}}}}}',
+  ])('charges 100 for inspection rejection: %s', async (text) => {
+    const app = await build({ quotaCapacity: 106 });
+    const rejected = await execute(app, text);
+    expect(rejected.json().errors).toBeDefined();
+    expect(rejected.headers['x-ratelimit-cost-remaining']).toBe('6');
+    expect(
+      (await execute(app, '{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}')).statusCode
+    ).toBe(200);
+    const denied = await execute(app, '{__typename}');
+    expect(denied.statusCode).toBe(429);
+    expect(denied.json().errors[0].extensions.code).toBe('RATE_LIMIT_EXCEEDED');
+    expect(Number(denied.headers['retry-after'])).toBeGreaterThan(0);
+  });
+  it('does not charge malformed HTTP or batches and publishes cost-point headers', async () => {
+    const app = await build({ quotaCapacity: 6 });
+    await app.inject({ method: 'POST', url: '/graphql', payload: { nope: true } });
+    await app.inject({
+      method: 'POST',
+      url: '/graphql',
+      headers: { 'content-type': 'application/json' },
+      payload: '{',
+    });
+    await app.inject({ method: 'POST', url: '/graphql', payload: [{ query: '{__typename}' }] });
+    await app.inject({ url: '/graphql?query=%7B__typename%7D&variables=invalid' });
+    const response = await execute(app, '{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}');
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['x-ratelimit-cost-limit']).toBe('6');
+    expect(response.headers['x-ratelimit-cost-remaining']).toBe('0');
+    expect(response.headers['x-ratelimit-limit']).toBeUndefined();
+    expect(response.headers['x-ratelimit-remaining']).toBeUndefined();
+  });
+  it('admits zero-cost operations and charges cached rejected queries on every request', async () => {
+    const app = await build({ quotaCapacity: 200 });
+    expect(
+      (await execute(app, '{__typename @skip(if:true)}')).headers['x-ratelimit-cost-remaining']
+    ).toBe('200');
+    expect((await execute(app, '{unknown}')).headers['x-ratelimit-cost-remaining']).toBe('100');
+    expect((await execute(app, '{unknown}')).headers['x-ratelimit-cost-remaining']).toBe('0');
+    expect((await execute(app, '{unknown}')).statusCode).toBe(429);
+  });
+  it('retains the cost of backend failures', async () => {
+    const catalogue = new EmptyCatalogue();
+    catalogue.wallpaper = () => Effect.die('backend failed');
+    const app = await build({ quotaCapacity: 6 }, { catalogue });
+    expect(
+      (await execute(app, '{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}')).json().errors
+    ).toBeDefined();
+    expect((await execute(app, '{__typename}')).statusCode).toBe(429);
+  });
   it.each([
     { args: 'first:20', definition: '', variables: undefined, size: 20 },
     { args: 'first:$size', definition: '($size:Int=20)', variables: undefined, size: 20 },
@@ -166,11 +242,11 @@ describe('GraphQL security driving contract', () => {
     const result = await execute(app);
     expect(result.statusCode).toBe(200);
     expect(result.json().errors).toBeUndefined();
-    expect(result.headers['x-ratelimit-remaining']).toBe('99');
-    expect(result.headers['x-ratelimit-reset']).toBeDefined();
+    expect(result.headers['x-ratelimit-cost-remaining']).toBe('999579');
+    expect(result.headers['x-ratelimit-cost-reset']).toBeDefined();
   });
   it('shares the client quota across changing spoofed forwarded-IP headers', async () => {
-    const app = await build({ rateLimitMaxAnonymous: 2 });
+    const app = await build({ quotaCapacity: 842 });
     const responses = [];
     for (const forwardedIp of ['198.51.100.1', '198.51.100.2', '198.51.100.3']) {
       responses.push(
@@ -193,13 +269,13 @@ describe('GraphQL security driving contract', () => {
       undefined,
     ]);
     expect(
-      responses.slice(0, 2).map((response) => response.headers['x-ratelimit-remaining'])
-    ).toEqual(['1', '0']);
+      responses.slice(0, 2).map((response) => response.headers['x-ratelimit-cost-remaining'])
+    ).toEqual(['421', '0']);
     expect(responses[2]?.json().errors[0].extensions.code).toBe('RATE_LIMIT_EXCEEDED');
   });
   it('accepts forwarded client identity only through configured proxy peers', async () => {
     const app = await build({
-      rateLimitMaxAnonymous: 1,
+      quotaCapacity: 421,
       trustedProxies: ['10.0.0.1', '10.0.1.0/24'],
     });
     const request = (remoteAddress: string, forwarded: string) =>
@@ -618,7 +694,7 @@ describe('GraphQL security driving contract', () => {
     '/graphql?operationName=test',
     '/%67raphql',
   ])('limits GraphQL URL %s despite user agent rotation', async (url) => {
-    const app = await build({ rateLimitMaxAnonymous: 1 });
+    const app = await build({ quotaCapacity: 421 });
     expect((await execute(app)).statusCode).toBe(200);
     const limited = await app.inject({
       method: 'POST',
@@ -682,7 +758,7 @@ describe('GraphQL security driving contract', () => {
     expect(response.json().errors).toBeDefined();
   });
   it('applies admission to GraphQL GET requests', async () => {
-    const app = await build({ rateLimitMaxAnonymous: 1 });
+    const app = await build({ quotaCapacity: 6 });
     const url = `/graphql?query=${encodeURIComponent('{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}')}`;
     expect((await app.inject({ url })).statusCode).toBe(200);
     expect((await app.inject({ url })).statusCode).toBe(429);
@@ -694,6 +770,10 @@ describe('GraphQL security driving contract', () => {
       headers: { origin: 'http://localhost:3000' },
     });
     expect(allowed.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+    expect(allowed.headers['access-control-expose-headers']).toContain('Retry-After');
+    expect(allowed.headers['access-control-expose-headers']).toContain(
+      'X-RateLimit-Cost-Remaining'
+    );
     const disallowed = await app.inject({
       url: '/health',
       headers: { origin: 'https://localhost:3000.attacker.example' },
@@ -712,7 +792,7 @@ describe('GraphQL security driving contract', () => {
       },
     });
     try {
-      const app = await build({ rateLimitMaxAnonymous: 2, graphqlMaxComplexity: 20 });
+      const app = await build({ quotaCapacity: 106, graphqlMaxComplexity: 20 });
       expect(
         (await execute(app, '{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}')).json().errors
       ).toBeUndefined();

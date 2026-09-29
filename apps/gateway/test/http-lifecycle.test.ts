@@ -32,8 +32,8 @@ function controlledCatalogue(read: Effect.Effect<Profile | null>, onSearch = () 
     searchProfiles: () => empty.searchProfiles(),
   });
 }
-async function serve(catalogue: Catalogue, shutdownTimeoutMs = 1000) {
-  const app = await createHttpApp(httpConfig, httpTestLayer(httpConfig, { catalogue }), {
+async function serve(catalogue: Catalogue, shutdownTimeoutMs = 1000, config = httpConfig) {
+  const app = await createHttpApp(config, httpTestLayer(config, { catalogue }), {
     shutdownTimeoutMs,
   });
   applications.push(app);
@@ -105,7 +105,7 @@ describe('HTTP request lifecycle', () => {
     expect(await response).toBeInstanceOf(Error);
   });
 
-  it('interrupts the capability effect when the client abandons the response', async () => {
+  it('interrupts abandoned work without refunding admitted cost', async () => {
     let entered = false;
     let interrupted = false;
     const read = Effect.sync(() => {
@@ -118,13 +118,17 @@ describe('HTTP request lifecycle', () => {
         })
       )
     );
-    const { app, address } = await serve(controlledCatalogue(read));
+    const { app, address } = await serve(controlledCatalogue(read), 1000, {
+      ...httpConfig,
+      quotaCapacity: 123,
+    });
     const abort = new AbortController();
     const response = query(address, abort.signal).catch((error: unknown) => error);
     await expect.poll(() => entered).toBe(true);
     abort.abort();
     expect(await response).toBeInstanceOf(Error);
     await expect.poll(() => interrupted).toBe(true);
+    expect((await query(address)).status).toBe(429);
     await app.close();
   });
 

@@ -11,6 +11,7 @@ export type AdmissionResult =
   | { readonly _tag: 'Limited'; readonly retryAfter: number };
 
 /** Atomic weighted token bucket: capacity refills continuously over windowMs.
+ * Callers provide nonnegative cost no larger than capacity.
  * Cost is reserved once, never refunded; denial does not debit or extend expiry.
  * Visitor keys are isolated; unavailable distributed storage admits
  * requests without charging quota and resumes normal limits after recovery.

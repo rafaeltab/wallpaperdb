@@ -109,6 +109,14 @@ headroom controls remain mandatory; this failure does not qualify the path.
 An integer-DCT map alternative keeps that exact compressed base and pre-JPEG
 gain map. Shadow failures persist, and cross-decoder agreement worsens. Both
 native map encodings remain separate failed evidence.
+A separate midpoint-offset map uses encoding gamma 1.5. This increases code
+precision near zero gain and passes every unchanged appearance gate for the ISO
+JPEG upscale. Native and independent HDR maximum error is 7.31 deltaE ITP;
+cross-reader maximum error is 5.53. The compressed gamma-3.2 base remains exact,
+and both actual JPEG layers remain eight-bit SOF0. This qualifies the experimental
+ICC-aware file path at the declared full display headroom. The stock reader
+that assumes sRGB still fails, so consumer compatibility remains pending.
+The five preceding failures stay visible and retain their exact output hashes.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

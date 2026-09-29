@@ -447,6 +447,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               *mozjpeg_experiment_report(mozjpeg, mozjpeg_historical, mozjpeg_lambdas),
               *coefficient_diagnostic_report(mozjpeg_diagnosis),
               '## Blockers and scope limits','',
+              '- The [fractional map-gamma-1.5 candidate](icc-gainmap-midpointoffset-gamma1.5.json) passes the unchanged SDR, native HDR, independent HDR and cross-reader gates for ISO JPEG upscale. It retains the gamma-3.2 compressed base, eight-bit SOF0 layers and midpoint offsets. Qualification requires the experimental ICC-aware readers at the declared full display headroom; the stock sRGB-assuming reader still fails and physical consumers remain pending. All five preceding failed representations remain separate.',
               '- The [integer-DCT map alternative](icc-gainmap-midpointoffset-gamma2-islow.json) retains the exact midpoint gamma-2 compressed base and native pre-JPEG map. It changes only native map JPEG coding. Both HDR readers still fail shadow maxima and their agreement worsens; its original floating-DCT counterpart remains separate.',
               '- A separately regenerated gain-map AVIF containment checks actual base, map and alternate precision against the source. One native moderate-offset depth-8 candidate passes authored SDR and both HDR readers at log2 display headroom 4. The stock depth-8 result fails; both automatic-depth variants declare alternate depth 12 and remain incompatible with the requested preservation selectors. Regenerated headroom and offsets differ from the source, so intermediate display adaptation remains untested. This is a declared endpoint proof, with physical consumers pending.',
               '- The [logarithmic midpoint-offset candidate](icc-gainmap-midpointoffset-gamma2.json) fixes the gamma-2 trial at ISO offsets 1/16384. Both HDR readers pass the existing midtone/highlight gates but fail their shadow maxima; their cross-comparison also fails in shadows. This separate result narrows the precision tradeoff without qualifying the JPEG or changing the original gates.',
@@ -577,8 +578,8 @@ def main():
     icc_results = []
     for policy, gamma, method in (('moderateoffset', 1, 'float'), ('smalloffset', 1, 'float'),
                                   ('smalloffset', 2, 'float'), ('midpointoffset', 2, 'float'),
-                                  ('midpointoffset', 2, 'islow')):
-        name = f'icc-gainmap-{policy}'+('-gamma2' if gamma == 2 else '')
+                                  ('midpointoffset', 2, 'islow'), ('midpointoffset', 1.5, 'float')):
+        name = f'icc-gainmap-{policy}'+(f'-gamma{gamma:g}' if gamma != 1 else '')
         name += '-islow' if method == 'islow' else ''
         result = run_icc_gainmap(WORK/name, map_policy=policy, map_gamma=gamma, map_method=method)
         write_json(RESULTS/f'{name}.json', result)

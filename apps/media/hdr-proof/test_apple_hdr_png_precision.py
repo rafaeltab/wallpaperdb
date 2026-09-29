@@ -147,8 +147,8 @@ class AppleHdrPngPrecisionTests(unittest.TestCase):
 
     def test_native_stage_changed_after_actual_measurement_remains_failed(self):
         original = self.module._read_planar
-        def read_then_change(path):
-            result = original(path)
+        def read_then_change(path, **kwargs):
+            result = original(path, **kwargs)
             if Path(path).name == 'native-pq.gbrpf32':
                 with Path(path).open('ab') as stream:
                     stream.write(b'late PQ stage drift')
@@ -173,6 +173,96 @@ class AppleHdrPngPrecisionTests(unittest.TestCase):
         self.assertEqual(case['status'], 'tested and failed')
         self.assertFalse(case['checks']['integrity'])
         self.assertTrue(any('integrity' in message for message in case['blockers']))
+
+
+class AppleHdrPngPrecisionGeometryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import apple_hdr_png_precision
+        cls.module = apple_hdr_png_precision
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.root = Path(cls.temporary.name)
+        cls.report = cls.module.run(cls.root/'proof', geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
+
+    def test_native_precision_geometries_keep_originals_and_independent_per_case_gates(self):
+        from matrix import build_matrix
+        cases = self.report['cases']
+        self.assertEqual([case['geometry'] for case in cases], ['contain', 'cover', 'fill', 'upscale', 'orientation'])
+        self.assertEqual(len({case['case_id'] for case in cases}), 5)
+        baselines = {case['geometry']: case for case in self.report['baseline']['cases']}
+        old_hashes = {'contain': '6a80e8d0e95d9ef35c3ec4958a43e4e098ff115cf51006b9075cd424005e3b5c',
+            'cover': 'bb5cc3d53c804a9192ffcd921bf2a9c1b3648af7210f22cebfaf4562260e1c27',
+            'fill': '125136af612bd6fec7b192bb3354b435c9a108fb27b2914f7ca9777cb264ed2b',
+            'upscale': '0dd5a52b0f54cf19d3751c3d891e1fd9db36563c3a194d229f3e7a8e3a3f5904',
+            'orientation': '3ffe361e65413d197a74023e2cfee6d4a29d4657ee0d24833233bbc5d833052d'}
+        for case in cases:
+            operation = case['geometry']
+            old = baselines[operation]
+            with self.subTest(operation=operation):
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertTrue(all(case['checks'].values()))
+                self.assertEqual(old['status'], 'qualified', old['blockers'])
+                self.assertEqual(old['artifacts']['sha256'], old_hashes[operation])
+                self.assertEqual(case['selectors'], self.module.apple_hdr_png._selectors(operation))
+                width, height = self.module.apple_hdr_png.SIZES[operation]
+                self.assertEqual((case['facts']['width'], case['facts']['height']), (width, height))
+                self.assertEqual(case['facts']['physical_pixel_dimensions'], [1, 1, 0])
+                self.assertTrue(case['facts']['native_decoders_agree'])
+                self.assertEqual((case['facts']['depth'], case['facts']['primaries'], case['facts']['transfer']), (16, 12, 16))
+                self.assertEqual(case['facts']['orientation'], 1)
+                self.assertEqual(case['reference_hdr'], old['reference_hdr'])
+                self.assertEqual(case['threshold_scope'], old['threshold_scope'])
+                self.assertFalse(case['rendering_scope']['intermediate_adaptation_qualified'])
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+                self.assertTrue(case['native_writer']['opaque_planes']['actual_alpha_exactly_one'])
+                self.assertTrue(case['native_writer']['opaque_planes']['rgb_bytes_unchanged'])
+                self.assertTrue(case['storage_checks']['native_rgb16_equals_independent_png'])
+                self.assertLess(case['precision_diagnostic']['candidate']['maximum_code_error'],
+                                case['precision_diagnostic']['baseline']['maximum_code_error'])
+                for path, sha in case['bound_files'].items():
+                    self.assertEqual(avif.digest(path), sha)
+        self.assertEqual(build_matrix([*baselines.values(), *cases])['evidence_errors'], [])
+
+    def test_precision_containment_bytes_facts_measurements_and_scopes_remain_exact(self):
+        original = self.module.run(self.root/'default')['cases'][0]
+        contained = self.report['cases'][0]
+        for key in ('case_id', 'candidate', 'selectors', 'facts', 'checks', 'measurements', 'status', 'blockers',
+                    'rendering_scope', 'qualification_scope', 'known_consumer_limitations', 'threshold_scope',
+                    'storage_checks', 'precision_diagnostic'):
+            self.assertEqual(contained[key], original[key], key)
+        for key in ('artifacts', 'reference_hdr', 'reference_sdr'):
+            self.assertEqual(contained[key]['sha256'], original[key]['sha256'], key)
+
+    def test_orientation_uses_actual_locked_source_and_exact_stored_rgb_then_rotates_once(self):
+        case = self.report['cases'][-1]
+        old = self.report['baseline']['cases'][-1]
+        self.assertEqual(case['orientation_source'], old['orientation_source'])
+        self.assertEqual(case['orientation_source']['orientation'], 6)
+        self.assertEqual(case['orientation_source']['sha256'],
+                         '691ce29e25ba756cf0d9d2a4e498fcb4f246eaa0fd7046b15fb10f38b58053c9')
+        self.assertEqual(case['artifacts']['source'], case['orientation_source']['path'])
+        self.assertEqual(case['source_facts']['metadata']['IFD0:Orientation'], 6)
+        self.assertEqual(case['native_geometry']['padding_filter'].count('transpose=clock'), 1)
+        self.assertEqual(case['rendering_scope']['orientation_applications'], 1)
+        self.assertEqual(case['rendering_scope']['source_orientation'], 6)
+        self.assertEqual(case['bound_files'][case['artifacts']['source']], case['orientation_source']['sha256'])
+
+    def test_unproved_or_ambiguous_geometry_selectors_reject_before_native_work(self):
+        for geometries in ((), ('contain', 'contain'), ('orientation-8',), ('crop',), ('identity',)):
+            before = len(avif.COMMANDS)
+            with self.subTest(geometries=geometries), self.assertRaises(ValueError):
+                self.module.run(self.root/'rejected', geometries=geometries)
+            self.assertEqual(len(avif.COMMANDS), before)
+        before = len(avif.COMMANDS)
+        with self.assertRaises(ValueError):
+            self.module.run(self.root/'ambiguous', geometries=('contain', 'cover'), selectors=self.module.SELECTORS)
+        with self.assertRaises(ValueError):
+            self.module.run(self.root/'mismatched', geometries=('cover',), selectors=self.module.SELECTORS)
+        with self.assertRaises(ValueError):
+            self.module.run(self.root/'unadmitted-source', source=Path(self.report['cases'][-1]['orientation_source']['path']),
+                            geometries=('orientation',))
+        self.assertEqual(len(avif.COMMANDS), before)
 
 
 if __name__ == '__main__':

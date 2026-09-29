@@ -61,7 +61,7 @@ export function ProfileWallpapers({ profileId }: { profileId: string }) {
     hasNextPage,
     fetchNextPage,
   } = useWallpaperInfiniteQuery({ filter: { profileId } });
-  const error = queryError ?? failureReason;
+  const error = failureReason ?? queryError;
   const wallpapers = data?.pages.flatMap((page) => page.edges.map((edge) => edge.node)) ?? [];
   let content: ReactNode;
 

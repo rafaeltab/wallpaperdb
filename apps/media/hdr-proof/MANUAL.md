@@ -75,6 +75,10 @@ endpoint passes establish accuracy against that legacy convention only.
 Keep this source-model blocker separate from output decoding and visible HDR.
 The documented full reference has a new revision; it supplies no asserted
 boost-2 interpretation and does not establish the newer XMP variant's semantics.
+The corrected native old Apple full-source preparation passes the documented
+source comparison. It is encoder-input evidence only. Check each derivative's
+separately named source model and file qualification before drawing a conclusion
+from its visible appearance.
 The gain-map JPEG endpoint comparisons use display boost 16. Check the separate
 ISO upscale boost-2 rendering record before selecting a download; its measured
 adaptation failure cannot be overridden by a successful endpoint or a physical

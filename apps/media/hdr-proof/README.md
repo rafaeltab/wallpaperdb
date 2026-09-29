@@ -140,6 +140,16 @@ documented reference has its own revision and is required by the old Apple
 full-rendering gate. Earlier measurements remain evidence for their named
 legacy convention. This article does not establish intermediate adaptation or
 the newer fixture's transplanted XMP headroom precedence.
+The separate [native full-source preparation](apple_native_source.py) now
+implements that documented old Apple model using original native JPEG samples,
+native bilinear8 map expansion and FFmpeg float32 transfer/gain arithmetic.
+Independent source comparison passes the unchanged photographic gates, with
+maximum error 0.000027853 Delta E ITP. Analytic controls cover all 65,536
+base/map code pairs at full-effect headrooms 1 and 8, with maximum numeric
+error 0.000466684 nits. Source admission rejects unknown model, color or hashes.
+This establishes encoder input for a separate candidate; it does not qualify
+any derivative, intermediate adaptation or newer Apple model. The six legacy
+source-model failures remain recorded alongside it.
 New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native

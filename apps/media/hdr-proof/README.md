@@ -271,6 +271,8 @@ and unchanged photographic HDR gates. Source reconstruction, linear geometry
 and the emitted single-layer PQ12 AVIF must pass separately. PQ encoding honors
 each native input's actual luminance normalization. The map-sampling convention
 is fixed for this proof; it is not claimed as ISO's uniquely mandated filter.
+Containment, crop, stretch and upscale keep separate candidate results; the
+original source-sampling failures remain visible at every geometry.
 Named reconstruction profiles remain bound to the source hash. Gain-map-preserving
 output and physical consumer interoperability remain unqualified.
 

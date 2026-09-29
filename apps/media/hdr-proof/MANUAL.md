@@ -62,7 +62,8 @@ The separately inspected SDR PNG8 files cover the same four geometries with
 standard PNG sRGB signaling and square pixels. Compare their authored SDR
 references separately from the AVIF renditions in each browser, viewer and
 wallpaper setter.
-The separately named HDR candidates emit single-layer PQ AVIF12. The original
+The separately named HDR candidates emit single-layer PQ AVIF12 for containment,
+crop, stretch and upscale. The original
 native-map-sampling candidate remains failed; the antialiased-map candidate has
 its own source, geometry and output measurements against the declared renderer
 convention. Compare the exact files independently on each device. A browser may

@@ -4,6 +4,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+import numpy as np
+
 import avif
 from authored_sdr_proof import run
 
@@ -14,6 +16,11 @@ class AuthoredAvifTests(unittest.TestCase):
             cases = run(Path(temporary), names=('gainmap-apple-new', 'gainmap-android-xmp'),
                         geometries=('contain', 'orientation'), formats=('avif',))
             json.dumps(cases, allow_nan=False)
+            for case in cases:
+                output = Path(case['artifacts']['output'])
+                coded_base = avif.read_png(output.with_name('output-authored.png'))
+                independently_decoded = avif.decode_avif(output, output.parent, 1)[0]
+                np.testing.assert_array_equal(independently_decoded, coded_base)
             self.assertEqual(len(cases), 8)
             for case in cases:
                 with self.subTest(case=case['case_id']):

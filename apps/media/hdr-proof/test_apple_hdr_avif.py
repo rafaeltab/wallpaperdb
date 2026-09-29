@@ -44,7 +44,7 @@ class AppleHdrAvifTests(unittest.TestCase):
         for path, digest in self.case['bound_files'].items():
             self.assertEqual(avif.digest(path), digest)
         for name, digest in self.report['source_hashes'].items():
-            self.assertEqual(avif.digest(Path(__file__).with_name(name)), digest)
+            self.assertEqual(avif.digest(Path(__file__).parent/name), digest)
         self.assertEqual(avif.digest(self.case['artifacts']['output']), self.case['artifacts']['sha256'])
         self.assertEqual(self.case['reference_hdr']['dimensions'], [173, 231])
 
@@ -162,7 +162,7 @@ class AppleHdrAvifTests(unittest.TestCase):
     def test_unproved_depth_geometry_and_mismatched_selector_tuples_reject_before_native_work(self):
         options = ({'depths': ()}, {'depths': (16,)}, {'depths': (10, 10)}, {'depths': (True,)},
                    {'depths': ('10',)}, {'depths': ([10],)}, {'geometries': ()},
-                   {'geometries': ('contain', 'contain')}, {'geometries': ('orientation',)},
+                   {'geometries': ('contain', 'contain')}, {'geometries': ('orientation-8',)},
                    {'geometries': ('crop',)}, {'geometries': (['contain'],)},
                    {'depths': (10,), 'selectors': dict(self.module.SELECTORS)},
                    {'geometries': ('cover',), 'selectors': dict(self.module.SELECTORS)},
@@ -196,6 +196,66 @@ class AppleHdrAvifTests(unittest.TestCase):
                 self.assertEqual(case['consumer_status'], 'pending manual review')
         from matrix import build_matrix
         self.assertEqual(build_matrix(report['cases'])['evidence_errors'], [])
+
+    def test_real_exif6_derivatives_at_each_depth_rotate_the_documented_source_once(self):
+        import numpy as np
+        from PIL import Image
+        report = self.module.run(self.root/'orientation', depths=(8,10,12), geometries=('orientation',))
+        self.assertEqual(len(report['cases']), 3)
+        for case in report['cases']:
+            with self.subTest(depth=case['selectors']['depth']):
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertTrue(all(case['checks'].values()))
+                self.assertEqual(case['orientation_source']['orientation'], 6)
+                self.assertEqual(case['orientation_source']['sha256'],
+                                 '691ce29e25ba756cf0d9d2a4e498fcb4f246eaa0fd7046b15fb10f38b58053c9')
+                self.assertEqual(case['artifacts']['source_sha256'], case['orientation_source']['sha256'])
+                self.assertEqual(case['artifacts']['source'], case['orientation_source']['path'])
+                self.assertEqual(case['source_facts']['metadata']['IFD0:Orientation'], 6)
+                self.assertFalse(case['source_decoder_evidence']['native_source']['orientation_applied'])
+                self.assertEqual(case['native_geometry']['padding_filter'].count('transpose=clock'), 1)
+                original = np.load(case['source_decoder_evidence']['reference']['path'])
+                rotated = np.rot90(original, -1)
+                expected = np.maximum(np.stack([np.asarray(Image.fromarray(rotated[..., channel].astype(np.float32)).resize(
+                    (173,130), Image.Resampling.LANCZOS)) for channel in range(3)],axis=-1),0)
+                self.assertTrue(np.array_equal(np.load(case['reference_hdr']['path']),expected))
+                self.assertEqual(case['reference_hdr']['dimensions'], [173,130])
+                self.assertEqual(case['rendering_scope']['orientation_applications'], 1)
+                self.assertFalse(case['rendering_scope']['intermediate_adaptation_qualified'])
+                self.assertTrue(case['structural_checks']['orientation_baked'])
+                self.assertIn('Transformations: None', case['facts']['info'])
+                self.assertEqual(case['facts']['exiftool'].get('Orientation', 1), 1)
+        from matrix import build_matrix
+        self.assertEqual(build_matrix(report['cases'])['evidence_errors'], [])
+
+    def test_real_generated_orientation_change_stops_before_native_pixel_preparation(self):
+        original = self.module.apple_orientation_source.generate
+        boundary = []
+        def generate_then_change(directory, **kwargs):
+            source = original(directory, **kwargs)
+            avif.native(['exiftool', '-overwrite_original', '-Orientation#=8', source])
+            boundary.append(len(avif.COMMANDS))
+            return source
+        with patch.object(self.module.apple_orientation_source, 'generate', side_effect=generate_then_change):
+            case = self.module.run(self.root/'changed-orientation', geometries=('orientation',))['cases'][0]
+        self.assertEqual(case['status'], 'tested and failed')
+        self.assertFalse(case['checks']['native_encoder'])
+        self.assertTrue(any('Generated EXIF6 source changed' in value for value in case['blockers']))
+        self.assertEqual(len(avif.COMMANDS), boundary[0])
+
+    def test_actual_oriented_source_is_hash_bound_through_native_decode(self):
+        original = self.module.apple_orientation_source.run
+        def prepare_then_change(directory, **kwargs):
+            result = original(directory, **kwargs)
+            source = Path(result['orientation_source']['path'])
+            source.write_bytes(source.read_bytes()+b'late oriented source drift')
+            return result
+        with patch.object(self.module.apple_orientation_source, 'run', side_effect=prepare_then_change):
+            case = self.module.run(self.root/'source-orientation-drift', geometries=('orientation',))['cases'][0]
+        self.assertEqual(case['status'], 'tested and failed')
+        self.assertFalse(case['checks']['integrity'])
+        self.assertTrue(any('integrity' in value for value in case['blockers']))
+        self.assertEqual(case['artifacts']['source_sha256'], self.module.apple_orientation_source.SOURCE_SHA256)
 
 
 if __name__ == '__main__':

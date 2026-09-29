@@ -4,7 +4,9 @@ Declared before measurements: unchanged photographic gainmap-hdr regional
 gates apply to source, float Lanczos geometry, native PQ intent and final AV1
 decoding. No source quantization allowance is added. Native source pixels feed
 FFmpeg/zimg and AOM; the documented reference is used only for measurement.
-Only contain, cover, fill and upscale are admitted at explicit8/10/12-bit depth.
+Only contain, cover, fill, upscale and a separately locked EXIF6 variant are
+admitted at explicit 8/10/12-bit depth. Orientation applies exactly once after
+the documented full effect in original stored raster coordinates.
 This single-layer output measures full HDR only. It neither preserves an
 authored SDR base inside the output nor establishes intermediate adaptation.
 """
@@ -14,6 +16,7 @@ from pathlib import Path
 import numpy as np
 
 import apple_native_source
+import apple_orientation_source
 import apple_source_model
 import avif
 import gainmap
@@ -26,10 +29,12 @@ from matrix import GAINMAP_GEOMETRIES
 
 SELECTORS = {'format': 'avif', 'range': 'hdr', 'gamut': 'preserve', 'depth': '12',
              'motion': 'preserve', 'transparency': 'preserve', 'w': 173, 'fit': 'contain'}
-SIZES = {'contain': (173, 231), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 1025)}
+SIZES = {'contain': (173, 231), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 1025),
+         'orientation': (173, 130)}
 DEPTHS = (8, 10, 12)
 DEPENDENCIES = ('apple_hdr_avif.py', 'test_apple_hdr_avif.py', *apple_native_source.DEPENDENCIES,
-                'gainmap_linear.py', 'gainmap_hdr.py', 'hdr_png8_precision.py', 'gainmap_avif_hdr.py', 'matrix.py')
+                'gainmap_linear.py', 'gainmap_hdr.py', 'hdr_png8_precision.py', 'gainmap_avif_hdr.py', 'matrix.py',
+                *apple_orientation_source.DEPENDENCIES)
 
 
 def _selectors(operation, depth):
@@ -77,7 +82,7 @@ def _run_one(directory, *, source, selectors, operation, depth):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
-    hashes = {name: avif.digest(Path(__file__).with_name(name)) for name in DEPENDENCIES}
+    hashes = {name: avif.digest(Path(__file__).parent/name) for name in DEPENDENCIES}
     case = {'case_id': f'gainmap-apple-old:hdr:avif:preserve:{depth}:{operation}:documented-full-native',
         'cell_id': 'gainmap-jpeg:hdr:avif', 'fixture_id': 'gainmap-apple-old',
         'source_sha256': apple_source_model.SOURCE_SHA256, 'source_reference_revision': apple_source_model.REFERENCE_REVISION,
@@ -100,26 +105,45 @@ def _run_one(directory, *, source, selectors, operation, depth):
         'measurements': {}, 'artifacts': {}, 'blockers': []}
     report = {'cases': [case]}
     try:
-        prepared = apple_native_source.run(directory/'source')
+        actual_source = source
+        orientation = 6 if operation == 'orientation' else 1
+        source_hash = apple_source_model.SOURCE_SHA256
+        if operation == 'orientation':
+            actual_source = apple_orientation_source.generate(directory/'orientation-fixture', parent=source)
+            source_hash = apple_orientation_source.SOURCE_SHA256
+            if avif.digest(actual_source) != source_hash:
+                raise ValueError('Generated EXIF6 source changed before native preparation')
+        prepared = (apple_orientation_source.run(directory/'source', source=actual_source)
+                    if operation == 'orientation' else apple_native_source.run(directory/'source'))
         report['source_preparation'] = prepared
         if prepared['status'] != 'qualified source preparation' or not all(prepared['checks'].values()):
             raise ValueError('Documented native source preparation did not qualify')
-        reference = gainmap.array_geometry(np.load(prepared['reference']['path']), operation)
+        if operation == 'orientation':
+            native = prepared['native_source']
+            if (native.get('source_orientation') != 6 or native.get('orientation_applied') is not False
+                    or prepared['orientation_source']['sha256'] != source_hash
+                    or prepared['orientation_source']['path'] != str(actual_source)):
+                raise ValueError('Actual EXIF6 source must remain unrotated until derivative geometry')
+            case['orientation_source'] = prepared['orientation_source']
+            case['rendering_scope'].update({'source_orientation': 6, 'orientation_applications': 1})
+            case['threshold_scope']['reference'] = 'Documented full effect in the original stored raster, one independent EXIF6 clockwise rotation, then unchanged P3 float Lanczos containment'
+        reference = gainmap.array_geometry(np.load(prepared['reference']['path']), operation, orientation)
         reference_path = directory/'independent-full-reference.npy'
         np.save(reference_path, reference)
-        sdr = gainmap.geometry(gainmap.source_image(apple_source_model.SOURCE, 'preserve'), operation, 1)
+        sdr = gainmap.geometry(gainmap.source_image(actual_source, 'preserve'), operation, orientation)
         profile = sdr.info.get('icc_profile')
         sdr.info.clear()
         sdr_path = directory/'reference-sdr.png'
         sdr.save(sdr_path, icc_profile=profile)
-        linear = gainmap_linear.resample_linear(prepared['native_source'], directory/'native-geometry.gbrapf32', operation)
+        linear = gainmap_linear.resample_linear(prepared['native_source'], directory/'native-geometry.gbrapf32', operation, orientation)
         output, intent, intent_pixels = _encode(linear, directory, operation=operation, depth=depth)
         bound = {**prepared['bound_files'], str(source): apple_source_model.SOURCE_SHA256,
+            str(actual_source): source_hash,
             str(output): avif.digest(output), str(reference_path): avif.digest(reference_path),
             str(sdr_path): avif.digest(sdr_path),
             str(linear['path']): avif.digest(linear['path']), intent['path']: intent['sha256']}
         case['checks']['native_encoder'] = True
-        case['artifacts'] = {'source': str(source), 'source_sha256': apple_source_model.SOURCE_SHA256,
+        case['artifacts'] = {'source': str(actual_source), 'source_sha256': source_hash,
                              'output': str(output), 'sha256': bound[str(output)]}
         facts = avif.inspect_avif(output)
         frames = avif.decode_avif(output, directory, 1)
@@ -160,7 +184,7 @@ def _run_one(directory, *, source, selectors, operation, depth):
             'independent_decoder': True, 'structure': all(structural.values()),
             'appearance': all(row['passed'] for row in measurements.values()), 'privacy': privacy})
         if (any(avif.digest(path) != sha for path, sha in bound.items())
-                or any(avif.digest(Path(__file__).with_name(name)) != sha for name, sha in hashes.items())):
+                or any(avif.digest(Path(__file__).parent/name) != sha for name, sha in hashes.items())):
             raise ValueError('Source, reference or emitted output integrity changed during decoding')
         case['bound_files'] = bound
         case['checks']['integrity'] = True

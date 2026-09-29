@@ -106,11 +106,12 @@ cannot qualify another source dialect.
 The separate ISO containment, crop, stretch and EXIF6 rendering entries retain
 the same file across boosts 2, 16 and 64. Each passes only at 16. Their matched
 SDR references and failed-rendering labels remain in the manual bundle.
-The separate XMP containment entries also retain one file at boosts 2 and 16.
-Only the boost-16 rendering passes. Use each entry's independent same-boost
-reference, retain its failed boost-2 label, and record the manifest's rendering
-scope alongside physical observations. Apple intermediate adaptation remains
-untested.
+The separate XMP containment, crop, stretch, upscale and real EXIF6 entries each
+retain one file at boosts 2 and 16. Only their boost-16 renderings pass. Use
+each entry's independent same-boost reference, retain its failed boost-2 label,
+and record the manifest's rendering scope alongside physical observations.
+Upscale requires the declared experimental ICC-aware readers. Apple intermediate
+adaptation remains untested.
 
 The optional gain-map AVIF source has separately inspected authored-SDR AVIF
 derivatives for containment, crop, stretch and upscale. Compare them with the

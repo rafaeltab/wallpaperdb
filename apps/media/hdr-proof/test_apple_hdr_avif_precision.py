@@ -160,5 +160,102 @@ class AppleHdrAvifPrecisionTests(unittest.TestCase):
                 self.assertTrue(case['privacy_measurement']['private_tags'])
 
 
+class AppleHdrAvifPrecisionDepthTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import apple_hdr_avif_precision
+        cls.module = apple_hdr_avif_precision
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.root = Path(cls.temporary.name)
+        cls.report = cls.module.run(cls.root/'proof', depths=(12, 10, 8))
+
+    def test_explicit_native_depths_keep_separate_baselines_and_unchanged_gates(self):
+        from matrix import build_matrix
+        cases = self.report['cases']
+        self.assertEqual([case['selectors']['depth'] for case in cases], ['12', '10', '8'])
+        self.assertEqual(len({case['case_id'] for case in cases}), 3)
+        baselines = {case['selectors']['depth']: case for case in self.report['baseline']['cases']}
+        hashes = {12: '1dffb13fe24aac6b2d43c7f65d82f3c6ec02cdf6709a04b36aadf36dc4028ebb',
+                  10: '6cf3a99518eca0ea0cee3208eacde4e7e8a53437db5fef8163d2491b82e28505',
+                  8: 'e55fc20801f655114d15734b5c7b71256baa0dd74a969983858e85a6613ddd8d'}
+        for case in cases:
+            depth = int(case['selectors']['depth'])
+            old = baselines[str(depth)]
+            with self.subTest(depth=depth):
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertTrue(all(case['checks'].values()))
+                self.assertTrue(all(case['structural_checks'].values()))
+                self.assertEqual(case['facts']['depth'], depth)
+                self.assertEqual(case['artifacts']['sha256'], hashes[depth])
+                self.assertEqual(case['output_packet_facts']['streams'][0]['pix_fmt'], 'gbrp' if depth == 8 else f'gbrp{depth}le')
+                self.assertEqual(case['selectors'], {**self.module.SELECTORS, 'depth': str(depth)})
+                self.assertEqual(case['reference_hdr']['sha256'], old['reference_hdr']['sha256'])
+                self.assertEqual(case['threshold_scope'], old['threshold_scope'])
+                self.assertEqual(case['threshold_scope']['profile'], 'gainmap-hdr')
+                self.assertEqual(case['threshold_scope']['source_quantization_allowance'], 0)
+                self.assertEqual(case['hdr_intent']['sha256'], 'abebcdf69ad7adf9b8630694df7a3ffb1772003985e740e24047996ee2c871dc')
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+                self.assertFalse(case['rendering_scope']['intermediate_adaptation_qualified'])
+                for path, sha in case['bound_files'].items():
+                    self.assertEqual(avif.digest(path), sha, path)
+        self.assertEqual(build_matrix([*baselines.values(), *cases])['evidence_errors'], [])
+
+    def test_signed_regional_errors_retain_every_regression_as_a_diagnostic(self):
+        baselines = {case['selectors']['depth']: case for case in self.report['baseline']['cases']}
+        for case in self.report['cases']:
+            old = baselines[case['selectors']['depth']]
+            comparison = case['regional_change_from_baseline']
+            self.assertEqual(comparison['qualification_role'], 'Diagnostic only; unchanged appearance gates decide qualification')
+            increases = []
+            for region, measured in case['measurements']['hdr']['regions'].items():
+                prior = old['measurements']['hdr']['regions'][region]
+                self.assertEqual(comparison['regions'][region]['samples'], measured['samples'])
+                self.assertEqual(measured['samples'], prior['samples'])
+                for metric in ('delta_e_itp', 'luminance_absolute_error_nits', 'luminance_relative_error_above_absolute_floor'):
+                    for statistic in ('mean', 'p95', 'maximum'):
+                        difference = measured[metric][statistic]-prior[metric][statistic]
+                        self.assertEqual(comparison['regions'][region][metric][statistic], difference)
+                        if difference > 0:
+                            increases.append(f'{region}.{metric}.{statistic}')
+            self.assertEqual(comparison['error_increases'], increases)
+        by_depth = {int(case['selectors']['depth']): case for case in self.report['cases']}
+        self.assertEqual([len(by_depth[depth]['regional_change_from_baseline']['error_increases']) for depth in (12, 10, 8)],
+                         [0, 5, 6])
+        # Coarser quantization is not a monotonic improvement from precise input.
+        eight = by_depth[8]
+        maximum = lambda case: max(region['delta_e_itp']['maximum'] for region in case['measurements']['hdr']['regions'].values()
+                                   if region['samples'])
+        self.assertGreater(maximum(eight), maximum(baselines['8']))
+        self.assertEqual(eight['status'], 'qualified')  # The original fixed gates still pass.
+
+    def test_prior_precision12_result_and_native_baseline_remain_exact(self):
+        original = self.module.run(self.root/'default')
+        for name, actual, expected in (('candidate', self.report['cases'][0], original['cases'][0]),
+                ('baseline', self.report['baseline']['cases'][0], original['baseline']['cases'][0])):
+            for key in ('case_id', 'candidate', 'selectors', 'checks', 'measurements', 'status', 'blockers',
+                        'structural_checks', 'output_packet_facts', 'privacy_measurement',
+                        'rendering_scope', 'qualification_scope', 'known_consumer_limitations', 'threshold_scope'):
+                self.assertEqual(actual[key], expected[key], (name, key))
+            for key in ('artifacts', 'reference_hdr', 'reference_sdr', 'hdr_intent'):
+                self.assertEqual(actual[key]['sha256'], expected[key]['sha256'], (name, key))
+            def stable_facts(row):
+                return {**row['facts'], 'info': row['facts']['info'].replace(row['artifacts']['output'], '<output>')}
+            self.assertEqual(stable_facts(actual), stable_facts(expected), name)
+
+    def test_unproved_or_ambiguous_depth_requests_stop_before_native_work(self):
+        for depths in ((), (8, 8), (16,), (True,), ('8',), ([8],)):
+            before = len(avif.COMMANDS)
+            with self.subTest(depths=depths), self.assertRaises(ValueError):
+                self.module.run(self.root/'rejected', depths=depths)
+            self.assertEqual(len(avif.COMMANDS), before)
+        before = len(avif.COMMANDS)
+        with self.assertRaises(ValueError):
+            self.module.run(self.root/'ambiguous', depths=(12, 10), selectors=self.module.SELECTORS)
+        with self.assertRaises(ValueError):
+            self.module.run(self.root/'mismatch', depths=(8,), selectors=self.module.SELECTORS)
+        self.assertEqual(len(avif.COMMANDS), before)
+
+
 if __name__ == '__main__':
     unittest.main()

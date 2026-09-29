@@ -204,6 +204,46 @@ def precision_report(precision):
     return lines
 
 
+def gainmap_candidate_report(evidence):
+    groups = {}
+    readers = {}
+    for case in evidence:
+        if not case.get('candidate', '').startswith('native-combine-'):
+            continue
+        key = (case['fixture_id'], case['candidate'], case['source_reference_revision'])
+        groups.setdefault(key, []).append(case)
+        for reader, diagnostic in case.get('consumer_decoder_diagnostics', {}).items():
+            readers.setdefault(reader, Counter())[diagnostic['status']] += 1
+
+    def largest(cases, measurement, metric, statistic):
+        values = [region[metric][statistic] for case in cases
+                  for region in case.get('measurements', {}).get(measurement, {}).get('regions', {}).values()
+                  if region.get('samples', 0) and statistic in region.get(metric, {})]
+        return f'{max(values):.4f}' if values else 'missing'
+
+    lines = ['## Native gain-map candidate measurements', '',
+             'Each value is the maximum of the recorded regional statistic across the tested geometries in that row. Means are not pooled across regions or images. Empty regions are excluded; absent measurements remain missing. Qualification still requires every original structural, privacy and appearance check. Exact case IDs, all shadow/midtone/highlight statistics and individual blockers remain in [measurements](measurements.json).', '',
+             '| Fixture | Candidate | Reference revision | Qualified/attempted | SDR Delta E mean | SDR Delta E max | HDR Delta E mean | HDR Delta E max | HDR mean absolute luminance error, nits |',
+             '| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |']
+    for (fixture, candidate, revision), cases in sorted(groups.items()):
+        values = [largest(cases, 'authored_sdr_base', 'delta_e_itp', 'mean'),
+                  largest(cases, 'authored_sdr_base', 'delta_e_itp', 'max'),
+                  largest(cases, 'reconstructed_hdr', 'delta_e_itp', 'mean'),
+                  largest(cases, 'reconstructed_hdr', 'delta_e_itp', 'max'),
+                  largest(cases, 'reconstructed_hdr', 'luminance_absolute_error_nits', 'mean')]
+        qualified = sum(case['status'] == 'qualified' for case in cases)
+        lines.append(f'| `{fixture}` | `{candidate}` | `{revision}` | {qualified}/{len(cases)} | '
+                     + ' | '.join(values) + ' |')
+    if readers:
+        lines += ['', 'The following separate decoder diagnostics do not alter the file qualification above. The original reader results remain recorded. A successful readback still leaves every physical consumer pending manual review.', '',
+                  '| Independent reader diagnostic | Attempted | Appearance passed | Failed or unqualified |',
+                  '| --- | ---: | ---: | ---: |']
+        for reader, statuses in sorted(readers.items()):
+            attempted, qualified = sum(statuses.values()), statuses['qualified']
+            lines.append(f'| `{reader}` | {attempted} | {qualified} | {attempted-qualified} |')
+    return lines + ['']
+
+
 def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
@@ -262,11 +302,12 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
         for region, values in image.get('regions', {}).items():
             if values.get('samples', 0):
                 lines.append(f"| `{case['case_id']}` | {region} | {values['delta_e_itp']['p95']:.4f} | {values['luminance_absolute_error_nits']['mean']:.4f} |")
-    lines += ['', 'The tunable Mobius and Reinhard trials use maintained native functions with fixed parameters. Their failures do not change the white target. Adaptive peak detection is disabled in the candidate conversion path; separate controls record frame-to-frame white shifts and repeat hashes with it enabled and disabled. Persistent temporal-filter history is not qualified by these per-frame trials.', '', '## Blockers and scope limits','',
+    lines += ['', 'The tunable Mobius and Reinhard trials use maintained native functions with fixed parameters. Their failures do not change the white target. Adaptive peak detection is disabled in the candidate conversion path; separate controls record frame-to-frame white shifts and repeat hashes with it enabled and disabled. Persistent temporal-filter history is not qualified by these per-frame trials.', '',
+              *gainmap_candidate_report(evidence), '## Blockers and scope limits','',
               '- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.',
               '- The separately versioned gainmap-hdr-target-gamut-v1 reference filters and clips negative Lanczos excursions in the requested output primaries. Clipping in the earlier Rec.2020 decoder coordinates could create negative components in the requested P3 or sRGB gamut. Analytic commutation, out-of-gamut and identity controls verify this correction. Old references and failed case IDs remain visible; new cases record the reference revision and diagnostic differences. Appearance thresholds are unchanged.',
               '- Combined gain-map candidates use JPEG SOF3 predictive RGB8 coding and proof-local native patches. The pinned libavif JPEG reader rejects SOF3, while the separately tested native JPEG/ISO and patched libultrahdr readers decode it. File qualification does not establish browser or wallpaper compatibility. Every exact representation still requires the listed physical consumer checks.',
-              '- Separate SOF0 RGB8 DCT candidates compute a gain map against their actual compressed SDR base. Passing cases have a coding form that the pinned libavif reader can decode; DCT shadow errors still disqualify other cases. The libavif JPEG-to-AVIF-to-PQ decoder route adds eight-bit YCbCr map rounding, so its extra appearance failures remain separate diagnostics. Neither decoder result qualifies a physical browser or wallpaper setter.',
+              '- Separate SOF0 RGB8 DCT candidates compute a gain map against their actual compressed SDR base. Passing cases have a coding form that the pinned libavif reader can decode; DCT shadow errors still disqualify other cases. The baseline libavif JPEG-to-AVIF-to-PQ decoder route adds eight-bit YCbCr map rounding. A separate native RGB reader preserves map samples without that conversion. Both reader results retain their own measurements and failures without changing any conversion gate. Neither decoder result qualifies a physical browser or wallpaper setter.',
               '- A separate moderate-offset native gain-map candidate uses offsets of 1/4096 to reduce the eight-bit map interval while retaining near-black accuracy. Analytic dark controls and unchanged regional appearance gates check the tradeoff. All ISO, ExifTool XMP and native probe channel extrema, gamma, offsets and headroom must agree within documented serialization precision. The prior identity-policy upscale failures stay visible.',
               '- Separate ISO float32 source candidates reuse the native codec transfer/gain functions before half-float storage and retain native float geometry. They must pass independent source, geometry, PQ intent and emitted-JPEG measurements. Floating-DCT alternatives use the native JDCT_FLOAT encoder while retaining the existing sRGB base transfer. Earlier source-precision and integer-DCT failures remain recorded.',
               '- Single-layer PQ PNG16 and AVIF12 candidates independently decode the executed native HDR intent against the gain-map source reference. They explicitly request output depth and preserve source primaries. The native PNG inspection file is also included as a manual comparison; its presence alone never qualifies a separate conversion. Explicit SDR requests continue to select the authored base.',

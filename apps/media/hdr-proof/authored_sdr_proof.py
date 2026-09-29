@@ -15,8 +15,8 @@ from matrix import GAINMAP_GEOMETRIES
 def run(directory, *, names=gainmap.NAMES,
         geometries=('identity', *gainmap.GEOMETRIES),
         gamuts=('preserve', 'srgb'), gammas=(None, 3.2), formats=('jpg',)):
-    if not formats or any(fmt not in ('jpg', 'png', 'webp') for fmt in formats):
-        raise ValueError('Authored SDR candidates support JPEG, PNG, and WebP')
+    if not formats or any(fmt not in ('jpg', 'avif', 'png', 'webp') for fmt in formats):
+        raise ValueError('Authored SDR candidates support JPEG, AVIF, PNG, and WebP')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     provenance = json.loads((gainmap.FIXTURES/'manifest.json').read_text())
@@ -76,6 +76,9 @@ def run(directory, *, names=gainmap.NAMES,
                             arguments['gamma'] = gamma
                         if fmt == 'jpg':
                             codec = gainmap_sdr
+                        elif fmt == 'avif':
+                            import authored_avif
+                            codec = authored_avif
                         else:
                             import authored_lossless
                             codec = authored_lossless

@@ -10,18 +10,18 @@ const input = { wallpaperId: 'wlpr_cancel', fileType: 'image' as const, mimeType
 const preset = { width: 80, height: 45, label: 'small' };
 
 describe('Image storage request ownership', () => {
-  it.each([
+  it.for([
     { phase: 'headers', deadline: false, health: false },
     { phase: 'body', deadline: false, health: false },
     { phase: 'body', deadline: true, health: false },
     { phase: 'headers', deadline: true, health: true },
     { phase: 'upload', deadline: false, health: false },
     { phase: 'upload', deadline: true, health: false },
-  ])('closes pending socket $phase deadline=$deadline health=$health', async ({
+  ])('closes pending socket $phase deadline=$deadline health=$health', { timeout: 5000 }, async ({
     phase,
     deadline,
     health,
-  }) => {
+  }, { signal: testSignal }) => {
     let observedRequest = () => {};
     const requested = new Promise<void>((resolve) => {
       observedRequest = resolve;
@@ -34,7 +34,14 @@ describe('Image storage request ownership', () => {
     const server = createServer((request, response) => {
       if (phase === 'upload' && request.method === 'GET') {
         response.writeHead(200, { 'Content-Length': png.length });
-        response.end(png);
+        if (deadline) {
+          // Deliberate fixture latency exceeds the former one-second safety abort.
+          // This is the regression stimulus, not a sleep used to wait for readiness.
+          const timer = setTimeout(() => response.end(png), 1200);
+          response.once('close', () => clearTimeout(timer));
+        } else {
+          response.end(png);
+        }
         return;
       }
       response.on('close', observedClose);
@@ -59,10 +66,18 @@ describe('Image storage request ownership', () => {
       }).pipe(Layer.provideMerge(TestClock.layer()))
     );
     const controller = new AbortController();
+    const signal = AbortSignal.any([controller.signal, testSignal]);
+    async function waitForRequest(operation: Promise<unknown>): Promise<void> {
+      await Promise.race([
+        requested,
+        operation.then(
+          (value) => { throw new Error(`Image operation completed before the ${phase} request`, { cause: value }); },
+          (cause: unknown) => { throw new Error(`Image operation failed before the ${phase} request`, { cause }); }
+        ),
+      ]);
+    }
     try {
       if (deadline) {
-        // A real-time abort is a test failure bound, not the deadline under test.
-        const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(1000)]);
         const operation = health
           ? runtime.runPromise(
               Effect.gen(function* () {
@@ -82,7 +97,7 @@ describe('Image storage request ownership', () => {
           (value) => ({ value }),
           (error: unknown) => ({ error })
         );
-        await requested;
+        await waitForRequest(operation);
         await runtime.runPromise(TestClock.adjust(health ? '5 seconds' : '100 seconds'));
         const result = await settled;
         expect('value' in result).toBe(true);
@@ -103,12 +118,12 @@ describe('Image storage request ownership', () => {
           Effect.gen(function* () {
             return yield* (yield* VariantImages).generate(input, preset);
           }),
-          { signal: controller.signal }
+          { signal }
         );
-        const rejected = expect(operation).rejects.toBeDefined();
-        await requested;
+        const rejected = operation.then(() => false, () => true);
+        await waitForRequest(operation);
         controller.abort();
-        await rejected;
+        expect(await rejected).toBe(true);
       }
       await closed;
     } finally {
@@ -119,7 +134,7 @@ describe('Image storage request ownership', () => {
         server.close((error) => (error ? reject(error) : resolve()));
       });
     }
-  }, 5000);
+  });
 });
 
 

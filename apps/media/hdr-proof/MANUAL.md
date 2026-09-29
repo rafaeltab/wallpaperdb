@@ -102,8 +102,8 @@ EXIF6 orientation each have their own inspected output and authored SDR comparis
 fixed-luminance single-layer HDR file;
 its passing codec measurements do not establish the viewer's HDR presentation
 or SDR fallback behavior.
-The separately named `precision-opaque-planar16` PNG containment has its own
-hash and measurements. Compare it with the earlier PNG at matched size,
+The separately named `precision-opaque-planar16` PNGs cover all five geometries,
+each with its own hash and measurements. Compare each with the earlier PNG at matched size,
 especially shadow gradients and dark colored edges. Both use the same source
 reference and remain pending physical review despite different measured errors.
 The gain-map JPEG endpoint comparisons use display boost 16. Check the separate

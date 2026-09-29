@@ -142,7 +142,7 @@ def candidate_files(evidence, fixtures):
         or case.get('candidate') == 'native-combine-moderateoffset-mozjpeg-base-dct-float-map'
         or case.get('candidate', '').startswith('native-combine-icc-gamma32-')
         or case.get('proof_module') in ('iso_geometry_headroom', 'gainmap_avif_identity_jpeg',
-                                       'xmp_containment_headroom', 'apple_hdr_avif', 'apple_hdr_png')
+                                       'xmp_containment_headroom', 'apple_hdr_avif', 'apple_hdr_png', 'apple_hdr_png_precision')
         or (case.get('fixture_id', '').startswith('apng-') and case.get('geometry') in ('contain', 'orientation'))]
     for case in selected:
         artifacts = case.get('artifacts')
@@ -799,7 +799,8 @@ def main():
     write_json(RESULTS/'apple-hdr-png-contain.json', apple_hdr_png)
     icc_results.extend(apple_hdr_png['cases'])
     from apple_hdr_png_precision import run as run_apple_hdr_png_precision
-    apple_hdr_png_precision = run_apple_hdr_png_precision(WORK/'apple-hdr-png-precision-contain')
+    apple_hdr_png_precision = run_apple_hdr_png_precision(WORK/'apple-hdr-png-precision-contain',
+        geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
     write_json(RESULTS/'apple-hdr-png-precision-contain.json', apple_hdr_png_precision)
     icc_results.extend(apple_hdr_png_precision['cases'])
     for source_id in ('gainmap-apple-old', 'gainmap-apple-new'):
@@ -909,7 +910,8 @@ def main():
     # the original generated corpus lock, including its PNG16 hashes.
     generated_fixtures = locked_fixtures + png8_result['fixtures'] + png8_geometry_result['fixtures'] + gainmap_avif_result['source_fixtures']
     generated_fixtures = merge_reconstruction_profiles(generated_fixtures, gainmap_avif_hdr_result['source_fixtures'])
-    generated_fixtures += apple_orientation_fixtures(apple_hdr_jpeg['cases']+apple_hdr_avif['cases']+apple_hdr_png['cases'])
+    generated_fixtures += apple_orientation_fixtures(apple_hdr_jpeg['cases']+apple_hdr_avif['cases']+
+                                                    apple_hdr_png['cases']+apple_hdr_png_precision['cases'])
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
     errors = matrix['evidence_errors'] + fixture_lock(locked_fixtures,args.update_fixture_lock)

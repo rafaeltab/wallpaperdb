@@ -208,9 +208,14 @@ one and every copied RGB byte is unchanged. Explicit native PQ float,
 planar16 quantization and RGB16 packing avoid the earlier conversion loss.
 Independent libpng decoding matches the native packed RGB16 bytes exactly.
 Analytic nearest-code error falls from 16 codes to one; this is a diagnostic,
-not a replacement acceptance limit. Only the separately named containment
-file enters the matrix as new evidence. Other geometries, fractional alpha,
-gamuts and depths require their own proof.
+not a replacement acceptance limit. Separate crop, stretch, upscale and actual
+EXIF6 orientation files pass with maxima 0.011055, 0.010527, 0.011214 and
+0.010703. Each preserves its original source and geometry gates, with one
+rotation for EXIF6, and has maximum code error one. All five original PNGs and
+the first precise containment retain their exact bytes and measurements. Only
+the five separately named precise outputs enter the matrix as new evidence;
+nested baseline records are not counted twice. Fractional alpha, other gamuts
+and depths require their own proof.
 New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native

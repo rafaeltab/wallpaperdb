@@ -42,10 +42,12 @@ class EvidenceFileTests(unittest.TestCase):
                 'artifacts': {'output': str(outputs[extension]), 'sha256': suite.avif.digest(outputs[extension])}}
                 for extension, depths in (('avif', (8, 10, 12)), ('png', (16,)))
                 for depth in depths for operation in ('contain', 'cover', 'fill', 'upscale', 'orientation')]
+            cases += [{**case, 'case_id': case['case_id']+'-precision', 'proof_module': 'apple_hdr_png_precision'}
+                      for case in cases if case['proof_module'] == 'apple_hdr_png']
             with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
                 files = suite.candidate_files(cases, [])
             self.assertEqual({row['case_id'] for row in files}, {case['case_id'] for case in cases})
-            self.assertEqual(len(files), 20)
+            self.assertEqual(len(files), 25)
             for row in files:
                 self.assertFalse(row['rendering_scope']['intermediate_adaptation_qualified'])
                 self.assertEqual(row['consumer_status'], 'pending manual review')

@@ -301,18 +301,27 @@ def timing(facts):
 
 
 def structure_checks(facts, frames, spec, reference, transfer, gamut, depth, count):
-    shape = reference[0].shape
+    frame_count = count > 0 and len(timing(facts)) == len(frames) == len(reference) == count
+    shape = reference[0].shape if reference else ()
+    dimensions = (frame_count and len(shape) == 3 and shape[2] == 4
+                  and (facts['width'], facts['height']) == (shape[1], shape[0])
+                  and all(frame.shape == ref.shape == shape for frame, ref in zip(frames, reference)))
     checks = {
-        'dimensions': (facts['width'], facts['height']) == (shape[1], shape[0]),
+        'dimensions': dimensions,
         'depth': facts['depth'] == depth,
         'transfer': facts['transfer'] == TRANSFERS[transfer] == facts['exiftool'].get('TransferCharacteristics'),
         'gamut': facts['primaries'] == PRIMARIES[gamut] == facts['exiftool'].get('ColorPrimaries'),
-        'matrix_full_range': facts['matrix'] == 0 and 'Range          : Full' in facts['info'],
+        'matrix_full_range': (facts['matrix'] == facts['exiftool'].get('MatrixCoefficients') == 0
+                              and facts['exiftool'].get('VideoFullRangeFlag') == 1
+                              and 'Range          : Full' in facts['info']),
+        'gain_map_absent': re.findall(r'^\s*\* Gain map\s*:\s*(.*)$', facts['info'], re.MULTILINE) == ['Absent'],
+        'icc_absent': re.findall(r'^\s*\* ICC Profile\s*:\s*(.*)$', facts['info'], re.MULTILINE) == ['Absent'],
         'orientation_baked': 'Transformations: None' in facts['info'],
-        'frames': len(timing(facts)) == count,
+        'frames': frame_count,
         'timing': timing(facts) == ([3, 7] if count == 2 else [1]),
         'loop': 'Repeat Count   : 2' in facts['info'] if count == 2 else True,
-        'alpha': all(np.max(np.abs(frame[..., 3]-ref[..., 3])) <= 2/(2**depth-1) for frame,ref in zip(frames, reference)),
+        'alpha': dimensions and all(np.max(np.abs(frame[..., 3]-ref[..., 3])) <= 2/(2**depth-1)
+                                    for frame, ref in zip(frames, reference)),
     }
     return checks
 

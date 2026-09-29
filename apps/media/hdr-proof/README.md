@@ -398,8 +398,15 @@ native HDR, independent HDR and cross-reader gates at display boost 16 for
 containment, crop, stretch and upscale. The original containment remains exact.
 Independent HDR maximum error is 6.10543 across these cases; both actual JPEG layers are RGB8
 SOF0. The source reference uses independent dav1d samples and parsed tmap
-metadata. Stock-reader failure and intermediate adaptation remain separate
-limitations; browser and wallpaper results remain pending.
+metadata. A separate [boost-2 rendering proof](gainmap_avif_hdr_jpeg_headroom.py)
+retains the exact containment file but fails against the source reconstructed
+at that same boost. Both readers agree; independent shadow maximum is 75.26896.
+Capacity-normalized and uncompressed-map diagnostics still fail. Changing the
+authored SDR geometry to a linear-light reference would itself fail the existing
+SDR gate, so that reference remains unchanged. These are optional conversion
+measurements, not an additional required product path. Stock-reader failure and
+measured adaptation failure remain explicit; browser and wallpaper results are
+pending.
 The [authored SDR GIF containment](gainmap_avif_gif.py) remains failed. Its real
 256-color native palette passes structure, ICC, opacity and independent decoding
 but exceeds the unchanged shadow and midtone appearance gates. A read-only

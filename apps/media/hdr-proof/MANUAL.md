@@ -103,8 +103,8 @@ variants. The JPEG has no separate aspect declaration; check the recorded
 raster dimensions and consumer geometry independently.
 The inspected SDR GIF containments from FFmpeg and libimagequant, including
 the separate gamma-3.2 ICC candidate, are failed palette diagnostics. Their metadata
-privacy, actual sRGB ICC, opacity and one-frame structure pass, but their shadow
-and midtone color errors exceed the file gates. Do not use either as a qualified
+privacy, actual ICC, opacity and one-frame structure pass, but their shadow
+and midtone color errors exceed the file gates. Do not use them as a qualified
 SDR fallback even if the consumer opens it.
 The gain-map AVIF source also has inspected HDR JPEG containment, crop, stretch
 and upscale with a
@@ -112,6 +112,10 @@ gamma-3.2 ICC base and regenerated RGB8 map. Its file measurements pass at
 display boost 16 through ICC-aware readers. Compare both SDR and HDR endpoints
 against their matched references; stock-reader and intermediate-adaptation
 limitations do not disappear when a consumer opens the file.
+The same containment JPEG has a separate failed boost-2 record with its own
+matched source reference. Keep its passing boost-16 endpoint and failed
+intermediate rendering separate in the checklist; a successful endpoint does
+not clear that appearance failure.
 The separately named HDR candidates emit single-layer PQ AVIF12 for containment,
 crop, stretch and upscale. The original
 native-map-sampling candidate remains failed; the antialiased-map candidate has

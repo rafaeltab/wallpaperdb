@@ -166,6 +166,14 @@ Both output readers agree, and its decoded pixels are exactly equal to those
 at boost 16, while the independently reconstructed source becomes brighter.
 The earlier endpoint success therefore proves neither intermediate adaptation
 nor this source's fully applied HDR appearance.
+A separate [full-source candidate](iso_full_headroom_candidate.py) renders the
+native float32 source at boost 64 before geometry and map regeneration. Its
+boost-64 file rendering passes both HDR readers, with independent shadow maximum
+7.79985 against the unchanged limit of 8. The same output fails boosts 2 and 16.
+Its native regenerated capacity is 3.089498 log2, while the source is 5.622376.
+This improves the full-source endpoint but leaves the joint same-file adaptation
+requirement failed. It retains the exact compressed SDR base and every earlier
+candidate's evidence.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

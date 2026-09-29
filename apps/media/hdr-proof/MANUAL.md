@@ -81,6 +81,10 @@ Its source capacity exceeds boost 16, so that earlier comparison is not the
 fully applied source HDR image. Use the joint same-file record for boosts 2,
 16 and 64; successes from different output files cannot be combined into one
 adaptive-HDR approval.
+The separately named full-source candidate passes at boost 64 and fails at 2
+and 16. Its native HDR comparison PNG belongs only to the boost-64 record.
+Use the independent same-boost references for the other renderings; neither
+file has passed the complete adaptive comparison.
 
 The optional gain-map AVIF source has separately inspected authored-SDR AVIF
 derivatives for containment, crop, stretch and upscale. Compare them with the

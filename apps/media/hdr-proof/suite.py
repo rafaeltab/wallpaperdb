@@ -491,9 +491,9 @@ def apple_documented_report(evidence):
              and case.get('proof_module') in ('apple_hdr_jpeg', 'apple_hdr_avif', 'apple_hdr_png')
              and case.get('source_reference_revision') == REFERENCE_REVISION]
     lines = ['## Corrected old Apple full-effect conversions', '',
-        'Current recorded rows only, using the independently documented full source model. The table keeps each exact output depth and geometry separate. Independent HDR and authored SDR maxima use the unchanged photographic gates; the complete regional color and luminance statistics remain in [measurements](measurements.json).', '',
-        '| Geometry | Output | Depth selector | Independent HDR maximum Delta E ITP | Authored SDR maximum Delta E ITP | Status |',
-        '| --- | --- | --- | ---: | ---: | --- |']
+        'Current recorded rows only, using the independently documented full source model. The table keeps each exact output gamut, depth and geometry separate. The output SHA-256 prefix distinguishes alternative encodings of the same request; full hashes and regional color/luminance statistics remain in [measurements](measurements.json). Independent HDR and authored SDR maxima use the unchanged photographic gates.', '',
+        '| Geometry | Output | Gamut selector | Depth selector | Independent HDR maximum Delta E ITP | Authored SDR maximum Delta E ITP | Output SHA-256 prefix | Status |',
+        '| --- | --- | --- | --- | ---: | ---: | --- | --- |']
     def maximum(measurement, absent):
         values = [region['delta_e_itp']['maximum'] for region in measurement.get('regions', {}).values()
                   if region.get('samples', 0) and 'maximum' in region.get('delta_e_itp', {})]
@@ -503,7 +503,9 @@ def apple_documented_report(evidence):
         hdr = maximum(measurements.get('independent_hdr', measurements.get('hdr', {})), 'missing')
         sdr = maximum(measurements.get('authored_sdr_base', {}),
                       'missing' if selectors['format'] == 'jpg' else 'not embedded')
-        lines.append(f'| {case["geometry"]} | {selectors["format"]} | {selectors["depth"]} | {hdr} | {sdr} | {case["status"]} |')
+        sha = (case.get('artifacts') or {}).get('sha256')
+        output = f'`{sha[:12]}`' if isinstance(sha, str) and re.fullmatch('[0-9a-f]{64}', sha) else 'missing'
+        lines.append(f'| {case["geometry"]} | {selectors["format"]} | {selectors["gamut"]} | {selectors["depth"]} | {hdr} | {sdr} | {output} | {case["status"]} |')
     if not cases:
         lines += ['', 'No current corrected-source conversion evidence.']
     return lines + ['',

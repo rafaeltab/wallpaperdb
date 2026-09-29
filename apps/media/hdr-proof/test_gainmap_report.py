@@ -84,19 +84,23 @@ class GainMapReportTests(unittest.TestCase):
         from apple_source_model import REFERENCE_REVISION
         case = {'fixture_id': 'gainmap-apple-old', 'proof_module': 'apple_hdr_jpeg',
             'source_reference_revision': REFERENCE_REVISION, 'geometry': 'contain',
-            'selectors': {'format': 'jpg', 'depth': 'preserve'}, 'status': 'qualified',
+            'selectors': {'format': 'jpg', 'gamut': 'preserve', 'depth': 'preserve'}, 'status': 'qualified',
+            'artifacts': {'sha256': 'a'*64},
             'measurements': {'independent_hdr': measurement(.1, 4.52892, .2),
                              'authored_sdr_base': measurement(.1, 4.64090, .1)}}
-        failed = {**case, 'geometry': 'orientation', 'status': 'tested and failed',
+        failed = {**case, 'geometry': 'orientation', 'status': 'tested and failed', 'artifacts': {},
             'measurements': {'independent_hdr': measurement(3, 12.45, 2)}}
         single = {**case, 'proof_module': 'apple_hdr_avif', 'geometry': 'cover',
-            'selectors': {'format': 'avif', 'depth': '10'},
+            'selectors': {'format': 'avif', 'gamut': 'preserve', 'depth': '10'},
             'measurements': {'hdr': measurement(.1, .82, .2)}}
+        wide = {**single, 'selectors': {**single['selectors'], 'gamut': 'rec2020'},
+                'artifacts': {'sha256': 'b'*64}, 'measurements': {'hdr': measurement(.1, 1.02, .2)}}
         legacy = {**case, 'source_reference_revision': 'legacy-convention'}
-        rendered = '\n'.join(apple_documented_report([case, failed, single, legacy]))
-        self.assertIn('| contain | jpg | preserve | 4.528920 | 4.640900 | qualified |', rendered)
-        self.assertIn('| orientation | jpg | preserve | 12.450000 | missing | tested and failed |', rendered)
-        self.assertIn('| cover | avif | 10 | 0.820000 | not embedded | qualified |', rendered)
+        rendered = '\n'.join(apple_documented_report([case, failed, single, wide, legacy]))
+        self.assertIn('| contain | jpg | preserve | preserve | 4.528920 | 4.640900 | `aaaaaaaaaaaa` | qualified |', rendered)
+        self.assertIn('| orientation | jpg | preserve | preserve | 12.450000 | missing | missing | tested and failed |', rendered)
+        self.assertIn('| cover | avif | preserve | 10 | 0.820000 | not embedded | `aaaaaaaaaaaa` | qualified |', rendered)
+        self.assertIn('| cover | avif | rec2020 | 10 | 1.020000 | not embedded | `bbbbbbbbbbbb` | qualified |', rendered)
         self.assertEqual(rendered.count('| contain |'), 1)
         self.assertIn('Current recorded rows only', rendered)
         self.assertIn('does not qualify intermediate Apple adaptation', rendered)

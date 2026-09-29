@@ -1,12 +1,12 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { AlertCircle, ArrowLeft, ImageOff, Upload } from 'lucide-react';
+import { ArrowLeft, ImageOff, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBrowseFilterPanel } from '@/components/browse-filter-panel-context';
 import { ProfileFilter } from '@/components/profile/profile-filter';
 import { WallpaperGridSkeleton } from '@/components/grid';
 import { LoadMoreTrigger } from '@/components/LoadMoreTrigger';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { GraphQLError } from '@/components/graphql-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -46,17 +46,28 @@ export function HomePage() {
   const [draftColor, setDraftColor] = useState(color ?? FALLBACK_COLOR_INPUT_VALUE);
   const colorChangeTimeoutRef = useRef<number | undefined>(undefined);
 
-  const { data, isLoading, isFetchingNextPage, error, hasNextPage, fetchNextPage } =
-    useWallpaperInfiniteQuery({
-      initialCursor: after ?? null,
-      filter: buildWallpaperFilter(
-        format,
-        getAspectRatioFilterValue(aspectRatio, deviceAspectRatioPreset),
-        profileId
-      ),
-      sort: buildWallpaperSort(color),
-    });
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    isFetchNextPageError,
+    error: queryError,
+    failureReason,
+    isFetching,
+    refetch,
+    hasNextPage,
+    fetchNextPage,
+  } = useWallpaperInfiniteQuery({
+    initialCursor: after ?? null,
+    filter: buildWallpaperFilter(
+      format,
+      getAspectRatioFilterValue(aspectRatio, deviceAspectRatioPreset),
+      profileId
+    ),
+    sort: buildWallpaperSort(color),
+  });
 
+  const error = queryError ?? failureReason;
   const handleLoadMore = useCallback(() => {
     fetchNextPage();
   }, [fetchNextPage]);
@@ -186,20 +197,38 @@ export function HomePage() {
         onFormatChange={handleFormatChange}
         onAspectRatioChange={handleAspectRatioChange}
       />
-      {isLoading ? (
+      {error && wallpapers.length === 0 ? (
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          <GraphQLError
+            error={error}
+            retry={refetch}
+            retrying={isFetching}
+            title="Failed to load wallpapers"
+          />
+        </div>
+      ) : isLoading ? (
         <LoadingState />
-      ) : error ? (
-        <ErrorState error={error} />
       ) : wallpapers.length === 0 ? (
         <EmptyState hasCursor={!!after} hasFilters={Boolean(profileId || format || aspectRatio)} />
       ) : (
         <>
           <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isFetchingNextPage} />
-          <LoadMoreTrigger
-            onLoadMore={handleLoadMore}
-            hasMore={hasNextPage ?? false}
-            isLoading={isFetchingNextPage}
-          />
+          {error ? (
+            <div className="max-w-2xl mx-auto px-4 py-6">
+              <GraphQLError
+                error={error}
+                retry={isFetchNextPageError || isFetchingNextPage ? fetchNextPage : refetch}
+                retrying={isFetching}
+                title="Could not load more wallpapers"
+              />
+            </div>
+          ) : (
+            <LoadMoreTrigger
+              onLoadMore={handleLoadMore}
+              hasMore={hasNextPage ?? false}
+              isLoading={isFetchingNextPage}
+            />
+          )}
         </>
       )}
     </div>
@@ -406,23 +435,6 @@ function getDeviceAspectRatioPreset(): BrowseAspectRatioPresetValue {
 
 function LoadingState() {
   return <WallpaperGridSkeleton count={12} baseSize={375} gap={16} />;
-}
-
-function ErrorState({ error }: { error: Error }) {
-  return (
-    <div className="max-w-2xl mx-auto px-4 py-12">
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Failed to load wallpapers</AlertTitle>
-        <AlertDescription>{error.message}</AlertDescription>
-      </Alert>
-      <div className="mt-4 flex justify-center">
-        <Button variant="outline" onClick={() => window.location.reload()}>
-          Try again
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 function EmptyState({ hasCursor, hasFilters }: { hasCursor: boolean; hasFilters: boolean }) {

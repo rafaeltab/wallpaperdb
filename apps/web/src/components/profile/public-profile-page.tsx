@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { Pencil } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { LoadMoreTrigger } from '@/components/LoadMoreTrigger';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { GraphQLError } from '@/components/graphql-error';
 import { Button } from '@/components/ui/button';
 import { WallpaperGrid } from '@/components/WallpaperGrid';
 import { useOwnerProfile } from '@/hooks/use-owner-profile';
@@ -49,33 +49,51 @@ export function PublicProfilePage({ profile }: PublicProfilePageProps) {
 }
 
 export function ProfileWallpapers({ profileId }: { profileId: string }) {
-  const { data, isLoading, isFetchingNextPage, error, hasNextPage, fetchNextPage } =
-    useWallpaperInfiniteQuery({ filter: { profileId } });
+  const {
+    data,
+    isLoading,
+    isFetchingNextPage,
+    isFetchNextPageError,
+    error: queryError,
+    failureReason,
+    isFetching,
+    refetch,
+    hasNextPage,
+    fetchNextPage,
+  } = useWallpaperInfiniteQuery({ filter: { profileId } });
+  const error = queryError ?? failureReason;
   const wallpapers = data?.pages.flatMap((page) => page.edges.map((edge) => edge.node)) ?? [];
   let content: ReactNode;
 
   if (error && wallpapers.length === 0) {
     content = (
-      <Alert variant="destructive">
-        <AlertTitle>Could not load wallpapers</AlertTitle>
-        <AlertDescription>Please try again later.</AlertDescription>
-      </Alert>
+      <GraphQLError
+        error={error}
+        retry={refetch}
+        retrying={isFetching}
+        title="Could not load wallpapers"
+      />
     );
   } else if (wallpapers.length > 0 || isLoading) {
     content = (
       <>
         <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isLoading || isFetchingNextPage} />
-        {error && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertTitle>Could not load more wallpapers</AlertTitle>
-            <AlertDescription>Your loaded wallpapers are still available.</AlertDescription>
-          </Alert>
+        {error ? (
+          <div className="mt-4">
+            <GraphQLError
+              error={error}
+              retry={isFetchNextPageError || isFetchingNextPage ? fetchNextPage : refetch}
+              retrying={isFetching}
+              title="Could not load more wallpapers"
+            />
+          </div>
+        ) : (
+          <LoadMoreTrigger
+            onLoadMore={() => void fetchNextPage()}
+            hasMore={Boolean(hasNextPage)}
+            isLoading={isFetchingNextPage}
+          />
         )}
-        <LoadMoreTrigger
-          onLoadMore={() => void fetchNextPage()}
-          hasMore={Boolean(hasNextPage)}
-          isLoading={isFetchingNextPage}
-        />
       </>
     );
   } else {

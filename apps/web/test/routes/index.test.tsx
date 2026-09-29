@@ -1,3 +1,4 @@
+import { GatewayAdmissionError } from '@/lib/graphql/admission';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as renderComponent, screen } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
@@ -52,7 +53,8 @@ vi.mock('@/components/WallpaperGrid', () => ({
 }));
 
 vi.mock('@/components/LoadMoreTrigger', () => ({
-  LoadMoreTrigger: () => null,
+  LoadMoreTrigger: ({ hasMore, onLoadMore }: { hasMore: boolean; onLoadMore: () => void }) =>
+    hasMore ? <button onClick={onLoadMore}>Automatic load more</button> : null,
 }));
 
 vi.mock('@/components/grid', () => ({
@@ -330,5 +332,46 @@ describe('HomePage browse filters', () => {
       format: 'png',
       aspectRatio: undefined,
     });
+  });
+});
+
+describe('HomePage admission failures', () => {
+  it.each([429, 503] as const)('keeps the grid before an HTTP %s error and pauses automatic loading until manual retry', (status) => {
+    const fetchNextPage = vi.fn();
+    vi.mocked(useWallpaperInfiniteQuery).mockReturnValue({
+      data: { pages: [{ edges: [{ node: { wallpaperId: 'loaded' } }] }] },
+      error: new GatewayAdmissionError(status, 2000),
+      hasNextPage: true, isFetchNextPageError: true, fetchNextPage,
+    } as unknown as ReturnType<typeof useWallpaperInfiniteQuery>);
+    render(<HomePage />);
+    const grid = screen.getByTestId('wallpaper-grid');
+    const alert = screen.getByRole('alert');
+    expect(grid.compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(alert).toHaveTextContent(status === 429 ? 'network' : 'busy');
+    expect(screen.queryByRole('button', { name: 'Automatic load more' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('shows the first quota denial while waiting and disables manual retry', () => {
+    vi.mocked(useWallpaperInfiniteQuery).mockReturnValue({
+      failureReason: new GatewayAdmissionError(429, 2000),
+      isLoading: true, isFetching: true, error: null,
+    } as unknown as ReturnType<typeof useWallpaperInfiniteQuery>);
+    render(<HomePage />);
+    expect(screen.getByRole('alert')).toHaveTextContent('network');
+    expect(screen.getByRole('alert')).toHaveTextContent('automatically');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeDisabled();
+  });
+
+  it('retries an initial overload in place without reloading the page', () => {
+    const refetch = vi.fn();
+    vi.mocked(useWallpaperInfiniteQuery).mockReturnValue({
+      error: new GatewayAdmissionError(503, 1000), refetch,
+    } as unknown as ReturnType<typeof useWallpaperInfiniteQuery>);
+    render(<HomePage />);
+    expect(screen.getByRole('alert')).toHaveTextContent('busy');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(refetch).toHaveBeenCalledOnce();
   });
 });

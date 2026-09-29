@@ -1,11 +1,13 @@
 """Report aggregation does not change conversion qualification."""
+from copy import deepcopy
 import unittest
 
 import numpy as np
 
 from appearance import compare_appearance
 
-from suite import gainmap_candidate_report
+from suite import gainmap_candidate_report, jpegli_experiment_report
+from matrix import CHECKS, GAINMAP_GEOMETRIES
 
 
 def measurement(mean, maximum, luminance):
@@ -15,7 +17,81 @@ def measurement(mean, maximum, luminance):
         'highlight': {'samples': 0, 'delta_e_itp': {'mean': 999, 'maximum': 999}}}}
 
 
+def native_case(candidate, geometry, qualified):
+    return {'fixture_id': 'gainmap-android-iso', 'source_sha256': 'a' * 64,
+            'candidate': f'native-combine-{candidate}', 'geometry': geometry,
+            'source_reference_revision': 'reference-v1',
+            'selectors': {'format': 'jpg', 'range': 'hdr', 'gamut': 'preserve', 'depth': 'preserve',
+                          'motion': 'preserve', 'transparency': 'preserve', **GAINMAP_GEOMETRIES[geometry]},
+            'facts': {'base': {'sof': 0}, 'map': {'sof': 0}},
+            'status': 'qualified' if qualified else 'tested and failed',
+            'checks': {key: qualified or key != 'appearance' for key in CHECKS},
+            'measurements': {}, 'blockers': []}
+
+
 class GainMapReportTests(unittest.TestCase):
+    def test_jpegli_quality_failures_remain_separate_from_hdr_qualification(self):
+        base = {'cases': [{'status': 'qualified'}, {'status': 'tested and failed'}]}
+        quality = {'cases': [{'status': 'tested and failed'}] * 3}
+        rendered = '\n'.join(jpegli_experiment_report(base, quality))
+        self.assertIn('2 native SOF0 RGB8 trials, of which 1 pass', rendered)
+        self.assertIn('3 native trials, with 0 passing and 3 failed or unqualified', rendered)
+        self.assertIn('(jpegli-quality-experiment.json)', rendered)
+        self.assertIn('do not qualify an HDR derivative', rendered)
+
+    def test_sof0_union_counts_complementary_exact_alternatives_once(self):
+        cases = [native_case(candidate, geometry, qualified)
+                 for candidate, geometry, qualified in (
+                     ('integer', 'contain', True), ('integer', 'cover', False),
+                     ('float', 'contain', False), ('float', 'cover', True),
+                     ('jpegli', 'fill', False))]
+        cases.append(deepcopy(cases[0]))
+        rendered = '\n'.join(gainmap_candidate_report(cases))
+        self.assertIn('| `reference-v1` | 2/3 | 2/3 |', rendered)
+        self.assertIn('observed corpus only', rendered)
+        self.assertIn('pending manual review', rendered)
+        # Every failed representation still contributes to its own row.
+        self.assertIn('| `native-combine-float` | `reference-v1` | 1/2 |', rendered)
+        self.assertIn('| `native-combine-jpegli` | `reference-v1` | 0/1 |', rendered)
+
+    def test_sof0_union_does_not_merge_selectors_geometry_source_or_reference(self):
+        original = native_case('integer', 'contain', True)
+        cases = [original]
+        for field, value in (('depth', '8'), ('gamut', 'srgb'), ('w', 174)):
+            changed = native_case('float', 'contain', False)
+            changed['selectors'][field] = value
+            cases.append(changed)
+        for field, value in (('geometry', 'cover'), ('fixture_id', 'gainmap-android-xmp'),
+                             ('source_sha256', 'b' * 64), ('source_reference_revision', 'reference-v2')):
+            changed = native_case('jpegli', 'contain', False)
+            changed[field] = value
+            cases.append(changed)
+        rendered = '\n'.join(gainmap_candidate_report(cases))
+        self.assertIn('| `reference-v1` | 1/7 | 1/3 |', rendered)
+        self.assertIn('| `reference-v2` | 0/1 | 0/1 |', rendered)
+
+    def test_sof0_union_requires_actual_layers_and_passing_original_evidence(self):
+        failed = native_case('integer', 'contain', False)
+        cases = [failed]
+        for mutation in ('predictive-base', 'predictive-map', 'missing-map', 'encoder',
+                         'failed-check', 'blocker', 'failed-measurement'):
+            changed = native_case(mutation, 'contain', True)
+            if mutation.startswith('predictive'):
+                changed['facts'][mutation.split('-')[1]]['sof'] = 3
+            elif mutation == 'missing-map':
+                changed['facts'].pop('map')
+            elif mutation == 'encoder':
+                changed['checks']['native_encoder'] = False
+            elif mutation == 'failed-check':
+                changed['checks']['privacy'] = False
+            elif mutation == 'blocker':
+                changed['blockers'] = ['Unresolved output validation']
+            else:
+                changed['measurements'] = {'reconstructed_hdr': {'passed': False}}
+            cases.append(changed)
+        rendered = '\n'.join(gainmap_candidate_report(cases))
+        self.assertIn('| `reference-v1` | 0/1 | 0/1 |', rendered)
+
     def test_real_appearance_record_supplies_maximum_fields(self):
         reference = np.ones((2, 2, 3))
         actual = reference * 1.01

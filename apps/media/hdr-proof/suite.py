@@ -12,7 +12,8 @@ import unittest
 
 import avif
 import gainmap
-from matrix import build_matrix, required_cases
+from matrix import (CHECKS, ProofRequestError, _has_rejected_measurement,
+                    _source_transform_matches, build_matrix, required_cases, validate_selectors)
 
 ROOT = Path(__file__).resolve().parent
 WORK = ROOT/'work'
@@ -220,6 +221,9 @@ def precision_report(precision):
 def gainmap_candidate_report(evidence):
     groups = {}
     readers = {}
+    sof0_requests = {}
+    required = {(case['fixture_id'], case['geometry'], json.dumps(validate_selectors(case['selectors']), sort_keys=True)): case
+                for case in required_cases() if case['cell_id'] == 'gainmap-jpeg:hdr:jpg'}
     for case in evidence:
         if not case.get('candidate', '').startswith('native-combine-'):
             continue
@@ -227,6 +231,32 @@ def gainmap_candidate_report(evidence):
         groups.setdefault(key, []).append(case)
         for reader, diagnostic in case.get('consumer_decoder_diagnostics', {}).items():
             readers.setdefault(reader, Counter())[diagnostic['status']] += 1
+        facts = case.get('facts', {})
+        if (case.get('checks', {}).get('native_encoder') is not True
+                or any(type(facts.get(layer, {}).get('sof')) is not int or facts[layer]['sof'] != 0
+                       for layer in ('base', 'map'))
+                or not re.fullmatch(r'[0-9a-f]{64}', case.get('source_sha256', ''))
+                or not case.get('geometry') or not case.get('source_reference_revision')
+                or not isinstance(case.get('selectors'), dict)):
+            continue
+        try:
+            selectors = validate_selectors(case['selectors'])
+        except ProofRequestError:
+            continue
+        if selectors.get('format') != 'jpg' or selectors['range'] != 'hdr':
+            continue
+        encoded_selectors = json.dumps(selectors, sort_keys=True)
+        orientation = case.get('orientation_source', {})
+        request = (case['fixture_id'], case['source_sha256'], case['geometry'], encoded_selectors,
+                   json.dumps(case.get('probe_crop_rectangle'), sort_keys=True),
+                   orientation.get('sha256'), orientation.get('orientation'))
+        sof0_requests.setdefault((case['source_reference_revision'], request), []).append(case)
+
+    def passes_original_checks(case):
+        checks = case.get('checks', {})
+        return (case.get('status') == 'qualified' and not case.get('blockers')
+                and all(checks.get(key) is True for key in set(CHECKS) | set(checks))
+                and not _has_rejected_measurement(case.get('measurements', {})))
 
     def largest(cases, measurement, metric, statistic):
         values = [region[metric][statistic] for case in cases
@@ -254,10 +284,39 @@ def gainmap_candidate_report(evidence):
         for reader, statuses in sorted(readers.items()):
             attempted, qualified = sum(statuses.values()), statuses['qualified']
             lines.append(f'| `{reader}` | {attempted} | {qualified} | {attempted-qualified} |')
+    if sof0_requests:
+        coverage = {}
+        for (revision, request), cases in sof0_requests.items():
+            row = coverage.setdefault(revision, Counter())
+            row['observed'] += 1
+            row['qualified'] += any(passes_original_checks(case) for case in cases)
+            fixture, _, geometry, selectors, crop, _, _ = request
+            planned = required.get((fixture, geometry, selectors)) if crop == 'null' else None
+            if planned:
+                row['required_observed'] += 1
+                row['required_qualified'] += any(passes_original_checks(case) and _source_transform_matches(case, planned)
+                                                 for case in cases)
+        lines += ['', 'The SOF0 union below counts each exact observed request once across native alternatives with independently inspected SOF0 base and map layers. Fixture and source hash, normalized selectors, geometry, crop and source-orientation facts, and reference revision must match. A request qualifies only when an exact alternative passes all original checks without blockers or rejected measurements. The per-candidate failures above remain unchanged.', '',
+                  '| Reference revision | Qualified/observed exact SOF0 requests | Qualified/observed required requests |',
+                  '| --- | ---: | ---: |']
+        for revision, row in sorted(coverage.items()):
+            lines.append(f'| `{revision}` | {row["qualified"]}/{row["observed"]} | '
+                         f'{row["required_qualified"]}/{row["required_observed"]} |')
+        lines += ['', 'These denominators cover the observed corpus only; the required column matches the fixed plan within that corpus. Unobserved requests remain untested. This summary selects no runtime encoder and changes no matrix status. Physical browser and OS wallpaper qualification remains pending manual review.']
     return lines + ['']
 
 
-def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli):
+def jpegli_experiment_report(base, quality):
+    base_passed = sum(case['status'] == 'qualified' for case in base['cases'])
+    quality_passed = sum(case['status'] == 'qualified' for case in quality['cases'])
+    return [
+        f'The separate [JPEGli base experiment](jpegli-base-experiment.json) records {len(base["cases"])} native SOF0 RGB8 trials, of which {base_passed} pass the unchanged authored-SDR base checks. Each failed trial retains its regional measurements.', '',
+        f'The bounded [JPEGli quality experiment](jpegli-quality-experiment.json) records {len(quality["cases"])} native trials, with {quality_passed} passing and {len(quality["cases"])-quality_passed} failed or unqualified. It retains every declared quality/table/adaptive option for the remaining source/geometry corpus under the same authored-SDR reference and thresholds.', '',
+        'Both base experiments do not qualify an HDR derivative and are excluded from the conversion-attempt counts above. A JPEGli HDR candidate must independently regenerate and validate its gain map and reconstructed HDR output. Physical consumer review remains pending.', '',
+    ]
+
+
+def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
@@ -317,7 +376,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
                 lines.append(f"| `{case['case_id']}` | {region} | {values['delta_e_itp']['p95']:.4f} | {values['luminance_absolute_error_nits']['mean']:.4f} |")
     lines += ['', 'The tunable Mobius and Reinhard trials use maintained native functions with fixed parameters. Their failures do not change the white target. Adaptive peak detection is disabled in the candidate conversion path; separate controls record frame-to-frame white shifts and repeat hashes with it enabled and disabled. Persistent temporal-filter history is not qualified by these per-frame trials.', '',
               *gainmap_candidate_report(evidence),
-              f'The separate [JPEGli base experiment](jpegli-base-experiment.json) records {len(jpegli["cases"])} native SOF0 RGB8 trials, of which {sum(case["status"] == "qualified" for case in jpegli["cases"])} pass the unchanged authored-SDR base checks. Each failed trial retains its regional measurements. These base experiments do not qualify an HDR derivative and are excluded from the conversion-attempt counts above. A JPEGli HDR candidate must independently regenerate and validate its gain map and reconstructed HDR output.', '',
+              *jpegli_experiment_report(jpegli, jpegli_quality),
               '## Blockers and scope limits','',
               '- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.',
               '- The separately versioned gainmap-hdr-target-gamut-v1 reference filters and clips negative Lanczos excursions in the requested output primaries. Clipping in the earlier Rec.2020 decoder coordinates could create negative components in the requested P3 or sRGB gamut. Analytic commutation, out-of-gamut and identity controls verify this correction. Old references and failed case IDs remain visible; new cases record the reference revision and diagnostic differences. Appearance thresholds are unchanged.',
@@ -335,7 +394,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- A further animated GIF candidate resamples alpha separately with native zimg and rounds to sixteen bits after each axis. Independent checks require identical RGB16 samples, intermediate alpha error within the existing PNG16 ceiling and exact final binary decisions. These candidates preserve the original SDR grade and keep the earlier half-alpha failures visible.',
               '- Static 16-bit HDR PNG sources have separate PQ/HLG, P3/Rec.2020 and alpha evidence for identity, contain, cover, fill, upscale and independently checked EXIF-8 orientation. Their source and HDR conversions use the unchanged stricter avif-12 appearance gates. Matching same-format identity requests are byte-exact controls. Six conflicting/unknown PNG signaling controls retain exact originals and withhold transforms.',
               '- Separate eight-bit PQ/HLG PNG sources use their own reviewed source hash lock. Their containment cases cover HDR PNG8/AVIF8 and explicit SDR PNG16/AVIF8. The direct-input failures remain recorded. A separate native zimg storage expansion must preserve every independently decoded RGBA sample exactly before conversion; it changes neither the reference intent nor the fixed output gates. Matching requests retain exact originals, and unknown CICP facts withhold transformations. Unlisted PNG8 geometries and formats remain untested.',
-              '- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain, cover, fill, upscale and independently checked EXIF-8 orientation derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. Four orientation sources have distinct hashes and every native rotation matches the independently decoded frames exactly. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Native SOURCE rectangles are independently reconstructed by exact RGBA replacement; out-of-bounds rectangles, partial default images, OVER blending and disposal remain rejected. Static extraction checks the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF at each tested geometry. JPEG opacity and GIF binary alpha require explicit coercion; preserve-alpha requests are rejected. The two PQ static GIF orientation cases exceed the fixed shadow color-error ceiling and remain unqualified. Unlisted APNG geometries remain untested.',
+              '- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain, cover, fill, upscale and independently checked EXIF-8 orientation derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. Four orientation sources have distinct hashes and every native rotation matches the independently decoded frames exactly. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Native SOURCE rectangles are independently reconstructed by exact RGBA replacement; out-of-bounds rectangles, partial default images, OVER blending and disposal remain rejected. Static extraction checks the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF at each tested geometry. JPEG opacity and GIF binary alpha require explicit coercion; preserve-alpha requests are rejected. The two original gamma-2.2 PQ static GIF orientation cases exceed the fixed shadow color-error ceiling and remain unqualified. The newer gamma-3.2 cases retain separate measurements and qualification. Unlisted APNG geometries remain untested.',
               '- Unlisted PNG/APNG cross-products, HDR WebP, gain-map AVIF and other unexecuted accepted-source requests remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
               '- These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.',
               '- The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.',
@@ -382,9 +441,12 @@ def main():
     from precision import run as run_precision
     precision = run_precision(WORK, WORK/'precision')
     write_json(RESULTS/'precision.json', precision)
-    from jpegli_proof import run as run_jpegli
+    from jpegli_proof import QUALITY_CORPUS, QUALITY_OPTIONS, run as run_jpegli
     jpegli_result = run_jpegli(WORK/'jpegli-base-experiment')
     write_json(RESULTS/'jpegli-base-experiment.json', jpegli_result)
+    jpegli_quality_result = run_jpegli(WORK/'jpegli-quality-experiment',
+                                     corpus=QUALITY_CORPUS, options=QUALITY_OPTIONS)
+    write_json(RESULTS/'jpegli-quality-experiment.json', jpegli_quality_result)
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))
@@ -432,7 +494,7 @@ def main():
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,generated_fixtures)
-    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result))
+    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))
     return 1 if errors else 2

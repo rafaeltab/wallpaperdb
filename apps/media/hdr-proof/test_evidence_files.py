@@ -34,3 +34,18 @@ class EvidenceFileTests(unittest.TestCase):
         cell = next(row for row in report['cells'] if row['id']=='gainmap-jpeg:hdr:jpg')
         self.assertEqual(cell['evidence'][0]['status'], 'tested and failed')
         self.assertTrue(report['evidence_errors'])
+
+    def test_manual_png_source_retains_its_actual_container_and_pending_status(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            source = root/'source.png'
+            source.write_bytes(b'file-copy-test-only')
+            fixture = {'id': 'png-pq-rec2020-16-opaque', 'path': str(source),
+                       'spec': {'depth': 16, 'frames': 1}, 'facts': {'depth': 16}}
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files([], [fixture])
+            self.assertEqual(len(files), 1)
+            self.assertEqual(files[0]['file'], 'source-png-pq-rec2020-16-opaque.png')
+            self.assertEqual(files[0]['sha256'], suite.avif.digest(source))
+            self.assertEqual(files[0]['consumer_status'], 'pending manual review')

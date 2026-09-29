@@ -84,11 +84,12 @@ def candidate_files(evidence, fixtures):
                         'warning':'A failed candidate is a diagnostic comparison, not an approved download or SDR fallback.' if case and case['status']!='qualified' else None})
     for fixture in fixtures:
         spec = fixture.get('spec')
-        if spec and (spec['depth']==10 or spec['frames']==2):
-            copy(fixture['path'], f'source-{fixture["id"]}.avif', 'Inspected synthetic HDR source', facts=fixture['facts'])
+        if spec and (spec['depth'] in (10,16) or spec['frames']==2):
+            suffix = Path(fixture['path']).suffix
+            copy(fixture['path'], f'source-{fixture["id"]}{suffix}', 'Inspected synthetic HDR source', facts=fixture['facts'])
     for source in (ROOT/'fixtures/gainmap').glob('*.jpg'):
         copy(source,f'source-{source.name}','Provenance-documented gain-map source; exact original')
-    selected = [case for case in evidence if (case.get('fixture_id') in ('avif-pq-rec2020-10-opaque','avif-hlg-rec2020-10-opaque','animated-pq-alpha') and case.get('geometry') in ('contain','identity')) or (case.get('fixture_id') in ('gainmap-apple-new','gainmap-android-xmp') and case.get('geometry')=='contain')]
+    selected = [case for case in evidence if (case.get('fixture_id') in ('avif-pq-rec2020-10-opaque','avif-hlg-rec2020-10-opaque','animated-pq-alpha','png-pq-rec2020-16-alpha','png-hlg-p3-16-opaque') and case.get('geometry') in ('contain','identity')) or (case.get('fixture_id') in ('gainmap-apple-new','gainmap-android-xmp') and case.get('geometry')=='contain')]
     for case in selected:
         artifacts = case.get('artifacts')
         values = [artifacts.get('output')] if isinstance(artifacts,dict) else artifacts or []
@@ -114,7 +115,7 @@ def fixture_lock(fixtures, update):
     generated = {f['id']:f['sha256'] for f in fixtures if f.get('spec') or f.get('generator')}
     path = ROOT/'fixtures/generated-sha256.json'
     if update:
-        write_json(path,{'generator':'avif.py; native versions locked by environment/ and Dockerfile', 'sha256':generated})
+        write_json(path,{'generator':'avif.py, hdr_png.py and selector_probes.py; native versions locked by environment/ and Dockerfile', 'sha256':generated})
     if not path.exists():
         return ['Missing generated fixture hash lock; capture once with --update-fixture-lock before committing.']
     expected = json.loads(path.read_text())['sha256']
@@ -237,7 +238,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- Same-transfer AVIF geometry operates in display-linear light with explicit alpha handling. Cover resizing filters before cropping. A separate native coverage resample normalizes image-edge weights to the unchanged independent reference. The declared required static and animated HDR AVIF requests have qualified file evidence; this does not extend to untested photographs or consumers.',
               '- Calibrated static and sequence-wide SDR tone/gamut controls pass. Eight-bit sRGB-transfer failures remain visible. Higher-depth and correctly declared gamma-2.2 candidates retain the same predeclared sdr-8 appearance ceiling and distinct case IDs. Qualified alternatives can satisfy matching product selectors; they never change a failed representation into a passing one. The gamma transfer must be interpreted correctly by each consumer.',
               '- Animated outputs retain separate checks for fully composed frames, unequal durations, repetition count and fractional alpha. Only the matching qualified representation can fulfill the requested animation and transparency selectors.',
-              '- Unexecuted optional HDR PNG/APNG, HDR WebP, gain-map AVIF and other accepted-source rows remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
+              '- Static 16-bit HDR PNG sources have separate PQ/HLG, P3/Rec.2020 and alpha evidence for identity and contain. Their source and HDR conversions use the unchanged stricter avif-12 appearance gates. Matching same-format identity requests are byte-exact controls. APNG, unlisted PNG geometries, HDR WebP, gain-map AVIF and other unexecuted accepted-source requests remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
               '- These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.',
               '- The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.',
               '- Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.', '',
@@ -271,6 +272,9 @@ def main():
     environment = versions()
     avif_result = avif.run(WORK/'avif')
     write_json(WORK/'avif-evidence.json',avif_result)
+    from hdr_png import run as run_hdr_png
+    png_result = run_hdr_png(WORK/'hdr-png')
+    write_json(WORK/'hdr-png-evidence.json',png_result)
     from precision import run as run_precision
     precision = run_precision(WORK, WORK/'precision')
     write_json(RESULTS/'precision.json', precision)
@@ -280,10 +284,12 @@ def main():
     from tone_probes import run as run_tone
     tone = run_tone(WORK)
     controls = run_selectors(WORK/'selectors')
-    evidence = avif_result['evidence'] + gainmap_result['cases'] + crossformat_result + controls.get('evidence',[])
-    fixtures = avif_result['fixtures'] + gainmap_result['fixtures'] + controls.get('fixtures',[])
+    controls['controls'].extend(png_result['controls'])
+    evidence = avif_result['evidence'] + png_result['evidence'] + gainmap_result['cases'] + crossformat_result + controls.get('evidence',[])
+    generated_fixtures = avif_result['fixtures'] + png_result['fixtures'] + controls.get('fixtures',[])
+    fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
-    errors = matrix['evidence_errors'] + fixture_lock(avif_result['fixtures']+controls.get('fixtures',[]),args.update_fixture_lock)
+    errors = matrix['evidence_errors'] + fixture_lock(generated_fixtures,args.update_fixture_lock)
     matrix['selector_control_failures'] = [c['case_id'] for c in controls.get('controls',[]) if c.get('status')!='passed']
     matrix['suite_integrity_errors'] = errors
     matrix['native_run_completed'] = True
@@ -296,7 +302,7 @@ def main():
             cell[key] = [{field:item[field] for field in ('case_id','fixture_id','selectors','status','checks','blockers','diagnostics') if field in item} | {'measurements_file':'measurements.json','measurement_case_id':item['case_id']} for item in cell[key]]
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
-    manual = candidate_files(evidence,avif_result['fixtures'])
+    manual = candidate_files(evidence,generated_fixtures)
     (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))

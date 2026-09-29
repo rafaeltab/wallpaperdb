@@ -1,5 +1,5 @@
 {
-  "generator": "avif.py; native versions locked by environment/ and Dockerfile",
+  "generator": "avif.py, hdr_png.py and selector_probes.py; native versions locked by environment/ and Dockerfile",
   "sha256": {
     "avif-pq-p3-8-opaque": "f53d15d9e644cc0d22aabdedd229d53d2e7f91371a683ca3b6ace55bb1e2b372",
     "avif-pq-p3-8-alpha": "d3491dbf323cb9aa57173bcc911df196b9aabea07f0dcf4422c22e65c3ef040a",
@@ -28,6 +28,14 @@
     "animated-pq-alpha": "9bfff5fddc798e21359b944d4bbed1e6ccfc092436db633bae2cc744be872b6d",
     "animated-hlg-alpha": "d10cf18a5de6ca4bd4adf70008d2184f008c8457c34ca30005c46b894857d14f",
     "selector-sdr": "488cf7bbcb6c43de6ba785b47ff4ac76c1c4c4b47f6c598af882b24b9bcf53d1",
-    "selector-hdr": "7f815a623992eaf193656958253d3a740ab9c6c01553339d99e3bb4bd0506fd8"
+    "selector-hdr": "7f815a623992eaf193656958253d3a740ab9c6c01553339d99e3bb4bd0506fd8",
+    "png-pq-p3-16-opaque": "613e980d4f59e9e6f74e5179145ad267ecfb7afb80b6a3012bb8a5a3324a17db",
+    "png-pq-p3-16-alpha": "52d49195ebc56393320f902ad3e271e0dc23b9311973a3a72a450df85ed380ce",
+    "png-pq-rec2020-16-opaque": "18f974e6a5b74683ff6ffc6c3fa89469b7af940daa3ebb7877e82de343257544",
+    "png-pq-rec2020-16-alpha": "0cc0336c957110fccccd2dd24cdfa3f9a821d32104d18adfab462606765b38bc",
+    "png-hlg-p3-16-opaque": "ad2f331e8b9fa459dfee6dd799ac7ff38674c51586f9c886fe0549a424973660",
+    "png-hlg-p3-16-alpha": "28206591ad66fed77c2728e3c6f1060986857a7a4d0090dc780dd8825df6eb57",
+    "png-hlg-rec2020-16-opaque": "1ce805b339cc4d3fadd870c04fb947749d6792d2a090dc70174b8649a5332ef7",
+    "png-hlg-rec2020-16-alpha": "17820b92a2114bff7677a62e89ce3b891c3d80d7c0153c6c8e7bf58bf35b44d9"
   }
 }

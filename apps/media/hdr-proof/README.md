@@ -16,7 +16,7 @@ Read the generated [report](results/report.md), [conversion matrix](results/conv
 
 The complete run replaces the generated report and measurement files under `results/`; it leaves complete intermediates and native diagnostics in ignored `work/`. Selected inspected files and their hashes are committed under [results/manual](results/manual/manifest.json). Follow [MANUAL.md](MANUAL.md) on the agreed Mac, iPad, Windows PC, and Galaxy. Browser and OS qualification stays pending until those devices have been checked by the user. A diagnostic file marked failed is not an approved SDR fallback.
 
-Changes to fixtures require an intentional `--update-fixture-lock` run and review of the changed source hashes. Dependency changes require new lock files and native qualification. The suite never downloads a floating fixture or silently refreshes an expected hash during normal execution. `fixtures/generated-sha256.json` covers generated AVIF and selector inputs; the committed JPEG fixture manifest and fixture tests cover the camera corpus and regenerated ISO representation.
+Changes to fixtures require an intentional `--update-fixture-lock` run and review of the changed source hashes. Dependency changes require new lock files and native qualification. The suite never downloads a floating fixture or silently refreshes an expected hash during normal execution. `fixtures/generated-sha256.json` covers generated AVIF, HDR PNG and selector inputs; the committed JPEG fixture manifest and fixture tests cover the camera corpus and regenerated ISO representation.
 
 The Python color equations and request oracle exist only in this proof. FFmpeg/libplacebo, Sharp/libvips/libultrahdr, and libavif/AOM perform the native candidate conversions. dav1d, ExifTool, Pillow/libjpeg, a small reader linked to libpng, and the independent gain-map reader check the bytes. Their precise limitations are recorded in every affected case. Unit tests of the proof-side request oracle do not claim production endpoint behavior. Media's existing dependency versions, source admission, UI, migrations, generation policy and caching are unchanged.
 
@@ -68,3 +68,15 @@ These are gamma-2.2 SDR files, not standard sRGB-transfer files. The accepted
 contract defines `gamut=srgb` as primaries, so these candidates retain the same
 selectors while recording different representation IDs. Profile-aware physical
 review remains mandatory; existing failed sRGB-transfer files stay failed.
+
+The [HDR PNG generator](hdr_png.py) creates eight deterministic static charts
+covering PQ/HLG, P3/Rec.2020 and opaque/fractional alpha at 16 bits. Native PNG
+encoding writes CICP; ExifTool checks signaling and the separate libpng reader
+decodes samples. Source and HDR derivative appearance use the existing stricter
+`avif-12` ceiling because their 16-bit precision exceeds the 12-bit fixture
+precision. SDR derivatives keep the existing `sdr-8` gates and independent tone
+reference. The initial scope covers identity and contain geometry. Matching
+HDR PNG identity requests are exact-byte controls, including original metadata,
+and do not count as encoder evidence. Converted files must remove the source's
+numeric GPS, camera model, serial, EXIF and XMP data. APNG and unlisted geometry
+remain untested; this proof does not change source admission.

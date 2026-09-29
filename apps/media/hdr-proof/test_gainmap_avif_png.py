@@ -13,6 +13,42 @@ import hdr_png
 
 
 class GainMapAvifPngTests(unittest.TestCase):
+    def test_additional_geometries_preserve_exact_containment_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            baseline = gainmap_avif_png.run(root/'baseline')
+            expanded = gainmap_avif_png.run(root/'expanded', geometries=('contain', 'cover', 'fill', 'upscale'))
+            self.assertEqual(len(expanded['evidence']), 4)
+            self.assertEqual(len(expanded['source_fixtures']), 1)
+            original = baseline['evidence'][0]
+            sizes = {'contain': (173, 130), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 576)}
+            for case in expanded['evidence']:
+                with self.subTest(geometry=case['geometry']):
+                    self.assertEqual(case['status'], 'qualified', case['blockers'])
+                    self.assertTrue(all(case['checks'].values()))
+                    self.assertEqual((case['facts']['width'], case['facts']['height']), sizes[case['geometry']])
+                    self.assertEqual(case['facts']['lossless_storage']['mismatched_rgba_samples'], 0)
+                    self.assertEqual(case['facts']['libpng_source_depth'], 8)
+                    self.assertEqual(case['facts']['physical_pixel_dimensions'], [1, 1, 0])
+                    self.assertEqual(case['measurements']['sdr']['fixture_class'], 'gainmap-sdr')
+                    self.assertEqual(case['consumer_status'], 'pending manual review')
+                    if case['geometry'] == 'contain':
+                        self.assertEqual(case['artifacts']['sha256'], '16bf329dbb17a14821b585b7a771d02a639bef9d5c7d097ed7a26d3ed53a905a')
+                        for key in ('case_id', 'selectors', 'status', 'measurements'):
+                            self.assertEqual(case[key], original[key])
+            self.assertEqual([(item['case_id'], item['status']) for item in expanded['controls']],
+                             [(item['case_id'], item['status']) for item in baseline['controls']])
+            self.assertEqual(expanded['hdr_status'], 'untested')
+
+    def test_unknown_duplicate_and_orientation_geometries_stop_before_native_work(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for operations in ((), ('contain', 'contain'), ('orientation',), ('crop',), ('arbitrary',)):
+                with self.subTest(geometries=operations):
+                    start = len(avif.COMMANDS)
+                    with self.assertRaisesRegex(ValueError, 'geometries'):
+                        gainmap_avif_png.run(Path(temporary), geometries=operations)
+                    self.assertEqual(len(avif.COMMANDS), start)
+
     def test_native_authored_containment_is_qualified_without_promoting_hdr(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = gainmap_avif_png.run(Path(temporary))

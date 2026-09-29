@@ -115,17 +115,17 @@ def native_decode(path, output, *, boost=16):
 
 
 def _pq_source(path, directory, expected_size):
-    """Inspect the existing XMP PQ bridge without widening native source support."""
+    """Inspect the existing XMP/Apple PQ bridge without widening native support."""
     import gainmap_hdr
     path = Path(path)
     if gainmap_hdr._pq_source_primaries(path) != 9:
-        raise ValueError('XMP native source bridge must carry actual Rec.2020 PQ signaling')
+        raise ValueError('Native source bridge must carry actual Rec.2020 PQ signaling')
     facts = gainmap.inspect(path, directory)
     signal = avif.read_png(path)
     if (facts['coded_depth'] != 16 or facts['frame_count'] != 1 or not facts['opaque']
             or facts['private_tags'] or facts['metadata'].get('IFD0:Orientation', 1) != 1
             or signal.shape[1::-1] != tuple(expected_size)):
-        raise ValueError('XMP native source bridge has unsupported precision, dimensions, orientation, motion or metadata')
+        raise ValueError('Native source bridge has unsupported precision, dimensions, orientation, motion or metadata')
     return avif.decode_transfer(signal[..., :3], 'pq', 'rec2020'), {
         'path': str(path), 'sha256': avif.digest(path), 'gamut': 'rec2020', 'transfer': 'pq',
         'coded_depth': 16, 'native_requested_depth': 12, 'facts': facts,
@@ -135,8 +135,9 @@ def _pq_source(path, directory, expected_size):
             'native ICC-aware and FFmpeg/ISO reconstruction gates.'}
 
 
-def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='float', source_id='gainmap-android-iso'):
-    """Bounded ISO experiments and one exact XMP-upscale gamma1.5 recipe."""
+def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='float',
+        source_id='gainmap-android-iso', operation='upscale'):
+    """Bounded ISO experiments, XMP upscale, and old Apple contain/upscale."""
     import gainmap_combine
     import gainmap_hdr
     from gainmap_metadata import check_metadata
@@ -144,15 +145,19 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
     from appearance import compare_appearance, sdr_signal_to_nits, delta_e_itp
     from matrix import GAINMAP_GEOMETRIES
     _encoder(map_policy, map_gamma, map_method)
-    if source_id not in ('gainmap-android-iso', 'gainmap-android-xmp'):
-        raise ValueError('Only pinned ISO and the separately admitted XMP source are supported')
-    if source_id == 'gainmap-android-xmp' and (map_policy, map_gamma, map_method) != ('midpointoffset', 1.5, 'float'):
-        raise ValueError('The XMP experiment admits only midpointoffset gamma1.5 FLOAT map upscale')
+    if source_id not in ('gainmap-android-iso', 'gainmap-android-xmp', 'gainmap-apple-old'):
+        raise ValueError('Only pinned ISO, XMP and old Apple sources are supported')
+    if source_id != 'gainmap-android-iso' and (map_policy, map_gamma, map_method) != ('midpointoffset', 1.5, 'float'):
+        raise ValueError('The XMP/old Apple experiments admit only midpointoffset gamma1.5 FLOAT maps')
+    allowed_geometry = ('contain', 'upscale') if source_id == 'gainmap-apple-old' else ('upscale',)
+    if operation not in allowed_geometry:
+        raise ValueError('Only the exact predeclared source/geometry tuples are admitted')
     folder = Path(directory)
     folder.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
-    name, operation = source_id, 'upscale'
-    gamut, source_precision = ('p3', 'float32') if name == 'gainmap-android-iso' else ('srgb', 'pq16')
+    name = source_id
+    gamut = 'srgb' if name == 'gainmap-android-xmp' else 'p3'
+    source_precision = 'float32' if name == 'gainmap-android-iso' else 'pq16'
     source = gainmap.FIXTURES/f'{name}.jpg'
     fixture = next(f for f in json.loads((gainmap.FIXTURES/'manifest.json').read_text())['fixtures'] if f['id'] == name)
     if avif.digest(source) != fixture['sha256']:
@@ -177,6 +182,21 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
         'measurements': {}, 'artifacts': {}, 'blockers': []}
     try:
         source_facts = gainmap.inspect(source, folder/'source-inspection')
+        if name == 'gainmap-apple-old':
+            # This dialect has no XMP HDR headroom. The pinned native reader
+            # requires Apple EXIF MakerNotes33/48 rather than assuming gamma
+            # or headroom from the source filename.
+            tags = source_facts['metadata']
+            apple_headroom, apple_gain = tags.get('Apple:HDRHeadroom'), tags.get('Apple:HDRGain')
+            if (not isinstance(apple_headroom, (int, float)) or not np.isfinite(apple_headroom) or apple_headroom <= 0
+                    or not isinstance(apple_gain, (int, float)) or not np.isfinite(apple_gain)
+                    or tags.get('IFD0:Orientation', 1) != 1):
+                raise ValueError('Old Apple source requires established MakerNote headroom/gain and identity orientation')
+            case['source_model_evidence'] = {'dialect': 'old Apple gain-map JPEG',
+                'headroom_origin': 'Pinned native libavif Apple EXIF MakerNotes33/48 fallback; no XMP headroom assumption',
+                'exiftool_hdr_headroom': apple_headroom, 'exiftool_hdr_gain': apple_gain,
+                'native_reader_source': 'https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.4.1/apps/shared/avifjpeg.c',
+                'scope': 'Locked old Apple fixture only; private MakerNotes are source facts and must be removed from output'}
         hdr_source, source_gamut, decoder = gainmap.source_hdr(source, folder/'source-inspection', gamut)
         case['checks']['independent_source_decoder'] = True
         case['source_facts'], case['source_decoder_evidence'] = source_facts, decoder
@@ -307,10 +327,10 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
                 logged_commands.append({'log': str(log), **value})
         except (UnicodeError, json.JSONDecodeError):
             pass
-    report = {'scope': f'One predeclared {name}-upscale ICC-aware native HDR candidate; unchanged appearance gates',
+    report = {'scope': f'One predeclared {name}-{operation} ICC-aware native HDR candidate; unchanged appearance gates',
         'source_policy': {'fixture': name, 'geometry': operation, 'native_precision': source_precision,
             'reference_revision': revision, 'gamut': gamut,
-            'declaration': 'XMP admits only the unchanged midpointoffset gamma1.5 FLOAT map recipe; '
+            'declaration': 'XMP upscale and old Apple contain/upscale admit only the unchanged midpointoffset gamma1.5 FLOAT map recipe; '
                 'the ISO-only float32 source guard remains unchanged. Source, geometry, native HDR intent, '
                 'authored SDR and both final HDR readers must pass the existing gates.'},
         'map_representation': {'policy': map_policy, 'encoding_gamma': map_gamma, 'coded_depth': 8,

@@ -133,6 +133,39 @@ class RenderingCoverageTests(unittest.TestCase):
         for row in joints:
             self.assertEqual(row['display_boosts'], [2, 16, 64] if row['fixture_id'] == 'gainmap-android-iso' else [2, 16])
 
+    def test_xmp_same_file_requires_the_separately_named_independent_endpoint(self):
+        from copy import deepcopy
+        from matrix import GAINMAP_RENDERING_SOURCES
+        planned = next(row for row in required_cases() if row['fixture_id'] == 'gainmap-android-xmp'
+                       and row['geometry'] == 'contain' and row['cell_id'] == 'gainmap-jpeg:hdr:jpg')
+        cases = [{**self.case(), **planned, 'case_id': f'bookkeeping-only-xmp-{boost}',
+                  'source_sha256': GAINMAP_RENDERING_SOURCES[planned['fixture_id']][0],
+                  'source_reference_revision': revision, 'rendering_scope': {'display_boost': boost},
+                  'status': 'qualified', 'checks': {key: True for key in self.case()['checks']},
+                  'measurements': {}, 'blockers': [], 'artifacts': {'sha256': 'a'*64}}
+                 for boost, revision in ((2, 'gainmap-xmp-intermediate-boost2-v1'),
+                                         (16, 'gainmap-xmp-independent-boost16-v1'))]
+        def joined(rows):
+            return next(row for row in build_matrix(rows)['rendering_coverage']['same_file_requirements']
+                        if row['fixture_id'] == planned['fixture_id'] and row['geometry'] == 'contain')
+        self.assertEqual(joined(cases)['status'], 'qualified')
+        for mutation in ('legacy-reference', 'other-source', 'missing-independent-gate', 'other-file'):
+            changed = deepcopy(cases)
+            if mutation == 'legacy-reference':
+                changed[1]['source_reference_revision'] = 'gainmap-hdr-target-gamut-v1'
+            elif mutation == 'other-source':
+                changed[1]['fixture_id'] = 'gainmap-apple-old'
+                changed[1]['source_sha256'] = GAINMAP_RENDERING_SOURCES['gainmap-apple-old'][0]
+            elif mutation == 'missing-independent-gate':
+                changed[1]['checks'].pop('independent_source_decoder')
+            else:
+                changed[1]['artifacts']['sha256'] = 'b'*64
+            with self.subTest(mutation=mutation):
+                self.assertNotEqual(joined(changed)['status'], 'qualified')
+        legacy = deepcopy(cases[1])
+        legacy['source_reference_revision'] = 'gainmap-hdr-target-gamut-v1'
+        self.assertEqual(build_matrix([legacy])['product_coverage']['qualified_count'], 1)
+
     def test_orientation_rendering_requires_the_declared_source_transform(self):
         from copy import deepcopy
         planned = next(row for row in required_cases() if row['fixture_id'] == 'gainmap-android-iso'

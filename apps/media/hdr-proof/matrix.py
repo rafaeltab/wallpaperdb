@@ -412,7 +412,11 @@ def _rendering_coverage(cells):
     for request in plan:
         fixture = request['fixture_id']
         intermediate = _rendering_requirement(cells, request, 2, GAINMAP_RENDERING_SOURCES[fixture][1])
-        endpoint = _rendering_requirement(cells, request, 16, 'gainmap-hdr-target-gamut-v1')
+        # The independent XMP float reference is distinct from the retained
+        # native PQ endpoint oracle. A renamed legacy record cannot replace it.
+        endpoint_revision = ('gainmap-xmp-independent-boost16-v1' if fixture == 'gainmap-android-xmp'
+                             else 'gainmap-hdr-target-gamut-v1')
+        endpoint = _rendering_requirement(cells, request, 16, endpoint_revision)
         points = [intermediate, endpoint]
         requirements.append(intermediate)
         if fixture == 'gainmap-android-iso':
@@ -430,8 +434,9 @@ def _rendering_coverage(cells):
             'same_file_requirements': same_files,
             'same_file_required_count': len(same_files),
             'same_file_qualified_count': sum(row['status'] == 'qualified' for row in same_files),
-            'reference_scope': 'ISO rendering uses the established independent source model. XMP and Apple '
-                'boost2 reference revisions declare pending work; assigning that name cannot qualify a file '
+            'reference_scope': 'ISO rendering uses the established independent source model. XMP requires '
+                'separately named independent boost2/16 references; the old native endpoint oracle stays separate. '
+                'Apple boost2 reference revisions declare pending work; assigning a reference name cannot qualify a file '
                 'without native source-model, independent-reference and actual-file proof. Existing endpoint '
                 'records without an explicit display boost remain separate from this same-file join.'}
 

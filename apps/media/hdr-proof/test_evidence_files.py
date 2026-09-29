@@ -39,22 +39,25 @@ class EvidenceFileTests(unittest.TestCase):
                 self.assertEqual(candidate['sha256'], suite.avif.digest(output))
                 self.assertEqual(candidate['consumer_status'], 'pending manual review')
 
-    def test_manual_bundle_keeps_each_iso_geometry_rendering_scope(self):
+    def test_manual_bundle_keeps_each_required_geometry_rendering_scope(self):
         # Bookkeeping only; these bytes cannot qualify a conversion.
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root/'results').mkdir()
             output = root/'same-file.jpg'
             output.write_bytes(b'file-copy-test-only')
-            cases = [{'case_id': f'iso-{geometry}-boost{boost}', 'fixture_id': 'gainmap-android-iso',
-                      'geometry': geometry, 'proof_module': 'iso_geometry_headroom',
+            cases = [{'case_id': f'{fixture}-{geometry}-boost{boost}', 'fixture_id': fixture,
+                      'geometry': geometry, 'proof_module': module,
                       'status': 'qualified' if boost == 16 else 'tested and failed',
                       'qualification_scope': f'One actual file at boost {boost}',
                       'artifacts': {'output': str(output), 'sha256': suite.avif.digest(output)}}
-                     for geometry in ('contain', 'cover', 'fill', 'orientation') for boost in (2, 16, 64)]
+                     for fixture, module, boosts in (
+                         ('gainmap-android-iso', 'iso_geometry_headroom', (2, 16, 64)),
+                         ('gainmap-android-xmp', 'xmp_containment_headroom', (2, 16)))
+                     for geometry in ('contain', 'cover', 'fill', 'orientation') for boost in boosts]
             with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
                 files = suite.candidate_files(cases, [])
-            self.assertEqual(len(files), 12)
+            self.assertEqual(len(files), 20)
             for case, entry in zip(cases, files):
                 self.assertEqual(entry['case_id'], case['case_id'])
                 self.assertEqual(entry['qualification_scope'], case['qualification_scope'])

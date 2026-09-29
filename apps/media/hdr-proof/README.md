@@ -168,8 +168,8 @@ selector. An unqualified rendering blocks faithful-HDR qualification even when a
 The adaptation inventory covers all 20 required gain-map fixture/geometry
 tuples. Each needs the same file at boosts 2 and 16; all five ISO geometries also
 need boost 64. This makes 25 additional rendering points and 20 same-file joins.
-Untested XMP and Apple source models remain unqualified. Their existing boost-16
-successes cannot fill a missing intermediate reference. A rendering point also
+Untested renderings remain unqualified. Existing boost-16 successes cannot fill
+a missing intermediate reference. A rendering point also
 requires explicit independent-source-decoder evidence, and endpoint records
 without an explicit boost cannot enter the same-file join.
 The [boost-2 proof](iso_intermediate_headroom.py) reruns the exact native
@@ -220,7 +220,7 @@ fails appearance at 2 and 64. The independent reference reconstructs the
 canonical source at the requested boost before geometry, with one rotation
 for the orientation case. The extracted source map is hash-bound before and
 after decoding. All five required ISO geometries now have measured adaptation
-failures; XMP and Apple intermediate rendering remains untested.
+failures. The separate XMP measurements below cannot qualify Apple adaptation.
 
 The [independent XMP source reader](gainmap_xmp.py) now establishes the original
 photograph at boosts 2 and 16 with independently parsed XML gain arithmetic and
@@ -234,6 +234,16 @@ The source explicitly declares EXIF sRGB but lacks the ICC required by the
 Android container specification, so its scope is a legacy EXIF-sRGB renderer.
 The differing UltraHDR source renderer remains a failed diagnostic. This source
 proof does not qualify a derivative or physical display.
+
+The [XMP containment rendering proof](xmp_containment_headroom.py) compares one
+actual native HDR JPEG against those independent source references after matched
+geometry. It preserves the earlier endpoint file and measurements. The file
+passes at boost 16 but fails at boost 2, where independent shadow maximum error
+is 88.53405 against the unchanged limit of 8. Both output readers agree, and all
+nonappearance gates pass. Its source gain weight is 2/7 at boost 2, while the
+regenerated output weight is 0.360639. The two rendering records and their
+references are included in the manual bundle; their same-file requirement
+remains failed. Apple intermediate adaptation remains untested.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

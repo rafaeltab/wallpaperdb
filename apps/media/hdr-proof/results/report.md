@@ -4,20 +4,20 @@ The HDR milestone remains blocked. Automated codec results do not qualify browse
 
 Reproduce from the repository root with `make run PACKAGE=media SCRIPT=proof:hdr`. Docker must support linux/amd64. The default command returns exit 2 while required codec cases or physical checks are unqualified. This is an intentional qualification failure, not a passing release gate.
 
-Recorded 1951 conversion attempts over 52 fixture records: 1941 completed native encoding, 10 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 1375 qualified, 576 tested and failed.
-The inventory covers 85 HDR-ledger cells and 5 labeled SDR controls. Ledger outcomes: 9 deliberately deferred, 17 incompatible with the requested selectors, 16 qualified, 24 tested and failed, 19 untested.
+Recorded 2507 conversion attempts over 56 fixture records: 2495 completed native encoding, 12 stopped at a native operation, and 0 lack a confirmed native outcome. Qualification outcomes: 1925 qualified, 582 tested and failed.
+The inventory covers 85 HDR-ledger cells and 5 labeled SDR controls. Ledger outcomes: 9 deliberately deferred, 17 incompatible with the requested selectors, 15 qualified, 25 tested and failed, 19 untested.
 
 The original fixed coverage plan contains 320 cases. Unexecuted fixed-plan cases: 0. Unlisted cross-products are untested, even when a neighboring case passes.
 
 ## Accepted product coverage
 
-300 of 320 declared product fixture/geometry requirements have qualified codec evidence. 0 have no matching tested tuple.
+320 of 320 declared product fixture/geometry requirements have qualified codec evidence. 0 have no matching tested tuple.
 
 The accepted contract permits a suitable supported depth when depth is omitted. Required SDR AVIF requests therefore accept exact qualified 8-, 10-, or 12-bit evidence. This does not qualify a failed explicit depth=8 request. WebP retains its eight-bit output constraint. Every other selector, source fixture, geometry, and qualification gate must match. No runtime depth-selection policy is implemented here.
 
 | Required product path | Fixture/geometry requirements | Qualified | Untested |
 | --- | ---: | ---: | ---: |
-| `gainmap-jpeg:hdr:jpg` | 20 | 0 | 0 |
+| `gainmap-jpeg:hdr:jpg` | 20 | 20 | 0 |
 | `gainmap-jpeg:sdr:jpg` | 40 | 40 | 0 |
 | `static-avif:hdr:avif` | 120 | 120 | 0 |
 | `static-avif:sdr:avif` | 120 | 120 | 0 |
@@ -31,7 +31,7 @@ These counts cover the declared corpus only. A ledger cell can retain failed exa
 
 Of 320 original fixed-plan cases, 320 have exact fixture/selector evidence and 156 qualify. This plan chose eight-bit SDR AVIF; that choice is not a product requirement when depth is omitted. Native encoding completed in 320; 0 stopped at a native operation. A native failure can occur while preparing an input fixture, before the final encoder is reached.
 
-Across all recorded cases, 541 have measured check failures and 57 lack required evidence. These counts overlap. A missing ordinary-white patch after cropping or an unavailable independent gamut reference is an evidence gap, not a measured change to those pixels.
+Across all recorded cases, 545 have measured check failures and 57 lack required evidence. These counts overlap. A missing ordinary-white patch after cropping or an unavailable independent gamut reference is an evidence gap, not a measured change to those pixels.
 
 False downstream flags on a failed native operation are unevaluated. They do not establish additional appearance, decoder, or metadata privacy failures. Successful encoding also does not establish qualification. The original status enums and required passing criteria remain unchanged.
 
@@ -79,6 +79,8 @@ A qualified case requires a real encoder, a separate decoder, exact structural c
 All comparisons use display-referred linear light. PQ uses ST 2084 absolute luminance. HLG uses a declared 1000-nit reference display and gamma 1.2 OOTF. Geometry references use independent Pillow floating-point bilinear resampling with premultiplied alpha. The comparison includes patch boundaries; interpolation differences are measured rather than hidden by discarding edges. These synthetic charts stress conversion and do not represent every photographic or artistic source.
 
 Authored SDR JPEG candidates additionally use a correctly declared gamma-3.2 ICC transfer with sRGB or P3 primaries. They preserve the independently referenced authored SDR grade and existing acceptance gates while testing the forty required gain-map source/gamut/geometry requests. The native RGB JPEG encoder and independent FFmpeg MJPEG decoder check emitted pixels; the actual ICC matrix and curves determine their color interpretation. Native zimg fractional crop windows retain the filter samples needed at cover boundaries. Standard sRGB-transfer candidates and their failures remain separate. The accepted gamut selectors identify primaries, so a different correctly signaled transfer does not change those selectors. ICC interpretation by physical consumers remains pending.
+
+Authored SDR lossless PNG and WebP candidates pass all four gain-map sources, two requested gamuts and seven geometries using 8-bit samples with independently verified sRGB transfer and sRGB or P3 ICC primaries. Their 112 cases keep the authored SDR grade and unchanged appearance gates; physical consumer interpretation remains pending.
 
 The predeclared [thresholds](../thresholds.json) report BT.2124 Delta E ITP and luminance error separately for shadows, midtones, and highlights. Best-effort SDR additionally requires 203-nit ordinary white near 0.90 sRGB signal, retained shadows/midtones, smooth highlight detail, and an independent chromatic mapping reference. The 1000-nit candidate uses a fixed Mobius knee of 0.6 and exposure 1.1. The 4000-nit sequence uses knee 0.54 and exposure 1.2 across both frames. Both use peak output scale 0.99. Its explicit relative-colorimetric gamut mapping clips out-of-gamut sRGB channels after primary conversion; it does not claim perceptual gamut compression. The independent reference derives the shoulder from boundary conditions and converts through D65 XYZ. Identity controls test tone policy before crop, while every encoded derivative is compared at its actual geometry, grouped by source HDR luminance region. Authored JPEG SDR bases bypass automatic HDR tone mapping. Separate gamma-2.2 candidates preserve the same SDR grade with sRGB primaries and a correctly declared coding transfer. AVIF uses CICP 1/4/0; JPEG/WebP/GIF use an independently parsed ICC matrix/TRC profile. GIF requires explicit binary-alpha coercion when the source has fractional alpha. They are not standard sRGB-transfer files. Every emitted representation needs its own consumer review.
 
@@ -137,7 +139,7 @@ Read [measurements](measurements.json) for each case, including native failures,
 | hdr-png | sdr | avif | after proof | qualified | 0 |
 | hdr-png | sdr | png | after proof | qualified | 0 |
 | hdr-png | sdr | webp | after proof | qualified | 0 |
-| hdr-png | sdr | gif | after proof | qualified | 0 |
+| hdr-png | sdr | gif | after proof | tested and failed | 0 |
 | avif-gainmap | hdr | jpg | after proof | untested | 0 |
 | avif-gainmap | hdr | avif | after proof | tested and failed | 0 |
 | avif-gainmap | hdr | png | after proof | untested | 0 |
@@ -210,22 +212,24 @@ The tunable Mobius and Reinhard trials use maintained native functions with fixe
 
 ## Blockers and scope limits
 
-- The pinned Apple fixes remove the retained-layer encoding error and correct new-Apple headroom. Required Apple geometries now encode and independently decode, but regional SDR-base and HDR reconstruction errors still exceed the fixed limits. Resampling the base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. Native regeneration against the retained authored base is also measured, with separate libultrahdr and libavif source decoders. These alternatives still exceed appearance limits and remain unqualified.
+- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.
+- The separately versioned gainmap-hdr-target-gamut-v1 reference filters and clips negative Lanczos excursions in the requested output primaries. Clipping in the earlier Rec.2020 decoder coordinates could create negative components in the requested P3 or sRGB gamut. Analytic commutation, out-of-gamut and identity controls verify this correction. Old references and failed case IDs remain visible; new cases record the reference revision and diagnostic differences. Appearance thresholds are unchanged.
+- Combined gain-map candidates use JPEG SOF3 predictive RGB8 coding and proof-local native patches. The pinned libavif JPEG reader rejects SOF3, while the separately tested native JPEG/ISO and patched libultrahdr readers decode it. File qualification does not establish browser or wallpaper compatibility. Every exact representation still requires the listed physical consumer checks.
 - The retained native JPEG writer emits independently parsed ISO plus per-channel Android metadata. Android element-style XMP now encodes and independently reconstructs. The validated ISO source reader removes a source-evidence gap within its declared scope. The separate native libavif regeneration route still rejects ISO-only input. Fractional map-coordinate crops in the retained-map route remain explicit failures.
 - Same-transfer AVIF geometry operates in display-linear light with explicit alpha handling. Cover resizing filters before cropping. A separate native coverage resample normalizes image-edge weights to the unchanged independent reference. The declared required static and animated HDR AVIF requests have qualified file evidence; this does not extend to untested photographs or consumers.
 - Calibrated static and sequence-wide SDR tone/gamut controls pass. Eight-bit sRGB-transfer failures remain visible. Higher-depth and correctly declared gamma-2.2 candidates retain the same predeclared sdr-8 appearance ceiling and distinct case IDs. Qualified alternatives can satisfy matching product selectors; they never change a failed representation into a passing one. The gamma transfer must be interpreted correctly by each consumer.
 - Animated outputs retain separate checks for fully composed frames, unequal durations, repetition count and fractional alpha. Only the matching qualified representation can fulfill the requested animation and transparency selectors.
 - Static 16-bit HDR PNG sources have separate PQ/HLG, P3/Rec.2020 and alpha evidence for identity, contain, cover, fill, upscale and independently checked EXIF-8 orientation. Their source and HDR conversions use the unchanged stricter avif-12 appearance gates. Matching same-format identity requests are byte-exact controls. Six conflicting/unknown PNG signaling controls retain exact originals and withhold transforms.
-- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Real native partial rectangles and unsupported composition remain rejected. Other APNG geometries, static extraction and orientation remain unqualified.
+- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain, cover, fill, upscale and independently checked EXIF-8 orientation derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. Four orientation sources have distinct hashes and every native rotation matches the independently decoded frames exactly. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Native SOURCE rectangles are independently reconstructed by exact RGBA replacement; out-of-bounds rectangles, partial default images, OVER blending and disposal remain rejected. Static extraction checks the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF at each tested geometry. JPEG opacity and GIF binary alpha require explicit coercion; preserve-alpha requests are rejected. The two PQ static GIF orientation cases exceed the fixed shadow color-error ceiling and remain unqualified. Unlisted APNG geometries remain untested.
 - Unlisted PNG/APNG cross-products, HDR WebP, gain-map AVIF and other unexecuted accepted-source requests remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.
 - These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.
 - The fixtures include synthetic charts and the documented upstream gain-map corpus. Additional independent real-device photographs, gain-map depth/layout variants and wider motion/composition corpora remain coverage gaps.
 - Safari on the named Mac and iPad, Chrome on Windows/Galaxy, Firefox SDR fallbacks, downloaded files, native viewers and built-in wallpaper setters all remain pending user review. An OS that flattens HDR does not remove the HDR download; a usable SDR download still must qualify.
 
-Prepared 223 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
+Prepared 459 inspected source/candidate files with hashes. Follow [the physical-device checklist](../MANUAL.md). No UI, migration, generation policy, caching, source-admission or production delivery behavior changed.
 
 ## Suite integrity
 
-Proof-side controls: 44. Unit tests run before native conversions. Evidence validation errors: 0.
+Proof-side controls: 46. Unit tests run before native conversions. Evidence validation errors: 0.
 
 Policy authority: [HDR resolution](https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153), [complete ledger](https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5870519681), [proof ticket](https://github.com/rafaeltab/wallpaperdb/issues/284), [delivery contract](https://github.com/rafaeltab/wallpaperdb/issues/250). Native algorithm references: [FFmpeg libplacebo filter](https://ffmpeg.org/ffmpeg-filters.html#libplacebo), [libplacebo options](https://libplacebo.org/options/), [libavif tools](https://github.com/AOMediaCodec/libavif/tree/v1.4.1/apps), [Sharp gain-map API](https://sharp.pixelplumbing.com/api-output/#keepgainmap).

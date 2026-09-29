@@ -21,7 +21,7 @@ several gigabytes under `work/`; running several copies in a RAM-backed `/tmp`
 can exhaust host memory and cause native-operation timeouts. Such timeouts stay
 failed in the recorded run. A later successful replay supplies separate evidence.
 
-Changes to fixtures require an intentional `--update-fixture-lock` run and review of the changed source hashes. Dependency changes require new lock files and native qualification. The suite never downloads a floating fixture or silently refreshes an expected hash during normal execution. `fixtures/generated-sha256.json` covers generated AVIF, HDR PNG/APNG and selector inputs; the committed JPEG fixture manifest and fixture tests cover the camera corpus and regenerated ISO representation.
+Changes to fixtures require intentional review of their committed source hashes. `--update-fixture-lock` updates the original generated corpus; the separately declared PNG8 corpus retains its own lock. Dependency changes require new lock files and native qualification. The suite never downloads a floating fixture or silently refreshes an expected hash during normal execution. `fixtures/generated-sha256.json` covers generated AVIF, sixteen-bit HDR PNG/APNG and selector inputs; the committed JPEG fixture manifest and fixture tests cover the camera corpus and regenerated ISO representation.
 
 The Python color equations and request oracle exist only in this proof. FFmpeg/libplacebo, Sharp/libvips/libultrahdr, and libavif/AOM perform the native candidate conversions. dav1d, ExifTool, Pillow/libjpeg, a small reader linked to libpng, and the independent gain-map reader check the bytes. Their precise limitations are recorded in every affected case. Unit tests of the proof-side request oracle do not claim production endpoint behavior. Media's existing dependency versions, source admission, UI, migrations, generation policy and caching are unchanged.
 
@@ -60,6 +60,10 @@ quantization, with unchanged RGB8 output depth and sRGB transfer. The complete
 suite regenerates [all trial measurements](results/jpegli-base-experiment.json),
 including failures, native commands and build/source hashes. A passing SDR base
 alone does not qualify a gain-map JPEG or establish physical compatibility.
+The separate `jpegli-base-dct-float-map` HDR candidate recomputes the gain map
+against the actual JPEGli-compressed base and encodes the map with the existing
+native floating-DCT helper. Both layers remain SOF0 RGB8. Its emitted JPEG must
+pass the complete independent SDR, HDR, metadata and privacy checks.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
@@ -186,6 +190,13 @@ plus exact native libpng code recovery and a half-code quantization bound.
 [Source hashes](fixtures/png8-source-sha256.json) are locked separately.
 These source checks do not qualify derivatives or change the sixteen-bit
 fixtures, their hashes or their stricter appearance gates.
+The [PNG8 containment proof](hdr_png8_proof.py) separately evaluates HDR
+PNG8/AVIF8 and explicit SDR PNG16/AVIF8 outputs. A direct native input expansion
+changes normalized samples and leaves measured failures. A separate native
+zimg expansion preserves every RGB and alpha sample exactly before conversion.
+Its candidates use distinct IDs and the same references and output gates;
+the original bytes, measurements and failures remain unchanged. The complete
+suite includes both candidates, exact-byte no-ops and unknown-CICP controls.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

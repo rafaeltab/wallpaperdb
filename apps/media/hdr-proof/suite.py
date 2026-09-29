@@ -109,6 +109,8 @@ def candidate_files(evidence, fixtures):
         copy(source,f'source-{source.name}','Provenance-documented gain-map source; exact original')
     selected = [case for case in evidence
         if (case.get('fixture_id', '').startswith('avif-') and case.get('geometry') == 'contain')
+        or (case.get('fixture_id', '').startswith('png-') and '-8-' in case['fixture_id']
+            and case.get('geometry') == 'contain')
         or (case.get('fixture_id') in ('animated-pq-alpha', 'animated-hlg-alpha',
                                      'png-pq-rec2020-16-alpha', 'png-hlg-p3-16-opaque')
             and case.get('geometry') in ('contain', 'identity'))
@@ -332,6 +334,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               '- Additional gamma-3.2 GIF candidates use native nearest rounding and retain the same SDR reference and fixed thresholds. Static AVIF/APNG cases have separate IDs from gamma-2.2 failures. Optional animated APNG-to-GIF cases preserve 300/700 ms timing and three total plays, encoded as two GIF repeats. Explicit binary coercion compares exact threshold decisions. Quantized half-alpha mismatches remain failed and record the reference, encoder-input and decoded values.',
               '- A further animated GIF candidate resamples alpha separately with native zimg and rounds to sixteen bits after each axis. Independent checks require identical RGB16 samples, intermediate alpha error within the existing PNG16 ceiling and exact final binary decisions. These candidates preserve the original SDR grade and keep the earlier half-alpha failures visible.',
               '- Static 16-bit HDR PNG sources have separate PQ/HLG, P3/Rec.2020 and alpha evidence for identity, contain, cover, fill, upscale and independently checked EXIF-8 orientation. Their source and HDR conversions use the unchanged stricter avif-12 appearance gates. Matching same-format identity requests are byte-exact controls. Six conflicting/unknown PNG signaling controls retain exact originals and withhold transforms.',
+              '- Separate eight-bit PQ/HLG PNG sources use their own reviewed source hash lock. Their containment cases cover HDR PNG8/AVIF8 and explicit SDR PNG16/AVIF8. The direct-input failures remain recorded. A separate native zimg storage expansion must preserve every independently decoded RGBA sample exactly before conversion; it changes neither the reference intent nor the fixed output gates. Matching requests retain exact originals, and unknown CICP facts withhold transformations. Unlisted PNG8 geometries and formats remain untested.',
               '- Four animated RGBA16 APNG sources cover PQ/HLG and P3/Rec.2020 with full-canvas SOURCE frames, no disposal, 300/700 ms timing and three plays. An independent chunk reader verifies animation/color metadata and passes unchanged compressed frame data to native libpng. Contain, cover, fill, upscale and independently checked EXIF-8 orientation derivatives cover HDR APNG/AVIF and explicit SDR APNG/AVIF/WebP under unchanged gates. Four orientation sources have distinct hashes and every native rotation matches the independently decoded frames exactly. PQ uses one 4000-nit sequence peak; HLG uses its 1000-nit reference display. HDR APNG has CICP, SDR APNG has standard sRGB signaling, and SDR AVIF/WebP have gamma-2.2 CICP/ICC. Native SOURCE rectangles are independently reconstructed by exact RGBA replacement; out-of-bounds rectangles, partial default images, OVER blending and disposal remain rejected. Static extraction checks the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF at each tested geometry. JPEG opacity and GIF binary alpha require explicit coercion; preserve-alpha requests are rejected. The two PQ static GIF orientation cases exceed the fixed shadow color-error ceiling and remain unqualified. Unlisted APNG geometries remain untested.',
               '- Unlisted PNG/APNG cross-products, HDR WebP, gain-map AVIF and other unexecuted accepted-source requests remain untested. Container capability has not been reclassified as impossibility. HEIC/HEIF and JPEG XL inputs retain their deliberate deferrals.',
               '- These are proof-side selector and byte-delivery controls. Production endpoint integration, byte-free metadata persistence and generation-owned facts still need implementation tests; this suite does not claim those endpoints exist.',
@@ -370,6 +373,9 @@ def main():
     from hdr_png import run as run_hdr_png
     png_result = run_hdr_png(WORK/'hdr-png')
     write_json(WORK/'hdr-png-evidence.json',png_result)
+    from hdr_png8_proof import run as run_hdr_png8
+    png8_result = run_hdr_png8(WORK/'hdr-png8', normalize_sources=True)
+    write_json(WORK/'hdr-png8-evidence.json',png8_result)
     from apng import run as run_apng
     apng_result = run_apng(WORK/'apng', animated_gif=True)
     write_json(WORK/'apng-evidence.json',apng_result)
@@ -389,6 +395,8 @@ def main():
                                                    policies=('moderateoffset',), coding='dct-rgb')
     combined_gainmap_result += run_combined_gainmap(WORK/'combined-gainmap-dct-float',
                                                    policies=('moderateoffset',), coding='dct-float-rgb')
+    combined_gainmap_result += run_combined_gainmap(WORK/'combined-gainmap-jpegli',
+        policies=('moderateoffset',), coding='jpegli-base-dct-float-map')
     combined_gainmap_result += run_combined_gainmap(WORK/'combined-iso-float32',
         names=('gainmap-android-iso',), policies=('moderateoffset',), source_precision='float32')
     write_json(WORK/'combined-gainmap-evidence.json',combined_gainmap_result)
@@ -401,12 +409,16 @@ def main():
     tone = run_tone(WORK)
     controls = run_selectors(WORK/'selectors')
     controls['controls'].extend(png_result['controls'])
+    controls['controls'].extend(png8_result['controls'])
     controls['controls'].extend(apng_result['controls'])
-    evidence = avif_result['evidence'] + png_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
-    generated_fixtures = avif_result['fixtures'] + png_result['fixtures'] + apng_result['fixtures'] + controls.get('fixtures',[])
+    evidence = avif_result['evidence'] + png_result['evidence'] + png8_result['evidence'] + apng_result['evidence'] + gainmap_result['cases'] + authored_sdr_result + combined_gainmap_result + gainmap_crossformat_result + crossformat_result + controls.get('evidence',[])
+    locked_fixtures = avif_result['fixtures'] + png_result['fixtures'] + apng_result['fixtures'] + controls.get('fixtures',[])
+    # PNG8 validates its separate source lock before any conversion. Preserve
+    # the original generated corpus lock, including its PNG16 hashes.
+    generated_fixtures = locked_fixtures + png8_result['fixtures']
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
-    errors = matrix['evidence_errors'] + fixture_lock(generated_fixtures,args.update_fixture_lock)
+    errors = matrix['evidence_errors'] + fixture_lock(locked_fixtures,args.update_fixture_lock)
     matrix['selector_control_failures'] = [c['case_id'] for c in controls.get('controls',[]) if c.get('status')!='passed']
     matrix['suite_integrity_errors'] = errors
     matrix['native_run_completed'] = True

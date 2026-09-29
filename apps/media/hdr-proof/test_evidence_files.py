@@ -9,6 +9,29 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_covers_every_png8_source_and_containment_representation(self):
+        from hdr_png8 import fixture_specs
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            fixtures, cases = [], []
+            for spec in fixture_specs():
+                source = root/f'{spec["id"]}.png'
+                source.write_bytes(b'file-copy-test-only')
+                fixtures.append({'id': spec['id'], 'path': str(source), 'spec': spec, 'facts': spec})
+                for dynamic_range in ('hdr', 'sdr'):
+                    for extension in ('png', 'avif'):
+                        for candidate in ('direct', 'normalized-source16'):
+                            cases.append({'case_id': f'{spec["id"]}:{dynamic_range}:{extension}:contain:{candidate}',
+                                'fixture_id': spec['id'], 'geometry': 'contain', 'status': 'tested and failed',
+                                'artifacts': {'output': str(source)}})
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files(cases, fixtures)
+            self.assertEqual(len(files), 72)
+            self.assertEqual({entry['case_id'] for entry in files if entry['case_id']},
+                             {case['case_id'] for case in cases})
+            self.assertTrue(all(entry['consumer_status'] == 'pending manual review' for entry in files))
+
     def test_manual_bundle_rejects_bytes_changed_after_fixture_or_output_inspection(self):
         for role in ('fixture', 'output', 'reference'):
             with self.subTest(role=role), tempfile.TemporaryDirectory() as temporary:

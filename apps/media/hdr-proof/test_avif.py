@@ -9,6 +9,26 @@ from sdr_reference import reference_srgb
 
 
 class FixtureTests(unittest.TestCase):
+    def test_sdr_without_geometry_retains_hidden_rgb_for_explicit_alpha_removal(self):
+        for transfer in ('pq', 'hlg'):
+            for gamut in ('p3', 'rec2020'):
+                for mode in ('identity', 'static'):
+                    with self.subTest(transfer=transfer, gamut=gamut, mode=mode), tempfile.TemporaryDirectory() as temporary:
+                        folder = Path(temporary)
+                        rgba = np.ones((8, 8, 4))
+                        rgba[..., :3] = encode_transfer(np.array([18, 100, 203]), transfer, gamut)
+                        rgba[..., 3] = np.linspace(0, 1, 8)
+                        source, output = folder/'source.png', folder/'sdr.png'
+                        write_png(source, rgba)
+                        stored = read_png(source)
+                        convert_frame(source, output, transfer, gamut, mode, sdr=True, peak_nits=1000)
+                        actual = read_png(output)
+                        expected = reference_srgb(decode_transfer(stored[..., :3], transfer, gamut), gamut, peak_nits=1000)
+                        measurement = compare_appearance(sdr_signal_to_nits(expected), sdr_signal_to_nits(actual[..., :3]),
+                            reference_gamut='srgb', actual_gamut='srgb', fixture_class='sdr-8')
+                        self.assertTrue(measurement['passed'], measurement['failures'])
+                        np.testing.assert_allclose(actual[..., 3], stored[..., 3], atol=1/65535)
+
     def test_pq_hlg_round_trip_preserves_absolute_anchors(self):
         scene = make_scene(False)[..., :3]
         for transfer in ('pq', 'hlg'):

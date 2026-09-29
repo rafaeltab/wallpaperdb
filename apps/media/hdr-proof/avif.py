@@ -153,6 +153,11 @@ def convert_frame(source, output, transfer, gamut, mode, *, sdr=False, mapper=No
         from sdr_candidate import convert
         if peak_nits is None:
             raise ValueError('The calibrated SDR candidate requires a declared sequence peak in nits')
+        if mode in ('identity', 'static'):
+            # No spatial filtering is requested. An association roundtrip would
+            # erase RGB below zero alpha, which explicit JPEG coercion retains.
+            convert(source, output, transfer, gamut, peak_nits=peak_nits)
+            return
         intermediate = Path(output).with_name(Path(output).stem + '-hdr.png')
         _convert_hdr_frame(source, intermediate, transfer, gamut, mode, outw, outh)
         convert(intermediate, output, transfer, gamut, peak_nits=peak_nits)

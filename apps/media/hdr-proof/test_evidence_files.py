@@ -10,6 +10,22 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_includes_complete_mozjpeg_hdr_crop(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            source = root/'native.jpg'
+            source.write_bytes(b'file-copy-test-only')
+            case = {'case_id': 'gainmap-android-iso:hdr:jpg:cover:mozjpeg',
+                'fixture_id': 'gainmap-android-iso', 'geometry': 'cover', 'status': 'qualified',
+                'candidate': 'native-combine-moderateoffset-mozjpeg-base-dct-float-map',
+                'artifacts': {'output': str(source), 'sha256': suite.avif.digest(source)}}
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files([case], [])
+            self.assertEqual(len(files), 1)
+            self.assertEqual(files[0]['case_id'], case['case_id'])
+            self.assertEqual(files[0]['consumer_status'], 'pending manual review')
+
     def test_manual_bundle_rejects_missing_inspected_output(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

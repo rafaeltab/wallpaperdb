@@ -6,7 +6,7 @@ import numpy as np
 
 from appearance import compare_appearance
 
-from suite import gainmap_candidate_report, jpegli_experiment_report
+from suite import gainmap_candidate_report, jpegli_experiment_report, mozjpeg_experiment_report
 from matrix import CHECKS, GAINMAP_GEOMETRIES
 
 
@@ -15,6 +15,20 @@ def measurement(mean, maximum, luminance):
         'delta_e_itp': {'mean': mean, 'maximum': maximum},
         'luminance_absolute_error_nits': {'mean': luminance}},
         'highlight': {'samples': 0, 'delta_e_itp': {'mean': 999, 'maximum': 999}}}}
+
+
+class MozjpegReportTests(unittest.TestCase):
+    def test_base_report_keeps_decoder_failures_separate_from_appearance(self):
+        valid = {'status': 'qualified', 'measurement': {'passed': True}}
+        measured = {'status': 'tested and failed', 'measurement': {'passed': False}}
+        concealed = {'status': 'tested and failed', 'facts': {'decoder_diagnostics': [
+            {'exit_code': 0, 'stderr': 'overread'}]}}
+        rendered = '\n'.join(mozjpeg_experiment_report({'cases': [valid, measured]},
+                                                       {'cases': [concealed, measured]}))
+        self.assertIn('| Optimized Huffman | 2 | 1 | 1 | 0 |', rendered)
+        self.assertIn('| Retained standard Huffman | 2 | 0 | 1 | 1 |', rendered)
+        self.assertIn('excluded from the conversion-attempt counts', rendered)
+        self.assertIn('pending manual review', rendered)
 
 
 def native_case(candidate, geometry, qualified):

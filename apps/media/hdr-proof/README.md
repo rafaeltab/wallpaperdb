@@ -65,6 +65,17 @@ against the actual JPEGli-compressed base and encodes the map with the existing
 native floating-DCT helper. Both layers remain SOF0 RGB8. Its emitted JPEG must
 pass the complete independent SDR, HDR, metadata and privacy checks.
 
+The separate [MozJPEG experiment](mozjpeg_proof.py) fixes quality 100 and RGB8
+coding while varying native integer/floating DCT, trellis and deringing. Its
+static encoder is built from a checksum-pinned source archive. Optimized Huffman
+coding is required for the tested trellis setup. The original standard-table
+failures remain a separate replay, including malformed files that FFmpeg
+conceals while returning exit zero. Both proof command runners reject FFmpeg
+error diagnostics before any such raster can qualify.
+The `mozjpeg-base-dct-float-map` ISO crop candidate independently checks a complete
+HDR JPEG using the compressed native base, a regenerated floating-DCT gain map
+and the unchanged SDR/HDR gates. Native file success leaves consumer review pending.
+
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
 the same HDR intent and fixed appearance limits. Analytic near-black controls
@@ -210,6 +221,8 @@ existing, stricter `avif-12` appearance ceiling against decoded-source geometry.
 Source quantization remains separate. Alpha error must stay within two codes
 at the actual output depth. The complete suite includes these measurements and
 their inspected containment files for pending physical review.
+The same higher-depth cases also cover crop, fill, upscale and real EXIF-8
+orientation, with exact native rotation checked before resampling.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

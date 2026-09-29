@@ -132,6 +132,10 @@ independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native
 reconstruction remains byte-identical after removing unused MakerNotes;
 unknown required XMP facts reject transformation.
+A separate integer-DCT map retains the same new Apple upscale base, HDR intent
+and pre-JPEG gain samples. The shadow maximum stays at 8.08225, and both HDR
+readers also exceed the highlight p95 limit of 3. Both map encodings remain
+failed evidence under unchanged thresholds.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
@@ -342,11 +346,18 @@ appearance checks. Stock depth-8 failures and automatic-depth-12 incompatibility
 remain visible. Qualification covers the declared full-headroom endpoints only:
 regenerated offsets and headroom differ from the source, so intermediate display
 adaptation remains untested. Physical consumers remain pending.
-The separate [authored SDR JPEG proof](gainmap_avif_jpeg.py) checks containment, crop, stretch and upscale
-from the same gain-map AVIF source. Standard sRGB RGB8 quality-100 JPEG passes
+The separate [authored SDR JPEG proof](gainmap_avif_jpeg.py) checks containment,
+crop, stretch and upscale from the same gain-map AVIF source. Standard sRGB
+RGB8 quality-100 JPEG passes
 the first three geometries. Upscale fails the unchanged shadow maximum at
-25.49485 in both native-input and full-reference comparisons. Independent inspection establishes color
-from actual ICC, RGB components and Adobe transform fields; decoder-guessed
+25.49485 in both native-input and full-reference comparisons. A separate
+gamma-3.2 ICC upscale passes the same gates, with shadow maximum 3.83562.
+Native conversion changes the coding transfer of the existing SDR samples;
+the authored reference and sRGB primaries remain unchanged. Regional mean
+errors increase but remain within the fixed limits. Exhaustive sample checks
+verify the native coding transfer, and the standard-sRGB failure stays visible.
+Independent inspection establishes color from actual ICC, RGB components and
+Adobe transform fields; decoder-guessed
 color defaults remain diagnostics. Actual dimensions are checked without
 inventing an absent JPEG aspect declaration. Physical interpretation remains
 pending independently from the lossless PNG, WebP and AVIF versions.

@@ -60,7 +60,8 @@ upscale. Old Apple containment and upscale have their own qualified ICC-aware
 file candidates with the same pending consumer limitations. Their original
 source needs its headroom MakerNotes; a source missing those facts remains
 original-only. New Apple containment also passes the file gates, while its
-upscale remains a failed diagnostic. Its source headroom comes from the verified
+upscale remains a failed diagnostic with either floating- or integer-DCT map
+coding. Its source headroom comes from the verified
 auxiliary XMP; unknown required XMP facts remain original-only. The five earlier
 ISO variants remain failed diagnostics. Stock native readers assume sRGB transfer or reject ICC
 in this path. Each manifest entry retains this qualification scope and its
@@ -80,6 +81,9 @@ and a standard sRGB ICC profile. Compare its exact file with the matched authore
 the PNG/AVIF versions; do not infer ICC interpretation from successful decoding.
 The separate SDR JPEG containment, crop and stretch use standard sRGB ICC and
 RGB8 SOF0 coding. Its standard-sRGB upscale remains a failed diagnostic.
+The separately named gamma-3.2 ICC upscale passes file accuracy with the same
+authored reference. Check its actual ICC interpretation on each consumer;
+opening the file does not establish correct shadows or contrast.
 Compare its inspected file with the same authored SDR reference and the lossless
 variants. The JPEG has no separate aspect declaration; check the recorded
 raster dimensions and consumer geometry independently.

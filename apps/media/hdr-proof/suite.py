@@ -237,9 +237,9 @@ def gainmap_candidate_report(evidence):
              '| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |']
     for (fixture, candidate, revision), cases in sorted(groups.items()):
         values = [largest(cases, 'authored_sdr_base', 'delta_e_itp', 'mean'),
-                  largest(cases, 'authored_sdr_base', 'delta_e_itp', 'max'),
+                  largest(cases, 'authored_sdr_base', 'delta_e_itp', 'maximum'),
                   largest(cases, 'reconstructed_hdr', 'delta_e_itp', 'mean'),
-                  largest(cases, 'reconstructed_hdr', 'delta_e_itp', 'max'),
+                  largest(cases, 'reconstructed_hdr', 'delta_e_itp', 'maximum'),
                   largest(cases, 'reconstructed_hdr', 'luminance_absolute_error_nits', 'mean')]
         qualified = sum(case['status'] == 'qualified' for case in cases)
         lines.append(f'| `{fixture}` | `{candidate}` | `{revision}` | {qualified}/{len(cases)} | '

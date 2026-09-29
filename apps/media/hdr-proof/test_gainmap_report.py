@@ -1,17 +1,34 @@
 """Report aggregation does not change conversion qualification."""
 import unittest
 
+import numpy as np
+
+from appearance import compare_appearance
+
 from suite import gainmap_candidate_report
 
 
 def measurement(mean, maximum, luminance):
     return {'regions': {'shadow': {'samples': 10,
-        'delta_e_itp': {'mean': mean, 'max': maximum},
+        'delta_e_itp': {'mean': mean, 'maximum': maximum},
         'luminance_absolute_error_nits': {'mean': luminance}},
-        'highlight': {'samples': 0, 'delta_e_itp': {'mean': 999, 'max': 999}}}}
+        'highlight': {'samples': 0, 'delta_e_itp': {'mean': 999, 'maximum': 999}}}}
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_real_appearance_record_supplies_maximum_fields(self):
+        reference = np.ones((2, 2, 3))
+        actual = reference * 1.01
+        measured = compare_appearance(reference, actual, reference_gamut='srgb',
+                                      actual_gamut='srgb', fixture_class='gainmap-sdr')
+        case = {'fixture_id': 'source', 'candidate': 'native-combine-example',
+                'source_reference_revision': 'reference-v1', 'status': 'tested and failed',
+                'measurements': {'authored_sdr_base': measured, 'reconstructed_hdr': measured}}
+        rendered = '\n'.join(gainmap_candidate_report([case]))
+        self.assertNotIn(' | missing |', rendered)
+        maximum = measured['regions']['shadow']['delta_e_itp']['maximum']
+        self.assertIn(f' | {maximum:.4f} |', rendered)
+
     def test_reports_failed_attempts_and_maximum_regional_statistics_without_pooling(self):
         cases = [
             {'fixture_id': 'source', 'candidate': 'native-combine-moderateoffset-dct-rgb',

@@ -1,3 +1,4 @@
+import { GatewayAdmissionError } from '@/lib/graphql/admission';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -390,5 +391,23 @@ describe('Biography Markdown', () => {
     expect(screen.getByText('Made with care').closest('blockquote')).not.toBeNull();
     expect(screen.getByText('const greeting = "hello";').closest('pre')).not.toBeNull();
     expect(within(screen.getByRole('table')).getByRole('cell', { name: '12' })).toBeInTheDocument();
+  });
+});
+
+describe('Biography wallpaper admission errors', () => {
+  afterEach(() => vi.useRealTimers());
+  it.each([429, 503] as const)('explains HTTP %s and does not run missing-wallpaper retries after denial', async (status) => {
+    vi.useFakeTimers();
+    vi.mocked(request).mockReset().mockRejectedValue(new GatewayAdmissionError(status, 2000));
+    const client = new QueryClient();
+    const view = render(<QueryClientProvider client={client}><BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" /></QueryClientProvider>);
+    try {
+      await act(async () => vi.advanceTimersByTimeAsync(10));
+      expect(screen.getByRole('alert')).toHaveTextContent(status === 429 ? 'network' : 'busy');
+      await act(async () => vi.advanceTimersByTimeAsync(60_000));
+      expect(request).toHaveBeenCalledTimes(status === 429 ? 2 : 1);
+      expect(screen.getByRole('button', { name: 'Try wallpaper again' })).toBeEnabled();
+      expect(view.container.querySelector('p div, p p')).toBeNull();
+    } finally { view.unmount(); client.clear(); }
   });
 });

@@ -10,6 +10,26 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_keeps_each_explicit_apple_avif_tuple(self):
+        # Only copy/scoping behavior is tested; these bytes never qualify a codec.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            output = root/'output.avif'
+            output.write_bytes(b'copy-bookkeeping-only')
+            cases = [{'case_id': f'apple-{depth}-{operation}', 'fixture_id': 'gainmap-apple-old',
+                'proof_module': 'apple_hdr_avif', 'geometry': operation, 'status': 'qualified',
+                'rendering_scope': {'intermediate_adaptation_qualified': False},
+                'artifacts': {'output': str(output), 'sha256': suite.avif.digest(output)}}
+                for depth in (10, 12) for operation in ('contain', 'cover', 'fill', 'upscale')]
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files(cases, [])
+            self.assertEqual({row['case_id'] for row in files}, {case['case_id'] for case in cases})
+            self.assertEqual(len(files), 8)
+            for row in files:
+                self.assertFalse(row['rendering_scope']['intermediate_adaptation_qualified'])
+                self.assertEqual(row['consumer_status'], 'pending manual review')
+
     def test_manual_bundle_keeps_identity_conversion_and_each_rendering_scope(self):
         # Bookkeeping only; these bytes cannot qualify a conversion.
         with tempfile.TemporaryDirectory() as temporary:

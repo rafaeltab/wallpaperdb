@@ -163,15 +163,17 @@ stretch and upscale pass with independent HDR maxima 4.84060, 4.69820 and
 7.34111. Containment retains its exact bytes and measurements. The default
 replay includes all four geometries and their inspected manual files. No partial
 Apple adaptation or orientation is qualified by these full-effect results.
-The separate [explicit PQ12 P3 AVIF containment](apple_hdr_avif.py) preserves
-that documented full image with maximum Delta E ITP 0.350934. It uses the
-unchanged photographic gates without a source precision allowance. Native
-float preparation and geometry feed FFmpeg/zimg then AOM; dav1d independently
-decodes the emitted AV1. Actual 12-bit PQ/P3 signaling, geometry, square pixels,
-opacity, identity orientation and privacy pass. This single-layer output has
-no embedded authored SDR base or gain map. The manual bundle supplies a matched
-SDR comparison and the inspected native HDR intent. Display tone mapping,
-other depth/geometry selectors and physical consumers require separate proof.
+The separate [explicit PQ P3 AVIF proofs](apple_hdr_avif.py) preserve that
+documented full image at 10 and 12 bits after containment, crop, stretch and
+upscale. All eight tuples pass; maximum Delta E ITP is 0.350935 at 12 bits and
+0.821563 at 10 bits. Containment12 retains its original bytes and measurements.
+They use the unchanged photographic gates without a source precision allowance.
+Native float preparation and geometry feed FFmpeg/zimg then AOM; dav1d
+independently decodes the emitted AV1. Actual depth, PQ/P3 signaling, geometry,
+square pixels, opacity, identity orientation and privacy pass. These single-layer
+outputs have no embedded authored SDR base or gain map. Each manual entry
+supplies a matched SDR comparison and inspected native HDR intent. Display tone
+mapping, other depths/orientation and physical consumers require separate proof.
 New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native

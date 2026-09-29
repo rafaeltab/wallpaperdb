@@ -143,6 +143,28 @@ class EvidenceFileTests(unittest.TestCase):
                 self.assertIn('not an approved download', entry['warning'])
                 self.assertEqual(entry['consumer_status'], 'pending manual review')
 
+    def test_manual_bundle_keeps_qualified_icc_reader_scope_and_stock_failure(self):
+        # Bookkeeping only: these bytes never exercise or qualify an encoder.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            source = root/'scoped.jpg'
+            source.write_bytes(b'file-copy-test-only')
+            case = {'case_id': 'iso-upscale-icc-gamma15',
+                'fixture_id': 'gainmap-android-iso', 'geometry': 'upscale', 'status': 'qualified',
+                'candidate': 'native-combine-icc-gamma32-midpointoffset',
+                'qualification_scope': 'Experimental native ICC-aware file path only',
+                'known_consumer_limitations': ['Stock reader assumes sRGB base transfer'],
+                'consumer_decoder_diagnostics': {'stock_native_srgb': {'status': 'tested and failed'}},
+                'artifacts': {'output': str(source), 'sha256': suite.avif.digest(source)}}
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files([case], [])
+            self.assertEqual(len(files), 1)
+            for field in ('qualification_scope', 'known_consumer_limitations', 'consumer_decoder_diagnostics'):
+                self.assertEqual(files[0][field], case[field])
+            self.assertEqual(files[0]['codec_status'], 'qualified')
+            self.assertEqual(files[0]['consumer_status'], 'pending manual review')
+
     def test_manual_bundle_rejects_missing_inspected_output(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

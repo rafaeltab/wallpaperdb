@@ -53,10 +53,13 @@ Separate SOF0 DCT JPEG candidates have their own manifest entries. Some retain
 measured shadow failures and are only diagnostic files. Test a qualified SOF0
 file separately from the SOF3 file; neither result establishes the other's
 decoder, gain-map interpretation or HDR presentation behavior.
-The two gamma-3.2 ICC-aware HDR JPEG experiments remain failed diagnostic
-files. Their SDR base and reconstructed HDR have separate measurements.
-Stock native readers assume sRGB transfer or reject ICC in this path; record
-that interpretation separately from a consumer's ability to open the JPEG.
+Gamma-3.2 ICC-aware HDR JPEG experiments have separate SDR-base and HDR
+measurements. The midpoint-offset map-gamma-1.5 ISO upscale passes the file
+gates with experimental ICC-aware readers. The preceding five variants remain
+failed diagnostics. Stock native readers assume sRGB transfer or reject ICC
+in this path. Each manifest entry retains this qualification scope and its
+reader limitations. Check ICC interpretation and HDR reconstruction separately
+from a consumer's ability to open the JPEG; keep physical results pending.
 
 The optional gain-map AVIF source has separately inspected authored-SDR AVIF
 derivatives for containment, crop, stretch and upscale. Compare them with the
@@ -81,9 +84,9 @@ Single-layer HDR PNG16 candidates use the same declared renderer convention.
 Keep the original ambiguous-aspect diagnostic separate from the square-pixel
 candidate, and compare each qualified PNG with the corresponding PQ AVIF12 and
 authored SDR pair. Opening a 16-bit PNG does not establish visible HDR output.
-The separate regenerated gain-map AVIF containment keeps eight-bit base, map
-and alternate declarations. It passes the authored SDR endpoint and the declared
-log2-headroom-4 HDR reference. Its regenerated offsets and headroom differ from
+The separate regenerated gain-map AVIF containment, crop, stretch and upscale
+keep eight-bit base, map and alternate declarations. Each passes the authored
+SDR endpoint and the declared log2-headroom-4 HDR reference. Its regenerated offsets and headroom differ from
 the source; intermediate display adaptation remains untested. Compare source
 and derivative at stable brightness, then repeat at another brightness setting
 and window size. Record any changing exposure or highlight difference separately

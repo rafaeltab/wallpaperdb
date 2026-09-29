@@ -320,7 +320,8 @@ FFmpeg and ExifTool verify storage, PQ signaling, dimensions and privacy;
 source, geometry and final appearance must still pass. The original aspect
 failure stays visible beside the corrected candidate.
 The separate [regenerated gain-map AVIF proof](gainmap_avif_preserve.py) preserves
-actual base, map and alternate depth at eight bits. Independent BMFF/tmap and
+actual base, map and alternate depth at eight bits for containment, crop, stretch
+and upscale. Independent BMFF/tmap and
 AV1 packet inspection precede authored SDR, independent HDR and native HDR
 appearance checks. Stock depth-8 failures and automatic-depth-12 incompatibility
 remain visible. Qualification covers the declared full-headroom endpoints only:

@@ -1,10 +1,10 @@
-"""Explicit PQ10/PQ12 P3 AVIF geometries from documented old Apple full HDR.
+"""Explicit PQ8/PQ10/PQ12 P3 AVIF geometries from documented old Apple full HDR.
 
 Declared before measurements: unchanged photographic gainmap-hdr regional
 gates apply to source, float Lanczos geometry, native PQ intent and final AV1
 decoding. No source quantization allowance is added. Native source pixels feed
 FFmpeg/zimg and AOM; the documented reference is used only for measurement.
-Only contain, cover, fill and upscale are admitted at explicit10/12-bit depth.
+Only contain, cover, fill and upscale are admitted at explicit8/10/12-bit depth.
 This single-layer output measures full HDR only. It neither preserves an
 authored SDR base inside the output nor establishes intermediate adaptation.
 """
@@ -27,7 +27,7 @@ from matrix import GAINMAP_GEOMETRIES
 SELECTORS = {'format': 'avif', 'range': 'hdr', 'gamut': 'preserve', 'depth': '12',
              'motion': 'preserve', 'transparency': 'preserve', 'w': 173, 'fit': 'contain'}
 SIZES = {'contain': (173, 231), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 1025)}
-DEPTHS = (10, 12)
+DEPTHS = (8, 10, 12)
 DEPENDENCIES = ('apple_hdr_avif.py', 'test_apple_hdr_avif.py', *apple_native_source.DEPENDENCIES,
                 'gainmap_linear.py', 'gainmap_hdr.py', 'hdr_png8_precision.py', 'gainmap_avif_hdr.py', 'matrix.py')
 
@@ -43,7 +43,7 @@ def _measure(expected, actual):
 
 def _encode(linear, directory, *, operation='contain', depth=12):
     if operation not in SIZES or type(depth) is not int or depth not in DEPTHS:
-        raise ValueError('Only the declared explicit10/12-bit native geometries are admitted')
+        raise ValueError('Only the declared explicit8/10/12-bit native geometries are admitted')
     width, height = SIZES[operation]
     if (linear.get('format') != 'gbrapf32le' or linear.get('gamut') != 'p3'
             or linear.get('normalization_nits') != 203
@@ -133,7 +133,8 @@ def _run_one(directory, *, source, selectors, operation, depth):
             '-of', 'json', output]))
         streams = packet.get('streams', [])
         structural['independent_packet_facts'] = len(streams) == 1 and all(streams[0].get(key) == value
-            for key, value in {'codec_name': 'av1', 'width': width, 'height': height, 'pix_fmt': f'gbrp{depth}le',
+            for key, value in {'codec_name': 'av1', 'width': width, 'height': height,
+                'pix_fmt': 'gbrp' if depth == 8 else f'gbrp{depth}le',
                 'color_space': 'gbr', 'color_transfer': 'smpte2084', 'color_primaries': 'smpte432',
                 'color_range': 'pc', 'nb_read_frames': '1', 'sample_aspect_ratio': '1:1',
                 'display_aspect_ratio': f'{width}:{height}' if width != height else '1:1'}.items())

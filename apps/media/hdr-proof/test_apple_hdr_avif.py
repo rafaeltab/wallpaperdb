@@ -160,7 +160,7 @@ class AppleHdrAvifTests(unittest.TestCase):
         self.assertEqual(matrix['rendering_coverage']['same_file_qualified_count'], 0)
 
     def test_unproved_depth_geometry_and_mismatched_selector_tuples_reject_before_native_work(self):
-        options = ({'depths': ()}, {'depths': (8,)}, {'depths': (10, 10)}, {'depths': (True,)},
+        options = ({'depths': ()}, {'depths': (16,)}, {'depths': (10, 10)}, {'depths': (True,)},
                    {'depths': ('10',)}, {'depths': ([10],)}, {'geometries': ()},
                    {'geometries': ('contain', 'contain')}, {'geometries': ('orientation',)},
                    {'geometries': ('crop',)}, {'geometries': (['contain'],)},
@@ -177,6 +177,25 @@ class AppleHdrAvifTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.module._encode(self.case['native_geometry'], self.root/'wrong-geometry', operation='cover')
         self.assertEqual(len(avif.COMMANDS), before)
+
+    def test_explicit8_bit_paths_use_the_unchanged_photographic_gates(self):
+        report = self.module.run(self.root/'eight-bit', depths=(8,),
+                                 geometries=('contain', 'cover', 'fill', 'upscale'))
+        self.assertEqual(len(report['cases']), 4)
+        for case in report['cases']:
+            with self.subTest(geometry=case['geometry']):
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertTrue(all(case['checks'].values()))
+                self.assertTrue(all(case['structural_checks'].values()))
+                self.assertEqual(case['facts']['depth'], 8)
+                self.assertEqual(case['output_packet_facts']['streams'][0]['pix_fmt'], 'gbrp')
+                self.assertEqual(case['selectors']['depth'], '8')
+                self.assertEqual(case['threshold_scope']['profile'], 'gainmap-hdr')
+                self.assertEqual(case['threshold_scope']['source_quantization_allowance'], 0)
+                self.assertFalse(case['rendering_scope']['intermediate_adaptation_qualified'])
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+        from matrix import build_matrix
+        self.assertEqual(build_matrix(report['cases'])['evidence_errors'], [])
 
 
 if __name__ == '__main__':

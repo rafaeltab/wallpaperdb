@@ -15,6 +15,7 @@ import struct
 import numpy as np
 
 import apple_native_source
+import apple_orientation_source
 import apple_source_model
 import avif
 import gainmap
@@ -28,9 +29,11 @@ from matrix import GAINMAP_GEOMETRIES
 SELECTORS = {'format': 'png', 'range': 'hdr', 'gamut': 'preserve', 'depth': '16',
              'motion': 'preserve', 'transparency': 'preserve', 'w': 173, 'fit': 'contain'}
 CHROMATICITIES = [31270, 32900, 68000, 32000, 26500, 69000, 15000, 6000]
-SIZES = {'contain': (173, 231), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 1025)}
+SIZES = {'contain': (173, 231), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 1025),
+         'orientation': (173, 130)}
 DEPENDENCIES = ('apple_hdr_png.py', 'test_apple_hdr_png.py', *apple_native_source.DEPENDENCIES,
-                'gainmap_linear.py', 'gainmap_hdr.py', 'hdr_png.py', 'hdr_png8_precision.py', 'matrix.py')
+                'gainmap_linear.py', 'gainmap_hdr.py', 'hdr_png.py', 'hdr_png8_precision.py', 'matrix.py',
+                *apple_orientation_source.DEPENDENCIES)
 
 
 def _selectors(operation):
@@ -109,7 +112,14 @@ def _run_one(directory, *, source=apple_source_model.SOURCE, selectors=None, ope
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
-    hashes = {name: avif.digest(Path(__file__).with_name(name)) for name in DEPENDENCIES}
+    hashes = {name: avif.digest(Path(__file__).parent/name) for name in DEPENDENCIES}
+    parent_source = source
+    if operation == 'orientation':
+        source = apple_orientation_source.generate(directory/'orientation-fixture', parent=parent_source)
+        if avif.digest(source) != apple_orientation_source.SOURCE_SHA256:
+            raise ValueError('Generated EXIF6 source changed before native pixel work')
+    actual_source_hash = avif.digest(source)
+    orientation = 6 if operation == 'orientation' else 1
     case = {'case_id': f'gainmap-apple-old:hdr:png:preserve:16:{operation}:documented-full-native',
         'cell_id': 'gainmap-jpeg:hdr:png', 'fixture_id': 'gainmap-apple-old',
         'source_sha256': apple_source_model.SOURCE_SHA256, 'source_reference_revision': apple_source_model.REFERENCE_REVISION,
@@ -135,26 +145,39 @@ def _run_one(directory, *, source=apple_source_model.SOURCE, selectors=None, ope
                                                f'P3 float Lanczos {operation}')
     report = {'cases': [case]}
     try:
-        prepared = apple_native_source.run(directory/'source')
+        prepared = (apple_orientation_source.run(directory/'source', source=source)
+                    if operation == 'orientation' else apple_native_source.run(directory/'source'))
         report['source_preparation'] = prepared
         if prepared['status'] != 'qualified source preparation' or not all(prepared['checks'].values()):
             raise ValueError('Documented native source preparation did not qualify')
-        reference = gainmap.array_geometry(np.load(prepared['reference']['path']), operation)
+        if operation == 'orientation':
+            native = prepared['native_source']
+            case['checks']['source_transform'] = False
+            if (native.get('source_orientation') != 6 or native.get('orientation_applied') is not False
+                    or prepared['orientation_source']['sha256'] != actual_source_hash
+                    or prepared['orientation_source']['path'] != str(source)):
+                raise ValueError('Actual EXIF6 source must remain unrotated until derivative geometry')
+            case['orientation_source'] = prepared['orientation_source']
+            case['checks']['source_transform'] = True
+            case['rendering_scope'].update({'source_orientation': 6, 'orientation_applications': 1})
+            case['threshold_scope']['reference'] = ('Documented full Rec709/linear old Apple stored raster, '
+                'then one clockwise EXIF6 rotation and unchanged independent P3 float Lanczos containment')
+        reference = gainmap.array_geometry(np.load(prepared['reference']['path']), operation, orientation)
         reference_path = directory/'independent-full-reference.npy'
         np.save(reference_path, reference)
-        sdr = gainmap.geometry(gainmap.source_image(apple_source_model.SOURCE, 'preserve'), operation, 1)
+        sdr = gainmap.geometry(gainmap.source_image(source, 'preserve'), operation, orientation)
         profile = sdr.info.get('icc_profile')
         sdr.info.clear()
         sdr_path = directory/'reference-sdr.png'
         sdr.save(sdr_path, icc_profile=profile)
-        linear = gainmap_linear.resample_linear(prepared['native_source'], directory/'native-geometry.gbrapf32', operation)
+        linear = gainmap_linear.resample_linear(prepared['native_source'], directory/'native-geometry.gbrapf32', operation, orientation)
         output = directory/'output.png'
         writer = encode(linear, output, operation=operation)
-        bound = {**prepared['bound_files'], str(source): apple_source_model.SOURCE_SHA256,
+        bound = {**prepared['bound_files'], str(source): actual_source_hash, str(parent_source): apple_source_model.SOURCE_SHA256,
             str(output): avif.digest(output), str(reference_path): avif.digest(reference_path),
             str(sdr_path): avif.digest(sdr_path), str(linear['path']): avif.digest(linear['path'])}
         case['checks']['native_encoder'] = True
-        case['artifacts'] = {'source': str(source), 'source_sha256': apple_source_model.SOURCE_SHA256,
+        case['artifacts'] = {'source': str(source), 'source_sha256': actual_source_hash,
                              'output': str(output), 'sha256': bound[str(output)]}
         facts, pixels = inspect_output(output) if operation == 'contain' else inspect_output(output, dimensions=(width, height))
         measurements = {'native_source': prepared['measurement'],
@@ -172,7 +195,7 @@ def _run_one(directory, *, source=apple_source_model.SOURCE, selectors=None, ope
             'native_geometry': measurements['native_geometry']['passed'], 'independent_decoder': True,
             'structure': True, 'appearance': all(row['passed'] for row in measurements.values()), 'privacy': True})
         if (any(avif.digest(path) != sha for path, sha in bound.items())
-                or any(avif.digest(Path(__file__).with_name(name)) != sha for name, sha in hashes.items())):
+                or any(avif.digest(Path(__file__).parent/name) != sha for name, sha in hashes.items())):
             raise ValueError('Source, reference or emitted output integrity changed during decoding')
         case['bound_files'] = bound
         case['checks']['integrity'] = True

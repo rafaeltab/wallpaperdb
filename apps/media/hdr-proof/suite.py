@@ -770,7 +770,7 @@ def main():
     icc_results.extend(apple_hdr_avif['cases'])
     from apple_hdr_png import run as run_apple_hdr_png
     apple_hdr_png = run_apple_hdr_png(WORK/'apple-hdr-png-contain',
-                                   geometries=('contain', 'cover', 'fill', 'upscale'))
+                                   geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
     write_json(RESULTS/'apple-hdr-png-contain.json', apple_hdr_png)
     icc_results.extend(apple_hdr_png['cases'])
     for source_id in ('gainmap-apple-old', 'gainmap-apple-new'):
@@ -877,7 +877,7 @@ def main():
     # the original generated corpus lock, including its PNG16 hashes.
     generated_fixtures = locked_fixtures + png8_result['fixtures'] + png8_geometry_result['fixtures'] + gainmap_avif_result['source_fixtures']
     generated_fixtures = merge_reconstruction_profiles(generated_fixtures, gainmap_avif_hdr_result['source_fixtures'])
-    generated_fixtures += apple_orientation_fixtures(apple_hdr_jpeg['cases'])
+    generated_fixtures += apple_orientation_fixtures(apple_hdr_jpeg['cases']+apple_hdr_png['cases'])
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
     errors = matrix['evidence_errors'] + fixture_lock(locked_fixtures,args.update_fixture_lock)

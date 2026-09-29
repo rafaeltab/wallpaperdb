@@ -93,8 +93,8 @@ are separate fixed-luminance full-effect files. Each authored SDR companion is a
 comparison image; the AVIF has no embedded SDR base or adaptive gain map. Record the viewer's tone mapping
 and apparent brightness separately from the passing file comparison. Its PQ16
 companion is inspected encoder intent, not an independent reference.
-The corrected old Apple PQ16 P3 PNG containment, crop, stretch and upscale
-each have their own inspected output and authored SDR comparison. Each is a
+The corrected old Apple PQ16 P3 PNG containment, crop, stretch, upscale and
+EXIF6 orientation each have their own inspected output and authored SDR comparison. Each is a
 fixed-luminance single-layer HDR file;
 its passing codec measurements do not establish the viewer's HDR presentation
 or SDR fallback behavior.

@@ -180,8 +180,10 @@ supplies a matched SDR comparison and inspected native HDR intent. Display tone
 mapping, other selectors/orientation and physical consumers require separate proof.
 The [explicit PQ16 P3 PNG proofs](apple_hdr_png.py) also pass the documented
 full-effect containment, crop, stretch and upscale comparisons, with maximum
-Delta E ITP 0.258409, 0.275747, 0.270038 and 0.257914. Containment retains its
-original bytes and measurements. The
+Delta E ITP 0.258409, 0.275747, 0.270038 and 0.257914. A separately tested
+real EXIF6 variant passes with maximum 0.259545 after one clockwise rotation,
+producing a 173-by-130 identity-oriented file. The earlier four outputs and
+measurements remain exact. The
 native FFmpeg/zimg writer and independent libpng decoder agree exactly on
 RGB16 samples. Actual CICP, matching chromaticities, square pixels, static
 opaque structure, identity orientation and metadata privacy pass. Each manual

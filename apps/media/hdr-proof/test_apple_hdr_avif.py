@@ -300,10 +300,62 @@ class AppleHdrAvifRec2020Tests(unittest.TestCase):
         self.assertEqual(matrix['evidence_errors'], [])
         self.assertEqual(matrix['rendering_coverage']['same_file_qualified_count'], 0)
 
+    def test_rec2020_geometries_preserve_containment_and_rotate_real_exif6_once(self):
+        import numpy as np
+        from PIL import Image
+        report = self.module.run(self.root/'all-rec2020', gamut='rec2020', depths=(12,10,8),
+            geometries=('contain','cover','fill','upscale','orientation'))
+        self.assertEqual(len(report['cases']), 15)
+        hashes = {
+            ('cover', 12): 'e465d94330cda0b1ea255400811355f672eb497b491f02f65e14afd45906d357',
+            ('cover', 10): 'e2363592fcd5fe4da1a4800759f9df57c0b577b2c21b53770d2891e6e727449a',
+            ('cover', 8): 'baaeaa05629400681a4c8f192102015e3e70a29dbe0c8fd257fca7840a0f67be',
+            ('fill', 12): 'ae4bd10218ec959f6161d34a03060e25dbb897ee1e76f96b2d388320ae47a014',
+            ('fill', 10): 'b0792c2ddc8d1a1613e9be8592a8d39c04cb9fd620a05a240ceb5fe6f671ee12',
+            ('fill', 8): '301dd454c14a2889786be8d32ae60b96108a09b8f6e3a9e22b563d9411131fc8',
+            ('upscale', 12): 'dc5b4d920e812df6366b4039b3ae8934a36723e617ce500e5b461ea00fb5caf1',
+            ('upscale', 10): 'f091a2c5d565d0a7bae0bcdeac8834c40139a4c29b03c73e23c074a16d0ee4de',
+            ('upscale', 8): 'ca4fc1b31b7112065032571102b817967bbe1ed5f9ba6d3efbdecf1f5b038a3e',
+            ('orientation', 12): '6835635d8c94fb539014dc513c10db45733216170ab46b183cd775cd9de48a00',
+            ('orientation', 10): '2ef78fb0f418fd5e3a1ee23b826f79de1efdb9b82b717912a407829ba4e65d12',
+            ('orientation', 8): '85acc9290863e4ebf2829527c4f0e3ea090fae15179a473d34d8ebbb98daece5',
+        }
+        previous = {case['case_id']:case for case in self.report['cases']}
+        for case in report['cases']:
+            with self.subTest(case=case['case_id']):
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertTrue(all(case['checks'].values()))
+                self.assertTrue(all(case['structural_checks'].values()))
+                self.assertEqual(case['selectors']['gamut'], 'rec2020')
+                self.assertEqual((case['facts']['primaries'],case['facts']['transfer'],case['facts']['matrix']), (9,16,0))
+                self.assertEqual(case['reference_hdr']['gamut'], 'p3')
+                self.assertEqual(case['native_geometry']['gamut'], 'p3')
+                self.assertEqual(case['threshold_scope']['source_quantization_allowance'], 0)
+                if case['geometry'] == 'contain':
+                    old = previous[case['case_id']]
+                    for key in ('selectors','status','checks','measurements','threshold_scope','rendering_scope','qualification_scope','known_consumer_limitations','structural_checks','output_packet_facts'):
+                        self.assertEqual(case[key],old[key],key)
+                    self.assertEqual(case['artifacts']['sha256'],old['artifacts']['sha256'])
+                else:
+                    self.assertEqual(case['artifacts']['sha256'],hashes[(case['geometry'],int(case['selectors']['depth']))])
+                if case['geometry'] == 'orientation':
+                    self.assertEqual(case['orientation_source']['orientation'], 6)
+                    self.assertEqual(case['artifacts']['source_sha256'],self.module.apple_orientation_source.SOURCE_SHA256)
+                    self.assertEqual(case['source_facts']['metadata']['IFD0:Orientation'],6)
+                    self.assertFalse(case['source_decoder_evidence']['native_source']['orientation_applied'])
+                    self.assertEqual(case['native_geometry']['padding_filter'].count('transpose=clock'),1)
+                    original=np.load(case['source_decoder_evidence']['reference']['path'])
+                    rotated=np.rot90(original,-1)
+                    expected=np.maximum(np.stack([np.asarray(Image.fromarray(rotated[...,ch].astype(np.float32)).resize((173,130),Image.Resampling.LANCZOS)) for ch in range(3)],axis=-1),0)
+                    self.assertTrue(np.array_equal(np.load(case['reference_hdr']['path']),expected))
+                    self.assertEqual(case['rendering_scope']['orientation_applications'],1)
+        from matrix import build_matrix
+        self.assertEqual(build_matrix(report['cases'])['evidence_errors'],[])
+
     def test_unproved_gamut_geometry_and_selector_combinations_reject_before_native_work(self):
         options = ({'gamut': 'p3'}, {'gamut': 'srgb'}, {'gamut': ['rec2020']},
-                   {'gamut': 'rec2020', 'geometries': ('cover',)},
-                   {'gamut': 'rec2020', 'geometries': ('orientation',)},
+                   {'gamut': 'rec2020', 'geometries': ('crop',)},
+                   {'gamut': 'rec2020', 'geometries': ('orientation-8',)},
                    {'gamut': 'rec2020', 'selectors': dict(self.module.SELECTORS)})
         for kwargs in options:
             before = len(avif.COMMANDS)

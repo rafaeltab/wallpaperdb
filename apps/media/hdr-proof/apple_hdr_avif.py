@@ -7,7 +7,7 @@ FFmpeg/zimg and AOM; the documented reference is used only for measurement.
 Only contain, cover, fill, upscale and a separately locked EXIF6 variant are
 admitted at explicit 8/10/12-bit depth. Orientation applies exactly once after
 the documented full effect in original stored raster coordinates.
-Explicit Rec.2020 is a separate containment-only candidate at each depth.
+Explicit Rec.2020 is a separate candidate for each geometry and depth.
 Native zimg converts P3 geometry; the independent P3 reference and photographic
 gates stay unchanged for the cross-gamut intent and final appearance checks.
 This single-layer output measures full HDR only. It neither preserves an
@@ -51,7 +51,7 @@ def _measure(expected, actual, actual_gamut='p3'):
 
 def _encode(linear, directory, *, operation='contain', depth=12, gamut='preserve'):
     if (operation not in SIZES or type(depth) is not int or depth not in DEPTHS
-            or gamut not in ('preserve', 'rec2020') or gamut == 'rec2020' and operation != 'contain'):
+            or gamut not in ('preserve', 'rec2020')):
         raise ValueError('Only the declared explicit8/10/12-bit native geometries are admitted')
     output_gamut, primaries = ('p3', 12) if gamut == 'preserve' else ('rec2020', 9)
     width, height = SIZES[operation]
@@ -209,7 +209,6 @@ def _run_one(directory, *, source, selectors, operation, depth, gamut='preserve'
 def run(directory, *, source=apple_source_model.SOURCE, selectors=None, depths=(12,), geometries=('contain',), gamut='preserve'):
     depths, geometries = tuple(depths), tuple(geometries)
     if (type(gamut) is not str or gamut not in ('preserve', 'rec2020')
-            or gamut == 'rec2020' and geometries != ('contain',)
             or not depths or any(type(depth) is not int or depth not in DEPTHS for depth in depths)
             or len(set(depths)) != len(depths)
             or not geometries or any(type(operation) is not str or operation not in SIZES for operation in geometries)

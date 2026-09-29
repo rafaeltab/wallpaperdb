@@ -28,22 +28,24 @@ class EvidenceFileTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             suite.apple_orientation_fixtures([{**case, 'source_facts': {'metadata': {'IFD0:Orientation': 1}}}])
 
-    def test_manual_bundle_keeps_each_explicit_apple_avif_tuple(self):
+    def test_manual_bundle_keeps_each_explicit_apple_single_layer_tuple(self):
         # Only copy/scoping behavior is tested; these bytes never qualify a codec.
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root/'results').mkdir()
-            output = root/'output.avif'
-            output.write_bytes(b'copy-bookkeeping-only')
-            cases = [{'case_id': f'apple-{depth}-{operation}', 'fixture_id': 'gainmap-apple-old',
-                'proof_module': 'apple_hdr_avif', 'geometry': operation, 'status': 'qualified',
+            outputs = {extension: root/('output.'+extension) for extension in ('avif', 'png')}
+            for output in outputs.values():
+                output.write_bytes(b'copy-bookkeeping-only')
+            cases = [{'case_id': f'apple-{extension}-{depth}-{operation}', 'fixture_id': 'gainmap-apple-old',
+                'proof_module': 'apple_hdr_'+extension, 'geometry': operation, 'status': 'qualified',
                 'rendering_scope': {'intermediate_adaptation_qualified': False},
-                'artifacts': {'output': str(output), 'sha256': suite.avif.digest(output)}}
-                for depth in (8, 10, 12) for operation in ('contain', 'cover', 'fill', 'upscale')]
+                'artifacts': {'output': str(outputs[extension]), 'sha256': suite.avif.digest(outputs[extension])}}
+                for extension, depths in (('avif', (8, 10, 12)), ('png', (16,)))
+                for depth in depths for operation in ('contain', 'cover', 'fill', 'upscale')]
             with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
                 files = suite.candidate_files(cases, [])
             self.assertEqual({row['case_id'] for row in files}, {case['case_id'] for case in cases})
-            self.assertEqual(len(files), 12)
+            self.assertEqual(len(files), 16)
             for row in files:
                 self.assertFalse(row['rendering_scope']['intermediate_adaptation_qualified'])
                 self.assertEqual(row['consumer_status'], 'pending manual review')

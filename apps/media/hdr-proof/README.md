@@ -178,13 +178,15 @@ square pixels, opacity, identity orientation and privacy pass. These single-laye
 outputs have no embedded authored SDR base or gain map. Each manual entry
 supplies a matched SDR comparison and inspected native HDR intent. Display tone
 mapping, other selectors/orientation and physical consumers require separate proof.
-The [explicit PQ16 P3 PNG containment](apple_hdr_png.py) also passes the
-documented full-effect comparison, with maximum Delta E ITP 0.258409. The
+The [explicit PQ16 P3 PNG proofs](apple_hdr_png.py) also pass the documented
+full-effect containment, crop, stretch and upscale comparisons, with maximum
+Delta E ITP 0.258409, 0.275747, 0.270038 and 0.257914. Containment retains its
+original bytes and measurements. The
 native FFmpeg/zimg writer and independent libpng decoder agree exactly on
 RGB16 samples. Actual CICP, matching chromaticities, square pixels, static
-opaque structure, identity orientation and metadata privacy pass. Its manual
-entry includes the matched authored SDR comparison. This explicit depth16
-result does not qualify an embedded SDR base, adaptive gain map or physical
+opaque structure, identity orientation and metadata privacy pass. Each manual
+entry includes its matched authored SDR comparison. These explicit depth16
+results do not qualify an embedded SDR base, adaptive gain map or physical
 consumer.
 New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.

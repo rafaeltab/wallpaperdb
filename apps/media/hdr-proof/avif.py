@@ -310,6 +310,7 @@ def run(output_dir, *, specs=None):
     from appearance import compare_appearance, sdr_signal_to_nits, RGB_TO_XYZ
     from sdr_reference import reference_srgb
     import gamma_sdr
+    import gamma_icc
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     evidence, fixtures = [], []
@@ -356,6 +357,11 @@ def run(output_dir, *, specs=None):
         # The gamut selector promises primaries, not a coding transfer. Keep a
         # distinct representation and independent decode for genuine gamma 2.2.
         operations += [('sdr', 'avif', 'preserve', g, None, 'gamma22') for g in ('contain','cover','fill','upscale','orientation')]
+        operations += [('sdr', ext, 'static' if spec['frames'] == 2 else 'preserve', g, None, 'gamma22')
+                       for ext in ('jpg', 'webp') for g in ('identity','contain','cover','fill','upscale','orientation')
+                       if not (spec['frames'] == 2 and ext == 'webp' and g != 'identity')]
+        if spec['frames'] == 2:
+            operations += [('sdr', 'webp', 'preserve', g, None, 'gamma22') for g in ('contain','cover','fill','upscale','orientation')]
         for dynamic_range, ext, motion, geometry, depth_variant, transfer_variant in operations:
             sdr = dynamic_range == 'sdr'
             target_gamut = 'srgb' if sdr else spec['gamut']
@@ -389,7 +395,7 @@ def run(output_dir, *, specs=None):
             if transfer_variant is not None:
                 item['optional_transfer_variant'] = True
                 item['representation'] = {'primaries': 'srgb', 'transfer': 'gamma 2.2',
-                                          'cicp': [1, 4, 0], 'coded_depth': depth,
+                                          'signaling': 'CICP 1/4/0' if ext == 'avif' else 'Verified ICC matrix/TRC profile', 'coded_depth': depth,
                                           'reference_grade': 'Unchanged independent SDR tone/gamut reference',
                                           'consumer_status': 'pending manual review'}
             try:
@@ -421,6 +427,8 @@ def run(output_dir, *, specs=None):
                     facts = inspect_avif(target)
                     actual = decode_avif(target, case_dir, count)
                     detail = structure_checks(facts, actual, spec, refs, target_transfer, target_gamut, depth, count)
+                elif transfer_variant is not None:
+                    facts, actual, detail, output_profile = encode_gamma_other(converted, target, ext, refs, count)
                 else:
                     facts, actual, detail = encode_other(converted, target, ext, target_transfer, target_gamut, refs, count, spec)
                 item['checks']['native_encoder'] = True
@@ -433,15 +441,22 @@ def run(output_dir, *, specs=None):
                 item['checks']['privacy'] = b'HDR-PROOF-PRIVATE' not in target.read_bytes() and not any(k in facts.get('exiftool', {}) for k in ('GPSLatitude','GPSLongitude','Make','Model','SerialNumber','OwnerName'))
                 if ext == 'avif':
                     item['checks']['privacy'] &= all(re.search(r'\* '+kind+r' Metadata\s*:\s*Absent',facts['info']) is not None for kind in ('Exif','XMP'))
+                elif transfer_variant is not None:
+                    item['checks']['privacy'] &= facts['privacy']
                 measurements = []
                 for i, (ref, decoded) in enumerate(zip(refs,actual)):
                     if sdr:
                         expected = reference_srgb(ref[..., :3], spec['gamut'], peak_nits=peak_nits)
-                        actual_nits = (gamma_sdr.decode_signal_to_nits(decoded[..., :3]) if transfer_variant is not None
-                                       else sdr_signal_to_nits(decoded[..., :3]))
+                        actual_gamut = 'srgb'
+                        if transfer_variant is not None and ext != 'avif':
+                            actual_nits = gamma_icc.decode_signal_to_nits(decoded[..., :3], output_profile)
+                            actual_gamut = 'rec2020'
+                        else:
+                            actual_nits = (gamma_sdr.decode_signal_to_nits(decoded[..., :3]) if transfer_variant is not None
+                                           else sdr_signal_to_nits(decoded[..., :3]))
                         measured = compare_appearance(
                             sdr_signal_to_nits(expected), actual_nits,
-                            reference_gamut='srgb', actual_gamut='srgb', fixture_class='sdr-8',
+                            reference_gamut='srgb', actual_gamut=actual_gamut, fixture_class='sdr-8',
                             alpha=None if ext == 'jpg' else ref[..., 3],
                             region_reference_luminance_nits=ref[..., :3] @ RGB_TO_XYZ[spec['gamut']][1],
                         )
@@ -473,6 +488,31 @@ def run(output_dir, *, specs=None):
             evidence.append(item)
         print(f'AVIF {spec["id"]}: {len(operations)} native cases', flush=True)
     return {'evidence':evidence, 'fixtures':fixtures, 'commands':COMMANDS}
+
+
+def encode_gamma_other(paths, target, ext, refs, count):
+    import gamma_icc
+    gamma_icc.encode(paths, target, ext)
+    facts, actual, profile = gamma_icc.inspect_and_decode(target)
+    alpha_limit = 0 if ext == 'jpg' else 2/255
+    errors = [float(np.max(np.abs(frame[..., 3] - (1 if ext == 'jpg' else reference[..., 3]))))
+              for frame, reference in zip(actual, refs)]
+    facts['alpha_measurement'] = {'comparison': 'explicit opaque coercion' if ext == 'jpg' else 'preserved fractional alpha',
+                                  'absolute_error_limit': alpha_limit, 'frame_maximum_absolute_errors': errors,
+                                  'maximum_absolute_error': max(errors, default=None)}
+    facts['sha256'] = digest(target)
+    exif = facts['exiftool']
+    detail = {'dimensions': all(frame.shape == ref.shape for frame, ref in zip(actual, refs)),
+              'frames': len(actual) == count,
+              'color_signaling': facts['icc']['gamma22_srgb_primaries'],
+              'gamut': facts['icc']['gamma22_srgb_primaries'],
+              'orientation_baked': exif.get('Orientation', 1) == 1,
+              'depth': exif.get('BitsPerSample') == 8 if ext == 'jpg' else
+                       facts['format'] == 'WEBP' and 'WEBP' in str(exif.get('FileType', '')).upper(),
+              'alpha': bool(errors) and all(error <= alpha_limit for error in errors),
+              'timing': facts['durations_ms'] == [300, 700] if count == 2 else True,
+              'loop': facts['loop'] == 3 if count == 2 else True}
+    return facts, actual, detail, profile
 
 
 def encode_other(paths, target, ext, transfer, gamut, refs, count, spec):

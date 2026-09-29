@@ -181,7 +181,7 @@ class FixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             result = run(temporary, specs=[spec])
             cases = {case['case_id']: case for case in result['evidence']}
-            self.assertEqual(len(cases), 27)
+            self.assertEqual(len(cases), 39)
             for geometry in ('contain', 'cover', 'fill', 'upscale', 'orientation'):
                 baseline_id = f'{spec["id"]}:sdr:avif:srgb:preserve:{geometry}'
                 baseline, candidate = cases[baseline_id], cases[baseline_id + ':depth-12']
@@ -207,6 +207,24 @@ class FixtureTests(unittest.TestCase):
             self.assertEqual(matrix['evidence_errors'], [])
             cell = next(cell for cell in matrix['cells'] if cell['id'] == 'static-avif:sdr:avif')
             self.assertEqual(cell['status'], 'tested and failed')
+
+    def test_native_gamma_icc_animation_preserves_requested_motion_alpha_and_sdr_grade(self):
+        from avif import run
+        spec = {'id': 'animated-pq-alpha', 'transfer': 'pq', 'gamut': 'rec2020',
+                'depth': 10, 'alpha': True, 'frames': 2}
+        with tempfile.TemporaryDirectory() as temporary:
+            result = run(temporary, specs=[spec])
+            cases = {case['case_id']: case for case in result['evidence']}
+            for geometry in ('contain', 'cover', 'fill', 'upscale', 'orientation'):
+                case_id = f'{spec["id"]}:sdr:webp:srgb:preserve:{geometry}:transfer-gamma22'
+                self.assertTrue(case_id in cases, case_id)
+                case = cases[case_id]
+                self.assertEqual(case['status'], 'qualified', (geometry, case['blockers'], case.get('structural_checks')))
+                self.assertEqual(case['facts']['durations_ms'], [300, 700])
+                self.assertEqual(case['facts']['loop'], 3)
+                self.assertTrue(case['facts']['icc']['gamma22_srgb_primaries'])
+                self.assertTrue(case['structural_checks']['alpha'])
+                self.assertTrue(case['checks']['privacy'])
 
     def test_native_sixteen_bit_png_rejects_eight_bit_fractional_alpha_precision(self):
         from avif import encode_other

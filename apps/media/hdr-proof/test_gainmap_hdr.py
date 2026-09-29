@@ -41,17 +41,20 @@ class NativeGainMapHdrGeometryTests(unittest.TestCase):
                     (case_dir / "reference").mkdir()
                     reference = independent_hdr(source, case_dir / "reference", gamut)
                     pq = decode_source(source, case_dir / "native", gamut)
-                    result = resample_pq(pq, case_dir / "linear.gbrapf32", "contain")
-                    actual = read_linear(result)
-                    measured = compare_appearance(array_geometry(reference, "contain"), actual,
-                                                  reference_gamut="rec2020", actual_gamut="rec2020",
-                                                  fixture_class="gainmap-hdr")
-                    self.assertTrue(measured["passed"], measured["failures"])
-                    self.assertGreater(float(actual.max()), 203)
-                    # An alpha-drop conversion previously forced 16-bit linear
-                    # values, losing dark colors despite a float file suffix.
-                    lattice = actual / 10000 * 65535
-                    self.assertGreater(float(np.max(np.abs(lattice - np.round(lattice)))), 0.1)
+                    for operation in ('contain', 'cover', 'fill', 'upscale', 'crop', 'orientation'):
+                        with self.subTest(geometry=operation):
+                            orientation = 6 if operation == 'orientation' else 1
+                            result = resample_pq(pq, case_dir / f"{operation}.gbrapf32", operation, orientation)
+                            actual = read_linear(result)
+                            measured = compare_appearance(array_geometry(reference, operation, orientation), actual,
+                                                          reference_gamut="rec2020", actual_gamut="rec2020",
+                                                          fixture_class="gainmap-hdr")
+                            self.assertTrue(measured["passed"], measured["failures"])
+                            self.assertGreater(float(actual.max()), 203)
+                            # An alpha-drop conversion previously forced 16-bit linear
+                            # values, losing dark colors despite a float file suffix.
+                            lattice = actual / 10000 * 65535
+                            self.assertGreater(float(np.max(np.abs(lattice - np.round(lattice)))), 0.1)
 
     def test_constants_linear_gradients_and_edge_impulses_match_float_reference(self):
         with tempfile.TemporaryDirectory() as temporary:

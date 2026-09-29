@@ -1,0 +1,293 @@
+--- a/lib/src/jpegrutils.cpp
++++ b/lib/src/jpegrutils.cpp
+@@ -10,6 +10,7 @@
+ 
+ #include <algorithm>
+ #include <cmath>
++#include <map>
+ 
+ #include "ultrahdr/ultrahdrcommon.h"
+ #include "ultrahdr/jpegr.h"
+@@ -104,6 +105,94 @@
+   position += length;
+   return g_no_error;
+ }
++
++// Adobe gain-map channel properties may be scalar elements or three-item
++// rdf:Seq arrays. Keep this separate from the existing Apple/scalar handler:
++// nested array endings must not discard the surrounding property name.
++class GainMapChannelElements : public XmlHandler {
++  struct Node {
++    string name;
++    string text;
++    vector<Node> children;
++  };
++  struct Values {
++    bool valid = false;
++    float channels[3] = {0, 0, 0};
++  };
++  vector<Node> stack;
++  map<string, Values> properties;
++
++  static bool channelProperty(const string& name) {
++    return name == "hdrgm:GainMapMin" || name == "hdrgm:GainMapMax" ||
++           name == "hdrgm:Gamma" || name == "hdrgm:OffsetSDR" || name == "hdrgm:OffsetHDR";
++  }
++
++  static bool whitespace(const string& value) {
++    return value.find_first_not_of(" \t\r\n") == string::npos;
++  }
++
++  static bool number(const string& text, float* value) {
++    stringstream stream(text);
++    if (!(stream >> *value) || !std::isfinite(*value)) return false;
++    stream >> std::ws;
++    return stream.eof();
++  }
++
++ public:
++  DataMatchResult StartElement(const XmlTokenContext& context) override {
++    string name;
++    if (context.BuildTokenValue(&name)) stack.push_back({name, "", {}});
++    return context.GetResult();
++  }
++
++  DataMatchResult ElementContent(const XmlTokenContext& context) override {
++    string value;
++    if (!stack.empty() && context.BuildTokenValue(&value)) stack.back().text += value;
++    return context.GetResult();
++  }
++
++  DataMatchResult FinishElement(const XmlTokenContext& context) override {
++    if (stack.empty()) return context.GetResult();
++    Node node = std::move(stack.back());
++    stack.pop_back();
++    if (channelProperty(node.name) && !stack.empty() && stack.back().name == "rdf:Description") {
++      Values values;
++      if (properties.count(node.name)) {
++        // Repeated properties are ambiguous, including a malformed second one.
++        properties[node.name].valid = false;
++      } else {
++        if (node.children.empty()) {
++          values.valid = number(node.text, &values.channels[0]);
++          values.channels[1] = values.channels[2] = values.channels[0];
++        } else if (whitespace(node.text) && node.children.size() == 1 &&
++                   node.children[0].name == "rdf:Seq" && whitespace(node.children[0].text) &&
++                   node.children[0].children.size() == 3) {
++          values.valid = true;
++          for (size_t c = 0; c < 3; ++c) {
++            const Node& item = node.children[0].children[c];
++            values.valid &= item.name == "rdf:li" && item.children.empty() &&
++                            number(item.text, &values.channels[c]);
++          }
++        }
++        properties[node.name] = values;
++      }
++    }
++    if (!stack.empty()) stack.back().children.push_back(std::move(node));
++    return context.GetResult();
++  }
++
++  bool has(const string& name) const { return properties.count(name) != 0; }
++
++  bool get(const string& name, float* values, bool logarithmic) const {
++    auto found = properties.find(name);
++    if (found == properties.end() || !found->second.valid) return false;
++    for (size_t c = 0; c < 3; ++c) {
++      values[c] = logarithmic ? exp2(found->second.channels[c]) : found->second.channels[c];
++      if (!std::isfinite(values[c])) return false;
++    }
++    return true;
++  }
++};
+ 
+ // Extremely simple XML Handler - just searches for interesting elements
+ class XMPXmlHandler : public XmlHandler {
+@@ -125,6 +214,7 @@
+   enum ParseState { NotStrarted, Started, Done };
+ 
+   virtual DataMatchResult StartElement(const XmlTokenContext& context) {
++    channelElements.StartElement(context);
+     string val;
+     if (context.BuildTokenValue(&val)) {
+       if (!val.compare(containerName)) {
+@@ -147,6 +237,7 @@
+   }
+ 
+   virtual DataMatchResult FinishElement(const XmlTokenContext& context) {
++    channelElements.FinishElement(context);
+     if (state == Started) {
+       if (lastElementName.empty()) {
+         state = Done;
+@@ -159,6 +250,7 @@
+   }
+ 
+   virtual DataMatchResult ElementContent(const XmlTokenContext& context) {
++    channelElements.ElementContent(context);
+     string val;
+     if (state == Started && !lastElementName.empty()) {
+       if (context.BuildTokenValue(&val)) {
+@@ -253,6 +345,13 @@
+   }
+ 
+   bool getMaxContentBoost(float* max_content_boost, bool* present) {
++    if (channelElements.has(maxContentBoostAttrName)) {
++      *present = true;
++      float values[3];
++      if (maxContentBoostFound || !channelElements.get(maxContentBoostAttrName, values, true)) return false;
++      *max_content_boost = values[0];
++      return true;
++    }
+     if (state == Done) {
+       *present = maxContentBoostFound;
+       stringstream ss(maxContentBoostStr);
+@@ -269,6 +368,13 @@
+   }
+ 
+   bool getMinContentBoost(float* min_content_boost, bool* present) {
++    if (channelElements.has(minContentBoostAttrName)) {
++      *present = true;
++      float values[3];
++      if (minContentBoostFound || !channelElements.get(minContentBoostAttrName, values, true)) return false;
++      *min_content_boost = values[0];
++      return true;
++    }
+     if (state == Done) {
+       *present = minContentBoostFound;
+       stringstream ss(minContentBoostStr);
+@@ -285,6 +391,13 @@
+   }
+ 
+   bool getGamma(float* gamma, bool* present) {
++    if (channelElements.has(gammaAttrName)) {
++      *present = true;
++      float values[3];
++      if (gammaFound || !channelElements.get(gammaAttrName, values, false)) return false;
++      *gamma = values[0];
++      return true;
++    }
+     if (state == Done) {
+       *present = gammaFound;
+       stringstream ss(gammaStr);
+@@ -301,6 +414,13 @@
+   }
+ 
+   bool getOffsetSdr(float* offset_sdr, bool* present) {
++    if (channelElements.has(offsetSdrAttrName)) {
++      *present = true;
++      float values[3];
++      if (offsetSdrFound || !channelElements.get(offsetSdrAttrName, values, false)) return false;
++      *offset_sdr = values[0];
++      return true;
++    }
+     if (state == Done) {
+       *present = offsetSdrFound;
+       stringstream ss(offsetSdrStr);
+@@ -317,6 +437,13 @@
+   }
+ 
+   bool getOffsetHdr(float* offset_hdr, bool* present) {
++    if (channelElements.has(offsetHdrAttrName)) {
++      *present = true;
++      float values[3];
++      if (offsetHdrFound || !channelElements.get(offsetHdrAttrName, values, false)) return false;
++      *offset_hdr = values[0];
++      return true;
++    }
+     if (state == Done) {
+       *present = offsetHdrFound;
+       stringstream ss(offsetHdrStr);
+@@ -381,9 +508,24 @@
+     }
+   }
+ 
++  bool copyChannelElements(uhdr_gainmap_metadata_ext_t* metadata) const {
++    if (channelElements.has(maxContentBoostAttrName) &&
++        !channelElements.get(maxContentBoostAttrName, metadata->max_content_boost, true)) return false;
++    if (channelElements.has(minContentBoostAttrName) &&
++        !channelElements.get(minContentBoostAttrName, metadata->min_content_boost, true)) return false;
++    if (channelElements.has(gammaAttrName) &&
++        !channelElements.get(gammaAttrName, metadata->gamma, false)) return false;
++    if (channelElements.has(offsetSdrAttrName) &&
++        !channelElements.get(offsetSdrAttrName, metadata->offset_sdr, false)) return false;
++    if (channelElements.has(offsetHdrAttrName) &&
++        !channelElements.get(offsetHdrAttrName, metadata->offset_hdr, false)) return false;
++    return true;
++  }
++
+   bool getIsApple() const { return isApple; }
+ 
+  private:
++  GainMapChannelElements channelElements;
+   static const string containerName;
+ 
+   static const string versionAttrName;
+@@ -872,6 +1014,13 @@
+   std::fill_n(metadata->gamma + 1, 2, metadata->gamma[0]);
+   std::fill_n(metadata->offset_hdr + 1, 2, metadata->offset_hdr[0]);
+   std::fill_n(metadata->offset_sdr + 1, 2, metadata->offset_sdr[0]);
++  if (!handler.copyChannelElements(metadata)) {
++    uhdr_error_info_t status;
++    status.error_code = UHDR_CODEC_ERROR;
++    status.has_detail = 1;
++    snprintf(status.detail, sizeof status.detail, "xml parse error, invalid channel metadata");
++    return status;
++  }
+ 
+   return g_no_error;
+ }
+@@ -929,14 +1078,32 @@
+   writer.WriteAttributeNameAndValue("rdf:about", "");
+   writer.WriteXmlns(kGainMapPrefix, kGainMapUri);
+   writer.WriteAttributeNameAndValue(kMapVersion, metadata.version);
+-  writer.WriteAttributeNameAndValue(kMapGainMapMin, log2(metadata.min_content_boost[0]));
+-  writer.WriteAttributeNameAndValue(kMapGainMapMax, log2(metadata.max_content_boost[0]));
+-  writer.WriteAttributeNameAndValue(kMapGamma, metadata.gamma[0]);
+-  writer.WriteAttributeNameAndValue(kMapOffsetSdr, metadata.offset_sdr[0]);
+-  writer.WriteAttributeNameAndValue(kMapOffsetHdr, metadata.offset_hdr[0]);
++  const bool multichannel = !metadata.are_all_channels_identical();
++  if (!multichannel) {
++    writer.WriteAttributeNameAndValue(kMapGainMapMin, log2(metadata.min_content_boost[0]));
++    writer.WriteAttributeNameAndValue(kMapGainMapMax, log2(metadata.max_content_boost[0]));
++    writer.WriteAttributeNameAndValue(kMapGamma, metadata.gamma[0]);
++    writer.WriteAttributeNameAndValue(kMapOffsetSdr, metadata.offset_sdr[0]);
++    writer.WriteAttributeNameAndValue(kMapOffsetHdr, metadata.offset_hdr[0]);
++  }
+   writer.WriteAttributeNameAndValue(kMapHDRCapacityMin, log2(metadata.hdr_capacity_min));
+   writer.WriteAttributeNameAndValue(kMapHDRCapacityMax, log2(metadata.hdr_capacity_max));
+   writer.WriteAttributeNameAndValue(kMapBaseRenditionIsHDR, "False");
++  if (multichannel) {
++    auto writeChannels = [&](const string& name, const float values[3], bool logarithmic) {
++      size_t depth = writer.StartWritingElement(name);
++      writer.StartWritingElement("rdf:Seq");
++      for (size_t c = 0; c < 3; ++c) {
++        writer.WriteElementAndContent("rdf:li", logarithmic ? log2(values[c]) : values[c]);
++      }
++      writer.FinishWritingElementsToDepth(depth);
++    };
++    writeChannels(kMapGainMapMin, metadata.min_content_boost, true);
++    writeChannels(kMapGainMapMax, metadata.max_content_boost, true);
++    writeChannels(kMapGamma, metadata.gamma, false);
++    writeChannels(kMapOffsetSdr, metadata.offset_sdr, false);
++    writeChannels(kMapOffsetHdr, metadata.offset_hdr, false);
++  }
+   writer.FinishWriting();
+ 
+   return ss.str();
+--- a/lib/src/jpegr.cpp
++++ b/lib/src/jpegr.cpp
+@@ -1117,14 +1117,6 @@
+     return status;
+   }
+ 
+-  if (kWriteXmpMetadata && !metadata->are_all_channels_identical()) {
+-    uhdr_error_info_t status;
+-    status.error_code = UHDR_CODEC_UNSUPPORTED_FEATURE;
+-    status.has_detail = 1;
+-    snprintf(status.detail, sizeof status.detail,
+-             "signalling multichannel gainmap metadata in xmp mode is not supported");
+-    return status;
+-  }
+ 
+   const size_t xmpNameSpaceLength = kXmpNameSpace.size() + 1;  // need to count the null terminator
+   const size_t isoNameSpaceLength = kIsoNameSpace.size() + 1;  // need to count the null terminator

@@ -6,4 +6,5 @@
 !png_decode.c
 !native-gainmap-build.sh
 !native_gainmap.cpp
+!libultrahdr-xmp-arrays.patch
 !libavif-sequence-transform.patch

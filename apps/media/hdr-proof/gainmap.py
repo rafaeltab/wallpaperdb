@@ -28,6 +28,9 @@ NATIVE_RETAIN_BUILD = {
                       "5b2ce500f5f8103a24a388b76d3c6b615d1028e4",
                       "2b058012b5bf4a8433c3593c3c9b15daf8cd7848"],
     "upstream_patch_status": "Experimental pinned PR484 and PR491 patches; not an upstream release.",
+    "local_patches": [{"path": "libultrahdr-xmp-arrays.patch",
+                       "sha256": "1fa1ab115b8d27dd9fd409554db38adc280637f854b1339aa578fe7c25705383",
+                       "scope": "Native scalar/three-channel element XMP reading and per-channel XMP writing; no map pixels rewritten."}],
     "pipeline": "Patched native compressed base/map extraction; Sharp 0.35.5 geometry on each layer; native compressed-layer packing with dual ISO/Android metadata.",
 }
 
@@ -202,7 +205,8 @@ def independent_hdr(path, directory, gamut):
     command(["avifgainmaputil", "printmetadata", avif], directory / "independent-gainmap-metadata.log")
     raw = command(["ffmpeg", "-v", "error", "-i", png, "-f", "rawvideo", "-pix_fmt", "rgb48le", "pipe:1"],
                   directory / "independent-hdr-pixels.log", binary=True)
-    width, height = Image.open(png).size
+    with Image.open(png) as decoded:
+        width, height = decoded.size
     signal = np.frombuffer(raw, dtype="<u2").reshape(height, width, 3) / 65535.0
     # ST 2084 inverse transfer, with absolute luminance in cd/m2.
     power = signal ** (1 / (2523 / 32))
@@ -306,7 +310,7 @@ def run(output_dir):
         case["selectors"]["format"] = job["format"]
         case["established_source_gamut"] = job["source_gamut"]
         if job["mode"] == "native-retain":
-            case["candidate"] = "libultrahdr-2.0.2+PR484+PR491:retain-base-and-map:sharp-0.35.5-geometry"
+            case["candidate"] = "libultrahdr-2.0.2+PR484+PR491+XMP-arrays:retain-base-and-map:sharp-0.35.5-geometry"
             case["native_build"] = NATIVE_RETAIN_BUILD
             native_log = case_dir / "native-parts-both" / "native-commands.json"
             if native_log.exists():

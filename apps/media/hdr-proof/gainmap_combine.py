@@ -19,14 +19,17 @@ import gainmap_sdr
 from lossless_jpeg import encode as encode_lossless
 
 
-def encode(source, output, operation, *, gamut, map_policy='smalloffset', orientation=6):
+def encode(source, output, operation, *, gamut, map_policy='smalloffset', orientation=6,
+           geometry_revision='decoder-gamut-v1'):
     source, output = Path(source), Path(output)
     fixtures = json.loads((gainmap.FIXTURES/'manifest.json').read_text())['fixtures']
     matches = [fixture for fixture in fixtures if fixture['sha256'] == gainmap.digest(source)]
     if len(matches) != 1 or matches[0]['expected']['gamut'] != gamut:
         raise ValueError('Native combined candidate requires a pinned source with established gamut facts')
-    if map_policy not in ('fullrange', 'smalloffset'):
+    if map_policy not in ('fullrange', 'smalloffset', 'identity'):
         raise ValueError('Unknown native gain-map encoder policy')
+    if geometry_revision not in ('decoder-gamut-v1', 'gainmap-hdr-target-gamut-v1'):
+        raise ValueError('Unknown native geometry coordinate revision')
     if operation not in gainmap.GEOMETRIES or orientation not in range(1, 9):
         raise ValueError('Unsupported native combined geometry or orientation')
     directory = output.with_name(output.stem+'-parts')
@@ -53,9 +56,11 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     base_encoding = encode_lossless(authored, base, icc_profile=bytes(profile))
 
     source_pq = gainmap_hdr.decode_source(source, directory/'hdr-source', gamut)
-    # The independent ISO source oracle works in its verified P3 coordinates;
-    # the native libavif/XMP oracle for the other sources works in Rec.2020.
-    working_gamut = 'p3' if matches[0]['id'] == 'gainmap-android-iso' else 'rec2020'
+    # Keep the prior decoder-coordinate experiment available. The explicitly
+    # versioned target-gamut path clips only after resampling in the requested
+    # gamut, so its geometry does not create unrepresentable target colors.
+    working_gamut = (gamut if geometry_revision == 'gainmap-hdr-target-gamut-v1' else
+                     'p3' if matches[0]['id'] == 'gainmap-android-iso' else 'rec2020')
     geometry = gainmap_hdr.resample_pq(source_pq, directory/'hdr-linear.gbrapf32', operation,
                                       orientation if operation == 'orientation' else 1, gamut=working_gamut)
     width, height = geometry['width'], geometry['height']
@@ -65,7 +70,7 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     working_primaries = {'srgb': 1, 'p3': 12, 'rec2020': 9}[working_gamut]
     hdr = directory/'hdr-intent-pq.png'
     # Keep float alpha until PQ encoding. Dropping it while still linear makes
-    # swscale quantize the native float samples onto a16-bit linear lattice.
+    # swscale quantize the native float samples onto a 16-bit linear lattice.
     filters = (
         'setparams=alpha_mode=premultiplied,'
         f'zscale=agamma=0:transferin=linear:transfer=16:primariesin={working_primaries}:'
@@ -79,7 +84,7 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     avif, gain_png, gain_jpeg = directory/'combined.avif', directory/'map.png', directory/'map.jpg'
     tool = f'/opt/proof/libavif/{map_policy}/avifgainmaputil'
     # Auto depth preserves the HDR input precision while the authored PNG base
-    # and gain-map JPEG remain8-bit. Passing -d8 also quantizes PQ input to8.
+    # and gain-map JPEG remain 8-bit. Passing -d8 also quantizes PQ input to 8.
     gainmap.command([tool, 'combine', authored, hdr, avif, '--cicp-base', f'{primaries}/13/0',
                      '--cicp-alternate', f'{primaries}/16/0', '--ignore-profile', '--downscaling', '1',
                      '--depth-gain-map', '8', '--qgain-map', '100', '--yuv-gain-map', '444',
@@ -94,6 +99,7 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
               'base_geometry': base_geometry, 'base_encoding': base_encoding,
               'hdr_geometry': geometry, 'hdr_intent_filters': filters, 'map_encoding': map_encoding,
               'map_policy': map_policy, 'native_map_encoder': tool,
+              'source_reference_revision': geometry_revision,
               'map_encoder_sha256': hashlib.sha256(Path(tool).read_bytes()).hexdigest(),
               'authored_sdr_png': str(authored), 'hdr_intent_pq_png': str(hdr), 'gain_map_png': str(gain_png),
               'output': str(output), 'output_sha256': gainmap.digest(output), 'parts_directory': str(directory),

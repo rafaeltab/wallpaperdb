@@ -368,6 +368,14 @@ Adobe transform fields; decoder-guessed
 color defaults remain diagnostics. Actual dimensions are checked without
 inventing an absent JPEG aspect declaration. Physical interpretation remains
 pending independently from the lossless PNG, WebP and AVIF versions.
+The separate [HDR JPEG containment](gainmap_avif_hdr_jpeg.py) combines the
+verified native SDR and HDR preparations from this source. Its gamma-3.2 ICC
+base and regenerated midpoint-offset gamma-1.5 map pass the unchanged SDR,
+native HDR, independent HDR and cross-reader gates at display boost 16.
+Independent HDR maximum error is 3.84965; both actual JPEG layers are RGB8
+SOF0. The source reference uses independent dav1d samples and parsed tmap
+metadata. Stock-reader failure and intermediate adaptation remain separate
+limitations; browser and wallpaper results remain pending.
 The [authored SDR GIF containment](gainmap_avif_gif.py) remains failed. Its real
 256-color native palette passes structure, ICC, opacity and independent decoding
 but exceeds the unchanged shadow and midtone appearance gates. A read-only
@@ -379,6 +387,12 @@ but raises the shadow maximum to 62.97; 951 pixels cannot meet the maximum gate
 with that exact palette. Both native outputs remain failed, with distinct
 case IDs and unchanged references. The native package version, library hash
 and its different version-API report are recorded separately.
+A third candidate applies the existing native gamma-3.2 coding transfer before
+the same libimagequant adapter, with an actual matching ICC profile. It reduces
+the shadow maximum to 46.78 and the exact-palette bound to 794 pixels, but still
+fails shadow and midtone gates. The optimizer's fixed gamma convention is
+recorded separately from the actual output color interpretation. All three
+photographic GIF candidates remain unqualified.
 
 The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
 PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no

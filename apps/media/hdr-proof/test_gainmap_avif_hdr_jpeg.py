@@ -1,5 +1,7 @@
 """Native HDR JPEG must preserve both independently defined source endpoints."""
 import copy
+import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -148,6 +150,82 @@ class GainMapAvifHdrJpegTests(unittest.TestCase):
         self.assertEqual(result['action'], 'original only')
         self.assertIn('source hash', result['reason'])
         self.assertEqual(len(avif.COMMANDS), start)
+
+
+class GainMapAvifHdrJpegGeometryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.temporary.name)
+        cls.result = gainmap_avif_hdr_jpeg.run(cls.root/'proof', geometries=('contain', 'cover', 'fill', 'upscale'))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporary.cleanup()
+
+    def test_each_native_geometry_keeps_its_own_references_depths_and_full_headroom_gates(self):
+        cases = self.result['evidence']
+        self.assertEqual(len(cases), 4)
+        self.assertEqual(len({case['case_id'] for case in cases}), 4)
+        self.assertEqual([case['geometry'] for case in cases], ['contain', 'cover', 'fill', 'upscale'])
+        self.assertEqual([case['status'] for case in cases], ['qualified']*4)
+        for case in cases:
+            with self.subTest(geometry=case['geometry']):
+                self.assertIn('independent_hdr', case['measurements'], case['blockers'])
+                dimensions = gainmap_avif_hdr_jpeg.SIZES[case['geometry']]
+                for layer in ('base', 'map'):
+                    facts = case['facts'][layer]
+                    self.assertEqual((facts['width'], facts['height']), dimensions)
+                    self.assertEqual((facts['sof'], facts['depth'], facts['components']), (0, 8, 3))
+                for key in ('native_hdr_preparation', 'native_sdr_preparation', 'native_transfer', 'native_encoder', 'full_headroom', 'structure', 'privacy'):
+                    self.assertTrue(case['checks'][key], case['blockers'])
+                self.assertEqual(case['endpoint']['display_boost'], 16)
+                self.assertEqual(case['endpoint']['independent_weight'], 1)
+                self.assertEqual(case['endpoint']['partial_adaptation'], 'untested')
+                self.assertIn('display boost 16 only', case['qualification_scope'])
+                self.assertEqual(case['status'], 'qualified' if all(case['checks'].values()) else 'tested and failed')
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+                self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
+        expected_hashes = ['8d75fedb48b4622c4af1ce6d47592aa47a1325ffbe4cbd2817753c28d0127955',
+            'eb70a90c64012a6fef4a7879811fe0a0a3dc5748c9e32064ce81f3198adae2bb',
+            'ba81c3b9a61554eaf06205bbe17b6129f0aecdf396e16c0e5b2b8f13d8d133c1',
+            'fc025b1532d65390865c153d10317fbc4b9173d21559340a22e44b410310c430']
+        self.assertEqual([case['artifacts']['sha256'] for case in cases], expected_hashes)
+        self.assertAlmostEqual(cases[-1]['measurements']['independent_hdr']['regions']['shadow']['delta_e_itp']['maximum'], 6.105432785879105, places=6)
+        matrix = build_matrix(cases)
+        self.assertEqual(matrix['evidence_errors'], [])
+        actual = next(cell for cell in matrix['cells'] if cell['id'] == 'avif-gainmap:hdr:jpg')['evidence']
+        self.assertEqual([(row['case_id'], row['status']) for row in actual], [(row['case_id'], row['status']) for row in cases])
+
+    def test_wrong_geometry_lists_and_selectors_stop_before_native_work(self):
+        for geometries in ((), ('contain', 'contain'), ('crop',), ('orientation',), ('unknown',)):
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                gainmap_avif_hdr_jpeg.run(self.root/'wrong', geometries=geometries)
+            self.assertEqual(len(avif.COMMANDS), start)
+        for geometries in (('contain', 'cover'), ('cover',), ('fill',), ('upscale',)):
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                gainmap_avif_hdr_jpeg.run(self.root/'wrong-selectors', geometries=geometries, selectors=gainmap_avif_hdr_jpeg.SELECTORS)
+            self.assertEqual(len(avif.COMMANDS), start)
+
+    def test_actual_cover_raster_cannot_borrow_containment_dimensions(self):
+        case = next(row for row in self.result['evidence'] if row['geometry'] == 'cover')
+        with self.assertRaisesRegex(ValueError, 'geometry'):
+            gainmap_avif_hdr_jpeg.inspect_output(case['artifacts']['output'], self.root/'wrong-dimensions')
+
+    def test_containment_bytes_facts_checks_and_measurements_remain_exact(self):
+        case = self.result['evidence'][0]
+        self.assertEqual(case['geometry'], 'contain')
+        self.assertEqual(case['status'], 'qualified')
+        self.assertEqual(case['artifacts']['sha256'], '8d75fedb48b4622c4af1ce6d47592aa47a1325ffbe4cbd2817753c28d0127955')
+        expected = {'facts': 'dc6615e385490f4420d818d6f83147e9150db696ef8f27321d1b10eb2df5893e',
+            'checks': '2fae13a5a55d59ffddce5d5cd33858ae8cf048b7f25a2b3bd7993d39386b6225',
+            'measurements': 'e9239cd0a0c643da7496400e211cfc898581efd5037ceab5d091cb403f6badae',
+            'threshold_scope': '0d7e8cc6cb5f58064ac40a3fb750af032038c2fdf67de1595148f81a33b7db79',
+            'endpoint': '4622b2e5cfcf92a983597f82e2e04acc474af28caf08f28e65bcb4e4c3970808'}
+        for key, digest in expected.items():
+            self.assertEqual(hashlib.sha256(json.dumps(case[key], sort_keys=True).encode()).hexdigest(), digest, key)
 
 
 if __name__ == '__main__':

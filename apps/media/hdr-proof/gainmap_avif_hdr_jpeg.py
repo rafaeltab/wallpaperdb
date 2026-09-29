@@ -15,6 +15,7 @@ adaptation, another renderer convention or a production generation policy.
 """
 import json
 from pathlib import Path
+import struct
 
 import numpy as np
 from PIL import Image
@@ -32,10 +33,12 @@ from appearance import compare_appearance, sdr_signal_to_nits
 from gainmap_iso import ISO_ID, segments
 from gainmap_metadata import check_metadata
 from gamma_icc import decode_signal_to_nits, profile_facts
+from matrix import GAINMAP_GEOMETRIES
 
 
 SELECTORS = {'format': 'jpg', 'range': 'hdr', 'gamut': 'preserve', 'depth': 'preserve',
              'motion': 'preserve', 'transparency': 'preserve', 'w': 173, 'fit': 'contain'}
+SIZES = {'contain': (173, 130), 'cover': (173, 173), 'fill': (173, 211), 'upscale': (769, 576)}
 POLICY = {**gainmap_avif_hdr.POLICY,
     'output_scope': 'One identity-oriented static opaque HDR JPEG containment at 173x130; actual RGB8 base and RGB8 map preserve both source coded depths',
     'hdr_reference_revision': gainmap_avif_hdr.POLICY['reference_revision'],
@@ -48,25 +51,39 @@ POLICY = {**gainmap_avif_hdr.POLICY,
     'depth_scope': 'The native compute AVIF bridge declares an alternate depth of 12 bits. The requested JPEG output must have two independently inspected layers at 8 bits each',
     'endpoint_scope': 'Display boost 16 and source/output gain weight 1 only; regenerated gain metadata is measured. Intermediate adaptation remains unqualified',
     'consumer_scope': 'ICC-aware independent/native file readers only; stock-reader diagnostic and browser/OS wallpaper qualification remain separate and pending manual review'}
+GEOMETRY_POLICY = {**POLICY,
+    'output_scope': 'Only identity-oriented static opaque HDR JPEG contain, cover, fill and upscale; actual RGB8 base and map preserve both source coded depths',
+    'geometry_reference': gainmap_avif_hdr.GEOMETRY_POLICY['geometry_reference'],
+    'sdr_reference': 'Direct dav1d authored SDR base, independent Pillow RGB8 Lanczos with matched contain/cover/fill/upscale geometry, nominal 100-nit SDR white; unchanged authored grade',
+    'orientation_scope': 'No transformed source or extra crop selector is admitted without a separately verified real fixture'}
 
 
-def validate_selectors(selectors):
-    if selectors != SELECTORS:
-        raise ValueError('Only the exact HDR JPEG containment selectors are admitted')
+def _selectors(operation):
+    return {**{key: value for key, value in SELECTORS.items() if key not in ('w', 'fit')},
+            **GAINMAP_GEOMETRIES[operation]}
+
+
+def validate_selectors(selectors, *, operation='contain'):
+    if operation not in SIZES:
+        raise ValueError('Unsupported HDR JPEG geometry')
+    if selectors != _selectors(operation):
+        label = 'containment' if operation == 'contain' else operation
+        raise ValueError(f'Only the exact HDR JPEG {label} selectors are admitted')
 
 
 def source_decision(source, directory, *, source_lock=gainmap_avif.SOURCE_LOCK):
     return gainmap_avif_hdr.source_decision(source, directory, source_lock=source_lock)
 
 
-def _layer_structure(data):
+def _layer_structure(data, dimensions):
     """Inspect the bounded native RGB8 layer and reject unknown metadata."""
     headers = list(segments(data))
     allowed = (0xC0, 0xC4, 0xDB, 0xE0, 0xE1, 0xE2, 0xEE)
     if any(marker not in allowed for marker, _ in headers):
         raise ValueError('Unknown JPEG frame or private metadata segment')
     frames = [value for marker, value in headers if marker == 0xC0]
-    if (len(frames) != 1 or len(frames[0]) != 15 or frames[0][:6] != b'\x08\x00\x82\x00\xad\x03'
+    width, height = dimensions
+    if (len(frames) != 1 or len(frames[0]) != 15 or frames[0][:6] != struct.pack('>BHHB', 8, height, width, 3)
             or frames[0][6::3] != b'RGB' or frames[0][7::3] != b'\x11'*3):
         raise ValueError('Expected actual contained baseline RGB8 without subsampling')
     aspect = []
@@ -103,12 +120,15 @@ def _layer_structure(data):
             raise ValueError('Unexpected extra JPEG scan, image or trailing payload')
     else:
         raise ValueError('Incomplete JPEG entropy data')
-    return {'rgb8_dimensions': [173, 130], 'orientation': 1,
+    return {'rgb8_dimensions': [width, height], 'orientation': 1,
             'pixel_aspect': aspect or ['No explicit pixel-aspect override'],
             'header_markers': [hex(marker) for marker, _ in headers]}
 
 
-def inspect_output(path, directory):
+def inspect_output(path, directory, *, dimensions=(173, 130)):
+    if tuple(dimensions) not in SIZES.values():
+        raise ValueError('Expected one of the bounded HDR JPEG geometries')
+    width, height = dimensions
     path, directory = Path(path), Path(directory)
     facts = gainmap.inspect(path, directory)
     if (not facts.get('gain_map_present') or not facts.get('iso_metadata')
@@ -118,7 +138,7 @@ def inspect_output(path, directory):
     for layer in ('base', 'map'):
         observed = facts[layer]
         if any(observed.get(key) != value for key, value in
-               {'width': 173, 'height': 130, 'depth': 8, 'components': 3, 'sof': 0}.items()):
+               {'width': width, 'height': height, 'depth': 8, 'components': 3, 'sof': 0}.items()):
             raise ValueError('Unknown emitted JPEG base/map geometry or coded depth')
     data, map_data = path.read_bytes(), (directory/'map.jpg').read_bytes()
     tags = facts['metadata']
@@ -131,7 +151,7 @@ def inspect_output(path, directory):
             or tags.get('XMP-GContainer:DirectoryItemMime') != ['image/jpeg']*2
             or tags.get('XMP-GContainer:DirectoryItemLength') != map_size):
         raise ValueError('Expected exactly the two declared JPEG layers without extra payload')
-    facts['layer_structure'] = {'base': _layer_structure(data[:base_size]), 'map': _layer_structure(map_data)}
+    facts['layer_structure'] = {'base': _layer_structure(data[:base_size], dimensions), 'map': _layer_structure(map_data, dimensions)}
     with Image.open(path) as image:
         profile = image.info.get('icc_profile', b'')
     decode_signal_to_nits(np.zeros((1, 3)), profile, expected_gamma=3.2, expected_gamut='srgb')
@@ -160,18 +180,23 @@ def _hdr_measure(reference, actual):
     return compare_appearance(reference, actual, reference_gamut='srgb', actual_gamut='srgb', fixture_class='gainmap-hdr')
 
 
-def _case(root, hdr, sdr, sampling):
-    original = next(row for row in hdr['evidence'] if row['candidate'] == 'native-pq16-square-pixels')
-    authored = sdr['evidence'][0]
+def _case(root, hdr, sdr, sampling, *, operation='contain'):
+    selectors = _selectors(operation)
+    validate_selectors(selectors, operation=operation)
+    width, height = SIZES[operation]
+    root = root if operation == 'contain' else root/operation
+    original = next(row for row in hdr['evidence'] if row['candidate'] == 'native-pq16-square-pixels' and row['geometry'] == operation)
+    authored = next(row for row in sdr['evidence'] if row['geometry'] == operation)
     source = Path(original['artifacts']['source'])
-    case = {'case_id': gainmap_avif.FIXTURE_ID+':hdr:jpg:preserve:preserve:contain:icc-midpoint-gamma15-float',
+    case = {'case_id': gainmap_avif.FIXTURE_ID+f':hdr:jpg:preserve:preserve:{operation}:icc-midpoint-gamma15-float',
         'cell_id': 'avif-gainmap:hdr:jpg', 'fixture_id': gainmap_avif.FIXTURE_ID,
-        'candidate': 'native-icc-midpoint-gamma15-float', 'geometry': 'contain', 'selectors': SELECTORS,
+        'candidate': 'native-icc-midpoint-gamma15-float', 'geometry': operation, 'selectors': selectors,
         'source_sha256': original['source_sha256'], 'source_facts': original['source_facts'],
-        'threshold_scope': {**POLICY, 'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
+        'threshold_scope': {**(POLICY if operation == 'contain' else GEOMETRY_POLICY),
+                            'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
         'status': 'tested and failed', 'consumer_status': 'pending manual review',
         'qualification_scope': 'Experimental ICC-aware native and independent file readers at the full-headroom '
-            'endpoint only, under the declared gain-map AVIF renderer convention; physical consumers remain pending manual review',
+            'endpoint with display boost 16 only, under the declared gain-map AVIF renderer convention; physical consumers remain pending manual review',
         'known_consumer_limitations': ['Gain application must interpret the actual gamma 3.2 base ICC. '
             'The pinned stock native reader assumes sRGB; its stock_native_srgb measurement remains separate.',
             'Intermediate adaptation and browser/OS wallpaper behavior remain unqualified.'],
@@ -195,15 +220,16 @@ def _case(root, hdr, sdr, sampling):
             raise ValueError('Native endpoint input changed after independent inspection')
         hdr_facts, _ = gainmap_avif_hdr_png.inspect_and_decode(hdr_path)
         gainmap_avif_png.inspect_and_decode(sdr_path)
-        if (hdr_facts['width'], hdr_facts['height']) != (173, 130):
+        if (hdr_facts['width'], hdr_facts['height']) != (width, height):
             raise ValueError('Native HDR intent geometry changed')
         reference_hdr, reference_sdr = original['reference_hdr'], authored['reference_sdr']
         if any(avif.digest(value['path']) != value['sha256'] for value in (reference_hdr, reference_sdr)):
             raise ValueError('Independent endpoint reference changed')
-        hdr_reference = gainmap.array_geometry(np.load(reference_hdr['path']), 'contain')
+        hdr_reference = gainmap.array_geometry(np.load(reference_hdr['path']), operation)
         with Image.open(reference_sdr['path']) as image:
             sdr_reference = sdr_signal_to_nits(np.asarray(image).astype(float)/255)
         base, output = root/'gamma32-base.jpg', root/'output.jpg'
+        root.mkdir(parents=True, exist_ok=True)
         base_encoding = gainmap_avif_jpeg._encode(sdr_path, base, gamma32=True)
         case['checks']['native_transfer'] = base_encoding['transfer_stage']['passed']
         candidate = icc_gainmap.pack(base, hdr_path, output,
@@ -212,7 +238,7 @@ def _case(root, hdr, sdr, sampling):
         case['native_candidate'] = {**candidate, 'base_encoding': base_encoding}
         case['artifacts'] = {'source': str(source), 'source_sha256': source_hash,
                              'output': str(output), 'sha256': avif.digest(output)}
-        facts = inspect_output(output, root/'inspection')
+        facts = inspect_output(output, root/'inspection', dimensions=(width, height))
         actual_sdr, sdr_facts = gainmap_sdr.decode_linear(output, gamut='srgb', gamma=3.2)
         native_hdr, native_facts = icc_gainmap.native_decode(output, root/'native.rgbf32', boost=16)
         independent_hdr, independent_facts = icc_gainmap.independent_decode(output, root/'inspection/map.jpg', boost=16)
@@ -223,7 +249,7 @@ def _case(root, hdr, sdr, sampling):
             'cross_decoder_hdr': _hdr_measure(independent_hdr, native_hdr)}
         probe = facts['native_metadata_probe']
         native_weight = min(np.log2(16)/np.log2(probe['hdr_capacity_max']), 1)
-        structure = {'geometry': actual_sdr.shape == native_hdr.shape == independent_hdr.shape == hdr_reference.shape == (130, 173, 3),
+        structure = {'geometry': actual_sdr.shape == native_hdr.shape == independent_hdr.shape == hdr_reference.shape == (height, width, 3),
             'gamut': sdr_facts['gamut'] == native_facts['gamut'] == independent_facts['gamut'] == 'srgb',
             'actual_base_icc': sdr_facts['icc_sha256'] == base_encoding['icc_sha256'],
             'actual_rgb8_layers': all(facts[layer]['depth'] == 8 and facts[layer]['sof'] == 0 for layer in ('base','map')),
@@ -267,15 +293,21 @@ def _case(root, hdr, sdr, sampling):
     return case
 
 
-def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
-    validate_selectors(SELECTORS if selectors is None else selectors)
+def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, geometries=('contain',)):
+    geometries = tuple(geometries)
+    if not geometries or len(set(geometries)) != len(geometries) or any(operation not in SIZES for operation in geometries):
+        raise ValueError('Expected distinct contain, cover, fill or upscale geometries')
+    if selectors is not None:
+        if len(geometries) != 1:
+            raise ValueError('Explicit selectors require one declared geometry')
+        validate_selectors(selectors, operation=geometries[0])
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
     start = len(avif.COMMANDS)
-    sampling = gainmap_avif_hdr.run(root/'sampling-diagnostics', source_lock=source_lock)
-    hdr = gainmap_avif_hdr_png.run(root/'native-hdr-png', source_lock=source_lock)
-    sdr = gainmap_avif_png.run(root/'native-sdr-png', source_lock=source_lock)
-    case = _case(root, hdr, sdr, sampling)
+    sampling = gainmap_avif_hdr.run(root/'sampling-diagnostics', source_lock=source_lock, geometries=geometries)
+    hdr = gainmap_avif_hdr_png.run(root/'native-hdr-png', source_lock=source_lock, geometries=geometries)
+    sdr = gainmap_avif_png.run(root/'native-sdr-png', source_lock=source_lock, geometries=geometries)
+    cases = [_case(root, hdr, sdr, sampling, operation=operation) for operation in geometries]
     controls = [{**row, 'case_id': row['case_id'].replace('gainmap-avif-hdr-png16-', 'gainmap-avif-hdr-jpeg-')}
                 for row in hdr['controls'] if 'original' in row['case_id']]
     for name, change in (('depth16', {'depth': '16'}), ('other-gamut', {'gamut': 'p3'}),
@@ -295,7 +327,8 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None):
         except json.JSONDecodeError:
             record = {'text': content}
         logs.append({'path': str(path), 'sha256': avif.digest(path), 'record': record})
-    return {'evidence': [case], 'source_fixtures': hdr['source_fixtures'], 'fixtures': [], 'controls': controls,
+    return {'evidence': cases, 'source_fixtures': hdr['source_fixtures'], 'fixtures': [], 'controls': controls,
             'source_reconstruction_profiles': sampling['source_reconstruction_profiles'],
-            'commands': avif.COMMANDS[start:], 'scope': POLICY, 'consumer_status': 'pending manual review',
+            'commands': avif.COMMANDS[start:], 'scope': POLICY if geometries == ('contain',) else GEOMETRY_POLICY,
+            'consumer_status': 'pending manual review',
             'native_log_artifacts': logs}

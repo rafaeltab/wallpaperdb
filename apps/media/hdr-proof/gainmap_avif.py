@@ -3,7 +3,8 @@
 Only the locked static RGB8 sRGB base with a monochrome eight-bit map is admitted.
 The BMFF parser reads actual item associations and tmap fractions. Direct AV1
 items are decoded by FFmpeg/dav1d and checked against libavif/dav1d PNG samples.
-This establishes the authored SDR base; HDR reconstruction is still unproved.
+This inspector establishes the authored SDR base. HDR reconstruction requires
+the separate, explicitly named renderer profiles in gainmap_avif_hdr.py.
 No decoded reference array is supplied to a native encoder.
 """
 import hashlib

@@ -394,6 +394,103 @@ class IccGainmapTests(unittest.TestCase):
                     self.assertEqual(case['consumer_status'], 'pending manual review')
                     self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
 
+    def test_new_apple_scope_rejects_other_geometries_before_native_calls(self):
+        import avif
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            for operation in ('cover', 'fill', 'crop', 'noop'):
+                before = len(avif.COMMANDS)
+                with self.subTest(operation=operation), self.assertRaises(ValueError):
+                    run(Path(temporary), source_id='gainmap-apple-new', operation=operation,
+                        map_policy='midpointoffset', map_gamma=1.5)
+                self.assertEqual(len(avif.COMMANDS), before)
+            self.assertEqual(list(Path(temporary).iterdir()), [])
+
+    def test_new_apple_xmp_headroom_is_authoritative_and_unknown_models_are_rejected(self):
+        import avif
+        import gainmap
+        import gainmap_hdr
+        from icc_gainmap import _new_apple_source_model
+        source = gainmap.FIXTURES/'gainmap-apple-new.jpg'
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            original = gainmap_hdr.decode_source(source, folder/'original', 'p3')
+            stripped = folder/'no-makernotes.jpg'
+            stripped.write_bytes(source.read_bytes())
+            native(['exiftool', '-overwrite_original', '-MakerNotes=', stripped])
+            facts = gainmap.inspect(stripped, folder/'stripped-inspection')
+            model = _new_apple_source_model(facts, folder/'stripped-inspection/map.jpg')
+            self.assertIsNone(model['exiftool_hdr_headroom'])
+            self.assertIsNone(model['exiftool_hdr_gain'])
+            self.assertEqual(model['xmp_linear_headroom'], 4.532783)
+            self.assertEqual(avif.digest(gainmap_hdr.decode_source(stripped, folder/'stripped', 'p3')),
+                             avif.digest(original))
+            for label, old, new in (
+                    ('unknown-version', b'>131072<', b'>999999<'),
+                    ('unknown-model', b'2020:aux:hdrgainmap', b'2020:aux:unknownmap'),
+                    ('nonfinite-headroom', b'>4.532783<', b'>nan     <'),
+                    ('zero-headroom', b'>4.532783<', b'>0.000000<'),
+                    ('missing-headroom', b'HDRGainMapHeadroom', b'UnknownMapHeadroom')):
+                with self.subTest(label=label):
+                    self.assertEqual(len(old), len(new))
+                    self.assertIn(old, source.read_bytes())
+                    changed = folder/f'{label}.jpg'
+                    changed.write_bytes(source.read_bytes().replace(old, new))
+                    before = avif.digest(changed)
+                    inspection = folder/f'{label}-inspection'
+                    facts = gainmap.inspect(changed, inspection)
+                    with self.assertRaisesRegex(ValueError, 'XMP'):
+                        _new_apple_source_model(facts, inspection/'map.jpg')
+                    if label == 'zero-headroom':
+                        with self.assertRaises((RuntimeError, ValueError)):
+                            gainmap_hdr.decode_source(changed, folder/label, 'p3')
+                        self.assertFalse((folder/label/'source-pq-rec2020.png').exists())
+                    self.assertEqual(avif.digest(changed), before)
+            unknown = folder/'missing-headroom.jpg'
+            native(['exiftool', '-overwrite_original', '-MakerNotes=', unknown])
+            before = avif.digest(unknown)
+            with self.assertRaises((RuntimeError, ValueError)):
+                gainmap_hdr.decode_source(unknown, folder/'unknown-headroom', 'p3')
+            self.assertFalse((folder/'unknown-headroom/source-pq-rec2020.png').exists())
+            self.assertEqual(avif.digest(unknown), before)
+
+    def test_new_apple_contain_qualifies_and_upscale_retains_appearance_failure(self):
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            for operation, expected_size in (('contain', (173, 231)), ('upscale', (769, 1025))):
+                with self.subTest(operation=operation):
+                    case = run(Path(temporary)/operation, source_id='gainmap-apple-new', operation=operation,
+                               map_policy='midpointoffset', map_gamma=1.5)['cases'][0]
+                    if operation == 'contain':
+                        self.assertEqual(case['status'], 'qualified', case['blockers'])
+                        self.assertTrue(all(case['checks'].values()))
+                        self.assertTrue(all(value['passed'] for value in case['measurements'].values()))
+                    else:
+                        self.assertEqual(case['status'], 'tested and failed')
+                        self.assertEqual(case['blockers'], ['Failed appearance check'])
+                        self.assertTrue(all(value for key, value in case['checks'].items() if key != 'appearance'))
+                        self.assertFalse(case['checks']['appearance'])
+                        self.assertTrue(case['measurements']['reconstructed_hdr']['passed'])
+                        self.assertEqual(case['measurements']['independent_hdr']['failures'], ['shadow.delta_e_max'])
+                        self.assertGreater(case['measurements']['independent_hdr']['regions']['shadow']['delta_e_itp']['maximum'], 8)
+                    self.assertEqual(case['source_precision'], 'pq16')
+                    self.assertEqual(case['source_model_evidence']['xmp_version'], 131072)
+                    self.assertEqual(case['source_model_evidence']['xmp_linear_headroom'], 4.532783)
+                    self.assertIn('XMP', case['source_model_evidence']['headroom_origin'])
+                    self.assertAlmostEqual(case['source_model_evidence']['exiftool_hdr_headroom'], 1.518931985)
+                    self.assertEqual(case['source_model_evidence']['exiftool_hdr_gain'], 0)
+                    self.assertEqual(case['hdr_intent']['facts']['metadata']['PNG-cICP:ColorPrimaries'], 12)
+                    self.assertEqual((case['facts']['base']['width'], case['facts']['base']['height']), expected_size)
+                    self.assertEqual((case['facts']['base']['depth'], case['facts']['map']['depth']), (8, 8))
+                    self.assertEqual(case['artifacts']['sha256'], {
+                        'contain': '12cef3e234b7c187d013426697b1624b1b7e79ddd4b6e12224bb72d286875b46',
+                        'upscale': 'b2d03efba21ee73c3716447d4dce09bea89d59bfce81408cfcb35cfa9ea19804'}[operation])
+                    self.assertEqual(case['geometry'], operation)
+                    self.assertFalse(case['facts']['private_tags'])
+                    self.assertFalse(any(key.startswith('Apple:') for key in case['facts']['metadata']))
+                    self.assertEqual(case['consumer_status'], 'pending manual review')
+                    self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
+
     def test_xmp_upscale_uses_inspected_pq_source_and_qualifies_both_hdr_readers(self):
         from icc_gainmap import run, _pq_source
         from hdr_png import _png_chunks

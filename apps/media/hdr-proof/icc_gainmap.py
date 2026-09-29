@@ -135,9 +135,31 @@ def _pq_source(path, directory, expected_size):
             'native ICC-aware and FFmpeg/ISO reconstruction gates.'}
 
 
+def _new_apple_source_model(source_facts, map_path):
+    """Admit the locked XMP dialect without silently assuming EXIF headroom."""
+    tags = json.loads(avif.native(['exiftool', '-json', '-n', '-G1', '-s', map_path]))[0]
+    version = tags.get('XMP-HDRGainMap:HDRGainMapVersion')
+    headroom = tags.get('XMP-HDRGainMap:HDRGainMapHeadroom')
+    auxiliary_type = tags.get('XMP-apdi:AuxiliaryImageType')
+    if (version != 131072 or auxiliary_type != 'urn:com:apple:photo:2020:aux:hdrgainmap'
+            or type(headroom) not in (int, float) or not np.isfinite(headroom) or headroom <= 1
+            or source_facts['metadata'].get('IFD0:Orientation', 1) != 1):
+        raise ValueError('New Apple source requires established XMP version/model/headroom and identity orientation')
+    return {'dialect': 'new Apple gain-map JPEG', 'xmp_version': version,
+        'xmp_auxiliary_type': auxiliary_type, 'xmp_linear_headroom': headroom,
+        'xmp_log2_headroom': float(np.log2(headroom)),
+        'headroom_origin': 'Pinned native libavif reads XMP HDRGainMapHeadroom as linear headroom; '
+            'present XMP takes precedence over Apple EXIF MakerNotes33/48',
+        'exiftool_hdr_headroom': source_facts['metadata'].get('Apple:HDRHeadroom'),
+        'exiftool_hdr_gain': source_facts['metadata'].get('Apple:HDRGain'),
+        'native_reader_source': 'https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.4.1/apps/shared/avifjpeg.c',
+        'scope': 'Locked new Apple XMP model only; MakerNotes are recorded source facts, not required '
+            'headroom input, and all private source metadata must be removed from output'}
+
+
 def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='float',
         source_id='gainmap-android-iso', operation='upscale'):
-    """Bounded ISO experiments, XMP upscale, and old Apple contain/upscale."""
+    """Bounded ISO experiments, XMP upscale, and Apple contain/upscale."""
     import gainmap_combine
     import gainmap_hdr
     from gainmap_metadata import check_metadata
@@ -145,11 +167,11 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
     from appearance import compare_appearance, sdr_signal_to_nits, delta_e_itp
     from matrix import GAINMAP_GEOMETRIES
     _encoder(map_policy, map_gamma, map_method)
-    if source_id not in ('gainmap-android-iso', 'gainmap-android-xmp', 'gainmap-apple-old'):
-        raise ValueError('Only pinned ISO, XMP and old Apple sources are supported')
+    if source_id not in ('gainmap-android-iso', 'gainmap-android-xmp', 'gainmap-apple-old', 'gainmap-apple-new'):
+        raise ValueError('Only the four pinned ISO, XMP and Apple sources are supported')
     if source_id != 'gainmap-android-iso' and (map_policy, map_gamma, map_method) != ('midpointoffset', 1.5, 'float'):
-        raise ValueError('The XMP/old Apple experiments admit only midpointoffset gamma1.5 FLOAT maps')
-    allowed_geometry = ('contain', 'upscale') if source_id == 'gainmap-apple-old' else ('upscale',)
+        raise ValueError('The XMP/Apple experiments admit only midpointoffset gamma1.5 FLOAT maps')
+    allowed_geometry = ('contain', 'upscale') if source_id in ('gainmap-apple-old', 'gainmap-apple-new') else ('upscale',)
     if operation not in allowed_geometry:
         raise ValueError('Only the exact predeclared source/geometry tuples are admitted')
     folder = Path(directory)
@@ -197,6 +219,8 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
                 'exiftool_hdr_headroom': apple_headroom, 'exiftool_hdr_gain': apple_gain,
                 'native_reader_source': 'https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.4.1/apps/shared/avifjpeg.c',
                 'scope': 'Locked old Apple fixture only; private MakerNotes are source facts and must be removed from output'}
+        elif name == 'gainmap-apple-new':
+            case['source_model_evidence'] = _new_apple_source_model(source_facts, folder/'source-inspection/map.jpg')
         hdr_source, source_gamut, decoder = gainmap.source_hdr(source, folder/'source-inspection', gamut)
         case['checks']['independent_source_decoder'] = True
         case['source_facts'], case['source_decoder_evidence'] = source_facts, decoder
@@ -330,7 +354,7 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
     report = {'scope': f'One predeclared {name}-{operation} ICC-aware native HDR candidate; unchanged appearance gates',
         'source_policy': {'fixture': name, 'geometry': operation, 'native_precision': source_precision,
             'reference_revision': revision, 'gamut': gamut,
-            'declaration': 'XMP upscale and old Apple contain/upscale admit only the unchanged midpointoffset gamma1.5 FLOAT map recipe; '
+            'declaration': 'XMP upscale and old/new Apple contain/upscale admit only the unchanged midpointoffset gamma1.5 FLOAT map recipe; '
                 'the ISO-only float32 source guard remains unchanged. Source, geometry, native HDR intent, '
                 'authored SDR and both final HDR readers must pass the existing gates.'},
         'map_representation': {'policy': map_policy, 'encoding_gamma': map_gamma, 'coded_depth': 8,

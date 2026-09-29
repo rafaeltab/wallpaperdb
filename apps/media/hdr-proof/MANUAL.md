@@ -66,8 +66,8 @@ The separately inspected SDR PNG8 files cover the same four geometries with
 standard PNG sRGB signaling and square pixels. Compare their authored SDR
 references separately from the AVIF renditions in each browser, viewer and
 wallpaper setter.
-The authored SDR WebP containment file uses lossless RGB8 and a standard sRGB
-ICC profile. Compare its exact file with the matched authored SDR reference and
+The authored SDR WebP files cover the same four geometries with lossless RGB8
+and a standard sRGB ICC profile. Compare its exact file with the matched authored SDR reference and
 the PNG/AVIF versions; do not infer ICC interpretation from successful decoding.
 The separately named HDR candidates emit single-layer PQ AVIF12 for containment,
 crop, stretch and upscale. The original

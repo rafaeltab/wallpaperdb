@@ -285,8 +285,8 @@ Their actual native PNGs use standard sRGB/cHRM/gAMA signaling and explicitly sq
 libpng decoding must preserve the native encoder-input samples exactly;
 ExifTool and a strict chunk reader verify color, depth, geometry and privacy.
 Exact storage does not replace its regional appearance checks.
-The separate [SDR WebP containment proof](gainmap_avif_webp.py) uses that verified
-native preparation and an actual native sRGB ICC profile. Native libwebp and
+The separate [SDR WebP proof](gainmap_avif_webp.py) covers containment, crop,
+stretch and upscale using that verified native preparation and an actual native sRGB ICC profile. Native libwebp and
 FFmpeg must agree on every stored RGB8 sample, with strict container, profile
 and privacy checks. Its authored SDR appearance gates remain unchanged; HDR
 rendering and physical consumer interpretation are separate.

@@ -447,10 +447,11 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               *mozjpeg_experiment_report(mozjpeg, mozjpeg_historical, mozjpeg_lambdas),
               *coefficient_diagnostic_report(mozjpeg_diagnosis),
               '## Blockers and scope limits','',
+              '- The [logarithmic midpoint-offset candidate](icc-gainmap-midpointoffset-gamma2.json) fixes the gamma-2 trial at ISO offsets 1/16384. Both HDR readers pass the existing midtone/highlight gates but fail their shadow maxima; their cross-comparison also fails in shadows. This separate result narrows the precision tradeoff without qualifying the JPEG or changing the original gates.',
               '- The [separate map-gamma-2 experiment](icc-gainmap-smalloffset-gamma2.json) retains the small ISO offset and both eight-bit JPEG layers. AVIF/ISO/XMP/native gamma values and zero/fractional/full-headroom controls must agree. Highlight error improves, but shadow error and regional means remain failed under the same gates. Earlier gamma-1 bytes and failed cases stay separate.',
               '- Separate ICC-aware HDR JPEG experiments use the actual gamma-3.2 base profile, native LittleCMS float32 linearization and native gain computation. Both the [moderate-offset](icc-gainmap-moderateoffset.json) and [small-offset](icc-gainmap-smalloffset.json) cases remain in the matrix. The former fails independent shadow reconstruction and decoder agreement; the latter improves agreement but fails midtone/highlight appearance. The fixed references, RGB8 layer depths and appearance gates are unchanged. Stock readers that assume sRGB or reject ICC remain separately recorded limitations. Their inspected files are diagnostic, with physical consumers pending.',
               '- Single-layer HDR PNG16 from the verified gain-map AVIF renderer retains a distinct original aspect failure: pHYs 0:1 does not establish the requested square pixels. A separate native setsar=1 rewrite must preserve every decoded RGB16 and alpha sample while establishing 1:1. Independent chunk parsing, ExifTool, libpng and FFmpeg check color, depth, geometry, privacy and storage; unchanged source, geometry and HDR appearance gates still apply. Neither representation certifies physical HDR presentation.',
-              '- Authored SDR WebP containment from the locked gain-map AVIF uses the same verified native source/geometry preparation. Actual lossless RGB8 WebP and native sRGB ICC semantics are independently inspected. FFmpeg and libwebp must recover every native input sample exactly; the independent authored SDR reference and unchanged photographic limits still determine appearance qualification. HDR and physical consumer interpretation are separate.',
+              '- Authored SDR WebP containment, crop, stretch and upscale from the locked gain-map AVIF uses the same verified native source/geometry preparation. Actual lossless RGB8 WebP and native sRGB ICC semantics are independently inspected. FFmpeg and libwebp must recover every native input sample exactly; the independent authored SDR reference and unchanged photographic limits still determine appearance qualification. HDR and physical consumer interpretation are separate.',
               '- Original Sharp, retained-map and native-regeneration candidates keep their measured failures. Resampling a base and logarithmic map separately does not commute with resizing reconstructed HDR in linear light. The native combined candidate instead resizes the authored SDR and reconstructed HDR intents separately, computes a new map, and retains both compressed RGB8 JPEG layers exactly. Independent FFmpeg SDR decoding, native libultrahdr HDR reconstruction and a separately validated ISO reader check the emitted file.',
               '- The separately versioned gainmap-hdr-target-gamut-v1 reference filters and clips negative Lanczos excursions in the requested output primaries. Clipping in the earlier Rec.2020 decoder coordinates could create negative components in the requested P3 or sRGB gamut. Analytic commutation, out-of-gamut and identity controls verify this correction. Old references and failed case IDs remain visible; new cases record the reference revision and diagnostic differences. Appearance thresholds are unchanged.',
               '- Combined gain-map candidates use JPEG SOF3 predictive RGB8 coding and proof-local native patches. The pinned libavif JPEG reader rejects SOF3, while the separately tested native JPEG/ISO and patched libultrahdr readers decode it. File qualification does not establish browser or wallpaper compatibility. Every exact representation still requires the listed physical consumer checks.',
@@ -556,7 +557,8 @@ def main():
         geometries=('contain', 'cover', 'fill', 'upscale'))
     write_json(WORK/'gainmap-avif-png-evidence.json', gainmap_avif_png_result)
     from gainmap_avif_webp import run as run_gainmap_avif_webp
-    gainmap_avif_webp_result = run_gainmap_avif_webp(WORK/'gainmap-avif-authored-webp')
+    gainmap_avif_webp_result = run_gainmap_avif_webp(WORK/'gainmap-avif-authored-webp',
+        geometries=('contain', 'cover', 'fill', 'upscale'))
     write_json(WORK/'gainmap-avif-webp-evidence.json', gainmap_avif_webp_result)
     from gainmap_avif_hdr import run as run_gainmap_avif_hdr
     gainmap_avif_hdr_result = run_gainmap_avif_hdr(WORK/'gainmap-avif-hdr-geometries',
@@ -568,7 +570,7 @@ def main():
     write_json(WORK/'gainmap-avif-hdr-png-evidence.json', gainmap_avif_hdr_png_result)
     from icc_gainmap import run as run_icc_gainmap
     icc_results = []
-    for policy, gamma in (('moderateoffset', 1), ('smalloffset', 1), ('smalloffset', 2)):
+    for policy, gamma in (('moderateoffset', 1), ('smalloffset', 1), ('smalloffset', 2), ('midpointoffset', 2)):
         name = f'icc-gainmap-{policy}'+('-gamma2' if gamma == 2 else '')
         result = run_icc_gainmap(WORK/name, map_policy=policy, map_gamma=gamma)
         write_json(RESULTS/f'{name}.json', result)

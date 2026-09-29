@@ -23,7 +23,8 @@ from PIL import Image, ImageCms
 import avif
 import gainmap_avif
 import gainmap_avif_png
-from appearance import compare_appearance, sdr_signal_to_nits
+from appearance import RGB_TO_XYZ, compare_appearance, sdr_signal_to_nits
+from gamma_icc import decode_signal_to_nits, make_profile, profile_facts
 from gainmap import private_metadata_tags
 from gainmap_iso import _base_color_facts
 from matrix import GAINMAP_GEOMETRIES
@@ -44,6 +45,48 @@ GEOMETRY_POLICY = {**POLICY,
     'geometry': gainmap_avif_png.GEOMETRY_POLICY['geometry'],
     'scope': 'Only authored SDR JPEG contain, cover, fill and upscale from the identity-oriented locked source',
     'aspect_scope': 'Actual requested pixel raster without an aspect override; no explicit1:1 aspect declaration is claimed'}
+GAMMA32_POLICY = {**GEOMETRY_POLICY,
+    'scope': 'One separate gamma 3.2 upscale candidate at 769x576 from the same inspected native authored SDR PNG',
+    'rationale': 'The standard-sRGB upscale fails both existing shadow maximum gates at 25.494851 delta E. Before measuring this candidate, gamma 3.2 is selected to allocate more RGB8 precision to shadows; source, geometry, 100-nit white, reference and gainmap-sdr limits stay unchanged',
+    'output': 'Static opaque baseline SOF0 RGB8 JPEG, quality 100, no subsampling, actual gamma 3.2 matrix/TRC ICC with sRGB primaries',
+    'color_signaling': 'Actual ICC type-0 curves, colorants and chromatic adaptation define display luminance; an sRGB profile or gamma name alone cannot qualify',
+    'transfer_stage': 'Native normalized RGB8 to RGB16, native sRGB EOTF then gamma 3.2 OETF LUT, native nearest RGB16 to RGB8 without dithering; never reference pixels',
+    'baseline_candidate': 'All standard-sRGB candidates and failures remain separate and unchanged; this transfer is opt-in only',
+    'consumer_scope': 'File appearance under the actual ICC only; browser and OS wallpaper ICC handling remains pending manual review'}
+
+
+def _gamma32_input(source, output):
+    value = '(val/maxval)'
+    linear = f'if(lte({value},0.04045),{value}/12.92,pow(({value}+0.055)/1.055,2.4))'
+    curve = f'maxval*pow({linear},1/3.2)'
+    filters = ('format=gbrp,zscale=rangein=full:range=full,format=gbrp16le,format=rgb48le,'
+               'lutrgb='+':'.join(f"{channel}='{curve}'" for channel in 'rgb')+','
+               'format=gbrp16le,zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24')
+    avif.native(['ffmpeg', '-v', 'error', '-y', '-i', source, '-vf', filters, '-frames:v', '1',
+                 '-map_metadata', '-1', '-threads', '1', output])
+    with Image.open(source) as image:
+        if image.mode != 'RGB':
+            raise ValueError('Expected actual native RGB8 transfer input')
+        signal = np.asarray(image).astype(float)/255
+    with Image.open(output) as image:
+        if image.mode != 'RGB':
+            raise ValueError('Expected actual native RGB8 coding samples')
+        coded = np.asarray(image)
+    # Measurement only. These analytic samples never enter the native encoder.
+    linear = np.where(signal <= .04045, signal/12.92, ((signal+.055)/1.055)**2.4)
+    expected = np.floor(np.floor(linear**(1/3.2)*65535)*255/65535+.5).astype(np.uint8)
+    if coded.shape != expected.shape:
+        raise ValueError('Native transfer changed the inspected geometry')
+    raw = avif.native(['ffmpeg', '-v', 'error', '-i', output, '-frames:v', '1',
+                       '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1'])
+    mismatches = int(np.count_nonzero(coded != expected))
+    decoder_exact = raw == coded.tobytes()
+    return {'input': str(source), 'input_sha256': avif.digest(source),
+            'output': str(output), 'output_sha256': avif.digest(output), 'native_filters': filters,
+            'passed': mismatches == 0 and decoder_exact, 'mismatched_coding_samples': mismatches,
+            'independent_decode_exact': decoder_exact, 'rgb8_sha256': hashlib.sha256(raw).hexdigest(),
+            'dimensions': [coded.shape[1], coded.shape[0]],
+            'scope': 'Coding samples only; incidental PNG color tags do not define the qualified JPEG. Its actual gamma ICC does'}
 
 
 def _selectors(operation):
@@ -72,10 +115,12 @@ def source_decision(source, directory, *, source_lock=gainmap_avif.SOURCE_LOCK):
         return {'action': 'original only', 'source_valid': False, 'reason': str(error), 'sha256': avif.digest(source)}
 
 
-def _parse_jpeg(data, *, dimensions=(173, 130)):
+def _parse_jpeg(data, *, dimensions=(173, 130), gamma32=False):
     """Bounded generated SOF0/one-scan RGB JPEG; reject unknown APP metadata."""
     if tuple(dimensions) not in SIZES.values():
         raise ValueError('Expected a bounded authored SDR JPEG geometry')
+    if gamma32 and tuple(dimensions) != SIZES['upscale']:
+        raise ValueError('Only the explicit gamma3.2 upscale geometry is admitted')
     width, height = dimensions
     if data[:2] != b'\xff\xd8':
         raise ValueError('Missing JPEG start marker')
@@ -127,11 +172,21 @@ def _parse_jpeg(data, *, dimensions=(173, 130)):
         raise ValueError('Expected the native Adobe RGB identity transform')
     if not all(any(marker == wanted for marker, _ in headers) for wanted in (0xDB, 0xC4)):
         raise ValueError('JPEG quantization or entropy tables missing')
-    color = _base_color_facts(data)
-    if color['gamut'] != 'srgb' or color['transfer'] != 'srgb':
-        raise ValueError('Expected actual sRGB ICC matrix and transfer semantics')
+    if gamma32:
+        chunks = [value for marker, value in headers if marker == 0xE2]
+        if (not chunks or any(len(value) < 14 for value in chunks)
+                or any(value[13] != len(chunks) for value in chunks)
+                or sorted(value[12] for value in chunks) != list(range(1, len(chunks)+1))):
+            raise ValueError('Expected one complete unambiguous gamma3.2 ICC profile')
+        profile = b''.join(value[14:] for value in sorted(chunks, key=lambda value: value[12]))
+        decode_signal_to_nits(np.zeros((1, 3)), profile, expected_gamma=3.2, expected_gamut='srgb')
+        color = {**profile_facts(profile), 'transfer': 'gamma3.2', 'icc_sha256': hashlib.sha256(profile).hexdigest()}
+    else:
+        color = _base_color_facts(data)
+        if color['gamut'] != 'srgb' or color['transfer'] != 'srgb':
+            raise ValueError('Expected actual sRGB ICC matrix and transfer semantics')
     return {'width': width, 'height': height, 'depth': 8, 'sof': 0, 'components': 3,
-            'gamut': 'srgb', 'transfer': 'srgb', 'color': color,
+            'gamut': 'srgb', 'transfer': color['transfer'], 'color': color,
             'icc_sha256': color['icc_sha256'], 'orientation': 1, 'frames': 1, 'opaque': True,
             'no_aspect_override': True, 'aspect_ratio_explicitly_signaled': False,
             'pixel_aspect': 'Absent; no JFIF/EXIF aspect override. The requested pixel raster is independently verified',
@@ -139,9 +194,9 @@ def _parse_jpeg(data, *, dimensions=(173, 130)):
             'header_markers': [hex(marker) for marker, _ in headers], 'gain_map': 'absent', 'private_metadata_segments': []}
 
 
-def inspect_and_decode(path, *, dimensions=(173, 130)):
+def inspect_and_decode(path, *, dimensions=(173, 130), gamma32=False):
     path = Path(path)
-    facts = _parse_jpeg(path.read_bytes(), dimensions=dimensions)
+    facts = _parse_jpeg(path.read_bytes(), dimensions=dimensions, gamma32=gamma32)
     width, height = facts['width'], facts['height']
     packet = json.loads(avif.native(['ffprobe', '-v', 'error', '-c:v', 'mjpeg', '-count_frames',
                                      '-show_frames', '-show_streams', '-of', 'json', path]))
@@ -183,8 +238,15 @@ def inspect_and_decode(path, *, dimensions=(173, 130)):
     return facts, codes
 
 
-def _encode(source, output):
-    profile = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
+def _encode(source, output, *, gamma32=False):
+    transfer = None
+    if gamma32:
+        encoded = output.with_name('gamma32-coding.png')
+        transfer = _gamma32_input(source, encoded)
+        source = encoded
+        profile = bytearray(make_profile(gamma=3.2, gamut='srgb'))
+    else:
+        profile = bytearray(ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes())
     profile[24:36] = struct.pack('>6H', 2020, 1, 1, 0, 0, 0)
     profile[84:100] = bytes(16)
     with Image.open(source) as image:
@@ -193,28 +255,36 @@ def _encode(source, output):
         clean = Image.frombytes('RGB', image.size, image.convert('RGB').tobytes())
         clean.save(output, format='JPEG', quality=100, subsampling=0, keep_rgb=True,
                    optimize=False, progressive=False, icc_profile=bytes(profile))
-    return {'encoder': 'Pillow native libjpeg '+Image.core.jpeglib_version,
+    return {**({'transfer_stage': transfer} if gamma32 else {}),
+            'encoder': 'Pillow native libjpeg '+Image.core.jpeglib_version,
             'input': str(source), 'input_sha256': avif.digest(source), 'icc_sha256': hashlib.sha256(profile).hexdigest(),
             'options': {'quality': 100, 'subsampling': 0, 'keep_rgb': True, 'optimize': False, 'progressive': False},
             'output_sha256': avif.digest(output)}
 
 
-def _case(root, original):
+def _case(root, original, *, gamma32=False):
     operation = original['geometry']
     selectors = {**original['selectors'], 'format': 'jpg'}
     validate_selectors(selectors, operation=operation)
+    if gamma32:
+        if operation != 'upscale':
+            raise ValueError('Only the explicit gamma3.2 upscale geometry is admitted')
+        root = root/'gamma32'
     root = root if operation == 'contain' else root/operation
     root.mkdir(parents=True, exist_ok=True)
-    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:sdr:jpg:preserve:preserve:{operation}:authored-srgb-rgb8',
+    coding = 'gamma32' if gamma32 else 'srgb'
+    case = {'case_id': f'{gainmap_avif.FIXTURE_ID}:sdr:jpg:preserve:preserve:{operation}:authored-{coding}-rgb8',
         'cell_id': 'avif-gainmap:sdr:jpg', 'fixture_id': gainmap_avif.FIXTURE_ID,
-        'candidate': 'native-authored-base-jpeg-srgb', 'selectors': selectors, 'geometry': operation,
+        'candidate': f'native-authored-base-jpeg-{coding}', 'selectors': selectors, 'geometry': operation,
         'source_facts': original['source_facts'], 'source_sha256': original['source_sha256'],
         'status': 'tested and failed', 'consumer_status': 'pending manual review',
-        'threshold_scope': {**(POLICY if operation == 'contain' else GEOMETRY_POLICY),
+        'threshold_scope': {**(GAMMA32_POLICY if gamma32 else POLICY if operation == 'contain' else GEOMETRY_POLICY),
                             'thresholds_sha256': avif.digest(Path(__file__).with_name('thresholds.json'))},
         'checks': {key: False for key in ('native_encoder', 'native_preparation', 'independent_source_decoder',
             'independent_decoder', 'structure', 'native_storage_appearance', 'appearance', 'privacy')},
         'measurements': {}, 'artifacts': {}, 'blockers': [], 'native_preparation': original}
+    if gamma32:
+        case['checks']['native_transfer'] = False
     try:
         case['checks']['native_preparation'] = (original['status'] == 'qualified'
             and all(original['checks'].values()) and not original['blockers'])
@@ -225,27 +295,39 @@ def _case(root, original):
         if avif.digest(source) != original['artifacts']['sha256']:
             raise ValueError('Native PNG preparation changed after inspection')
         _, native_pixels = gainmap_avif_png.inspect_and_decode(source)
-        case['native_candidate'] = _encode(source, output)
+        case['native_candidate'] = _encode(source, output, gamma32=gamma32)
         case['checks']['native_encoder'] = True
+        if gamma32:
+            case['checks']['native_transfer'] = case['native_candidate']['transfer_stage']['passed']
         case['artifacts'] = {'output': str(output), 'sha256': avif.digest(output),
                              'source': original['artifacts']['source'], 'source_sha256': original['source_sha256']}
-        facts, codes = inspect_and_decode(output, dimensions=SIZES[operation])
+        facts, codes = inspect_and_decode(output, dimensions=SIZES[operation], gamma32=gamma32)
         reference = original['reference_sdr']
         reference_path = Path(reference['path'])
         if avif.digest(reference_path) != reference['sha256']:
             raise ValueError('Independent authored SDR reference changed')
         with Image.open(reference_path) as image:
             expected = sdr_signal_to_nits(np.asarray(image).astype(float)/255)
-        actual = sdr_signal_to_nits(codes/255)
-        measured = compare_appearance(expected, actual, reference_gamut='srgb', actual_gamut='srgb', fixture_class='gainmap-sdr')
+        actual_gamut = 'srgb'
+        coding_pixels = np.rint(native_pixels[..., :3]*255)
+        if gamma32:
+            color = facts['color']
+            xyz = (100*(codes/255)**np.asarray(color['gammas'])) @ np.asarray(color['rgb_to_xyz_d65']).T
+            actual = xyz @ np.linalg.inv(RGB_TO_XYZ['rec2020']).T
+            actual_gamut = 'rec2020'
+            with Image.open(case['native_candidate']['input']) as image:
+                coding_pixels = np.asarray(image)
+        else:
+            actual = sdr_signal_to_nits(codes/255)
+        measured = compare_appearance(expected, actual, reference_gamut='srgb', actual_gamut=actual_gamut, fixture_class='gainmap-sdr')
         stored = compare_appearance(sdr_signal_to_nits(native_pixels[..., :3]), actual,
-                                    reference_gamut='srgb', actual_gamut='srgb', fixture_class='gainmap-sdr')
+                                    reference_gamut='srgb', actual_gamut=actual_gamut, fixture_class='gainmap-sdr')
         case['checks'].update({'independent_decoder': True, 'native_storage_appearance': stored['passed'],
             'structure': facts['icc_sha256'] == case['native_candidate']['icc_sha256'],
             'appearance': measured['passed'], 'privacy': facts['privacy']['passed']})
         case.update({'facts': facts, 'reference_sdr': reference, 'measurements': {'sdr': measured, 'native_storage': stored},
-            'storage_measurement': {'mismatched_rgb8_samples': int(np.count_nonzero(codes != np.rint(native_pixels[..., :3]*255))),
-                'maximum_absolute_code_difference': int(np.max(np.abs(codes.astype(int)-np.rint(native_pixels[..., :3]*255))))},
+            'storage_measurement': {'mismatched_rgb8_samples': int(np.count_nonzero(codes != coding_pixels)),
+                'maximum_absolute_code_difference': int(np.max(np.abs(codes.astype(int)-coding_pixels.astype(int))))},
             'privacy_measurement': facts['privacy']})
         case['blockers'] = [f'Failed {key} check' for key, passed in case['checks'].items() if not passed]
         if not case['blockers']:
@@ -255,10 +337,12 @@ def _case(root, original):
     return case
 
 
-def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, geometries=('contain',)):
+def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, geometries=('contain',), gamma32_upscale=False):
     geometries = tuple(geometries)
     if not geometries or len(set(geometries)) != len(geometries) or any(operation not in SIZES for operation in geometries):
         raise ValueError('Expected distinct contain, cover, fill or upscale geometries')
+    if gamma32_upscale and 'upscale' not in geometries:
+        raise ValueError('The gamma3.2 candidate requires an explicit upscale geometry')
     if selectors is not None:
         if len(geometries) != 1:
             raise ValueError('Explicit selectors require one declared geometry')
@@ -268,6 +352,8 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, geom
     start = len(avif.COMMANDS)
     prepared = gainmap_avif_png.run(root/'native-png', source_lock=source_lock, geometries=geometries)
     cases = [_case(root, original) for original in prepared['evidence']]
+    if gamma32_upscale:
+        cases.append(_case(root, next(case for case in prepared['evidence'] if case['geometry'] == 'upscale'), gamma32=True))
     controls = [{**row, 'case_id': row['case_id'].replace('gainmap-avif-png-', 'gainmap-avif-jpeg-')}
                 for row in prepared['controls'] if row.get('original')]
     for label, change in (('hdr', {'range': 'hdr'}), ('depth16', {'depth': '16'}),
@@ -279,6 +365,7 @@ def run(directory, *, source_lock=gainmap_avif.SOURCE_LOCK, selectors=None, geom
             rejected = True
         controls.append({'case_id': 'gainmap-avif-jpeg-'+label+'-withheld', 'passed': rejected,
                          'status': 'passed' if rejected else 'tested and failed'})
-    return {'evidence': cases, 'source_fixtures': prepared['source_fixtures'], 'fixtures': [],
+    return {**({'additional_candidate_scope': GAMMA32_POLICY} if gamma32_upscale else {}),
+            'evidence': cases, 'source_fixtures': prepared['source_fixtures'], 'fixtures': [],
             'controls': controls, 'commands': avif.COMMANDS[start:], 'scope': POLICY if geometries == ('contain',) else GEOMETRY_POLICY,
             'consumer_status': 'pending manual review'}

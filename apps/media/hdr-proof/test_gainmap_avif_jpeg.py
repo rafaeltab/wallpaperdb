@@ -5,6 +5,9 @@ from pathlib import Path
 import tempfile
 import unittest
 
+import numpy as np
+from PIL import Image
+
 import avif
 import gainmap_avif
 import gainmap_avif_jpeg
@@ -206,6 +209,127 @@ class GainMapAvifJpegGeometryTests(unittest.TestCase):
         self.assertEqual(case['artifacts']['sha256'], 'fe78297586abb65828565ab94185a57898a9ec5926f6d8b30a8a2db555d5be5e')
         measured_hash = hashlib.sha256(json.dumps(case['measurements'], sort_keys=True).encode()).hexdigest()
         self.assertEqual(measured_hash, '9cb5b9a6773ad4f0f32e309087f39be4bd3e48b50fb3a058161aa3896fb306c9')
+
+
+class GainMapAvifJpegGamma32Tests(unittest.TestCase):
+    def test_native_transfer_matches_every_rgb8_code_without_reference_input(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            codes = np.arange(256, dtype=np.uint8)
+            samples = np.stack((codes, codes[::-1], np.roll(codes, 37)), axis=-1)[None, ...]
+            source, output = root/'native-input.png', root/'gamma32.png'
+            Image.fromarray(samples).save(source)
+            facts = gainmap_avif_jpeg._gamma32_input(source, output)
+            signal = samples.astype(float)/255
+            linear = np.where(signal <= .04045, signal/12.92, ((signal+.055)/1.055)**2.4)
+            expected = np.floor(np.floor(linear**(1/3.2)*65535)*255/65535+.5).astype(np.uint8)
+            with Image.open(output) as image:
+                actual = np.asarray(image)
+            np.testing.assert_array_equal(actual, expected)
+            self.assertTrue(facts['passed'])
+            self.assertEqual(facts['mismatched_coding_samples'], 0)
+            self.assertTrue(facts['independent_decode_exact'])
+            self.assertEqual(facts['input_sha256'], avif.digest(source))
+            self.assertEqual(facts['output_sha256'], avif.digest(output))
+
+    def test_gamma32_is_bounded_to_an_explicit_upscale_request(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for geometries in (('contain',), ('cover',), ('fill',)):
+                start = len(avif.COMMANDS)
+                with self.assertRaisesRegex(ValueError, 'gamma3.2.*upscale'):
+                    gainmap_avif_jpeg.run(temporary, geometries=geometries, gamma32_upscale=True)
+                self.assertEqual(len(avif.COMMANDS), start)
+
+
+class GainMapAvifJpegGamma32EvidenceTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.temporary.name)
+        cls.result = gainmap_avif_jpeg.run(cls.root/'proof', geometries=('contain', 'cover', 'fill', 'upscale'), gamma32_upscale=True)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporary.cleanup()
+
+    def test_optional_transfer_keeps_all_four_standard_candidates_exact(self):
+        evidence = self.result['evidence']
+        self.assertEqual(len(evidence), 5)
+        expected = (
+            ('fe78297586abb65828565ab94185a57898a9ec5926f6d8b30a8a2db555d5be5e', '9cb5b9a6773ad4f0f32e309087f39be4bd3e48b50fb3a058161aa3896fb306c9'),
+            ('1b14f2e6cac11df6de6eea90850e4dc7a67877e62b35731a3232eae3086209c6', '9aad51fbcb9e2b42edceff41fe68b55033b95a3f8481953fe7078ca82e8f5679'),
+            ('2614dfe0f7dd9610c235cbbb6087eee7d86f29d5e8e8438a2fe04f7c45ce6d39', '8c3fe41605898d259d5429328d8679bcb1e7ce842cb566abb1b68d41e8d92080'),
+            ('f3be6e4c6e560ece389f853d484eb2470faaca6cbc2ec3ee9e58ffe89720f5b1', 'aa7aecd337be1ace5db4dcb6fc473179c4d2f8a25ef18afaf467b8a4181a0cab'))
+        for case, (encoded, measured) in zip(evidence[:4], expected):
+            self.assertEqual(case['artifacts']['sha256'], encoded)
+            self.assertEqual(hashlib.sha256(json.dumps(case['measurements'], sort_keys=True).encode()).hexdigest(), measured)
+        self.assertEqual([case['status'] for case in evidence[:4]], ['qualified']*3+['tested and failed'])
+
+    def test_real_gamma32_case_uses_actual_icc_and_same_source_reference(self):
+        self.assertEqual(len(self.result['evidence']), 5)
+        standard, case = self.result['evidence'][-2:]
+        self.assertEqual(case['candidate'], 'native-authored-base-jpeg-gamma32')
+        self.assertNotEqual(case['case_id'], standard['case_id'])
+        self.assertEqual(case['selectors'], standard['selectors'])
+        self.assertEqual(case['reference_sdr'], standard['reference_sdr'])
+        self.assertEqual(case['source_sha256'], standard['source_sha256'])
+        self.assertEqual(case['native_candidate']['transfer_stage']['input_sha256'], standard['native_candidate']['input_sha256'])
+        self.assertEqual(case['facts']['transfer'], 'gamma3.2')
+        self.assertEqual(case['facts']['gamut'], 'srgb')
+        self.assertTrue(case['facts']['rgb_packing_exact'])
+        np.testing.assert_allclose(case['facts']['color']['gammas'], [3.2]*3, atol=1/65536, rtol=0)
+        self.assertTrue(case['checks']['structure'], case['blockers'])
+        self.assertTrue(case['checks']['privacy'], case['blockers'])
+        self.assertEqual(case['threshold_scope']['thresholds_sha256'], standard['threshold_scope']['thresholds_sha256'])
+        self.assertEqual(case['threshold_scope']['reference_revision'], standard['threshold_scope']['reference_revision'])
+        self.assertEqual(case['status'], 'qualified' if all(case['checks'].values()) else 'tested and failed')
+        self.assertEqual(case['status'], 'qualified', case['blockers'])
+        self.assertTrue(case['checks']['native_transfer'])
+        self.assertEqual(case['artifacts']['sha256'], '2f6ac345b710717bd167bd1a7bccd4c62fc7410fa373ec9e81c3efefeb862bed')
+        self.assertAlmostEqual(case['measurements']['sdr']['regions']['shadow']['delta_e_itp']['maximum'], 3.8356176080182944, places=6)
+        self.assertAlmostEqual(case['measurements']['native_storage']['regions']['shadow']['delta_e_itp']['maximum'], 3.6499951417726626, places=6)
+        self.assertEqual(case['consumer_status'], 'pending manual review')
+        matrix = build_matrix(self.result['evidence'])
+        self.assertEqual(matrix['evidence_errors'], [])
+        actual = next(cell for cell in matrix['cells'] if cell['id'] == 'avif-gainmap:sdr:jpg')['evidence']
+        self.assertEqual([(row['case_id'], row['status']) for row in actual], [(row['case_id'], row['status']) for row in self.result['evidence']])
+
+    def test_wrong_gamma_or_gamut_and_default_interpretation_reject_before_decode(self):
+        self.assertEqual(len(self.result['evidence']), 5)
+        case = self.result['evidence'][-1]
+        data = Path(case['artifacts']['output']).read_bytes()
+        start = len(avif.COMMANDS)
+        with self.assertRaises(ValueError):
+            gainmap_avif_jpeg.inspect_and_decode(case['artifacts']['output'], dimensions=(769, 576))
+        self.assertEqual(len(avif.COMMANDS), start)
+        for label, gamma, gamut in (('wrong-gamma', 2.2, 'srgb'), ('wrong-gamut', 3.2, 'p3')):
+            profile, output = self.root/f'{label}.icc', self.root/f'{label}.jpg'
+            profile.write_bytes(make_profile(gamma=gamma, gamut=gamut))
+            output.write_bytes(data)
+            avif.native(['exiftool', '-overwrite_original', f'-ICC_Profile<={profile}', output])
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                gainmap_avif_jpeg.inspect_and_decode(output, dimensions=(769, 576), gamma32=True)
+            self.assertEqual(len(avif.COMMANDS), start)
+
+    def test_incomplete_or_duplicate_gamma_icc_chunks_reject_before_decode(self):
+        case = self.result['evidence'][-1]
+        data = Path(case['artifacts']['output']).read_bytes()
+        marker = b'ICC_PROFILE\x00\x01\x01'
+        self.assertEqual(data.count(marker), 1)
+        position = data.index(marker)-4
+        length = int.from_bytes(data[position+2:position+4], 'big')+2
+        segment = data[position:position+length]
+        variants = (data.replace(marker, marker[:-1]+b'\x02'),
+                    data[:position]+segment+data[position:],
+                    data[:position]+data[position+length:])
+        for index, changed in enumerate(variants):
+            output = self.root/f'invalid-profile-{index}.jpg'
+            output.write_bytes(changed)
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                gainmap_avif_jpeg.inspect_and_decode(output, dimensions=(769, 576), gamma32=True)
+            self.assertEqual(len(avif.COMMANDS), start)
 
 
 if __name__ == '__main__':

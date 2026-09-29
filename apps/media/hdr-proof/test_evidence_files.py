@@ -41,11 +41,11 @@ class EvidenceFileTests(unittest.TestCase):
                 'rendering_scope': {'intermediate_adaptation_qualified': False},
                 'artifacts': {'output': str(outputs[extension]), 'sha256': suite.avif.digest(outputs[extension])}}
                 for extension, depths in (('avif', (8, 10, 12)), ('png', (16,)))
-                for depth in depths for operation in ('contain', 'cover', 'fill', 'upscale')]
+                for depth in depths for operation in ('contain', 'cover', 'fill', 'upscale', 'orientation')]
             with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
                 files = suite.candidate_files(cases, [])
             self.assertEqual({row['case_id'] for row in files}, {case['case_id'] for case in cases})
-            self.assertEqual(len(files), 16)
+            self.assertEqual(len(files), 20)
             for row in files:
                 self.assertFalse(row['rendering_scope']['intermediate_adaptation_qualified'])
                 self.assertEqual(row['consumer_status'], 'pending manual review')

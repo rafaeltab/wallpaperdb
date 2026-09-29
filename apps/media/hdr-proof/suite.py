@@ -765,7 +765,7 @@ def main():
     icc_results.extend(apple_hdr_jpeg['cases'])
     from apple_hdr_avif import run as run_apple_hdr_avif
     apple_hdr_avif = run_apple_hdr_avif(WORK/'apple-hdr-avif-contain', depths=(12, 10, 8),
-                                     geometries=('contain', 'cover', 'fill', 'upscale'))
+                                     geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
     write_json(RESULTS/'apple-hdr-avif-contain.json', apple_hdr_avif)
     icc_results.extend(apple_hdr_avif['cases'])
     from apple_hdr_png import run as run_apple_hdr_png
@@ -877,7 +877,7 @@ def main():
     # the original generated corpus lock, including its PNG16 hashes.
     generated_fixtures = locked_fixtures + png8_result['fixtures'] + png8_geometry_result['fixtures'] + gainmap_avif_result['source_fixtures']
     generated_fixtures = merge_reconstruction_profiles(generated_fixtures, gainmap_avif_hdr_result['source_fixtures'])
-    generated_fixtures += apple_orientation_fixtures(apple_hdr_jpeg['cases']+apple_hdr_png['cases'])
+    generated_fixtures += apple_orientation_fixtures(apple_hdr_jpeg['cases']+apple_hdr_avif['cases']+apple_hdr_png['cases'])
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
     errors = matrix['evidence_errors'] + fixture_lock(locked_fixtures,args.update_fixture_lock)

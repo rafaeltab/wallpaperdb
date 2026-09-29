@@ -168,20 +168,22 @@ reconstruction; the output is 173 by 130 with identity orientation. The manual
 bundle includes this actual source and all five derivatives. Partial Apple
 adaptation remains unqualified by these full-effect results.
 The separate [explicit PQ P3 AVIF proofs](apple_hdr_avif.py) preserve that
-documented full image at 8, 10 and 12 bits after containment, crop, stretch and
-upscale. All twelve tuples pass; maximum Delta E ITP is 0.350935 at 12 bits,
-0.821563 at 10 bits and 2.8433 at 8 bits. Containment12 retains its original bytes and measurements.
+documented full image at 8, 10 and 12 bits after containment, crop, stretch,
+upscale and real EXIF6 orientation. All fifteen tuples pass; maximum Delta E
+ITP is 0.360347 at 12 bits, 0.821563 at 10 bits and 2.843321 at 8 bits. Containment12 retains its original bytes and measurements.
 They use the unchanged photographic gates without a source precision allowance.
 Native float preparation and geometry feed FFmpeg/zimg then AOM; dav1d
 independently decodes the emitted AV1. Actual depth, PQ/P3 signaling, geometry,
 square pixels, opacity, identity orientation and privacy pass. These single-layer
 outputs have no embedded authored SDR base or gain map. Each manual entry
 supplies a matched SDR comparison and inspected native HDR intent. Display tone
-mapping, other selectors/orientation and physical consumers require separate proof.
+mapping, other selectors and physical consumers require separate proof. The
+EXIF6 cases reconstruct the actual stored raster before one clockwise rotation
+in each geometry path; all twelve earlier outputs and measurements remain exact.
 The [explicit PQ16 P3 PNG proofs](apple_hdr_png.py) also pass the documented
 full-effect containment, crop, stretch and upscale comparisons, with maximum
-Delta E ITP 0.258409, 0.275747, 0.270038 and 0.257914. A separately tested
-real EXIF6 variant passes with maximum 0.259545 after one clockwise rotation,
+Delta E ITP 0.258409, 0.275747, 0.270037 and 0.257913. A separately tested
+real EXIF6 variant passes with maximum 0.259544 after one clockwise rotation,
 producing a 173-by-130 identity-oriented file. The earlier four outputs and
 measurements remain exact. The
 native FFmpeg/zimg writer and independent libpng decoder agree exactly on

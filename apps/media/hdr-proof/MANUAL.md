@@ -69,6 +69,13 @@ ISO variants remain failed diagnostics. Stock native readers assume sRGB transfe
 in this path. Each manifest entry retains this qualification scope and its
 reader limitations. Check ICC interpretation and HDR reconstruction separately
 from a consumer's ability to open the JPEG; keep physical results pending.
+The gain-map JPEG endpoint comparisons use display boost 16. Check the separate
+ISO upscale boost-2 rendering record before selecting a download; its measured
+adaptation failure cannot be overridden by a successful endpoint or a physical
+observation. Repeat gain-map comparisons at different brightness settings and
+window sizes, recording changing shadow, exposure and highlight behavior.
+The browser's actual effective headroom may be unknown, so do not label a
+brightness setting as an exact numerical boost without measuring it.
 
 The optional gain-map AVIF source has separately inspected authored-SDR AVIF
 derivatives for containment, crop, stretch and upscale. Compare them with the

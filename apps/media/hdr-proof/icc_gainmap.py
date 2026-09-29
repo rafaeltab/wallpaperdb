@@ -206,10 +206,14 @@ def run(directory, *, map_policy='moderateoffset', map_gamma=1, map_method='floa
         'selectors': {'format': 'jpg', 'range': 'hdr', 'gamut': 'preserve', 'depth': 'preserve',
             'motion': 'preserve', 'transparency': 'preserve', **GAINMAP_GEOMETRIES[operation]},
         'status': 'tested and failed', 'consumer_status': 'pending manual review',
-        'qualification_scope': 'Experimental native ICC-aware file path only; stock native HDR readers '
+        'qualification_scope': 'Experimental native ICC-aware file path only at display boost 16; '
+            'no intermediate display-headroom qualification. Stock native HDR readers '
             'assume sRGB or reject ICC, and physical consumers have not been qualified',
+        'rendering_scope': {'display_boost': 16, 'source_reference_revision': revision,
+            'scope': 'One declared display boost, not a proof of every source or output adaptation weight'},
         'known_consumer_limitations': ['Pinned libultrahdr assumes sRGB base transfer. '
-            'Pinned libavif rejects ICC gain computation/application. These gamma3.2 files need ICC-aware gain application.'],
+            'Pinned libavif rejects ICC gain computation/application. These gamma3.2 files need ICC-aware gain application.',
+            'Intermediate display headroom is not qualified by the display-boost-16 endpoint measurement.'],
         'checks': {key: False for key in ('native_encoder', 'independent_source_decoder', 'native_source_precision',
             'native_geometry', 'hdr_intent', 'independent_decoder', 'structure', 'appearance', 'privacy')},
         'measurements': {}, 'artifacts': {}, 'blockers': []}

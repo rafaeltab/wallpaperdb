@@ -239,7 +239,13 @@ def product_coverage_report(matrix):
              '| --- | ---: | ---: | ---: |']
     for row in coverage['cells']:
         lines.append(f'| `{row["cell_id"]}` | {row["required_count"]} | {row["qualified_count"]} | {row["untested_count"]} |')
-    lines += ['', 'These counts cover the declared corpus only. A ledger cell can retain failed exact-selector candidates while its required product requests have qualified alternatives. Consumer review and a usable SDR wallpaper download remain separate requirements. The original fixed-plan outcomes below remain visible.', '']
+    lines += ['', 'These counts cover the declared corpus only. Gain-map HDR counts describe the original display boost 16 comparisons; they do not qualify intermediate display headroom. A ledger cell can retain failed exact-selector candidates while its endpoint requests have qualified alternatives. Consumer review and a usable SDR wallpaper download remain separate requirements. The original fixed-plan outcomes below remain visible.', '']
+    rendering = matrix['rendering_coverage']
+    lines += [f'{rendering["qualified_count"]} of {rendering["required_count"]} additional HDR rendering requirements qualify. An unqualified row blocks faithful-HDR qualification independently of the endpoint counts and pending physical checks.', '',
+              '| Exact rendering requirement | Display boost | Status |', '| --- | ---: | --- |']
+    for row in rendering['requirements']:
+        lines.append(f'| `{row["requirement_id"]}` | {row["display_boost"]} | {row["status"]} |')
+    lines += ['', 'Source and output must use the same display boost and the declared independent reference. A passing endpoint or another headroom value cannot satisfy this gate. No new product selector or runtime generation policy is introduced.', '']
     return lines
 
 
@@ -391,7 +397,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
     lines = ['# HDR conversion proof results','',
-             'The HDR milestone remains blocked. Automated codec results do not qualify browser HDR presentation, native viewers, or OS wallpaper setters. Issue #284 remains open. Valid original requests retain exact bytes; unqualified transforms remain unsupported, and unknown required source facts remain original-only.','',
+             'The HDR milestone remains blocked. Required conversion and display-headroom rendering gates must pass separately from browser HDR presentation, native viewers, and OS wallpaper checks. Automated codec results cannot qualify those physical consumers. Issue #284 remains open. Valid original requests retain exact bytes; unqualified transforms remain unsupported, and unknown required source facts remain original-only.','',
              'Reproduce from the repository root with `make run PACKAGE=media SCRIPT=proof:hdr`. Docker must support linux/amd64. The default command returns exit 2 while required codec cases or physical checks are unqualified. This is an intentional qualification failure, not a passing release gate.','',
              f'Recorded {len(evidence)} conversion attempts over {len(fixtures)} fixture records: {stages["native_completed"]} completed native encoding, {stages["native_operation_failures"]} stopped at a native operation, and {stages["native_not_established"]} lack a confirmed native outcome. Qualification outcomes: '+', '.join(f'{value} {key}' for key,value in sorted(counts.items()))+'.',
              f'The inventory covers {matrix["ledger_cell_count"]} HDR-ledger cells and {matrix["generic_sdr_control_count"]} labeled SDR controls. Ledger outcomes: '+', '.join(f'{value} {key}' for key,value in sorted(cell_counts.items()))+'.','',
@@ -450,6 +456,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
               *mozjpeg_experiment_report(mozjpeg, mozjpeg_historical, mozjpeg_lambdas),
               *coefficient_diagnostic_report(mozjpeg_diagnosis),
               '## Blockers and scope limits','',
+              '- The [ISO intermediate-headroom proof](iso-intermediate-boost2.json) fails at display boost 2 against an independently reconstructed source at that same boost. Both actual output readers agree within the existing limits, but reconstructed appearance does not. The source capacity is about 49.26 times SDR white; the regenerated file is about 4.47. Read-only pre-JPEG-map and ideal-gain diagnostics retain large errors. A normalized-weight diagnostic reduces broad bias but still fails, so capacity metadata alone cannot resolve this geometry/adaptation mismatch. The separate display-boost-16 endpoint remains measured; the boost-2 rendering requirement blocks faithful-HDR qualification independently of endpoint counts and physical review.',
               '- The [fractional map-gamma-1.5 candidate](icc-gainmap-midpointoffset-gamma1.5.json) passes the unchanged SDR, native HDR, independent HDR and cross-reader gates for ISO JPEG upscale. It retains the gamma-3.2 compressed base, eight-bit SOF0 layers and midpoint offsets. Qualification requires the experimental ICC-aware readers at the declared full display headroom; the stock sRGB-assuming reader still fails and physical consumers remain pending. All five preceding failed representations remain separate.',
               '- The [Android XMP fractional-gamma upscale](icc-gainmap-xmp-midpointoffset-gamma1.5.json) passes the same file gates using the existing PQ16 source bridge with requested native depth 12. Its source reference shares libavif gain application; source transport agreement is not a claim of a second source-renderer implementation. Independent final HDR readers still qualify the output. The ISO-only float32 guard, stock-reader failure and pending physical status are unchanged.',
               '- New Apple containment passes the same ICC-aware JPEG recipe, while the original upscale remains failed at independent HDR shadow maximum 8.08225 against the unchanged limit 8. Native source/geometry/intent, SDR appearance and cross-reader agreement pass. A separate integer-DCT map keeps that shadow failure and adds highlight p95 failures in both HDR readers, with identical base and pre-JPEG map samples. A separately named FLOAT-base/FLOAT-map upscale preserves native gamma3.2 input and P3 ICC bytes, regenerates the map against its actual compressed base, and passes all gates at maximum HDR error 6.77896. The observed SOF0 union now covers 24/24 tuples, including 20/20 required, within the declared reader scope. Exact auxiliary XMP model/version/headroom facts govern this source; removing its non-authoritative MakerNotes leaves native reconstruction byte-identical, while unknown required XMP facts reject transformation.',
@@ -629,6 +636,10 @@ def main():
         map_policy='midpointoffset', map_gamma=1.5, base_method='float')
     write_json(RESULTS/f'{name}.json', result)
     icc_results.extend(result['cases'])
+    from iso_intermediate_headroom import run as run_iso_intermediate
+    iso_intermediate = run_iso_intermediate(WORK/'iso-intermediate-boost2')
+    write_json(RESULTS/'iso-intermediate-boost2.json', iso_intermediate)
+    icc_results.extend(iso_intermediate['cases'])
     gainmap_result = gainmap.run(WORK)
     from authored_sdr_proof import run as run_authored_sdr
     authored_sdr_result = run_authored_sdr(WORK/'authored-sdr', formats=('jpg','avif','png','webp'))

@@ -7,8 +7,8 @@ import numpy as np
 from appearance import compare_appearance
 
 from suite import (coefficient_diagnostic_report, gainmap_candidate_report,
-                   jpegli_experiment_report, mozjpeg_experiment_report)
-from matrix import CHECKS, GAINMAP_GEOMETRIES
+                   jpegli_experiment_report, mozjpeg_experiment_report, product_coverage_report)
+from matrix import CHECKS, GAINMAP_GEOMETRIES, build_matrix
 
 
 def measurement(mean, maximum, luminance):
@@ -57,6 +57,14 @@ def native_case(candidate, geometry, qualified):
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_endpoint_report_exposes_additional_required_rendering_gap(self):
+        rendered = '\n'.join(product_coverage_report(build_matrix([])))
+        self.assertIn('display boost 16', rendered)
+        self.assertIn('0 of 1 additional HDR rendering requirements qualify', rendered)
+        self.assertIn('gainmap-android-iso:hdr:jpg:upscale:display-boost2', rendered)
+        self.assertIn('| 2 | untested |', rendered)
+        self.assertIn('blocks faithful-HDR qualification', rendered)
+
     def test_jpegli_quality_failures_remain_separate_from_hdr_qualification(self):
         base = {'cases': [{'status': 'qualified'}, {'status': 'tested and failed'}]}
         quality = {'cases': [{'status': 'tested and failed'}] * 3}

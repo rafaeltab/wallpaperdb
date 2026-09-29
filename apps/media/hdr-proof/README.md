@@ -143,6 +143,20 @@ cross-reader error 5.73114. Together, the observed SOF0 alternatives cover all
 24 tested source/geometry tuples, including all 20 required tuples. This is
 file qualification within the declared decoder scope; stock-reader limitations
 and pending physical review remain unchanged.
+These gain-map endpoint measurements use display boost 16. They do not prove
+faithful adaptation at other display headroom values. The matrix separately
+requires ISO upscale at boost 2, using the same source/output display boost
+and an independently reconstructed, matched-geometry source reference. A
+failure of that rendering blocks faithful-HDR qualification even when all
+320 original fixture/geometry requests have passing endpoint alternatives.
+The [boost-2 proof](iso_intermediate_headroom.py) reruns the exact native
+converter and records a large appearance failure while both output readers
+agree. Its source capacity is about 49.26 times SDR white, compared with 4.47
+for the regenerated output. Read-only uncompressed-map and ideal-gain
+diagnostics retain the mismatch. Normalizing the interpolation weight removes
+much of the broad exposure bias but still fails the shadow and midtone maxima.
+Changing capacity metadata alone is therefore insufficient for this measured
+geometry. These diagnostic pixels never enter the encoder or qualify a file.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

@@ -231,9 +231,12 @@ def _diagnostic_summary(cells, plan):
 
 def _source_transform_matches(evidence, planned):
     """Different source transforms cannot substitute for the declared probe."""
+    if evidence.get('probe_crop_rectangle') is not None:
+        # No required tuple uses the separately named custom crop probe.
+        return False
     expected = planned.get('source_transform_requirement')
     if not expected:
-        return True
+        return evidence.get('orientation_source') is None
     source = evidence.get('orientation_source')
     if not isinstance(source, dict) or not re.fullmatch(r'[0-9a-f]{64}', str(source.get('sha256', ''))):
         return False
@@ -273,6 +276,12 @@ def _product_coverage(cells, plan):
         expected = validate_selectors(selectors)
         matching = []
         for evidence in by_cell[planned['cell_id']]['evidence']:
+            rendering = evidence.get('rendering_scope', {})
+            if (planned['cell_id'] == 'gainmap-jpeg:hdr:jpg' and
+                    isinstance(rendering, dict) and rendering.get('display_boost', 16) != 16):
+                # A separately measured intermediate rendering cannot replace
+                # the original corpus's display-boost-16 endpoint comparison.
+                continue
             if (evidence.get('fixture_id') != planned['fixture_id']
                     or evidence.get('geometry') != planned['geometry']
                     or not _source_transform_matches(evidence, planned)):
@@ -312,12 +321,48 @@ def _product_coverage(cells, plan):
         cell['product_coverage'] = row
         rows.append(row)
     return {
-        'scope': 'Accepted product requests across the declared fixture/geometry plan. Numeric-depth failures remain separate exact-case evidence. This does not implement runtime depth selection or qualify physical consumers.',
+        'scope': 'Accepted product requests across the declared fixture/geometry plan. Gain-map HDR counts describe the original display-boost-16 endpoint corpus, not general adaptation; separate rendering_coverage must also pass. Numeric-depth failures remain separate exact-case evidence. This does not implement runtime depth selection or qualify physical consumers.',
         'required_count': len(requirements),
         'qualified_count': sum(item['status'] == 'qualified' for item in requirements),
         'untested_count': sum(item['status'] == 'untested' for item in requirements),
         'requirements': requirements, 'cells': rows,
     }
+
+
+def _rendering_coverage(cells):
+    """A known HDR adaptation gap cannot disappear behind endpoint coverage."""
+    requirement = {
+        'requirement_id': 'gainmap-android-iso:hdr:jpg:upscale:display-boost2',
+        'cell_id': 'gainmap-jpeg:hdr:jpg', 'fixture_id': 'gainmap-android-iso',
+        'source_sha256': 'f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e',
+        'geometry': 'upscale', 'display_boost': 2,
+        'source_reference_revision': 'gainmap-iso-intermediate-boost2-v1',
+        'selectors': {'format': 'jpg', 'range': 'hdr', 'gamut': 'preserve', 'depth': 'preserve',
+                      'motion': 'preserve', 'transparency': 'preserve', **GAINMAP_GEOMETRIES['upscale']}}
+    expected = validate_selectors(requirement['selectors'])
+    matching = []
+    for cell in cells:
+        for case in cell['evidence']:
+            rendering = case.get('rendering_scope')
+            if (any(case.get(key) != requirement[key] for key in
+                    ('cell_id', 'fixture_id', 'source_sha256', 'geometry', 'source_reference_revision'))
+                    or not _source_transform_matches(case, requirement)
+                    or not isinstance(rendering, dict) or rendering.get('display_boost') != requirement['display_boost']):
+                continue
+            try:
+                if validate_selectors(case.get('selectors', {})) != expected:
+                    continue
+            except ProofRequestError:
+                continue
+            if case['status'] in ('qualified', 'tested and failed'):
+                matching.append(case)
+    qualified = sorted({case['case_id'] for case in matching if case['status'] == 'qualified' and not case.get('blockers')})
+    requirement.update({'status': 'qualified' if qualified else 'tested and failed' if matching else 'untested',
+        'qualified_evidence': qualified, 'tested_evidence': sorted({case['case_id'] for case in matching})})
+    return {'scope': 'Additional faithful-HDR appearance requirement at the same source/output display boost. '
+                'It is separate from the original 320 endpoint cases and adds no product selector. '
+                'Passing this one point would not qualify untested headroom values or physical consumers.',
+            'required_count': 1, 'qualified_count': int(bool(qualified)), 'requirements': [requirement]}
 
 
 def build_matrix(evidence):
@@ -393,6 +438,7 @@ def build_matrix(evidence):
         # turns file-only evidence into a production capability advertisement.
         cell["advertisable"] = False
     product_coverage = _product_coverage(cells, plan)
+    rendering_coverage = _rendering_coverage(cells)
     return {
         "schema_version": 2, "scope": "Automated codec proof only; no production capability publication or physical-display certification.",
         "ledger_cell_count": 85, "generic_sdr_control_count": 5,
@@ -401,8 +447,11 @@ def build_matrix(evidence):
         "coverage_plan_scope": "required_case_count and diagnostic_summary.required_cases retain the original fixed 320-case suite plan. Product requirements use product_coverage; SDR AVIF output depth was not mandated as 8 by the accepted contract.",
         "diagnostic_summary": _diagnostic_summary(cells, plan),
         "product_coverage": product_coverage,
+        "rendering_coverage": rendering_coverage,
         "milestone_qualified": False,
-        "milestone_blockers": ["Physical browser/native viewer/OS wallpaper checks remain pending manual review."] + [row['cell_id'] for row in product_coverage['cells'] if not row['codec_complete']],
+        "milestone_blockers": ["Physical browser/native viewer/OS wallpaper checks remain pending manual review."]
+            + [row['cell_id'] for row in product_coverage['cells'] if not row['codec_complete']]
+            + [row['requirement_id'] for row in rendering_coverage['requirements'] if row['status'] != 'qualified'],
         "policy_sources": [
             "https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153",
             "https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5870519681",

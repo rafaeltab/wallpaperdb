@@ -325,6 +325,9 @@ class IccGainmapTests(unittest.TestCase):
             self.assertEqual(case['native_candidate']['computed_map_sha256'], 'cfac5baf0333f8db5c9ef6fc40e9809035d3594de18fe3ce6a2495d5fe062d25')
             self.assertTrue(case['case_id'].endswith('map-gamma1.5:gainmap-hdr-target-gamut-v1'))
             self.assertIn('Experimental native ICC-aware file path only', case['qualification_scope'])
+            self.assertIn('display boost 16', case['qualification_scope'])
+            self.assertEqual(case['rendering_scope']['display_boost'], 16)
+            self.assertIn('Intermediate display headroom', ' '.join(case['known_consumer_limitations']))
             self.assertEqual(case['consumer_status'], 'pending manual review')
             self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
 

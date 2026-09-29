@@ -60,6 +60,77 @@ class InventoryTests(unittest.TestCase):
         self.assertTrue(report["evidence_errors"])
 
 
+class RenderingCoverageTests(unittest.TestCase):
+    """Aggregation records only; these tests never qualify an actual encoder."""
+    def case(self):
+        from matrix import CHECKS
+        planned = next(row for row in required_cases() if row['fixture_id'] == 'gainmap-android-iso'
+                       and row['geometry'] == 'upscale' and row['cell_id'] == 'gainmap-jpeg:hdr:jpg')
+        return {**planned, 'case_id': 'bookkeeping-only-boost2',
+            'source_sha256': 'f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e',
+            'source_reference_revision': 'gainmap-iso-intermediate-boost2-v1',
+            'rendering_scope': {'display_boost': 2}, 'status': 'tested and failed',
+            'checks': {key: key != 'appearance' for key in CHECKS},
+            'measurements': {'hdr': {'passed': False}}, 'blockers': ['Measured HDR appearance failure']}
+
+    def test_required_intermediate_rendering_stays_separate_from_endpoint_counts(self):
+        failed = self.case()
+        endpoint = {**failed, 'case_id': 'bookkeeping-only-boost16', 'status': 'qualified',
+                    'checks': {key: True for key in failed['checks']}, 'measurements': {}, 'blockers': [],
+                    'rendering_scope': {'display_boost': 16}}
+        report = build_matrix([failed, endpoint])
+        self.assertEqual(report['product_coverage']['qualified_count'], 1)
+        rendering = report['rendering_coverage']
+        self.assertEqual((rendering['required_count'], rendering['qualified_count']), (1, 0))
+        requirement = rendering['requirements'][0]
+        self.assertEqual(requirement['status'], 'tested and failed')
+        self.assertEqual(requirement['tested_evidence'], [failed['case_id']])
+        self.assertEqual(requirement['qualified_evidence'], [])
+        self.assertIn(requirement['requirement_id'], report['milestone_blockers'])
+        self.assertEqual(build_matrix([])['rendering_coverage']['requirements'][0]['status'], 'untested')
+
+    def test_only_exact_source_selectors_headroom_reference_and_passing_gates_count(self):
+        from copy import deepcopy
+        case = self.case()
+        case.update(status='qualified', checks={key: True for key in case['checks']}, measurements={}, blockers=[])
+        report = build_matrix([case])
+        self.assertEqual(report['rendering_coverage']['qualified_count'], 1)
+        self.assertEqual(report['product_coverage']['qualified_count'], 0)
+        requirement = report['rendering_coverage']['requirements'][0]
+        self.assertNotIn(requirement['requirement_id'], report['milestone_blockers'])
+        for mutation in ('source', 'hash', 'geometry', 'selectors', 'boost', 'missing-boost', 'revision', 'crop', 'orientation',
+                         'appearance', 'decoder', 'failed-measurement', 'blocker'):
+            changed = deepcopy(case)
+            if mutation == 'source':
+                changed['fixture_id'] = 'gainmap-apple-new'
+            elif mutation == 'hash':
+                changed['source_sha256'] = 'b'*64
+            elif mutation == 'geometry':
+                changed['geometry'] = 'contain'
+            elif mutation == 'selectors':
+                changed['selectors']['w'] += 1
+            elif mutation == 'boost':
+                changed['rendering_scope']['display_boost'] = 4
+            elif mutation == 'missing-boost':
+                changed.pop('rendering_scope')
+            elif mutation == 'revision':
+                changed['source_reference_revision'] = 'different-reference'
+            elif mutation == 'crop':
+                changed['probe_crop_rectangle'] = [1, 2, 3, 4]
+            elif mutation == 'orientation':
+                changed['orientation_source'] = {'sha256': 'a'*64, 'orientation': 8}
+            elif mutation in ('appearance', 'decoder'):
+                changed['checks']['appearance' if mutation == 'appearance' else 'independent_decoder'] = False
+            elif mutation == 'failed-measurement':
+                changed['measurements'] = {'hdr': {'passed': False}}
+            else:
+                changed['blockers'] = ['Unresolved evidence']
+            with self.subTest(mutation=mutation):
+                report = build_matrix([changed])
+                self.assertEqual(report['rendering_coverage']['qualified_count'], 0)
+                self.assertIn(requirement['requirement_id'], report['milestone_blockers'])
+
+
 class DiagnosticTests(unittest.TestCase):
     def case(self, **changes):
         planned = next(case for case in required_cases() if case["cell_id"] == "static-avif:hdr:avif")

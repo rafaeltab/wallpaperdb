@@ -1,4 +1,4 @@
-"""Explicit AVIF8/10/12 containment from separately verified precise PQ16 PNG.
+"""Explicit AVIF8/10/12 containment and AVIF12 geometry from precise PQ16 PNG.
 
 Declared before measurement: the same documented Apple full-effect reference
 and gainmap-hdr gates apply to native source, geometry, PQ intent and decoded
@@ -24,13 +24,16 @@ from gainmap_avif_hdr import _pixel_aspect
 
 SELECTORS = dict(apple_hdr_avif.SELECTORS)
 DEPTHS = (8, 10, 12)
+SIZES = dict(apple_hdr_png_precision.SIZES)
 DEPENDENCIES = ('apple_hdr_avif_precision.py', 'test_apple_hdr_avif_precision.py',
                 *apple_hdr_avif.DEPENDENCIES, *apple_hdr_png_precision.DEPENDENCIES)
 
 
-def inspect_output(path, directory, reference, *, depth=12):
-    if type(depth) is not int or depth not in DEPTHS:
-        raise ValueError('Unproved AVIF precision depth')
+def inspect_output(path, directory, reference, *, depth=12, operation='contain'):
+    if (type(depth) is not int or depth not in DEPTHS or operation not in SIZES
+            or depth != 12 and operation != 'contain'):
+        raise ValueError('Unproved AVIF precision depth/geometry')
+    width, height = SIZES[operation]
     facts = avif.inspect_avif(path)
     frames = avif.decode_avif(path, directory, 1)
     rgba = np.concatenate((reference, np.ones((*reference.shape[:2], 1))), axis=-1)
@@ -41,11 +44,11 @@ def inspect_output(path, directory, reference, *, depth=12):
         '-of', 'json', path]))
     streams = packet.get('streams', [])
     structural['independent_packet_facts'] = len(streams) == 1 and all(streams[0].get(key) == value
-        for key, value in {'codec_name': 'av1', 'width': 173, 'height': 231,
+        for key, value in {'codec_name': 'av1', 'width': width, 'height': height,
             'pix_fmt': 'gbrp' if depth == 8 else f'gbrp{depth}le',
             'color_space': 'gbr', 'color_transfer': 'smpte2084', 'color_primaries': 'smpte432',
             'color_range': 'pc', 'nb_read_frames': '1', 'sample_aspect_ratio': '1:1',
-            'display_aspect_ratio': '173:231'}.items())
+            'display_aspect_ratio': f'{width}:{height}' if width != height else '1:1'}.items())
     structural['pixel_aspect'] = _pixel_aspect(path)['passed']
     tags = json.loads(avif.native(['exiftool', '-j', '-n', '-G1', '-s', path]))[0]
     private = gainmap.private_metadata_tags(tags)
@@ -74,16 +77,17 @@ def _regional_changes(baseline, candidate):
     return result
 
 
-def _run_one(directory, *, source=apple_source_model.SOURCE, selectors=None, depth=12):
-    if (type(depth) is not int or depth not in DEPTHS
-            or (selectors is not None and selectors != {**SELECTORS, 'depth': str(depth)})
+def _run_one(directory, *, source=apple_source_model.SOURCE, selectors=None, depth=12, operation='contain'):
+    if (type(depth) is not int or depth not in DEPTHS or operation not in SIZES
+            or depth != 12 and operation != 'contain'
+            or (selectors is not None and selectors != apple_hdr_avif._selectors(operation, depth))
             or avif.digest(source) != apple_source_model.SOURCE_SHA256):
-        raise ValueError('Only the locked source and exact explicit-depth P3 containment selectors are admitted; original only otherwise')
+        raise ValueError('Only the locked source and exact proved P3 depth/geometry selectors are admitted; original only otherwise')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     first = len(avif.COMMANDS)
     hashes = {name: avif.digest(Path(__file__).parent/name) for name in DEPENDENCIES}
-    baseline = apple_hdr_avif.run(directory/'baseline', source=source, depths=(depth,))
+    baseline = apple_hdr_avif.run(directory/'baseline', source=source, depths=(depth,), geometries=(operation,))
     old = baseline['cases'][0]
     case = copy.deepcopy(old)
     case.update({'case_id': old['case_id']+':precision-opaque-planar16',
@@ -91,18 +95,34 @@ def _run_one(directory, *, source=apple_source_model.SOURCE, selectors=None, dep
         'status': 'tested and failed', 'blockers': [], 'measurements': {}, 'artifacts': {},
         'qualification_scope': f'One explicit P3 AVIF{depth} containment from inspected precise native PQ16 intent. '
             'Documented full effect only; other selectors and physical consumers require separate evidence.'})
+    if operation != 'contain':
+        case['qualification_scope'] = (f'One explicit P3 AVIF12 {operation} from inspected precise native PQ16 intent. '
+            'Documented full effect only; other selectors and physical consumers require separate evidence.')
     case['checks'] = {key: False for key in (*old['checks'], 'baseline', 'native_preparation', 'reference_agreement')}
+    if operation == 'orientation':
+        case['checks']['source_transform'] = False
     for key in ('facts', 'hdr_intent', 'bound_files', 'structural_checks', 'output_packet_facts', 'privacy_measurement'):
         case.pop(key, None)
     report = {'baseline': baseline, 'cases': [case]}
     try:
         if old['status'] != 'qualified' or not all(old['checks'].values()):
             raise ValueError('Unchanged original AVIF baseline did not qualify')
-        prepared = apple_hdr_png_precision.run(directory/'native-preparation', source=source)
+        prepared = apple_hdr_png_precision.run(directory/'native-preparation', source=source, geometries=(operation,))
         report['native_preparation'] = prepared
         intent = prepared['cases'][0]
         if intent['status'] != 'qualified' or not all(intent['checks'].values()):
             raise ValueError('Precise native PNG preparation did not qualify')
+        if operation == 'orientation':
+            orientation = intent['orientation_source']
+            if (intent['checks'].get('source_transform') is not True
+                    or orientation['sha256'] != old['orientation_source']['sha256']
+                    or orientation['orientation'] != 6 or orientation['path'] != intent['artifacts']['source']
+                    or orientation['sha256'] != intent['artifacts']['source_sha256']
+                    or intent['source_decoder_evidence']['native_source']['orientation_applied'] is not False
+                    or intent['native_geometry']['padding_filter'].count('transpose=clock') != 1):
+                raise ValueError('Actual oriented native source and one geometry rotation were not verified')
+            case['orientation_source'] = orientation
+            case['checks']['source_transform'] = True
         agreement = all(intent['reference_hdr'][key] == old['reference_hdr'][key]
             for key in ('sha256', 'dimensions', 'gamut', 'transfer', 'units', 'source_reference_revision'))
         agreement = agreement and intent['reference_sdr']['sha256'] == old['reference_sdr']['sha256']
@@ -119,10 +139,10 @@ def _run_one(directory, *, source=apple_source_model.SOURCE, selectors=None, dep
         avif.encode_avif([png], output, 'pq', 'p3', depth)
         case['checks']['native_encoder'] = True
         protected[str(output)] = avif.digest(output)
-        case['artifacts'] = {**old['artifacts'], 'output': str(output), 'sha256': protected[str(output)]}
+        case['artifacts'] = {**intent['artifacts'], 'output': str(output), 'sha256': protected[str(output)]}
         if any(avif.digest(path) != sha for path, sha in protected.items()):
             raise ValueError('Source, reference or native intent integrity changed before output decoding')
-        facts, pixels, structural, packet, privacy = inspect_output(output, directory, reference, depth=depth)
+        facts, pixels, structural, packet, privacy = inspect_output(output, directory, reference, depth=depth, operation=operation)
         measurements = {**intent['measurements'], 'native_intent': intent['measurements']['hdr'],
             'hdr': compare_appearance(reference, avif.decode_transfer(pixels[..., :3], 'pq', 'p3'),
                 reference_gamut='p3', actual_gamut='p3', fixture_class='gainmap-hdr')}
@@ -155,15 +175,21 @@ def _run_one(directory, *, source=apple_source_model.SOURCE, selectors=None, dep
     return report
 
 
-def run(directory, *, source=apple_source_model.SOURCE, selectors=None, depths=(12,)):
-    depths = tuple(depths)
+def run(directory, *, source=apple_source_model.SOURCE, selectors=None, depths=(12,), geometries=('contain',)):
+    depths, geometries = tuple(depths), tuple(geometries)
     if (not depths or any(type(depth) is not int or depth not in DEPTHS for depth in depths)
             or len(set(depths)) != len(depths)
-            or selectors is not None and (len(depths) != 1 or selectors != {**SELECTORS, 'depth': str(depths[0])})):
-        raise ValueError('Expected distinct proved explicit depths and at most one exact selector request')
+            or not geometries or any(type(operation) is not str or operation not in SIZES for operation in geometries)
+            or len(set(geometries)) != len(geometries)
+            or any(depth != 12 and operation != 'contain' for depth in depths for operation in geometries)
+            or selectors is not None and (len(depths) != 1 or len(geometries) != 1
+                                         or selectors != apple_hdr_avif._selectors(geometries[0], depths[0]))):
+        raise ValueError('Expected distinct proved depth/geometry tuples and at most one exact selector request')
     directory = Path(directory)
-    reports = [_run_one(directory if depth == 12 else directory/f'depth-{depth}',
-                        source=source, selectors=selectors, depth=depth) for depth in depths]
+    reports = [_run_one(directory if (depth, operation) == (12, 'contain')
+                        else directory/(f'depth-{depth}' if operation == 'contain' else f'{operation}-{depth}'),
+                        source=source, selectors=selectors, depth=depth, operation=operation)
+               for depth in depths for operation in geometries]
     report = reports[0]
     if len(reports) > 1:
         baselines = [result['baseline'] for result in reports]

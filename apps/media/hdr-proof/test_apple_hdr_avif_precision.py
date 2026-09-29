@@ -257,5 +257,84 @@ class AppleHdrAvifPrecisionDepthTests(unittest.TestCase):
         self.assertEqual(len(avif.COMMANDS), before)
 
 
+class AppleHdrAvifPrecisionGeometryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import apple_hdr_avif_precision
+        cls.module = apple_hdr_avif_precision
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.root = Path(cls.temporary.name)
+        cls.report = cls.module.run(cls.root/'proof', geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
+
+    def test_native12_geometries_have_independent_intent_output_and_baseline_gates(self):
+        from matrix import build_matrix
+        cases = self.report['cases']
+        self.assertEqual([case['geometry'] for case in cases], ['contain', 'cover', 'fill', 'upscale', 'orientation'])
+        baselines = {case['geometry']: case for case in self.report['baseline']['cases']}
+        self.assertEqual(len({case['case_id'] for case in cases}), 5)
+        for case in cases:
+            operation = case['geometry']
+            old = baselines[operation]
+            with self.subTest(operation=operation):
+                self.assertEqual(case['status'], 'qualified', case['blockers'])
+                self.assertTrue(all(case['checks'].values()))
+                self.assertTrue(all(case['structural_checks'].values()))
+                self.assertEqual(case['selectors'], self.module.apple_hdr_avif._selectors(operation, 12))
+                width, height = self.module.apple_hdr_png_precision.SIZES[operation]
+                self.assertEqual((case['facts']['width'], case['facts']['height']), (width, height))
+                self.assertEqual(case['facts']['depth'], 12)
+                packet = case['output_packet_facts']['streams'][0]
+                self.assertEqual((packet['width'], packet['height'], packet['pix_fmt'], packet['sample_aspect_ratio']),
+                                 (width, height, 'gbrp12le', '1:1'))
+                self.assertEqual(case['reference_hdr']['sha256'], old['reference_hdr']['sha256'])
+                self.assertEqual(case['threshold_scope'], old['threshold_scope'])
+                self.assertEqual(case['hdr_intent']['facts']['physical_pixel_dimensions'], [1, 1, 0])
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+                self.assertFalse(case['rendering_scope']['intermediate_adaptation_qualified'])
+                self.assertEqual(case['regional_change_from_baseline']['qualification_role'],
+                                 'Diagnostic only; unchanged appearance gates decide qualification')
+                for path, sha in case['bound_files'].items():
+                    self.assertEqual(avif.digest(path), sha, path)
+        self.assertEqual(build_matrix([*baselines.values(), *cases])['evidence_errors'], [])
+
+    def test_native_orientation_reads_the_precise_png_actual_exif6_source(self):
+        case = self.report['cases'][-1]
+        self.assertEqual(case['orientation_source']['orientation'], 6)
+        self.assertEqual(case['orientation_source']['sha256'],
+                         '691ce29e25ba756cf0d9d2a4e498fcb4f246eaa0fd7046b15fb10f38b58053c9')
+        self.assertEqual(case['artifacts']['source'], case['orientation_source']['path'])
+        self.assertEqual(case['artifacts']['source_sha256'], case['orientation_source']['sha256'])
+        self.assertEqual(case['source_facts']['metadata']['IFD0:Orientation'], 6)
+        self.assertFalse(case['source_decoder_evidence']['native_source']['orientation_applied'])
+        self.assertEqual(case['native_geometry']['padding_filter'].count('transpose=clock'), 1)
+        self.assertEqual(case['rendering_scope']['orientation_applications'], 1)
+        self.assertEqual(case['facts']['exiftool'].get('Orientation', 1), 1)
+        self.assertTrue(case['structural_checks']['orientation_baked'])
+
+    def test_containment12_fields_and_regional_comparison_remain_exact(self):
+        old = self.module.run(self.root/'default')['cases'][0]
+        actual = self.report['cases'][0]
+        for key in ('case_id', 'candidate', 'selectors', 'checks', 'measurements', 'status', 'blockers',
+                    'structural_checks', 'output_packet_facts', 'privacy_measurement',
+                    'rendering_scope', 'qualification_scope', 'known_consumer_limitations', 'threshold_scope',
+                    'regional_change_from_baseline'):
+            self.assertEqual(actual[key], old[key], key)
+        for key in ('artifacts', 'reference_hdr', 'reference_sdr', 'hdr_intent'):
+            self.assertEqual(actual[key]['sha256'], old[key]['sha256'], key)
+
+    def test_unproved_depth_geometry_combinations_reject_before_native_work(self):
+        options = ({'geometries': ()}, {'geometries': ('contain', 'contain')}, {'geometries': ('orientation-8',)},
+                   {'geometries': ('crop',)}, {'geometries': (['cover'],)},
+                   {'depths': (8,), 'geometries': ('cover',)}, {'depths': (10,), 'geometries': ('orientation',)},
+                   {'depths': (12, 8), 'geometries': ('contain', 'fill')},
+                   {'geometries': ('cover',), 'selectors': self.module.SELECTORS})
+        for kwargs in options:
+            before = len(avif.COMMANDS)
+            with self.subTest(options=kwargs), self.assertRaises(ValueError):
+                self.module.run(self.root/'rejected', **kwargs)
+            self.assertEqual(len(avif.COMMANDS), before)
+
+
 if __name__ == '__main__':
     unittest.main()

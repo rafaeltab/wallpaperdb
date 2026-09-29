@@ -9,6 +9,28 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_bundle_rejects_bytes_changed_after_fixture_or_output_inspection(self):
+        for role in ('fixture', 'output', 'reference'):
+            with self.subTest(role=role), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                (root/'results').mkdir()
+                source = root/'inspected.png'
+                source.write_bytes(b'file-copy-test-only')
+                inspected_hash = suite.avif.digest(source)
+                fixture = {'id': 'avif-pq-p3-8-opaque', 'path': str(source),
+                    'spec': {'depth': 8, 'frames': 1}, 'facts': {}, 'sha256': inspected_hash}
+                case = {'case_id': 'avif-pq-p3-8-opaque:contain:copy-test',
+                    'fixture_id': fixture['id'], 'geometry': 'contain', 'status': 'qualified'}
+                if role == 'output':
+                    case['artifacts'] = {'output': str(source), 'sha256': inspected_hash}
+                if role == 'reference':
+                    case['reference_sdr'] = {'path': str(source), 'sha256': inspected_hash}
+                source.write_bytes(b'changed-after-inspection')
+                with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                    with self.assertRaisesRegex(ValueError, 'changed after inspection'):
+                        suite.candidate_files([] if role == 'fixture' else [case],
+                                              [fixture] if role == 'fixture' else [])
+
     def test_manual_bundle_covers_every_static_avif_transfer_gamut_depth_and_alpha(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

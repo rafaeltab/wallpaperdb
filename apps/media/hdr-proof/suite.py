@@ -82,13 +82,17 @@ def candidate_files(evidence, fixtures):
             if Path(name).name != name:
                 raise ValueError('Manual manifest contains a nonlocal path')
             (manual/name).unlink(missing_ok=True)
-    def copy(source, name, role, case=None, facts=None, codec_status=None, coding_scope=None):
+    def copy(source, name, role, case=None, facts=None, codec_status=None, coding_scope=None, expected_sha256=None):
         source = Path(source)
         if not source.exists():
             return
         destination = manual/name
         shutil.copyfile(source,destination)
-        entries.append({'file': name, 'sha256':avif.digest(destination), 'role':role,
+        copied_hash = avif.digest(destination)
+        if expected_sha256 is not None and copied_hash != expected_sha256:
+            destination.unlink()
+            raise ValueError(f'Manual file changed after inspection: {name}')
+        entries.append({'file': name, 'sha256':copied_hash, 'role':role,
                         'case_id':case.get('case_id') if case else None,
                         'codec_status':codec_status or (case.get('status') if case else 'source reference, not a conversion qualification'),
                         'consumer_status':'pending manual review', 'facts':facts or (case.get('facts') if case else None),
@@ -98,7 +102,8 @@ def candidate_files(evidence, fixtures):
         spec = fixture.get('spec')
         if spec and (spec['depth'] in (8,10,12,16) or spec['frames']==2):
             suffix = Path(fixture['path']).suffix
-            copy(fixture['path'], f'source-{fixture["id"]}{suffix}', 'Inspected synthetic HDR source', facts=fixture['facts'])
+            copy(fixture['path'], f'source-{fixture["id"]}{suffix}', 'Inspected synthetic HDR source',
+                 facts=fixture['facts'], expected_sha256=fixture.get('sha256'))
     for source in (ROOT/'fixtures/gainmap').glob('*.jpg'):
         copy(source,f'source-{source.name}','Provenance-documented gain-map source; exact original')
     selected = [case for case in evidence
@@ -120,11 +125,15 @@ def candidate_files(evidence, fixtures):
             if suffix not in ('.jpg','.avif','.png','.webp','.gif'):
                 continue
             name = re.sub(r'[^a-zA-Z0-9_-]','-',case['case_id'])+suffix
-            copy(source,name,'Inspected native conversion candidate',case=case)
+            inspected_hash = (artifacts.get('sha256') if isinstance(artifacts, dict) else None)
+            inspected_hash = inspected_hash or case.get('facts', {}).get('sha256')
+            copy(source,name,'Inspected native conversion candidate',case=case, expected_sha256=inspected_hash)
         reference = case.get('reference_sdr')
         if reference:
             name = re.sub(r'[^a-zA-Z0-9_-]','-',case['case_id'])+'-reference-sdr.png'
-            copy(artifact_path(reference['path']),name,'Independent matched-geometry authored SDR reference',facts={'reference_sha256':reference['sha256'],'case_id':case['case_id']})
+            copy(artifact_path(reference['path']),name,'Independent matched-geometry authored SDR reference',
+                 facts={'reference_sha256':reference['sha256'],'case_id':case['case_id']},
+                 expected_sha256=reference['sha256'])
         hdr_intent = case.get('hdr_intent', {})
         if hdr_intent.get('facts'):
             intent = artifact_path(hdr_intent['path'])
@@ -133,6 +142,7 @@ def candidate_files(evidence, fixtures):
             name = re.sub(r'[^a-zA-Z0-9_-]','-',case['case_id'])+'-native-hdr-intent.png'
             copy(intent, name, 'Inspected native matched-geometry HDR intent comparison', case=case,
                  facts=hdr_intent['facts'],
+                 expected_sha256=hdr_intent['sha256'],
                  codec_status='inspected native HDR intent; not a conversion qualification',
                  coding_scope='16-bit PQ PNG; native encoder intent, not an independent source reference')
     write_json(manual/'manifest.json',{'status':'pending manual review','files':entries})

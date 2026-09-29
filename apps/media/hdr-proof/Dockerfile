@@ -13,4 +13,6 @@ COPY native-gainmap-build.sh native_gainmap.cpp libultrahdr-xmp-arrays.patch /op
 RUN sh /opt/proof/native-gainmap-build.sh
 COPY png_decode.c /opt/proof/png_decode.c
 RUN cc -O2 -Wall -Wextra -Werror /opt/proof/png_decode.c -lpng -o /usr/local/bin/hdr-proof-png-decode
+COPY native-zimg-build.sh native_zimg_window.c /opt/proof/
+RUN sh /opt/proof/native-zimg-build.sh
 WORKDIR /proof

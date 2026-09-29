@@ -8,3 +8,5 @@
 !native_gainmap.cpp
 !libultrahdr-xmp-arrays.patch
 !libavif-sequence-transform.patch
+!native-zimg-build.sh
+!native_zimg_window.c

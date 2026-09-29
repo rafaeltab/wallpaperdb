@@ -223,6 +223,22 @@ def selectors(mode, gamut, operation):
     return result
 
 
+def source_hdr(path, directory, gamut):
+    """Decode a source whose gamut the caller has already established."""
+    from gainmap_iso import decode_iso_source
+    try:
+        pixels = independent_hdr(path, directory, gamut)
+        return pixels, 'rec2020', {'decoder': 'Independent native libavif gain-map reconstruction',
+                                  'scope': 'Pinned source corpus with independently established base gamut'}
+    except Exception as error:
+        preferred_failure = str(error)[:1800]
+    decoded = decode_iso_source(Path(path).read_bytes(), (Path(directory)/'map.jpg').read_bytes())
+    if decoded['gamut'] != gamut:
+        raise ValueError('Independently decoded ISO gamut disagrees with declared source gamut')
+    return decoded['linear_rgb_nits'], decoded['gamut'], {
+        **decoded['evidence'], 'preferred_decoder_failure': preferred_failure}
+
+
 def run(output_dir):
     output_dir = Path(output_dir).resolve()
     directory = output_dir / "gainmap"
@@ -242,9 +258,9 @@ def run(output_dir):
             raise ValueError(f"Fixture {name} lacks independent signaling for its declared {gamut} gamut")
         sources[name] = {"path": path, "facts": facts, "gamut": gamut}
         try:
-            sources[name]["hdr"] = independent_hdr(path, evidence_dir, gamut)
-            sources[name]["hdr_gamut"] = "rec2020"
+            sources[name]["hdr"], sources[name]["hdr_gamut"], decoder_evidence = source_hdr(path, evidence_dir, gamut)
             facts["independent_hdr_decode"] = True
+            facts["independent_hdr_decoder_evidence"] = decoder_evidence
         except Exception as error:
             facts["independent_hdr_decode"] = False
             facts["independent_hdr_blocker"] = str(error)[:1800]
@@ -396,7 +412,7 @@ def run(output_dir):
                         actual_gamut={0: "srgb", 1: "p3", 2: "rec2020"}[native_source["gamut"]], fixture_class="gainmap-hdr")
                 case["checks"]["independent_source_decoder"] = source["facts"]["independent_hdr_decode"]
                 if not source["facts"]["independent_hdr_decode"]:
-                    case["blockers"].append("Source HDR has no maintained independent decoder in this pinned environment; supplementary source reconstruction cannot qualify this conversion.")
+                    case["blockers"].append("Source HDR has no independently verified decoder within the supported native/ISO reader scope; supplementary reconstruction cannot qualify this conversion.")
                 try:
                     hdr_output = independent_hdr(path, case_dir, actual_gamut)
                     hdr_gamut = "rec2020"

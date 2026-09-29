@@ -6,6 +6,7 @@ SOF3 JPEG coding and local native patches require separate consumer review.
 """
 
 import hashlib
+from functools import partial
 import json
 from pathlib import Path
 import shutil
@@ -20,18 +21,24 @@ from lossless_jpeg import encode as encode_lossless
 
 
 def encode(source, output, operation, *, gamut, map_policy='smalloffset', orientation=6,
-           geometry_revision='decoder-gamut-v1', coding='lossless-rgb'):
+           geometry_revision='decoder-gamut-v1', coding='lossless-rgb', source_precision='pq16'):
     source, output = Path(source), Path(output)
     fixtures = json.loads((gainmap.FIXTURES/'manifest.json').read_text())['fixtures']
     matches = [fixture for fixture in fixtures if fixture['sha256'] == gainmap.digest(source)]
     if len(matches) != 1 or matches[0]['expected']['gamut'] != gamut:
         raise ValueError('Native combined candidate requires a pinned source with established gamut facts')
+    if source_precision not in ('pq16', 'float32'):
+        raise ValueError('Unknown native HDR source precision candidate')
+    if source_precision == 'float32' and matches[0]['id'] != 'gainmap-android-iso':
+        raise ValueError('Native float32 source precision is proven only for the pinned ISO fixture')
     if map_policy not in ('fullrange', 'smalloffset', 'identity', 'moderateoffset'):
         raise ValueError('Unknown native gain-map encoder policy')
-    if coding not in ('lossless-rgb', 'dct-rgb'):
+    if coding not in ('lossless-rgb', 'dct-rgb', 'dct-float-rgb'):
         raise ValueError('Unknown native JPEG coding representation')
-    if coding == 'dct-rgb':
+    if coding in ('dct-rgb', 'dct-float-rgb'):
         from dct_jpeg import encode as encode_jpeg
+        if coding == 'dct-float-rgb':
+            encode_jpeg = partial(encode_jpeg, method='float')
     else:
         encode_jpeg = encode_lossless
     if geometry_revision not in ('decoder-gamut-v1', 'gainmap-hdr-target-gamut-v1'):
@@ -61,14 +68,24 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     base = directory/'base.jpg'
     base_encoding = encode_jpeg(authored, base, icc_profile=bytes(profile))
 
-    source_pq = gainmap_hdr.decode_source(source, directory/'hdr-source', gamut)
     # Keep the prior decoder-coordinate experiment available. The explicitly
     # versioned target-gamut path clips only after resampling in the requested
     # gamut, so its geometry does not create unrepresentable target colors.
     working_gamut = (gamut if geometry_revision == 'gainmap-hdr-target-gamut-v1' else
                      'p3' if matches[0]['id'] == 'gainmap-android-iso' else 'rec2020')
-    geometry = gainmap_hdr.resample_pq(source_pq, directory/'hdr-linear.gbrapf32', operation,
-                                      orientation if operation == 'orientation' else 1, gamut=working_gamut)
+    native_source = None
+    if source_precision == 'float32':
+        import gainmap_linear
+        native_source = gainmap_linear.decode_iso_linear(source, directory/'hdr-source',
+                                                         gamut=gamut, precision='float32')
+        if native_source['gamut'] != working_gamut:
+            raise ValueError('Native float32 source and requested working gamut disagree')
+        geometry = gainmap_linear.resample_linear(native_source, directory/'hdr-linear.gbrapf32',
+                                                  operation, orientation if operation == 'orientation' else 1)
+    else:
+        source_pq = gainmap_hdr.decode_source(source, directory/'hdr-source', gamut)
+        geometry = gainmap_hdr.resample_pq(source_pq, directory/'hdr-linear.gbrapf32', operation,
+                                          orientation if operation == 'orientation' else 1, gamut=working_gamut)
     width, height = geometry['width'], geometry['height']
     if [width, height] != base_geometry['dimensions']:
         raise ValueError('Native authored SDR and reconstructed HDR geometry disagree')
@@ -80,7 +97,7 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     filters = (
         'setparams=alpha_mode=premultiplied,'
         f'zscale=agamma=0:transferin=linear:transfer=16:primariesin={working_primaries}:'
-        f'primaries={working_primaries}:matrixin=0:matrix=0:rangein=full:range=full:npl=10000,'
+        f'primaries={working_primaries}:matrixin=0:matrix=0:rangein=full:range=full:npl={geometry["normalization_nits"]},'
         'format=gbrapf32le:alpha_modes=premultiplied,format=gbrpf32le,'
         f'zscale=agamma=0:transferin=16:transfer=16:primariesin={working_primaries}:'
         f'primaries={primaries}:matrixin=0:matrix=0:rangein=full:range=full:npl=10000,format=rgb48le')
@@ -94,7 +111,7 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     # DCT changes the base samples. Compute the gain against the actual
     # compressed JPEG through native libavif/libjpeg, so its IDCT precision
     # and the source for gain calculation match the native reconstruction.
-    gain_base = base if coding == 'dct-rgb' else authored
+    gain_base = authored if coding == 'lossless-rgb' else base
     gainmap.command([tool, 'combine', gain_base, hdr, avif, '--cicp-base', f'{primaries}/13/0',
                      '--cicp-alternate', f'{primaries}/16/0', '--ignore-profile', '--downscaling', '1',
                      '--depth-gain-map', '8', '--qgain-map', '100', '--yuv-gain-map', '444',
@@ -104,13 +121,15 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     gainmap.command(['/opt/proof/ultrahdr/precise/hdr-proof-uhdr', 'pack-avif', avif, base, gain_jpeg, output],
                     directory/'native-packing.log')
     geometry['dimensions'] = [width, height]
-    result = {'candidate': f'native-libavif-{map_policy}-{coding}-jpeg',
+    source_suffix = '-source-float32' if source_precision == 'float32' else ''
+    result = {'candidate': f'native-libavif-{map_policy}-{coding}-jpeg{source_suffix}',
+              'source_precision': source_precision,
               'source_fixture': matches[0]['id'], 'source_sha256': gainmap.digest(source),
               'base_geometry': base_geometry, 'base_encoding': base_encoding,
               'hdr_geometry': geometry, 'hdr_intent_filters': filters, 'map_encoding': map_encoding,
               'map_policy': map_policy, 'native_map_encoder': tool,
               'source_reference_revision': geometry_revision,
-              'jpeg_coding': coding, 'gain_map_base_from_compressed_jpeg': coding == 'dct-rgb',
+              'jpeg_coding': coding, 'gain_map_base_from_compressed_jpeg': coding != 'lossless-rgb',
               'map_encoder_sha256': hashlib.sha256(Path(tool).read_bytes()).hexdigest(),
               'authored_sdr_png': str(authored), 'hdr_intent_pq_png': str(hdr), 'gain_map_png': str(gain_png),
               'output': str(output), 'output_sha256': gainmap.digest(output), 'parts_directory': str(directory),
@@ -118,6 +137,8 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
               'coding_scope': ('JPEG SOF3 RGB8 base and RGB8 gain map; native libavif SOF3 reader remains unsupported'
                   if coding == 'lossless-rgb' else 'JPEG SOF0 RGB8 DCT base/map; both authored SDR and reconstructed HDR '
                   'must pass; RGB component identifiers survive native packing without Adobe APP14')}
+    if native_source is not None:
+        result['hdr_source'] = native_source
     if orientation_facts:
         result['orientation_source'] = orientation_facts
     (directory/'encoding-evidence.json').write_text(json.dumps(result, indent=2)+'\n')

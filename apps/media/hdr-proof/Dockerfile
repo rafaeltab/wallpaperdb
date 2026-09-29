@@ -17,4 +17,6 @@ COPY native-zimg-build.sh native_zimg_window.c /opt/proof/
 RUN sh /opt/proof/native-zimg-build.sh
 COPY native_lossless_jpeg.c /opt/proof/native_lossless_jpeg.c
 RUN cc -O2 -Wall -Wextra -Werror /opt/proof/native_lossless_jpeg.c -ljpeg -o /usr/local/bin/hdr-proof-lossless-jpeg
+COPY native_dct_jpeg.c /opt/proof/native_dct_jpeg.c
+RUN cc -O2 -Wall -Wextra -Werror /opt/proof/native_dct_jpeg.c -ljpeg -o /usr/local/bin/hdr-proof-dct-jpeg
 WORKDIR /proof

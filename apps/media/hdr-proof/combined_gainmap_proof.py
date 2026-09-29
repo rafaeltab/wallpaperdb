@@ -18,7 +18,11 @@ from matrix import GAINMAP_GEOMETRIES
 
 def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
         policies=('identity', 'moderateoffset'), reference_revision='gainmap-hdr-target-gamut-v1',
-        coding='lossless-rgb'):
+        coding='lossless-rgb', source_precision='pq16'):
+    if source_precision not in ('pq16', 'float32'):
+        raise ValueError('Unknown native HDR source precision candidate')
+    if source_precision == 'float32' and any(name != 'gainmap-android-iso' for name in names):
+        raise ValueError('Native float32 source precision is proven only for the pinned ISO fixture')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     fixtures = json.loads((gainmap.FIXTURES/'manifest.json').read_text())['fixtures']
@@ -34,7 +38,8 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
         source_hdr, source_hdr_gamut, source_decoder = gainmap.source_hdr(source, source_directory, gamut)
         for policy in policies:
             for operation in geometries:
-                candidate = f'native-combine-{policy}-{coding}'
+                source_suffix = '-source-float32' if source_precision == 'float32' else ''
+                candidate = f'native-combine-{policy}-{coding}{source_suffix}'
                 case_id = f'{name}:hdr:jpg:preserve:preserve:{operation}:{candidate}:{reference_revision}'
                 folder = directory/case_id.replace(':', '-')
                 folder.mkdir(exist_ok=True)
@@ -44,6 +49,7 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                                  {'w': 173, 'h': 153, 'fit': 'fill'})
                 case = {'case_id': case_id, 'fixture_id': name, 'cell_id': 'gainmap-jpeg:hdr:jpg',
                         'candidate': candidate, 'geometry': operation, 'selectors': selectors,
+                        'source_precision': source_precision,
                         'source_reference_revision': reference_revision, 'source_sha256': gainmap.digest(source),
                         'status': 'tested and failed', 'consumer_status': 'pending manual review',
                         'known_consumer_limitations': ([
@@ -88,9 +94,22 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                         'purpose': 'Independent matched-geometry authored SDR base for HDR JPEG comparison'}
                     target = folder/'output.jpg'
                     encoded = gainmap_combine.encode(source, target, operation, gamut=gamut, map_policy=policy,
-                        orientation=orientation, geometry_revision=reference_revision, coding=coding)
+                        orientation=orientation, geometry_revision=reference_revision, coding=coding,
+                        source_precision=source_precision)
                     case['checks']['native_encoder'] = True
                     case['native_candidate'] = encoded
+                    if source_precision == 'float32':
+                        native_source = encoded['hdr_source']
+                        native_pixels = np.fromfile(native_source['path'], dtype='<f4').reshape(
+                            3, native_source['height'], native_source['width'])
+                        native_pixels = native_pixels[[2, 0, 1]].transpose(1, 2, 0).astype(np.float64)
+                        native_pixels *= native_source['normalization_nits']
+                        source_measurement = compare_appearance(source_hdr, native_pixels,
+                            reference_gamut=source_hdr_gamut, actual_gamut=native_source['gamut'],
+                            fixture_class='gainmap-hdr')
+                        case['source_precision_evidence'] = native_source
+                        case['measurements']['native_hdr_source'] = source_measurement
+                        case['checks']['native_source_precision'] = source_measurement['passed']
                     if 'orientation_source' in encoded:
                         case['orientation_source'] = encoded['orientation_source']
                     actual_geometry = gainmap_hdr.read_linear(encoded['hdr_geometry'])
@@ -161,7 +180,7 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                     case['hdr_decoder_evidence'] = {'native': native_facts, 'iso': decoded_iso['evidence']}
                     case['artifacts'] = {'output': str(target), 'sha256': gainmap.digest(target),
                         'reference_sdr': str(reference_sdr), 'reference_sdr_sha256': gainmap.digest(reference_sdr)}
-                    if coding == 'dct-rgb':
+                    if coding in ('dct-rgb', 'dct-float-rgb'):
                         # Keep this third decoder route's extra native map
                         # conversion visible. It is neither the encoder nor a
                         # physical consumer, and it must not erase its failures

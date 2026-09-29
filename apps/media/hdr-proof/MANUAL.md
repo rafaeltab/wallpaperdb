@@ -93,11 +93,19 @@ and real EXIF6 orientation are separate fixed-luminance full-effect files. Each 
 comparison image; the AVIF has no embedded SDR base or adaptive gain map. Record the viewer's tone mapping
 and apparent brightness separately from the passing file comparison. Its PQ16
 companion is inspected encoder intent, not an independent reference.
+The explicit Rec.2020 AVIF containment files have separate 8/10/12-bit entries.
+Compare them with the corresponding P3 output and the same authored SDR
+companion. Record color interpretation and visible brightness for each exact
+file; a passing P3 result does not establish Rec.2020 presentation.
 The corrected old Apple PQ16 P3 PNG containment, crop, stretch, upscale and
 EXIF6 orientation each have their own inspected output and authored SDR comparison. Each is a
 fixed-luminance single-layer HDR file;
 its passing codec measurements do not establish the viewer's HDR presentation
 or SDR fallback behavior.
+The separately named `precision-opaque-planar16` PNG containment has its own
+hash and measurements. Compare it with the earlier PNG at matched size,
+especially shadow gradients and dark colored edges. Both use the same source
+reference and remain pending physical review despite different measured errors.
 The gain-map JPEG endpoint comparisons use display boost 16. Check the separate
 ISO upscale boost-2 rendering record before selecting a download; its measured
 adaptation failure cannot be overridden by a successful endpoint or a physical

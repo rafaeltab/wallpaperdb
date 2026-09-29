@@ -790,7 +790,7 @@ def main():
     write_json(RESULTS/'apple-hdr-avif-contain.json', apple_hdr_avif)
     icc_results.extend(apple_hdr_avif['cases'])
     apple_hdr_avif_rec2020 = run_apple_hdr_avif(WORK/'apple-hdr-avif-rec2020-contain',
-                                              depths=(12, 10, 8), gamut='rec2020')
+        depths=(12, 10, 8), gamut='rec2020', geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
     write_json(RESULTS/'apple-hdr-avif-rec2020-contain.json', apple_hdr_avif_rec2020)
     icc_results.extend(apple_hdr_avif_rec2020['cases'])
     from apple_hdr_png import run as run_apple_hdr_png
@@ -911,7 +911,7 @@ def main():
     generated_fixtures = locked_fixtures + png8_result['fixtures'] + png8_geometry_result['fixtures'] + gainmap_avif_result['source_fixtures']
     generated_fixtures = merge_reconstruction_profiles(generated_fixtures, gainmap_avif_hdr_result['source_fixtures'])
     generated_fixtures += apple_orientation_fixtures(apple_hdr_jpeg['cases']+apple_hdr_avif['cases']+
-                                                    apple_hdr_png['cases']+apple_hdr_png_precision['cases'])
+        apple_hdr_avif_rec2020['cases']+apple_hdr_png['cases']+apple_hdr_png_precision['cases'])
     fixtures = generated_fixtures + gainmap_result['fixtures']
     matrix = build_matrix(evidence)
     errors = matrix['evidence_errors'] + fixture_lock(locked_fixtures,args.update_fixture_lock)

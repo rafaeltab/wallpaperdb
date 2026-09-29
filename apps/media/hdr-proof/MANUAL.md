@@ -93,7 +93,7 @@ and real EXIF6 orientation are separate fixed-luminance full-effect files. Each 
 comparison image; the AVIF has no embedded SDR base or adaptive gain map. Record the viewer's tone mapping
 and apparent brightness separately from the passing file comparison. Its PQ16
 companion is inspected encoder intent, not an independent reference.
-The explicit Rec.2020 AVIF containment files have separate 8/10/12-bit entries.
+The explicit Rec.2020 AVIF files cover all five geometries at 8/10/12 bits.
 Compare them with the corresponding P3 output and the same authored SDR
 companion. Record color interpretation and visible brightness for each exact
 file; a passing P3 result does not establish Rec.2020 presentation.

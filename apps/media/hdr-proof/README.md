@@ -185,9 +185,11 @@ and 12 bits. Their independent HDR maxima are 3.391872, 1.019600 and 0.545535.
 Native zimg converts the P3 geometry, while the unchanged P3 reference measures
 both the native Rec.2020 intent and emitted AVIF across gamuts. AOM and dav1d
 verify the actual Rec.2020 signaling and samples. All fifteen P3 outputs and
-measurements remain exact. Other Rec.2020 geometries are unqualified until
-separately tested; these containment results do not establish physical HDR
-presentation or an embedded SDR base.
+measurements remain exact. Separate Rec.2020 crop, stretch, upscale and actual
+EXIF6 orientation now pass at all three depths. Across those fifteen Rec.2020
+tuples, maximum errors are 3.725792, 1.085030 and 0.736385 at 8, 10 and 12 bits.
+The three containment files and every P3 result remain exact. These results do
+not establish physical HDR presentation or an embedded SDR base.
 The [explicit PQ16 P3 PNG proofs](apple_hdr_png.py) also pass the documented
 full-effect containment, crop, stretch and upscale comparisons, with maximum
 Delta E ITP 0.258409, 0.275747, 0.270037 and 0.257913. A separately tested

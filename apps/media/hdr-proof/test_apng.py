@@ -18,8 +18,8 @@ class ApngTests(unittest.TestCase):
             result = apng.run(Path(temporary), specs=[next(apng.fixture_specs())],
                               geometries=('contain',), motions=('preserve',), animated_gif=True)
         cases = [case for case in result['evidence'] if case['selectors']['format'] == 'gif']
-        self.assertEqual(len(cases), 1)
-        case = cases[0]
+        self.assertEqual(len(cases), 2)
+        case = next(case for case in cases if not case['case_id'].endswith('-alpha16'))
         self.assertTrue(case['case_id'].endswith(':gamma3.2-nearest-animation'))
         self.assertEqual(case['status'], 'tested and failed')
         self.assertEqual(case['selectors']['transparency'], 'coerce')
@@ -40,6 +40,12 @@ class ApngTests(unittest.TestCase):
         self.assertTrue(case['checks']['native_encoder'])
         self.assertTrue(case['checks']['independent_decoder'])
         self.assertTrue(case['checks']['privacy'])
+        candidate = next(case for case in cases if case['case_id'].endswith('-alpha16'))
+        self.assertEqual(candidate['status'], 'qualified', candidate['blockers'])
+        self.assertEqual(candidate['selectors'], case['selectors'])
+        self.assertEqual(candidate['facts']['alpha_measurement']['frame_maximum_absolute_errors'], [0, 0])
+        self.assertTrue(all(check['passed'] for check in candidate['measurements']['alpha_geometry']))
+        self.assertTrue(candidate['measurements']['sequence_white_control']['passed'])
 
     def test_native_hdr_fixtures_preserve_16bit_pixels_alpha_and_timing(self):
         with tempfile.TemporaryDirectory() as temporary:

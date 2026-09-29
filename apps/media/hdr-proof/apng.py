@@ -380,6 +380,7 @@ def run(output_directory, *, specs=None,
                                    ('sdr', 'gif', 'static', 'gamma3.2-nearest')])
             if animated_gif and 'preserve' in motions:
                 operations.append(('sdr', 'gif', 'preserve', 'gamma3.2-nearest-animation'))
+                operations.append(('sdr', 'gif', 'preserve', 'gamma3.2-nearest-animation-alpha16'))
             for dynamic_range, extension, motion, representation in operations:
                 count = 1 if motion == 'static' else 2
                 selected_references = resized_references[:count]
@@ -409,11 +410,24 @@ def run(output_directory, *, specs=None,
                     if decision['action'] != 'unqualified':
                         raise ValueError('Tuple is not eligible for a native conversion experiment')
                     item['frame_selection'] = decision['frame_selection']
-                    converted = []
+                    converted, alpha_geometry = [], []
                     for index, path in enumerate(conversion_paths[:count]):
                         output = case_directory/f'converted-{index}.png'
                         avif.convert_frame(path, output, spec['transfer'], spec['gamut'], geometry,
                                            sdr=sdr, peak_nits=spec['peak_nits'] if sdr else None)
+                        if representation == 'gamma3.2-nearest-animation-alpha16':
+                            from gif_alpha import apply_alpha_geometry
+                            precise = case_directory/f'converted-alpha16-{index}.png'
+                            apply_alpha_geometry(path, output, precise, geometry)
+                            actual_pixels = avif.read_png(precise)
+                            unchanged_rgb = bool(np.array_equal(actual_pixels[..., :3], avif.read_png(output)[..., :3]))
+                            alpha_error = float(np.max(np.abs(actual_pixels[..., 3] - selected_references[index][..., 3])))
+                            alpha_geometry.append({'method': 'native separable zimg; normalized edges; RGB16 channel transport',
+                                'maximum_absolute_error': alpha_error, 'absolute_error_limit': 2 / 65535,
+                                'threshold_scope': 'Existing PNG16 ceiling bounds two native axis-rounding steps; final binary alpha remains exact',
+                                'rgb_codes_unchanged': unchanged_rgb,
+                                'passed': unchanged_rgb and alpha_error <= 2 / 65535})
+                            output = precise
                         converted.append(output)
                     target = case_directory/f'output.{extension}'
                     if extension == 'png' and count == 1:
@@ -459,6 +473,8 @@ def run(output_directory, *, specs=None,
                             expected_gamma=3.2 if representation else 2.2) for frame in frames]
                         actual_gamut = 'rec2020'
                     privacy = inspect_privacy(target, facts, extension)
+                    if alpha_geometry:
+                        detail['alpha_geometry'] = all(check['passed'] for check in alpha_geometry)
                     white_control = _sequence_white_control(frames, resized_references, geometry) if count == 2 else None
                     measurements = []
                     for reference, actual in zip(selected_references, linear):
@@ -477,7 +493,7 @@ def run(output_directory, *, specs=None,
                                       and (white_control is None or white_control['passed'])
                                       and (not sdr or all(control['passed'] for control in tone_controls))})
                     item['measurements'] = {'frames': measurements, 'tone_controls': tone_controls if sdr else [],
-                                            'sequence_white_control': white_control}
+                                            'sequence_white_control': white_control, 'alpha_geometry': alpha_geometry}
                     item['facts'], item['structural_checks'] = facts, detail
                     item['artifacts'] = {'output': str(target), 'sha256': avif.digest(target),
                                          'source': str(actual_source), 'source_sha256': avif.digest(actual_source)}

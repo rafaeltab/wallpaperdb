@@ -20,7 +20,10 @@ class IccGainmapTests(unittest.TestCase):
     def test_smalloffset_actual_file_keeps_same_analytic_headroom_controls(self):
         self._headroom_control('smalloffset')
 
-    def _headroom_control(self, map_policy):
+    def test_smalloffset_gamma2_uses_real_metadata_at_all_display_headrooms(self):
+        self._headroom_control('smalloffset', map_gamma=2)
+
+    def _headroom_control(self, map_policy, *, map_gamma=1):
         from avif import encode_transfer
         from icc_gainmap import pack, independent_decode, native_decode
         from appearance import compare_appearance
@@ -40,7 +43,7 @@ class IccGainmapTests(unittest.TestCase):
                 '-s', '48x8', '-i', 'pipe:0', '-vf', 'format=gbrp16le,zscale=transferin=16:transfer=16:primariesin=12:primaries=12:matrixin=0:matrix=0:rangein=full:range=full,format=rgb48le',
                 '-frames:v', '1', '-color_primaries', '12',
                 '-color_trc', '16', '-colorspace', '0', '-color_range', '2', hdr], data=pq.tobytes())
-            evidence = pack(base, hdr, output, map_policy=map_policy)
+            evidence = pack(base, hdr, output, map_policy=map_policy, map_gamma=map_gamma)
             facts = gainmap.inspect(output, folder/'inspection')
             self.assertEqual((facts['base']['sof'], facts['map']['sof']), (0, 0))
             self.assertEqual((evidence['coded_base_depth'], evidence['coded_map_depth']), (8, 8))
@@ -48,6 +51,39 @@ class IccGainmapTests(unittest.TestCase):
                 self.assertEqual(decoded.info['icc_profile'], profile)
             probe = json.loads(native(['/opt/proof/ultrahdr/precise/hdr-proof-uhdr', 'probe', output]))
             self.assertTrue(all(check_metadata(facts, probe)['checks'].values()))
+            self.assertEqual(probe['gamma'], [map_gamma]*3)
+            self.assertTrue(all(channel['gamma'] == map_gamma for channel in facts['iso_metadata']['channels']))
+            if map_gamma == 2:
+                from avif import decode_transfer, read_png
+                metadata = facts['iso_metadata']['channels']
+                metadata *= 3 if len(metadata) == 1 else 1
+                minimum = np.array([channel['minimum'] for channel in metadata])
+                maximum = np.array([channel['maximum'] for channel in metadata])
+                offset = np.array([channel['base_offset'] for channel in metadata])
+                target = decode_transfer(read_png(hdr)[..., :3], 'pq', 'p3')/203
+                normalized = np.clip((np.log2((target+offset)/(linear+offset))-minimum)/(maximum-minimum), 0, 1)
+                expected_codes = normalized**2*255
+                map_codes = np.asarray(Image.open(evidence['computed_map']).convert('RGB'))
+                self.assertTrue(np.any((expected_codes > 16) & (expected_codes < 239)))
+                # Half a code is nearest-integer quantization. The extra
+                # 0.01 code bounds native float PQ/ICC and metadata rounding.
+                self.assertLessEqual(float(np.max(np.abs(map_codes-expected_codes))), .51)
+                # A gamma2 packer must reject gamma1 native metadata, even
+                # though both sets of JPEG sample arrays are decodable.
+                gamma1 = folder/'gamma1.avif'
+                native([TOOL.replace('/hdr-proof-', '/smalloffset/hdr-proof-'),
+                        'compute', base, hdr, gamma1])
+                gamma2_tool = TOOL.replace('/hdr-proof-', '/smalloffset-gamma2/hdr-proof-')
+                rejected = folder/'wrong-gamma.jpg'
+                with self.assertRaisesRegex(RuntimeError, 'gamma2/smalloffset'):
+                    native([gamma2_tool, 'pack-gamma2', gamma1, base,
+                            folder/'output-icc-parts/map.jpg', rejected])
+                self.assertFalse(rejected.exists())
+                with self.assertRaisesRegex(RuntimeError, 'gamma 1'):
+                    native(['/opt/proof/ultrahdr/precise/hdr-proof-uhdr', 'pack-avif',
+                            folder/'output-icc-parts/combined.avif', base,
+                            folder/'output-icc-parts/map.jpg', rejected])
+                self.assertFalse(rejected.exists())
             for boost in (1, 2**.5, 2, 16):
                 expected, oracle = independent_decode(output, folder/'inspection/map.jpg', boost=boost)
                 actual, native_facts = native_decode(output, folder/f'{boost}.rgbf32', boost=boost)
@@ -79,13 +115,28 @@ class IccGainmapTests(unittest.TestCase):
                 wrong = folder/f'{label}.png'
                 wrong.write_bytes(modified)
                 with self.subTest(label=label), self.assertRaisesRegex(RuntimeError, 'PNG'):
-                    pack(base, wrong, folder/f'{label}.jpg', map_policy=map_policy)
+                    pack(base, wrong, folder/f'{label}.jpg', map_policy=map_policy, map_gamma=map_gamma)
                 self.assertFalse((folder/f'{label}.jpg').exists())
             # Without HDR output qualification, an unknown ICC must still
             # stop the native HDR decoder before applying gain.
             native(['exiftool', '-overwrite_original', '-ICC_Profile=', output])
             with self.assertRaisesRegex(RuntimeError, 'ICC'):
                 native_decode(output, folder/'unknown.rgbf32')
+
+    def test_unsupported_gamma_and_offset_combinations_stop_before_encoding(self):
+        from icc_gainmap import pack
+        import avif
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)/'unknown.jpg'
+            for policy, gamma in (('moderateoffset', 2), ('smalloffset', 0),
+                                  ('smalloffset', 3), ('smalloffset', True),
+                                  ('unknown', 1), ('smalloffset', float('nan'))):
+                before = len(avif.COMMANDS)
+                with self.subTest(policy=policy, gamma=gamma), self.assertRaises(ValueError):
+                    pack('missing-base.jpg', 'missing-intent.png', output,
+                         map_policy=policy, map_gamma=gamma)
+                self.assertEqual(len(avif.COMMANDS), before)
+                self.assertFalse(output.exists())
 
     def test_native_lcms_reads_actual_gamma_profile_and_near_black_codes(self):
         codes = np.array([[0, 0, 0], [1, 1, 1], [2, 2, 2], [4, 2, 1],
@@ -163,6 +214,27 @@ class IccGainmapTests(unittest.TestCase):
             self.assertTrue(report['commands'])
             self.assertTrue(report['gainmap_commands'])
             self.assertIn('lcms2.h', report['native_source_hashes'])
+
+    def test_gamma2_retains_real_source_appearance_failures(self):
+        from icc_gainmap import run
+        with tempfile.TemporaryDirectory() as temporary:
+            report = run(Path(temporary), map_policy='smalloffset', map_gamma=2)
+            case = report['cases'][0]
+            self.assertEqual(case['status'], 'tested and failed', case['blockers'])
+            self.assertEqual(case['blockers'], ['Failed appearance check'])
+            self.assertTrue(case['checks']['independent_decoder'])
+            self.assertTrue(case['structural_checks']['requested_map_gamma'])
+            self.assertTrue(case['measurements']['authored_sdr_base']['passed'])
+            for decoder in ('reconstructed_hdr', 'independent_hdr'):
+                failures = case['measurements'][decoder]['failures']
+                self.assertIn('shadow.delta_e_max', failures)
+                self.assertIn('midtone.delta_e_mean', failures)
+                self.assertIn('highlight.delta_e_mean', failures)
+                self.assertNotIn('highlight.delta_e_max', failures)
+            self.assertEqual(case['artifacts']['sha256'], '3bc969bc0e724859f1f2ddebc138f05fc5b8db1522898f5aa80b6460e7d2d633')
+            self.assertEqual(case['consumer_status'], 'pending manual review')
+            self.assertEqual(case['consumer_decoder_diagnostics']['stock_native_srgb']['status'], 'tested and failed')
+            self.assertTrue(case['case_id'].endswith('map-gamma2:gainmap-hdr-target-gamut-v1'))
 
 
 if __name__ == '__main__':

@@ -28,3 +28,4 @@
 !icc-gainmap-build.sh
 !native_icc_gainmap.cpp
 !libavif-icc-linear-base.patch
+!libavif-gamma2-gain.patch

@@ -21,12 +21,20 @@ from gainmap_iso import iso_metadata, jpeg_facts, segments
 TOOL = '/opt/proof/icc-gainmap/hdr-proof-icc-gainmap'
 
 
-def pack(base, hdr_intent, output, *, map_policy='moderateoffset'):
-    """Regenerate a native RGB8 map against the actual compressed ICC base."""
-    from dct_jpeg import encode
+def _encoder(map_policy, map_gamma):
     if map_policy not in ('moderateoffset', 'smalloffset'):
         raise ValueError('Only the two predeclared native offset policies are supported')
-    tool = TOOL if map_policy == 'moderateoffset' else str(Path(TOOL).parent/'smalloffset'/Path(TOOL).name)
+    if (type(map_gamma) not in (int, float) or map_gamma not in (1, 2)
+            or map_gamma == 2 and map_policy != 'smalloffset'):
+        raise ValueError('Only map gamma1 and the separate smalloffset gamma2 candidate are supported')
+    variant = ('smalloffset-gamma2' if map_gamma == 2 else 'smalloffset')
+    return TOOL if map_policy == 'moderateoffset' else str(Path(TOOL).parent/variant/Path(TOOL).name)
+
+
+def pack(base, hdr_intent, output, *, map_policy='moderateoffset', map_gamma=1):
+    """Regenerate a native RGB8 map against the actual compressed ICC base."""
+    from dct_jpeg import encode
+    tool = _encoder(map_policy, map_gamma)
     output = Path(output)
     folder = output.with_name(output.stem+'-icc-parts')
     folder.mkdir(parents=True, exist_ok=True)
@@ -34,11 +42,14 @@ def pack(base, hdr_intent, output, *, map_policy='moderateoffset'):
     facts = json.loads(avif.native([tool, 'compute', base, hdr_intent, combined]))
     avif.native(['avifgainmaputil', 'extractgainmap', combined, png])
     map_encoding = encode(png, jpg, method='float')
-    avif.native(['/opt/proof/ultrahdr/precise/hdr-proof-uhdr', 'pack-avif', combined, base, jpg, output])
+    packer = ([tool, 'pack-gamma2'] if map_gamma == 2 else
+              ['/opt/proof/ultrahdr/precise/hdr-proof-uhdr', 'pack-avif'])
+    avif.native([*packer, combined, base, jpg, output])
     return {'native_icc': facts, 'map_encoding': map_encoding,
             'base': str(base), 'base_sha256': avif.digest(base), 'hdr_intent': str(hdr_intent),
             'hdr_intent_sha256': avif.digest(hdr_intent), 'output_sha256': avif.digest(output),
             'computed_map': str(png), 'native_encoder_sha256': avif.digest(tool), 'map_policy': map_policy,
+            'map_gamma': map_gamma, 'native_packer_sha256': avif.digest(packer[0]),
             'coded_base_depth': 8, 'coded_map_depth': 8,
             'working_precision': 'Native LCMS float32 base linearization; native gain equations',
             'consumer_status': 'pending manual review'}
@@ -94,7 +105,7 @@ def native_decode(path, output, *, boost=16):
     return values, facts
 
 
-def run(directory, *, map_policy='moderateoffset'):
+def run(directory, *, map_policy='moderateoffset', map_gamma=1):
     """Bounded first experiment: the pinned ISO gain-map JPEG upscale only."""
     import gainmap_combine
     import gainmap_hdr
@@ -104,8 +115,7 @@ def run(directory, *, map_policy='moderateoffset'):
     from matrix import GAINMAP_GEOMETRIES
     folder = Path(directory)
     folder.mkdir(parents=True, exist_ok=True)
-    if map_policy not in ('moderateoffset', 'smalloffset'):
-        raise ValueError('Only the two predeclared native offset policies are supported')
+    _encoder(map_policy, map_gamma)
     start = len(avif.COMMANDS)
     name, operation, gamut = 'gainmap-android-iso', 'upscale', 'p3'
     source = gainmap.FIXTURES/f'{name}.jpg'
@@ -114,6 +124,8 @@ def run(directory, *, map_policy='moderateoffset'):
         raise ValueError('Pinned ISO source fixture hash changed')
     revision = 'gainmap-hdr-target-gamut-v1'
     candidate = f'native-combine-icc-gamma32-{map_policy}-dct-float-map-source-float32'
+    if map_gamma != 1:
+        candidate += f'-map-gamma{map_gamma:g}'
     case = {'case_id': f'{name}:hdr:jpg:preserve:preserve:{operation}:{candidate}:{revision}',
         'fixture_id': name, 'source_sha256': fixture['sha256'], 'cell_id': 'gainmap-jpeg:hdr:jpg',
         'candidate': candidate, 'geometry': operation, 'source_reference_revision': revision,
@@ -147,7 +159,8 @@ def run(directory, *, map_policy='moderateoffset'):
             map_policy='moderateoffset', geometry_revision=revision, source_precision='float32')
         base, output = folder/'gamma32-base.jpg', folder/'output.jpg'
         base_encoding = gainmap_sdr.encode(source, base, operation, gamut=gamut, gamma=3.2)
-        case['native_candidate'] = pack(base, preparation['hdr_intent_pq_png'], output, map_policy=map_policy)
+        case['native_candidate'] = pack(base, preparation['hdr_intent_pq_png'], output,
+            map_policy=map_policy, map_gamma=map_gamma)
         case['native_candidate'].update({'base_encoding': base_encoding, 'source_preparation': preparation})
         case['checks']['native_encoder'] = True
         native_source = preparation['hdr_source']
@@ -194,6 +207,7 @@ def run(directory, *, map_policy='moderateoffset'):
             'static_opaque': facts['frame_count'] == 1 and facts['opaque'],
             'dual_metadata': bool(facts['iso_identifier'] and facts['android_xmp_properties']),
             'metadata_agreement': all(agreement['checks'].values()),
+            'requested_map_gamma': probe['gamma'] == [map_gamma]*3,
             'actual_base_icc': sdr_facts['icc_sha256'] == base_encoding['icc_sha256']}
         case['checks'].update({'independent_decoder': cross['passed'],
             'structure': all(case['structural_checks'].values()),
@@ -249,10 +263,20 @@ def run(directory, *, map_policy='moderateoffset'):
         except (UnicodeError, json.JSONDecodeError):
             pass
     report = {'scope': 'One predeclared ISO-upscale ICC-aware native HDR candidate; unchanged appearance gates',
+        'map_representation': {'policy': map_policy, 'encoding_gamma': map_gamma, 'coded_depth': 8,
+            'encoding': 'Native pow(normalized log gain, gamma), rounded to RGB8; native float DCT JPEG',
+            'decoding': 'Actual emitted map code raised to reciprocal gamma before affine log-gain recovery',
+            'gamma2_rationale': 'Smalloffset gamma1 measured highlight median normalized log gain 0.590619. '
+                'Local quantization sensitivity is log-gain interval/(gamma*u**(gamma-1)); '
+                'gamma2 is the single predeclared option near the local optimum 1.90, without pixel prebias.',
+            'upstream_sources': [
+                'https://raw.githubusercontent.com/AOMediaCodec/libavif/v1.4.1/src/gainmap.c',
+                'https://raw.githubusercontent.com/google/libultrahdr/e5f5a022fe96fc4dc2ee35c19f733a50df807abe/lib/src/gainmapmath.cpp']},
         'cases': [case], 'commands': avif.COMMANDS[start:], 'threshold_sha256': avif.digest(Path(__file__).with_name('thresholds.json')),
         'gainmap_commands': logged_commands,
         'source_hashes': {name: avif.digest(Path(__file__).with_name(name)) for name in
-            ('icc_gainmap.py', 'native_icc_gainmap.cpp', 'icc-gainmap-build.sh', 'libavif-icc-linear-base.patch')},
+            ('icc_gainmap.py', 'native_icc_gainmap.cpp', 'icc-gainmap-build.sh', 'libavif-icc-linear-base.patch',
+             'libavif-gamma2-gain.patch')},
         'native_hashes': Path('/opt/proof/icc-gainmap/binary-sha256.txt').read_text(),
         'native_source_hashes': Path('/opt/proof/icc-gainmap/source-sha256.txt').read_text()}
     (folder/'results.json').write_text(json.dumps(report, indent=2)+'\n')

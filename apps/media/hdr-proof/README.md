@@ -96,6 +96,12 @@ remain unqualified. Stock readers that assume sRGB transfer or reject ICC also
 remain separate limitations; this experiment does not establish interoperability.
 The complete command reproduces both experiments and includes their failed
 cases in the matrix, with separate measurements and inspected diagnostic files.
+A further native map-gamma-2 representation retains the small offset and uses
+matching AVIF, ISO, XMP and native metadata. Analytic zero, fractional and full
+headroom controls verify the reciprocal decoding exponent. This allocates more
+of the existing eight-bit map precision to the measured gain range; it changes
+neither image grade nor reference. Highlight error improves, but regional means
+and shadow error still fail. The earlier gamma-1 bytes remain pinned.
 
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining

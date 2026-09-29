@@ -51,8 +51,19 @@ mkdir -p /opt/proof/icc-gainmap/smalloffset
 c++ -std=c++17 -O2 -Wall -Wextra -Werror -I . -I libavif-1.4.1/include -I uhdr -I uhdr/lib/include \
     /opt/proof/native_icc_gainmap.cpp avif-build/libavif_internal.a uhdr-build/libuhdr.a \
     /usr/lib/liblcms2.so.2 -ljpeg -lpng -laom -ldav1d -pthread -lm -o /opt/proof/icc-gainmap/smalloffset/hdr-proof-icc-gainmap
+# Gamma2 is a separate, predeclared map representation. Native libavif
+# already applies pow(normalized_log_gain, gamma) and writes matching metadata.
+# Keep both gamma1 variants compiled before changing the native defaults.
+echo 'f6b46b336722f3f0a967249144555458efec18b3c96f8ed71c359a091cb31948  /opt/proof/libavif-gamma2-gain.patch' | sha256sum -c -
+patch -d libavif-1.4.1 -p1 < /opt/proof/libavif-gamma2-gain.patch
+cmake --build avif-build --target avif --parallel 4
+mkdir -p /opt/proof/icc-gainmap/smalloffset-gamma2
+c++ -std=c++17 -O2 -Wall -Wextra -Werror -I . -I libavif-1.4.1/include -I uhdr -I uhdr/lib/include \
+    /opt/proof/native_icc_gainmap.cpp avif-build/libavif_internal.a uhdr-build/libuhdr.a \
+    /usr/lib/liblcms2.so.2 -ljpeg -lpng -laom -ldav1d -pthread -lm -o /opt/proof/icc-gainmap/smalloffset-gamma2/hdr-proof-icc-gainmap
 sha256sum lcms2.h /usr/lib/liblcms2.so.2 /opt/proof/icc-gainmap/hdr-proof-icc-gainmap \
     /opt/proof/icc-gainmap/smalloffset/hdr-proof-icc-gainmap \
+    /opt/proof/icc-gainmap/smalloffset-gamma2/hdr-proof-icc-gainmap \
     > /opt/proof/icc-gainmap/binary-sha256.txt
 sha256sum lcms2.h avif.tar.gz uhdr.tar.gz pr*.patch /opt/proof/libavif-*-gain.patch \
     /opt/proof/libavif-icc-linear-base.patch /opt/proof/libultrahdr-*.patch \

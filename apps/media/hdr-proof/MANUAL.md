@@ -88,7 +88,7 @@ intent. The intent is encoder input, not an independent source reference.
 Keep its documented-model label separate from earlier legacy-model files.
 Their stock-reader failures and untested intermediate adaptation remain visible;
 Mac, iPad, Windows and Galaxy observations are still pending.
-The corrected old Apple PQ10/PQ12 P3 AVIF containment, crop, stretch and upscale
+The corrected old Apple PQ8/PQ10/PQ12 P3 AVIF containment, crop, stretch and upscale
 are separate fixed-luminance full-effect files. Each authored SDR companion is a
 comparison image; the AVIF has no embedded SDR base or adaptive gain map. Record the viewer's tone mapping
 and apparent brightness separately from the passing file comparison. Its PQ16

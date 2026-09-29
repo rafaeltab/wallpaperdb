@@ -39,11 +39,11 @@ class EvidenceFileTests(unittest.TestCase):
                 'proof_module': 'apple_hdr_avif', 'geometry': operation, 'status': 'qualified',
                 'rendering_scope': {'intermediate_adaptation_qualified': False},
                 'artifacts': {'output': str(output), 'sha256': suite.avif.digest(output)}}
-                for depth in (10, 12) for operation in ('contain', 'cover', 'fill', 'upscale')]
+                for depth in (8, 10, 12) for operation in ('contain', 'cover', 'fill', 'upscale')]
             with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
                 files = suite.candidate_files(cases, [])
             self.assertEqual({row['case_id'] for row in files}, {case['case_id'] for case in cases})
-            self.assertEqual(len(files), 8)
+            self.assertEqual(len(files), 12)
             for row in files:
                 self.assertFalse(row['rendering_scope']['intermediate_adaptation_qualified'])
                 self.assertEqual(row['consumer_status'], 'pending manual review')

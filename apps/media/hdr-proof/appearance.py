@@ -65,8 +65,9 @@ def _rgb(values):
         raise ValueError("Expected nonempty RGB arrays with last dimension 3")
     if not np.all(np.isfinite(values)):
         raise ValueError("RGB values must be finite")
-    if np.any(values < -1e-8):
-        raise ValueError("RGB in the declared input gamut must be nonnegative")
+    # RGB is a coordinate system. A valid P3 red has a negative blue coordinate
+    # when expressed in Rec.2020. Check physical luminance and the metric's LMS
+    # domain after primary conversion, without clipping or moving the color.
     return values
 
 
@@ -106,6 +107,8 @@ def linear_rgb_to_itp(rgb_nits, gamut="rec2020"):
     """BT.2124 Annex 1, with T = Ct/2 and absolute ST 2084 normalization."""
     rgb_nits = _rgb(rgb_nits)
     gamut = _gamut(gamut)
+    if np.min(rgb_nits @ RGB_TO_XYZ[gamut][1]) < -1e-8:
+        raise ValueError("Metric input luminance must be nonnegative")
     if gamut != "rec2020":
         xyz = rgb_nits @ RGB_TO_XYZ[gamut].T
         rgb_nits = xyz @ np.linalg.inv(RGB_TO_XYZ["rec2020"]).T

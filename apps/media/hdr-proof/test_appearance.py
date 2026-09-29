@@ -10,6 +10,7 @@ from appearance import (
     evaluate_sdr_tone_map,
     linear_rgb_to_itp,
     sdr_signal_to_nits,
+    RGB_TO_XYZ,
 )
 
 
@@ -47,6 +48,25 @@ class AppearanceTests(unittest.TestCase):
     def test_identical_pixels_have_zero_delta(self):
         ramp = reference_ramp()
         np.testing.assert_allclose(delta_e_itp(ramp, ramp), 0, atol=1e-10)
+
+    def test_same_p3_color_in_signed_rec2020_coordinates_keeps_its_measurement(self):
+        p3 = np.array([[1., 0., 0.], [100., 0., 0.], [1000., 0., 0.]])
+        rec2020 = p3 @ RGB_TO_XYZ['p3'].T @ np.linalg.inv(RGB_TO_XYZ['rec2020']).T
+        self.assertLess(float(rec2020.min()), 0)
+        np.testing.assert_allclose(delta_e_itp(p3, rec2020, 'p3', 'rec2020'), 0, atol=1e-10)
+        measured = compare_appearance(p3, rec2020, reference_gamut='p3', actual_gamut='rec2020',
+                                      fixture_class='gainmap-hdr')
+        self.assertTrue(measured['passed'])
+        for region in measured['regions'].values():
+            if region.get('samples'):
+                self.assertLess(region['luminance_absolute_error_nits']['maximum'], 1e-10)
+        # Clipping these coordinates changes the color. Measurement must not do it.
+        self.assertGreater(float(delta_e_itp(p3, np.maximum(rec2020, 0), 'p3', 'rec2020').max()), .01)
+
+    def test_negative_luminance_and_out_of_domain_lms_remain_rejected(self):
+        for invalid in (np.array([-1., -1., -1.]), np.array([-200., 100., 0.])):
+            with self.subTest(rgb=invalid), self.assertRaisesRegex(ValueError, 'luminance|LMS'):
+                linear_rgb_to_itp(invalid, 'rec2020')
 
     def test_matched_geometry_is_mandatory(self):
         with self.assertRaisesRegex(ValueError, "geometry"):

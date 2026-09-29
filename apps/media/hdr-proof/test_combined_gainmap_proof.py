@@ -23,6 +23,9 @@ class CombinedGainMapProofTests(unittest.TestCase):
                     self.assertIn('superseded_reference_difference', case['reference_revision_diagnostics'])
                     self.assertNotIn('superseded_reference_difference', case['measurements'])
                     self.assertEqual(case['consumer_status'], 'pending manual review')
+                    self.assertTrue(Path(case['reference_sdr']['path']).is_file())
+                    self.assertEqual(case['reference_sdr']['sha256'], case['artifacts']['reference_sdr_sha256'])
+                    self.assertIn('SOF3', case['known_consumer_limitations'][0])
             matrix = build_matrix(cases)
             aggregated = {item['case_id']: item for cell in matrix['cells'] for item in cell['evidence']}
             for case in cases:

@@ -43,6 +43,9 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                         'candidate': candidate, 'geometry': operation, 'selectors': selectors,
                         'source_reference_revision': reference_revision, 'source_sha256': gainmap.digest(source),
                         'status': 'tested and failed', 'consumer_status': 'pending manual review',
+                        'known_consumer_limitations': [
+                            'Pinned native libavif cannot read JPEG SOF3 predictive base/map coding; '
+                            'physical browser and wallpaper consumers have not been tested.'],
                         'checks': {key: False for key in ('native_encoder', 'independent_source_decoder',
                             'independent_decoder', 'native_geometry', 'structure', 'appearance', 'privacy')},
                         'blockers': [], 'artifacts': {}, 'measurements': {}, 'reference_revision_diagnostics': {}}
@@ -74,6 +77,9 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                     sdr_reference.info.clear()
                     reference_sdr = folder/'reference-sdr.png'
                     sdr_reference.save(reference_sdr, icc_profile=profile)
+                    case['reference_sdr'] = {'path': str(reference_sdr), 'sha256': gainmap.digest(reference_sdr),
+                        'gamut': gamut, 'transfer': 'srgb',
+                        'purpose': 'Independent matched-geometry authored SDR base for HDR JPEG comparison'}
                     target = folder/'output.jpg'
                     encoded = gainmap_combine.encode(source, target, operation, gamut=gamut, map_policy=policy,
                         orientation=orientation, geometry_revision=reference_revision)

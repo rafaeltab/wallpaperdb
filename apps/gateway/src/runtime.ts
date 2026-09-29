@@ -24,6 +24,7 @@ export class HttpExecution extends Context.Service<
   HttpExecution,
   {
     run<A, E>(effect: Effect.Effect<A, E, HttpServices>, options?: Effect.RunOptions): Promise<A>;
+    awaitIdle(signal: AbortSignal): Promise<void>;
     drain(timeoutMs: number): Effect.Effect<void>;
   }
 >()('wallpaperdb.gateway/http/Execution') {}
@@ -34,10 +35,27 @@ export const httpExecutionLayer = Layer.effect(
   Effect.gen(function* () {
     const requests = yield* FiberSet.make();
     const run = yield* FiberSet.runtimePromise(requests)<HttpServices>();
+    const pending = new WeakMap<AbortSignal, Set<Promise<unknown>>>();
     let draining = false;
     return HttpExecution.of({
-      run: (effect, options) =>
-        run(draining ? Effect.interrupt : traceGatewayEffect(effect), options),
+      run: (effect, options) => {
+        const promise = run(draining ? Effect.interrupt : traceGatewayEffect(effect), options);
+        const signal = options?.signal;
+        if (signal) {
+          const work = pending.get(signal) ?? new Set<Promise<unknown>>();
+          pending.set(signal, work);
+          work.add(promise);
+          const settled = () => {
+            work.delete(promise);
+          };
+          void promise.then(settled, settled);
+        }
+        return promise;
+      },
+      awaitIdle: async (signal) => {
+        const work = pending.get(signal);
+        while (work?.size) await Promise.allSettled(work);
+      },
       drain: Effect.fn('http.drain')(function* (timeoutMs: number) {
         draining = true;
         yield* FiberSet.awaitEmpty(requests).pipe(Effect.timeoutOption(timeoutMs));

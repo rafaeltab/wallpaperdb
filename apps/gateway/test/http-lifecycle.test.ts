@@ -90,6 +90,76 @@ describe('HTTP request lifecycle', () => {
     ).toBeLessThan(100);
   });
 
+  it('times out underlying work, keeps its charge and recovers after cancellation cleanup', async () => {
+    let interrupted = false;
+    let reads = 0;
+    let searched = false;
+    const read = Effect.suspend(() => {
+      reads++;
+      return reads === 1
+        ? Effect.never.pipe(
+            Effect.onInterrupt(() =>
+              Effect.sync(() => {
+                interrupted = true;
+              })
+            )
+          )
+        : Effect.succeed(profile);
+    });
+    const { address } = await serve(
+      controlledCatalogue(read, () => {
+        searched = true;
+      }),
+      1000,
+      { graphqlMaxActive: 1, graphqlDeadlineMs: 50, quotaCapacity: 2000 }
+    );
+    const timedOut = await query(address);
+    expect(timedOut.status).toBe(503);
+    expect(await timedOut.json()).toMatchObject({
+      errors: [{ extensions: { code: 'GATEWAY_OVERLOADED', reason: 'timeout' } }],
+    });
+    await expect.poll(() => interrupted).toBe(true);
+    expect(searched).toBe(false);
+    const next = await query(address);
+    expect(next.status).toBe(200);
+    expect(Number(next.headers.get('x-ratelimit-cost-remaining'))).toBeLessThan(
+      Number(timedOut.headers.get('x-ratelimit-cost-remaining'))
+    );
+  });
+
+  it('holds a disconnected request slot until its cancellation finalizer settles', async () => {
+    const cleanup = Deferred.makeUnsafe<void>();
+    let entered = false;
+    let cancelling = false;
+    let calls = 0;
+    const read = Effect.suspend(() => {
+      calls++;
+      if (calls > 1) return Effect.succeed(profile);
+      entered = true;
+      return Effect.never.pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            cancelling = true;
+          }).pipe(Effect.andThen(Deferred.await(cleanup)))
+        )
+      );
+    });
+    const { address } = await serve(controlledCatalogue(read), 1000, { graphqlMaxActive: 1 });
+    const abort = new AbortController();
+    const pending = query(address, abort.signal).catch((error: unknown) => error);
+    try {
+      await expect.poll(() => entered).toBe(true);
+      abort.abort();
+      expect(await pending).toBeInstanceOf(Error);
+      await expect.poll(() => cancelling).toBe(true);
+      expect((await query(address)).status).toBe(503);
+      expect(calls).toBe(1);
+    } finally {
+      await Effect.runPromise(Deferred.succeed(cleanup, undefined));
+    }
+    await expect.poll(async () => (await query(address)).status).toBe(200);
+  });
+
   it('finishes a whole GraphQL response during shutdown grace, including later nested resolvers', async () => {
     const release = Effect.runSync(Deferred.make<void>());
     let entered = false;

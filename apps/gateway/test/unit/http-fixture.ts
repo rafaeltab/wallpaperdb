@@ -21,6 +21,7 @@ export const httpConfig: HttpConfig = {
   mediaServiceUrl: 'http://media.example.com',
   mediaPublicPath: '/media',
   graphqlMaxActive: 32,
+  graphqlDeadlineMs: 5000,
   graphqlMaxDepth: 5,
   graphqlMaxComplexity: 2000,
   graphqlMaxUniqueFields: 50,

@@ -21,6 +21,7 @@ export interface HttpConfig {
   readonly mediaPublicBaseUrl?: string;
   readonly mediaPublicPath: string;
   readonly graphqlMaxActive: number;
+  readonly graphqlDeadlineMs: number;
   readonly graphqlMaxDepth: number;
   readonly graphqlMaxComplexity: number;
   readonly graphqlMaxUniqueFields: number;
@@ -252,7 +253,7 @@ export async function createHttpApp<E>(
   app.addHook('onClose', () => runtime.dispose());
   try {
     const execution = await runtime.runPromise(HttpExecution, { signal: options.signal });
-    const requests = installRequestLifecycle(app, config);
+    const requests = installRequestLifecycle(app, config, execution);
     app.addHook('preClose', async () => {
       app.connectionsState.isShuttingDown = true;
       await runtime.runPromise(
@@ -341,7 +342,8 @@ export async function createHttpApp<E>(
             config.nodeEnv !== 'production' && config.graphqlIntrospectionEnabled,
             operationName
           )
-        ).pipe(Effect.withSpan('admission.inspect_query'))
+        ).pipe(Effect.withSpan('admission.inspect_query')),
+        { signal: request.gatewaySignal }
       );
       const decision = await execution.run(
         Admission.use((admission) =>
@@ -414,7 +416,13 @@ function recordTelemetry(record: () => void): void {
   }
 }
 
-function installRequestLifecycle(app: FastifyInstance, config: HttpConfig) {
+function installRequestLifecycle(
+  app: FastifyInstance,
+  config: HttpConfig,
+  execution: HttpExecution['Service']
+) {
+  const controllers = new WeakMap<FastifyRequest, AbortController>();
+  const deadlines = new WeakMap<FastifyRequest, ReturnType<typeof setTimeout>>();
   const graphqlRequests = new Set<FastifyRequest>();
   const active = new Set<AbortController>();
   const connections = new Set<Socket>();
@@ -422,7 +430,7 @@ function installRequestLifecycle(app: FastifyInstance, config: HttpConfig) {
     connections.add(socket);
     socket.once('close', () => connections.delete(socket));
   });
-  const completions = new WeakMap<FastifyRequest, () => void>();
+  const completions = new WeakMap<FastifyRequest, () => Promise<void>>();
   const empty = Latch.makeUnsafe(true);
   let closing = false;
   app.decorateRequest('gatewaySignal');
@@ -437,12 +445,17 @@ function installRequestLifecycle(app: FastifyInstance, config: HttpConfig) {
     }
     const controller = new AbortController();
     request.gatewaySignal = controller.signal;
+    controllers.set(request, controller);
     active.add(controller);
     empty.closeUnsafe();
-    const complete = () => {
+    let completing: Promise<void> | undefined;
+    const finish = async () => {
       request.raw.removeListener('aborted', abandon);
       reply.raw.removeListener('close', abandon);
       completions.delete(request);
+      clearTimeout(deadlines.get(request));
+      controller.abort();
+      await execution.awaitIdle(controller.signal);
       graphqlRequests.delete(request);
       active.delete(controller);
       if (active.size === 0) {
@@ -450,9 +463,13 @@ function installRequestLifecycle(app: FastifyInstance, config: HttpConfig) {
         if (closing) for (const socket of connections) socket.end();
       }
     };
+    const complete = () => {
+      completing ??= finish();
+      return completing;
+    };
     const abandon = () => {
       if (!reply.raw.writableFinished) controller.abort();
-      complete();
+      void complete();
     };
     completions.set(request, complete);
     request.raw.once('aborted', abandon);
@@ -474,9 +491,27 @@ function installRequestLifecycle(app: FastifyInstance, config: HttpConfig) {
         );
     }
     graphqlRequests.add(request);
+    const deadline = setTimeout(() => {
+      recordTelemetry(() =>
+        recordCounter('graphql.active_work.rejected', 1, { reason: 'timeout' })
+      );
+      controllers.get(request)?.abort();
+      if (!reply.sent && !reply.raw.destroyed) {
+        void reply
+          .code(503)
+          .header('Retry-After', '1')
+          .send(
+            graphqlError('GATEWAY_OVERLOADED', 'The request took too long. Please try again.', {
+              reason: 'timeout',
+            })
+          );
+      }
+    }, config.graphqlDeadlineMs);
+    deadline.unref();
+    deadlines.set(request, deadline);
   });
   app.addHook('onResponse', async (request) => {
-    completions.get(request)?.();
+    await completions.get(request)?.();
   });
   return {
     drain: Effect.fn('http.requests.drain')(function* (timeoutMs: number) {

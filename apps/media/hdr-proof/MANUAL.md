@@ -32,6 +32,10 @@ The bundle also includes inspected 16-bit PQ PNG files showing the native
 encoder's matched-geometry HDR intent. Use these to compare another HDR container
 when a consumer rejects the JPEG. They are native comparison files, not
 independent source references or additional qualified conversions.
+Separate SOF0 DCT JPEG candidates have their own manifest entries. Some retain
+measured shadow failures and are only diagnostic files. Test a qualified SOF0
+file separately from the SOF3 file; neither result establishes the other's
+decoder, gain-map interpretation or HDR presentation behavior.
 
 The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
 two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit

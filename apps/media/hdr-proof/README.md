@@ -36,6 +36,14 @@ matrix coding. Separate libultrahdr variants test RGB JPEG decoding and its
 existing exact transfer/gain formulas. The pinned libavif reader rejects these
 SOF3 JPEG files; file accuracy and physical consumer compatibility remain separate.
 
+Separate SOF0 RGB8 DCT candidates recompute the gain map against their actual
+compressed SDR base. The pinned libavif reader can decode that coding form,
+but some files still exceed the fixed authored-SDR shadow limits. Its extra
+JPEG-to-AVIF-to-PQ reconstruction also introduces eight-bit YCbCr map rounding;
+those appearance failures remain visible as a separate decoder diagnostic.
+Both independent JPEG/ISO and native libultrahdr reconstruction must pass the
+unchanged file gates. Every physical consumer remains pending.
+
 A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
 of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
 the same HDR intent and fixed appearance limits. Analytic near-black controls
@@ -112,6 +120,10 @@ Optional animated APNG-to-GIF candidates also verify both fully composed frames,
 300/700 ms timing and three total plays. GIF encodes that as two repeats after
 the initial play. An exact binary-alpha mismatch is a failure, even when it
 comes from one half-opacity sample rounded across the cutoff by an intermediate.
+Another native candidate resamples alpha separately and rounds to sixteen bits
+after each axis. It must preserve every RGB16 code, keep intermediate alpha
+within the existing PNG16 precision ceiling and match every final binary decision.
+The original quantized failures remain separate cases.
 
 The [authored SDR JPEG proof](authored_sdr_proof.py) also evaluates gamma-3.2
 ICC encodings against the same independently decoded authored SDR base. These

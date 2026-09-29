@@ -30,4 +30,14 @@ cmake --build build --target avifgainmaputil --parallel 4
 mkdir -p /opt/proof/libavif/fullrange
 cp build/avifgainmaputil /opt/proof/libavif/fullrange/
 sha256sum /opt/proof/libavif/fullrange/avifgainmaputil > /opt/proof/libavif/fullrange/binary-sha256.txt
+# Separate precision experiment. The normalized 1/64 default offsets are
+# 3.171875 nits at 203-nit white; cancellation amplifies an eight-bit gain-map
+# code error near black. A 1/65536 offset reduces that absolute floor but
+# widens the gain interval, so unchanged regional gates decide its tradeoff.
+echo '3ac99d201fb1ed56b2c73921702fe81c865e3b8fea2e3bc1c2089710dce16d93  /opt/proof/libavif-small-offset-gain.patch' | sha256sum -c -
+patch -d libavif-1.4.1 -p1 < /opt/proof/libavif-small-offset-gain.patch
+cmake --build build --target avifgainmaputil --parallel 4
+mkdir -p /opt/proof/libavif/smalloffset
+cp build/avifgainmaputil /opt/proof/libavif/smalloffset/
+sha256sum /opt/proof/libavif/smalloffset/avifgainmaputil > /opt/proof/libavif/smalloffset/binary-sha256.txt
 rm -rf /tmp/gainmap-build

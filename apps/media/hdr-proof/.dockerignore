@@ -11,6 +11,7 @@
 !libultrahdr-precise-transfer.patch
 !libavif-sequence-transform.patch
 !libavif-full-range-gain.patch
+!libavif-small-offset-gain.patch
 !native-zimg-build.sh
 !native_zimg_window.c
 !native_lossless_jpeg.c

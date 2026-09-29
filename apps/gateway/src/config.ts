@@ -130,6 +130,9 @@ export const gatewayConfig = Effect.gen(function* () {
     rateLimitEnabled: boolean('RATE_LIMIT_ENABLED', true),
     quotaCapacity: positive('QUOTA_CAPACITY', 1000000),
     quotaRefillMs: positive('QUOTA_REFILL_MS', 60000),
+    quotaFallbackCapacity: positive('QUOTA_FALLBACK_CAPACITY', 100000),
+    quotaFallbackRefillMs: positive('QUOTA_FALLBACK_REFILL_MS', 60000),
+    quotaFallbackMaxVisitors: positive('QUOTA_FALLBACK_MAX_VISITORS', 10000),
     cursorSecret: Configuration.schema(
       Schema.Redacted(Schema.String.check(Schema.isMinLength(32))),
       'CURSOR_SECRET'
@@ -138,16 +141,22 @@ export const gatewayConfig = Effect.gen(function* () {
   });
 }).pipe(
   Effect.mapError(configurationError),
-  Effect.flatMap((config) =>
-    config.quotaCapacity < Math.max(config.graphqlMaxComplexity, 100)
+  Effect.flatMap((config) => {
+    const fields: string[] = [];
+    if (config.quotaCapacity < Math.max(config.graphqlMaxComplexity, 100))
+      fields.push('QUOTA_CAPACITY');
+    if (config.quotaFallbackCapacity < Math.max(config.graphqlMaxComplexity, 100))
+      fields.push('QUOTA_FALLBACK_CAPACITY');
+    if (config.nodeEnv === 'production') {
+      if (!config.rateLimitEnabled) fields.push('RATE_LIMIT_ENABLED');
+      if (!config.redisEnabled) fields.push('REDIS_ENABLED');
+    }
+    return fields.length
       ? Effect.fail(
-          new GatewayConfigurationError({
-            message: 'Invalid gateway configuration',
-            fields: ['QUOTA_CAPACITY'],
-          })
+          new GatewayConfigurationError({ message: 'Invalid gateway configuration', fields })
         )
-      : Effect.succeed(config)
-  )
+      : Effect.succeed(config);
+  })
 );
 
 export type Config = Effect.Success<typeof gatewayConfig>;

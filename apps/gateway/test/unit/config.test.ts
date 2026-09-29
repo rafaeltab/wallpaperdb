@@ -85,6 +85,9 @@ describe('startup configuration', () => {
       graphqlDeadlineMs: 5000,
       quotaCapacity: 1000000,
       quotaRefillMs: 60000,
+      quotaFallbackCapacity: 100000,
+      quotaFallbackRefillMs: 60000,
+      quotaFallbackMaxVisitors: 10000,
       cursorExpirationMs: 604800000,
     });
   });
@@ -108,7 +111,7 @@ describe('startup configuration', () => {
         PORT: '7000',
         OPENSEARCH_PROFILE_INDEX: 'custom_profiles',
         COLOR_SPREAD_STRATEGY: 'exact',
-        RATE_LIMIT_ENABLED: 'false',
+        RATE_LIMIT_ENABLED: 'true',
         GRAPHQL_INTROSPECTION_ENABLED: 'true',
         GRAPHQL_MAX_COMPLEXITY: '1505',
         REDIS_ENABLED: 'true',
@@ -120,20 +123,28 @@ describe('startup configuration', () => {
       port: 7000,
       opensearchProfileIndex: 'custom_profiles',
       colorSpreadStrategy: 'exact',
-      rateLimitEnabled: false,
+      rateLimitEnabled: true,
       graphqlIntrospectionEnabled: true,
       graphqlMaxComplexity: 1505,
       redisEnabled: true,
     });
     expect(
-      loadConfig({ ...environment, NODE_ENV: 'production', TRUSTED_PROXIES: '10.0.0.1' })
-        .graphqlIntrospectionEnabled
+      loadConfig({
+        ...environment,
+        NODE_ENV: 'production',
+        TRUSTED_PROXIES: '10.0.0.1',
+        REDIS_ENABLED: 'true',
+      }).graphqlIntrospectionEnabled
     ).toBe(false);
   });
   it.each([
     { QUOTA_CAPACITY: '99', GRAPHQL_MAX_COMPLEXITY: '10' },
     { QUOTA_CAPACITY: '100', GRAPHQL_MAX_COMPLEXITY: '101' },
     { QUOTA_REFILL_MS: '0' },
+    { QUOTA_FALLBACK_CAPACITY: '99', GRAPHQL_MAX_COMPLEXITY: '10' },
+    { QUOTA_FALLBACK_CAPACITY: '100', GRAPHQL_MAX_COMPLEXITY: '101' },
+    { QUOTA_FALLBACK_REFILL_MS: '0' },
+    { QUOTA_FALLBACK_MAX_VISITORS: '0' },
     { GRAPHQL_MAX_ACTIVE: '0' },
     { GRAPHQL_DEADLINE_MS: '0' },
     { GRAPHQL_MAX_ACTIVE: '1.5' },
@@ -150,4 +161,25 @@ describe('startup configuration', () => {
       'Invalid gateway configuration'
     );
   });
+});
+
+it.each([
+  'RATE_LIMIT_ENABLED',
+  'REDIS_ENABLED',
+])('rejects disabled production protection %s but permits explicit development disabling', async (field) => {
+  const overrides = {
+    ...environment,
+    NODE_ENV: 'production',
+    TRUSTED_PROXIES: '10.0.0.1',
+    REDIS_ENABLED: 'true',
+    [field]: 'false',
+  };
+  const error = await Effect.runPromise(
+    gatewayConfig.pipe(
+      Effect.provideService(ConfigProvider.ConfigProvider, ConfigProvider.fromUnknown(overrides)),
+      Effect.flip
+    )
+  );
+  expect(error.fields).toContain(field);
+  expect(() => loadConfig({ ...overrides, NODE_ENV: 'development' })).not.toThrow();
 });

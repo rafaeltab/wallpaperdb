@@ -33,11 +33,12 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
         raise ValueError('Native float32 source precision is proven only for the pinned ISO fixture')
     if map_policy not in ('fullrange', 'smalloffset', 'identity', 'moderateoffset'):
         raise ValueError('Unknown native gain-map encoder policy')
-    if coding not in ('lossless-rgb', 'dct-rgb', 'dct-float-rgb', 'jpegli-base-dct-float-map'):
+    if coding not in ('lossless-rgb', 'dct-rgb', 'dct-float-rgb', 'jpegli-base-dct-float-map',
+                      'mozjpeg-base-dct-float-map'):
         raise ValueError('Unknown native JPEG coding representation')
-    if coding in ('dct-rgb', 'dct-float-rgb', 'jpegli-base-dct-float-map'):
+    if coding in ('dct-rgb', 'dct-float-rgb', 'jpegli-base-dct-float-map', 'mozjpeg-base-dct-float-map'):
         from dct_jpeg import encode as encode_jpeg
-        if coding in ('dct-float-rgb', 'jpegli-base-dct-float-map'):
+        if coding in ('dct-float-rgb', 'jpegli-base-dct-float-map', 'mozjpeg-base-dct-float-map'):
             encode_jpeg = partial(encode_jpeg, method='float')
     else:
         encode_jpeg = encode_lossless
@@ -45,6 +46,12 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     if coding == 'jpegli-base-dct-float-map':
         from jpegli import encode as encode_jpegli
         encode_base = partial(encode_jpegli, input_type='uint8', tables='standard', adaptive=True)
+    elif coding == 'mozjpeg-base-dct-float-map':
+        from mozjpeg import encode as encode_mozjpeg
+        # Declared deterministic profile among the four passing ISO cover
+        # base trials. The compressed base is still requalified after packing.
+        encode_base = partial(encode_mozjpeg, method='islow', trellis=True,
+                              deringing=False, optimized_huffman=True)
     if geometry_revision not in ('decoder-gamut-v1', 'gainmap-hdr-target-gamut-v1'):
         raise ValueError('Unknown native geometry coordinate revision')
     if operation not in gainmap.GEOMETRIES or orientation not in range(1, 9):

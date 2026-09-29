@@ -181,7 +181,8 @@ def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
                     case['hdr_decoder_evidence'] = {'native': native_facts, 'iso': decoded_iso['evidence']}
                     case['artifacts'] = {'output': str(target), 'sha256': gainmap.digest(target),
                         'reference_sdr': str(reference_sdr), 'reference_sdr_sha256': gainmap.digest(reference_sdr)}
-                    if coding in ('dct-rgb', 'dct-float-rgb', 'jpegli-base-dct-float-map'):
+                    if coding in ('dct-rgb', 'dct-float-rgb', 'jpegli-base-dct-float-map',
+                                  'mozjpeg-base-dct-float-map'):
                         # Keep this third decoder route's extra native map
                         # conversion visible. It is neither the encoder nor a
                         # physical consumer, and it must not erase its failures

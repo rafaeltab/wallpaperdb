@@ -12,7 +12,11 @@ import Redis from 'ioredis';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { redisQuotaLayer } from '../src/adapters/redis/index.js';
-import { type AdmissionResult, Quota } from '../src/capabilities/admission/index.js';
+import {
+  type AdmissionResult,
+  type QuotaUnavailable,
+  Quota,
+} from '../src/capabilities/admission/index.js';
 
 let container: StartedTestContainer;
 beforeAll(async () => {
@@ -26,7 +30,13 @@ async function distributed(port = container.getMappedPort(6379), enabled = true)
     redisQuotaLayer({ redisEnabled: enabled, redisHost: '127.0.0.1', redisPort: port })
   );
   const quota = await runtime.runPromise(Quota);
-  return { quota, dispose: () => runtime.dispose() };
+  return {
+    quota: {
+      take: (...args: Parameters<Quota['take']>) =>
+        quota.take(...args).pipe(Effect.catchTag('QuotaUnavailable', Effect.succeed)),
+    },
+    dispose: () => runtime.dispose(),
+  };
 }
 function observeQuotaMetrics() {
   const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
@@ -39,7 +49,11 @@ function observeQuotaMetrics() {
       return exporter.getMetrics().flatMap((resource) =>
         resource.scopeMetrics.flatMap((scope) =>
           scope.metrics
-            .filter((metric) => metric.descriptor.name === 'admission.quota.unenforced')
+            .filter(
+              (metric) =>
+                metric.descriptor.name === 'admission.quota.unavailable' ||
+                metric.descriptor.name === 'admission.quota.saturated'
+            )
             .flatMap((metric) =>
               metric.dataPoints.map((point) => ({
                 attributes: point.attributes,
@@ -182,7 +196,7 @@ describe('quota storage contract', () => {
       await b.dispose();
     }
   });
-  it('allows every request without local quota windows when Redis is disabled or unreachable', async () => {
+  it('reports typed unavailability when Redis is disabled or unreachable', async () => {
     const observed = observeQuotaMetrics();
     try {
       for (const enabled of [false, true]) {
@@ -191,7 +205,7 @@ describe('quota storage contract', () => {
           for (let i = 0; i < 3; i++) {
             expect(
               await Effect.runPromise(adapter.quota.take('unavailable', 1, 60000, 1))
-            ).toMatchObject({ _tag: 'Allowed', remaining: 1 });
+            ).toMatchObject({ _tag: 'QuotaUnavailable' });
           }
         } finally {
           await adapter.dispose();
@@ -212,7 +226,7 @@ describe('quota storage contract', () => {
     const adapter = await distributed(bridge.port);
     const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
     const observed = observeQuotaMetrics();
-    let pending: Promise<AdmissionResult[]> | undefined;
+    let pending: Promise<Array<AdmissionResult | QuotaUnavailable>> | undefined;
     try {
       await control.ping();
       bridge.holdReplies();
@@ -231,7 +245,7 @@ describe('quota storage contract', () => {
       expect(await control.ping()).toBe('PONG');
       expect(
         await Effect.runPromise(adapter.quota.take('healthy-saturation', 100, 60000, 1))
-      ).toMatchObject({ _tag: 'Allowed', remaining: 100 });
+      ).toMatchObject({ _tag: 'Saturated' });
       expect(Number(await control.hget('graphql:quota:healthy-saturation', 'tokens'))).toBeCloseTo(
         36,
         0
@@ -287,8 +301,7 @@ describe('quota storage contract', () => {
       expect(
         await Effect.runPromise(adapter.quota.take('cancel-held', 100, 60000, 1))
       ).toMatchObject({
-        _tag: 'Allowed',
-        remaining: 100,
+        _tag: 'Saturated',
       });
       expect(await observed.read()).toEqual([{ attributes: { reason: 'saturated' }, value: 1 }]);
       expect(Number(await control.hget('graphql:quota:cancel-held', 'tokens'))).toBeCloseTo(36, 0);
@@ -316,8 +329,8 @@ describe('quota storage contract', () => {
     try {
       await control.lpush('graphql:quota:wrong-type', 'invalid-quota-storage');
       expect(await Effect.runPromise(adapter.quota.take('wrong-type', 1, 60000, 1))).toMatchObject({
-        _tag: 'Allowed',
-        remaining: 1,
+        _tag: 'QuotaUnavailable',
+        reason: 'command_failure',
       });
       expect(await observed.read()).toEqual([
         { attributes: { reason: 'command_failure' }, value: 1 },
@@ -339,8 +352,8 @@ describe('quota storage contract', () => {
       expect(
         await Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000, 1))
       ).toMatchObject({
-        _tag: 'Allowed',
-        remaining: 1,
+        _tag: 'QuotaUnavailable',
+        reason: 'command_failure',
       });
       expect(await observed.read()).toEqual([
         { attributes: { reason: 'command_failure' }, value: 1 },
@@ -384,7 +397,7 @@ describe('quota storage contract', () => {
       await adapter.dispose();
     }
   });
-  it('fails open during a connection outage and restores distributed enforcement after reconnecting', async () => {
+  it('reports failure during a connection outage and restores distributed enforcement after reconnecting', async () => {
     const bridge = await proxy();
     const adapter = await distributed(bridge.port);
     try {
@@ -395,7 +408,7 @@ describe('quota storage contract', () => {
       bridge.disconnect();
       await expect
         .poll(() => Effect.runPromise(adapter.quota.take('reconnect', 1, 60000, 1)))
-        .toMatchObject({ _tag: 'Allowed', remaining: 1 });
+        .toMatchObject({ _tag: 'QuotaUnavailable' });
       bridge.restore();
       await expect
         .poll(() => Effect.runPromise(adapter.quota.take('reconnect', 1, 60000, 1)), {
@@ -416,7 +429,7 @@ describe('quota storage contract', () => {
     try {
       expect(
         await Effect.runPromise(adapter.quota.take('startup-outage', 1, 60000, 1))
-      ).toMatchObject({ _tag: 'Allowed', remaining: 1 });
+      ).toMatchObject({ _tag: 'QuotaUnavailable' });
       bridge.restore();
       await expect
         .poll(() => Effect.runPromise(adapter.quota.take('startup-outage', 1, 60000, 1)), {
@@ -443,7 +456,8 @@ describe('quota storage contract', () => {
           { concurrency: 'unbounded' }
         ).pipe(Effect.timeout('3 seconds'))
       );
-      expect(decisions.every((decision) => decision._tag === 'Allowed')).toBe(true);
+      expect(decisions.filter((decision) => decision._tag === 'Saturated')).toHaveLength(192);
+      expect(decisions.filter((decision) => decision._tag === 'QuotaUnavailable')).toHaveLength(64);
       expect(bridge.evals).toBeLessThanOrEqual(64);
       const committed = 500 - Number(await control.hget('graphql:quota:stalled', 'tokens'));
       expect(committed).toBeGreaterThan(0);

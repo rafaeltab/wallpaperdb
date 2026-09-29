@@ -1,7 +1,11 @@
 import { recordCounter } from '@wallpaperdb/core/telemetry';
 import { Clock, Effect, Layer, Queue, Schema, Semaphore, Stream } from 'effect';
 import Redis from 'ioredis';
-import { type AdmissionResult, Quota } from '../../capabilities/admission/index.js';
+import {
+  type AdmissionResult,
+  Quota,
+  QuotaUnavailable,
+} from '../../capabilities/admission/index.js';
 
 const consume = `
 local capacity = tonumber(ARGV[1])
@@ -65,9 +69,9 @@ class RedisQuota implements Quota {
     limit: number,
     windowMs: number,
     cost: number
-  ): Effect.fn.Return<AdmissionResult> {
-    if (!this.client) return yield* allowWithoutQuota(limit, windowMs, 'disabled');
-    if (!this.available) return yield* allowWithoutQuota(limit, windowMs, 'unavailable');
+  ): Effect.fn.Return<AdmissionResult, QuotaUnavailable> {
+    if (!this.client) return yield* unavailable('disabled');
+    if (!this.available) return yield* unavailable('unavailable');
     const client = this.client;
     const reply = yield* this.permits.withPermitsIfAvailable(1)(
       Effect.tryPromise({
@@ -84,36 +88,41 @@ class RedisQuota implements Quota {
             )
           )
         ),
-        Effect.catch(() =>
-          Effect.sync(() => {
-            this.disconnect();
-            return undefined;
-          })
+        Effect.catch((cause) =>
+          Effect.logWarning('Distributed quota command failed', { cause }).pipe(
+            Effect.andThen(
+              Effect.sync(() => {
+                this.disconnect();
+                return undefined;
+              })
+            )
+          )
         ),
         // Redis cannot cancel an issued command. Keep its permit until the command
         // settles under the client's one-second deadline, including on caller cancellation.
         Effect.uninterruptible
       )
     );
-    if (reply._tag === 'None') return yield* allowWithoutQuota(limit, windowMs, 'saturated');
-    if (reply.value === undefined)
-      return yield* allowWithoutQuota(limit, windowMs, 'command_failure');
+    if (reply._tag === 'None') {
+      yield* Effect.try(() =>
+        recordCounter('admission.quota.saturated', 1, { reason: 'saturated' })
+      ).pipe(Effect.ignore);
+      return { _tag: 'Saturated' };
+    }
+    if (reply.value === undefined) return yield* unavailable('command_failure');
     const [allowed, remaining, refill] = reply.value;
     if (allowed === 0) return { _tag: 'Limited', retryAfter: refill };
     const now = yield* Clock.currentTimeMillis;
     return { _tag: 'Allowed', remaining, reset: now + refill };
   });
 }
-const allowWithoutQuota = Effect.fnUntraced(function* (
-  limit: number,
-  windowMs: number,
-  reason: 'disabled' | 'unavailable' | 'saturated' | 'command_failure'
-): Effect.fn.Return<AdmissionResult> {
-  yield* Effect.try(() => recordCounter('admission.quota.unenforced', 1, { reason })).pipe(
+const unavailable = Effect.fnUntraced(function* (
+  reason: QuotaUnavailable['reason']
+): Effect.fn.Return<never, QuotaUnavailable> {
+  yield* Effect.try(() => recordCounter('admission.quota.unavailable', 1, { reason })).pipe(
     Effect.ignore
   );
-  const now = yield* Clock.currentTimeMillis;
-  return { _tag: 'Allowed', remaining: limit, reset: now + windowMs };
+  return yield* Effect.fail(new QuotaUnavailable({ reason }));
 });
 export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota> {
   return Layer.effect(
@@ -124,7 +133,7 @@ export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota> {
         Stream.runForEach((available) =>
           (available
             ? Effect.logInfo('Distributed quota enforcement restored')
-            : Effect.logWarning('Distributed quota unavailable; allowing requests')
+            : Effect.logWarning('Distributed quota unavailable; local admission required')
           ).pipe(Effect.annotateLogs({ 'admission.quota.available': available }))
         ),
         Effect.forkScoped
@@ -175,7 +184,7 @@ export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota> {
       client.on('close', () => quota.setAvailable(false));
       yield* Effect.tryPromise(() => client.connect()).pipe(
         Effect.catch(() =>
-          Effect.logWarning('Distributed quota unavailable at startup; allowing requests')
+          Effect.logWarning('Distributed quota unavailable at startup; local admission required')
         )
       );
       return quota;

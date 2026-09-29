@@ -544,7 +544,9 @@ def encode_other(paths, target, ext, transfer, gamut, refs, count, spec):
     elif ext == 'gif':
         options += ['-filter_complex','[0:v]format=rgba,split[image][palette];[palette]palettegen=reserve_transparent=1[pal];[image][pal]paletteuse=alpha_threshold=128','-frames:v','1']
     else:
-        options += ['-pix_fmt','rgba64be','-color_primaries',str(PRIMARIES[gamut]),'-color_trc',str(TRANSFERS[transfer]),'-frames:v','1']
+        # PNG EXIF arrives as frame side data; -map_metadata alone does not
+        # remove it. Keep explicit frame color fields while deleting side data.
+        options += ['-vf','sidedata=mode=delete','-pix_fmt','rgba64be','-color_primaries',str(PRIMARIES[gamut]),'-color_trc',str(TRANSFERS[transfer]),'-frames:v','1']
     if transfer == 'srgb' and ext in ('jpg', 'webp') and count == 1:
         native(['node', Path(__file__).parent/'encode-sdr.cjs'],
                data=json.dumps({'input': str(paths[0]), 'output': str(target), 'format': ext}).encode())

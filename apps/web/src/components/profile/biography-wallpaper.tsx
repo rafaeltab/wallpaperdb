@@ -1,3 +1,5 @@
+import { GraphQLError } from '@/components/graphql-error';
+import { GatewayAdmissionError } from '@/lib/graphql/admission';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { useWallpaperQuery } from '@/hooks/useWallpaperQuery';
@@ -11,14 +13,17 @@ export function BiographyWallpaper({
   profileId: string;
   alt: string;
 }) {
-  const query = useWallpaperQuery(wallpaperId, { staleTime: 0, retry: false });
+  const query = useWallpaperQuery(wallpaperId, { staleTime: 0 });
   const [retries, setRetries] = useState(0);
+  const error = query.error ?? query.failureReason;
+  const admissionFailed = error instanceof GatewayAdmissionError;
   const wallpaper = query.data;
   const variant = wallpaper?.variants?.[0];
   const matches = wallpaper?.wallpaperId === wallpaperId && wallpaper.profileId === profileId;
   const retryable = !wallpaper || (matches && !variant);
   useEffect(() => {
-    if (query.isPending || query.isFetching || !retryable || retries >= 3) return;
+    if (query.isPending || query.isFetching || admissionFailed || !retryable || retries >= 3)
+      return;
     const timeout = window.setTimeout(
       () => {
         setRetries((count) => count + 1);
@@ -27,7 +32,16 @@ export function BiographyWallpaper({
       1000 * 2 ** retries
     );
     return () => window.clearTimeout(timeout);
-  }, [query.isPending, query.isFetching, query.refetch, retryable, retries]);
+  }, [query.isPending, query.isFetching, query.refetch, admissionFailed, retryable, retries]);
+  const errorDisplay = admissionFailed ? (
+    <GraphQLError
+      error={error}
+      retry={() => query.refetch()}
+      retrying={query.isFetching}
+      retryLabel="Try wallpaper again"
+    />
+  ) : null;
+  if (errorDisplay && (!matches || !variant)) return errorDisplay;
   if (query.isPending)
     return <output className="my-4 block text-sm text-muted-foreground">Loading wallpaper…</output>;
   if (
@@ -58,6 +72,7 @@ export function BiographyWallpaper({
   }
   return (
     <span className="my-4 block overflow-hidden rounded-xl border bg-muted/30">
+      {errorDisplay}
       <Link
         to="/wallpapers/$wallpaperId"
         params={{ wallpaperId }}

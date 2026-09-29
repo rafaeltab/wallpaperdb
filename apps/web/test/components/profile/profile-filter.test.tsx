@@ -191,3 +191,33 @@ describe('Profile wallpaper filter', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+describe('Profile filter admission errors', () => {
+  beforeEach(() => mockFetch.mockReset());
+  it.each([429, 503])('explains HTTP %s for a selected Profile', async (status) => {
+    mockFetch.mockImplementation(() => Promise.resolve(new Response('{}', { status, headers: { 'retry-after': '0' } })));
+    const { client } = renderFilter(ada.id);
+    expect(await screen.findByRole('alert')).toHaveTextContent(status === 429 ? 'network' : 'busy');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Retry selected Profile' })).toBeEnabled());
+    expect(mockFetch).toHaveBeenCalledTimes(status === 429 ? 2 : 1);
+    client.clear();
+  });
+
+  it.each([429, 503])('keeps Profile results before an HTTP %s next-page error', async (status) => {
+    mockFetch.mockResolvedValueOnce(response({ searchProfiles: {
+      edges: [{ node: ada }], pageInfo: { hasNextPage: true, endCursor: 'cursor_ada' },
+    } }));
+    const user = userEvent.setup();
+    const { client } = renderFilter();
+    await user.type(screen.getByRole('searchbox', { name: 'Profile' }), 'ada');
+    await screen.findByRole('button', { name: 'Load more Profiles' });
+    mockFetch.mockImplementation(() => Promise.resolve(new Response('{}', { status, headers: { 'retry-after': '0' } })));
+    await user.click(screen.getByRole('button', { name: 'Load more Profiles' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(status === 429 ? 'network' : 'busy');
+    expect(screen.getByRole('list', { name: 'Matching Profiles' }).compareDocumentPosition(alert) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Retry loading more Profiles' })).toBeEnabled());
+    expect(mockFetch).toHaveBeenCalledTimes(status === 429 ? 3 : 2);
+    client.clear();
+  });
+});

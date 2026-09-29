@@ -1,3 +1,4 @@
+import { GraphQLError } from '@/components/graphql-error';
 import { graphqlQueryOptions } from '@/lib/graphql/admission';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
@@ -35,6 +36,10 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
     enabled: Boolean(profileId),
   });
 
+  const selectedError = selected.error ?? selected.failureReason;
+  const resultsError = results.error ?? results.failureReason;
+  const nextPageFailed = results.isFetchNextPageError || results.isFetchingNextPage;
+
   return (
     <div className="flex max-w-lg flex-col gap-2">
       {profileId ? (
@@ -54,23 +59,7 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
                 </span>
               </span>
             </>
-          ) : selected.isError ? (
-            <div className="min-w-0 flex-1">
-              <p role="alert" className="text-xs text-destructive">
-                Could not load the selected Profile.
-              </p>
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="h-auto p-0"
-                aria-label="Retry selected Profile"
-                onClick={() => void selected.refetch()}
-              >
-                Try again
-              </Button>
-            </div>
-          ) : (
+          ) : selectedError ? null : (
             <span className="flex-1 text-sm text-muted-foreground">
               {selected.isLoading
                 ? 'Loading selected Profile…'
@@ -90,6 +79,15 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
             Clear
           </Button>
         </div>
+      ) : null}
+      {profileId && selectedError ? (
+        <GraphQLError
+          error={selectedError}
+          retry={() => selected.refetch()}
+          retrying={selected.isFetching}
+          title="Could not load the selected Profile."
+          retryLabel="Retry selected Profile"
+        />
       ) : null}
       {!collapsed ? (
         <>
@@ -114,27 +112,6 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
             <output htmlFor={inputId} className="text-xs text-muted-foreground">
               Searching Profiles…
             </output>
-          ) : null}
-          {query && query === debouncedQuery && results.isError && !results.isFetchNextPageError ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <p role="alert" className="text-xs text-destructive">
-                Could not search Profiles. Try again.
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void results.refetch()}
-                aria-label="Retry Profile search"
-              >
-                Try again
-              </Button>
-            </div>
-          ) : null}
-          {query && query === debouncedQuery && results.isFetchNextPageError ? (
-            <p role="alert" className="text-xs text-destructive">
-              Could not load more Profiles.
-            </p>
           ) : null}
           {query && query === debouncedQuery && results.data?.pages[0].edges.length === 0 ? (
             <output htmlFor={inputId} className="text-xs text-muted-foreground">
@@ -175,7 +152,20 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
                 ))}
             </ul>
           ) : null}
-          {query && query === debouncedQuery && results.hasNextPage ? (
+          {query && query === debouncedQuery && resultsError ? (
+            <GraphQLError
+              error={resultsError}
+              retry={() => (nextPageFailed ? results.fetchNextPage() : results.refetch())}
+              retrying={results.isFetching}
+              title={
+                nextPageFailed
+                  ? 'Could not load more Profiles.'
+                  : 'Could not search Profiles. Try again.'
+              }
+              retryLabel={nextPageFailed ? 'Retry loading more Profiles' : 'Retry Profile search'}
+            />
+          ) : null}
+          {query && query === debouncedQuery && results.hasNextPage && !resultsError ? (
             <Button
               type="button"
               variant="outline"

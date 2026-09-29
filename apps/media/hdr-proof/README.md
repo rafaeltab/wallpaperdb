@@ -36,6 +36,16 @@ matrix coding. Separate libultrahdr variants test RGB JPEG decoding and its
 existing exact transfer/gain formulas. The pinned libavif reader rejects these
 SOF3 JPEG files; file accuracy and physical consumer compatibility remain separate.
 
+A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
+of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
+the same HDR intent and fixed appearance limits. Analytic near-black controls
+check the offset tradeoff; the earlier identity-map candidates and their upscale
+failures remain visible. Native ISO-only source reconstruction checks the ICC,
+base/map samples and metadata before applying gain. Its map expansion is limited
+to independently verified identity or two-times axes. Missing or conflicting
+color signaling, unknown ICC facts, nonidentity map orientation and unproved map
+ratios reject transformation.
+
 Its [versioned geometry reference](gainmap_reference.py) filters and clips in the
 requested gamut before conversion to metric coordinates. Clipping Lanczos
 excursions in Rec.2020 can create colors outside the requested P3 or sRGB gamut.
@@ -83,6 +93,13 @@ These are gamma-2.2 SDR files, not standard sRGB-transfer files. The accepted
 contract defines `gamut=srgb` as primaries, so these candidates retain the same
 selectors while recording different representation IDs. Profile-aware physical
 review remains mandatory; existing failed sRGB-transfer files stay failed.
+
+Separate GIF candidates use a gamma-3.2 ICC profile and native nearest rounding
+to eight bits. They retain the same SDR reference, selectors and appearance
+limits. Their case IDs identify the representation; earlier gamma-2.2 failures
+remain visible. This includes the two PQ APNG static orientation cases, which
+pass with the new representation. GIF still requires explicit coercion of
+fractional alpha to binary transparency.
 
 The [authored SDR JPEG proof](authored_sdr_proof.py) also evaluates gamma-3.2
 ICC encodings against the same independently decoded authored SDR base. These

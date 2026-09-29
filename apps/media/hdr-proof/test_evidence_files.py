@@ -9,6 +9,33 @@ from matrix import build_matrix, required_cases
 
 
 class EvidenceFileTests(unittest.TestCase):
+    def test_manual_hdr_intent_keeps_inspection_and_distinguishes_native_comparison(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root/'results').mkdir()
+            intent = root/'intent.png'
+            intent.write_bytes(b'file-copy-test-only')
+            facts = {'depth': 16, 'width': 192, 'height': 256, 'cicp': [12, 16, 0, 1]}
+            case = {'case_id': 'gainmap-android-iso:hdr:jpg:contain:copy-test',
+                'fixture_id': 'gainmap-android-iso', 'geometry': 'contain', 'status': 'qualified',
+                'native_candidate': {'coding_scope': 'JPEG SOF3'},
+                'hdr_intent': {'path': str(intent), 'sha256': suite.avif.digest(intent), 'facts': facts}}
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                files = suite.candidate_files([case], [])
+            self.assertEqual(len(files), 1)
+            entry = files[0]
+            self.assertEqual(entry['sha256'], suite.avif.digest(intent))
+            self.assertEqual(entry['facts'], facts)
+            self.assertEqual(entry['case_id'], case['case_id'])
+            self.assertEqual(entry['consumer_status'], 'pending manual review')
+            self.assertEqual(entry['codec_status'], 'inspected native HDR intent; not a conversion qualification')
+            self.assertNotIn('SOF3', entry['coding_scope'])
+            self.assertNotIn('Independent', entry['role'])
+            intent.write_bytes(b'changed-after-inspection')
+            with patch.object(suite, 'RESULTS', root/'results'), patch.object(suite, 'ROOT', root):
+                with self.assertRaisesRegex(ValueError, 'changed after inspection'):
+                    suite.candidate_files([case], [])
+
     def test_manual_bundle_includes_old_apple_and_iso_candidates_with_coding_scope(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

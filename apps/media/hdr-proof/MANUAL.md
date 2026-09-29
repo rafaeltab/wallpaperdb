@@ -25,6 +25,10 @@ JPEG/ISO and patched libultrahdr decoders check its file accuracy. Record each
 browser, viewer and wallpaper setter's ability to decode these exact files
 before assessing visible HDR. A different JPEG candidate's result does not
 establish SOF3 compatibility. Keep every consumer result pending until tested.
+The bundle also includes inspected 16-bit PQ PNG files showing the native
+encoder's matched-geometry HDR intent. Use these to compare another HDR container
+when a consumer rejects the JPEG. They are native comparison files, not
+independent source references or additional qualified conversions.
 
 The optional APNG files have 16-bit samples, PQ/HLG with P3/Rec.2020 CICP, and
 two full-canvas frames lasting 300 and 700 ms over three plays. Their explicit
@@ -45,7 +49,7 @@ files are diagnostics and must not be recorded as qualified fallbacks.
 - [ ] Compare the HDR candidate with the source at matched geometry, then with its explicit SDR counterpart. Confirm highlights visibly exceed ordinary white where the source does; inspect shadow detail, midtones, ordinary white and bright highlight texture. Record any exposure shift, clipping, banding, color shift or halo.
 - [ ] Compare each gain-map JPEG's SDR rendering with its authored SDR base. Confirm a visibly changed SDR grade is not being mistaken for a successful HDR transform.
 - [ ] Check the saturated art and gamut patches for hue shifts or flat clipping. Compare the sRGB SDR reference independently from the preserved-gamut reference.
-- [ ] Test gamma-2.2 SDR candidates separately from standard sRGB-transfer candidates. Verify their inspected CICP `1/4/0` or embedded ICC profile, then compare the same SDR reference on each browser, viewer and wallpaper setter. A consumer that ignores the declared transfer can change shadows and contrast despite using the correct primaries.
+- [ ] Test gamma-2.2 and gamma-3.2 SDR candidates separately from standard sRGB-transfer candidates. Verify their inspected CICP `1/4/0` or embedded ICC profile, then compare the same SDR reference on each browser, viewer and wallpaper setter. A consumer that ignores the declared transfer can change shadows and contrast despite using the correct primaries.
 - [ ] Play animated PQ AVIF over both dark and light checkerboard backgrounds. Verify fractional alpha and edges, first fully composed frame, frame order, frame durations, loop behavior and steady exposure across frames. Repeat playback and reload to detect adaptation or rerun exposure shifts.
 - [ ] Repeat the animation checks for optional HDR APNG and its inspected SDR APNG/AVIF/WebP derivatives. Record whether the consumer displays both frames or only the PNG default image. Compare the fixed ordinary-white column across frames, fractional alpha, 300/700 ms timing and three plays. A still preview does not qualify animation.
 - [ ] Test static extraction against the animation's first fully composed frame, with the same crop and background.

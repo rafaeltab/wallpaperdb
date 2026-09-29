@@ -18,14 +18,19 @@ class NativeGainMapRegenerationTests(unittest.TestCase):
     def test_regenerated_map_preserves_authored_base_and_source_display_headroom(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            for name, gamut in (("apple-old", "p3"), ("apple-new", "p3"),
-                                ("android-xmp", "srgb"), ("android-iso", "p3")):
-                with self.subTest(source=name):
-                    case_dir = directory / name
+            for name, gamut, mode in (("apple-old", "p3", "native-regenerate"),
+                                      ("apple-new", "p3", "native-regenerate"),
+                                      ("android-xmp", "srgb", "native-regenerate"),
+                                      ("android-iso", "p3", "native-regenerate"),
+                                      ("apple-old", "p3", "native-regenerate-avif"),
+                                      ("apple-new", "p3", "native-regenerate-avif"),
+                                      ("android-xmp", "srgb", "native-regenerate-avif")):
+                with self.subTest(source=name, mode=mode):
+                    case_dir = directory / f"{name}-{mode}"
                     case_dir.mkdir()
                     source = ROOT / "fixtures/gainmap" / f"gainmap-{name}.jpg"
                     output = case_dir / "output.jpg"
-                    job = {"case_id": name, "mode": "native-regenerate", "format": "jpg",
+                    job = {"case_id": name, "mode": mode, "format": "jpg",
                            "gamut": "preserve", "source_gamut": gamut, "geometry": "contain",
                            "input": str(source), "output": str(output)}
                     result = subprocess.run(["node", str(ROOT / "gainmap.cjs")], input=json.dumps([job]),

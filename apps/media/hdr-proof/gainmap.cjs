@@ -126,7 +126,26 @@ async function nativeRegenerate(job) {
   const basePipeline = await outputColor(geometry(sharp(base), job.geometry), job);
   await basePipeline.jpeg({ quality: 95, chromaSubsampling: '4:4:4' }).toFile(retainedBase);
   const target = await sharp(retainedBase).metadata();
-  const source = JSON.parse(run(executable, ['decode-linear', job.input, sourceFloat]));
+  let source;
+  if (job.mode === 'native-regenerate-avif') {
+    const primaries = { srgb: 1, p3: 12 }[job.source_gamut];
+    const gamut = { srgb: 0, p3: 1 }[job.source_gamut];
+    if (primaries === undefined) throw new Error('Libavif source decode requires independently established source gamut');
+    const sourceAvif = path.join(directory, 'source-lossless.avif');
+    const sourcePq = path.join(directory, 'source-pq.png');
+    run('avifgainmaputil', ['convert', job.input, sourceAvif, '--cicp', `${primaries}/13/0`,
+      '--ignore-profile', '-d', '8', '-y', '444', '-q', '100', '--qgain-map', '100', '-s', '10']);
+    run('avifgainmaputil', ['tonemap', sourceAvif, sourcePq, '--headroom', '4',
+      '--cicp-output', `${primaries}/16/0`, '--ignore-profile', '-d', '12', '-y', '444']);
+    run('ffmpeg', ['-v', 'error', '-i', sourcePq, '-vf',
+      `format=gbrpf32le,zscale=transferin=16:primariesin=${primaries}:matrixin=0:rangein=full:transfer=linear:primaries=${primaries}:matrix=0:range=full:npl=203`,
+      '-frames:v', '1', '-pix_fmt', 'gbrpf32le', '-f', 'rawvideo', '-y', sourceFloat]);
+    source = { width: metadata.width, height: metadata.height, gamut,
+      headroom: metadata.hdr_capacity_max, decoder: 'libavif-1.4.1+FFmpeg-8.1.2' };
+  } else {
+    source = { ...JSON.parse(run(executable, ['decode-linear', job.input, sourceFloat])),
+      decoder: 'libultrahdr-2.0.2+PR484+PR491+XMP-arrays' };
+  }
   const filters = [];
   if (job.geometry === 'orientation') {
     const orientation = (await sharp(base).metadata()).orientation || 1;
@@ -155,7 +174,7 @@ async function main() {
   const jobs = JSON.parse(fs.readFileSync(0, 'utf8'));
   for (const job of jobs) {
     try {
-      if (job.mode === 'native-regenerate') {
+      if (job.mode === 'native-regenerate' || job.mode === 'native-regenerate-avif') {
         const result = await nativeRegenerate(job);
         process.stdout.write(`${JSON.stringify({ case_id: job.case_id, ok: true, ...result })}\n`);
         continue;

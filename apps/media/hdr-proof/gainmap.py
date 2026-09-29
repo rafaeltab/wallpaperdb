@@ -254,7 +254,7 @@ def run(output_dir):
             except Exception as fallback_error:
                 facts["supplementary_iso_oracle_blocker"] = str(fallback_error)
         fixture_evidence.append({"fixture_id": name, **facts})
-        for mode in ("keep", "regenerate", "sdr"):
+        for mode in ("keep", "regenerate", "native-regenerate", "native-regenerate-avif", "sdr"):
             formats = FORMATS if mode in ("keep", "sdr") else ("jpg",)
             for fmt in formats:
                 gamuts = ("preserve", "srgb") if mode == "sdr" else ("preserve",)
@@ -262,8 +262,8 @@ def run(output_dir):
                     operations = GEOMETRIES if fmt == "jpg" else ("contain", "cover")
                     for operation in operations:
                         case_id = f"{name}:{'sdr' if mode == 'sdr' else 'hdr'}:{fmt}:{gamut_selector}:preserve:{operation}"
-                        if mode == "regenerate":
-                            case_id += ":regenerate"
+                        if mode in ("regenerate", "native-regenerate", "native-regenerate-avif"):
+                            case_id += f":{mode}"
                         case_dir = directory / "cases" / case_id.replace(":", "-")
                         case_dir.mkdir(parents=True, exist_ok=True)
                         input_path = path
@@ -309,10 +309,16 @@ def run(output_dir):
                 "blockers": [], "artifacts": [], "measurements": {}}
         case["selectors"]["format"] = job["format"]
         case["established_source_gamut"] = job["source_gamut"]
-        if job["mode"] == "native-retain":
+        if job["mode"] in ("native-retain", "native-regenerate", "native-regenerate-avif"):
             case["candidate"] = "libultrahdr-2.0.2+PR484+PR491+XMP-arrays:retain-base-and-map:sharp-0.35.5-geometry"
             case["native_build"] = NATIVE_RETAIN_BUILD
-            native_log = case_dir / "native-parts-both" / "native-commands.json"
+            regeneration = job["mode"] != "native-retain"
+            if regeneration:
+                source_decoder = "libavif-1.4.1" if job["mode"] == "native-regenerate-avif" else "libultrahdr-2.0.2"
+                case["candidate"] = f"libultrahdr-2.0.2+PR484+PR491+XMP-arrays:regenerate-against-authored-base:source-{source_decoder}"
+                case["native_build"] = {**NATIVE_RETAIN_BUILD,
+                    "pipeline": "Native source HDR decode; FFmpeg float linear Lanczos geometry; native libultrahdr supplied HDR/SDR intent regeneration, retained compressed authored SDR base and full-resolution quality100 RGB gain map."}
+            native_log = case_dir / ("native-regenerated-parts-both" if regeneration else "native-parts-both") / "native-commands.json"
             if native_log.exists():
                 case["artifacts"].append(str(native_log.relative_to(output_dir)))
             if encoded["ok"]:
@@ -320,6 +326,10 @@ def run(output_dir):
                 case["native_variant"] = encoded["native_variant"]
                 case["retained_parts"] = {key: str(Path(value).relative_to(output_dir))
                                           for key, value in encoded["retained_parts"].items()}
+                if regeneration:
+                    case["regeneration"] = encoded["regeneration"]
+                    case["native_hdr_source"] = {**encoded["native_hdr_source"],
+                        "path": str(Path(encoded["native_hdr_source"]["path"]).relative_to(output_dir))}
         if job["geometry"] == "crop":
             case["probe_crop_rectangle"] = {"left": 13, "top": 17, "width": 271, "height": 239}
         if not encoded["ok"]:
@@ -377,6 +387,13 @@ def run(output_dir):
             case["measurements"]["rgb_mae_code_255"] = float(np.mean(np.abs(np.asarray(reference) - actual * 255)))
             case["checks"]["appearance"] = sdr_measurement["passed"]
             if is_hdr:
+                if "native_hdr_source" in case and "hdr" in source:
+                    native_source = case["native_hdr_source"]
+                    values = np.fromfile(output_dir / native_source["path"], dtype="<f4")
+                    native_source_rgb = values.reshape(3, native_source["height"], native_source["width"])[[2, 0, 1]].transpose(1, 2, 0) * 203.0
+                    case["measurements"]["native_source_hdr_decode"] = compare_appearance(
+                        source["hdr"], native_source_rgb, reference_gamut=source["hdr_gamut"],
+                        actual_gamut={0: "srgb", 1: "p3", 2: "rec2020"}[native_source["gamut"]], fixture_class="gainmap-hdr")
                 case["checks"]["independent_source_decoder"] = source["facts"]["independent_hdr_decode"]
                 if not source["facts"]["independent_hdr_decode"]:
                     case["blockers"].append("Source HDR has no maintained independent decoder in this pinned environment; supplementary source reconstruction cannot qualify this conversion.")

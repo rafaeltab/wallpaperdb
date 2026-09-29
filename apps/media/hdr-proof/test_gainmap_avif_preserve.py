@@ -1,4 +1,6 @@
 """A gain-map AVIF derivative needs actual layer depths and two faithful renditions."""
+import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -169,6 +171,130 @@ class GainMapAvifPreserveTests(unittest.TestCase):
         self.assertEqual(decision['action'], 'original only')
         self.assertIn('source hash', decision['reason'])
         self.assertEqual(len(avif.COMMANDS), start)
+
+
+class GainMapAvifPreserveGeometryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temporary = tempfile.TemporaryDirectory()
+        cls.root = Path(cls.temporary.name)
+        cls.result = gainmap_avif_preserve.run(cls.root/'proof', geometries=('contain', 'cover', 'fill', 'upscale'))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporary.cleanup()
+
+    def test_all_geometries_keep_actual_layer_depths_and_independent_readers(self):
+        evidence = self.result['evidence']
+        self.assertEqual(len(evidence), 16)
+        self.assertEqual(len({case['case_id'] for case in evidence}), 16)
+        self.assertEqual(len(self.result['source_reconstruction_profiles']), 1)
+        for case in evidence:
+            with self.subTest(case=case['case_id']):
+                dimensions = list(gainmap_avif_preserve.SIZES[case['geometry']])
+                self.assertIn('independent_hdr', case['measurements'], case['blockers'])
+                self.assertTrue(case['checks']['known_source'])
+                self.assertTrue(case['checks']['source_appearance'])
+                self.assertTrue(case['checks']['linear_geometry_appearance'])
+                self.assertTrue(case['checks']['native_hdr_storage'])
+                self.assertEqual(case['facts']['base']['dimensions'], dimensions)
+                self.assertEqual(case['facts']['map']['dimensions'], dimensions)
+                self.assertEqual(case['facts']['alternate']['dimensions'], dimensions)
+                self.assertEqual(case['facts']['base']['depths'], [8]*3)
+                self.assertEqual(case['facts']['map']['depths'], [8]*3)
+                self.assertEqual(case['native_hdr_artifact']['facts']['dimensions'], dimensions)
+                self.assertEqual(case['adaptation_scope']['intermediate_adaptation'], 'untested')
+                self.assertEqual(case['consumer_status'], 'pending manual review')
+                self.assertEqual(case['threshold_scope']['thresholds_sha256'], '0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf')
+                self.assertEqual(case['privacy_measurement']['private_tags'], [])
+                for name in ('base', 'map'):
+                    stream = case['packet_facts'][name]['streams'][0]
+                    self.assertEqual([stream['width'], stream['height']], dimensions)
+                    self.assertEqual(stream['nb_read_frames'], '1')
+                    self.assertEqual(stream['sample_aspect_ratio'], '1:1')
+                if case['candidate'].endswith('auto'):
+                    self.assertEqual(case['status'], 'incompatible with the requested selectors')
+                    self.assertEqual(case['facts']['alternate']['depths'], [12]*3)
+                elif case['candidate'].startswith('stock'):
+                    self.assertEqual(case['status'], 'tested and failed')
+                    self.assertFalse(case['checks']['structure'])
+                else:
+                    self.assertEqual(case['status'], 'qualified', case['blockers'])
+                    self.assertTrue(all(case['checks'].values()))
+        matrix = build_matrix(evidence)
+        self.assertEqual(matrix['evidence_errors'], [])
+        actual = next(cell for cell in matrix['cells'] if cell['id'] == 'avif-gainmap:hdr:avif')['evidence']
+        self.assertEqual([(case['case_id'], case['status']) for case in actual], [(case['case_id'], case['status']) for case in evidence])
+        self.assertEqual([case['geometry'] for case in actual if case['status'] == 'qualified'], ['contain', 'cover', 'fill', 'upscale'])
+
+    def test_unproved_or_ambiguous_geometry_lists_stop_before_native_work(self):
+        for geometries in ((), ('contain', 'contain'), ('orientation',), ('crop',), ('identity',), ('unknown',)):
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                gainmap_avif_preserve.run(self.root/'wrong-geometries', geometries=geometries)
+            self.assertEqual(len(avif.COMMANDS), start)
+        with self.assertRaises(ValueError):
+            gainmap_avif_preserve.run(self.root/'ambiguous', geometries=('contain', 'cover'), selectors=gainmap_avif_preserve.SELECTORS)
+        for operation in ('cover', 'fill', 'upscale'):
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                gainmap_avif_preserve.run(self.root/'wrong-selectors', geometries=(operation,), selectors=gainmap_avif_preserve.SELECTORS)
+            self.assertEqual(len(avif.COMMANDS), start)
+
+    def test_containment_bytes_statuses_and_every_measurement_remain_exact(self):
+        expected = {
+            'stock-auto': ('incompatible with the requested selectors', '94005280cbaec0a0f5418bdf70226bdc89c1c183fc118bea30bef816ab1761b2', 'f880dbeeb0a863fab7789970b77445d3d1ce331df099c5213e706e0377c50c12'),
+            'stock-depth8': ('tested and failed', '485dc0a025ccf0206c096961514c2503c49ba58b025021ff4fbc1c671d6c29b4', 'a361fa3ffb0ee9234dedee1760bd60fbc174b8187f8cec29828d6969a262ee7a'),
+            'moderateoffset-auto': ('incompatible with the requested selectors', '5807ca72d3124427ebb155ce9c23e2467f7630c5b5c78e1398aa631a88c53c54', '5aceb948fea4ac69014e337c21f4f8f4a5540f85f16bf08ccf345b966a83405f'),
+            'moderateoffset-depth8': ('qualified', '45a3b21d212803fd292da1d667d455b4ef03b7ae909cd3908ec5e93398feb754', '893c582ce97a48407c3445e5e73b94a15e71bda8e6a07245d62b5d8712cc672c'),
+        }
+        cases = [case for case in self.result['evidence'] if case['geometry'] == 'contain']
+        self.assertEqual(len(cases), 4)
+        for case in cases:
+            measured_hash = hashlib.sha256(json.dumps(case['measurements'], sort_keys=True).encode()).hexdigest()
+            self.assertEqual((case['status'], case['artifacts']['sha256'], measured_hash), expected[case['candidate']])
+
+    def test_output_and_native_hdr_bridge_dimensions_cannot_be_inferred_from_request(self):
+        case = next(case for case in self.result['evidence'] if case['geometry'] == 'cover' and case['candidate'] == 'moderateoffset-depth8')
+        for inspect, args in ((gainmap_avif_preserve.inspect_output, (Path(case['artifacts']['output']), self.root/'wrong-inspection')),
+                              (gainmap_avif_preserve.inspect_native_hdr, (Path(case['native_hdr_artifact']['path']),))):
+            start = len(avif.COMMANDS)
+            with self.assertRaises(ValueError):
+                inspect(*args)
+            self.assertEqual(len(avif.COMMANDS), start)
+        packet = Path(case['packet_facts']['base']['path'])
+        with self.assertRaisesRegex(ValueError, 'dimensions'):
+            gainmap_avif_preserve.inspect_packet(packet, 'base', [173, 130])
+
+    def test_upscale_container_and_packet_level_agree_without_relaxing_depth_flags(self):
+        case = next(case for case in self.result['evidence'] if case['geometry'] == 'upscale' and case['candidate'] == 'moderateoffset-depth8')
+        for name in ('base', 'map'):
+            self.assertEqual(case['facts'][name]['av1_configuration_hex'], '81240000')
+            self.assertEqual(case['packet_facts'][name]['streams'][0]['level'], 4)
+        data = Path(case['artifacts']['output']).read_bytes()
+        for name, after in (('wrong-level', b'\x81\x20\x00\x00'), ('wrong-depth', b'\x81\x24\x20\x00')):
+            changed = self.root/f'{name}.avif'
+            changed.write_bytes(data.replace(b'av1C\x81\x24\x00\x00', b'av1C'+after))
+            start = len(avif.COMMANDS)
+            with self.assertRaisesRegex(ValueError, 'AV1 configuration'):
+                gainmap_avif_preserve.inspect_output(changed, self.root/name, dimensions=(769, 576))
+            self.assertEqual(len(avif.COMMANDS), start)
+
+    def test_native_encoder_success_remains_recorded_when_actual_geometry_rejects(self):
+        case = next(case for case in self.result['evidence'] if case['geometry'] == 'cover' and case['candidate'] == 'moderateoffset-depth8')
+        # Supply actual native cover inputs to a containment request. The real
+        # encoder succeeds, then independent output dimensions must reject it
+        # before the appearance references can be consumed.
+        rejected = gainmap_avif_preserve._case(Path(case['artifacts']['source']), case['source_facts'],
+            case['native_source'], case['native_geometry'], case['measurements'], None, None,
+            Path(case['native_combine']['base_input']['path']), Path(case['native_combine']['hdr_input']['path']),
+            self.root/'mismatched-native-inputs', 'moderateoffset-depth8',
+            case['native_combine']['tool'], 8, 'contain')
+        self.assertEqual(rejected['status'], 'tested and failed')
+        self.assertTrue(rejected['checks']['native_encoder'])
+        self.assertFalse(rejected['checks']['structure'])
+        self.assertIn('dimensions', rejected['blockers'][0])
+        self.assertTrue(Path(rejected['artifacts']['output']).exists())
 
 
 if __name__ == '__main__':

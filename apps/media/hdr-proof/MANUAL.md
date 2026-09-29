@@ -79,6 +79,13 @@ The corrected native old Apple full-source preparation passes the documented
 source comparison. It is encoder-input evidence only. Check each derivative's
 separately named source model and file qualification before drawing a conclusion
 from its visible appearance.
+The separately named corrected old Apple containment has a qualified boost-16
+file comparison against the documented full effect. Its manual entry includes
+the HDR JPEG, matched authored SDR reference and inspected native PQ16 HDR
+intent. The intent is encoder input, not an independent source reference.
+Keep its documented-model label separate from earlier legacy-model files.
+Its stock-reader failure and untested intermediate adaptation remain visible;
+Mac, iPad, Windows and Galaxy observations are still pending.
 The gain-map JPEG endpoint comparisons use display boost 16. Check the separate
 ISO upscale boost-2 rendering record before selecting a download; its measured
 adaptation failure cannot be overridden by a successful endpoint or a physical

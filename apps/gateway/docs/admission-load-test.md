@@ -51,7 +51,7 @@ The [HTTP lifecycle tests](../test/http-lifecycle.test.ts) separately exercise b
 
 ## Completed admission and ingress measurements
 
-Repeated on 2026-09-29 after shared usage telemetry and local fallback were implemented, using gateway commit `9ce8c53f` and the same Caddy endpoint, real Redis/OpenSearch, and three-wallpaper fixture. The host had approximately 18 GiB available memory after unrelated worktree application containers were stopped. No build or test suite ran during collection. Only Gateway and its dependencies were needed for these operations. This is a small-fixture development experiment, not a populated-catalogue or production capacity test.
+Repeated on 2026-09-29 after shared usage telemetry and local fallback were implemented, using gateway commit `9ce8c53f` and the same Caddy endpoint, real Redis/OpenSearch, and three-wallpaper fixture. The host had approximately 18 GiB available memory after this worktree's nonessential application containers were stopped. No build or test suite ran during collection. Only Gateway and its dependencies were needed for these operations. This is a small-fixture development experiment, not a populated-catalogue or production capacity test.
 
 All rows used one client IP, so concurrent workers also exercise shared-IP contention. Each row sent 128 requests. The completed cheap query envelope was 80 bytes and the expensive envelope was 90 bytes. Rejected requests remain in reported throughput and latency; high denial throughput is not successful backend throughput. The load script now reports status/code counts, current cost limits, and client concurrency to make that distinction visible.
 
@@ -85,7 +85,7 @@ With Redis healthy and the bucket refilled, a separate run paced requests at 25,
 | 25 | 8 / 13 | 10 / 12 | 25 |
 | 50 | 5 / 7 | 9 / 12 | 50 |
 | 100 | 5 / 6 | 6 / 8 | 101 |
-| 200 | 4 / 13 | 6 / 8 | 200–201 |
+| 200 | 4 / 13 | 6 / 8 | 200 to 201 |
 
 Use the following conservative initial deployment settings, subject to the production verification below:
 
@@ -97,11 +97,11 @@ Use the following conservative initial deployment settings, subject to the produ
 | Raw ingress rate per trusted IP | 25 requests/s, burst at most 8 across ingress replicas | The lowest paced rate succeeded for both operations. This adds a coarse raw-traffic bound without replacing cost admission. Shared-network fairness and production traffic require retuning. |
 | GraphQL body size at ingress | 16,384 bytes | Largest shipped query-only JSON envelope was 674 bytes. This leaves more than 24 times that size for variables and formatting while cutting the observed gateway transport ceiling by a factor of 64. Measure real filter/cursor payloads before deployment. |
 
-The aggregate rate is a deployment budget sized by healthy replica count. An ingress must coordinate or partition it, rather than grant the full budget independently to every ingress instance. A per-IP raw-request limit is shared across the ingress deployment. These raw-rate settings and the 16 KiB body limit are a product-neutral starting contract, not controls installed in local Caddy. Do not claim the ingress contract is enforced until the selected topology passes verification. The rate observations are short bursts, roughly 0.6–5.1 seconds per row, and do not establish sustained rates, populated-page serialization costs, or acceptable production tail latency.
+The aggregate rate is a deployment budget sized by healthy replica count. An ingress must coordinate or partition it, rather than grant the full budget independently to every ingress instance. A per-IP raw-request limit is shared across the ingress deployment. These raw-rate settings and the 16 KiB body limit are a product-neutral starting contract, not controls installed in local Caddy. Do not claim the ingress contract is enforced until the selected topology passes verification. The rate observations are short bursts, roughly 0.6 to 5.1 seconds per row, and do not establish sustained rates, populated-page serialization costs, or acceptable production tail latency.
 
 ### Body-size probes
 
-The script measured all five shipped web query-only JSON envelopes at 237–674 bytes. It then appended legal JSON whitespace to the cheap request, isolating raw body size from query complexity. Through local Caddy, 1,024, 4,096, 16,384, 16,385, 65,536, and 1,048,576-byte bodies all returned 200. The 1,048,577-byte body returned 413 `BAD_REQUEST`, no quota headers, and a safe error body. Successful probe latency was 2.5–28.0 ms; the rejected probe took 3.0 ms. This finds the current one-MiB gateway transport ceiling and proves local ingress does not implement the selected 16-KiB production bound. It does not measure the memory cost of concurrent oversized bodies, chunked bodies, slow uploads, or GET URI limits.
+The script measured all five shipped web query-only JSON envelopes at 237 to 674 bytes. It then appended legal JSON whitespace to the cheap request, isolating raw body size from query complexity. Through local Caddy, 1,024, 4,096, 16,384, 16,385, 65,536, and 1,048,576-byte bodies all returned 200. The 1,048,577-byte body returned 413 `BAD_REQUEST`, no quota headers, and a safe error body. Successful probe latency was 2.5 to 28.0 ms; the rejected probe took 3.0 ms. This finds the current one-MiB gateway transport ceiling and proves local ingress does not implement the selected 16-KiB production bound. It does not measure the memory cost of concurrent oversized bodies, chunked bodies, slow uploads, or GET URI limits.
 
 ### Reproduce and verify the deployment
 

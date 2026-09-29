@@ -57,6 +57,32 @@ def native_case(candidate, geometry, qualified):
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_rgb8_base_bound_reports_its_exact_admission_and_normalization(self):
+        from suite import iso_base_code_report
+        diagnostic = {'sdr_maximum_gate': 8, 'hdr_maximum_gate': 8,
+            'normalization': {'sdr_nominal_white_nits': 100, 'hdr_reference_white_nits': 203},
+            'inputs': [{'xy': [236, 822]}, {'xy': [242, 640]}],
+            'enumeration': {'enumerated_codes': 256**3, 'records': [
+                {'admissible_base_codes': count, 'minimum_green_code': low, 'maximum_green_code': high,
+                 'minimum_own_green_nits_at203': minimum, 'maximum_own_green_nits_at203': maximum}
+                for count, low, high, minimum, maximum in ((668, 65, 73, 2.55794978, 3.70),
+                                                          (603, 64, 72, 2.43, 3.54840453))]},
+            'analytic_bound': {'contradiction_established': True,
+                'D_upper_bound_nits': -2.2254864511, 'D_lower_bound_nits': -2.1981335519,
+                'contradiction_margin_nits': .027352899208}}
+        rendered = '\n'.join(iso_base_code_report(diagnostic))
+        self.assertIn('| [236, 822] | 668 | 65..73 | 2.557950..3.700000 |', rendered)
+        self.assertIn('| [242, 640] | 603 | 64..72 | 2.430000..3.548405 |', rendered)
+        self.assertIn('| -2.225486 | -2.198134 | 0.027353 | established |', rendered)
+        self.assertIn('16,777,216', rendered)
+        self.assertIn('SDR at 100 nits', rendered)
+        self.assertIn('HDR at 203 nits', rendered)
+        self.assertIn('Other ICC transfers or colorants', rendered)
+        self.assertIn('cannot qualify a conversion', rendered)
+        self.assertIn('(iso-base-code-bound.json)', rendered)
+        diagnostic['analytic_bound']['contradiction_established'] = False
+        self.assertIn('| not established |', '\n'.join(iso_base_code_report(diagnostic)))
+
     def test_global_offset_bound_reports_only_the_declared_fixed_base_contradiction(self):
         from suite import iso_global_offset_report
         diagnostic = {'fixed_maximum_gate': 8, 'analytic_bound': {

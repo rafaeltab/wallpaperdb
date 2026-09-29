@@ -425,7 +425,24 @@ def iso_global_offset_report(diagnostic):
         f'The unchanged maximum of {diagnostic["fixed_maximum_gate"]} supplies the error-ball radius. Disjoint offset bounds rule out every shared nonnegative offset pair for this fixed model, including arbitrary map precision and per-pixel gains. The analytic enclosure uses linear support, monotone PQ inversion and signed matrix intervals. Numerical sampling only checks the implementation. Guarded float64 arithmetic is not a formal directed-rounding certificate. Other bases, capacities, reference models, geometry, gain equations and physical consumers remain outside this result. This diagnostic cannot qualify a conversion.', '']
 
 
-def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound, global_bound):
+def iso_base_code_report(diagnostic):
+    bound = diagnostic['analytic_bound']
+    conclusion = 'established' if bound['contradiction_established'] else 'not established'
+    normalization = diagnostic['normalization']
+    lines = ['## Same-ICC RGB8 base bound', '',
+        f'The [decoded-base diagnostic](iso-base-code-bound.json) enumerates all {diagnostic["enumeration"]["enumerated_codes"]:,} RGB8 triples under the same actual gamma3.2 P3 ICC. It admits each pixel code only when its authored SDR maximum error is at most {diagnostic["sdr_maximum_gate"]}. SDR at {normalization["sdr_nominal_white_nits"]} nits determines that admission; own-primary HDR at {normalization["hdr_reference_white_nits"]} nits supplies the offset inequalities. Fresh source references and native evidence establish both strict gain directions before enumeration.', '',
+        '| Pixel [x, y] | Admitted RGB8 codes | Green codes | Own-green HDR interval, nits |',
+        '| --- | ---: | --- | --- |']
+    for source, row in zip(diagnostic['inputs'], diagnostic['enumeration']['records']):
+        lines.append(f'| {source["xy"]} | {row["admissible_base_codes"]} | {row["minimum_green_code"]}..{row["maximum_green_code"]} | {row["minimum_own_green_nits_at203"]:.6f}..{row["maximum_own_green_nits_at203"]:.6f} |')
+    return lines + ['',
+        '| D upper bound, nits | D lower bound, nits | Contradiction margin, nits | Contradiction |',
+        '| ---: | ---: | ---: | --- |',
+        f'| {bound["D_upper_bound_nits"]:.6f} | {bound["D_lower_bound_nits"]:.6f} | {bound["contradiction_margin_nits"]:.6f} | {conclusion} |', '',
+        f'The HDR maximum remains {diagnostic["hdr_maximum_gate"]}. This optimistic bound ignores JPEG neighborhood coupling and the other regional SDR gates, and permits arbitrary per-pixel gains and map precision at the current positive ordered weights. Other ICC transfers or colorants, continuous or higher-precision bases, capacities, reference models and gain equations remain outside the result. Float64 classification checks its distance from the unchanged gate but is not a formal directed-rounding certificate. This diagnostic cannot qualify a conversion or physical consumer.', '']
+
+
+def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound, global_bound, base_bound):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
     stages = matrix['diagnostic_summary']['all_cases']
@@ -440,6 +457,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              *precision_report(precision),
              *iso_map_bound_report(map_bound),
              *iso_global_offset_report(global_bound),
+             *iso_base_code_report(base_bound),
              '## Environment and reproducibility','',
              'The image uses the same Node 22 Alpine/musl deployment shape as Media. This is a proposed native proof pipeline, not the existing Sharp 0.33 production worker. No service dependency was upgraded. HDR geometry uses native FFmpeg/zimg float processing and luminance-coupled HLG transforms. The calibrated SDR candidate uses the native CPU Mobius filter. CPU lavapipe runs the retained libplacebo comparison trials without a host GPU. Network access is disabled during tests.','',
              f'- Node: `{native_versions["node"]}`',
@@ -738,6 +756,9 @@ def main():
     from iso_global_offset_bound import run as run_iso_global_offset_bound
     iso_global_bound = run_iso_global_offset_bound(WORK/'iso-global-offset-bound', map_code_report=iso_map_bound)
     write_json(RESULTS/'iso-global-offset-bound.json', iso_global_bound)
+    from iso_base_code_bound import run as run_iso_base_code_bound
+    iso_base_bound = run_iso_base_code_bound(WORK/'iso-base-code-bound', map_code_report=iso_map_bound)
+    write_json(RESULTS/'iso-base-code-bound.json', iso_base_bound)
     from iso_geometry_headroom import run as run_iso_geometry_headroom
     iso_geometry_headroom = run_iso_geometry_headroom(WORK/'iso-geometry-headroom')
     write_json(RESULTS/'iso-geometry-headroom.json', iso_geometry_headroom)
@@ -817,7 +838,7 @@ def main():
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'native_gainmap_commands':[{'path':str(p.relative_to(ROOT)), 'commands':json.loads(p.read_text())} for p in sorted(WORK.rglob('native-commands.json'))], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,generated_fixtures)
-    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas,mozjpeg_diagnosis,iso_map_bound,iso_global_bound))
+    (RESULTS/'report.md').write_text(render_report(matrix,evidence,fixtures,tone,controls,environment,errors,manual,precision,jpegli_result,jpegli_quality_result,mozjpeg_result,mozjpeg_historical,mozjpeg_lambdas,mozjpeg_diagnosis,iso_map_bound,iso_global_bound,iso_base_bound))
     counts = Counter(case['status'] for case in evidence)
     print(json.dumps({'completed':True,'native_cases':len(evidence),'case_statuses':counts,'integrity_errors':errors,'milestone_qualified':False,'report':'hdr-proof/results/report.md'},indent=2))
     return 1 if errors else 2

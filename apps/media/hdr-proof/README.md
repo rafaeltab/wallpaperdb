@@ -257,6 +257,18 @@ supply the analytic argument; sampled probes only check the implementation.
 Float64 outward guards do not constitute a formal directed-rounding
 certificate or change the appearance gate. The diagnostic cannot qualify a
 conversion or physical consumer.
+The [same-ICC RGB8 base diagnostic](iso_base_code_bound.py) extends that result
+to every decoded RGB8 base triple under the actual gamma3.2 P3 profile. Of
+16,777,216 codes, 668 and 603 satisfy the unchanged authored SDR maximum gate
+at the two pixels. Even independently favorable green extrema leave a
+0.027353-nit contradiction in the shared offset difference. SDR code admission
+uses nominal white 100 nits; own-primary HDR inequalities use 203 nits. The
+diagnostic rechecks native evidence and source references, then establishes
+both strict gain directions afresh. Other ICC transfers/colorants, continuous
+or higher-precision bases, capacities and gain equations remain outside this
+result. Ignoring JPEG coupling and the other regional gates enlarges the
+admissible set. Numerical cutoff checks do not provide a formal
+directed-rounding certificate or change any conversion qualification.
 The [four other ISO geometries](iso_geometry_headroom.py) rerun their exact
 qualified recipes and preserve every original endpoint measurement. Each
 containment, crop, stretch and EXIF6 orientation file passes at boost 16 and

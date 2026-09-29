@@ -107,8 +107,13 @@ class NativeGainMapHdrGeometryTests(unittest.TestCase):
                     m1, m2, c1, c2, c3 = 2610/16384, 2523/32, 3424/4096, 2413/128, 2392/128
                     value = (scene / 10000) ** m1
                     signal = ((c1 + c2 * value) / (1 + c3 * value)) ** m2
-                    source = directory / f"{name}.png"
-                    write_png(source, np.concatenate((signal, np.ones((*scene.shape[:2], 1))), axis=-1))
+                    source, untagged = directory/f'{name}.png', directory/f'{name}-untagged.png'
+                    write_png(untagged, np.concatenate((signal, np.ones((*scene.shape[:2], 1))), axis=-1))
+                    native(['ffmpeg', '-v', 'error', '-y', '-i', untagged,
+                            '-vf', 'setparams=color_primaries=9:color_trc=16:colorspace=gbr:range=full',
+                            '-color_primaries', '9', '-color_trc', '16', '-colorspace', 'rgb',
+                            '-color_range', 'pc', '-pix_fmt', 'rgba64be', '-map_metadata', '-1',
+                            '-frames:v', '1', '-threads', '1', source])
                     # Account only for the explicitly encoded fixture precision.
                     encoded = np.round(signal * 65535) / 65535
                     inverse = encoded ** (1/m2)

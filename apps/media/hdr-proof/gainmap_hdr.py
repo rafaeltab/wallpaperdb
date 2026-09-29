@@ -130,11 +130,9 @@ def _pq_source_primaries(source):
     from hdr_png import _png_chunks
     chunks = _png_chunks(Path(source).read_bytes())
     cicp = [payload for kind, payload in chunks if kind == b'cICP']
-    # Existing analytic controls explicitly supply untagged Rec.2020 PQ PNGs.
-    if not cicp:
-        return 9
     if (len(cicp) != 1 or len(cicp[0]) != 4 or cicp[0][0] not in (1, 9, 12)
-            or cicp[0][1:] != bytes((16, 0, 1))):
+            or cicp[0][1:] != bytes((16, 0, 1))
+            or any(kind in (b'iCCP', b'sRGB') for kind, _ in chunks)):
         raise ValueError('HDR geometry requires recognized full-range RGB PQ signaling')
     return cicp[0][0]
 

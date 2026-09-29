@@ -488,7 +488,7 @@ def iso_continuous_base_report(diagnostic):
 def apple_documented_report(evidence):
     from apple_source_model import REFERENCE_REVISION
     cases = [case for case in evidence if case.get('fixture_id') == 'gainmap-apple-old'
-             and case.get('proof_module') in ('apple_hdr_jpeg', 'apple_hdr_avif', 'apple_hdr_png')
+             and case.get('proof_module') in ('apple_hdr_jpeg', 'apple_hdr_avif', 'apple_hdr_png', 'apple_hdr_png_precision')
              and case.get('source_reference_revision') == REFERENCE_REVISION]
     lines = ['## Corrected old Apple full-effect conversions', '',
         'Current recorded rows only, using the independently documented full source model. The table keeps each exact output gamut, depth and geometry separate. The output SHA-256 prefix distinguishes alternative encodings of the same request; full hashes and regional color/luminance statistics remain in [measurements](measurements.json). Independent HDR and authored SDR maxima use the unchanged photographic gates.', '',
@@ -798,6 +798,10 @@ def main():
                                    geometries=('contain', 'cover', 'fill', 'upscale', 'orientation'))
     write_json(RESULTS/'apple-hdr-png-contain.json', apple_hdr_png)
     icc_results.extend(apple_hdr_png['cases'])
+    from apple_hdr_png_precision import run as run_apple_hdr_png_precision
+    apple_hdr_png_precision = run_apple_hdr_png_precision(WORK/'apple-hdr-png-precision-contain')
+    write_json(RESULTS/'apple-hdr-png-precision-contain.json', apple_hdr_png_precision)
+    icc_results.extend(apple_hdr_png_precision['cases'])
     for source_id in ('gainmap-apple-old', 'gainmap-apple-new'):
         for operation in ('contain', 'upscale'):
             name = f'icc-{source_id}-{operation}-midpointoffset-gamma1.5'

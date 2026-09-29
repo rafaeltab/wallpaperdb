@@ -200,6 +200,17 @@ opaque structure, identity orientation and metadata privacy pass. Each manual
 entry includes its matched authored SDR comparison. These explicit depth16
 results do not qualify an embedded SDR base, adaptive gain map or physical
 consumer.
+The separate [opaque-plane PNG precision candidate](apple_hdr_png_precision.py)
+keeps that exact containment baseline and reduces maximum HDR error from
+0.258409 to 0.010890 under the same photographic gates. Native byte copying
+removes the float alpha plane only after verifying every alpha sample equals
+one and every copied RGB byte is unchanged. Explicit native PQ float,
+planar16 quantization and RGB16 packing avoid the earlier conversion loss.
+Independent libpng decoding matches the native packed RGB16 bytes exactly.
+Analytic nearest-code error falls from 16 codes to one; this is a diagnostic,
+not a replacement acceptance limit. Only the separately named containment
+file enters the matrix as new evidence. Other geometries, fractional alpha,
+gamuts and depths require their own proof.
 New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native

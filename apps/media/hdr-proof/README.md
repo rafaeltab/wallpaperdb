@@ -224,10 +224,16 @@ Its maximum HDR error falls from 0.350934 to 0.174863; regional color means,
 p95 values and maxima also improve against the same documented P3 reference.
 Source, geometry and native preparation must pass first, and their hashes are
 checked before encoding, before output decoding and at completion. The earlier
-AVIF result stays exact as nested baseline evidence. Only the separately named
-explicit P3 AVIF12 containment enters the matrix as new evidence. Other depths
-and geometries, intermediate adaptation and physical consumers remain outside
-this increment.
+AVIF result stays exact as nested baseline evidence. Separate explicit P3
+AVIF10 and AVIF8 containment files also pass the unchanged gates, with their
+tradeoffs recorded. At 10 bits, maximum HDR error falls from 0.734999 to
+0.687237, while five regional luminance-error statistics increase. At 8 bits,
+maximum HDR error rises from 2.648045 to 2.686236; six regional error statistics
+increase. Every signed regional change is retained. More precise input does
+not guarantee that every metric improves after coarse output quantization.
+Only the three separately named candidates enter the matrix; earlier files
+and measurements remain exact. Other geometries, intermediate adaptation and
+physical consumers remain outside this increment.
 New Apple containment also passes, while the original upscale remains failed at an
 independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
 This source requires its auxiliary XMP model, version and headroom. Native

@@ -57,6 +57,25 @@ def native_case(candidate, geometry, qualified):
 
 
 class GainMapReportTests(unittest.TestCase):
+    def test_precision_tradeoff_report_preserves_positive_errors_without_requalifying(self):
+        from suite import apple_precision_tradeoffs
+        case = {'proof_module': 'apple_hdr_avif_precision', 'geometry': 'contain',
+            'selectors': {'depth': '8'}, 'status': 'qualified',
+            'regional_change_from_baseline': {'regions': {'shadow': {'samples': 10,
+                'delta_e_itp': {'mean': -.1, 'p95': -.2, 'maximum': .038191},
+                'luminance_absolute_error_nits': {'mean': .003, 'p95': -.01, 'maximum': 0}}}}}
+        unchanged = {**case, 'selectors': {'depth': '12'},
+                     'regional_change_from_baseline': {'regions': {'shadow': {'samples': 10,
+                         'delta_e_itp': {'mean': -.1, 'p95': -.2, 'maximum': -.3}}}}}
+        rendered = '\n'.join(apple_precision_tradeoffs([case, unchanged]))
+        self.assertIn('| contain | 8 | shadow | delta_e_itp | maximum | +0.038191000 | qualified |', rendered)
+        self.assertIn('| contain | 8 | shadow | luminance_absolute_error_nits | mean | +0.003000000 | qualified |', rendered)
+        self.assertIn('| contain | 12 | none | none | none | 0 | qualified |', rendered)
+        self.assertNotIn('-0.100000000', rendered)
+        self.assertIn('unchanged appearance gates decide qualification', rendered)
+        self.assertIn('not a universal improvement', rendered)
+        self.assertEqual(apple_precision_tradeoffs([]), [])
+
     def test_capacity_report_keeps_zero_weight_models_and_native_admission_separate(self):
         from suite import iso_capacity_report
         diagnostic = {'constraints': {'authored_base_bypass_model_excluded': True,

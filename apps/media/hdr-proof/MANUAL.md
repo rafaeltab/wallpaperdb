@@ -93,10 +93,12 @@ and real EXIF6 orientation are separate fixed-luminance full-effect files. Each 
 comparison image; the AVIF has no embedded SDR base or adaptive gain map. Record the viewer's tone mapping
 and apparent brightness separately from the passing file comparison. Its PQ16
 companion is inspected encoder intent, not an independent reference.
-The separate `precision-opaque-planar16` P3 AVIF12 containment uses a more
-accurate inspected PQ16 intent. Compare its exact file with the earlier AVIF12
+The separate `precision-opaque-planar16` P3 AVIF8/10/12 containment uses a more
+accurate inspected PQ16 intent. Compare each exact file with its earlier same-depth AVIF
 at matched size, retaining each hash, measurement record and pending physical
-status. Its SDR companion is still a separate comparison image.
+status. Its SDR companion is still a separate comparison image. Some 8/10-bit
+statistics worsen despite passing the same limits; use the recorded regional
+changes when inspecting shadow gradients and colored edges.
 The explicit Rec.2020 AVIF files cover all five geometries at 8/10/12 bits.
 Compare them with the corresponding P3 output and the same authored SDR
 companion. Record color interpretation and visible brightness for each exact

@@ -535,6 +535,32 @@ def apple_documented_report(evidence):
         'Each row measures the full effect only; a passing row does not qualify intermediate Apple adaptation. JPEG retains its declared ICC-aware reader scope and separate stock-reader diagnostics. Single-layer AVIF/PNG has no embedded authored SDR base or adaptive gain map. The inspected manual entries preserve each output, authored SDR comparison, source hash and rendering scope. Browser, native viewer and OS wallpaper results remain pending manual review.', '']
 
 
+def apple_precision_tradeoffs(evidence):
+    cases = [case for case in evidence if case.get('proof_module') == 'apple_hdr_avif_precision'
+             and 'regional_change_from_baseline' in case]
+    if not cases:
+        return []
+    lines = ['## Measured AVIF precision tradeoffs', '',
+        'More precise encoder input is not a universal improvement after output quantization. Every positive regional error change is listed below as candidate minus its exact earlier baseline. The unchanged appearance gates decide qualification; a qualified alternative can still worsen individual statistics. Full signed changes and both measurements remain in the machine-readable evidence. A none row means no measured error statistic increased.', '',
+        '| Geometry | Depth | Region | Error metric | Statistic | Positive change | Case status |',
+        '| --- | --- | --- | --- | --- | ---: | --- |']
+    for case in cases:
+        count = 0
+        for region, measurements in case['regional_change_from_baseline']['regions'].items():
+            if not measurements['samples']:
+                continue
+            for metric, statistics in measurements.items():
+                if metric == 'samples':
+                    continue
+                for statistic, difference in statistics.items():
+                    if difference > 0:
+                        lines.append(f'| {case["geometry"]} | {case["selectors"]["depth"]} | {region} | {metric} | {statistic} | +{difference:.9f} | {case["status"]} |')
+                        count += 1
+        if not count:
+            lines.append(f'| {case["geometry"]} | {case["selectors"]["depth"]} | none | none | none | 0 | {case["status"]} |')
+    return lines + ['']
+
+
 def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual, precision, jpegli, jpegli_quality, mozjpeg, mozjpeg_historical, mozjpeg_lambdas, mozjpeg_diagnosis, map_bound, global_bound, base_bound, continuous_bound, capacity_bound):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
@@ -554,6 +580,7 @@ def render_report(matrix, evidence, fixtures, tone, controls, native_versions, e
              *iso_continuous_base_report(continuous_bound),
              *iso_capacity_report(capacity_bound),
              *apple_documented_report(evidence),
+             *apple_precision_tradeoffs(evidence),
              '## Environment and reproducibility','',
              'The image uses the same Node 22 Alpine/musl deployment shape as Media. This is a proposed native proof pipeline, not the existing Sharp 0.33 production worker. No service dependency was upgraded. HDR geometry uses native FFmpeg/zimg float processing and luminance-coupled HLG transforms. The calibrated SDR candidate uses the native CPU Mobius filter. CPU lavapipe runs the retained libplacebo comparison trials without a host GPU. Network access is disabled during tests.','',
              f'- Node: `{native_versions["node"]}`',
@@ -828,7 +855,7 @@ def main():
     write_json(RESULTS/'apple-hdr-png-precision-contain.json', apple_hdr_png_precision)
     icc_results.extend(apple_hdr_png_precision['cases'])
     from apple_hdr_avif_precision import run as run_apple_hdr_avif_precision
-    apple_hdr_avif_precision = run_apple_hdr_avif_precision(WORK/'apple-hdr-avif-precision-contain')
+    apple_hdr_avif_precision = run_apple_hdr_avif_precision(WORK/'apple-hdr-avif-precision-contain', depths=(12, 10, 8))
     write_json(RESULTS/'apple-hdr-avif-precision-contain.json', apple_hdr_avif_precision)
     icc_results.extend(apple_hdr_avif_precision['cases'])
     for source_id in ('gainmap-apple-old', 'gainmap-apple-new'):

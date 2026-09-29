@@ -48,4 +48,14 @@ cmake --build build --target avifgainmaputil --parallel 4
 mkdir -p /opt/proof/libavif/identity
 cp build/avifgainmaputil /opt/proof/libavif/identity/
 sha256sum /opt/proof/libavif/identity/avifgainmaputil > /opt/proof/libavif/identity/binary-sha256.txt
+# An additional candidate trades part of the near-black offset reduction for
+# a narrower gain interval. Upscaling can pair a zero authored SDR sample with
+# nonzero HDR, widening both extremes. Keep that prior failing representation
+# and test this 203/4096-nit offset against the same black and appearance gates.
+echo 'dfbbe115d1fcfcae756b61bc5a1f023cd9cd1381c92dd59db345d398b29d86ea  /opt/proof/libavif-moderate-offset-gain.patch' | sha256sum -c -
+patch -d libavif-1.4.1 -p1 < /opt/proof/libavif-moderate-offset-gain.patch
+cmake --build build --target avifgainmaputil --parallel 4
+mkdir -p /opt/proof/libavif/moderateoffset
+cp build/avifgainmaputil /opt/proof/libavif/moderateoffset/
+sha256sum /opt/proof/libavif/moderateoffset/avifgainmaputil > /opt/proof/libavif/moderateoffset/binary-sha256.txt
 rm -rf /tmp/gainmap-build

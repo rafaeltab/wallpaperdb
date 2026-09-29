@@ -26,7 +26,7 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     matches = [fixture for fixture in fixtures if fixture['sha256'] == gainmap.digest(source)]
     if len(matches) != 1 or matches[0]['expected']['gamut'] != gamut:
         raise ValueError('Native combined candidate requires a pinned source with established gamut facts')
-    if map_policy not in ('fullrange', 'smalloffset', 'identity'):
+    if map_policy not in ('fullrange', 'smalloffset', 'identity', 'moderateoffset'):
         raise ValueError('Unknown native gain-map encoder policy')
     if geometry_revision not in ('decoder-gamut-v1', 'gainmap-hdr-target-gamut-v1'):
         raise ValueError('Unknown native geometry coordinate revision')

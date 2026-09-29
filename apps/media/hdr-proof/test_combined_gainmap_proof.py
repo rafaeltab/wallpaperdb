@@ -12,7 +12,7 @@ class CombinedGainMapProofTests(unittest.TestCase):
     def test_android_and_both_apple_contain_requests_qualify_with_explicit_reference_revision(self):
         with tempfile.TemporaryDirectory() as temporary:
             cases = run(Path(temporary), names=('gainmap-android-xmp', 'gainmap-apple-old', 'gainmap-apple-new'),
-                        geometries=('contain',))
+                        geometries=('contain',), policies=('identity',))
             self.assertEqual(len(cases), 3)
             for case in cases:
                 with self.subTest(source=case['fixture_id']):

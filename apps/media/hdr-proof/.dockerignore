@@ -13,6 +13,7 @@
 !libavif-full-range-gain.patch
 !libavif-small-offset-gain.patch
 !libavif-identity-gain.patch
+!libavif-moderate-offset-gain.patch
 !native-zimg-build.sh
 !native_zimg_window.c
 !native_lossless_jpeg.c

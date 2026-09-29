@@ -15,7 +15,7 @@ from matrix import GAINMAP_GEOMETRIES
 
 
 def run(directory, *, names=gainmap.NAMES, geometries=gainmap.GEOMETRIES,
-        policies=('identity',), reference_revision='gainmap-hdr-target-gamut-v1'):
+        policies=('identity', 'moderateoffset'), reference_revision='gainmap-hdr-target-gamut-v1'):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     fixtures = json.loads((gainmap.FIXTURES/'manifest.json').read_text())['fixtures']

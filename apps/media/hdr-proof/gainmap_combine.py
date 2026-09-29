@@ -33,14 +33,18 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
         raise ValueError('Native float32 source precision is proven only for the pinned ISO fixture')
     if map_policy not in ('fullrange', 'smalloffset', 'identity', 'moderateoffset'):
         raise ValueError('Unknown native gain-map encoder policy')
-    if coding not in ('lossless-rgb', 'dct-rgb', 'dct-float-rgb'):
+    if coding not in ('lossless-rgb', 'dct-rgb', 'dct-float-rgb', 'jpegli-base-dct-float-map'):
         raise ValueError('Unknown native JPEG coding representation')
-    if coding in ('dct-rgb', 'dct-float-rgb'):
+    if coding in ('dct-rgb', 'dct-float-rgb', 'jpegli-base-dct-float-map'):
         from dct_jpeg import encode as encode_jpeg
-        if coding == 'dct-float-rgb':
+        if coding in ('dct-float-rgb', 'jpegli-base-dct-float-map'):
             encode_jpeg = partial(encode_jpeg, method='float')
     else:
         encode_jpeg = encode_lossless
+    encode_base = encode_jpeg
+    if coding == 'jpegli-base-dct-float-map':
+        from jpegli import encode as encode_jpegli
+        encode_base = partial(encode_jpegli, input_type='uint8', tables='standard', adaptive=True)
     if geometry_revision not in ('decoder-gamut-v1', 'gainmap-hdr-target-gamut-v1'):
         raise ValueError('Unknown native geometry coordinate revision')
     if operation not in gainmap.GEOMETRIES or orientation not in range(1, 9):
@@ -66,7 +70,7 @@ def encode(source, output, operation, *, gamut, map_policy='smalloffset', orient
     profile[24:36] = struct.pack('>6H', 2020, 1, 1, 0, 0, 0)
     profile[84:100] = bytes(16)
     base = directory/'base.jpg'
-    base_encoding = encode_jpeg(authored, base, icc_profile=bytes(profile))
+    base_encoding = encode_base(authored, base, icc_profile=bytes(profile))
 
     # Keep the prior decoder-coordinate experiment available. The explicitly
     # versioned target-gamut path clips only after resampling in the requested

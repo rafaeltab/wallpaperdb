@@ -123,7 +123,7 @@
         "-s",
         "384x512",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/native-authored-source.rgb",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/native-authored-source.rgb",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -136,7 +136,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/native-authored-horizontal.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/native-authored-horizontal.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -148,7 +148,7 @@
         "error",
         "-y",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/native-authored-horizontal.png",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/native-authored-horizontal.png",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -161,7 +161,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/native-authored.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/native-authored.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -169,11 +169,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -192,7 +192,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -211,7 +211,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -219,11 +219,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -242,7 +242,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -261,7 +261,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -269,11 +269,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -292,7 +292,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -311,7 +311,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -319,11 +319,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -342,7 +342,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -361,7 +361,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -369,11 +369,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -392,7 +392,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -411,7 +411,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -419,11 +419,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -442,7 +442,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -461,7 +461,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -488,7 +488,7 @@
         "-s",
         "403x302",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/native-authored-source.rgb",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/native-authored-source.rgb",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=906:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:302:769:302[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=906:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:302:769:302[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -501,7 +501,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/native-authored-horizontal.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/native-authored-horizontal.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -513,7 +513,7 @@
         "error",
         "-y",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/native-authored-horizontal.png",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/native-authored-horizontal.png",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=1728:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:576:769:576[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=1728:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:576:769:576[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -526,7 +526,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/native-authored.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/native-authored.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -534,11 +534,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "769",
         "576",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -557,7 +557,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -576,7 +576,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -584,11 +584,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "769",
         "576",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -607,7 +607,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -626,7 +626,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -634,11 +634,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "769",
         "576",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -657,7 +657,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -676,7 +676,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -684,11 +684,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "769",
         "576",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -707,7 +707,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -726,7 +726,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -734,11 +734,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "769",
         "576",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -757,7 +757,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -776,7 +776,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -784,11 +784,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "769",
         "576",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -807,7 +807,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -826,7 +826,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -853,7 +853,7 @@
         "-s",
         "384x512",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/native-authored-source.rgb",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/native-authored-source.rgb",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=519:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=173:512:173:512[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=519:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=173:512:173:512[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -866,7 +866,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/native-authored-horizontal.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/native-authored-horizontal.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -878,7 +878,7 @@
         "error",
         "-y",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/native-authored-horizontal.png",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/native-authored-horizontal.png",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=519:h=693:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=173:231:173:231[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=519:h=693:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=173:231:173:231[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -891,7 +891,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/native-authored.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/native-authored.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -899,11 +899,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -922,7 +922,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -941,7 +941,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -949,11 +949,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -972,7 +972,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -991,7 +991,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -999,11 +999,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -1022,7 +1022,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1041,7 +1041,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1049,11 +1049,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -1072,7 +1072,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1091,7 +1091,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1099,11 +1099,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -1122,7 +1122,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1141,7 +1141,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1149,11 +1149,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -1172,7 +1172,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1191,7 +1191,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1218,7 +1218,7 @@
         "-s",
         "384x512",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/native-authored-source.rgb",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/native-authored-source.rgb",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -1231,7 +1231,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/native-authored-horizontal.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/native-authored-horizontal.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1243,7 +1243,7 @@
         "error",
         "-y",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/native-authored-horizontal.png",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/native-authored-horizontal.png",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -1256,7 +1256,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/native-authored.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/native-authored.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1264,11 +1264,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -1287,7 +1287,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1306,7 +1306,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1314,11 +1314,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -1337,7 +1337,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1356,7 +1356,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1364,11 +1364,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -1387,7 +1387,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1406,7 +1406,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1414,11 +1414,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -1437,7 +1437,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1456,7 +1456,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1464,11 +1464,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -1487,7 +1487,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1506,7 +1506,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1514,11 +1514,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -1537,7 +1537,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1556,7 +1556,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1583,7 +1583,7 @@
         "-s",
         "384x512",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/native-authored-source.rgb",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/native-authored-source.rgb",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=519:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=173:512:173:512[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=519:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=173:512:173:512[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -1596,7 +1596,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/native-authored-horizontal.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/native-authored-horizontal.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1608,7 +1608,7 @@
         "error",
         "-y",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/native-authored-horizontal.png",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/native-authored-horizontal.png",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=519:h=693:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=173:231:173:231[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=519:h=693:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=173:231:173:231[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -1621,7 +1621,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/native-authored.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/native-authored.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1629,11 +1629,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -1652,7 +1652,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1671,7 +1671,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1679,11 +1679,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -1702,7 +1702,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1721,7 +1721,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1729,11 +1729,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -1752,7 +1752,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1771,7 +1771,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1779,11 +1779,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -1802,7 +1802,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1821,7 +1821,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1829,11 +1829,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -1852,7 +1852,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1871,7 +1871,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1879,11 +1879,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "173",
         "231",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -1902,7 +1902,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -1921,7 +1921,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1948,7 +1948,7 @@
         "-s",
         "384x512",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/native-authored-source.rgb",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/native-authored-source.rgb",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=1536:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:512:769:512[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -1961,7 +1961,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/native-authored-horizontal.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/native-authored-horizontal.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1973,7 +1973,7 @@
         "error",
         "-y",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/native-authored-horizontal.png",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/native-authored-horizontal.png",
         "-filter_complex",
         "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=2307:h=3075:filter=lanczos:rangein=full:range=full,format=gbrpf32le,crop=769:1025:769:1025[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
         "-filter_complex_threads",
@@ -1986,7 +1986,7 @@
         "-1",
         "-threads",
         "1",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/native-authored.png"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/native-authored.png"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1994,11 +1994,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -2017,7 +2017,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -2036,7 +2036,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2044,11 +2044,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -2067,7 +2067,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -2086,7 +2086,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2094,11 +2094,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "islow",
         "1",
         "0",
@@ -2117,7 +2117,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -2136,7 +2136,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2144,11 +2144,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -2167,7 +2167,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -2186,7 +2186,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2194,11 +2194,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -2217,7 +2217,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -2236,7 +2236,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2244,11 +2244,11 @@
     {
       "argv": [
         "/opt/proof/mozjpeg/hdr-proof-mozjpeg",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg-input.raw",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "769",
         "1025",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5-mozjpeg.icc",
         "float",
         "1",
         "0",
@@ -2267,7 +2267,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -2286,7 +2286,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2320,7 +2320,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/reference-sdr.png",
         "sha256": "506eaa7ab5ac7d17fcf1d83d8cd8810eec148ef4517a58c2f005a66f78690792",
         "gamut": "p3",
         "transfer": "srgb"
@@ -2453,7 +2453,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "a359939873217c48f12272efbb677f9a3b61c0ebe3bacc043e195fe9c68a86e6"
       },
       "facts": {
@@ -2586,7 +2586,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -2678,7 +2678,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/reference-sdr.png",
         "sha256": "506eaa7ab5ac7d17fcf1d83d8cd8810eec148ef4517a58c2f005a66f78690792",
         "gamut": "p3",
         "transfer": "srgb"
@@ -2811,7 +2811,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "7341c7a79de6d24b2a9046d820226fb06496302682a484ce20c27bf650efe6dd"
       },
       "facts": {
@@ -2944,7 +2944,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -3036,7 +3036,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/reference-sdr.png",
         "sha256": "506eaa7ab5ac7d17fcf1d83d8cd8810eec148ef4517a58c2f005a66f78690792",
         "gamut": "p3",
         "transfer": "srgb"
@@ -3169,7 +3169,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "d425c2c816300289fa2afdd735150ca3e65a7bd919c0a63543cd8961bd3e6751"
       },
       "facts": {
@@ -3302,7 +3302,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -3394,7 +3394,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/reference-sdr.png",
         "sha256": "506eaa7ab5ac7d17fcf1d83d8cd8810eec148ef4517a58c2f005a66f78690792",
         "gamut": "p3",
         "transfer": "srgb"
@@ -3527,7 +3527,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "41c5ad5acc5de63945857a188a28278a721d131d69ce4db7ae660a35f41b5f5b"
       },
       "facts": {
@@ -3660,7 +3660,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -3752,7 +3752,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/reference-sdr.png",
         "sha256": "506eaa7ab5ac7d17fcf1d83d8cd8810eec148ef4517a58c2f005a66f78690792",
         "gamut": "p3",
         "transfer": "srgb"
@@ -3885,7 +3885,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "cc69a3db49012302bde0f2bb13aeea9d716b0851bdd03b205f4451003298f8e9"
       },
       "facts": {
@@ -4018,7 +4018,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -4110,7 +4110,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/reference-sdr.png",
         "sha256": "506eaa7ab5ac7d17fcf1d83d8cd8810eec148ef4517a58c2f005a66f78690792",
         "gamut": "p3",
         "transfer": "srgb"
@@ -4243,7 +4243,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "c9c87b361bbf7618b670a8e9f125a7c1853883de8ca9f5ffd21e4aa976cd3da7"
       },
       "facts": {
@@ -4376,7 +4376,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -4468,7 +4468,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/reference-sdr.png",
         "sha256": "30d5f9e378f49d454d69dc544b280d6495ac51ee963dc0a84e410bb2672094c2",
         "gamut": "srgb",
         "transfer": "srgb"
@@ -4601,7 +4601,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "59ebb1a96fc305e18afce2c7a0ccb5c1cb65094c6db8876637c9102156d00721"
       },
       "facts": {
@@ -4740,7 +4740,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -4832,7 +4832,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/reference-sdr.png",
         "sha256": "30d5f9e378f49d454d69dc544b280d6495ac51ee963dc0a84e410bb2672094c2",
         "gamut": "srgb",
         "transfer": "srgb"
@@ -4965,7 +4965,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "ab821d07b730b331d2c92de0cb2d6e5da2cc2db9a3d6c1bd3f49d7dc2622ea67"
       },
       "facts": {
@@ -5104,7 +5104,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -5196,7 +5196,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/reference-sdr.png",
         "sha256": "30d5f9e378f49d454d69dc544b280d6495ac51ee963dc0a84e410bb2672094c2",
         "gamut": "srgb",
         "transfer": "srgb"
@@ -5329,7 +5329,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "ef9e72d9551e4b75a7168213731ef60e0eb9d1f76dacb8dfb2238ca6b130a046"
       },
       "facts": {
@@ -5468,7 +5468,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -5560,7 +5560,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/reference-sdr.png",
         "sha256": "30d5f9e378f49d454d69dc544b280d6495ac51ee963dc0a84e410bb2672094c2",
         "gamut": "srgb",
         "transfer": "srgb"
@@ -5693,7 +5693,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "27bdf2cea0b6dbd127b8541489c3fe36835da2d40306eab89075282f4900262e"
       },
       "facts": {
@@ -5832,7 +5832,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -5924,7 +5924,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/reference-sdr.png",
         "sha256": "30d5f9e378f49d454d69dc544b280d6495ac51ee963dc0a84e410bb2672094c2",
         "gamut": "srgb",
         "transfer": "srgb"
@@ -6057,7 +6057,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "51b87111c68e7dfaed39fc5a3a0887f043735b8e9bfb3b8a44457b46a1ef979f"
       },
       "facts": {
@@ -6196,7 +6196,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -6288,7 +6288,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/reference-sdr.png",
         "sha256": "30d5f9e378f49d454d69dc544b280d6495ac51ee963dc0a84e410bb2672094c2",
         "gamut": "srgb",
         "transfer": "srgb"
@@ -6421,7 +6421,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "46741a72d7b7d064ef7b985285fd7ce8a0220c12b934f2c0d3d5218bc0caecfd"
       },
       "facts": {
@@ -6560,7 +6560,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -6652,7 +6652,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -6785,7 +6785,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "54eb82397e4fea4cbd01f0944180097f5f0c05c9f3c6d166cd46eca552e3c5d0"
       },
       "facts": {
@@ -6919,7 +6919,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -7011,7 +7011,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -7144,7 +7144,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "41660fa6886ddb6913fd8fc60321ce90a46a48a6619230fc64cfc809b6b4c376"
       },
       "facts": {
@@ -7278,7 +7278,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -7370,7 +7370,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -7503,7 +7503,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "e1a334f3a56b15c068acad703570caf2c090d8890b74537494e59ada4a969342"
       },
       "facts": {
@@ -7637,7 +7637,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -7729,7 +7729,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -7862,7 +7862,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "976be396866156cb39a8d29b8a12e26690a55fa8abd7bcc4bac0e2ff76280586"
       },
       "facts": {
@@ -7996,7 +7996,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -8088,7 +8088,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -8221,7 +8221,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "402729e78880960850b9aebd180051e44de099440d1e67953902493463075b62"
       },
       "facts": {
@@ -8355,7 +8355,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -8447,7 +8447,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -8580,7 +8580,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "d656961b26fc12784c9bd24bad74be8e9510769fec9fb21a87f853262b313ed6"
       },
       "facts": {
@@ -8714,7 +8714,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -8806,7 +8806,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -8939,7 +8939,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "c9b59662d14bd7cdb6db6aaf30ee52a6b84b5a9c81afbeb0b71f7c68560cd225"
       },
       "facts": {
@@ -9073,7 +9073,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -9165,7 +9165,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -9298,7 +9298,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "8cb4123bf8839cdc87d567953cd1873a8d024f4418746aa999970412432a0b0d"
       },
       "facts": {
@@ -9432,7 +9432,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -9524,7 +9524,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -9657,7 +9657,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "2a2aefd5c3ce00886f1673a9b621f4d71c5f3970daa22e18676fbf73a6fccd9a"
       },
       "facts": {
@@ -9791,7 +9791,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -9883,7 +9883,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -10016,7 +10016,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "7cd2cd469ba633334affa18901dd6dcd475ad348934dfba08eb452020188f27d"
       },
       "facts": {
@@ -10150,7 +10150,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -10242,7 +10242,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -10375,7 +10375,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "668b39ff637a9545dc80adae845a777ba5eac35133bc0067763e9c23cdceb65e"
       },
       "facts": {
@@ -10509,7 +10509,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -10601,7 +10601,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -10734,7 +10734,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "cae3d5591acae9518b895d42cd6c7f95d4814d5e01079f1683434651ae802410"
       },
       "facts": {
@@ -10868,7 +10868,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -10960,7 +10960,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -11093,7 +11093,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "54eb82397e4fea4cbd01f0944180097f5f0c05c9f3c6d166cd46eca552e3c5d0"
       },
       "facts": {
@@ -11227,7 +11227,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -11319,7 +11319,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -11452,7 +11452,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "41660fa6886ddb6913fd8fc60321ce90a46a48a6619230fc64cfc809b6b4c376"
       },
       "facts": {
@@ -11586,7 +11586,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -11678,7 +11678,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -11811,7 +11811,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "e1a334f3a56b15c068acad703570caf2c090d8890b74537494e59ada4a969342"
       },
       "facts": {
@@ -11945,7 +11945,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -12037,7 +12037,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -12170,7 +12170,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "976be396866156cb39a8d29b8a12e26690a55fa8abd7bcc4bac0e2ff76280586"
       },
       "facts": {
@@ -12304,7 +12304,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -12396,7 +12396,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -12529,7 +12529,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "402729e78880960850b9aebd180051e44de099440d1e67953902493463075b62"
       },
       "facts": {
@@ -12663,7 +12663,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -12755,7 +12755,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/reference-sdr.png",
         "sha256": "45d069ab3a3f81f4b9269b63aacb94f0d1d8c987840f511d232582517056fc90",
         "gamut": "p3",
         "transfer": "srgb"
@@ -12888,7 +12888,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "d656961b26fc12784c9bd24bad74be8e9510769fec9fb21a87f853262b313ed6"
       },
       "facts": {
@@ -13022,7 +13022,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -13114,7 +13114,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -13247,7 +13247,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "c9b59662d14bd7cdb6db6aaf30ee52a6b84b5a9c81afbeb0b71f7c68560cd225"
       },
       "facts": {
@@ -13381,7 +13381,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -13473,7 +13473,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -13606,7 +13606,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "8cb4123bf8839cdc87d567953cd1873a8d024f4418746aa999970412432a0b0d"
       },
       "facts": {
@@ -13740,7 +13740,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -13832,7 +13832,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -13965,7 +13965,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "2a2aefd5c3ce00886f1673a9b621f4d71c5f3970daa22e18676fbf73a6fccd9a"
       },
       "facts": {
@@ -14099,7 +14099,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -14191,7 +14191,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -14324,7 +14324,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "sha256": "7cd2cd469ba633334affa18901dd6dcd475ad348934dfba08eb452020188f27d"
       },
       "facts": {
@@ -14458,7 +14458,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -14550,7 +14550,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -14683,7 +14683,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "sha256": "668b39ff637a9545dc80adae845a777ba5eac35133bc0067763e9c23cdceb65e"
       },
       "facts": {
@@ -14817,7 +14817,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",
@@ -14909,7 +14909,7 @@
       "consumer_status": "pending manual review",
       "qualification_scope": "Authored SDR base codec experiment only; no gain-map or HDR derivative qualification",
       "reference_sdr": {
-        "path": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/reference-sdr.png",
+        "path": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/reference-sdr.png",
         "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
         "gamut": "p3",
         "transfer": "srgb"
@@ -15042,7 +15042,7 @@
         "scope": "Native SOF0 RGB8 JPEG with unchanged transfer/primaries and no chroma subsampling"
       },
       "artifacts": {
-        "output": "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "output": "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "sha256": "cae3d5591acae9518b895d42cd6c7f95d4814d5e01079f1683434651ae802410"
       },
       "facts": {
@@ -15176,7 +15176,7 @@
               "-c:v",
               "mjpeg",
               "-i",
-              "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+              "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
               "-frames:v",
               "1",
               "-f",

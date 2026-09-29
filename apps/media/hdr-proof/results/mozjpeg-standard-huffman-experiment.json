@@ -82,6 +82,16 @@
     ],
     "quality": 100,
     "optimized_huffman": false,
+    "lambdas": [
+      [
+        14.75,
+        16.5
+      ]
+    ],
+    "lambda_fields": [
+      "lambda_scale1",
+      "lambda_scale2"
+    ],
     "reference": "Unchanged independently decoded authored SDR with matched geometry",
     "selection": "Every declared option is recorded, including failures"
   },
@@ -90,14 +100,21 @@
     "url": "https://codeload.github.com/mozilla/mozjpeg/tar.gz/refs/tags/v4.1.5",
     "sha256": "9fcbb7171f6ac383f5b391175d6fb3acde5e64c4c4727274eade84ed0998fcc1"
   },
+  "lambda_rationale": {
+    "source": "https://github.com/mozilla/mozjpeg/blob/v4.1.5/README-mozilla.txt",
+    "implementation": "https://github.com/mozilla/mozjpeg/blob/v4.1.5/jcdctmgr.c",
+    "native_objective": "R + lambda * D; scale1 raises the native coefficient-distortion penalty",
+    "hypothesis": "More coefficient precision may avoid measured one-code near-black errors; it does not change authored samples, reference grade, transfer, depth or acceptance gates",
+    "scope": "Three predeclared lambda settings; every result is retained, including default controls"
+  },
   "native_versions": {
     "mozjpeg": "4.1.5; static, SIMD disabled",
     "ffmpeg": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers"
   },
   "source_hashes": {
-    "mozjpeg.py": "5e4f4193fdeca62506e3e70ca97afc2b3b5bc88ef99b57e69562e9686703e3cb",
-    "mozjpeg_proof.py": "7e020c49b2c0099aac34e787a06b6620d1079b32cd4caaafd07ce16c8b52ada2",
-    "native_mozjpeg.c": "37fdabaf32bd0c6eba57e2a03c97d8414a507cb6d53930cbc804afb75a888ce6",
+    "mozjpeg.py": "2378048a865963492f8eecd190b1d15bb41e015ad4311b0a0ed3a82e76ff5fb7",
+    "mozjpeg_proof.py": "3dbe1494afdedc65fa0dbe6205ff462744252b2b1698300f17132fe6ef3cd3c5",
+    "native_mozjpeg.c": "2ed9e0bcc62ae3c52abc7e66045fb531c3f97407b9fbacd5ef8830d52116190a",
     "mozjpeg-build.sh": "b93def018c304c3bc037132be8a1d0e65df63954135f48a4d8703c8c0ede340e",
     "avif.py": "28c87a831fe1b29333060b870e5f081e744b8dd3deec9ccbe21e07ed1bdac6e1",
     "gainmap_sdr.py": "e6a6adca28b469c59447a7e525b4faabfbd0ce3076f658af703e912e0efe7a85",
@@ -108,7 +125,7 @@
     "environment/apk-lock.json": "9ad6fac99fc767130451dec55c82d0fa3b652a7a6477cc7ae8e417b5a4c3a9c6",
     "fixtures/gainmap/manifest.json": "f77e0b6f8146f66487858eebc613dafc64a1f041706db52e932904dcbccfa24b"
   },
-  "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+  "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
   "commands": [
     {
       "argv": [
@@ -350,7 +367,9 @@
         "islow",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -398,7 +417,9 @@
         "islow",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -446,7 +467,9 @@
         "islow",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -482,7 +505,9 @@
         "islow",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -518,7 +543,9 @@
         "float",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -566,7 +593,9 @@
         "float",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -614,7 +643,9 @@
         "float",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -650,7 +681,9 @@
         "float",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -751,7 +784,9 @@
         "islow",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -799,7 +834,9 @@
         "islow",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -847,7 +884,9 @@
         "islow",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -883,7 +922,9 @@
         "islow",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -919,7 +960,9 @@
         "float",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -967,7 +1010,9 @@
         "float",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1015,7 +1060,9 @@
         "float",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1051,7 +1098,9 @@
         "float",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1152,7 +1201,9 @@
         "islow",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1200,7 +1251,9 @@
         "islow",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1248,7 +1301,9 @@
         "islow",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1284,7 +1339,9 @@
         "islow",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1320,7 +1377,9 @@
         "float",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1368,7 +1427,9 @@
         "float",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1416,7 +1477,9 @@
         "float",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1464,7 +1527,9 @@
         "float",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1577,7 +1642,9 @@
         "islow",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1625,7 +1692,9 @@
         "islow",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1673,7 +1742,9 @@
         "islow",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1709,7 +1780,9 @@
         "islow",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1745,7 +1818,9 @@
         "float",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1793,7 +1868,9 @@
         "float",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1841,7 +1918,9 @@
         "float",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1877,7 +1956,9 @@
         "float",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -1978,7 +2059,9 @@
         "islow",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2026,7 +2109,9 @@
         "islow",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2074,7 +2159,9 @@
         "islow",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2110,7 +2197,9 @@
         "islow",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2146,7 +2235,9 @@
         "float",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2194,7 +2285,9 @@
         "float",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2242,7 +2335,9 @@
         "float",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2278,7 +2373,9 @@
         "float",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2379,7 +2476,9 @@
         "islow",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2427,7 +2526,9 @@
         "islow",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2475,7 +2576,9 @@
         "islow",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2511,7 +2614,9 @@
         "islow",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2547,7 +2652,9 @@
         "float",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2595,7 +2702,9 @@
         "float",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2643,7 +2752,9 @@
         "float",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2679,7 +2790,9 @@
         "float",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2780,7 +2893,9 @@
         "islow",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2828,7 +2943,9 @@
         "islow",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2876,7 +2993,9 @@
         "islow",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2912,7 +3031,9 @@
         "islow",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2948,7 +3069,9 @@
         "float",
         "0",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -2996,7 +3119,9 @@
         "float",
         "0",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -3044,7 +3169,9 @@
         "float",
         "1",
         "0",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -3080,7 +3207,9 @@
         "float",
         "1",
         "1",
-        "0"
+        "0",
+        "14.75",
+        "16.5"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -3126,7 +3255,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -3212,6 +3343,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -3292,7 +3425,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "d73a4d171c3d0daba85bd0f34a6770dd69d70aa125a07a1bd546f518518a990a",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "b99561c642e445aa68fa39ecf74600b02c05f1e7803054020642ea4d70d32453",
@@ -3516,7 +3649,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -3602,6 +3737,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -3682,7 +3819,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "d73a4d171c3d0daba85bd0f34a6770dd69d70aa125a07a1bd546f518518a990a",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "b99561c642e445aa68fa39ecf74600b02c05f1e7803054020642ea4d70d32453",
@@ -3906,7 +4043,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -3993,6 +4132,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -4073,7 +4214,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "d73a4d171c3d0daba85bd0f34a6770dd69d70aa125a07a1bd546f518518a990a",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "ecc3420f8e2f2ac39882d84e631b54e7c872fd6fc1ff514ed6d3facc8e3d1992",
@@ -4121,7 +4262,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -4208,6 +4351,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -4288,7 +4433,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "d73a4d171c3d0daba85bd0f34a6770dd69d70aa125a07a1bd546f518518a990a",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "ecc3420f8e2f2ac39882d84e631b54e7c872fd6fc1ff514ed6d3facc8e3d1992",
@@ -4336,7 +4481,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -4422,6 +4569,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -4502,7 +4651,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "d73a4d171c3d0daba85bd0f34a6770dd69d70aa125a07a1bd546f518518a990a",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "4d787f26e91a7f26c1066d5b96aa5fdcf85f25d096c0909b97c9717ed9d30a2e",
@@ -4726,7 +4875,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -4812,6 +4963,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -4892,7 +5045,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "d73a4d171c3d0daba85bd0f34a6770dd69d70aa125a07a1bd546f518518a990a",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "4d787f26e91a7f26c1066d5b96aa5fdcf85f25d096c0909b97c9717ed9d30a2e",
@@ -5116,7 +5269,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -5203,6 +5358,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -5283,7 +5440,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "d73a4d171c3d0daba85bd0f34a6770dd69d70aa125a07a1bd546f518518a990a",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "7679fb856283121e1f3c96463d7f651f0f831afcb4e78d737b457e90df051dd8",
@@ -5331,7 +5488,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -5418,6 +5577,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -5498,7 +5659,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "d73a4d171c3d0daba85bd0f34a6770dd69d70aa125a07a1bd546f518518a990a",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "7679fb856283121e1f3c96463d7f651f0f831afcb4e78d737b457e90df051dd8",
@@ -5546,7 +5707,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -5596,6 +5759,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -5676,7 +5841,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "ab445a0880aef490d93da86a8886db52e9e9ffb619a5678d9fb928f8a3724b79",
@@ -5900,7 +6065,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -5950,6 +6117,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -6030,7 +6199,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "ab445a0880aef490d93da86a8886db52e9e9ffb619a5678d9fb928f8a3724b79",
@@ -6254,7 +6423,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -6305,6 +6476,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -6385,7 +6558,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "592f2d7a346ca09a48dd3978e2abe46b6dde9b9d02aa94decd1244f202724977",
@@ -6433,7 +6606,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -6484,6 +6659,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -6564,7 +6741,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "592f2d7a346ca09a48dd3978e2abe46b6dde9b9d02aa94decd1244f202724977",
@@ -6612,7 +6789,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -6662,6 +6841,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -6742,7 +6923,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "8df98a5694e2717e23b7fdead37e82954f2f354dbbcafd6ee8d3f8dad82f0ccf",
@@ -6966,7 +7147,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -7016,6 +7199,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -7096,7 +7281,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "8df98a5694e2717e23b7fdead37e82954f2f354dbbcafd6ee8d3f8dad82f0ccf",
@@ -7320,7 +7505,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -7371,6 +7558,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -7451,7 +7640,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "0640691269c4961ab26503d527ed0673429ed6f3c5e1574e96b64e26eb9d708e",
@@ -7499,7 +7688,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -7550,6 +7741,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -7630,7 +7823,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
         "icc_sha256": "988c5e6b54f698849d28e8b6d078abaadf1f505da9d7e75681aec9d9e18a5238",
         "output_sha256": "0640691269c4961ab26503d527ed0673429ed6f3c5e1574e96b64e26eb9d708e",
@@ -7678,7 +7871,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -7728,6 +7923,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -7808,7 +8005,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
         "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
         "output_sha256": "f3be6e4c6e560ece389f853d484eb2470faaca6cbc2ec3ee9e58ffe89720f5b1",
@@ -8038,7 +8235,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -8088,6 +8287,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -8168,7 +8369,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
         "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
         "output_sha256": "a636993e26fdf1084173218dee76a4089c99884c6ebc1f85f9831492542992aa",
@@ -8398,7 +8599,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -8449,6 +8652,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -8529,7 +8734,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
         "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
         "output_sha256": "f0c50655d578eba8633ec43edef63127e704f06ec6f3867133a214cf3dfe278a",
@@ -8577,7 +8782,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -8628,6 +8835,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -8708,7 +8917,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
         "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
         "output_sha256": "7f1fb293a040d718f03b336acbdad0f6101d42bd1ce264ce9a9bccf037e598de",
@@ -8756,7 +8965,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -8806,6 +9017,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -8886,7 +9099,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
         "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
         "output_sha256": "186cbb30006b8002d691a9473fb4c2148b7f2e7f3e5a837bfd94c9cff4c4a8e9",
@@ -9116,7 +9329,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -9166,6 +9381,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -9246,7 +9463,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
         "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
         "output_sha256": "ded3f182dd9ad9bae5eb8fa7c5b88c8736615e1f3275e60a4d825733c2a97df6",
@@ -9476,7 +9693,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -9526,6 +9745,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -9606,7 +9827,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
         "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
         "output_sha256": "4f639be732f80530fd6b43446e1d40dcec18c0071f2fed94b8c1f5ee1e7f87c0",
@@ -9843,7 +10064,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -9893,6 +10116,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -9973,7 +10198,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
         "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
         "output_sha256": "26ab5940f465058bf0ba4aa0cf92086bb321d8ce45d256ed89925cde23a816ef",
@@ -10210,7 +10435,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -10260,6 +10487,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -10340,7 +10569,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "563d1b9fd05ec82c363a3ed626e5fb6630d44e9ae3c8867a4b1d8d73b0e2fd28",
@@ -10565,7 +10794,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -10615,6 +10846,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -10695,7 +10928,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "811d62125bdd186092801c1b0c3490e5f390f72c7ff76b3d55c053c7c16adbb7",
@@ -10920,7 +11153,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -10971,6 +11206,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -11051,7 +11288,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "d1ba28bed0437eb00953d3de62afaec5df2d14489629693d5ea705b8f4d7c9da",
@@ -11099,7 +11336,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -11150,6 +11389,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -11230,7 +11471,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "c12ae9dedad0a7fedaf874004db5c95f3317060b71f9cd724793253836eaa779",
@@ -11278,7 +11519,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -11328,6 +11571,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -11408,7 +11653,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "9a24fe626fe42ffd6bc3e0d319179c8b840945d951dfcd85b25d7f3539210172",
@@ -11633,7 +11878,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -11683,6 +11930,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -11763,7 +12012,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "4bfd5ce970c66f8289fc924fbd28b356da605d4363899dcd7d7a224ea1395003",
@@ -11988,7 +12237,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -12039,6 +12290,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -12119,7 +12372,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "da1975823c2d8649bf0e137152cd9ed82e2d86eda6338a279e57a2cc208297ef",
@@ -12167,7 +12420,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -12218,6 +12473,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -12298,7 +12555,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "f95d3f21f0514eb35b8108a24003960601ace8fd34e31cbb8dbb1e817c2ededa",
@@ -12346,7 +12603,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -12396,6 +12655,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -12476,7 +12737,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "4ac04892e2d0bd7516ffc8629577bc838d43cd981b5968d8f1b4809788514e03",
@@ -12701,7 +12962,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -12751,6 +13014,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -12831,7 +13096,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "607391dc290fac95c497a765e499677ea14b5369f607e31b78ae44c4a145b753",
@@ -13056,7 +13321,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -13107,6 +13374,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -13187,7 +13456,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "e291e5360a97c47610fe3fa6414f32aaff38fdc828163a3b9b644b69e57848e3",
@@ -13235,7 +13504,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -13286,6 +13557,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -13366,7 +13639,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "45458b5f0c43093cab024691d8b62f452a999fb2767ef822ab780b7b4fc6da1a",
@@ -13414,7 +13687,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -13464,6 +13739,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -13544,7 +13821,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "6eeb4459755e13ca2c35ddc07735ecfa5f08a10634e8464005cb5af5d12abfb2",
@@ -13769,7 +14046,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -13819,6 +14098,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -13899,7 +14180,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "203cdbe9b59375b8603ec3b7561bb93f35e45c4706f267bf13ac1c0d5d81b0e5",
@@ -14124,7 +14405,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -14175,6 +14458,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -14255,7 +14540,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "d99ebbb5f85f782744424504dec4ecc9ae9ac6ea2905302c6c2dd5bfc76e2656",
@@ -14303,7 +14588,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -14354,6 +14641,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -14434,7 +14723,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "a0ffc8622ae2beb7acd07035d76c78dfc8c20125ed0c5f87fb4012b064b843f8",
@@ -14482,7 +14771,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -14532,6 +14823,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -14612,7 +14905,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "563d1b9fd05ec82c363a3ed626e5fb6630d44e9ae3c8867a4b1d8d73b0e2fd28",
@@ -14837,7 +15130,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -14887,6 +15182,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -14967,7 +15264,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "811d62125bdd186092801c1b0c3490e5f390f72c7ff76b3d55c053c7c16adbb7",
@@ -15192,7 +15489,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -15243,6 +15542,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -15323,7 +15624,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "d1ba28bed0437eb00953d3de62afaec5df2d14489629693d5ea705b8f4d7c9da",
@@ -15371,7 +15672,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -15422,6 +15725,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -15502,7 +15807,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "c12ae9dedad0a7fedaf874004db5c95f3317060b71f9cd724793253836eaa779",
@@ -15550,7 +15855,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -15600,6 +15907,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -15680,7 +15989,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "9a24fe626fe42ffd6bc3e0d319179c8b840945d951dfcd85b25d7f3539210172",
@@ -15905,7 +16214,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -15955,6 +16266,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -16035,7 +16348,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "4bfd5ce970c66f8289fc924fbd28b356da605d4363899dcd7d7a224ea1395003",
@@ -16260,7 +16573,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -16311,6 +16626,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -16391,7 +16708,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "da1975823c2d8649bf0e137152cd9ed82e2d86eda6338a279e57a2cc208297ef",
@@ -16439,7 +16756,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -16490,6 +16809,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -16570,7 +16891,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "f95d3f21f0514eb35b8108a24003960601ace8fd34e31cbb8dbb1e817c2ededa",
@@ -16618,7 +16939,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -16668,6 +16991,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -16748,7 +17073,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "4ac04892e2d0bd7516ffc8629577bc838d43cd981b5968d8f1b4809788514e03",
@@ -16973,7 +17298,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -17023,6 +17350,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -17103,7 +17432,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "607391dc290fac95c497a765e499677ea14b5369f607e31b78ae44c4a145b753",
@@ -17328,7 +17657,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -17379,6 +17710,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -17459,7 +17792,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "e291e5360a97c47610fe3fa6414f32aaff38fdc828163a3b9b644b69e57848e3",
@@ -17507,7 +17840,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -17558,6 +17893,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -17638,7 +17975,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "45458b5f0c43093cab024691d8b62f452a999fb2767ef822ab780b7b4fc6da1a",
@@ -17686,7 +18023,9 @@
         "trellis": false,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -17736,6 +18075,8 @@
         "trellis": false,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -17816,7 +18157,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "6eeb4459755e13ca2c35ddc07735ecfa5f08a10634e8464005cb5af5d12abfb2",
@@ -18041,7 +18382,9 @@
         "trellis": false,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -18091,6 +18434,8 @@
         "trellis": false,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -18171,7 +18516,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "203cdbe9b59375b8603ec3b7561bb93f35e45c4706f267bf13ac1c0d5d81b0e5",
@@ -18396,7 +18741,9 @@
         "trellis": true,
         "deringing": false,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -18447,6 +18794,8 @@
         "trellis": true,
         "deringing": false,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -18527,7 +18876,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "d99ebbb5f85f782744424504dec4ecc9ae9ac6ea2905302c6c2dd5bfc76e2656",
@@ -18575,7 +18924,9 @@
         "trellis": true,
         "deringing": true,
         "quality": 100,
-        "optimized_huffman": false
+        "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5
       },
       "status": "tested and failed",
       "consumer_status": "pending manual review",
@@ -18626,6 +18977,8 @@
         "trellis": true,
         "deringing": true,
         "optimized_huffman": false,
+        "lambda_scale1": 14.75,
+        "lambda_scale2": 16.5,
         "quality": 100,
         "coded_depth": 8,
         "simd": false,
@@ -18706,7 +19059,7 @@
             1
           ]
         },
-        "native_encoder_binary_sha256": "085a833c10b4c1f1630cfce510fdcf2df5a164a4dcef6b56fcb922fa33a529b6",
+        "native_encoder_binary_sha256": "0ef7576d43b6831c9715a4fb5528bf30f88723c67794f773c03b0c6a4d148bcd",
         "input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
         "icc_sha256": "e66638d6120898ed4db48b9d355d40008ba14f522f124a95549d5663138d8170",
         "output_sha256": "a0ffc8622ae2beb7acd07035d76c78dfc8c20125ed0c5f87fb4012b064b843f8",

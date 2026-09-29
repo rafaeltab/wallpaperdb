@@ -76,7 +76,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "8f2e7d0add298291309cb119fc13ea07e756a8ed1c4fac0bec025d9962eeb338",
           "native_input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
@@ -527,7 +529,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "a359939873217c48f12272efbb677f9a3b61c0ebe3bacc043e195fe9c68a86e6",
           "native_input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
@@ -978,7 +982,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "86ae57517461f80934430c0c15bb8a4e4210e92b3e513e0e521571c6e64af17c",
           "native_input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
@@ -1429,7 +1435,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "41c5ad5acc5de63945857a188a28278a721d131d69ce4db7ae660a35f41b5f5b",
           "native_input_sha256": "3cdfe6affb8cc737b85c98b65d6cbb035a450a481e46d7f44eb55a16eb6e781c",
@@ -3758,7 +3766,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "05f2b3448f582639b906b3b74338d638e6113ac10c2b64165cf77ff0dff8b2b3",
           "native_input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
@@ -4209,7 +4219,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "59ebb1a96fc305e18afce2c7a0ccb5c1cb65094c6db8876637c9102156d00721",
           "native_input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
@@ -4660,7 +4672,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "0bdc8331c6111c53a995be367da3b92a4f33c60eb9bbf79cb550e9dd68899b47",
           "native_input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
@@ -5111,7 +5125,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "27bdf2cea0b6dbd127b8541489c3fe36835da2d40306eab89075282f4900262e",
           "native_input_sha256": "b73c7b4a0a7d9313a87f2d5d2291dd538250544f1e72672d3567427a94550e46",
@@ -7440,7 +7456,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "40c62a8cf75eb2275ce5fe685f9c917ba481adf5ce784f1762441e60669d0871",
           "native_input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
@@ -7891,7 +7909,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "54eb82397e4fea4cbd01f0944180097f5f0c05c9f3c6d166cd46eca552e3c5d0",
           "native_input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
@@ -8342,7 +8362,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "7b80598e9a6025e814671c4606dd7ff1cb902394a70153a0ae09e579deec63f7",
           "native_input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
@@ -8793,7 +8815,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "976be396866156cb39a8d29b8a12e26690a55fa8abd7bcc4bac0e2ff76280586",
           "native_input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
@@ -11122,7 +11146,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "e7c51388966d14b3bb6b8d771c199c5bfb3ac3ad03933921a19c0c415afe4970",
           "native_input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
@@ -11573,7 +11599,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "c9b59662d14bd7cdb6db6aaf30ee52a6b84b5a9c81afbeb0b71f7c68560cd225",
           "native_input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
@@ -12024,7 +12052,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "3bb34ec697e3179fabb72a0afee31daa12e0a65d18d2299a2237cd2fcbab419b",
           "native_input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
@@ -12475,7 +12505,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "7cd2cd469ba633334affa18901dd6dcd475ad348934dfba08eb452020188f27d",
           "native_input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
@@ -14804,7 +14836,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "40c62a8cf75eb2275ce5fe685f9c917ba481adf5ce784f1762441e60669d0871",
           "native_input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
@@ -15255,7 +15289,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "54eb82397e4fea4cbd01f0944180097f5f0c05c9f3c6d166cd46eca552e3c5d0",
           "native_input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
@@ -15706,7 +15742,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "7b80598e9a6025e814671c4606dd7ff1cb902394a70153a0ae09e579deec63f7",
           "native_input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
@@ -16157,7 +16195,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "976be396866156cb39a8d29b8a12e26690a55fa8abd7bcc4bac0e2ff76280586",
           "native_input_sha256": "1568dc68efc1a76fd9e2f4f727c9ea81363a1ce60586984d2e1802fd66f39533",
@@ -18486,7 +18526,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "e7c51388966d14b3bb6b8d771c199c5bfb3ac3ad03933921a19c0c415afe4970",
           "native_input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
@@ -18937,7 +18979,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "c9b59662d14bd7cdb6db6aaf30ee52a6b84b5a9c81afbeb0b71f7c68560cd225",
           "native_input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
@@ -19388,7 +19432,9 @@
             "trellis": false,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "3bb34ec697e3179fabb72a0afee31daa12e0a65d18d2299a2237cd2fcbab419b",
           "native_input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
@@ -19839,7 +19885,9 @@
             "trellis": true,
             "deringing": false,
             "quality": 100,
-            "optimized_huffman": true
+            "optimized_huffman": true,
+            "lambda_scale1": 14.75,
+            "lambda_scale2": 16.5
           },
           "output_sha256": "7cd2cd469ba633334affa18901dd6dcd475ad348934dfba08eb452020188f27d",
           "native_input_sha256": "7a1b8250134dcf228010556e2550303565b71f21fa55caf660133bcb54cdf06e",
@@ -22106,7 +22154,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22125,7 +22173,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22138,7 +22186,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22157,7 +22205,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22165,7 +22213,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "459",
         "223",
         "459",
@@ -22182,7 +22230,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22201,7 +22249,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22209,7 +22257,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "162",
         "453",
         "459",
@@ -22226,7 +22274,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22245,7 +22293,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22253,7 +22301,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "184",
         "639",
         "459",
@@ -22270,7 +22318,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22289,7 +22337,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22297,7 +22345,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "432",
         "28",
         "459",
@@ -22314,7 +22362,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22333,7 +22381,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22341,7 +22389,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "432",
         "28",
         "459",
@@ -22358,7 +22406,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22377,7 +22425,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22385,7 +22433,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "432",
         "28",
         "459",
@@ -22402,7 +22450,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22421,7 +22469,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22429,7 +22477,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "461",
         "554",
         "459",
@@ -22446,7 +22494,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22465,7 +22513,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22473,7 +22521,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-iso-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "461",
         "554",
         "459",
@@ -22490,7 +22538,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22509,7 +22557,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22522,7 +22570,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22541,7 +22589,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22549,7 +22597,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "7",
         "498",
         "7",
@@ -22566,7 +22614,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22585,7 +22633,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22593,7 +22641,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "650",
         "480",
         "7",
@@ -22610,7 +22658,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22629,7 +22677,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22637,7 +22685,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "488",
         "527",
         "7",
@@ -22654,7 +22702,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22673,7 +22721,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22681,7 +22729,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "650",
         "480",
         "7",
@@ -22698,7 +22746,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22717,7 +22765,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22725,7 +22773,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "395",
         "518",
         "7",
@@ -22742,7 +22790,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22761,7 +22809,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22769,7 +22817,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "488",
         "527",
         "7",
@@ -22786,7 +22834,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22805,7 +22853,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22813,7 +22861,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "395",
         "518",
         "7",
@@ -22830,7 +22878,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22849,7 +22897,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22857,7 +22905,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-android-xmp-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "395",
         "518",
         "7",
@@ -22874,7 +22922,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22893,7 +22941,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22906,7 +22954,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22925,7 +22973,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22933,7 +22981,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "39",
         "111",
         "37",
@@ -22950,7 +22998,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -22969,7 +23017,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -22977,7 +23025,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "39",
         "109",
         "37",
@@ -22994,7 +23042,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23013,7 +23061,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23021,7 +23069,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "37",
         "25",
         "37",
@@ -23038,7 +23086,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23057,7 +23105,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23065,7 +23113,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "39",
         "111",
         "37",
@@ -23082,7 +23130,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23101,7 +23149,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23109,7 +23157,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "31",
         "181",
         "37",
@@ -23126,7 +23174,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23145,7 +23193,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23153,7 +23201,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "31",
         "181",
         "37",
@@ -23170,7 +23218,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23189,7 +23237,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23197,7 +23245,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "37",
         "25",
         "37",
@@ -23214,7 +23262,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23233,7 +23281,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23241,7 +23289,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "37",
         "25",
         "37",
@@ -23258,7 +23306,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23277,7 +23325,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23290,7 +23338,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23309,7 +23357,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23317,7 +23365,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "463",
         "932",
         "160",
@@ -23334,7 +23382,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23353,7 +23401,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23361,7 +23409,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "160",
         "367",
         "160",
@@ -23378,7 +23426,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23397,7 +23445,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23405,7 +23453,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "432",
         "19",
         "160",
@@ -23422,7 +23470,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23441,7 +23489,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23449,7 +23497,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "320",
         "641",
         "160",
@@ -23466,7 +23514,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23485,7 +23533,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23493,7 +23541,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "160",
         "684",
         "160",
@@ -23510,7 +23558,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23529,7 +23577,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23537,7 +23585,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "452",
         "846",
         "160",
@@ -23554,7 +23602,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23573,7 +23621,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23581,7 +23629,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "160",
         "684",
         "160",
@@ -23598,7 +23646,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23617,7 +23665,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23625,7 +23673,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-old-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "160",
         "684",
         "160",
@@ -23642,7 +23690,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23661,7 +23709,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23674,7 +23722,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23693,7 +23741,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23701,7 +23749,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "39",
         "111",
         "37",
@@ -23718,7 +23766,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23737,7 +23785,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23745,7 +23793,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "39",
         "109",
         "37",
@@ -23762,7 +23810,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23781,7 +23829,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23789,7 +23837,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "37",
         "25",
         "37",
@@ -23806,7 +23854,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23825,7 +23873,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23833,7 +23881,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "39",
         "111",
         "37",
@@ -23850,7 +23898,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23869,7 +23917,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23877,7 +23925,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "31",
         "181",
         "37",
@@ -23894,7 +23942,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23913,7 +23961,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23921,7 +23969,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "31",
         "181",
         "37",
@@ -23938,7 +23986,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -23957,7 +24005,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -23965,7 +24013,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "37",
         "25",
         "37",
@@ -23982,7 +24030,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24001,7 +24049,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24009,7 +24057,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-contain/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "37",
         "25",
         "37",
@@ -24026,7 +24074,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24045,7 +24093,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24058,7 +24106,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24077,7 +24125,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24085,7 +24133,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis0-deringing0-huffman-optimized.jpg",
         "463",
         "932",
         "160",
@@ -24102,7 +24150,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24121,7 +24169,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24129,7 +24177,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized.jpg",
         "160",
         "367",
         "160",
@@ -24146,7 +24194,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24165,7 +24213,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24173,7 +24221,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis0-deringing0-huffman-optimized.jpg",
         "432",
         "19",
         "160",
@@ -24190,7 +24238,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24209,7 +24257,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24217,7 +24265,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/optimized-guard-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
+        "/proof/work/mozjpeg-base-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized.jpg",
         "320",
         "641",
         "160",
@@ -24234,7 +24282,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24253,7 +24301,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24261,7 +24309,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "160",
         "684",
         "160",
@@ -24278,7 +24326,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24297,7 +24345,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24305,7 +24353,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-islow-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "452",
         "846",
         "160",
@@ -24322,7 +24370,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24341,7 +24389,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24349,7 +24397,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-18.75-16.5.jpg",
         "160",
         "684",
         "160",
@@ -24366,7 +24414,7 @@
         "-c:v",
         "mjpeg",
         "-i",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "-frames:v",
         "1",
         "-f",
@@ -24385,7 +24433,7 @@
         "-n",
         "-G1",
         "-s",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg"
       ],
       "exit_code": 0,
       "stderr": ""
@@ -24393,7 +24441,7 @@
     {
       "argv": [
         "/usr/local/bin/hdr-proof-jpeg-coefficients",
-        "/mozjpeg-probe/lambda-sweep/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
+        "/proof/work/mozjpeg-lambda-experiment/gainmap-apple-new-upscale/mozjpeg-q100-float-trellis1-deringing0-huffman-optimized-lambda-22.75-16.5.jpg",
         "160",
         "684",
         "160",
@@ -24404,13 +24452,13 @@
     }
   ],
   "input_report_canonical_sha256": {
-    "baseline": "79f4f05e6c1f57f32700576cdfaffc1d37ed7d1679e2a2f2389a586d738d54a8",
-    "lambda": "175fd4569caaf1fb0ce8530fabb5fc0c13f29142249605d04a861718611d6f31"
+    "baseline": "39683c6a96ddafe9acec73040c5844d13571657ca7d9935cd9a9bada5d8edeaa",
+    "lambda": "2ecf5645364045814f75739282632c980bca63d4a52a2949ca36ab28974668d8"
   },
   "source_hashes": {
     "mozjpeg_diagnostics.py": "17d1ea3fe78bfa179ddb3780555819fc659268e3a534abb76398c1ffccff3e87",
     "native_jpeg_coefficients.c": "d98485f099cc1cfc08093af555c7678fcdaab9d1122a75b5ced784021243b9bb",
-    "Dockerfile": "7a095667ef07ace4a32151812d349449c61c17723b42d4942a99082fa30fe32b",
+    "Dockerfile": "ce7028f6a89ac9b2f69c649f04750101ceb0f72051e15a3b94000c384655be09",
     "environment/apk-lock.json": "9ad6fac99fc767130451dec55c82d0fa3b652a7a6477cc7ae8e417b5a4c3a9c6",
     "appearance.py": "a0be551e0e7c27b9fb786c63d1fa72113c5f66415360ce3ae854c72aeb3809e8",
     "gainmap_sdr.py": "e6a6adca28b469c59447a7e525b4faabfbd0ce3076f658af703e912e0efe7a85",

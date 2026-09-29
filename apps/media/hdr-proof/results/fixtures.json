@@ -13501,6 +13501,1018 @@
     }
   },
   {
+    "id": "avif-gainmap-from-android-xmp",
+    "path": "/proof/work/gainmap-avif-authored-sdr/source/avif-gainmap-from-android-xmp.avif",
+    "sha256": "2c744ec754e5953db4b2e0787ef2e729d9c3d5c00f685cfb7243cc3ea93630bd",
+    "parent": {
+      "path": "/proof/fixtures/gainmap/gainmap-android-xmp.jpg",
+      "sha256": "d22fd05e210df1067ebd6a1f63d0e5d94c5fa9042fe2ebd7067a10a301402271",
+      "provenance": "fixtures/gainmap/manifest.json"
+    },
+    "source_lock": {
+      "passed": true,
+      "path": "/proof/fixtures/gainmap-avif-source-sha256.json",
+      "lock_sha256": "ba3f6e12bf59b940a478f9ae7ec4c903d8ae3c423c3a38e9555171bcce5ec230"
+    },
+    "facts": {
+      "base": {
+        "item_id": 1,
+        "dimensions": [
+          403,
+          302
+        ],
+        "depths": [
+          8,
+          8,
+          8
+        ],
+        "cicp": [
+          1,
+          13,
+          0,
+          1
+        ],
+        "icc": "absent",
+        "transformations": "none",
+        "av1_configuration_hex": "81200000"
+      },
+      "map": {
+        "item_id": 3,
+        "dimensions": [
+          512,
+          384
+        ],
+        "depths": [
+          8
+        ],
+        "cicp": [
+          2,
+          2,
+          6,
+          1
+        ],
+        "icc": "absent",
+        "transformations": "none",
+        "av1_configuration_hex": "81011c00"
+      },
+      "alternate": {
+        "item_id": 2,
+        "dimensions": [
+          403,
+          302
+        ],
+        "depths": [
+          8,
+          8,
+          8
+        ],
+        "cicp": [
+          1,
+          16,
+          0,
+          1
+        ],
+        "icc": "absent",
+        "transformations": "none"
+      },
+      "metadata": {
+        "use_base_color_space": true,
+        "base_headroom": [
+          0,
+          1
+        ],
+        "alternate_headroom": [
+          7,
+          2
+        ],
+        "gain_map_min": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "gain_map_max": [
+          [
+            7,
+            2
+          ],
+          [
+            18,
+            5
+          ],
+          [
+            37,
+            10
+          ]
+        ],
+        "gamma": [
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            1,
+            1
+          ]
+        ],
+        "base_offset": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "alternate_offset": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      "orientation": 1,
+      "frames": 1,
+      "motion": "static",
+      "alpha": "none",
+      "authored_sdr_basis": "Primary sRGB image with zero base headroom in independently parsed tmap metadata",
+      "hdr_reconstruction": "untested",
+      "native_information": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/gainmap-avif-authored-sdr/source/avif-gainmap-from-android-xmp.avif\n * Resolution     : 403x302\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (2709 bytes)\n * Exif Metadata  : Present (830 bytes)\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : 512x384 pixels, 8 bit, YUV400, Full Range, Matrix Coeffs. 6, Base Headroom 0.00 (SDR), Alternate Headroom 3.50 (HDR)\n * Alternate image:\n    * Color Primaries: 1\n    * Transfer Char. : 16\n    * Matrix Coeffs. : 0\n    * ICC Profile    : Absent\n    * Bit Depth      : 8\n    * Planes         : 3\n\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [403x302]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "avif-gainmap-from-android-xmp.avif",
+          "FileSize": 251836,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A",
+            "tmap"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ExifByteOrder": "II",
+          "Make": "Google",
+          "Model": "Pixel 4a",
+          "Orientation": 1,
+          "XResolution": 72,
+          "YResolution": 72,
+          "ResolutionUnit": 2,
+          "Software": "GIMP 2.10.32",
+          "YCbCrPositioning": 1,
+          "ExposureTime": 0.000937,
+          "ExposureProgram": 2,
+          "ISO": 47,
+          "ExifVersion": "0232",
+          "DateTimeOriginal": "2022:08:24 20:07:42",
+          "CreateDate": "2022:08:24 20:07:42",
+          "OffsetTime": "+00:00",
+          "OffsetTimeOriginal": "+00:00",
+          "OffsetTimeDigitized": "+00:00",
+          "ComponentsConfiguration": "1 2 3 0",
+          "ShutterSpeedValue": "0.000936781366528578",
+          "ExposureCompensation": 0,
+          "SubjectDistance": 0,
+          "MeteringMode": 2,
+          "Flash": 32,
+          "SubSecTime": "023000",
+          "SubSecTimeOriginal": "023000",
+          "SubSecTimeDigitized": "023000",
+          "FlashpixVersion": "0100",
+          "ColorSpace": 1,
+          "ExifImageWidth": 403,
+          "ExifImageHeight": 302,
+          "InteropIndex": "R98",
+          "InteropVersion": "0100",
+          "SensingMethod": 2,
+          "SceneType": 1,
+          "CustomRendered": 1,
+          "ExposureMode": 0,
+          "DigitalZoomRatio": 0,
+          "SceneCaptureType": 0,
+          "Contrast": 0,
+          "Saturation": 0,
+          "Sharpness": 0,
+          "SubjectDistanceRange": 0,
+          "LensMake": "Google",
+          "LensModel": "Pixel 4a unknown camera",
+          "CompositeImage": 1,
+          "XMPToolkit": "XMP Core 5.5.0",
+          "DocumentID": "gimp:docid:gimp:d19d8265-6ba3-418e-9f89-cefba3ef5b22",
+          "InstanceID": "xmp.iid:a21468a0-72ee-489e-8927-2f380856cb8c",
+          "OriginalDocumentID": "xmp.did:915da93c-438f-425b-b7c0-ddd63bad346b",
+          "Format": "image/jpeg",
+          "PatientSex": "other",
+          "Api": 2.0,
+          "Platform": "Linux",
+          "TimeStamp": "1661371642640328",
+          "CreatorTool": "GIMP 2.10",
+          "MetadataDate": "2022:08:24T22:07:07+02:00",
+          "ModifyDate": "2022:08:24T22:07:07+02:00",
+          "Version": 1.0,
+          "HistoryAction": [
+            "saved",
+            "saved",
+            "saved",
+            "saved"
+          ],
+          "HistoryChanged": [
+            "/",
+            "/",
+            "/metadata",
+            "/"
+          ],
+          "HistoryInstanceID": [
+            "xmp.iid:f13d68d8-4ce1-4b96-8693-06fa2b068a09",
+            "xmp.iid:22108f79-8464-416c-9df2-f0a964bf865d",
+            "xmp.iid:d1f1b9bd-d635-4bb2-8267-e847d9e0c892",
+            "xmp.iid:c7acfa6c-c977-410c-92ff-c3b900b7af4b"
+          ],
+          "HistorySoftwareAgent": [
+            "Gimp 2.10 (Linux)",
+            "Gimp 2.10 (Linux)",
+            "Gimp 2.10 (Linux)",
+            "Gimp 2.10 (Linux)"
+          ],
+          "HistoryWhen": [
+            "2022:08:24 21:15:28+02:00",
+            "2022:08:24 21:16:53+02:00",
+            "2022:08:24 22:05:15+02:00",
+            "2022:08:24 22:07:22+02:00"
+          ],
+          "DirectoryItemSemantic": [
+            "Primary",
+            "GainMap"
+          ],
+          "DirectoryItemMime": [
+            "image/jpeg",
+            "image/jpeg"
+          ],
+          "DirectoryItemLength": 14092,
+          "HDRPlusMakerNote": "(Binary data 36 bytes, use -b option to extract)",
+          "ImageWidth": 403,
+          "ImageHeight": 302,
+          "ImageSpatialExtent": "403 302",
+          "ImagePixelDepth": "8 8 8",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 251193,
+          "MediaDataOffset": 643,
+          "ImageSize": "403 302",
+          "Megapixels": 0.121706,
+          "ShutterSpeed": 0.000937,
+          "SubSecCreateDate": "2022:08:24 20:07:42.023000+00:00",
+          "SubSecDateTimeOriginal": "2022:08:24 20:07:42.023000+00:00",
+          "SubSecModifyDate": "2022:08:24 20:07:42.023000+00:00"
+        },
+        "width": 403,
+        "height": 302,
+        "depth": 8,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 0,
+        "alpha": "Absent",
+        "sha256": "2c744ec754e5953db4b2e0787ef2e729d9c3d5c00f685cfb7243cc3ea93630bd"
+      },
+      "privacy_metadata": {
+        "ExifTool:ExifToolVersion": 13.55,
+        "File:FileType": "AVIF",
+        "File:FileTypeExtension": "AVIF",
+        "File:MIMEType": "image/avif",
+        "File:ExifByteOrder": "II",
+        "File:ImageWidth": 403,
+        "File:ImageHeight": 302,
+        "QuickTime:MajorBrand": "avif",
+        "QuickTime:MinorVersion": "0.0.0",
+        "QuickTime:CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A",
+          "tmap"
+        ],
+        "QuickTime:HandlerType": "pict",
+        "QuickTime:ImageSpatialExtent": "403 302",
+        "QuickTime:ImagePixelDepth": "8 8 8",
+        "QuickTime:AV1ConfigurationVersion": 1,
+        "QuickTime:ChromaFormat": 0,
+        "QuickTime:ChromaSamplePosition": 0,
+        "QuickTime:ColorProfiles": "nclx",
+        "QuickTime:ColorPrimaries": 1,
+        "QuickTime:TransferCharacteristics": 13,
+        "QuickTime:MatrixCoefficients": 0,
+        "QuickTime:VideoFullRangeFlag": 1,
+        "QuickTime:MediaDataSize": 251193,
+        "QuickTime:MediaDataOffset": 643,
+        "Meta:PrimaryItemReference": 1,
+        "IFD0:Make": "Google",
+        "IFD0:Model": "Pixel 4a",
+        "IFD0:Orientation": 1,
+        "IFD0:XResolution": 72,
+        "IFD0:YResolution": 72,
+        "IFD0:ResolutionUnit": 2,
+        "IFD0:Software": "GIMP 2.10.32",
+        "IFD0:ModifyDate": "2022:08:24 20:07:42",
+        "IFD0:YCbCrPositioning": 1,
+        "ExifIFD:ExposureTime": 0.000937,
+        "ExifIFD:ExposureProgram": 2,
+        "ExifIFD:ISO": 47,
+        "ExifIFD:ExifVersion": "0232",
+        "ExifIFD:DateTimeOriginal": "2022:08:24 20:07:42",
+        "ExifIFD:CreateDate": "2022:08:24 20:07:42",
+        "ExifIFD:OffsetTime": "+00:00",
+        "ExifIFD:OffsetTimeOriginal": "+00:00",
+        "ExifIFD:OffsetTimeDigitized": "+00:00",
+        "ExifIFD:ComponentsConfiguration": "1 2 3 0",
+        "ExifIFD:ShutterSpeedValue": "0.000936781366528578",
+        "ExifIFD:ExposureCompensation": 0,
+        "ExifIFD:SubjectDistance": 0,
+        "ExifIFD:MeteringMode": 2,
+        "ExifIFD:Flash": 32,
+        "ExifIFD:SubSecTime": "023000",
+        "ExifIFD:SubSecTimeOriginal": "023000",
+        "ExifIFD:SubSecTimeDigitized": "023000",
+        "ExifIFD:FlashpixVersion": "0100",
+        "ExifIFD:ColorSpace": 1,
+        "ExifIFD:ExifImageWidth": 403,
+        "ExifIFD:ExifImageHeight": 302,
+        "ExifIFD:SensingMethod": 2,
+        "ExifIFD:SceneType": 1,
+        "ExifIFD:CustomRendered": 1,
+        "ExifIFD:ExposureMode": 0,
+        "ExifIFD:DigitalZoomRatio": 0,
+        "ExifIFD:SceneCaptureType": 0,
+        "ExifIFD:Contrast": 0,
+        "ExifIFD:Saturation": 0,
+        "ExifIFD:Sharpness": 0,
+        "ExifIFD:SubjectDistanceRange": 0,
+        "ExifIFD:LensMake": "Google",
+        "ExifIFD:LensModel": "Pixel 4a unknown camera",
+        "ExifIFD:CompositeImage": 1,
+        "InteropIFD:InteropIndex": "R98",
+        "InteropIFD:InteropVersion": "0100",
+        "XMP-x:XMPToolkit": "XMP Core 5.5.0",
+        "XMP-xmpMM:DocumentID": "gimp:docid:gimp:d19d8265-6ba3-418e-9f89-cefba3ef5b22",
+        "XMP-xmpMM:InstanceID": "xmp.iid:a21468a0-72ee-489e-8927-2f380856cb8c",
+        "XMP-xmpMM:OriginalDocumentID": "xmp.did:915da93c-438f-425b-b7c0-ddd63bad346b",
+        "XMP-xmpMM:HistoryAction": [
+          "saved",
+          "saved",
+          "saved",
+          "saved"
+        ],
+        "XMP-xmpMM:HistoryChanged": [
+          "/",
+          "/",
+          "/metadata",
+          "/"
+        ],
+        "XMP-xmpMM:HistoryInstanceID": [
+          "xmp.iid:f13d68d8-4ce1-4b96-8693-06fa2b068a09",
+          "xmp.iid:22108f79-8464-416c-9df2-f0a964bf865d",
+          "xmp.iid:d1f1b9bd-d635-4bb2-8267-e847d9e0c892",
+          "xmp.iid:c7acfa6c-c977-410c-92ff-c3b900b7af4b"
+        ],
+        "XMP-xmpMM:HistorySoftwareAgent": [
+          "Gimp 2.10 (Linux)",
+          "Gimp 2.10 (Linux)",
+          "Gimp 2.10 (Linux)",
+          "Gimp 2.10 (Linux)"
+        ],
+        "XMP-xmpMM:HistoryWhen": [
+          "2022:08:24 21:15:28+02:00",
+          "2022:08:24 21:16:53+02:00",
+          "2022:08:24 22:05:15+02:00",
+          "2022:08:24 22:07:22+02:00"
+        ],
+        "XMP-dc:Format": "image/jpeg",
+        "XMP-DICOM:PatientSex": "other",
+        "XMP-GIMP:Api": 2.0,
+        "XMP-GIMP:Platform": "Linux",
+        "XMP-GIMP:TimeStamp": "1661371642640328",
+        "XMP-GIMP:Version": "2.10.32",
+        "XMP-xmp:CreatorTool": "GIMP 2.10",
+        "XMP-xmp:MetadataDate": "2022:08:24T22:07:07+02:00",
+        "XMP-xmp:ModifyDate": "2022:08:24T22:07:07+02:00",
+        "XMP-hdrgm:Version": 1.0,
+        "XMP-GContainer:DirectoryItemSemantic": [
+          "Primary",
+          "GainMap"
+        ],
+        "XMP-GContainer:DirectoryItemMime": [
+          "image/jpeg",
+          "image/jpeg"
+        ],
+        "XMP-GContainer:DirectoryItemLength": 14092,
+        "XMP-GCamera:HDRPlusMakerNote": "(Binary data 36 bytes, use -b option to extract)",
+        "Composite:ImageSize": "403 302",
+        "Composite:Megapixels": 0.121706,
+        "Composite:ShutterSpeed": 0.000937,
+        "Composite:SubSecCreateDate": "2022:08:24 20:07:42.023000+00:00",
+        "Composite:SubSecDateTimeOriginal": "2022:08:24 20:07:42.023000+00:00",
+        "Composite:SubSecModifyDate": "2022:08:24 20:07:42.023000+00:00"
+      },
+      "private_tags": [
+        "IFD0:Make",
+        "IFD0:Model",
+        "IFD0:Software",
+        "IFD0:ModifyDate",
+        "ExifIFD:ExposureTime",
+        "ExifIFD:ExposureProgram",
+        "ExifIFD:ISO",
+        "ExifIFD:DateTimeOriginal",
+        "ExifIFD:CreateDate",
+        "ExifIFD:OffsetTime",
+        "ExifIFD:OffsetTimeOriginal",
+        "ExifIFD:OffsetTimeDigitized",
+        "ExifIFD:ShutterSpeedValue",
+        "ExifIFD:ExposureCompensation",
+        "ExifIFD:SubjectDistance",
+        "ExifIFD:MeteringMode",
+        "ExifIFD:Flash",
+        "ExifIFD:SubSecTime",
+        "ExifIFD:SubSecTimeOriginal",
+        "ExifIFD:SubSecTimeDigitized",
+        "ExifIFD:SensingMethod",
+        "ExifIFD:SceneType",
+        "ExifIFD:CustomRendered",
+        "ExifIFD:ExposureMode",
+        "ExifIFD:DigitalZoomRatio",
+        "ExifIFD:SceneCaptureType",
+        "ExifIFD:Contrast",
+        "ExifIFD:Saturation",
+        "ExifIFD:Sharpness",
+        "ExifIFD:SubjectDistanceRange",
+        "ExifIFD:LensMake",
+        "ExifIFD:LensModel",
+        "ExifIFD:CompositeImage",
+        "XMP-x:XMPToolkit",
+        "XMP-xmpMM:DocumentID",
+        "XMP-xmpMM:InstanceID",
+        "XMP-xmpMM:OriginalDocumentID",
+        "XMP-xmpMM:HistoryAction",
+        "XMP-xmpMM:HistoryChanged",
+        "XMP-xmpMM:HistoryInstanceID",
+        "XMP-xmpMM:HistorySoftwareAgent",
+        "XMP-xmpMM:HistoryWhen",
+        "XMP-dc:Format",
+        "XMP-DICOM:PatientSex",
+        "XMP-GIMP:Api",
+        "XMP-GIMP:Platform",
+        "XMP-GIMP:TimeStamp",
+        "XMP-GIMP:Version",
+        "XMP-xmp:CreatorTool",
+        "XMP-xmp:MetadataDate",
+        "XMP-xmp:ModifyDate",
+        "XMP-GCamera:HDRPlusMakerNote"
+      ],
+      "native_metadata_printer": " * Base headroom:      0 (as fraction: 0/1)\n * Alternate headroom: 3.5 (as fraction: 7/2)\n * Gain Map Min:       R 0 (as fraction: 0/1)                     G 0 (as fraction: 0/1)                     B 0 (as fraction: 0/1)                    \n * Gain Map Max:       R 3.5 (as fraction: 7/2)                   G 3.5 (as fraction: 7/2)                   B 3.5 (as fraction: 7/2)                  \n * Base Offset:        R 0 (as fraction: 0/1)                     G 0 (as fraction: 0/1)                     B 0 (as fraction: 0/1)                    \n * Alternate Offset:   R 0 (as fraction: 0/1)                     G 0 (as fraction: 0/1)                     B 0 (as fraction: 0/1)                    \n * Gain Map Gamma:     R 1 (as fraction: 1/1)                     G 1 (as fraction: 1/1)                     B 1 (as fraction: 1/1)                    \n * Use Base Color Space: True\n",
+      "metadata_printer_limitation": "Pinned libavif 1.4.1 FormatFractions prints channel zero three times; the independent tmap fractions above are authoritative",
+      "base_decoder_agreement": true,
+      "map_decoder_agreement": true,
+      "packet_samples": {
+        "base": {
+          "sha256": "5fc3c50de8fa67232cafed1e1b05b5c193a5469dacbd498a2b0059aafc6fc254",
+          "decoded_sha256": "ed3f7a271113759665ef82cd2794389ed138381afc85affa1490e2802e83aa3c",
+          "native_facts": {
+            "frames": [
+              {
+                "media_type": "video",
+                "width": 403,
+                "height": 302,
+                "crop_top": 0,
+                "crop_bottom": 0,
+                "crop_left": 0,
+                "crop_right": 0,
+                "pix_fmt": "gbrp",
+                "color_range": "pc",
+                "color_space": "gbr",
+                "color_primaries": "bt709",
+                "color_transfer": "iec61966-2-1"
+              }
+            ],
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "av1",
+                "profile": "High",
+                "codec_type": "video",
+                "width": 403,
+                "height": 302,
+                "pix_fmt": "gbrp",
+                "color_range": "pc",
+                "color_space": "gbr",
+                "color_transfer": "iec61966-2-1",
+                "color_primaries": "bt709",
+                "nb_read_frames": "1",
+                "disposition": {
+                  "default": 0,
+                  "dub": 0,
+                  "original": 0,
+                  "comment": 0,
+                  "lyrics": 0,
+                  "karaoke": 0,
+                  "forced": 0,
+                  "hearing_impaired": 0,
+                  "visual_impaired": 0,
+                  "clean_effects": 0,
+                  "attached_pic": 0,
+                  "timed_thumbnails": 0,
+                  "non_diegetic": 0,
+                  "captions": 0,
+                  "descriptions": 0,
+                  "metadata": 0,
+                  "dependent": 0,
+                  "still_image": 0,
+                  "multilayer": 0
+                }
+              }
+            ]
+          },
+          "decoder": "FFmpeg/libdav1d from exact BMFF AV1 item bytes, without AVIF re-encoding"
+        },
+        "map": {
+          "sha256": "d098009a11040b6235a988fa2b4c71c4ac81ed42237e0ee979e291244af08f82",
+          "decoded_sha256": "4b1f96a94ced78e4a3e7b84341775e5156b2881d4f6863826a09f177d2596dfd",
+          "native_facts": {
+            "frames": [
+              {
+                "media_type": "video",
+                "width": 512,
+                "height": 384,
+                "crop_top": 0,
+                "crop_bottom": 0,
+                "crop_left": 0,
+                "crop_right": 0,
+                "pix_fmt": "gray",
+                "color_range": "pc",
+                "color_space": "smpte170m"
+              }
+            ],
+            "programs": [],
+            "stream_groups": [],
+            "streams": [
+              {
+                "codec_name": "av1",
+                "profile": "Main",
+                "codec_type": "video",
+                "width": 512,
+                "height": 384,
+                "pix_fmt": "gray",
+                "color_range": "pc",
+                "color_space": "smpte170m",
+                "nb_read_frames": "1",
+                "disposition": {
+                  "default": 0,
+                  "dub": 0,
+                  "original": 0,
+                  "comment": 0,
+                  "lyrics": 0,
+                  "karaoke": 0,
+                  "forced": 0,
+                  "hearing_impaired": 0,
+                  "visual_impaired": 0,
+                  "clean_effects": 0,
+                  "attached_pic": 0,
+                  "timed_thumbnails": 0,
+                  "non_diegetic": 0,
+                  "captions": 0,
+                  "descriptions": 0,
+                  "metadata": 0,
+                  "dependent": 0,
+                  "still_image": 0,
+                  "multilayer": 0
+                }
+              }
+            ]
+          },
+          "decoder": "FFmpeg/libdav1d from exact BMFF AV1 item bytes, without AVIF re-encoding"
+        }
+      }
+    },
+    "source_valid": true,
+    "valid_scope": "Established authored SDR base; HDR appearance is limited to the named reconstruction profiles, with output and consumer qualification separate",
+    "source_reconstruction_profiles": [
+      {
+        "candidate": "libavif-native-map-sampling-pq12",
+        "reference_revision": "gainmap-avif-hdr-bilinear8-lanczosfloat-v1",
+        "status": "tested and failed",
+        "measurement": {
+          "passed": false,
+          "metric": "BT.2124 Delta E ITP",
+          "fixture_class": "gainmap-hdr",
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "region_basis": "appearance_reference_luminance_nits",
+          "regions": {
+            "shadow": {
+              "samples": 22133,
+              "delta_e_itp": {
+                "mean": 0.06746337406480754,
+                "p95": 0.09958538063407812,
+                "maximum": 1.1844557774159108
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.003998927673658178,
+                "p95": 0.00872130801850765,
+                "maximum": 0.2078454812851227
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 2.147764972001786e-06,
+                "p95": 0.0,
+                "maximum": 0.0108859562662525
+              },
+              "reference_mean_nits": 5.243010891799848,
+              "actual_mean_nits": 5.243764307401552
+            },
+            "midtone": {
+              "samples": 51520,
+              "delta_e_itp": {
+                "mean": 0.12911163991627295,
+                "p95": 0.6958865824273691,
+                "maximum": 3.7364772384721574
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.13419594658170342,
+                "p95": 0.8647503733752804,
+                "maximum": 10.174348349884553
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.0008563378115962412,
+                "p95": 0.008501135558066681,
+                "maximum": 0.050409672556244844
+              },
+              "reference_mean_nits": 98.15266625866124,
+              "actual_mean_nits": 98.16614061609181
+            },
+            "highlight": {
+              "samples": 48053,
+              "delta_e_itp": {
+                "mean": 0.10038061191421149,
+                "p95": 0.6984302195962058,
+                "maximum": 8.187944143126831
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.3333636495699162,
+                "p95": 2.1071353335349103,
+                "maximum": 32.95178531318891
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.0007143888400575163,
+                "p95": 0.008719551995929425,
+                "maximum": 0.11239325171593516
+              },
+              "reference_mean_nits": 364.1848122637672,
+              "actual_mean_nits": 364.2148897208093
+            }
+          },
+          "failures": [
+            "highlight.delta_e_max"
+          ],
+          "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+        },
+        "native_source": {
+          "path": "/proof/work/gainmap-avif-hdr-geometries/libavif-native-map-sampling-pq12/source-pq.png",
+          "sha256": "faecf9429d5e07a1b9accf9788670574f76eb2d878607a868a4de56043cc6afb",
+          "metadata": {
+            "use_base_color_space": true,
+            "base_headroom": [
+              0,
+              1
+            ],
+            "alternate_headroom": [
+              7,
+              2
+            ],
+            "gain_map_min": [
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ]
+            ],
+            "gain_map_max": [
+              [
+                7,
+                2
+              ],
+              [
+                18,
+                5
+              ],
+              [
+                37,
+                10
+              ]
+            ],
+            "gamma": [
+              [
+                1,
+                1
+              ],
+              [
+                1,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ],
+            "base_offset": [
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ]
+            ],
+            "alternate_offset": [
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ]
+            ]
+          },
+          "display_headroom_log2": 4,
+          "precision": "Pinned libavif native map sampling, gain application and PQ12 PNG output",
+          "sampling_scope": "Valid distinct native sampling convention; measured against the unchanged predeclared reference",
+          "map_sampling": {
+            "passed": true,
+            "pass_scope": "Known native sampler and RGB8 source map precision from the pinned implementation; no claim of equal reference samples"
+          }
+        },
+        "scope": "Source reconstruction under this renderer convention only; output and display qualification are separate"
+      },
+      {
+        "candidate": "native-antialiased-bilinear8-float32",
+        "reference_revision": "gainmap-avif-hdr-bilinear8-lanczosfloat-v1",
+        "status": "qualified",
+        "measurement": {
+          "passed": true,
+          "metric": "BT.2124 Delta E ITP",
+          "fixture_class": "gainmap-hdr",
+          "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+          "region_basis": "appearance_reference_luminance_nits",
+          "regions": {
+            "shadow": {
+              "samples": 22133,
+              "delta_e_itp": {
+                "mean": 0.0011073965785043424,
+                "p95": 1.0690450130922563e-05,
+                "maximum": 0.5530064427795341
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.00013320688857009345,
+                "p95": 1.263121724548455e-06,
+                "maximum": 0.0960637579738517
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.0,
+                "p95": 0.0,
+                "maximum": 0.0
+              },
+              "reference_mean_nits": 5.243010891799848,
+              "actual_mean_nits": 5.242878872759986
+            },
+            "midtone": {
+              "samples": 51520,
+              "delta_e_itp": {
+                "mean": 0.0007535363187149353,
+                "p95": 1.7781396443011457e-05,
+                "maximum": 0.7334005243601069
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 0.0005442404343818678,
+                "p95": 3.664985271711885e-05,
+                "maximum": 1.795843208480278
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 5.08454676429022e-06,
+                "p95": 0.0,
+                "maximum": 0.009176753302135136
+              },
+              "reference_mean_nits": 98.15266625866124,
+              "actual_mean_nits": 98.15215360886596
+            },
+            "highlight": {
+              "samples": 48053,
+              "delta_e_itp": {
+                "mean": 1.3937805393439817e-05,
+                "p95": 1.972149227481403e-05,
+                "maximum": 3.568133911025122e-05
+              },
+              "luminance_absolute_error_nits": {
+                "mean": 5.8016752906527103e-05,
+                "p95": 0.00014231994384772406,
+                "maximum": 0.00043022895351896295
+              },
+              "luminance_relative_error_above_absolute_floor": {
+                "mean": 0.0,
+                "p95": 0.0,
+                "maximum": 0.0
+              },
+              "reference_mean_nits": 364.1848122637672,
+              "actual_mean_nits": 364.1848702805201
+            }
+          },
+          "failures": [],
+          "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+        },
+        "native_source": {
+          "path": "/proof/work/gainmap-avif-hdr-geometries/native-antialiased-bilinear8-float32/source-linear.gbrpf32",
+          "sha256": "32e2b522274f2e305aff5493da602a2f76c4ddaf9c62e0f3e0bb71a26c21b9ec",
+          "format": "gbrpf32le",
+          "width": 403,
+          "height": 302,
+          "gamut": "srgb",
+          "normalization_nits": 203,
+          "alpha": false,
+          "source_sha256": "2c744ec754e5953db4b2e0787ef2e729d9c3d5c00f685cfb7243cc3ea93630bd",
+          "precision": "Native float32 gain application from exact RGB8 base and resampled map",
+          "gain_filter": "[0:v]format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,geq=r='if(lte(r(X,Y),0.04045),r(X,Y)/12.92,pow((r(X,Y)+0.055)/1.055,2.4))':g='if(lte(g(X,Y),0.04045),g(X,Y)/12.92,pow((g(X,Y)+0.055)/1.055,2.4))':b='if(lte(b(X,Y),0.04045),b(X,Y)/12.92,pow((b(X,Y)+0.055)/1.055,2.4))'[base];[1:v]format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le[map];[base][map]blend=c0_expr='(A+0)*pow(2,(0+3.6000000000000001*pow(B,1))*1)-0':c1_expr='(A+0)*pow(2,(0+3.7000000000000002*pow(B,1))*1)-0':c2_expr='(A+0)*pow(2,(0+3.5*pow(B,1))*1)-0'[out]",
+          "metadata": {
+            "use_base_color_space": true,
+            "base_headroom": [
+              0,
+              1
+            ],
+            "alternate_headroom": [
+              7,
+              2
+            ],
+            "gain_map_min": [
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ]
+            ],
+            "gain_map_max": [
+              [
+                7,
+                2
+              ],
+              [
+                18,
+                5
+              ],
+              [
+                37,
+                10
+              ]
+            ],
+            "gamma": [
+              [
+                1,
+                1
+              ],
+              [
+                1,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ],
+            "base_offset": [
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ]
+            ],
+            "alternate_offset": [
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                0,
+                1
+              ]
+            ]
+          },
+          "weight": 1,
+          "display_headroom_log2": 4,
+          "map_sampling": {
+            "maximum_code_difference": 1,
+            "changed_pixels": 110,
+            "mean_absolute_code_difference": 0.0009038173960199168,
+            "passed": true,
+            "pass_scope": "Native opaque RGB8 samples at base dimensions with equal channels; code differences are diagnostic and appearance has separate unchanged gates",
+            "output_dimensions": [
+              403,
+              302
+            ],
+            "depth": 8,
+            "opaque": true,
+            "pixel_sha256": "b990b2055f7e64e27aef689c880ff218e6c911df9e86177c79c87d69ff01fcf9",
+            "precision": "Native normalized antialiased bilinear, horizontal then vertical, RGB8 rounding after each axis",
+            "filters": [
+              "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=1209:h=1152:filter=bilinear:rangein=full:range=full,format=gbrpf32le,crop=403:384:403:384[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=1209:h=1152:filter=bilinear:rangein=full:range=full,format=gbrpf32le,crop=403:384:403:384[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]",
+              "[0:v]pad=iw*3:ih*3:iw:ih:color=black,format=gbrp,zscale=rangein=full:range=full,format=gbrpf32le,split[pixels][coverage];[pixels]zscale=w=1209:h=906:filter=bilinear:rangein=full:range=full,format=gbrpf32le,crop=403:302:403:302[p];[coverage]geq=r='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':g='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)':b='between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)',zscale=w=1209:h=906:filter=bilinear:rangein=full:range=full,format=gbrpf32le,crop=403:302:403:302[c];[p][c]blend=all_expr='if(gt(B,0),A/B,0)',zscale=rangein=full:range=full:dither=none,format=gbrp,format=rgb24[out]"
+            ],
+            "path": "/proof/work/gainmap-avif-hdr-geometries/native-antialiased-bilinear8-float32/map-resampled.png",
+            "sha256": "25582d0af05f25ff3462797a47506936fc14a5c2a8b91d6cc7b713034730814c"
+          },
+          "base_decoder_agreement": true,
+          "base_decoder": "libavif/AOM, checked against direct dav1d AV1 samples",
+          "base_input": {
+            "path": "/proof/work/gainmap-avif-hdr-geometries/native-antialiased-bilinear8-float32/base-aom.png",
+            "sha256": "0194275cda59ac44e60f4cdcd8aaa17d310f1bb10e475b6a7ea5e55a57524aa3",
+            "pixel_sha256": "ed3f7a271113759665ef82cd2794389ed138381afc85affa1490e2802e83aa3c"
+          },
+          "map_input": {
+            "path": "/proof/work/gainmap-avif-hdr-geometries/source-inspection/map-native.png",
+            "sha256": "72480f250f930cdc641d22f0b31aace136112d95791fafc6fcc3ca1c12dae4fa",
+            "decoder_agreement": true,
+            "independent_gray_pixel_sha256": "4b1f96a94ced78e4a3e7b84341775e5156b2881d4f6863826a09f177d2596dfd"
+          }
+        },
+        "scope": "Source reconstruction under this renderer convention only; output and display qualification are separate"
+      }
+    ]
+  },
+  {
     "fixture_id": "gainmap-android-iso",
     "sha256": "f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e",
     "metadata": {

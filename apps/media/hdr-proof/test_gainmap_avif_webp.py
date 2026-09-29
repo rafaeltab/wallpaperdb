@@ -6,6 +6,7 @@ import unittest
 import avif
 import gainmap_avif_webp
 from gamma_icc import make_profile
+from matrix import build_matrix
 
 
 class GainmapAvifWebpTests(unittest.TestCase):
@@ -13,6 +14,7 @@ class GainmapAvifWebpTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             result = gainmap_avif_webp.run(Path(temporary), geometries=('contain', 'cover', 'fill', 'upscale'))
             self.assertEqual(len(result['evidence']), 4)
+            self.assertEqual(build_matrix(result['evidence'])['evidence_errors'], [])
             for case, operation, dimensions in zip(result['evidence'],
                     ('contain', 'cover', 'fill', 'upscale'), ((173, 130), (173, 173), (173, 211), (769, 576))):
                 self.assertEqual(case['geometry'], operation)

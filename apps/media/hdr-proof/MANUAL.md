@@ -135,6 +135,14 @@ The separately resized original-map candidate has correct source capacity and
 gain metadata, but fails at boost 2, source-full headroom and boost 16. All three
 entries point to the same diagnostic file. Matching metadata does not make it
 an approved HDR derivative.
+The optional unresized gain-map AVIF-to-HDR-JPEG conversion has one file that
+passes the automated comparisons at boosts 2, source-full and 16. Its three
+manifest entries share the same file hash and record different `rendering_scope`
+values. They are measurements of one adaptive image, not three different image
+contents. Compare that file with its original-raster SDR reference and source
+at each device setting, recording the consumer's actual behavior. Its ICC-aware
+scope and pending physical status still apply; it does not qualify the failed
+resized candidates or unmeasured headroom values.
 The separately named HDR candidates emit single-layer PQ AVIF12 for containment,
 crop, stretch and upscale. The original
 native-map-sampling candidate remains failed; the antialiased-map candidate has

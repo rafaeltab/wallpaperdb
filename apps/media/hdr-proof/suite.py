@@ -108,6 +108,7 @@ def candidate_files(evidence, fixtures):
                         'consumer_status':'pending manual review', 'facts':facts or (case.get('facts') if case else None),
                         'coding_scope':coding_scope or (case.get('native_candidate',{}).get('coding_scope') if case else None),
                         'qualification_scope':case.get('qualification_scope') if case else None,
+                        'rendering_scope':case.get('rendering_scope') if case else None,
                         'known_consumer_limitations':case.get('known_consumer_limitations', []) if case else [],
                         'consumer_decoder_diagnostics':case.get('consumer_decoder_diagnostics', {}) if case else {},
                         'warning':'A failed candidate is a diagnostic comparison, not an approved download or SDR fallback.' if case and case['status']!='qualified' else None})

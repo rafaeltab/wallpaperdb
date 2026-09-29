@@ -21,6 +21,7 @@ class EvidenceFileTests(unittest.TestCase):
             cases = [{'case_id': f'identity-{label}', 'fixture_id': 'avif-gainmap-from-android-xmp',
                       'geometry': 'identity', 'proof_module': 'gainmap_avif_identity_jpeg',
                       'status': 'qualified', 'qualification_scope': f'No resize, rendering {label}',
+                      'rendering_scope': {'label': label, 'headroom_is_product_selector': False},
                       'known_consumer_limitations': ['Physical review pending'],
                       'consumer_decoder_diagnostics': {'stock': {'status': 'tested and failed'}},
                       'artifacts': {'output': str(output), 'sha256': suite.avif.digest(output)},
@@ -32,6 +33,7 @@ class EvidenceFileTests(unittest.TestCase):
             for case in cases:
                 candidate = next(entry for entry in files if entry['case_id'] == case['case_id'])
                 self.assertEqual(candidate['qualification_scope'], case['qualification_scope'])
+                self.assertEqual(candidate['rendering_scope'], case['rendering_scope'])
                 self.assertEqual(candidate['known_consumer_limitations'], case['known_consumer_limitations'])
                 self.assertEqual(candidate['consumer_decoder_diagnostics'], case['consumer_decoder_diagnostics'])
                 self.assertEqual(candidate['sha256'], suite.avif.digest(output))

@@ -30,13 +30,14 @@ def decode_source(source, directory, gamut):
     return pq
 
 
-def resample_pq(source_pq, output, operation, orientation=1):
+def resample_pq(source_pq, output, operation, orientation=1, *, gamut='rec2020'):
     """Resample known Rec.2020/PQ PNG through native float Lanczos filters."""
     output = Path(output)
+    primaries = {'rec2020': 9, 'p3': 12, 'srgb': 1}[gamut]
     with Image.open(source_pq) as image:
         source_width, source_height = image.size
     if operation == 'cover':
-        return _cover_pq(source_pq, output, source_width, source_height)
+        return _cover_pq(source_pq, output, source_width, source_height, gamut)
     width, height = source_width, source_height
     prefix = []
     if operation == "orientation":
@@ -69,7 +70,7 @@ def resample_pq(source_pq, output, operation, orientation=1):
     filters = ("[0:v]" + ",".join(prefix + [
         "format=gbrap16le", "pad=iw*3:ih*3:iw:ih:color=black@0", "setparams=alpha_mode=premultiplied",
         "format=gbrapf32le:alpha_modes=premultiplied",
-        "zscale=agamma=0:transferin=16:primariesin=9:matrixin=0:rangein=full:transfer=linear:primaries=9:matrix=0:range=full:npl=10000",
+        f"zscale=agamma=0:transferin=16:primariesin=9:matrixin=0:rangein=full:transfer=linear:primaries={primaries}:matrix=0:range=full:npl=10000",
         "format=gbrapf32le:alpha_modes=premultiplied", "split[pixels][coverage]"])
         + ";[pixels]" + resample + "[numerator];[coverage]geq="
         + ":".join(f"{channel}='{coverage}'" for channel in "rgba") + "," + resample + "[weight];"
@@ -78,19 +79,20 @@ def resample_pq(source_pq, output, operation, orientation=1):
     command(["ffmpeg", "-v", "error", "-filter_complex_threads", "1", "-i", source_pq,
              "-filter_complex", filters, "-map", "[out]", "-frames:v", "1", "-pix_fmt", "gbrapf32le",
              "-f", "rawvideo", "-y", output], output.with_suffix(".log"))
-    return {"path": str(output), "format": "gbrapf32le", "gamut": "rec2020", "transfer": "linear",
+    return {"path": str(output), "format": "gbrapf32le", "gamut": gamut, "transfer": "linear",
             "normalization_nits": 10000, "width": 173 if operation == "cover" else target_width,
             "height": 173 if operation == "cover" else target_height, "filter": filters,
             "source_size": [source_width, source_height]}
 
 
-def _cover_pq(source, output, width, height):
+def _cover_pq(source, output, width, height, gamut):
     """Keep the fractional source window instead of rounding an intermediate size."""
     padded = output.with_suffix('.padded.gbrapf32')
+    primaries = {'rec2020': 9, 'p3': 12, 'srgb': 1}[gamut]
     filters = ('format=gbrap16le,pad=iw*3:ih*3:iw:ih:color=black@0,'
                'setparams=alpha_mode=premultiplied,format=gbrapf32le:alpha_modes=premultiplied,'
                'zscale=agamma=0:transferin=16:primariesin=9:matrixin=0:rangein=full:'
-               'transfer=linear:primaries=9:matrix=0:range=full:npl=10000,'
+               f'transfer=linear:primaries={primaries}:matrix=0:range=full:npl=10000,'
                'format=gbrapf32le:alpha_modes=premultiplied')
     command(['ffmpeg', '-v', 'error', '-y', '-i', source, '-vf', filters,
              '-frames:v', '1', '-pix_fmt', 'gbrapf32le', '-f', 'rawvideo', padded],
@@ -122,7 +124,7 @@ def _cover_pq(source, output, width, height):
     if len(rgb) != 3*173*173*4:
         raise ValueError('Native normalized HDR float size disagrees with geometry')
     output.write_bytes(rgb + struct.pack('<f', 1.0) * (173*173))
-    return {'path': str(output), 'format': 'gbrapf32le', 'gamut': 'rec2020', 'transfer': 'linear',
+    return {'path': str(output), 'format': 'gbrapf32le', 'gamut': gamut, 'transfer': 'linear',
             'normalization_nits': 10000, 'width': 173, 'height': 173,
             'filter': filters, 'normalization_filter': normalize, 'native_active_region': region,
             'source_size': [width, height]}

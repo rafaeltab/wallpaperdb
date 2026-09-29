@@ -1,0 +1,67 @@
+---
+title: Operate gateway admission
+description: Cost budgets, overload responses, degraded operation, and the production ingress contract.
+---
+
+Gateway admission protects ordinary discovery fairness and bounds active GraphQL work. It does not guarantee resistance to source-IP rotation or distributed attacks. People behind one public IP share a budget; proxy misconfiguration can incorrectly combine or separate those budgets. The [gateway decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/docs/adr/0003-weighted-ip-admission-with-bounded-fallback.md) records these tradeoffs.
+
+## Client contract
+
+Every GraphQL caller uses one trusted client-IP identity. Authentication, User-Agent changes, and forwarding headers from an untrusted peer do not provide a new budget. A valid query costs its selected operation's complexity score, with resolved variables. A cost point is estimated work, not a request, a millisecond, or a byte. Existing per-query depth, breadth, pagination, and complexity limits still apply.
+
+| Outcome | Charge | Client action |
+| --- | --- | --- |
+| Valid operation admitted | Its calculated score, including zero | Keep the result. The charge stays spent after backend failure, timeout, or disconnect. |
+| Query inspection rejects the operation | 100 points if admitted | Correct the query. An exhausted budget can return 429 instead of the inspection error. |
+| Malformed HTTP or batch rejection before inspection | None | Correct the request. Raw ingress limits still apply. |
+| HTTP 429, `RATE_LIMIT_EXCEEDED` | None for the denied reservation | Wait for `Retry-After`; this IP's current shared or local budget is exhausted. |
+| HTTP 503, `GATEWAY_OVERLOADED` before inspection/admission | None | Retry manually after the advertised wait. Work capacity is occupied. |
+| Deadline after successful admission | Charge retained | A connected caller receives 503; retry manually. |
+
+Errors retain GraphQL's `errors` array with stable `extensions.code`. `Retry-After` is an integer number of seconds, rounded up for quota exhaustion; `extensions.retryAfter`, when present, is milliseconds. Overload advertises a one-second wait, not a promise of available capacity after one second. Error bodies disclose neither Redis diagnostics nor client identity.
+
+`X-RateLimit-Cost-Limit` is the current bucket's capacity in points. Admitted requests also receive `X-RateLimit-Cost-Remaining` in points and `X-RateLimit-Cost-Reset`, a Unix timestamp in milliseconds when that bucket would be full with no further charges. A denial reports the limit and retry delay; clients must not assume remaining/reset headers exist on denials or overload. These headers never represent a number of remaining requests. The running gateway's `/documentation/json` and `/documentation` endpoints publish the HTTP schema.
+
+The web client schedules one automatic 429 retry after the advertised wait plus a small random delay. Another 429 leaves a visible message and manual retry. HTTP 503 never automatically retries. Cached content remains visible, and a failed next page appears after loaded wallpapers with automatic load-more paused until retry.
+
+## Configuration and degraded operation
+
+[Gateway configuration](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/src/config.ts) owns environment names and defaults. The initial shared bucket has 1,000,000 points and refills that capacity continuously over 60,000 ms. The local fallback has 100,000 points over 60,000 ms per IP per replica. Tune these through `QUOTA_CAPACITY`, `QUOTA_REFILL_MS`, `QUOTA_FALLBACK_CAPACITY`, and `QUOTA_FALLBACK_REFILL_MS`. Both capacities must accommodate the query complexity ceiling and the 100-point inspection penalty. The broad budgets are provisional because production traffic has no baseline.
+
+`GRAPHQL_MAX_ACTIVE` and `GRAPHQL_DEADLINE_MS` start at 32 requests and 5,000 ms per replica. The [load evidence and reproduction plan](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/docs/admission-load-test.md) records why. A request holds its slot through inspection, admission, backend work, and cancellation cleanup. A slow cleanup delays release; admitting replacement work earlier would violate the bound. Other HTTP routes do not consume these GraphQL slots.
+
+Production requires `RATE_LIMIT_ENABLED=true`, `REDIS_ENABLED=true`, and nonempty `TRUSTED_PROXIES` containing explicit proxy IPs or nonzero CIDR ranges. Production rejects disabled enforcement or missing trust configuration at startup. Direct development access is permitted with no trusted proxies. Do not trust all peers or copy a development subnet into production without verifying its membership.
+
+| Condition | Admission guarantee | Response and recovery |
+| --- | --- | --- |
+| Redis healthy, several replicas | One atomic weighted bucket per trusted IP across replicas | 429 when the shared budget cannot reserve the cost. Denial does not debit. |
+| Redis unavailable or a quota command fails | Smaller local bucket on each replica; fleet-wide guarantee unavailable | Admitted local work proceeds, exhausted local budgets return 429. |
+| Redis-command permits occupied | No unchecked bypass or extra queue | Immediate 503, even if Redis is healthy. |
+| Local identity store full | Existing budgets remain enforceable; depleted budgets are not evicted for new IPs | A new positive-cost identity receives 503. Fully refilled entries can be reclaimed. |
+| Active-work slots occupied | Per-replica bound remains in every mode | Immediate 503 before inspection and backend execution. |
+| Deadline or disconnect | Cancel underlying work and retain admitted charge | Release the slot after cleanup; remote work may already have completed. |
+| Redis recovers | Resume the shared bucket on the next successful reservation | Do not merge local charges; count recovery. An ambiguous failed reservation may already have charged Redis. |
+| Replica restarts during outage | That replica loses its local budgets | Other replicas retain theirs. IP-affinity routing reduces extra local allowances but is not required for healthy correctness. |
+
+`QUOTA_FALLBACK_MAX_VISITORS` bounds retained local budgets, initially 10,000 per replica. [Adapter source](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/src/adapters/redis/index.ts) owns quota-command concurrency and timeout settings. Increasing replica count increases degraded-mode allowances and total active-work capacity. It does not multiply the healthy shared budget.
+
+## Production ingress contract
+
+No production ingress product is selected. Deployers must implement all of the following before exposing Gateway:
+
+1. Apply a coarse raw-request rate limit before gateway parsing and inspection, including malformed, oversized, batched, and zero-cost requests. Define both per-IP and aggregate capacity so source-IP rotation cannot evade the deployment's aggregate limit. Size aggregate capacity against the number and resources of healthy replicas; independent ingress instances must not silently multiply an intended global limit.
+2. Bound request bodies before buffering or forwarding them to Gateway, including chunked bodies and alternate GraphQL transport methods. Bound URI/header sizes for GET and connection/read timeouts separately. Upload limits on other services are a separate policy.
+3. Strip caller-supplied client-IP forwarding data and construct the trusted chain at the ingress. Configure only known proxy peers or their dedicated network ranges in `TRUSTED_PROXIES`. Verify every hop and IPv4/IPv6 path.
+4. Restrict direct network access to gateway replicas to the ingress and required internal operators or probes. Application trust configuration cannot enforce firewall or security-group isolation.
+
+The measured starting rate and body limits, along with their limits of applicability, are recorded in the [load evidence](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/docs/admission-load-test.md). Repeat those measurements on the chosen production topology before deployment. The local [Caddy configuration](https://github.com/rafaeltab/wallpaperdb/blob/main/infra/caddy/Caddyfile) provides development routing; it is not an implementation or certification of this production contract.
+
+After selecting a topology, verify its public endpoint from an external network and a permitted internal peer. Confirm direct replica access fails, forged forwarding headers do not change quota identity, genuine distinct IPs remain distinct, and multiple clients behind one IP share the quota. Exercise both GraphQL GET and POST, malformed and chunked bodies, oversized bodies, raw-rate bursts, and ingress replica changes. Confirm rejection happens before gateway execution using request and backend counters. Repeat with several gateway replicas, Redis stopped, Redis restored, slow backend work, and a disconnected client. Record actual proxy version, trust chain, network rules, CPU/memory allocations, catalogue size, selected limits, accepted throughput, and latency. A successful local test does not replace this deployment check.
+
+## Monitoring and tuning
+
+Use the provisioned Gateway GraphQL Security dashboard and [alert definitions](https://github.com/rafaeltab/wallpaperdb/tree/main/infra/grafana/provisioning/alerting) as the source for queries. The [service diagnosis guide](/docs/observability) explains fallback, recovery, and saturation counters. Review charged points and query-score distributions alongside denials, latency, active saturation, and fallback before changing capacity. Sustained overload requires identifying the constrained work, rather than just increasing the request limit.
+
+The shared usage panel divides current-minute charged points by an approximate distinct count of IPs charged positive cost in that Redis minute. It uses Redis time and deduplicates replica snapshots. It is a partial-minute mean, not a per-IP percentile or request rate. An idle minute has no active-IP mean; stale samples, Redis failure, or invalid telemetry make it unavailable. Local outage charges are excluded. No raw or pseudonymous IP appears in metric labels.
+
+Treat fallback alerts as lost fleet-wide enforcement even when requests succeed. Restore Redis and check recovery plus fresh shared-usage samples. Treat saturation alerts as rejected work; inspect latency, backend health, and configured capacity. Telemetry failures must not change admission decisions or trigger a second debit. Source definitions live in the [admission adapter](https://github.com/rafaeltab/wallpaperdb/tree/main/apps/gateway/src/adapters/admission-telemetry) and the provisioned dashboard.

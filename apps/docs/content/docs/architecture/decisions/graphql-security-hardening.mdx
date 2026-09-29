@@ -3,6 +3,8 @@ title: "ADR-002: GraphQL Security Hardening"
 description: Architecture decision for implementing comprehensive GraphQL security without external complexity libraries.
 ---
 
+This page preserves the original decision. Its IP plus User-Agent quota, request-count settings, performance estimates, IP metric labels, and broad denial-of-service claims are historical and must not guide deployment. The [gateway admission contract](/docs/guides/gateway-admission) describes the current behavior and limits. [Gateway ADR 0003](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/docs/adr/0003-weighted-ip-admission-with-bounded-fallback.md) records the replacement decision.
+
 **Status:** Accepted  
 **Date:** 2024-12-21  
 **Context:** Protecting Gateway GraphQL API from DoS attacks

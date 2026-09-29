@@ -1,5 +1,7 @@
 # Effect services and owned lifetimes
 
+The admission bypass and quota telemetry policy below is historical. [ADR 0003](0003-weighted-ip-admission-with-bounded-fallback.md) supersedes it with weighted IP admission, bounded local fallback, and overload rejection. The other lifetime decisions remain in effect.
+
 The gateway adopts Effect 4 throughout its effectful execution and dependency graph. Effect and its OpenTelemetry and Node platform packages are pinned to `4.0.0-rc.115`; the gateway's OpenTelemetry SDK moves to version 2 to match the bridge. The previous migration used Effect for execution while manually constructing its dependency graph, leaving service keys unused and background work outside the owning scope.
 
 Application-owned TypeScript interfaces now have namespaced `Context.Service` keys. Capability layers yield their dependencies and expose only their driving ports; driven adapter layers implement the consuming capabilities' ports. `gatewayLayer` selects and composes implementations once, sharing the same OpenSearch resource between queries, projections, and health checks. Configuration values enter through named layer parameters; passwords and cursor signing secrets use Effect `Redacted` values until passed to the relevant adapter. Pure domain calculations stay pure.

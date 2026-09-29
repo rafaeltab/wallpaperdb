@@ -15,13 +15,22 @@ export type AdmissionResult =
  * requests without charging quota and resumes normal limits after recovery.
  */
 export interface Quota {
-  take(visitor: string, limit: number, windowMs: number): Effect.Effect<AdmissionResult>;
+  take(
+    visitor: string,
+    limit: number,
+    windowMs: number,
+    cost: number
+  ): Effect.Effect<AdmissionResult>;
 }
 
 export const Quota = Context.Service<Quota>('wallpaperdb.gateway.admission.Quota');
 
+export type Inspection =
+  | { readonly _tag: 'Valid'; readonly cost: number }
+  | { readonly _tag: 'Rejected' };
+
 export interface Admission {
-  admit(visitor: string): Effect.Effect<AdmissionResult>;
+  admit(visitor: string, inspection: Inspection): Effect.Effect<AdmissionResult>;
 }
 
 export const Admission = Context.Service<Admission>('wallpaperdb.gateway.admission.Admission');

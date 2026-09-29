@@ -119,7 +119,9 @@ function installAdmission(
         );
     }
     const result = await execution.run(
-      Admission.use((admission) => admission.admit(fingerprint(request.ip))),
+      Admission.use((admission) =>
+        admission.admit(fingerprint(request.ip), { _tag: 'Valid', cost: 1 })
+      ),
       { signal: request.gatewaySignal }
     );
     switch (result._tag) {

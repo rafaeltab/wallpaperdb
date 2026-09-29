@@ -11,19 +11,20 @@ export const memoryQuotaLayer: Layer.Layer<Quota> = Layer.effect(
     const take = Effect.fn('test.quota.take')(function* (
       visitor: string,
       limit: number,
-      windowMs: number
+      windowMs: number,
+      cost: number
     ) {
       const now = DateTime.toEpochMillis(yield* DateTime.now);
       return yield* Ref.modify(windows, (current): [AdmissionResult, Windows] => {
         const key = JSON.stringify([visitor, windowMs]);
         const saved = current.get(key);
         const window = saved && saved.reset > now ? saved : { count: 0, reset: now + windowMs };
-        if (window.count >= limit)
+        if (window.count + cost > limit)
           return [{ _tag: 'Limited', retryAfter: window.reset - now }, current];
         const updated = new Map(current);
-        updated.set(key, { ...window, count: window.count + 1 });
+        updated.set(key, { ...window, count: window.count + cost });
         return [
-          { _tag: 'Allowed', remaining: limit - window.count - 1, reset: window.reset },
+          { _tag: 'Allowed', remaining: limit - window.count - cost, reset: window.reset },
           updated,
         ];
       });

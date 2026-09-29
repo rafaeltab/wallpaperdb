@@ -19,7 +19,9 @@ describe('Effect OpenTelemetry bridge', () => {
     try {
       const execution = await runtime.runPromise(HttpExecution);
       await trace.getTracer('gateway-contract').startActiveSpan('http.request', async (span) => {
-        await execution.run(Admission.use((admission) => admission.admit('visitor')));
+        await execution.run(
+          Admission.use((admission) => admission.admit('visitor', { _tag: 'Valid', cost: 1 }))
+        );
         await execution.run(Availability.use((availability) => availability.ready(false, true)));
         span.end();
       });

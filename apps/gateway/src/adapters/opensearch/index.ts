@@ -456,12 +456,31 @@ type IndexMapping = {
   source?: { excludes: string[] };
   properties: Record<string, unknown>;
 };
-const indexedMappingField = (type: 'keyword' | 'float' | 'integer' | 'long' | 'date') =>
+const indexedMappingField = (type: 'keyword' | 'float' | 'integer' | 'long') =>
   Schema.Struct({
     type: Schema.Literal(type),
     index: Schema.optionalKey(Schema.Boolean),
     doc_values: Schema.optionalKey(Schema.Boolean),
   }).check(Schema.makeFilter((field) => field.index !== false && field.doc_values !== false));
+// Projection writes ISO timestamps, including timestamps supplied by upstream events.
+const isoDateMappingField = Schema.Struct({
+  type: Schema.Literal('date'),
+  index: Schema.optionalKey(Schema.Boolean),
+  doc_values: Schema.optionalKey(Schema.Boolean),
+  format: Schema.optionalKey(Schema.String),
+}).check(
+  Schema.makeFilter(
+    (field) =>
+      field.index !== false &&
+      field.doc_values !== false &&
+      (field.format === undefined ||
+        field.format
+          .split('||')
+          .some(
+            (format) => format === 'strict_date_optional_time' || format === 'date_optional_time'
+          ))
+  )
+);
 const disabledMappingObject = Schema.Struct({
   type: Schema.Literal('object'),
   enabled: Schema.Literal(false),
@@ -497,7 +516,7 @@ const verifyWallpaperMapping = Effect.fnUntraced(function* (
                 aspectRatio: indexedMappingField('float'),
                 format: indexedMappingField('keyword'),
                 fileSizeBytes: indexedMappingField('long'),
-                createdAt: indexedMappingField('date'),
+                createdAt: isoDateMappingField,
               }),
             }),
             colorReady: indexedMappingField('keyword'),
@@ -507,8 +526,8 @@ const verifyWallpaperMapping = Effect.fnUntraced(function* (
               index: Schema.Literal(false),
             }),
             variantOrder: disabledMappingObject,
-            uploadedAt: indexedMappingField('date'),
-            updatedAt: indexedMappingField('date'),
+            uploadedAt: isoDateMappingField,
+            updatedAt: isoDateMappingField,
             utilities: Schema.Struct({
               type: Schema.optionalKey(Schema.Literal('object')),
               enabled: Schema.optionalKey(Schema.Literal(true)),

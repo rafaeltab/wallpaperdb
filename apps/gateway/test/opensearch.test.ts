@@ -228,6 +228,118 @@ describe('OpenSearch catalogue port contract', () => {
     }
   });
 
+  it.each([
+    'strict_date_optional_time',
+    'date_optional_time',
+    'epoch_millis||strict_date_optional_time',
+  ])('accepts ISO-compatible date format %s for projected timestamps', async (format) => {
+    const index = searchFixture.index(`iso-dates-${format.replaceAll('|', '-').toLowerCase()}`);
+    const required = await client.indices.getMapping({
+      index: searchFixture.options.wallpaperIndex,
+    });
+    const mapping = structuredClone(required.body[searchFixture.options.wallpaperIndex].mappings);
+    mapping.properties.uploadedAt.format = format;
+    mapping.properties.updatedAt.format = format;
+    mapping.properties.variants.properties.createdAt.format = format;
+    try {
+      await client.indices.create({
+        index,
+        body: {
+          settings: { 'index.mapping.total_fields.limit': 10100 },
+          mappings: mapping,
+        },
+      });
+      const compatible = await acquireSearchFixture({
+        ...searchFixture.options,
+        wallpaperIndex: index,
+      });
+      try {
+        await Effect.runPromise(
+          compatible.project.record({
+            _tag: 'WallpaperUploaded',
+            wallpaperId: 'iso-date-projection',
+            profileId: 'owner',
+            uploadedAt: timestamp,
+            occurrence: occurrence('iso-date-upload'),
+          })
+        );
+        await Effect.runPromise(
+          compatible.project.record({
+            _tag: 'VariantAvailable',
+            wallpaperId: 'iso-date-projection',
+            variant,
+            occurrence: occurrence('iso-date-variant'),
+          })
+        );
+        const stored = await client.get({ index, id: 'iso-date-projection' });
+        expect(stored.body._source).toMatchObject({
+          uploadedAt: timestamp,
+          updatedAt: timestamp,
+          variants: [{ createdAt: timestamp }],
+        });
+      } finally {
+        await compatible.dispose();
+      }
+    } finally {
+      await client.indices.delete({ index, ignore_unavailable: true });
+    }
+  });
+
+  it.each([
+    'uploadedAt',
+    'updatedAt',
+    'variants.createdAt',
+  ] as const)('rejects an existing %s date mapping that cannot parse ISO timestamps', async (field) => {
+    const index = searchFixture.index(`epoch-millis-${field.replace('.', '-').toLowerCase()}`);
+    const required = await client.indices.getMapping({
+      index: searchFixture.options.wallpaperIndex,
+    });
+    const mapping = structuredClone(required.body[searchFixture.options.wallpaperIndex].mappings);
+    const dateField =
+      field === 'variants.createdAt'
+        ? mapping.properties.variants.properties.createdAt
+        : mapping.properties[field];
+    dateField.format = 'epoch_millis';
+    try {
+      await client.indices.create({
+        index,
+        body: {
+          settings: { 'index.mapping.total_fields.limit': 10100 },
+          mappings: mapping,
+        },
+      });
+      await expect(
+        client.index({
+          index,
+          id: 'iso-date-probe',
+          body: {
+            wallpaperId: 'iso-date-probe',
+            userId: 'owner',
+            variants: [variant],
+            uploadedAt: timestamp,
+            updatedAt: timestamp,
+          },
+        })
+      ).rejects.toMatchObject({ meta: { body: { error: { type: 'mapper_parsing_exception' } } } });
+
+      const result = await Effect.runPromise(
+        Layer.build(openSearchLayer({ ...searchFixture.options, wallpaperIndex: index })).pipe(
+          Effect.scoped,
+          Effect.result
+        )
+      );
+      expect(result._tag).toBe('Failure');
+      if (result._tag === 'Failure')
+        expect(result.failure.diagnostic).toMatchObject({
+          dependency: 'opensearch',
+          operation: 'inspect-index',
+          index,
+        });
+    } finally {
+      await client.indices.delete({ index, ignore_unavailable: true });
+    }
+  });
+
   it('aborts interrupted requests and closes in-flight transport work with the layer scope', async () => {
     let stalledRequests = 0;
     let activeRequests = 0;

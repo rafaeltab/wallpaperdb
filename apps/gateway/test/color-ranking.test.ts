@@ -102,8 +102,15 @@ describe('Native color ranking port contract', () => {
     await client.indices.refresh({ index: fixture.options.wallpaperIndex });
   });
   afterAll(async () => {
-    await Promise.all([client.close(), resource?.dispose()]);
-    await fixture.destroy();
+    try {
+      await client.close();
+    } finally {
+      try {
+        await resource?.dispose();
+      } finally {
+        await fixture.destroy();
+      }
+    }
   });
 
   it.each([
@@ -226,15 +233,16 @@ describe('Native color ranking port contract', () => {
       forwarded.on('error', () => outgoing.destroy());
       incoming.pipe(forwarded);
     });
-    proxy.listen(0, '127.0.0.1');
-    await once(proxy, 'listening');
-    const address = proxy.address();
-    if (address === null || typeof address === 'string') throw new Error('Expected TCP listener');
-    const proxied = await acquireSearchFixture({
-      ...fixture.options,
-      url: `http://127.0.0.1:${address.port}`,
-    });
+    let proxied: Awaited<ReturnType<typeof acquireSearchFixture>> | undefined;
     try {
+      proxy.listen(0, '127.0.0.1');
+      await once(proxy, 'listening');
+      const address = proxy.address();
+      if (address === null || typeof address === 'string') throw new Error('Expected TCP listener');
+      proxied = await acquireSearchFixture({
+        ...fixture.options,
+        url: `http://127.0.0.1:${address.port}`,
+      });
       expect(
         (await Effect.runPromise(proxied.adapter.read.search(selection()))).entries.length
       ).toBe(12);
@@ -243,11 +251,14 @@ describe('Native color ranking port contract', () => {
         await Effect.runPromise(Effect.flip(proxied.adapter.read.search(selection())))
       ).toMatchObject({ _tag: 'CatalogueUnavailable' });
     } finally {
-      await proxied.dispose();
-      proxy.closeAllConnections();
-      await new Promise<void>((resolve, reject) =>
-        proxy.close((error) => (error ? reject(error) : resolve()))
-      );
+      try {
+        await proxied?.dispose();
+      } finally {
+        proxy.closeAllConnections();
+        await new Promise<void>((resolve, reject) =>
+          proxy.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
     }
   });
 });

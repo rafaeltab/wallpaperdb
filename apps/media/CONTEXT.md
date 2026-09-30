@@ -1,6 +1,6 @@
-# Media delivery
+# Media
 
-Media delivers authorized renditions of committed assets. Producers own source assets; Media owns inspection, rendition generation, selection, and its delivery catalog.
+Media owns image processing and authorized delivery. Producers own committed Assets; Media owns inspection, rendition generation, selection, its delivery catalog, and the [planned stateless conversion of temporary HDR Profile picture sources](../../docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md).
 
 ## Language
 

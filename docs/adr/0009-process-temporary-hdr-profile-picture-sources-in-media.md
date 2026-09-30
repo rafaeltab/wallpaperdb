@@ -1,0 +1,9 @@
+# Process temporary HDR Profile picture sources in Media
+
+Status: accepted. Implementation boundaries remain with [rendition specification planning](https://github.com/rafaeltab/wallpaperdb/issues/259).
+
+Media owns native processing of temporary HDR Profile picture sources. Web selects the crop, sends the source and crop settings to Media, receives the processed image, and uploads that image to User. Media retains neither the conversion input nor its output and does not register them in its delivery catalog. User validates the processed upload against its effective picture policy and owns the resulting immutable Asset and Profile transition. Compliant HDR uploads pass through User without another re-encode; noncanonical HDR uploads are rejected.
+
+This keeps complex HDR reconstruction, cropping, and encoding in the context already responsible for HDR image processing. Faithful browser HDR editing is unproved, and duplicating that processing in User would add another native encoding pipeline. We accept transferring the full source to Media and returning the processed image through Web in exchange for small stored Profile pictures and concentrated processing responsibility. This ownership decision does not establish codec qualification or deployment capacity.
+
+Temporary conversion is distinct from a Rendition request for an existing Asset. It creates no retained source, Materialized rendition, or new Asset identity in Media. User still decides acceptance and current-picture availability, and the existing Asset delivery and lifecycle contracts remain in force. The SDR editor keeps its existing browser processing path. The [confirmed HDR Profile picture policy](https://github.com/rafaeltab/wallpaperdb/issues/270#issuecomment-5902621514) owns source admission, automatic HDR routing, preservation requirements, previews, and configurable limits.

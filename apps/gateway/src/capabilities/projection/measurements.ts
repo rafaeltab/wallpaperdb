@@ -4,7 +4,7 @@ import {
   COLOR_FEATURE_NAMES,
   COLOR_MEASUREMENT_VERSION,
   COLOR_REFERENCE_COMMIT,
-} from '../catalogue/index.js';
+} from '@wallpaperdb/events/color-vocabulary';
 import type { ProjectionChange } from './contract.js';
 
 function validPair(coverage: number, quality: number): boolean {

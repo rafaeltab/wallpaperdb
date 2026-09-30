@@ -1,4 +1,8 @@
 {
+  "allowedCapabilityDependencies": {
+    "catalogue": ["@wallpaperdb/events/color-vocabulary"],
+    "projection": ["@wallpaperdb/events/color-vocabulary"]
+  },
   "publicModules": [
     "graphql",
     "cursors",

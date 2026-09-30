@@ -40,4 +40,4 @@ export {
   COLOR_MEASUREMENT_VERSION,
   COLOR_REFERENCE_COMMIT,
   COLOR_ANCHORS_SHA256,
-} from './color-definition.js';
+} from '@wallpaperdb/events/color-vocabulary';

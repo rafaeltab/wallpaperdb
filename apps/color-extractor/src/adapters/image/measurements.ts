@@ -2,6 +2,7 @@ import { COLOR_ANCHORS, COLOR_CUTOFFS, COLOR_FEATURE_NAMES } from '@wallpaperdb/
 import type { ColorMeasurements } from '../../capabilities/extraction/index.js';
 
 type Lab = readonly [number, number, number];
+type Hsv = readonly [hue: number, saturation: number, value: number];
 const clamp = (value: number) => Math.min(1, Math.max(0, value));
 const smoothstep = (value: number) => {
   const x = clamp(value);
@@ -19,7 +20,7 @@ function rgbToLab(rgb: readonly number[]): Lab {
     0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
   ];
 }
-function hsv([r, g, b]: readonly number[]): Lab {
+function hsv([r, g, b]: readonly number[]): Hsv {
   const max = Math.max(r, g, b),
     min = Math.min(r, g, b),
     d = max - min;

@@ -124,6 +124,29 @@ describe('OpenSearch catalogue port contract', () => {
       replacement: { dynamic: false },
     },
     {
+      label: 'a source allowlist dropping measurements and color occurrence metadata',
+      field: '_source',
+      replacement: {
+        includes: ['wallpaperId', 'userId', 'variants', 'uploadedAt', 'updatedAt'],
+      },
+    },
+    {
+      label: 'a source allowlist dropping variant occurrence metadata',
+      field: '_source',
+      replacement: {
+        includes: [
+          'wallpaperId',
+          'userId',
+          'variants',
+          'uploadedAt',
+          'updatedAt',
+          'colorSnapshot',
+          'colorReady',
+          'colorOrder',
+        ],
+      },
+    },
+    {
       label: 'dynamically indexed measurements',
       field: 'colorSnapshot',
       replacement: { enabled: true },
@@ -167,10 +190,14 @@ describe('OpenSearch catalogue port contract', () => {
           settings: { 'index.mapping.total_fields.limit': 10100 },
           mappings: {
             ...mapping,
-            properties: {
-              ...mapping.properties,
-              [field]: { ...mapping.properties[field], ...replacement },
-            },
+            ...(field === '_source'
+              ? { _source: { ...mapping._source, ...replacement } }
+              : {
+                  properties: {
+                    ...mapping.properties,
+                    [field]: { ...mapping.properties[field], ...replacement },
+                  },
+                }),
           },
         },
       });

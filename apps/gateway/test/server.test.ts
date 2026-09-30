@@ -1,15 +1,16 @@
 import { execFile, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpServer, request as forwardHttpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { headers } from 'nats';
-import { Cause, ConfigProvider, Effect, Exit, Fiber, Scope } from 'effect';
+import { Cause, ConfigProvider, Effect, Exit, Fiber, Layer, Scope } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from '@effect/vitest';
+import { openSearchLayer } from '../src/adapters/opensearch/index.js';
 import { loadConfig } from '../src/config.js';
 import { startGateway } from '../src/server.js';
 import { gatewayProgram } from '../src/bootstrap.js';
@@ -139,7 +140,33 @@ describe('Gateway bootstrap and deployed artifact', () => {
     const secret = 'startup-private-upstream-response';
     const password = 'startup-private-http-password';
     let inspections = 0;
+    if (operation === 'update-index-mapping') {
+      await Effect.runPromise(
+        Layer.build(
+          openSearchLayer({
+            ...tester.search.options,
+            wallpaperIndex: environment().OPENSEARCH_INDEX,
+          })
+        ).pipe(Effect.scoped)
+      );
+    }
     const dependency = createHttpServer((request, response) => {
+      if (
+        operation === 'update-index-mapping' &&
+        request.url?.includes(environment().OPENSEARCH_INDEX)
+      ) {
+        const forwarded = forwardHttpRequest(
+          new URL(request.url, tester.search.options.url),
+          { method: request.method, headers: request.headers },
+          (upstream) => {
+            response.writeHead(upstream.statusCode ?? 500, upstream.headers);
+            upstream.pipe(response);
+          }
+        );
+        forwarded.on('error', () => response.destroy());
+        request.pipe(forwarded);
+        return;
+      }
       if (request.method === 'HEAD') {
         inspections++;
         const status =

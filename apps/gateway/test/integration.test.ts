@@ -192,7 +192,8 @@ describe('Gateway composition with real adapters', () => {
             properties: {
               wallpaperId: { type: 'keyword' },
               variants: { type: 'nested' },
-              colorHistogram: { type: 'knn_vector', dimension: 64 },
+              utilities: { dynamic: 'strict' },
+              colorReady: { type: 'keyword' },
             },
           },
         },
@@ -208,7 +209,9 @@ describe('Gateway composition with real adapters', () => {
       });
       const settings = await client.indices.getSettings({ index: wallpaperIndex });
       expect(settings.body).toMatchObject({
-        [wallpaperIndex]: { settings: { index: { knn: 'true' } } },
+        [wallpaperIndex]: {
+          settings: { index: { mapping: { total_fields: { limit: '10100' } } } },
+        },
       });
     } finally {
       await client.close();

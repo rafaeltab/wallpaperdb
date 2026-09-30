@@ -1,5 +1,5 @@
 import { Context, type Effect, Schema } from 'effect';
-import type { Profile, Variant } from '../catalogue/index.js';
+import type { ColorDescriptor, Profile, Variant } from '../catalogue/index.js';
 
 export interface Occurrence {
   readonly source: string;
@@ -13,18 +13,7 @@ export type ProjectionChange =
       readonly _tag: 'ColorsMeasured';
       readonly occurrence: Occurrence;
       readonly wallpaperId: string;
-      readonly descriptor: {
-        readonly version: string;
-        readonly sampleCount: number;
-        readonly layers: readonly {
-          readonly cutoff: number;
-          readonly coverage: readonly number[];
-          readonly quality: readonly number[];
-        }[];
-        readonly named: Readonly<
-          Record<string, { readonly coverage: number; readonly quality: number }>
-        >;
-      };
+      readonly descriptor: ColorDescriptor;
       readonly original: { readonly owner: 'ingestor'; readonly id: string };
       readonly provenance: {
         readonly referenceCommit: string;
@@ -44,13 +33,6 @@ export type ProjectionChange =
       readonly occurrence: Occurrence;
       readonly wallpaperId: string;
       readonly variant: Variant;
-    }
-  | {
-      readonly _tag: 'ColorsExtracted';
-      readonly occurrence: Occurrence;
-      readonly wallpaperId: string;
-      readonly colorHistogram: number[];
-      readonly colorSpace: string;
     }
   | {
       readonly _tag: 'ProfilePublished';
@@ -73,11 +55,16 @@ export type ProjectionMutation =
       readonly variant: Variant;
     }
   | {
-      readonly _tag: 'PublishColors';
+      readonly _tag: 'PublishMeasurements';
       readonly occurrence: Occurrence;
       readonly wallpaperId: string;
-      readonly colorHistogram: number[];
-      readonly colorSpace: string;
+      readonly descriptor: ColorDescriptor;
+      readonly original: { readonly owner: 'ingestor'; readonly id: string };
+      readonly provenance: {
+        readonly referenceCommit: string;
+        readonly anchorsSha256: string;
+        readonly originalSha256: string;
+      };
     }
   | { readonly _tag: 'PublishProfile'; readonly occurrence: Occurrence; readonly profile: Profile };
 
@@ -91,11 +78,13 @@ export type ProjectionWrite =
   | { readonly _tag: 'Unchanged' }
   | { readonly _tag: 'Rejected' };
 
-/** Each mutation is atomic for its target. Replays do not duplicate variants or reset
- * enrichment; partial enrichment is durable before an upload and stays invisible to
- * catalogue readers until the upload arrives. Profile snapshots only advance version.
- * Complete color snapshots and variants with the same dimensions and format converge by occurrence time
- * and identity while legacy producers lack an entity version. Reads see completed writes. */
+/** Each target mutation is atomic. A complete compatible utility bank and its readiness
+ * marker commit together with the measurement snapshot. Metadata updates preserve the
+ * entire bank, including values unavailable in stored source. Replays never reset
+ * enrichment; enrichment before upload is durable but invisible to Catalogue readers.
+ * Colors and variants converge by precise occurrence time and identity. Profile
+ * snapshots only advance version. Reads see completed writes. Independent target
+ * documents and the broker acknowledgement do not share a transaction. */
 export interface ProjectionStore {
   apply(mutation: ProjectionMutation): Effect.Effect<ProjectionWrite, ProjectionUnavailable>;
 }
@@ -109,7 +98,7 @@ export type ProjectionOutcome =
   | { readonly _tag: 'Ignored' }
   | {
       readonly _tag: 'Rejected';
-      readonly reason: 'invalid-color-histogram' | 'invalid-projection';
+      readonly reason: 'incompatible-color-measurements' | 'invalid-projection';
     };
 
 export interface ProjectCatalogue {

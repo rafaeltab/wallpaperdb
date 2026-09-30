@@ -1,6 +1,7 @@
 export type {
   CatalogueConfig,
   ColorDescriptor,
+  ColorQuality,
   ColorPreference,
   CursorValue,
   HandleResolution,
@@ -31,4 +32,12 @@ export {
   colorUtilityFields,
   encodeColorUtilities,
 } from './color-utilities.js';
-export type { ColorQuality } from './color-utilities.js';
+
+export {
+  COLOR_ANCHORS,
+  COLOR_CUTOFFS,
+  COLOR_FEATURE_NAMES,
+  COLOR_MEASUREMENT_VERSION,
+  COLOR_REFERENCE_COMMIT,
+  COLOR_ANCHORS_SHA256,
+} from './color-definition.js';

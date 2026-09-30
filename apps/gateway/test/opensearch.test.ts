@@ -7,12 +7,15 @@ import { Effect, Layer } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type OpenSearchGateway, openSearchLayer } from '../src/adapters/opensearch/index.js';
 import type {
+  ColorDescriptor,
   SearchBatch,
   SearchSelection,
   Variant,
   Wallpaper,
 } from '../src/capabilities/catalogue/index.js';
 import type { ProjectCatalogue, ProjectionChange } from '../src/capabilities/projection/index.js';
+import { colorUtilityFields, COLOR_UTILITY_VERSION } from '../src/capabilities/catalogue/index.js';
+import { measuredColors, colorFixture } from './helpers/colors.js';
 import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
@@ -29,7 +32,7 @@ const occurrence = (id: string, time = timestamp) => ({
   id,
   occurredAt: time,
 });
-const colors = Array.from({ length: 64 }, (_, index) => (index === 0 ? 1 : 0));
+const colors = colorFixture.descriptor;
 
 describe('OpenSearch catalogue port contract', () => {
   const searchFixture = createSearchFixture();
@@ -69,14 +72,32 @@ describe('OpenSearch catalogue port contract', () => {
       occurrence: occurrence(`variant-${id}-${value.width}`, time),
     });
   }
-  async function addColors(id: string, histogram = colors, time = timestamp) {
-    return record({
-      _tag: 'ColorsExtracted',
-      wallpaperId: id,
-      colorHistogram: histogram,
-      colorSpace: 'hsv',
-      occurrence: occurrence(`colors-${id}`, time),
-    });
+  async function addColors(id: string, descriptor: ColorDescriptor = colors, time = timestamp) {
+    return record({ ...measuredColors(id, time), descriptor });
+  }
+  async function bank(id: string) {
+    const fields: Record<string, number> = {};
+    for (let start = 0; start < colorUtilityFields.length; start += 90) {
+      const selected = colorUtilityFields.slice(start, start + 90);
+      const result = await client.search({
+        index: searchFixture.index('wallpapers'),
+        body: {
+          _source: false,
+          query: { term: { wallpaperId: id } },
+          size: 1,
+          docvalue_fields: [
+            'wallpaperId',
+            'colorReady',
+            ...selected.map((key) => `utilities.${key}`),
+          ],
+        },
+      });
+      const hit = result.body.hits.hits[0];
+      expect(hit.fields.wallpaperId).toEqual([id]);
+      expect(hit.fields.colorReady).toEqual([COLOR_UTILITY_VERSION]);
+      for (const key of selected) fields[key] = Math.fround(hit.fields[`utilities.${key}`][0]);
+    }
+    return fields;
   }
   async function get(id: string): Promise<Wallpaper | null> {
     return Effect.runPromise(adapter.read.wallpaper(id));
@@ -200,7 +221,7 @@ describe('OpenSearch catalogue port contract', () => {
       index: searchFixture.index('wallpapers'),
       id: 'replayed',
     });
-    expect(persisted.body._source.colorHistogram).toEqual(colors);
+    expect(persisted.body._source.colorSnapshot.descriptor).toEqual(colors);
   });
 
   it('durably retains enrichment arriving before upload and hides unfinished wallpapers from readers', async () => {
@@ -213,9 +234,7 @@ describe('OpenSearch catalogue port contract', () => {
     );
     await upload('out-of-order');
     expect(await get('out-of-order')).toMatchObject({ variants: [variant] });
-    expect((await search({ profileId: 'out-of-order', colorVector: colors })).entries).toHaveLength(
-      1
-    );
+    expect((await search({ profileId: 'out-of-order' })).entries).toHaveLength(1);
   });
 
   it('deduplicates variant replay using its stable dimensions and format', async () => {
@@ -235,9 +254,7 @@ describe('OpenSearch catalogue port contract', () => {
       ])
     ).toEqual([{ _tag: 'Completed' }, { _tag: 'Completed' }, { _tag: 'Completed' }]);
     expect((await get('concurrent'))?.variants).toHaveLength(2);
-    expect((await search({ profileId: 'concurrent', colorVector: colors })).entries).toHaveLength(
-      1
-    );
+    expect((await search({ profileId: 'concurrent' })).entries).toHaveLength(1);
   });
 
   it('ignores older variant snapshots and advances updatedAt with event occurrence', async () => {
@@ -287,14 +304,14 @@ describe('OpenSearch catalogue port contract', () => {
 
   it('retains the newer color snapshot when older extraction is replayed', async () => {
     await upload('color-order');
-    const current = Array.from({ length: 64 }, (_, index) => (index === 10 ? 1 : 0));
+    const current = measuredColors('color-order', timestamp, 'dark-red').descriptor;
     await addColors('color-order', current, '2026-02-01T00:00:00.000Z');
     expect(await addColors('color-order')).toEqual({ _tag: 'Ignored' });
     const persisted = await client.get({
       index: searchFixture.index('wallpapers'),
       id: 'color-order',
     });
-    expect(persisted.body._source.colorHistogram).toEqual(current);
+    expect(persisted.body._source.colorSnapshot.descriptor).toEqual(current);
   });
 
   it.each([
@@ -305,23 +322,19 @@ describe('OpenSearch catalogue port contract', () => {
     await upload(id);
     const oldOccurrence = occurrence('z-older', '2026-01-01T00:00:00.1231Z');
     const newOccurrence = occurrence('a-newer', '2026-01-01T00:00:00.1239Z');
-    const newerColors = Array.from({ length: 64 }, (_, index) => (index === 10 ? 1 : 0));
+    const newerColors = measuredColors('precise', timestamp, 'dark-red').descriptor;
     const newerVariant = { ...variant, fileSizeBytes: 2000 };
     const events: ProjectionChange[] = [
       {
-        _tag: 'ColorsExtracted',
-        wallpaperId: id,
+        ...measuredColors(id),
         occurrence: oldOccurrence,
-        colorHistogram: colors,
-        colorSpace: 'hsv',
+        descriptor: colors,
       },
       { _tag: 'VariantAvailable', wallpaperId: id, occurrence: oldOccurrence, variant },
       {
-        _tag: 'ColorsExtracted',
-        wallpaperId: id,
+        ...measuredColors(id),
         occurrence: newOccurrence,
-        colorHistogram: newerColors,
-        colorSpace: 'hsv',
+        descriptor: newerColors,
       },
       {
         _tag: 'VariantAvailable',
@@ -335,68 +348,7 @@ describe('OpenSearch catalogue port contract', () => {
     expect((await get(id))?.variants).toEqual([newerVariant]);
     expect((await get(id))?.updatedAt).toBe('2026-01-01T00:00:00.123Z');
     const persisted = await client.get({ index: searchFixture.index('wallpapers'), id });
-    expect(persisted.body._source.colorHistogram).toEqual(newerColors);
-  });
-
-  it('compares precise occurrences against existing millisecond ordering metadata', async () => {
-    const id = 'legacy-millisecond-order';
-    await upload(id);
-    const legacyOccurrence = occurrence('z-legacy', '2026-01-01T00:00:00.123Z');
-    const legacyOrder = `${legacyOccurrence.occurredAt}/${JSON.stringify([legacyOccurrence.source, legacyOccurrence.id])}`;
-    await client.update({
-      index: searchFixture.index('wallpapers'),
-      id,
-      refresh: true,
-      body: {
-        doc: {
-          colorHistogram: colors,
-          colorSpace: 'hsv',
-          colorOrder: legacyOrder,
-          variants: [variant],
-          variantOrder: {
-            [JSON.stringify([variant.width, variant.height, variant.format])]: legacyOrder,
-          },
-          updatedAt: legacyOccurrence.occurredAt,
-        },
-      },
-    });
-    const next = occurrence('a-newer', '2026-01-01T00:00:00.123000000001Z');
-    const newerVariant = { ...variant, fileSizeBytes: 2000 };
-    expect(
-      await record({
-        _tag: 'VariantAvailable',
-        wallpaperId: id,
-        occurrence: next,
-        variant: newerVariant,
-      })
-    ).toEqual({ _tag: 'Completed' });
-    expect(
-      await record({
-        _tag: 'ColorsExtracted',
-        wallpaperId: id,
-        occurrence: next,
-        colorHistogram: colors,
-        colorSpace: 'hsv',
-      })
-    ).toEqual({ _tag: 'Completed' });
-    expect(
-      await record({
-        _tag: 'VariantAvailable',
-        wallpaperId: id,
-        occurrence: legacyOccurrence,
-        variant,
-      })
-    ).toEqual({ _tag: 'Ignored' });
-    expect(
-      await record({
-        _tag: 'ColorsExtracted',
-        wallpaperId: id,
-        occurrence: legacyOccurrence,
-        colorHistogram: colors,
-        colorSpace: 'hsv',
-      })
-    ).toEqual({ _tag: 'Ignored' });
-    expect((await get(id))?.variants).toEqual([newerVariant]);
+    expect(persisted.body._source.colorSnapshot.descriptor).toEqual(newerColors);
   });
 
   it('preserves newer enrichment timestamp when the initial upload arrives late', async () => {
@@ -477,41 +429,161 @@ describe('OpenSearch catalogue port contract', () => {
     ]);
   });
 
-  it('sorts color similarity with a deterministic wallpaper tie breaker and score cursor', async () => {
-    for (const id of ['similarity-a', 'similarity-b', 'similarity-c']) {
-      await upload(id, 'similarity');
+  async function faultyProjection(
+    id: string,
+    initial: 'stall' | 'conflict' | 'ambiguous' | 'unavailable'
+  ) {
+    const mode = initial;
+    let writes = 0;
+    const dependency = createServer((incoming, outgoing) => {
+      const targeted = incoming.method === 'PUT' && incoming.url?.includes(`/_doc/${id}`);
+      if (targeted) {
+        writes++;
+        if (mode === 'stall') return;
+        if (mode === 'conflict' || mode === 'unavailable') {
+          const status = mode === 'conflict' ? 409 : 503;
+          outgoing.writeHead(status, { 'Content-Type': 'application/json' });
+          outgoing.end(
+            JSON.stringify({
+              error: {
+                type: mode === 'conflict' ? 'version_conflict_engine_exception' : 'unavailable',
+              },
+              status,
+            })
+          );
+          return;
+        }
+      }
+      const forwarded = request(
+        new URL(incoming.url ?? '/', searchFixture.options.url),
+        { method: incoming.method, headers: incoming.headers },
+        (response) => {
+          if (targeted && mode === 'ambiguous') {
+            response.resume();
+            response.once('end', () => {
+              outgoing.writeHead(200, { 'Content-Type': 'application/json' });
+              outgoing.end(
+                JSON.stringify({
+                  _index: searchFixture.options.wallpaperIndex,
+                  _id: 'wrong-id',
+                  result: 'updated',
+                  _shards: { failed: 0 },
+                })
+              );
+            });
+          } else {
+            outgoing.writeHead(response.statusCode ?? 500, response.headers);
+            response.pipe(outgoing);
+          }
+        }
+      );
+      forwarded.on('error', () => outgoing.destroy());
+      incoming.pipe(forwarded);
+    });
+    dependency.listen(0, '127.0.0.1');
+    await once(dependency, 'listening');
+    const address = dependency.address();
+    if (!address || typeof address === 'string') throw new Error('Expected TCP listener');
+    const proxied = await acquireSearchFixture({
+      ...searchFixture.options,
+      url: `http://127.0.0.1:${address.port}`,
+    });
+    return {
+      project: proxied.project,
+      writes: () => writes,
+      async dispose() {
+        await proxied.dispose();
+        dependency.closeAllConnections();
+        await new Promise<void>((resolve, reject) =>
+          dependency.close((error) => (error ? reject(error) : resolve()))
+        );
+      },
+    };
+  }
+  it.each([
+    { mode: 'conflict' as const, attempts: 6 },
+    { mode: 'unavailable' as const, attempts: 1 },
+  ])('never marks rejected writes ready and bounds $mode attempts', async ({ mode, attempts }) => {
+    const id = `fault-${mode}`;
+    await upload(id);
+    const fault = await faultyProjection(id, mode);
+    try {
+      expect(
+        await Effect.runPromise(Effect.flip(fault.project.record(measuredColors(id))))
+      ).toMatchObject({ _tag: 'ProjectionUnavailable' });
+      expect(fault.writes()).toBe(attempts);
+      const stored = await client.get({ index: searchFixture.options.wallpaperIndex, id });
+      expect(stored.body._source.colorReady).toBeUndefined();
+      expect(stored.body._source.colorSnapshot).toBeUndefined();
       await addColors(id);
+      expect(await bank(id)).toEqual(colorFixture.utilities);
+    } finally {
+      await fault.dispose();
     }
-    const first = await search({
-      profileId: 'similarity',
-      colorVector: colors,
-      sortOrder: 'desc',
-      size: 2,
-    });
-    expect(first.entries.map((entry) => entry.wallpaper.wallpaperId)).toEqual([
-      'similarity-a',
-      'similarity-b',
-    ]);
-    expect(first.entries[0]?.cursor).toEqual([expect.any(Number), 'similarity-a']);
-    const second = await search({
-      profileId: 'similarity',
-      colorVector: colors,
-      sortOrder: 'desc',
-      searchAfter: first.entries.at(-1)?.cursor,
-    });
-    expect(second.entries.map((entry) => entry.wallpaper.wallpaperId)).toEqual(['similarity-c']);
-    const previous = await search({
-      profileId: 'similarity',
-      colorVector: colors,
-      sortOrder: 'asc',
-      searchAfter: second.entries[0]?.cursor,
-    });
-    expect(previous.entries.map((entry) => entry.wallpaper.wallpaperId)).toEqual([
-      'similarity-b',
-      'similarity-a',
-    ]);
+  });
+  it('replays an ambiguously acknowledged complete write without another write', async () => {
+    const id = 'fault-ambiguous';
+    await upload(id);
+    const fault = await faultyProjection(id, 'ambiguous');
+    try {
+      expect(
+        await Effect.runPromise(Effect.flip(fault.project.record(measuredColors(id))))
+      ).toMatchObject({ _tag: 'ProjectionUnavailable' });
+      expect(await bank(id)).toEqual(colorFixture.utilities);
+      expect(await Effect.runPromise(fault.project.record(measuredColors(id)))).toEqual({
+        _tag: 'Ignored',
+      });
+      expect(fault.writes()).toBe(1);
+    } finally {
+      await fault.dispose();
+    }
+  });
+  it('keeps interrupted work ineligible until a complete retry commits', async () => {
+    const id = 'fault-interrupted';
+    await upload(id);
+    const fault = await faultyProjection(id, 'stall');
+    try {
+      const pending = Effect.runPromise(
+        fault.project.record(measuredColors(id)).pipe(Effect.timeout('200 millis'), Effect.result)
+      );
+      await expect.poll(fault.writes).toBe(1);
+      expect((await pending)._tag).toBe('Failure');
+      const stored = await client.get({ index: searchFixture.options.wallpaperIndex, id });
+      expect(stored.body._source.colorReady).toBeUndefined();
+      await addColors(id);
+      expect(await bank(id)).toEqual(colorFixture.utilities);
+    } finally {
+      await fault.dispose();
+    }
   });
 
+  it('stores every complete utility as indexed float doc values without utility source', async () => {
+    await upload('bank-parity');
+    await addColors('bank-parity');
+    expect(await bank('bank-parity')).toEqual(colorFixture.utilities);
+    const stored = await client.get({
+      index: searchFixture.index('wallpapers'),
+      id: 'bank-parity',
+    });
+    expect(stored.body._source.utilities).toBeUndefined();
+    expect(stored.body._source.colorHistogram).toBeUndefined();
+    expect(stored.body._source.colorReady).toBe(COLOR_UTILITY_VERSION);
+    const mapping = await client.indices.getMapping({ index: searchFixture.index('wallpapers') });
+    const utilities = mapping.body[searchFixture.index('wallpapers')].mappings.properties.utilities;
+    expect(Object.keys(utilities.properties)).toHaveLength(10044);
+    expect(Object.values(utilities.properties)).toEqual(Array(10044).fill({ type: 'float' }));
+  });
+  it('keeps the entire utility bank after interleaved metadata updates and duplicate colors', async () => {
+    await addColors('metadata-bank');
+    await Promise.all([
+      upload('metadata-bank'),
+      addVariant('metadata-bank'),
+      addVariant('metadata-bank', { ...variant, format: 'image/png' }),
+    ]);
+    expect(await addColors('metadata-bank')).toEqual({ _tag: 'Ignored' });
+    expect(await bank('metadata-bank')).toEqual(colorFixture.utilities);
+    expect((await get('metadata-bank'))?.variants).toHaveLength(2);
+  });
   it('treats malformed persisted data as unavailable rather than asserting it is a wallpaper', async () => {
     const malformedFixture = createSearchFixture();
     const malformed = await acquireSearchFixture(malformedFixture.options);
@@ -671,89 +743,6 @@ describe('OpenSearch catalogue port contract', () => {
       ).toMatchObject({ _tag: 'CatalogueUnavailable' });
     } finally {
       await missing.dispose();
-    }
-  });
-
-  it('upgrades existing projection mappings while preserving stored wallpapers and variants', async () => {
-    await client.indices.create({
-      index: searchFixture.index('legacy-wallpapers'),
-      body: {
-        settings: { index: { knn: true } },
-        mappings: {
-          properties: {
-            wallpaperId: { type: 'keyword' },
-            userId: { type: 'keyword' },
-            uploadedAt: { type: 'date' },
-            updatedAt: { type: 'date' },
-            variants: {
-              type: 'nested',
-              properties: {
-                width: { type: 'integer' },
-                height: { type: 'integer' },
-                aspectRatio: { type: 'float' },
-                format: { type: 'keyword' },
-                fileSizeBytes: { type: 'long' },
-                createdAt: { type: 'date' },
-              },
-            },
-          },
-        },
-      },
-    });
-    await client.index({
-      index: searchFixture.index('legacy-wallpapers'),
-      id: 'legacy',
-      body: {
-        wallpaperId: 'legacy',
-        userId: 'legacy-profile',
-        uploadedAt: timestamp,
-        updatedAt: timestamp,
-        variants: [variant],
-      },
-      refresh: true,
-    });
-    const upgraded = await acquireSearchFixture({
-      ...searchFixture.options,
-      wallpaperIndex: searchFixture.index('legacy-wallpapers'),
-    });
-    try {
-      const mapping = await client.indices.getMapping({
-        index: searchFixture.index('legacy-wallpapers'),
-      });
-      expect(
-        mapping.body[searchFixture.index('legacy-wallpapers')].mappings.properties
-      ).toMatchObject({
-        variantOrder: { type: 'object', enabled: false },
-        colorOrder: { type: 'keyword', index: false },
-      });
-      expect(
-        (await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
-      ).toEqual([variant]);
-      const stale = await Effect.runPromise(
-        upgraded.project.record({
-          _tag: 'VariantAvailable',
-          wallpaperId: 'legacy',
-          variant: { ...variant, fileSizeBytes: 1, createdAt: '2025-01-01T00:00:00Z' },
-          occurrence: occurrence('legacy-stale', '2025-01-01T00:00:00.000Z'),
-        })
-      );
-      expect(stale).toEqual({ _tag: 'Ignored' });
-      expect(
-        (await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
-      ).toEqual([variant]);
-      await Effect.runPromise(
-        upgraded.project.record({
-          _tag: 'VariantAvailable',
-          wallpaperId: 'legacy',
-          variant: { ...variant, format: 'image/png' },
-          occurrence: occurrence('legacy-new-format'),
-        })
-      );
-      expect(
-        (await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
-      ).toHaveLength(2);
-    } finally {
-      await upgraded.dispose();
     }
   });
 });

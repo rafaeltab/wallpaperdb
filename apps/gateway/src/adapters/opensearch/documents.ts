@@ -1,6 +1,6 @@
 import { DateTime, Option, Schema } from 'effect';
 
-const timestamp = Schema.String.check(
+export const timestamp = Schema.String.check(
   Schema.isPattern(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?Z$/),
   Schema.makeFilter(
     (value) => {
@@ -15,7 +15,7 @@ const timestamp = Schema.String.check(
 );
 const positiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
 const nonnegativeInteger = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
-const variant = Schema.Struct({
+export const variantDocument = Schema.Struct({
   width: positiveInteger,
   height: positiveInteger,
   aspectRatio: Schema.Finite.check(Schema.isGreaterThan(0)),
@@ -26,7 +26,7 @@ const variant = Schema.Struct({
 const wallpaperDocument = Schema.Struct({
   wallpaperId: Schema.NonEmptyString,
   userId: Schema.NonEmptyString,
-  variants: Schema.Array(variant),
+  variants: Schema.Array(variantDocument),
   uploadedAt: timestamp,
   updatedAt: timestamp,
 });

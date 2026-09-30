@@ -10,9 +10,9 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - [Wallpaper color extraction](./apps/color-extractor/CONTEXT.md) - owns measurements of an original wallpaper's color distribution
 
-- [Wallpaper variant generation](./apps/variant-generator/CONTEXT.md) - owns lower-resolution wallpaper variants
+- [Wallpaper variant generation (legacy)](./apps/variant-generator/CONTEXT.md) - currently produces lower-resolution wallpaper variants; the [accepted delivery plan](https://github.com/rafaeltab/wallpaperdb/issues/250) moves generation ownership to Media
 
-- [Media](./apps/media/CONTEXT.md) - owns Asset inspection and rendition processing, temporary HDR Profile picture conversion, the delivery catalog, and delivery of immutable Assets
+- [Media](./apps/media/CONTEXT.md) - owns Asset inspection, rendition processing, temporary HDR Profile picture conversion, the delivery catalog, and delivery of immutable Assets; the [accepted delivery plan](https://github.com/rafaeltab/wallpaperdb/issues/250) includes the migration of legacy variant generation
 
 - [Tagging](./apps/tags/CONTEXT.md) - reserved for wallpaper classification; domain language remains undefined
 

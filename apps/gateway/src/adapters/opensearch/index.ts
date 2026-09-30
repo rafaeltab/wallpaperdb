@@ -509,6 +509,9 @@ const verifyWallpaperMapping = Effect.fnUntraced(function* (
             uploadedAt: indexedMappingField('date'),
             updatedAt: indexedMappingField('date'),
             utilities: Schema.Struct({
+              type: Schema.optionalKey(Schema.Literal('object')),
+              enabled: Schema.optionalKey(Schema.Literal(true)),
+              dynamic: Schema.Literal('strict'),
               properties: Schema.Record(Schema.String, indexedMappingField('float')),
             }),
           }),

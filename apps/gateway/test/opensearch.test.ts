@@ -115,6 +115,14 @@ describe('OpenSearch catalogue port contract', () => {
 
   it.each([
     { label: 'non-nested variants', field: 'variants', replacement: { type: 'object' } },
+    { label: 'nested utility fields', field: 'utilities', replacement: { type: 'nested' } },
+    { label: 'disabled utility indexing', field: 'utilities', replacement: { enabled: false } },
+    { label: 'dynamic utility fields', field: 'utilities', replacement: { dynamic: true } },
+    {
+      label: 'ignored unknown utility fields',
+      field: 'utilities',
+      replacement: { dynamic: false },
+    },
     {
       label: 'dynamically indexed measurements',
       field: 'colorSnapshot',

@@ -1,4 +1,5 @@
 import { DateTime, Option, Schema } from 'effect';
+import type { SearchSelection } from '../../capabilities/catalogue/index.js';
 
 export const timestamp = Schema.String.check(
   Schema.isPattern(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?Z$/),
@@ -97,19 +98,66 @@ export const profileDiscoveryResponse = Schema.decodeUnknownEffect(
     }),
   })
 );
-export const wallpaperSearchResponse = Schema.decodeUnknownEffect(
-  Schema.Struct({
-    hits: Schema.Struct({
-      hits: Schema.Array(
-        Schema.Struct({
-          _source: wallpaperDocument,
-          sort: Schema.Array(Schema.Union([Schema.String, Schema.Finite])),
+const wallpaperHit = Schema.Struct({
+  _id: Schema.NonEmptyString,
+  _index: Schema.NonEmptyString,
+  _source: wallpaperDocument,
+  _score: Schema.NullOr(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
+  fields: Schema.optionalKey(Schema.Struct({ wallpaperId: Schema.Array(Schema.NonEmptyString) })),
+  sort: Schema.Array(Schema.Union([Schema.String, Schema.Finite])),
+});
+function validHit(hit: typeof wallpaperHit.Type, selection: SearchSelection, index: string) {
+  const id = hit._source.wallpaperId;
+  if (hit._id !== id || hit._index !== index) return false;
+  if (!selection.color) return hit.sort.length === 1 && hit.sort[0] === id;
+  return (
+    hit.fields?.wallpaperId.length === 1 &&
+    hit.fields.wallpaperId[0] === id &&
+    hit._score !== null &&
+    hit.sort.length === 2 &&
+    hit.sort[0] === hit._score &&
+    hit.sort[1] === id
+  );
+}
+export function wallpaperSearchResponse(selection: SearchSelection, index: string) {
+  return Schema.decodeUnknownEffect(
+    Schema.Struct({
+      timed_out: Schema.Literal(false),
+      _shards: Schema.Struct({
+        total: positiveInteger,
+        successful: positiveInteger,
+        failed: Schema.Literal(0),
+      }).check(
+        Schema.makeFilter((shards) => shards.total === shards.successful, {
+          expected: 'all search shards succeeded',
         })
       ),
-      total: Schema.Struct({ value: nonnegativeInteger }),
-    }),
-  })
-);
+      hits: Schema.Struct({
+        hits: Schema.Array(
+          wallpaperHit.check(
+            Schema.makeFilter((hit) => validHit(hit, selection, index), {
+              expected: 'a consistent wallpaper ID, score and cursor',
+            })
+          )
+        ),
+        total: Schema.Struct({ value: nonnegativeInteger, relation: Schema.Literal('eq') }),
+      }),
+    }).check(
+      Schema.makeFilter(
+        ({ hits }) => {
+          const expected = Math.min(selection.size, hits.total.value);
+          const count = hits.hits.length;
+          return (
+            count <= expected &&
+            (selection.searchAfter !== undefined || count === expected) &&
+            new Set(hits.hits.map((hit) => hit._id)).size === count
+          );
+        },
+        { expected: 'a complete search page with unique wallpaper IDs' }
+      )
+    )
+  );
+}
 export const updateResponse = Schema.decodeUnknownEffect(
   Schema.Struct({ result: Schema.Literals(['created', 'updated', 'noop']) })
 );

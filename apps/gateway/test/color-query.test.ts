@@ -2,8 +2,23 @@ import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { setup } from './helpers/catalogue.js';
 import { COLOR_FEATURE_NAMES, type ColorQuery } from '../src/capabilities/catalogue/index.js';
+import { rankingCases } from './helpers/color-ranking.js';
 
 describe('Catalogue color query admission', () => {
+  it('resolves every supported frozen input to its original-count utility ranking', async () => {
+    const { read, catalogue } = await setup();
+    for (const entry of rankingCases) {
+      const result = await Effect.runPromise(
+        catalogue.search({
+          color: { ...entry.query, quality: entry.quality, targets: [...entry.query.targets] },
+        })
+      );
+      expect(result, entry.name).toMatchObject({ _tag: 'Found' });
+      expect(read.selections.at(-1)?.color, `${entry.name}/${entry.quality}`).toEqual(
+        entry.ranking
+      );
+    }
+  });
   it('defaults to the favorite vibe and resolves the nearest stored anchor', async () => {
     const { read, catalogue } = await setup();
     expect(

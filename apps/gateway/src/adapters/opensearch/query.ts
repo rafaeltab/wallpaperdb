@@ -12,6 +12,7 @@ export function searchBody(selection: SearchSelection) {
     filter.push({ nested: { path: 'variants', query: { bool: { must: variantTerms } } } });
   if (color) filter.push({ term: { colorReady: COLOR_UTILITY_VERSION } });
   return {
+    _source: ['wallpaperId', 'userId', 'variants', 'uploadedAt', 'updatedAt'],
     query: {
       bool: {
         must: color
@@ -37,7 +38,7 @@ export function searchBody(selection: SearchSelection) {
           : {}),
       },
     },
-    ...(color ? { docvalue_fields: ['wallpaperId'], stored_fields: '_none_' } : {}),
+    ...(color ? { docvalue_fields: ['wallpaperId'] } : {}),
     search_after: selection.searchAfter,
     size: selection.size,
     track_total_hits: true,

@@ -3,7 +3,9 @@ import { defaults } from '@wallpaperdb/vitest-config/defaults';
 import { defineConfig, mergeConfig } from 'vitest/config';
 
 const require = createRequire(import.meta.url);
-const searchTests = ['test/{opensearch,profile,profile-search,integration,server}.test.ts'];
+const searchTests = [
+  'test/{opensearch,color-ranking,profile,profile-search,integration,server}.test.ts',
+];
 const instrumentationTests = ['test/unit/otel.test.ts'];
 
 export default mergeConfig(

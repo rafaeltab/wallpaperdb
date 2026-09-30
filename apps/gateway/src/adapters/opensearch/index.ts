@@ -240,7 +240,7 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
         const result = yield* this.request(() =>
           this.client.search({ index: this.wallpapers, body: searchBody(selection) })
         );
-        const { hits } = yield* wallpaperSearchResponse(result.body);
+        const { hits } = yield* wallpaperSearchResponse(selection, this.wallpapers)(result.body);
         yield* recordTelemetry(() =>
           recordHistogram('opensearch.search.results', hits.total.value, {
             'opensearch.index': this.wallpapers,

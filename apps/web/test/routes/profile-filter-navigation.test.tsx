@@ -102,7 +102,7 @@ describe('Profile filter navigation', () => {
       '/?profileId=user_Ada&format=png&aspectRatio=16-9&after=old_cursor'
     );
     try {
-      expect(await screen.findByRole('button', { name: 'Wallpaper ordinary', exact: true })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Wallpaper ordinary' })).toBeInTheDocument();
       await user.click(await screen.findByRole('button', { name: 'Toggle filters' }));
       fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#ff0000' } });
       await waitFor(() => expect(router.state.location.search).toEqual({
@@ -111,14 +111,14 @@ describe('Profile filter navigation', () => {
       await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
         operationName: 'SearchWallpapers', variables: { filter, sort, first: 20, after: null },
       })));
-      expect(await screen.findByRole('button', { name: 'Wallpaper ranked_first', exact: true })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Wallpaper ordinary', exact: true })).not.toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Wallpaper ranked_first' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Wallpaper ordinary' })).not.toBeInTheDocument();
       act(() => triggerIntersection(true));
       await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
         operationName: 'SearchWallpapers', variables: { filter, sort, first: 20, after: 'ranked_cursor' },
       })));
-      expect(await screen.findByRole('button', { name: 'Wallpaper ranked_second', exact: true })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Wallpaper ranked_first', exact: true })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Wallpaper ranked_second' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Wallpaper ranked_first' })).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Clear color' }));
       await waitFor(() => expect(router.state.location.search).toEqual({
         profileId: 'user_Ada', format: 'png', aspectRatio: '16-9',
@@ -126,8 +126,8 @@ describe('Profile filter navigation', () => {
       await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
         operationName: 'SearchWallpapers', variables: { filter, first: 20, after: null },
       })));
-      expect(await screen.findByRole('button', { name: 'Wallpaper ordinary', exact: true })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Wallpaper ranked_first', exact: true })).not.toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Wallpaper ordinary' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Wallpaper ranked_first' })).not.toBeInTheDocument();
     } finally {
       view.unmount();
       queryClient.clear();

@@ -117,7 +117,7 @@ function matchesColorScore(hit: typeof wallpaperHit.Type, color: ColorRanking): 
   for (const { key, multiplicity } of color.utilities) {
     const values = hit.fields?.[`utilities.${key}`];
     const value = values?.[0];
-    if (values?.length !== 1 || typeof value !== 'number') return false;
+    if (values?.length !== 1 || typeof value !== 'number' || value < 0 || value > 1) return false;
     expected += Math.fround(Math.fround(value) * Math.fround(multiplicity / color.targetCount));
   }
   // Bound float32 rounding from the factor, clause scores, and accumulation.

@@ -17,7 +17,7 @@ No production implementation, migration, or rollout is part of this change.
 | [Research path](RESEARCH-PATH.md) | Why a vector-distance experiment became a study of perceived color, proportions, and global ranking. |
 | [Selected method](METHOD.md) | The representation, matching behavior, three settings, score calculation, and indexed fields. |
 | [Evidence and limits](EVIDENCE.md) | Accuracy, ranking fidelity, performance, storage, and the exact scope of each result. |
-| [Production questions](PRODUCTION-QUESTIONS.md) | Decisions and validation required when production work begins. |
+| [Production decisions and validation](PRODUCTION-QUESTIONS.md) | Confirmed integration decisions, correctness checks, and deferred deployment evidence. |
 
 ## The direction in brief
 
@@ -55,11 +55,21 @@ have **not** been measured.
 
 ## Product priorities and behavior
 
-The user's priorities, in order, are perceived accuracy, responsive searches,
-query flexibility, service CPU/memory, OpenSearch CPU/memory, then index storage.
-Accuracy and speed are crucial. A query taking one second or longer fails the
-research viability requirement; production validation must include load and
-end-to-end behavior, not only successful OpenSearch response percentiles.
+The research prioritized perceived accuracy, responsive searches, query
+flexibility, service CPU/memory, OpenSearch CPU/memory, then index storage. A query
+taking one second or longer failed that research's viability requirement.
+
+On September 30, 2026, the maintainer confirmed the selected prototype as the
+behavioral and numerical reference for application integration. Correct final
+values and rankings come first, then performance, then responsibility split.
+The full color contract can replace the old one, and infrastructure will start
+fresh with newly uploaded images. Backfill and migration tooling are unnecessary.
+Deployment-scale capacity evidence belongs to
+[#240](https://github.com/rafaeltab/wallpaperdb/issues/240), rather than a required
+million-record benchmark or predicted traffic target for completing
+[#266](https://github.com/rafaeltab/wallpaperdb/issues/266). The implementation
+decisions are recorded in [ADR 0006](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md)
+and the [production guidance](PRODUCTION-QUESTIONS.md).
 
 Users may ask for a general color impression, a named appearance, or multiple
 whole-image target amounts. “40% green, rest unspecified” aims near 40%; an 80%

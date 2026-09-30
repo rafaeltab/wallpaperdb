@@ -223,10 +223,13 @@ this by choosing the same anchor and amount.
 
 The linked prototype retains that historical behavior. A separate repeated-target
 weights prototype corrects it and has arithmetic regression evidence, but it was
-not silently incorporated into the linked snapshot. A production contract must
-explicitly choose duplicate handling and validate that choice. This is an
-implementation defect to resolve, not a desirable part of the color preference.
-See [multiplicity findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-MULTIPLICITY.md).
+not silently incorporated into the linked snapshot. On September 30, 2026, the
+maintainer accepted that correction for production integration: group identical
+complete utility keys and apply multiplicity divided by the original target
+count. Distinct-target queries retain the selected numeric path. Verify duplicate
+cases separately from frozen-snapshot parity. See the
+[production decision](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions)
+and [multiplicity findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-MULTIPLICITY.md).
 
 ## Appendix: precise mathematical definition
 

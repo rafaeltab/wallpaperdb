@@ -1,4 +1,4 @@
-import { COLOR_ANCHORS, COLOR_FEATURE_NAMES } from './color-definition.js';
+import { COLOR_ANCHORS, COLOR_FEATURE_NAMES } from '@wallpaperdb/events/color-vocabulary';
 import { colorUtilityKey } from './color-utilities.js';
 import type { ColorQuery, ColorRanking, InvalidSearch } from './contract.js';
 

@@ -1,37 +1,38 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft, ImageOff, Upload } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useBrowseFilterPanel } from '@/components/browse-filter-panel-context';
-import { ProfileFilter } from '@/components/profile/profile-filter';
+import { ColorFilter } from '@/components/color-filter';
+import { GraphQLError } from '@/components/graphql-error';
 import { WallpaperGridSkeleton } from '@/components/grid';
 import { LoadMoreTrigger } from '@/components/LoadMoreTrigger';
+import { ProfileFilter } from '@/components/profile/profile-filter';
 import { Badge } from '@/components/ui/badge';
-import { GraphQLError } from '@/components/graphql-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { WallpaperGrid } from '@/components/WallpaperGrid';
 import { useWallpaperInfiniteQuery } from '@/hooks/useWallpaperInfiniteQuery';
 import {
   BROWSE_ASPECT_RATIO_OPTIONS,
   BROWSE_FORMAT_OPTIONS,
-  getAspectRatioBadgeLabel,
-  getAspectRatioFilterValue,
-  getAspectRatioLabel,
-  buildWallpaperFilter,
-  buildWallpaperSort,
-  getColorBadgeLabel,
-  getFormatBadgeLabel,
-  parseBrowseSearch,
-  resolveClosestAspectRatioPreset,
   type BrowseAspectRatioPresetValue,
   type BrowseAspectRatioValue,
   type BrowseFormatValue,
   type BrowseSearchState,
+  buildWallpaperFilter,
+  buildWallpaperSort,
+  getAspectRatioBadgeLabel,
+  getAspectRatioFilterValue,
+  getAspectRatioLabel,
+  getFormatBadgeLabel,
+  parseBrowseSearch,
+  resolveClosestAspectRatioPreset,
 } from '@/lib/browse-filters';
-
-const COLOR_INPUT_DEBOUNCE_MS = 300;
-const FALLBACK_COLOR_INPUT_VALUE = '#FFFFFF';
+import {
+  type ColorPreference,
+  colorPreferenceAppearance,
+  colorPreferenceLabel,
+} from '@/lib/color-preferences';
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -39,13 +40,14 @@ export const Route = createFileRoute('/')({
 });
 
 export function HomePage() {
-  const { after, color, format, aspectRatio, profileId } = Route.useSearch();
+  const { after, color, colors, format, aspectRatio, profileId } = Route.useSearch();
   const navigate = useNavigate();
   const { isOpen, homeNavigationVersion } = useBrowseFilterPanel();
   const deviceAspectRatioPreset = useDeviceAspectRatioPreset();
-  const [draftColor, setDraftColor] = useState(color ?? FALLBACK_COLOR_INPUT_VALUE);
-  const colorChangeTimeoutRef = useRef<number | undefined>(undefined);
-  const previousHomeNavigationVersionRef = useRef(homeNavigationVersion);
+  const preferences = useMemo<readonly ColorPreference[]>(
+    () => colors ?? (color ? [{ color: color.toUpperCase(), quality: 'FAVORITE' }] : []),
+    [colors, color]
+  );
 
   const {
     data,
@@ -65,7 +67,7 @@ export function HomePage() {
       getAspectRatioFilterValue(aspectRatio, deviceAspectRatioPreset),
       profileId
     ),
-    sort: buildWallpaperSort(color),
+    sort: buildWallpaperSort(colors ?? color),
   });
 
   const error = failureReason ?? queryError;
@@ -124,101 +126,33 @@ export function HomePage() {
   );
 
   const handleColorChange = useCallback(
-    (nextColor?: string) => {
+    (next: ColorPreference[]) => {
       void navigate({
         to: '/',
-        search: (previous: {
-          after?: string;
-          color?: string;
-          format?: BrowseFormatValue;
-          aspectRatio?: BrowseAspectRatioValue;
-        }) => ({
+        search: (previous: BrowseSearchState) => ({
           ...previous,
           after: undefined,
-          color: nextColor,
+          color: undefined,
+          colors: next.length ? next : undefined,
         }),
       });
     },
     [navigate]
   );
-
-  const cancelPendingColorChange = useCallback(() => {
-    if (colorChangeTimeoutRef.current !== undefined) {
-      window.clearTimeout(colorChangeTimeoutRef.current);
-      colorChangeTimeoutRef.current = undefined;
-    }
-  }, []);
-
-  const handleColorInputChange = useCallback(
-    (nextColor: string) => {
-      const normalizedColor = nextColor.toUpperCase();
-
-      setDraftColor(normalizedColor);
-
-      cancelPendingColorChange();
-
-      colorChangeTimeoutRef.current = window.setTimeout(() => {
-        handleColorChange(normalizedColor);
-      }, COLOR_INPUT_DEBOUNCE_MS);
-    },
-    [cancelPendingColorChange, handleColorChange]
-  );
-
-  const handleClearColor = useCallback(() => {
-    cancelPendingColorChange();
-
-    setDraftColor(FALLBACK_COLOR_INPUT_VALUE);
-    handleColorChange(undefined);
-  }, [cancelPendingColorChange, handleColorChange]);
-
-  const handleApplyColor = useCallback(() => {
-    cancelPendingColorChange();
-
-    handleColorChange(draftColor);
-  }, [cancelPendingColorChange, draftColor, handleColorChange]);
-
-  useEffect(() => {
-    cancelPendingColorChange();
-
-    setDraftColor(color ?? FALLBACK_COLOR_INPUT_VALUE);
-  }, [cancelPendingColorChange, color]);
-
-  useEffect(() => {
-    const handleHistoryNavigation = () => {
-      cancelPendingColorChange();
-      setDraftColor(color ?? FALLBACK_COLOR_INPUT_VALUE);
-    };
-
-    window.addEventListener('popstate', handleHistoryNavigation);
-    return () => window.removeEventListener('popstate', handleHistoryNavigation);
-  }, [cancelPendingColorChange, color]);
-
-  useEffect(() => {
-    if (previousHomeNavigationVersionRef.current === homeNavigationVersion) return;
-    previousHomeNavigationVersionRef.current = homeNavigationVersion;
-    cancelPendingColorChange();
-    setDraftColor(FALLBACK_COLOR_INPUT_VALUE);
-  }, [cancelPendingColorChange, homeNavigationVersion]);
-
-  useEffect(() => {
-    return cancelPendingColorChange;
-  }, [cancelPendingColorChange]);
   const wallpapers = data?.pages.flatMap((page) => page.edges.map((edge) => edge.node)) ?? [];
 
   return (
     <div>
       <BrowseFilterPanel
+        key={homeNavigationVersion}
         isOpen={isOpen}
-        draftColor={draftColor}
-        selectedColor={color}
+        preferences={preferences}
+        onColorChange={handleColorChange}
         selectedFormat={format}
         selectedAspectRatio={aspectRatio}
         selectedProfileId={profileId}
         onProfileChange={handleProfileChange}
         deviceAspectRatioPreset={deviceAspectRatioPreset}
-        onClearColor={handleClearColor}
-        onApplyColor={handleApplyColor}
-        onColorInputChange={handleColorInputChange}
         onFormatChange={handleFormatChange}
         onAspectRatioChange={handleAspectRatioChange}
       />
@@ -236,7 +170,7 @@ export function HomePage() {
       ) : wallpapers.length === 0 ? (
         <EmptyState
           hasCursor={!!after}
-          hasFilters={Boolean(color || profileId || format || aspectRatio)}
+          hasFilters={Boolean(profileId || format || aspectRatio || preferences.length)}
         />
       ) : (
         <>
@@ -264,31 +198,25 @@ export function HomePage() {
 }
 
 function BrowseFilterPanel({
-  draftColor,
+  preferences,
+  onColorChange,
   isOpen,
-  selectedColor,
   selectedFormat,
   selectedAspectRatio,
   selectedProfileId,
   onProfileChange,
   deviceAspectRatioPreset,
-  onClearColor,
-  onApplyColor,
-  onColorInputChange,
   onFormatChange,
   onAspectRatioChange,
 }: {
-  draftColor: string;
+  preferences: readonly ColorPreference[];
+  onColorChange: (value: ColorPreference[]) => void;
   isOpen: boolean;
-  selectedColor?: string;
   selectedFormat?: BrowseFormatValue;
   selectedAspectRatio?: BrowseAspectRatioValue;
   selectedProfileId?: string;
   onProfileChange: (profileId?: string) => void;
   deviceAspectRatioPreset: BrowseAspectRatioPresetValue;
-  onClearColor: () => void;
-  onApplyColor: () => void;
-  onColorInputChange: (color: string) => void;
   onFormatChange: (format?: BrowseFormatValue) => void;
   onAspectRatioChange: (aspectRatio?: BrowseAspectRatioValue) => void;
 }) {
@@ -304,47 +232,7 @@ function BrowseFilterPanel({
         ) : null}
         {isOpen ? (
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <div>
-                <label htmlFor="browse-color" className="text-sm font-medium text-foreground">
-                  Color
-                </label>
-                <p id="browse-color-description" className="text-muted-foreground text-xs">
-                  Bias results toward a specific visual tone.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <Input
-                  id="browse-color"
-                  type="color"
-                  value={draftColor}
-                  aria-describedby="browse-color-description"
-                  className="h-10 w-14 cursor-pointer p-1"
-                  onInput={(event) => onColorInputChange(event.currentTarget.value)}
-                />
-                <span className="text-muted-foreground text-xs font-medium uppercase">
-                  {selectedColor ?? 'No color selected'}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onApplyColor}
-                  disabled={selectedColor === draftColor}
-                >
-                  Apply color
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onClearColor}
-                  disabled={!selectedColor}
-                >
-                  Clear color
-                </Button>
-              </div>
-            </div>
+            <ColorFilter value={preferences} onChange={onColorChange} />
 
             <div className="flex flex-col gap-2">
               <div>
@@ -408,19 +296,20 @@ function BrowseFilterPanel({
           </div>
         ) : null}
 
-        {!isOpen && (selectedColor || selectedFormat || selectedAspectRatio) ? (
+        {!isOpen && (preferences.length || selectedFormat || selectedAspectRatio) ? (
           <div className="flex flex-wrap gap-2">
-            {selectedColor ? (
-              <Badge variant="outline">
+            {preferences.map((target, index) => (
+              <Badge key={target.color ?? target.name} variant="outline">
                 <span
-                  data-testid="active-color-dot"
+                  data-testid={index === 0 ? 'active-color-dot' : undefined}
                   aria-hidden="true"
                   className="size-2 rounded-full border border-black/10"
-                  style={{ backgroundColor: selectedColor }}
+                  style={{ background: colorPreferenceAppearance(target) }}
                 />
-                {getColorBadgeLabel(selectedColor)}
+                Color: {colorPreferenceLabel(target)}
+                {target.percent !== undefined && ` · ${target.percent}%`}
               </Badge>
-            ) : null}
+            ))}
             {selectedFormat ? (
               <Badge variant="outline">{getFormatBadgeLabel(selectedFormat)}</Badge>
             ) : null}

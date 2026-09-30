@@ -1,7 +1,7 @@
 import {
   buildColorSort,
-  parseColorPreferences,
   type ColorPreference,
+  parseColorPreferences,
 } from '@/lib/color-preferences';
 import type { WallpaperFilter, WallpaperSort } from '@/lib/graphql/types';
 

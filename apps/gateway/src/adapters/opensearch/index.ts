@@ -249,19 +249,26 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
       Effect.gen({ self: this }, function* () {
         const hits = yield* this.searchPage(selection);
         const after = selection.searchAfter;
-        if (after && hits.hits.length < selection.size) {
-          const tail = yield* this.searchPage({
+        if (after) {
+          const fullPage = hits.hits.length === selection.size;
+          const anchor = fullPage ? hits.hits.at(-1) : undefined;
+          if (fullPage && !anchor)
+            return yield* new SearchRequestError({
+              cause: new Error('Empty full search page'),
+            });
+          const inverse = yield* this.searchPage({
             ...selection,
-            searchAfter: undefined,
+            searchAfter: anchor ? [...anchor.sort] : undefined,
             sortOrder: selection.sortOrder === 'asc' ? 'desc' : 'asc',
           });
-          const expected = [...tail.hits]
+          const expected = [...inverse.hits]
             .reverse()
             .filter((hit) => followsSearchCursor(hit.sort, after, selection));
+          const observed = fullPage ? hits.hits.slice(0, -1) : hits.hits;
           const complete =
-            expected.length === hits.hits.length &&
+            expected.length === observed.length &&
             expected.every((hit, position) =>
-              hit.sort.every((value, component) => value === hits.hits[position]?.sort[component])
+              hit.sort.every((value, component) => value === observed[position]?.sort[component])
             );
           if (!complete)
             return yield* new SearchRequestError({

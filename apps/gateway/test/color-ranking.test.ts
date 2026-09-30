@@ -45,7 +45,7 @@ const filters = [
   },
 ];
 
-describe('Native color ranking port contract', () => {
+describe('Native wallpaper search port contract', () => {
   const fixture = createSearchFixture();
   const client = new Client({ node: fixture.options.url });
   let resource: Awaited<ReturnType<typeof acquireSearchFixture>>;

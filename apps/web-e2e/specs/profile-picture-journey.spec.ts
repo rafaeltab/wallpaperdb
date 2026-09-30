@@ -94,18 +94,28 @@ test("Profile picture upload reaches public delivery and removal retires the old
     await page.getByTestId("sign-in-submit-button").click();
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
 
-    const ownerLoaded = page.waitForResponse(
-      (response) =>
-        response.url().endsWith("/user/profile/me/ensure") &&
-        response.request().method() === "POST",
-    );
     await page.goto("/web/settings/profile");
     await expect(
       page.getByRole("button", { name: "Edit profile picture", exact: true }),
     ).toBeVisible();
-    const ownerResponse = await ownerLoaded;
-    expect(ownerResponse.ok()).toBe(true);
-    const original = await ownerResponse.json();
+    await page
+      .getByRole("button", { name: "Edit display name", exact: true })
+      .click();
+    const displayName = page.getByRole("textbox", {
+      name: "Display name",
+      exact: true,
+    });
+    const originalDisplayName = await displayName.inputValue();
+    await displayName.press("Escape");
+    await page
+      .getByRole("button", { name: "Edit biography", exact: true })
+      .click();
+    const biography = page.getByRole("textbox", {
+      name: "Biography Markdown",
+      exact: true,
+    });
+    const originalBiography = await biography.inputValue();
+    await biography.press("Escape");
     const publicContext = await browser.newContext({
       storageState: { cookies: [], origins: [] },
     });
@@ -115,8 +125,8 @@ test("Profile picture upload reaches public delivery and removal retires the old
       const picture = await uniquePng(page, 128, 128);
       const saved = await uploadPicture(page, picture);
       expect(saved).toMatchObject({
-        displayName: original.displayName,
-        biographyMarkdown: original.biographyMarkdown,
+        displayName: originalDisplayName,
+        biographyMarkdown: originalBiography,
       });
       expect(saved.pictureAssetId).toEqual(expect.any(String));
       const image = profilePicture(page);

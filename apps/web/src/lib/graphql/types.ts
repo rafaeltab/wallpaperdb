@@ -40,20 +40,6 @@ export interface WallpaperFilter {
   variants?: VariantFilter;
 }
 
-export interface WallpaperSort {
-  color?: ColorSort;
-}
-
-export interface ColorSort {
-  colors: ColorInput[];
-}
-
-export interface ColorInput {
-  color: string;
-  amount: number;
-  spread?: number;
-}
-
 export interface VariantFilter {
   width?: number;
   height?: number;

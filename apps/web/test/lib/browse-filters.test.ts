@@ -4,8 +4,6 @@ import {
   buildWallpaperFilter,
   getAspectRatioBadgeLabel,
   getDeviceAspectRatioOptionLabel,
-  buildWallpaperSort,
-  getColorBadgeLabel,
   getFormatBadgeLabel,
   parseBrowseSearch,
   resolveClosestAspectRatioPreset,
@@ -30,14 +28,12 @@ describe('browse filters', () => {
   it('keeps only supported format values from route search', () => {
     expect(parseBrowseSearch({ after: 'cursor_123', color: '#ff0000', format: 'png', aspectRatio: '16-9' })).toEqual({
       after: 'cursor_123',
-      color: '#FF0000',
       format: 'png',
       aspectRatio: '16-9',
     });
 
     expect(parseBrowseSearch({ after: 'cursor_123', color: 'red', format: 'gif', aspectRatio: '3-1' })).toEqual({
       after: 'cursor_123',
-      color: undefined,
       format: undefined,
       aspectRatio: undefined,
     });
@@ -62,18 +58,7 @@ describe('browse filters', () => {
     expect(resolveClosestAspectRatioPreset(1080 / 1920)).toBe('9-16');
   });
 
-  it('maps a selected color to the wallpaper query sort', () => {
-    expect(buildWallpaperSort(undefined)).toBeUndefined();
-    expect(buildWallpaperSort('invalid')).toBeUndefined();
-    expect(buildWallpaperSort('#ff0000')).toEqual({
-      color: {
-        colors: [{ amount: 1, color: '#FF0000' }],
-      },
-    });
-  });
-
   it('formats active filter badges using user-facing labels', () => {
-    expect(getColorBadgeLabel('#ff0000')).toBe('Color: #FF0000');
     expect(getFormatBadgeLabel('jpeg')).toBe('Format: JPEG');
     expect(getFormatBadgeLabel('png')).toBe('Format: PNG');
     expect(getFormatBadgeLabel('webp')).toBe('Format: WebP');

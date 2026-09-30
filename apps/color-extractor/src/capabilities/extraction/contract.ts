@@ -21,6 +21,28 @@ export class ExtractionUnavailable extends Schema.TaggedError<ExtractionUnavaila
   { operation: Schema.String, cause: Schema.Defect() }
 ) {}
 
+export interface ColorMeasurements {
+  readonly version: 'shade-hue-256-v1';
+  readonly sampleCount: 16384;
+  readonly layers: readonly {
+    readonly cutoff: number;
+    readonly coverage: readonly number[];
+    readonly quality: readonly number[];
+  }[];
+  readonly named: Readonly<Record<string, { readonly coverage: number; readonly quality: number }>>;
+}
+export interface MeasuredImage {
+  readonly measurements: ColorMeasurements;
+  readonly originalSha256: string;
+}
+
+export interface ImageMeasurements {
+  extract(storage: OriginalImage): Effect.Effect<MeasuredImage, ExtractionUnavailable>;
+}
+export const ImageMeasurements = Context.Service<ImageMeasurements>(
+  'wallpaperdb.color-extractor.extraction.ImageMeasurements'
+);
+
 export interface ImageHistogram {
   extract(storage: OriginalImage): Effect.Effect<readonly number[], ExtractionUnavailable>;
 }

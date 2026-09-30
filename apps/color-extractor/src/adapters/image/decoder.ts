@@ -6,13 +6,11 @@ try {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
   const bytes = Buffer.concat(chunks);
-  const metadata = await sharp(bytes).metadata();
-  const aspectRatio = (metadata.width ?? 1) / (metadata.height ?? 1);
-  const targetHeight = Math.max(1, Math.round(Math.sqrt(10000 / aspectRatio)));
-  const targetWidth = Math.max(1, Math.round(targetHeight * aspectRatio));
   const pixels = await sharp(bytes)
+    .rotate()
+    .toColourspace('srgb')
     .ensureAlpha()
-    .resize(targetWidth, targetHeight, { fit: 'fill' })
+    .resize(128, 128, { fit: 'fill' })
     .raw()
     .toBuffer();
   process.stdout.end(pixels);

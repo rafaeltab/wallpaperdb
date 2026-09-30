@@ -12,7 +12,7 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - [Wallpaper variant generation (legacy)](./apps/variant-generator/CONTEXT.md) - currently produces lower-resolution wallpaper variants; the [accepted delivery plan](https://github.com/rafaeltab/wallpaperdb/issues/250) moves generation ownership to Media
 
-- [Media](./apps/media/CONTEXT.md) - owns Asset inspection, rendition processing, temporary HDR Profile picture conversion, the delivery catalog, and delivery of immutable Assets; the [accepted delivery plan](https://github.com/rafaeltab/wallpaperdb/issues/250) includes the migration of legacy variant generation
+- [Media](./apps/media/CONTEXT.md) - currently owns on-request rendition processing, the delivery catalog, and delivery of immutable Assets. The [accepted target model](https://github.com/rafaeltab/wallpaperdb/issues/250) assigns Asset inspection and all rendition generation to Media, including migration of legacy variant generation. [ADR 0009](./docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md) adds temporary HDR Profile picture conversion to that target ownership.
 
 - [Tagging](./apps/tags/CONTEXT.md) - reserved for wallpaper classification; domain language remains undefined
 

@@ -115,10 +115,6 @@ export const gatewayConfig = Effect.gen(function* () {
     mediaPublicPath: Configuration.NonEmptyString('MEDIA_PUBLIC_PATH').pipe(
       Configuration.withDefault('/media')
     ),
-    colorSpreadStrategy: Configuration.Literals(
-      ['linear', 'exponential', 'exact'],
-      'COLOR_SPREAD_STRATEGY'
-    ).pipe(Configuration.withDefault('linear')),
     graphqlDeadlineMs: positive('GRAPHQL_DEADLINE_MS', 5000),
     graphqlMaxActive: positive('GRAPHQL_MAX_ACTIVE', 32),
     graphqlMaxDepth: positive('GRAPHQL_MAX_DEPTH', 5),

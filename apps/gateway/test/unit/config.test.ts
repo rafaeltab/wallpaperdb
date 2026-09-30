@@ -77,7 +77,6 @@ describe('startup configuration', () => {
     expect(loadConfig(environment)).toMatchObject({
       port: 3004,
       opensearchProfileIndex: undefined,
-      colorSpreadStrategy: 'linear',
       redisEnabled: false,
       graphqlIntrospectionEnabled: true,
       graphqlMaxComplexity: 2000,
@@ -110,7 +109,6 @@ describe('startup configuration', () => {
         TRUSTED_PROXIES: '10.0.0.1',
         PORT: '7000',
         OPENSEARCH_PROFILE_INDEX: 'custom_profiles',
-        COLOR_SPREAD_STRATEGY: 'exact',
         RATE_LIMIT_ENABLED: 'true',
         GRAPHQL_INTROSPECTION_ENABLED: 'true',
         GRAPHQL_MAX_COMPLEXITY: '1505',
@@ -122,7 +120,6 @@ describe('startup configuration', () => {
     ).toMatchObject({
       port: 7000,
       opensearchProfileIndex: 'custom_profiles',
-      colorSpreadStrategy: 'exact',
       rateLimitEnabled: true,
       graphqlIntrospectionEnabled: true,
       graphqlMaxComplexity: 1505,
@@ -150,7 +147,6 @@ describe('startup configuration', () => {
     { GRAPHQL_MAX_ACTIVE: '1.5' },
     { PORT: '10garbage' },
     { OPENSEARCH_PROFILE_INDEX: '' },
-    { COLOR_SPREAD_STRATEGY: 'invalid' },
     { CURSOR_SECRET: 'short' },
     { RATE_LIMIT_ENABLED: 'yes' },
     { GRAPHQL_MAX_DEPTH: '0' },

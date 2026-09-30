@@ -12,7 +12,6 @@ import {
   type SearchSelection,
   type Wallpaper,
   catalogueLayer,
-  type CatalogueConfig,
 } from '../../src/capabilities/catalogue/index.js';
 const timestamp = '2026-01-01T00:00:00.000Z';
 export function wallpaper(id: string): Wallpaper {
@@ -108,10 +107,10 @@ export class Cursors implements CatalogueCursors {
     return { _tag: 'Decoded' as const, values: [...entry.values] };
   });
 }
-export async function setup(config: CatalogueConfig = { colorSpreadStrategy: 'linear' }) {
+export async function setup() {
   const read = new ReadAdapter();
   const cursors = new Cursors();
-  const layer = catalogueLayer(config).pipe(
+  const layer = catalogueLayer().pipe(
     Layer.provide(
       Layer.mergeAll(Layer.succeed(CatalogueRead, read), Layer.succeed(CatalogueCursors, cursors))
     )

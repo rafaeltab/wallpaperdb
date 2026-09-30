@@ -1,3 +1,31 @@
+export const colorModes = ['VIBE', 'PROPORTIONS'] as const;
+export const colorQualities = ['RELAXED', 'FAVORITE', 'STRICT'] as const;
+export const colorTargetNames = [
+  'RED',
+  'ORANGE',
+  'YELLOW',
+  'GREEN',
+  'TEAL',
+  'CYAN',
+  'BLUE',
+  'PURPLE',
+  'PINK',
+  'BROWN',
+  'BLACK',
+  'GRAY',
+  'WHITE',
+  'GRAYSCALE',
+  'STRICT_GRAYSCALE',
+  'NEAR_NEUTRAL',
+  'DARK',
+  'LIGHT',
+  'BRIGHT',
+  'VIVID',
+  'MUTED',
+  'MONOCHROMATIC',
+  'RAINBOW',
+] as const;
+
 export const schema = `#graphql
 	"""
 	A wallpaper image or video
@@ -125,6 +153,69 @@ export const schema = `#graphql
 	}
 
 	"""
+	Sort options for wallpaper search
+	"""
+	input WallpaperSort {
+		"""
+		Rank results by color similarity
+		"""
+		color: ColorSort
+	}
+
+	"""
+	Color sort input
+	"""
+	input ColorSort {
+		"""
+		Ranking mode. Defaults to VIBE.
+		"""
+		mode: ColorMode
+
+		"""
+		Color quality preset. Defaults to FAVORITE.
+		"""
+		quality: ColorQuality
+
+		"""
+		One through ten independently scored color targets
+		"""
+		targets: [ColorTarget!]!
+	}
+
+	enum ColorMode {
+		${colorModes.join('\n\t\t')}
+	}
+
+	enum ColorQuality {
+		${colorQualities.join('\n\t\t')}
+	}
+
+	enum ColorTargetName {
+		${colorTargetNames.join('\n\t\t')}
+	}
+
+	"""
+	A concrete or named color target. Supply exactly one of color and name.
+	"""
+	input ColorTarget {
+		"""
+		Hex color in #RRGGBB format
+		"""
+		color: String
+
+		"""
+		Named color or color-distribution target
+		"""
+		name: ColorTargetName
+
+		"""
+		Independent target proportion from 0 through 100 in steps of 10.
+		Required in PROPORTIONS mode. Omit in VIBE mode.
+		"""
+		percent: Int
+	}
+
+	"""
 	An edge in a connection
 	"""
 	type WallpaperEdge {
@@ -237,6 +328,11 @@ export const schema = `#graphql
 			Filter criteria
 			"""
 			filter: WallpaperFilter
+
+			"""
+			Sort criteria
+			"""
+			sort: WallpaperSort
 
 			"""
 			Number of items to return (forward pagination)

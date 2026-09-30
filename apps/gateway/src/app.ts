@@ -43,7 +43,7 @@ export function gatewayLayer(config: Config, options: AppOptions = {}) {
     wallpaperStream: config.natsStream,
     shutdownTimeoutMs: options.shutdownTimeoutMs,
   }).pipe(Layer.provide(projection));
-  const catalogue = catalogueLayer({ colorSpreadStrategy: config.colorSpreadStrategy }).pipe(
+  const catalogue = catalogueLayer().pipe(
     Layer.provide(
       Layer.mergeAll(
         search,

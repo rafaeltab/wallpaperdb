@@ -61,6 +61,7 @@ export async function waitForCataloguePage(
   page: Page,
   wallpaperId: string,
   color?: string,
+  profileId?: string,
 ) {
   let matchingCursor: string | undefined;
   await expect
@@ -78,7 +79,7 @@ export async function waitForCataloguePage(
               variables: {
                 after,
                 filter: color
-                  ? { variants: { format: "image/png" } }
+                  ? { profileId, variants: { format: "image/png" } }
                   : undefined,
                 sort: color
                   ? {

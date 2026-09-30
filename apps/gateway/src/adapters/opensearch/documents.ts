@@ -1,5 +1,9 @@
 import { DateTime, Option, Schema } from 'effect';
-import type { CursorValue, SearchSelection } from '../../capabilities/catalogue/index.js';
+import type {
+  ColorRanking,
+  CursorValue,
+  SearchSelection,
+} from '../../capabilities/catalogue/index.js';
 
 export const timestamp = Schema.String.check(
   Schema.isPattern(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?Z$/),
@@ -108,6 +112,18 @@ const wallpaperHit = Schema.Struct({
   ),
   sort: Schema.Array(Schema.Union([Schema.String, Schema.Finite])),
 });
+function matchesColorScore(hit: typeof wallpaperHit.Type, color: ColorRanking): boolean {
+  let expected = 0;
+  for (const { key, multiplicity } of color.utilities) {
+    const values = hit.fields?.[`utilities.${key}`];
+    const value = values?.[0];
+    if (values?.length !== 1 || typeof value !== 'number') return false;
+    expected += Math.fround(Math.fround(value) * Math.fround(multiplicity / color.targetCount));
+  }
+  // Bound float32 rounding from the factor, clause scores, and accumulation.
+  const tolerance = expected * (color.utilities.length + 2) * 2 ** -24;
+  return hit._score !== null && Math.abs(hit._score - expected) <= tolerance;
+}
 function validHit(hit: typeof wallpaperHit.Type, selection: SearchSelection, index: string) {
   const id = hit._source.wallpaperId;
   if (hit._id !== id || hit._index !== index) return false;
@@ -120,10 +136,7 @@ function validHit(hit: typeof wallpaperHit.Type, selection: SearchSelection, ind
     hit.sort.length === 2 &&
     hit.sort[0] === hit._score &&
     hit.sort[1] === id &&
-    selection.color.utilities.every(({ key }) => {
-      const values = hit.fields?.[`utilities.${key}`];
-      return values?.length === 1 && typeof values[0] === 'number';
-    })
+    matchesColorScore(hit, selection.color)
   );
 }
 export function followsSearchCursor(

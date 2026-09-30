@@ -30,7 +30,7 @@ export default mergeConfig(
           extends: true,
           test: {
             name: 'gateway',
-            include: ['test/**/*.test.ts'],
+            include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
             exclude: [...searchTests, ...instrumentationTests],
           },
         },

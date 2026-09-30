@@ -1,4 +1,8 @@
-import { COLOR_ANCHORS, COLOR_CUTOFFS, COLOR_FEATURE_NAMES } from './color-definition.js';
+import {
+  COLOR_ANCHORS,
+  COLOR_CUTOFFS,
+  COLOR_FEATURE_NAMES,
+} from '@wallpaperdb/events/color-vocabulary';
 import type { ColorDescriptor, ColorQuality } from './contract.js';
 
 export const COLOR_UTILITY_VERSION = 'linked-3-linear-10-v1';

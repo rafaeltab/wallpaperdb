@@ -190,6 +190,38 @@ describe('Native color ranking port contract', () => {
     }
     expect(backward.reverse()).toEqual(full.entries);
   });
+  it('rejects a ready bank missing a requested utility', async () => {
+    const color = references.find((reference) => reference.ranking.utilities.length > 1)?.ranking;
+    const missing = color?.utilities.at(-1)?.key;
+    if (!color || !missing) throw new Error('Expected a multiple-target ranking fixture');
+    const utilities = Object.fromEntries(
+      Object.keys(utilitiesReference.cases[0].utilities)
+        .filter((key) => key !== missing)
+        .map((key) => [key, 0])
+    );
+    const id = 'missing-requested-utility';
+    try {
+      await client.index({
+        index: fixture.options.wallpaperIndex,
+        id,
+        refresh: true,
+        body: {
+          wallpaperId: id,
+          userId: 'ranking',
+          variants: [variant],
+          uploadedAt: timestamp,
+          updatedAt: timestamp,
+          colorReady: COLOR_UTILITY_VERSION,
+          utilities,
+        },
+      });
+      expect(
+        await Effect.runPromise(Effect.flip(resource.adapter.read.search(selection(color))))
+      ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+    } finally {
+      await client.delete({ index: fixture.options.wallpaperIndex, id, refresh: true });
+    }
+  });
   it.each([
     'timeout',
     'shards',

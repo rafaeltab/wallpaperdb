@@ -103,20 +103,27 @@ const wallpaperHit = Schema.Struct({
   _index: Schema.NonEmptyString,
   _source: wallpaperDocument,
   _score: Schema.NullOr(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
-  fields: Schema.optionalKey(Schema.Struct({ wallpaperId: Schema.Array(Schema.NonEmptyString) })),
+  fields: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.Array(Schema.Union([Schema.String, Schema.Finite])))
+  ),
   sort: Schema.Array(Schema.Union([Schema.String, Schema.Finite])),
 });
 function validHit(hit: typeof wallpaperHit.Type, selection: SearchSelection, index: string) {
   const id = hit._source.wallpaperId;
   if (hit._id !== id || hit._index !== index) return false;
   if (!selection.color) return hit.sort.length === 1 && hit.sort[0] === id;
+  const ids = hit.fields?.wallpaperId;
   return (
-    hit.fields?.wallpaperId.length === 1 &&
-    hit.fields.wallpaperId[0] === id &&
+    ids?.length === 1 &&
+    ids[0] === id &&
     hit._score !== null &&
     hit.sort.length === 2 &&
     hit.sort[0] === hit._score &&
-    hit.sort[1] === id
+    hit.sort[1] === id &&
+    selection.color.utilities.every(({ key }) => {
+      const values = hit.fields?.[`utilities.${key}`];
+      return values?.length === 1 && typeof values[0] === 'number';
+    })
   );
 }
 export function followsSearchCursor(

@@ -45,6 +45,7 @@ export function HomePage() {
   const deviceAspectRatioPreset = useDeviceAspectRatioPreset();
   const [draftColor, setDraftColor] = useState(color ?? FALLBACK_COLOR_INPUT_VALUE);
   const colorChangeTimeoutRef = useRef<number | undefined>(undefined);
+  const previousHomeNavigationVersionRef = useRef(homeNavigationVersion);
 
   const {
     data,
@@ -193,7 +194,8 @@ export function HomePage() {
   }, [cancelPendingColorChange, color]);
 
   useEffect(() => {
-    if (!homeNavigationVersion) return;
+    if (previousHomeNavigationVersionRef.current === homeNavigationVersion) return;
+    previousHomeNavigationVersionRef.current = homeNavigationVersion;
     cancelPendingColorChange();
     setDraftColor(FALLBACK_COLOR_INPUT_VALUE);
   }, [cancelPendingColorChange, homeNavigationVersion]);

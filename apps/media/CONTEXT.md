@@ -1,6 +1,6 @@
 # Media
 
-Media owns Asset inspection, rendition processing, temporary HDR Profile picture conversion, and authorized delivery. Its delivery catalog identifies Assets and Materialized renditions available for delivery.
+Media delivers authorized renditions of committed Assets and owns on-request rendition processing. Its delivery catalog identifies Assets and Materialized renditions available for delivery.
 
 ## Language
 

@@ -1,4 +1,5 @@
 import { DateTime, Option, Schema } from 'effect';
+import { COLOR_UTILITY_VERSION } from '../../capabilities/catalogue/index.js';
 import type {
   ColorRanking,
   CursorValue,
@@ -105,7 +106,10 @@ export const profileDiscoveryResponse = Schema.decodeUnknownEffect(
 const wallpaperHit = Schema.Struct({
   _id: Schema.NonEmptyString,
   _index: Schema.NonEmptyString,
-  _source: wallpaperDocument,
+  _source: Schema.Struct({
+    ...wallpaperDocument.fields,
+    colorReady: Schema.optionalKey(Schema.String),
+  }),
   _score: Schema.NullOr(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))),
   fields: Schema.optionalKey(
     Schema.Record(Schema.String, Schema.Array(Schema.Union([Schema.String, Schema.Finite])))
@@ -147,6 +151,7 @@ function validHit(hit: typeof wallpaperHit.Type, selection: SearchSelection, ind
   const id = hit._source.wallpaperId;
   if (hit._id !== id || hit._index !== index || !matchesMetadata(hit, selection)) return false;
   if (!selection.color) return hit.sort.length === 1 && hit.sort[0] === id;
+  if (hit._source.colorReady !== COLOR_UTILITY_VERSION) return false;
   const ids = hit.fields?.wallpaperId;
   return (
     ids?.length === 1 &&
@@ -237,6 +242,12 @@ export const storageError = Schema.decodeUnknownOption(
     }),
   })
 );
-export function toWallpaper({ userId, variants, ...wallpaper }: typeof wallpaperDocument.Type) {
-  return { ...wallpaper, profileId: userId, variants: [...variants] };
+export function toWallpaper(document: typeof wallpaperDocument.Type) {
+  return {
+    wallpaperId: document.wallpaperId,
+    profileId: document.userId,
+    variants: [...document.variants],
+    uploadedAt: document.uploadedAt,
+    updatedAt: document.updatedAt,
+  };
 }

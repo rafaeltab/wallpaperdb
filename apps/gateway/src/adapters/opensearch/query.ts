@@ -12,7 +12,14 @@ export function searchBody(selection: SearchSelection) {
     filter.push({ nested: { path: 'variants', query: { bool: { must: variantTerms } } } });
   if (color) filter.push({ term: { colorReady: COLOR_UTILITY_VERSION } });
   return {
-    _source: ['wallpaperId', 'userId', 'variants', 'uploadedAt', 'updatedAt'],
+    _source: [
+      'wallpaperId',
+      'userId',
+      'variants',
+      'uploadedAt',
+      'updatedAt',
+      ...(color ? ['colorReady'] : []),
+    ],
     query: {
       bool: {
         must: color

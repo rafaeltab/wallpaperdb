@@ -67,15 +67,11 @@ describe('Catalogue projection', () => {
     invalidLayer({
       quality: [0.123, ...measuredColors('wallpaper').descriptor.layers[0].quality.slice(1)],
     }),
-    {
-      descriptor: {
-        ...measuredColors('wallpaper').descriptor,
-        named: {
-          ...measuredColors('wallpaper').descriptor.named,
-          red: { coverage: 0, quality: 1 },
-        },
-      },
-    },
+    invalidLayer({
+      quality: measuredColors('wallpaper').descriptor.layers[0].quality.map((quality, index) =>
+        index === measuredColors('wallpaper').descriptor.layers[0].coverage.indexOf(0) ? 1 : quality
+      ),
+    }),
     { original: { owner: 'ingestor' as const, id: 'another-wallpaper' } },
     { provenance: { ...measuredColors('wallpaper').provenance, anchorsSha256: 'unsupported' } },
   ])('rejects incompatible measurements without changing persistence', async (invalid) => {
@@ -91,6 +87,28 @@ describe('Catalogue projection', () => {
   it('publishes validated measurements with their provenance for complete atomic indexing', async () => {
     const store = new ControlledProjection();
     const event = measuredColors('wallpaper');
+    const outcome = await Effect.runPromise(
+      ProjectCatalogue.use((projection) => projection.record(event)).pipe(
+        Effect.provide(layer(store))
+      )
+    );
+    expect(outcome).toEqual({ _tag: 'Completed' });
+    expect(store.changes).toEqual([{ ...event, _tag: 'PublishMeasurements' }]);
+  });
+  it('publishes quantized named strength while preserving its nonzero quality', async () => {
+    const store = new ControlledProjection();
+    const measured = measuredColors('wallpaper');
+    // Frozen corpus-features: hue counts [1366 x 4, 1365 x 8] round strength to 0 bp, quality 1.
+    const event = {
+      ...measured,
+      descriptor: {
+        ...measured.descriptor,
+        named: {
+          ...measured.descriptor.named,
+          monochromatic: { coverage: 0, quality: 1 },
+        },
+      },
+    };
     const outcome = await Effect.runPromise(
       ProjectCatalogue.use((projection) => projection.record(event)).pipe(
         Effect.provide(layer(store))

@@ -15,8 +15,7 @@ function validPair(coverage: number, quality: number): boolean {
     Number.isFinite(quality) &&
     quality >= 0 &&
     quality <= 1 &&
-    Math.fround(quality) === quality &&
-    (coverage !== 0 || quality === 0)
+    Math.fround(quality) === quality
   );
 }
 export function compatibleMeasurements(
@@ -50,6 +49,7 @@ export function compatibleMeasurements(
       layer.coverage.every(
         (coverage, index) =>
           validPair(coverage, layer.quality[index]) &&
+          (coverage !== 0 || layer.quality[index] === 0) &&
           (level === 0 || coverage <= descriptor.layers[level - 1].coverage[index]) &&
           (coverage === 0 || layer.quality[index] + 1e-7 >= layer.cutoff)
       )

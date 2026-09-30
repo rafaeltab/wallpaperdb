@@ -188,7 +188,9 @@ describe('NATS projection adapter contract', () => {
     return JSON.parse(new TextDecoder().decode(message.data));
   }
 
-  it('retains complete measurements and preserves duplicate occurrence identity through projection', async () => {
+  it.each([
+    10000, 0,
+  ])('retains monochromatic coverage %i and duplicate occurrence identity through projection', async (coverage) => {
     class Store implements ProjectionStore {
       readonly changes: ProjectionMutation[] = [];
       readonly occurrences = new Set<string>();
@@ -209,7 +211,17 @@ describe('NATS projection adapter contract', () => {
       )
     );
     await consumer(project);
-    const change = measuredColors('duplicate-measurements', timestamp);
+    const measured = measuredColors('duplicate-measurements', timestamp);
+    const change = {
+      ...measured,
+      descriptor: {
+        ...measured.descriptor,
+        named: {
+          ...measured.descriptor.named,
+          monochromatic: { coverage, quality: 1 },
+        },
+      },
+    };
     const payload = JSON.stringify({
       specversion: '1.0',
       source: change.occurrence.source,

@@ -168,7 +168,21 @@ export function HomePage() {
     handleColorChange(undefined);
   }, [handleColorChange]);
 
+  const handleApplyColor = useCallback(() => {
+    if (colorChangeTimeoutRef.current !== undefined) {
+      window.clearTimeout(colorChangeTimeoutRef.current);
+      colorChangeTimeoutRef.current = undefined;
+    }
+
+    handleColorChange(draftColor);
+  }, [draftColor, handleColorChange]);
+
   useEffect(() => {
+    if (colorChangeTimeoutRef.current !== undefined) {
+      window.clearTimeout(colorChangeTimeoutRef.current);
+      colorChangeTimeoutRef.current = undefined;
+    }
+
     setDraftColor(color ?? FALLBACK_COLOR_INPUT_VALUE);
   }, [color]);
 
@@ -193,6 +207,7 @@ export function HomePage() {
         onProfileChange={handleProfileChange}
         deviceAspectRatioPreset={deviceAspectRatioPreset}
         onClearColor={handleClearColor}
+        onApplyColor={handleApplyColor}
         onColorInputChange={handleColorInputChange}
         onFormatChange={handleFormatChange}
         onAspectRatioChange={handleAspectRatioChange}
@@ -248,6 +263,7 @@ function BrowseFilterPanel({
   onProfileChange,
   deviceAspectRatioPreset,
   onClearColor,
+  onApplyColor,
   onColorInputChange,
   onFormatChange,
   onAspectRatioChange,
@@ -261,6 +277,7 @@ function BrowseFilterPanel({
   onProfileChange: (profileId?: string) => void;
   deviceAspectRatioPreset: BrowseAspectRatioPresetValue;
   onClearColor: () => void;
+  onApplyColor: () => void;
   onColorInputChange: (color: string) => void;
   onFormatChange: (format?: BrowseFormatValue) => void;
   onAspectRatioChange: (aspectRatio?: BrowseAspectRatioValue) => void;
@@ -298,6 +315,15 @@ function BrowseFilterPanel({
                 <span className="text-muted-foreground text-xs font-medium uppercase">
                   {selectedColor ?? 'No color selected'}
                 </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onApplyColor}
+                  disabled={selectedColor === draftColor}
+                >
+                  Apply color
+                </Button>
                 <Button
                   type="button"
                   variant="outline"

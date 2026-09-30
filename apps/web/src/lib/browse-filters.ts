@@ -1,3 +1,8 @@
+import {
+  buildColorSort,
+  parseColorPreferences,
+  type ColorPreference,
+} from '@/lib/color-preferences';
 import type { WallpaperFilter, WallpaperSort } from '@/lib/graphql/types';
 
 export const BROWSE_FORMAT_OPTIONS = [
@@ -31,10 +36,13 @@ export interface BrowseSearchState {
   format?: BrowseFormatValue;
   aspectRatio?: BrowseAspectRatioValue;
   color?: string;
+  colors?: ColorPreference[];
 }
 
 export function parseBrowseSearch(search: Record<string, unknown>): BrowseSearchState {
+  const colors = parseColorPreferences(search.colors);
   return {
+    ...(colors ? { colors } : {}),
     profileId:
       typeof search.profileId === 'string' && search.profileId ? search.profileId : undefined,
     after: typeof search.after === 'string' ? search.after : undefined,
@@ -83,7 +91,13 @@ export function buildAspectRatioFilter(
   };
 }
 
-export function buildWallpaperSort(color?: string): WallpaperSort | undefined {
+export function buildWallpaperSort(
+  color?: string | readonly ColorPreference[]
+): WallpaperSort | undefined {
+  if (Array.isArray(color)) {
+    const sort = buildColorSort(color);
+    return sort ? { color: sort } : undefined;
+  }
   const normalizedColor = normalizeBrowseColorValue(color);
 
   if (!normalizedColor) {

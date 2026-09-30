@@ -935,7 +935,7 @@ describe('NATS projection adapter contract', () => {
 
     await manager.streams.delete('WALLPAPER');
     await manager.streams.add(config);
-    // Lose the one-way ACK and the first confirmation; the broker must redeliver.
+    // Suppress the old one-way ACK if used, and fail the first confirmed ACK to force redelivery.
     const unconfirmedAck = vi.spyOn(JsMsgImpl.prototype, 'ack').mockImplementation(() => {});
     const interruptedConfirmation = vi
       .spyOn(JsMsgImpl.prototype, 'ackAck')

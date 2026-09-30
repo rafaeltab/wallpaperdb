@@ -252,12 +252,44 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
       .click();
   }
   await expect(card).toBeVisible();
+  const cleared = page.waitForResponse((response) => {
+    if (
+      !response.url().endsWith("/gateway/graphql") ||
+      response.request().method() !== "POST"
+    )
+      return false;
+    const request = response.request().postDataJSON();
+    return (
+      request.query.includes("SearchWallpapers") &&
+      request.variables?.filter?.profileId === owner.id &&
+      !request.variables?.sort
+    );
+  });
   await page.getByRole("button", { name: "Clear color", exact: true }).click();
+  const clearedResponse = await cleared;
+  expect(clearedResponse.ok()).toBe(true);
+  expect(clearedResponse.request().postDataJSON().variables).toEqual({
+    first: 20,
+    after: null,
+    filter: { profileId: owner.id, variants: { format: "image/png" } },
+  });
+  expect((await clearedResponse.json()).errors).toBeUndefined();
   await expect(page).not.toHaveURL(/color=/);
   await expect(page).toHaveURL(new RegExp(`profileId=${owner.id}`));
   await expect(
     page.getByRole("button", { name: "PNG", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  const ownedCursor = await waitForCataloguePage(
+    page,
+    wallpaperId,
+    undefined,
+    owner.id,
+  );
+  if (ownedCursor) {
+    const selectedPage = new URL(page.url());
+    selectedPage.searchParams.set("after", ownedCursor);
+    await page.goto(selectedPage.toString());
+  }
   await expect(card).toBeVisible();
   expect(pageErrors).toEqual([]);
 });

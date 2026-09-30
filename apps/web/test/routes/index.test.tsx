@@ -249,90 +249,79 @@ describe('HomePage browse filters', () => {
     });
   });
 
-  it('can apply the displayed fallback white without changing the native picker value', () => {
-    mockUseSearch.mockReturnValue({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined });
+  it('saves the displayed default color without changing the picker', () => {
+    mockUseSearch.mockReturnValue({ after: 'cursor_123', format: 'png' });
     (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
-
     render(<HomePage />);
-
-    expect(screen.getByLabelText('Color')).toHaveValue('#ffffff');
-    fireEvent.click(screen.getByRole('button', { name: 'Apply color' }));
-
+    fireEvent.click(screen.getByRole('button', { name: 'Add color or feature' }));
+    expect(screen.getByRole('textbox', { name: 'Hex color' })).toHaveValue('#5D80D6');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(mockNavigate).toHaveBeenCalledTimes(1);
-    const navigateCall = mockNavigate.mock.calls[0][0];
-    expect(navigateCall.search({ after: 'cursor_123', color: undefined, format: 'png' })).toEqual({
+    expect(mockNavigate.mock.calls[0][0].search({ after: 'cursor_123', format: 'png' })).toEqual({
       after: undefined,
-      color: '#FFFFFF',
+      color: undefined,
+      colors: [{ color: '#5D80D6', quality: 'FAVORITE' }],
       format: 'png',
     });
   });
 
-  it('applies a changed picker color once when Apply color is pressed before the debounce', () => {
+  it('saves a changed color once without a deferred second update', () => {
     vi.useFakeTimers();
-    mockUseSearch.mockReturnValue({ color: undefined });
+    mockUseSearch.mockReturnValue({});
     (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
-
     render(<HomePage />);
-    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Apply color' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add color or feature' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hex color' }), { target: { value: '#00ff00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     vi.advanceTimersByTime(300);
-
     expect(mockNavigate).toHaveBeenCalledTimes(1);
-    expect(mockNavigate.mock.calls[0][0].search({ color: undefined })).toEqual({
-      color: '#00FF00',
+    expect(mockNavigate.mock.calls[0][0].search({})).toEqual({
+      color: undefined,
+      colors: [{ color: '#00FF00', quality: 'FAVORITE' }],
       after: undefined,
     });
   });
 
-  it('cancels a pending picker update when Back or Forward changes the route color', () => {
-    vi.useFakeTimers();
+  it('discards a modal draft when Back or Forward changes the route color', () => {
     mockUseSearch.mockReturnValue({ color: '#FF0000' });
     (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
-
     const view = render(<HomePage />);
-    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
-
+    fireEvent.click(screen.getByRole('button', { name: 'Edit #FF0000' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hex color' }), { target: { value: '#00ff00' } });
     mockUseSearch.mockReturnValue({ color: '#123456' });
     view.rerender(<HomePage />);
-    vi.advanceTimersByTime(300);
-
     expect(mockNavigate).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Color')).toHaveValue('#123456');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit #123456' })).toBeInTheDocument();
   });
 
-  it('cancels a pending picker update when Back or Forward changes another browse filter', () => {
-    vi.useFakeTimers();
-    mockUseSearch.mockReturnValue({ color: '#FF0000', format: undefined });
+  it('discards a modal draft when Back or Forward changes another browse filter', () => {
+    mockUseSearch.mockReturnValue({ color: '#FF0000' });
     (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
-
     const view = render(<HomePage />);
-    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
-
+    fireEvent.click(screen.getByRole('button', { name: 'Edit #FF0000' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hex color' }), { target: { value: '#00ff00' } });
     fireEvent(window, new PopStateEvent('popstate'));
     mockUseSearch.mockReturnValue({ color: '#FF0000', format: 'png' });
     view.rerender(<HomePage />);
-    vi.advanceTimersByTime(300);
-
     expect(mockNavigate).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Color')).toHaveValue('#ff0000');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit #FF0000' })).toBeInTheDocument();
   });
 
-  it('keeps a pending picker color when the visitor selects PNG during its debounce', () => {
-    vi.useFakeTimers();
-    mockUseSearch.mockReturnValue({ color: undefined, format: undefined });
+  it('keeps a draft color when another filter changes without history navigation', () => {
+    mockUseSearch.mockReturnValue({});
     (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
-
     const view = render(<HomePage />);
-    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
-    fireEvent.click(screen.getByRole('button', { name: 'PNG' }));
-
-    mockUseSearch.mockReturnValue({ color: undefined, format: 'png' });
+    fireEvent.click(screen.getByRole('button', { name: 'Add color or feature' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Hex color' }), { target: { value: '#00ff00' } });
+    mockUseSearch.mockReturnValue({ format: 'png' });
     view.rerender(<HomePage />);
-    vi.advanceTimersByTime(300);
-
-    expect(mockNavigate).toHaveBeenCalledTimes(2);
-    expect(mockNavigate.mock.calls[1][0].search({ color: undefined, format: 'png' })).toEqual({
-      color: '#00FF00',
+    expect(screen.getByRole('textbox', { name: 'Hex color' })).toHaveValue('#00FF00');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(mockNavigate.mock.calls[0][0].search({ format: 'png' })).toEqual({
+      color: undefined,
+      colors: [{ color: '#00FF00', quality: 'FAVORITE' }],
       format: 'png',
       after: undefined,
     });

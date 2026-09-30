@@ -66,34 +66,36 @@ afterEach(() => {
 });
 
 it.each(['header Home', 'sidebar Browse'] as const)(
-  'cancels a pending picker color when the %s link clears browse search',
+  'discards an unfinished modal color when the %s link clears browse search',
   async (link) => {
     const { router, dispose } = renderNavigation('/');
 
     try {
       fireEvent.click(await screen.findByRole('button', { name: 'Toggle filters' }));
-      vi.useFakeTimers();
-      fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
-      fireEvent.click(link === 'header Home'
+      const homeLink = link === 'header Home'
         ? within(screen.getByRole('banner')).getByRole('link', { name: 'WallpaperDB' })
-        : screen.getByRole('link', { name: 'Browse' }));
+        : screen.getByRole('link', { name: 'Browse' });
+      fireEvent.click(screen.getByRole('button', { name: 'Add color or feature' }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'Hex color' }), { target: { value: '#00ff00' } });
+      fireEvent.click(homeLink);
 
-      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
-
-      expect(router.state.location.search).toEqual({});
-      expect(screen.getByLabelText('Color')).toHaveValue('#ffffff');
+      await waitFor(() => expect(router.state.location.search).toEqual({}));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(screen.queryByRole('button', { name: 'Edit #00FF00' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Add color or feature' }));
+      expect(screen.getByRole('textbox', { name: 'Hex color' })).toHaveValue('#5D80D6');
     } finally {
       dispose();
     }
   }
 );
 
-it('restores the colored picker when Back remounts browse after a Home link visit', async () => {
+it('restores the selected color when Back remounts browse after a Home link visit', async () => {
   const { router, dispose } = renderNavigation('/?color=%23FF0000');
 
   try {
     fireEvent.click(await screen.findByRole('button', { name: 'Toggle filters' }));
-    expect(screen.getByLabelText('Color')).toHaveValue('#ff0000');
+    expect(screen.getByRole('button', { name: 'Edit #FF0000' })).toBeInTheDocument();
 
     await act(async () => {
       await router.navigate({
@@ -107,7 +109,8 @@ it('restores the colored picker when Back remounts browse after a Home link visi
       within(screen.getByRole('banner')).getByRole('link', { name: 'WallpaperDB' })
     );
     await waitFor(() => expect(router.state.location.search).toEqual({}));
-    expect(await screen.findByLabelText('Color')).toHaveValue('#ffffff');
+    expect(await screen.findByRole('button', { name: 'Add color or feature' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit #FF0000' })).not.toBeInTheDocument();
 
     await act(async () => {
       router.history.back();
@@ -117,7 +120,9 @@ it('restores the colored picker when Back remounts browse after a Home link visi
       router.history.back();
     });
     await waitFor(() => expect(router.state.location.search).toEqual({ color: '#FF0000' }));
-    await waitFor(() => expect(screen.getByLabelText('Color')).toHaveValue('#ff0000'));
+    expect(await screen.findByRole('button', { name: 'Edit #FF0000' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit #FF0000' }));
+    expect(screen.getByRole('textbox', { name: 'Hex color' })).toHaveValue('#FF0000');
   } finally {
     dispose();
   }

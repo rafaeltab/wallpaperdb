@@ -62,7 +62,7 @@ function renderBrowse(initialEntry: string) {
 describe('Profile filter navigation', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('applies the displayed fallback white through the real route without changing the picker', async () => {
+  it('saves the displayed default color through the real route without changing the picker', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
@@ -83,11 +83,12 @@ describe('Profile filter navigation', () => {
     const { router, view, queryClient } = renderBrowse('/?format=png&after=old_cursor');
     try {
       await user.click(await screen.findByRole('button', { name: 'Toggle filters' }));
-      expect(screen.getByLabelText('Color')).toHaveValue('#ffffff');
-      await user.click(screen.getByRole('button', { name: 'Apply color' }));
+      await user.click(screen.getByRole('button', { name: 'Add color or feature' }));
+      expect(screen.getByRole('textbox', { name: 'Hex color' })).toHaveValue('#5D80D6');
+      await user.click(screen.getByRole('button', { name: 'Save' }));
 
       await waitFor(() =>
-        expect(router.state.location.search).toEqual({ format: 'png', color: '#FFFFFF' })
+        expect(router.state.location.search).toEqual({ format: 'png', colors: [{ color: '#5D80D6', quality: 'FAVORITE' }] })
       );
     } finally {
       view.unmount();

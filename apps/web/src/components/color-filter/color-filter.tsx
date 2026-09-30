@@ -28,6 +28,11 @@ export function ColorFilter({
     void serialized;
     setEditing(null);
   }, [serialized]);
+  useEffect(() => {
+    const discardDraft = () => setEditing(null);
+    window.addEventListener('popstate', discardDraft);
+    return () => window.removeEventListener('popstate', discardDraft);
+  }, []);
   const initial = typeof editing === 'number' ? value[editing] : undefined;
   return (
     <Dialog.Root

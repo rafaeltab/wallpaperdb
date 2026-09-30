@@ -309,9 +309,30 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
   );
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("button", { name: "Remove Dark", exact: true }).click();
+  const cleared = page.waitForResponse((response) => {
+    if (
+      !response.url().endsWith("/gateway/graphql") ||
+      response.request().method() !== "POST"
+    )
+      return false;
+    const request = response.request().postDataJSON();
+    return (
+      request.query.includes("SearchWallpapers") &&
+      request.variables?.filter?.profileId === owner.id &&
+      !request.variables?.sort
+    );
+  });
   await page
     .getByRole("button", { name: "Remove #336699", exact: true })
     .click();
+  const clearedResponse = await cleared;
+  expect(clearedResponse.ok()).toBe(true);
+  expect(clearedResponse.request().postDataJSON().variables).toEqual({
+    first: 20,
+    after: null,
+    filter: { profileId: owner.id, variants: { format: "image/png" } },
+  });
+  expect((await clearedResponse.json()).errors).toBeUndefined();
   await expect(page).not.toHaveURL(/colors?=/);
   await expect(page).toHaveURL(new RegExp(`profileId=${owner.id}`));
   await expect(

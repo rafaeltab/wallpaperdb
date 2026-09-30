@@ -7,12 +7,13 @@ import {
   BrowseFilterPanelProvider,
   useBrowseFilterPanel,
 } from '@/components/browse-filter-panel-context';
+import { isColorPrototype } from '@/components/color-filter-prototype/mode';
 import { HeaderLayout } from '@/components/header-layout';
 import { SearchBar } from '@/components/search-bar';
 import { Button } from '@/components/ui/button';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { UserMenu } from '@/components/user-menu';
 import { UploadQueueToastManager } from '@/components/upload/upload-queue-toast-manager';
+import { UserMenu } from '@/components/user-menu';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -89,6 +90,10 @@ function RootLayoutContent({
                     <X className="h-4 w-4" />
                   </Button>
                 </>
+              ) : isColorPrototype() ? (
+                <Button variant="ghost" size="sm" disabled>
+                  Sign in
+                </Button>
               ) : (
                 <UserMenu />
               )

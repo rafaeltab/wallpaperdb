@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { AuthBridge } from '@/components/auth-bridge';
+import { isColorPrototype } from '@/components/color-filter-prototype/mode';
 import { ProfileBootstrap } from '@/components/profile-bootstrap';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
@@ -65,6 +66,18 @@ declare module '@tanstack/react-router' {
 }
 
 function App() {
+  if (isColorPrototype())
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider defaultTheme="system" storageKey="wallpaperdb-theme">
+          <UploadQueueProvider>
+            <RouterProvider router={router} />
+            <Toaster />
+          </UploadQueueProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    );
+
   if (!PUBLISHABLE_KEY) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">

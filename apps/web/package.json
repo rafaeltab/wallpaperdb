@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:unit": "vitest run --coverage",
     "test:integration": "node --test test/clean-checkout.test.mjs",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prototype:colors": "make -C ../.. build PACKAGE=profile-markdown && vite --host 0.0.0.0 --port 3005",
+    "prototype:check": "biome check --write src/components/color-filter-prototype src/components/browse-filter-panel.tsx src/routes/index.tsx src/routes/__root.tsx src/App.tsx src/main.tsx package.json"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",

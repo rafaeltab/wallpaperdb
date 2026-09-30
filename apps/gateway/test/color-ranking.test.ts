@@ -251,6 +251,11 @@ describe('Native color ranking port contract', () => {
                 if (fault === 'missing-id') delete body.hits.hits[0].fields.wallpaperId;
                 if (fault === 'duplicate-id') body.hits.hits.push(body.hits.hits[0]);
                 if (fault === 'score') body.hits.hits[0]._score = -1;
+                if (fault === 'score-and-sort') {
+                  const changed = body.hits.hits[0]._score + 0.01;
+                  body.hits.hits[0]._score = changed;
+                  body.hits.hits[0].sort[0] = changed;
+                }
                 if (fault === 'sort') body.hits.hits[0].sort[1] = 'different';
                 if (fault.startsWith('order')) body.hits.hits.reverse();
                 if (fault.startsWith('stale')) body.hits.hits[0] = firstHit;
@@ -302,6 +307,7 @@ describe('Native color ranking port contract', () => {
       'missing-id',
       'duplicate-id',
       'score',
+      'score-and-sort',
       'sort',
       'order',
       'order-asc',

@@ -1,5 +1,9 @@
-import { COLOR_ANCHORS, COLOR_CUTOFFS, COLOR_FEATURE_NAMES } from '@wallpaperdb/events';
-import type { ColorMeasurements } from '../../capabilities/extraction/index.js';
+import {
+  COLOR_ANCHORS,
+  COLOR_CUTOFFS,
+  COLOR_FEATURE_NAMES,
+} from '@wallpaperdb/events/color-vocabulary';
+import type { ColorMeasurements } from './contract.js';
 
 type Lab = readonly [number, number, number];
 type Hsv = readonly [hue: number, saturation: number, value: number];

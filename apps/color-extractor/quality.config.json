@@ -1,7 +1,6 @@
 {
-  "publicModules": [
-    "http",
-    "adapters/image",
-    "adapters/events"
-  ]
+  "allowedCapabilityDependencies": {
+    "extraction": ["@wallpaperdb/events/color-vocabulary"]
+  },
+  "publicModules": ["http", "adapters/image", "adapters/events"]
 }

@@ -11,6 +11,10 @@
       "import": "./src/index.ts",
       "types": "./src/index.ts"
     },
+    "./color-vocabulary": {
+      "import": "./src/color-vocabulary.ts",
+      "types": "./src/color-vocabulary.ts"
+    },
     "./schemas": {
       "import": "./src/schemas/index.ts",
       "types": "./src/schemas/index.ts"

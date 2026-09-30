@@ -4,10 +4,10 @@ import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s
 import { Context, Effect, Layer, Semaphore } from 'effect';
 import { resolveOriginalAsset } from '@wallpaperdb/core/assets';
 import { decodePixels } from './process.js';
-import { measurePixels } from './measurements.js';
 import {
   ExtractionUnavailable,
   ImageMeasurements,
+  measurePixels,
   type OriginalImage,
 } from '../../capabilities/extraction/index.js';
 

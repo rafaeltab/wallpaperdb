@@ -169,6 +169,8 @@ export interface ProfileSearchBatch {
  * including zero scores. Native numeric scores descend, then wallpaper IDs ascend;
  * ascending order reverses both components for backward pagination. IDs come from
  * doc values. Timeouts, shard failures and incomplete responses are unavailable.
+ * Concurrent changes during page completeness checks may also be unavailable;
+ * pagination does not promise snapshot consistency.
  * Profile discovery orders exact current Handles, current prefixes, exact active
  * aliases, alias prefixes, Display name phrase/prefix matches, then fuzzy names.
  * Fixed ranks 6 through 1 use Profile ID ascending to break ties. Biography is excluded.

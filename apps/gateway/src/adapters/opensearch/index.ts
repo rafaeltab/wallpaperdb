@@ -16,6 +16,7 @@ import {
 } from '../../capabilities/projection/index.js';
 import { StartupDiagnostic } from '../../startup-diagnostics.js';
 import {
+  followsSearchCursor,
   partialWallpaperResponse,
   profileBatchResponse,
   profileDiscoveryResponse,
@@ -233,14 +234,40 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
       })
     )
   );
-  readonly search = Effect.fn('catalogue.storage.search')((selection: SearchSelection) =>
-    read(
-      'search',
+  private readonly searchPage = Effect.fn('catalogue.storage.search-page')(
+    (selection: SearchSelection) =>
       Effect.gen({ self: this }, function* () {
         const result = yield* this.request(() =>
           this.client.search({ index: this.wallpapers, body: searchBody(selection) })
         );
-        const { hits } = yield* wallpaperSearchResponse(selection, this.wallpapers)(result.body);
+        return (yield* wallpaperSearchResponse(selection, this.wallpapers)(result.body)).hits;
+      })
+  );
+  readonly search = Effect.fn('catalogue.storage.search')((selection: SearchSelection) =>
+    read(
+      'search',
+      Effect.gen({ self: this }, function* () {
+        const hits = yield* this.searchPage(selection);
+        const after = selection.searchAfter;
+        if (selection.color && after && hits.hits.length < selection.size) {
+          const tail = yield* this.searchPage({
+            ...selection,
+            searchAfter: undefined,
+            sortOrder: selection.sortOrder === 'asc' ? 'desc' : 'asc',
+          });
+          const expected = [...tail.hits]
+            .reverse()
+            .filter((hit) => followsSearchCursor(hit.sort, after, selection));
+          const complete =
+            expected.length === hits.hits.length &&
+            expected.every((hit, position) =>
+              hit.sort.every((value, component) => value === hits.hits[position]?.sort[component])
+            );
+          if (!complete)
+            return yield* new SearchRequestError({
+              cause: new Error('Incomplete or concurrently changed color search page'),
+            });
+        }
         yield* recordTelemetry(() =>
           recordHistogram('opensearch.search.results', hits.total.value, {
             'opensearch.index': this.wallpapers,

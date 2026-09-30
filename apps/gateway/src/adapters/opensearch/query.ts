@@ -38,7 +38,11 @@ export function searchBody(selection: SearchSelection) {
           : {}),
       },
     },
-    ...(color ? { docvalue_fields: ['wallpaperId'] } : {}),
+    ...(color
+      ? {
+          docvalue_fields: ['wallpaperId', ...color.utilities.map(({ key }) => `utilities.${key}`)],
+        }
+      : {}),
     search_after: selection.searchAfter,
     size: selection.size,
     track_total_hits: true,

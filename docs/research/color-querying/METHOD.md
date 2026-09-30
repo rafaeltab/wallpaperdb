@@ -166,9 +166,17 @@ indexes. The three-choice prototype stores the whole bank in one index.
 
 The prototype represents each utility as a float field with numeric indexing and
 doc values. It disables stored `_source` and retrieves IDs through doc values.
-These describe the tested layout; the production representation, reindexing
-source, and metadata integration must be designed explicitly. The actual
-million-record disk cost of this three-preset layout is not measured.
+On September 30, 2026, the maintainer selected this layout for production
+integration, as recorded in
+[ADR 0006](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions).
+Catalogue metadata projection and result retrieval must work within that
+representation; the decision does not require a separate metadata retrieval path.
+Retained versioned measurements through NATS provide the input for deriving
+utilities again when the descriptor definition is unchanged. The initial
+installation uses fresh storage and uploads, so migration/backfill or operator
+rebuild tooling is not required. See the [production guidance](PRODUCTION-QUESTIONS.md)
+for those scope decisions. The actual million-record disk cost of this
+three-preset layout remains unmeasured.
 
 For a search, select the stored field for each resolved target and preference.
 OpenSearch applies metadata eligibility filters and averages those utilities,

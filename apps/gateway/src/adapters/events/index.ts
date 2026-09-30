@@ -311,6 +311,17 @@ function retryDelay(attempt: number, options: NatsProjectionOptions): number {
   return Math.min(30_000, (options.retryDelayMs ?? 1000) * 2 ** Math.min(attempt - 1, 5));
 }
 
+const acknowledge = Effect.fn('catalogue.events.acknowledge')(function* (message: JsMsg) {
+  const confirmed = yield* broker('confirm acknowledgement', () =>
+    message.ackAck({ timeout: 5000 })
+  );
+  if (!confirmed) {
+    return yield* Effect.fail(
+      brokerError('confirm acknowledgement', new Error('Broker did not confirm acknowledgement'))
+    );
+  }
+});
+
 const processMessage = Effect.fn('catalogue.events.consume')(function* (
   message: JsMsg,
   js: JetStreamClient,
@@ -319,6 +330,7 @@ const processMessage = Effect.fn('catalogue.events.consume')(function* (
   const attempt = message.info.deliveryCount;
   const started = yield* Clock.currentTimeMillis;
   let status = 'error';
+  let acknowledgementAttempted = false;
   const attributes = {
     ...projectionAttributes(translate(message.subject, message.data, message.headers)),
     'event.subject': message.subject,
@@ -347,14 +359,17 @@ const processMessage = Effect.fn('catalogue.events.consume')(function* (
       case 'Rejected':
       case 'Exhausted':
         yield* quarantine(js, message, outcome._tag, options);
-        message.ack();
+        acknowledgementAttempted = true;
+        yield* acknowledge(message);
         return;
     }
   }).pipe(
     Effect.catchCause((cause) =>
       Effect.gen(function* () {
         if (Cause.hasInterrupts(cause)) return yield* Effect.failCause(cause);
-        message.nak(retryDelay(attempt, options));
+        // ackAck cannot be repeated on the same JsMsg. If its confirmation is
+        // lost, the broker redelivers after ack_wait unless it accepted the ACK.
+        if (!acknowledgementAttempted) message.nak(retryDelay(attempt, options));
         yield* Effect.logError('Projection delivery failed', cause);
         yield* Effect.annotateCurrentSpan('event.outcome', 'Retry');
       })

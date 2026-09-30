@@ -8,8 +8,9 @@ import {
 import { Deferred, Effect, Layer, ManagedRuntime } from 'effect';
 import { metrics } from '@opentelemetry/api';
 import { DiscardPolicy, headers, StorageType } from 'nats';
+import { JsMsgImpl } from 'nats/lib/jetstream/jsmsg.js';
 import { GenericContainer, Wait } from 'testcontainers';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   natsProjectionLayer,
   NatsProjectionConsumer,
@@ -921,7 +922,7 @@ describe('NATS projection adapter contract', () => {
   it.each([
     '{different invalid json',
     '{invalid json',
-  ])('preserves a new quarantine occurrence after recreating its source stream: %s', async (replacement) => {
+  ])('preserves and confirms a new quarantine occurrence after recreating its source stream: %s', async (replacement) => {
     const manager = await (await tester.nats.getConnection()).jetstreamManager();
     const { config } = await manager.streams.info('WALLPAPER');
     await manager.streams.delete('WALLPAPER');
@@ -934,13 +935,26 @@ describe('NATS projection adapter contract', () => {
 
     await manager.streams.delete('WALLPAPER');
     await manager.streams.add(config);
-    await consumer(new ControlledProjection());
-    await publish(replacement);
-    await acknowledged();
-
-    const recreated = await quarantine(2);
-    expect(recreated.id).not.toBe(original.id);
-    expect(recreated.data.original).toBe(Buffer.from(replacement).toString('base64'));
+    // Lose the one-way ACK and the first confirmation; the broker must redeliver.
+    const unconfirmedAck = vi.spyOn(JsMsgImpl.prototype, 'ack').mockImplementation(() => {});
+    const interruptedConfirmation = vi
+      .spyOn(JsMsgImpl.prototype, 'ackAck')
+      .mockRejectedValueOnce(new Error('controlled missing ACK confirmation'));
+    try {
+      await consumer(new ControlledProjection());
+      await manager.consumers.update('WALLPAPER', 'gateway-wallpaper-uploaded', {
+        ack_wait: 2_000_000_000,
+      });
+      await publish(replacement);
+      const recreated = await quarantine(2);
+      await acknowledged();
+      expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(2);
+      expect(recreated.id).not.toBe(original.id);
+      expect(recreated.data.original).toBe(Buffer.from(replacement).toString('base64'));
+    } finally {
+      unconfirmedAck.mockRestore();
+      interruptedConfirmation.mockRestore();
+    }
   });
 
   it('reuses the quarantine occurrence when a recreated consumer replays retained input', async () => {

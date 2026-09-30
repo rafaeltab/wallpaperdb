@@ -273,6 +273,56 @@ describe('HomePage browse filters', () => {
     vi.useRealTimers();
   });
 
+  it('can apply the displayed fallback white without changing the native picker value', () => {
+    mockUseSearch.mockReturnValue({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined });
+    (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
+
+    render(<HomePage />);
+
+    expect(screen.getByLabelText('Color')).toHaveValue('#ffffff');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply color' }));
+
+    const navigateCall = mockNavigate.mock.calls[0][0];
+    expect(navigateCall.search({ after: 'cursor_123', color: undefined, format: 'png' })).toEqual({
+      after: undefined,
+      color: '#FFFFFF',
+      format: 'png',
+    });
+  });
+
+  it('applies a changed picker color once when Apply color is pressed before the debounce', () => {
+    vi.useFakeTimers();
+    mockUseSearch.mockReturnValue({ color: undefined });
+    (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
+
+    render(<HomePage />);
+    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply color' }));
+    vi.advanceTimersByTime(300);
+
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate.mock.calls[0][0].search({ color: undefined })).toEqual({
+      color: '#00FF00',
+      after: undefined,
+    });
+  });
+
+  it('cancels a pending picker update when Back or Forward changes the route color', () => {
+    vi.useFakeTimers();
+    mockUseSearch.mockReturnValue({ color: '#FF0000' });
+    (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
+
+    const view = render(<HomePage />);
+    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
+
+    mockUseSearch.mockReturnValue({ color: '#123456' });
+    view.rerender(<HomePage />);
+    vi.advanceTimersByTime(300);
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Color')).toHaveValue('#123456');
+  });
+
   it('updates the route search state when an aspect ratio is selected', () => {
     mockUseSearch.mockReturnValue({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined });
     (useBrowseFilterPanel as Mock).mockReturnValue({

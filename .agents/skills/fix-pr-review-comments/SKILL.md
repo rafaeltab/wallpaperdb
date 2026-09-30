@@ -11,6 +11,8 @@ An invocation authorizes pushing tested fixes to the selected PR, posting replie
 
 Identify the repository and PR from the request or current branch. Ask when the target is ambiguous. Fetch the PR head and work on its branch, preserving unrelated local changes. Register the PR with the current thread when a PR-linking tool is available.
 
+For GitHub discovery, replies, reactions, and thread resolution, read [references/github-operations.md](references/github-operations.md). Use available GitHub tools or `gh`; retain the original comment IDs and distinguish them from thread IDs.
+
 Read all pages of review threads, their replies, review summaries, and PR conversation comments. By default, handle all unhandled actionable feedback. Explicit comment IDs or URLs narrow the selection, but still read the surrounding conversation. Skip resolved threads unless explicitly selected or later feedback reopens the concern. An outdated line marker does not establish that a concern is fixed.
 
 Keep a working checklist outside the repository or in session state. For each selected comment, record its URL and ID, thread ID if present, individual claims, verdict and evidence, fix commit, checks, and publication state. A prior reaction alone does not prove the feedback was handled; inspect the replies and current code. Skip acknowledgements and other comments with no requested action.

@@ -6,7 +6,7 @@ This workspace tests complete user journeys in the WallpaperDB web application. 
 
 - Verifies that the seeded user can sign in through the web UI and reuses saved authentication state after a dedicated setup step.
 - Uploads committed image fixtures through the authenticated UI and checks that every file completes successfully.
-- Follows fresh uploads through the catalogue and colour and format filters, and compares a selected variant's declared dimensions with the browser's decoded pixels.
+- Follows fresh uploads through the catalogue and Profile and format filters, and compares a selected variant's declared dimensions with the browser's decoded pixels.
 - Returns from an upload notification to the same queue and opens accessible wallpaper details with the keyboard.
 - Uploads and removes Profile pictures, with a separate anonymous browser checking public delivery, the restored generated avatar, and `404` with `Cache-Control: no-store` for the retired URL.
 - Checks service readiness before browser tests start and reports health diagnostics when the application stack is unavailable.

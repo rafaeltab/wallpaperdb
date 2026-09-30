@@ -12,7 +12,7 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - [Wallpaper variant generation](./apps/variant-generator/CONTEXT.md) - owns lower-resolution wallpaper variants
 
-- [Media](./apps/media/CONTEXT.md) - owns image processing, the delivery catalog, and delivery of immutable Assets
+- [Media](./apps/media/CONTEXT.md) - owns Asset inspection and rendition processing, temporary HDR Profile picture conversion, the delivery catalog, and delivery of immutable Assets
 
 - [Tagging](./apps/tags/CONTEXT.md) - reserved for wallpaper classification; domain language remains undefined
 

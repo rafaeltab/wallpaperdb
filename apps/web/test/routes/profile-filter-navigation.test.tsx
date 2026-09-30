@@ -7,7 +7,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -102,34 +102,64 @@ describe('Profile filter navigation', () => {
       variants: { format: 'image/png', aspectRatio: 16 / 9 },
     };
     const sort = {
-      color: { mode: 'VIBE', quality: 'FAVORITE', targets: [{ color: '#FF0000' }] },
+      color: { targets: [{ color: '#FF0000', mode: 'VIBE', quality: 'FAVORITE' }] },
     };
     const profile = {
-      id: 'user_Ada', handle: 'ada', displayName: 'Ada', picture: null,
-      canonicalPath: '/profiles/@ada', biographyMarkdown: '',
+      id: 'user_Ada',
+      handle: 'ada',
+      displayName: 'Ada',
+      picture: null,
+      canonicalPath: '/profiles/@ada',
+      biographyMarkdown: '',
     };
     const wallpaper = (wallpaperId: string) => ({
-      wallpaperId, profileId: profile.id,
-      uploadedAt: '2026-09-30T00:00:00.000Z', updatedAt: '2026-09-30T00:00:00.000Z',
-      variants: [{
-        width: 1920, height: 1080, aspectRatio: 16 / 9, format: 'image/png',
-        fileSizeBytes: 100, createdAt: '2026-09-30T00:00:00.000Z',
-        url: 'https://example.com/wallpaper.png',
-      }],
-    });
-    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
-      const request: GraphQLRequest = JSON.parse(String(init.body));
-      requests.push(request);
-      const ranked = Boolean(request.variables.sort);
-      const nextPage = request.variables.after === 'ranked_cursor';
-      const data = request.operationName === 'GetProfile' ? { profile } : {
-        searchWallpapers: {
-          edges: [{ node: wallpaper(ranked ? nextPage ? 'ranked_second' : 'ranked_first' : 'ordinary') }],
-          pageInfo: { hasNextPage: ranked && !nextPage, hasPreviousPage: nextPage, endCursor: 'ranked_cursor' },
+      wallpaperId,
+      profileId: profile.id,
+      uploadedAt: '2026-09-30T00:00:00.000Z',
+      updatedAt: '2026-09-30T00:00:00.000Z',
+      variants: [
+        {
+          width: 1920,
+          height: 1080,
+          aspectRatio: 16 / 9,
+          format: 'image/png',
+          fileSizeBytes: 100,
+          createdAt: '2026-09-30T00:00:00.000Z',
+          url: 'https://example.com/wallpaper.png',
         },
-      };
-      return new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } });
-    }));
+      ],
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const request: GraphQLRequest = JSON.parse(String(init.body));
+        requests.push(request);
+        const ranked = Boolean(request.variables.sort);
+        const nextPage = request.variables.after === 'ranked_cursor';
+        const data =
+          request.operationName === 'GetProfile'
+            ? { profile }
+            : {
+                searchWallpapers: {
+                  edges: [
+                    {
+                      node: wallpaper(
+                        ranked ? (nextPage ? 'ranked_second' : 'ranked_first') : 'ordinary'
+                      ),
+                    },
+                  ],
+                  pageInfo: {
+                    hasNextPage: ranked && !nextPage,
+                    hasPreviousPage: nextPage,
+                    endCursor: 'ranked_cursor',
+                  },
+                },
+              };
+        return new Response(JSON.stringify({ data }), {
+          headers: { 'content-type': 'application/json' },
+        });
+      })
+    );
     const user = userEvent.setup();
     const { router, view, queryClient } = renderBrowse(
       '/?profileId=user_Ada&format=png&aspectRatio=16-9&after=old_cursor'
@@ -137,30 +167,65 @@ describe('Profile filter navigation', () => {
     try {
       expect(await screen.findByRole('button', { name: 'Wallpaper ordinary' })).toBeInTheDocument();
       await user.click(await screen.findByRole('button', { name: 'Toggle filters' }));
-      fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#ff0000' } });
-      await waitFor(() => expect(router.state.location.search).toEqual({
-        profileId: 'user_Ada', format: 'png', aspectRatio: '16-9', color: '#FF0000',
-      }));
-      await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
-        operationName: 'SearchWallpapers', variables: { filter, sort, first: 20, after: null },
-      })));
-      expect(await screen.findByRole('button', { name: 'Wallpaper ranked_first' })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Add color or feature' }));
+      const editor = screen.getByRole('dialog');
+      fireEvent.change(within(editor).getByRole('textbox', { name: 'Hex color' }), {
+        target: { value: '#ff0000' },
+      });
+      await user.click(within(editor).getByRole('button', { name: 'Save' }));
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({
+          profileId: 'user_Ada',
+          format: 'png',
+          aspectRatio: '16-9',
+          colors: [{ color: '#FF0000', quality: 'FAVORITE' }],
+        })
+      );
+      await waitFor(() =>
+        expect(requests).toContainEqual(
+          expect.objectContaining({
+            operationName: 'SearchWallpapers',
+            variables: { filter, sort, first: 20, after: null },
+          })
+        )
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Wallpaper ranked_first' })
+      ).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Wallpaper ordinary' })).not.toBeInTheDocument();
       act(() => triggerIntersection(true));
-      await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
-        operationName: 'SearchWallpapers', variables: { filter, sort, first: 20, after: 'ranked_cursor' },
-      })));
-      expect(await screen.findByRole('button', { name: 'Wallpaper ranked_second' })).toBeInTheDocument();
+      await waitFor(() =>
+        expect(requests).toContainEqual(
+          expect.objectContaining({
+            operationName: 'SearchWallpapers',
+            variables: { filter, sort, first: 20, after: 'ranked_cursor' },
+          })
+        )
+      );
+      expect(
+        await screen.findByRole('button', { name: 'Wallpaper ranked_second' })
+      ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Wallpaper ranked_first' })).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'Clear color' }));
-      await waitFor(() => expect(router.state.location.search).toEqual({
-        profileId: 'user_Ada', format: 'png', aspectRatio: '16-9',
-      }));
-      await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
-        operationName: 'SearchWallpapers', variables: { filter, first: 20, after: null },
-      })));
+      await user.click(screen.getByRole('button', { name: 'Remove #FF0000' }));
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({
+          profileId: 'user_Ada',
+          format: 'png',
+          aspectRatio: '16-9',
+        })
+      );
+      await waitFor(() =>
+        expect(requests).toContainEqual(
+          expect.objectContaining({
+            operationName: 'SearchWallpapers',
+            variables: { filter, first: 20, after: null },
+          })
+        )
+      );
       expect(await screen.findByRole('button', { name: 'Wallpaper ordinary' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Wallpaper ranked_first' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Wallpaper ranked_first' })
+      ).not.toBeInTheDocument();
     } finally {
       view.unmount();
       queryClient.clear();

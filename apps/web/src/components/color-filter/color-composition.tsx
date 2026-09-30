@@ -49,12 +49,15 @@ export function ColorComposition({
   value,
   onChange,
   onEdit,
+  onEmpty,
 }: {
   value: readonly ColorPreference[];
   onChange: (value: ColorPreference[]) => void;
   onEdit: (index: number, button: HTMLButtonElement) => void;
+  onEmpty: () => void;
 }) {
   const track = useRef<HTMLDivElement>(null);
+  const editButtons = useRef(new Map<string, HTMLButtonElement>());
   const drag = useRef<{
     x: number;
     index: number;
@@ -78,6 +81,11 @@ export function ColorComposition({
             >
               <button
                 type="button"
+                ref={(button) => {
+                  const key = colorPreferenceKey(target);
+                  if (button) editButtons.current.set(key, button);
+                  else editButtons.current.delete(key);
+                }}
                 className="color-composition-edit"
                 aria-label={`Edit ${label}`}
                 title={`${label}${target.percent === undefined ? '' : ` · ${target.percent}%`} · ${MATCH_LABELS[target.quality]}`}
@@ -90,16 +98,14 @@ export function ColorComposition({
                 type="button"
                 className="color-composition-remove"
                 aria-label={`Remove ${label}`}
-                onClick={(event) => {
-                  const next =
-                    event.currentTarget.parentElement?.nextElementSibling?.querySelector<HTMLButtonElement>(
-                      'button'
-                    ) ??
-                    event.currentTarget.parentElement?.previousElementSibling?.querySelector<HTMLButtonElement>(
-                      'button'
-                    );
+                onClick={() => {
+                  const neighbor = value[index + 1] ?? value[index - 1];
+                  const next = neighbor
+                    ? editButtons.current.get(colorPreferenceKey(neighbor))
+                    : undefined;
                   onChange(value.filter((_, i) => i !== index));
-                  next?.focus();
+                  if (next) next.focus();
+                  else onEmpty();
                 }}
               >
                 <X size={12} />

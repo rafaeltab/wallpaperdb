@@ -60,6 +60,7 @@ export function ColorFilter({
         <ColorComposition
           value={value}
           onChange={onChange}
+          onEmpty={() => add.current?.focus()}
           onEdit={(index, button) => {
             returnFocus.current = button;
             setEditing(index);
@@ -175,7 +176,6 @@ function ColorEditor({
             <button
               type="button"
               aria-label={draft.percent === undefined ? 'Add percentage' : 'Clear percentage'}
-              disabled={draft.percent === undefined && maximum === 0}
               title={
                 distribution
                   ? 'Distribution strength across the image'

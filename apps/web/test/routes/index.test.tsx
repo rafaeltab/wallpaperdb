@@ -310,7 +310,8 @@ describe('HomePage browse filters', () => {
     expect(await screen.findByRole('button', { name: 'Device 9:16' })).toBeInTheDocument();
   });
 
-  it('clears the color filter immediately', () => {
+  it('clears the color filter immediately and cancels a pending picker update', () => {
+    vi.useFakeTimers();
     mockUseSearch.mockReturnValue({ after: 'cursor_123', color: '#FF0000', format: 'png', aspectRatio: undefined });
     (useBrowseFilterPanel as Mock).mockReturnValue({
       isOpen: true,
@@ -320,6 +321,7 @@ describe('HomePage browse filters', () => {
 
     render(<HomePage />);
 
+    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
     fireEvent.click(screen.getByRole('button', { name: 'Clear color' }));
 
     expect(mockNavigate).toHaveBeenCalledWith({
@@ -334,7 +336,28 @@ describe('HomePage browse filters', () => {
       format: 'png',
       aspectRatio: undefined,
     });
+    vi.advanceTimersByTime(300);
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
+
+  it.each(['loading', 'empty', 'failed'] as const)(
+    'keeps the selected color available to clear while results are %s', (state) => {
+      mockUseSearch.mockReturnValue({ color: '#FF0000', format: 'png' });
+      (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
+      (useWallpaperInfiniteQuery as Mock).mockReturnValue({
+        data: undefined,
+        isLoading: state === 'loading',
+        error: state === 'failed' ? new Error('Gateway unavailable') : null,
+      });
+      render(<HomePage />);
+
+      expect(screen.getByRole('button', { name: 'Clear color' })).toBeEnabled();
+      if (state === 'loading') expect(screen.getByTestId('wallpaper-grid-skeleton')).toBeInTheDocument();
+      if (state === 'empty') expect(screen.getByText('No wallpapers match these filters.')).toBeInTheDocument();
+      if (state === 'failed') expect(screen.getByText('Failed to load wallpapers')).toBeInTheDocument();
+    }
+  );
 });
 
 describe('HomePage admission failures', () => {

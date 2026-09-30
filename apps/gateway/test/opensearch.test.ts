@@ -230,6 +230,7 @@ describe('OpenSearch catalogue port contract', () => {
 
   it.each([
     'strict_date_optional_time',
+    'strict_date_optional_time_nanos',
     'date_optional_time',
     'epoch_millis||strict_date_optional_time',
   ])('accepts ISO-compatible date format %s for projected timestamps', async (format) => {
@@ -247,6 +248,17 @@ describe('OpenSearch catalogue port contract', () => {
         body: {
           settings: { 'index.mapping.total_fields.limit': 10100 },
           mappings: mapping,
+        },
+      });
+      await client.index({
+        index,
+        id: 'iso-date-probe',
+        body: {
+          wallpaperId: 'iso-date-probe',
+          userId: 'owner',
+          variants: [variant],
+          uploadedAt: timestamp,
+          updatedAt: timestamp,
         },
       });
       const compatible = await acquireSearchFixture({

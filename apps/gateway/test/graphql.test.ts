@@ -713,3 +713,25 @@ describe('GraphQL driving adapter contract', () => {
     }
   });
 });
+
+describe('GraphQL per-target color preferences', () => {
+  it('translates target overrides while preserving query defaults', async () => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      `{searchWallpapers(sort:{color:{quality:STRICT,targets:[{color:"#FF0000",mode:VIBE,quality:RELAXED},{name:DARK,mode:PROPORTIONS,percent:0,quality:FAVORITE},{name:RAINBOW,mode:PROPORTIONS,percent:40}]}}){edges{node{wallpaperId}}}}`
+    );
+    expect(response.body.errors).toBeUndefined();
+    expect(inbound.calls[0]).toMatchObject({
+      input: {
+        color: {
+          quality: 'strict',
+          targets: [
+            { color: '#FF0000', mode: 'vibe', quality: 'relaxed' },
+            { name: 'dark', mode: 'proportions', percent: 0, quality: 'favorite' },
+            { name: 'rainbow', mode: 'proportions', percent: 40 },
+          ],
+        },
+      },
+    });
+  });
+});

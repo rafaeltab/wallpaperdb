@@ -178,6 +178,11 @@ export const schema = `#graphql
 	A concrete or named color target. Supply exactly one of color and name.
 	"""
 	input ColorTarget {
+		"""Override the query mode for this target."""
+		mode: ColorMode
+		"""Override the query quality preference for this target."""
+		quality: ColorQuality
+
 		"""
 		Hex color in #RRGGBB format
 		"""

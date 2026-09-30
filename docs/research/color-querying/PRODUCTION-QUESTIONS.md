@@ -73,6 +73,9 @@ adapter translates protocol values without repeating those decisions. A target
 supplies one six-digit sRGB color or supported name. Vibe omits percentages;
 proportions require exact 10% steps from zero through 100%. Concrete named
 colors resolve through fixed swatches, while abstract names use their own fields.
+Each target may override mode and quality; omitted overrides inherit query
+defaults. Mixed vibe and proportion targets use their own complete utility keys
+and contribute equally to the original target count.
 
 The [native query adapter](../../../apps/gateway/src/adapters/opensearch/query.ts)
 applies complete-key multiplicity and filters metadata, contributor eligibility,

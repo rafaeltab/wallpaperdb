@@ -76,6 +76,8 @@ export type ColorTargetName =
   | 'RAINBOW';
 
 export interface ColorTarget {
+  mode?: 'VIBE' | 'PROPORTIONS';
+  quality?: 'RELAXED' | 'FAVORITE' | 'STRICT';
   color?: string;
   name?: ColorTargetName;
   percent?: number;

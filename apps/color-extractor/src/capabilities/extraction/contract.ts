@@ -37,24 +37,17 @@ export interface MeasuredImage {
 }
 
 export interface ImageMeasurements {
+  /** Decode the immutable original into the complete shade/hue descriptor and its content hash.
+   * Retains all five cutoff layers and every named target, including transparent-black originals.
+   * Reads and decoding are bounded, interruptible, and completed before returning. */
   extract(storage: OriginalImage): Effect.Effect<MeasuredImage, ExtractionUnavailable>;
 }
 export const ImageMeasurements = Context.Service<ImageMeasurements>(
   'wallpaperdb.color-extractor.extraction.ImageMeasurements'
 );
 
-export interface ImageHistogram {
-  extract(storage: OriginalImage): Effect.Effect<readonly number[], ExtractionUnavailable>;
-}
-
-export const ImageHistogram = Context.Service<ImageHistogram>(
-  'wallpaperdb.color-extractor.extraction.ImageHistogram'
-);
-
-export interface ExtractedColors {
+export interface ExtractedColors extends MeasuredImage {
   readonly input: ExtractionInput;
-  readonly histogram: readonly number[];
-  readonly colorSpace: 'hsv';
 }
 
 /** Completes only after the result is durably published; retries preserve occurrence identity. */

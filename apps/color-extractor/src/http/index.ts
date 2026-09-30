@@ -97,7 +97,7 @@ export async function createHttpApp<E>(
     await registerOpenAPI(app, {
       title: 'WallpaperDB Color Extractor API',
       version: '1.0.0',
-      description: 'Extracts color histograms from stored wallpaper images.',
+      description: 'Extracts color measurements from stored wallpaper images.',
       servers:
         config.nodeEnv === 'production'
           ? undefined

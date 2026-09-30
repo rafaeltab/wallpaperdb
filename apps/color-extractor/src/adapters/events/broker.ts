@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
+import {
+  COLOR_ANCHORS_SHA256,
+  COLOR_REFERENCE_COMMIT,
+  WallpaperColorsExtractedCloudEventSchema,
+} from '@wallpaperdb/events';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { Clock, Context, Effect, Exit, Layer, Option, Semaphore } from 'effect';
 import {
@@ -51,12 +56,19 @@ class NatsColorEvents implements ColorEvents {
     this: NatsColorEvents,
     result: Parameters<ColorEvents['publish']>[0]
   ) {
-    const { input, histogram, colorSpace } = result;
+    const { input, measurements, originalSha256 } = result;
     const source = 'https://wallpaperdb/color-extractor';
     const id = createHash('sha256')
-      .update(JSON.stringify(['colors-extracted-v1', input.occurrence.source, input.occurrence.id]))
+      .update(
+        JSON.stringify([
+          'colors-extracted',
+          measurements.version,
+          input.occurrence.source,
+          input.occurrence.id,
+        ])
+      )
       .digest('hex');
-    const event = {
+    const parsed = WallpaperColorsExtractedCloudEventSchema.safeParse({
       specversion: '1.0',
       source,
       id,
@@ -66,8 +78,33 @@ class NatsColorEvents implements ColorEvents {
       correlationid: input.correlationId,
       causationid: input.occurrence.id,
       causationsource: input.occurrence.source,
-      data: { wallpaperId: input.wallpaperId, colorHistogram: histogram, colorSpace },
-    };
+      data: {
+        schemaVersion: 1,
+        wallpaperId: input.wallpaperId,
+        original: {
+          owner: 'ingestor',
+          id: 'owner' in input.storage ? input.storage.id : input.wallpaperId,
+        },
+        provenance: {
+          referenceCommit: COLOR_REFERENCE_COMMIT,
+          anchorsSha256: COLOR_ANCHORS_SHA256,
+          originalSha256,
+        },
+        measurements,
+      },
+    });
+    if (!parsed.success)
+      return yield* Effect.fail(
+        new ExtractionUnavailable({ operation: 'validate-colors', cause: parsed.error })
+      ).pipe(
+        Effect.tapError((error) =>
+          Effect.logError('Color measurement publication rejected', {
+            operation: error.operation,
+            cause: error.cause,
+          })
+        )
+      );
+    const event = parsed.data;
     const carrier: Record<string, string> = {};
     const span = yield* OtelTracer.currentOtelSpan.pipe(Effect.option);
     propagation.inject(
@@ -77,12 +114,30 @@ class NatsColorEvents implements ColorEvents {
     const metadata = headers();
     for (const [key, value] of Object.entries(carrier)) metadata.set(key, value);
     metadata.set('content-type', 'application/cloudevents+json');
+    const messageId = JSON.stringify([source, id]);
+    metadata.set('Nats-Msg-Id', messageId);
+    metadata.set('Nats-Expected-Stream', this.stream);
+    const payload = JSON.stringify(event);
+    if (Buffer.byteLength(payload) + Buffer.byteLength(metadata.toString()) > 64 * 1024)
+      return yield* Effect.fail(
+        new ExtractionUnavailable({
+          operation: 'encode-colors',
+          cause: new Error('Measurement event exceeds the 64 KiB source-message budget'),
+        })
+      ).pipe(
+        Effect.tapError((error) =>
+          Effect.logError('Color measurement publication rejected', {
+            operation: error.operation,
+            cause: error.cause,
+          })
+        )
+      );
     const started = yield* Clock.currentTimeMillis;
     yield* this.permits.withPermits(1)(
       broker('publish-colors', () =>
-        this.client.publish('wallpaper.colors.extracted', JSON.stringify(event), {
+        this.client.publish('wallpaper.colors.extracted', payload, {
           headers: metadata,
-          msgID: JSON.stringify([source, id]),
+          msgID: messageId,
           expect: { streamName: this.stream },
           timeout: 5000,
         })

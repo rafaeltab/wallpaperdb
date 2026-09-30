@@ -58,7 +58,7 @@ function hueQuality(pixel: ReturnType<typeof coordinates>, anchor: ReturnType<ty
   const dl = pixel.l - anchor.l,
     da = pixel.a - anchor.a,
     db = pixel.b - anchor.b;
-  let distance;
+  let distance: number;
   if (anchor.strength === 0) distance = Math.hypot(dl, da, db);
   else {
     const relativeA = anchor.l * (pixel.relativeA - anchor.relativeA);
@@ -114,7 +114,9 @@ function namedMembership(rgb: readonly number[]) {
     if (name === 'pink') inside = inside && l >= 0.56;
     if (name === 'brown') inside = inside && l >= 0.22 && l <= 0.65;
     const palePenalty = name === 'red' ? 1 - clamp((l - 0.72) / 0.24) * 0.65 : 1;
-    assign(name, inside, (1 - hueDistance / width) * Math.sqrt(s) * Math.sqrt(v) * palePenalty);
+    const hueCore = 1 - hueDistance / width;
+    const vividness = Math.sqrt(s) * Math.sqrt(v);
+    assign(name, inside, hueCore * vividness * palePenalty);
   }
   assign('strict_grayscale', chroma <= 0.005, 1 - chroma / 0.005);
   assign('grayscale', chroma <= 0.035, 1 - chroma / 0.035);

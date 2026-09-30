@@ -197,11 +197,12 @@ function toChange(event: LegacyEvent, occurrence: Occurrence): ProjectionChange 
     }
     case 'wallpaper.colors.extracted':
       return {
-        _tag: 'ColorsExtracted',
+        _tag: 'ColorsMeasured',
         occurrence,
         wallpaperId: event.wallpaperId,
-        colorHistogram: event.colorHistogram,
-        colorSpace: event.colorSpace,
+        descriptor: event.measurements,
+        original: event.original,
+        provenance: event.provenance,
       };
     case 'profile.created':
     case 'profile.updated':

@@ -38,6 +38,7 @@ export {
 
 export {
   WallpaperColorsExtractedEventSchema,
+  WallpaperColorsExtractedCloudEventSchema,
   type WallpaperColorsExtractedEvent,
   WALLPAPER_COLORS_EXTRACTED_SUBJECT,
 } from "./wallpaper-colors-extracted.js";

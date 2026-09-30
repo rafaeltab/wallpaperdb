@@ -3,7 +3,7 @@ import { Effect, Layer, ManagedRuntime, Result } from 'effect';
 import { TestClock } from 'effect/testing';
 import { describe, expect, it } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
-import { ImageHistogram } from '../src/capabilities/extraction/index.js';
+import { ImageMeasurements } from '../src/capabilities/extraction/index.js';
 
 describe('Image storage request ownership', () => {
   it.each([
@@ -61,7 +61,7 @@ describe('Image storage request ownership', () => {
           : runtime.runPromise(
               Effect.result(
                 Effect.gen(function* () {
-                  return yield* (yield* ImageHistogram).extract({
+                  return yield* (yield* ImageMeasurements).extract({
                     bucket: 'wallpapers',
                     key: 'waiting.png',
                   });
@@ -92,7 +92,7 @@ describe('Image storage request ownership', () => {
       } else {
         const operation = runtime.runPromise(
           Effect.gen(function* () {
-            return yield* (yield* ImageHistogram).extract({
+            return yield* (yield* ImageMeasurements).extract({
               bucket: 'wallpapers',
               key: 'waiting.png',
             });

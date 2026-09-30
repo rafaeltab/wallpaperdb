@@ -1,30 +1,10 @@
+import { COLOR_FEATURE_NAMES } from '../capabilities/catalogue/index.js';
+
 export const colorModes = ['VIBE', 'PROPORTIONS'] as const;
 export const colorQualities = ['RELAXED', 'FAVORITE', 'STRICT'] as const;
-export const colorTargetNames = [
-  'RED',
-  'ORANGE',
-  'YELLOW',
-  'GREEN',
-  'TEAL',
-  'CYAN',
-  'BLUE',
-  'PURPLE',
-  'PINK',
-  'BROWN',
-  'BLACK',
-  'GRAY',
-  'WHITE',
-  'GRAYSCALE',
-  'STRICT_GRAYSCALE',
-  'NEAR_NEUTRAL',
-  'DARK',
-  'LIGHT',
-  'BRIGHT',
-  'VIVID',
-  'MUTED',
-  'MONOCHROMATIC',
-  'RAINBOW',
-] as const;
+export const colorTargetNames = COLOR_FEATURE_NAMES.map(
+  (name) => name.toUpperCase() as Uppercase<typeof name>
+);
 
 export const schema = `#graphql
 	"""

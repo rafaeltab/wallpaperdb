@@ -1,7 +1,8 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
-import { CatalogueUnavailable } from '../src/capabilities/catalogue/index.js';
+import { COLOR_FEATURE_NAMES, CatalogueUnavailable } from '../src/capabilities/catalogue/index.js';
 import { HttpExecution, httpExecutionLayer } from '../src/runtime.js';
-import { httpTestLayer } from './unit/http-fixture.js';
+import { createTestHttpApp, httpTestLayer } from './unit/http-fixture.js';
+import { setup as setupCatalogue } from './helpers/catalogue.js';
 import { metrics } from '@opentelemetry/api';
 import {
   AggregationTemporality,
@@ -141,6 +142,35 @@ async function setup(media: Partial<MediaUrls> = {}) {
   };
 }
 describe('GraphQL driving adapter contract', () => {
+  it('exposes exactly the shared named vocabulary and admits every enum through Catalogue', async () => {
+    const { read, catalogue } = await setupCatalogue();
+    const app = await createTestHttpApp(undefined, { catalogue });
+    applications.push(app);
+    const schemaResponse = await app.inject({
+      method: 'POST',
+      url: '/graphql',
+      payload: { query: '{ __type(name:"ColorTargetName") { enumValues { name } } }' },
+    });
+    expect(schemaResponse.statusCode).toBe(200);
+    expect(schemaResponse.json()).toEqual({
+      data: {
+        __type: { enumValues: COLOR_FEATURE_NAMES.map((name) => ({ name: name.toUpperCase() })) },
+      },
+    });
+    for (const name of COLOR_FEATURE_NAMES) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/graphql',
+        payload: {
+          query: `{ searchWallpapers(sort:{color:{targets:[{name:${name.toUpperCase()}}]}}) { edges { node { wallpaperId } } } }`,
+        },
+      });
+      expect(response.statusCode, name).toBe(200);
+      expect(response.json(), name).toEqual({ data: { searchWallpapers: { edges: [] } } });
+      expect(read.selections.at(-1)?.color?.targetCount, name).toBe(1);
+    }
+    expect(read.selections).toHaveLength(COLOR_FEATURE_NAMES.length);
+  });
   it('translates filters, legacy identity, pagination and color targets into the inbound query', async () => {
     const { query, inbound } = await setup();
     const response = await query(
@@ -215,38 +245,14 @@ describe('GraphQL driving adapter contract', () => {
       },
     });
   });
-  it.each([
-    'RED',
-    'ORANGE',
-    'YELLOW',
-    'GREEN',
-    'TEAL',
-    'CYAN',
-    'BLUE',
-    'PURPLE',
-    'PINK',
-    'BROWN',
-    'BLACK',
-    'GRAY',
-    'WHITE',
-    'GRAYSCALE',
-    'STRICT_GRAYSCALE',
-    'NEAR_NEUTRAL',
-    'DARK',
-    'LIGHT',
-    'BRIGHT',
-    'VIVID',
-    'MUTED',
-    'MONOCHROMATIC',
-    'RAINBOW',
-  ])('translates the named target %s', async (name) => {
+  it.each(COLOR_FEATURE_NAMES)('translates the named target %s', async (name) => {
     const { query, inbound } = await setup();
     const response = await query(
-      `{searchWallpapers(sort:{color:{targets:[{name:${name}}]}}){edges{node{wallpaperId}}}}`
+      `{searchWallpapers(sort:{color:{targets:[{name:${name.toUpperCase()}}]}}){edges{node{wallpaperId}}}}`
     );
     expect(response.body.errors).toBeUndefined();
     expect(inbound.calls[0]).toMatchObject({
-      input: { color: { targets: [{ name: name.toLowerCase() }] } },
+      input: { color: { targets: [{ name }] } },
     });
   });
   it.each([

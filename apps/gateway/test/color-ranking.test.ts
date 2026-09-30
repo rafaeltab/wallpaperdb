@@ -197,28 +197,43 @@ describe('Native color ranking port contract', () => {
     'duplicate-id',
     'score',
     'sort',
+    'order',
+    'order-asc',
+    'stale',
+    'stale-asc',
     'total',
     'truncated',
   ] as const)('rejects an incomplete or malformed %s ranking', async (fault) => {
     let corrupt = false;
+    let firstHit: unknown;
+    const orderedSelection: SearchSelection = {
+      ...selection(),
+      sortOrder: fault.endsWith('-asc') ? 'asc' : 'desc',
+    };
+    const full = await Effect.runPromise(resource.adapter.read.search(orderedSelection));
     const proxy = createServer((incoming, outgoing) => {
       const forwarded = request(
         new URL(incoming.url ?? '/', fixture.options.url),
         { method: incoming.method, headers: incoming.headers },
         (response) => {
-          if (corrupt && incoming.url?.includes('/_search')) {
+          if (incoming.url?.includes('/_search')) {
             const chunks: Buffer[] = [];
             response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
             response.on('end', () => {
               const body = JSON.parse(Buffer.concat(chunks).toString());
-              if (fault === 'timeout') body.timed_out = true;
-              if (fault === 'shards') body._shards.failed = 1;
-              if (fault === 'missing-id') delete body.hits.hits[0].fields.wallpaperId;
-              if (fault === 'duplicate-id') body.hits.hits.push(body.hits.hits[0]);
-              if (fault === 'score') body.hits.hits[0]._score = -1;
-              if (fault === 'sort') body.hits.hits[0].sort[1] = 'different';
-              if (fault === 'total') body.hits.total.relation = 'gte';
-              if (fault === 'truncated') body.hits.hits.pop();
+              if (!corrupt) firstHit = body.hits.hits[0];
+              else {
+                if (fault === 'timeout') body.timed_out = true;
+                if (fault === 'shards') body._shards.failed = 1;
+                if (fault === 'missing-id') delete body.hits.hits[0].fields.wallpaperId;
+                if (fault === 'duplicate-id') body.hits.hits.push(body.hits.hits[0]);
+                if (fault === 'score') body.hits.hits[0]._score = -1;
+                if (fault === 'sort') body.hits.hits[0].sort[1] = 'different';
+                if (fault.startsWith('order')) body.hits.hits.reverse();
+                if (fault.startsWith('stale')) body.hits.hits[0] = firstHit;
+                if (fault === 'total') body.hits.total.relation = 'gte';
+                if (fault === 'truncated') body.hits.hits.pop();
+              }
               outgoing.writeHead(response.statusCode ?? 500, {
                 'content-type': 'application/json',
               });
@@ -244,11 +259,16 @@ describe('Native color ranking port contract', () => {
         url: `http://127.0.0.1:${address.port}`,
       });
       expect(
-        (await Effect.runPromise(proxied.adapter.read.search(selection()))).entries.length
+        (await Effect.runPromise(proxied.adapter.read.search(orderedSelection))).entries.length
       ).toBe(12);
       corrupt = true;
+      const cursor = full.entries[3]?.cursor;
+      if (!cursor) throw new Error('Expected a complete ranking fixture');
+      const requested = fault.startsWith('stale')
+        ? { ...orderedSelection, size: 3, searchAfter: cursor }
+        : orderedSelection;
       expect(
-        await Effect.runPromise(Effect.flip(proxied.adapter.read.search(selection())))
+        await Effect.runPromise(Effect.flip(proxied.adapter.read.search(requested)))
       ).toMatchObject({ _tag: 'CatalogueUnavailable' });
     } finally {
       try {

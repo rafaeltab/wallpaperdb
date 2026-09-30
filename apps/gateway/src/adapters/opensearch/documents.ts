@@ -1,5 +1,5 @@
 import { DateTime, Option, Schema } from 'effect';
-import type { SearchSelection } from '../../capabilities/catalogue/index.js';
+import type { CursorValue, SearchSelection } from '../../capabilities/catalogue/index.js';
 
 export const timestamp = Schema.String.check(
   Schema.isPattern(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?Z$/),
@@ -119,6 +119,28 @@ function validHit(hit: typeof wallpaperHit.Type, selection: SearchSelection, ind
     hit.sort[1] === id
   );
 }
+export function followsSearchCursor(
+  cursor: readonly CursorValue[],
+  previous: readonly CursorValue[],
+  selection: SearchSelection
+): boolean {
+  const value = cursor[0];
+  const before = previous[0];
+  const direction = selection.sortOrder === 'asc' ? 1 : -1;
+  if (typeof value === 'number' && typeof before === 'number' && value !== before)
+    return (value - before) * direction > 0;
+  if (typeof value === 'string' && typeof before === 'string')
+    return Buffer.compare(Buffer.from(value), Buffer.from(before)) * direction > 0;
+  const id = cursor[1];
+  const previousId = previous[1];
+  return (
+    selection.color !== undefined &&
+    value === before &&
+    typeof id === 'string' &&
+    typeof previousId === 'string' &&
+    Buffer.compare(Buffer.from(id), Buffer.from(previousId)) * -direction > 0
+  );
+}
 export function wallpaperSearchResponse(selection: SearchSelection, index: string) {
   return Schema.decodeUnknownEffect(
     Schema.Struct({
@@ -150,10 +172,15 @@ export function wallpaperSearchResponse(selection: SearchSelection, index: strin
           return (
             count <= expected &&
             (selection.searchAfter !== undefined || count === expected) &&
-            new Set(hits.hits.map((hit) => hit._id)).size === count
+            new Set(hits.hits.map((hit) => hit._id)).size === count &&
+            hits.hits.every((hit, position) => {
+              const previous =
+                position === 0 ? selection.searchAfter : hits.hits[position - 1]?.sort;
+              return previous === undefined || followsSearchCursor(hit.sort, previous, selection);
+            })
           );
         },
-        { expected: 'a complete search page with unique wallpaper IDs' }
+        { expected: 'a complete search page with unique wallpaper IDs in cursor order' }
       )
     )
   );

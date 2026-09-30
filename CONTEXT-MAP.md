@@ -12,7 +12,7 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - [Wallpaper variant generation](./apps/variant-generator/CONTEXT.md) - owns lower-resolution wallpaper variants
 
-- [Media delivery](./apps/media/CONTEXT.md) - owns the delivery catalog and serves immutable assets
+- [Media](./apps/media/CONTEXT.md) - owns image processing, the delivery catalog, and delivery of immutable Assets
 
 - [Tagging](./apps/tags/CONTEXT.md) - reserved for wallpaper classification; domain language remains undefined
 
@@ -24,6 +24,7 @@ Additional contexts are documented lazily as their domain language is resolved.
 - **Ingestor -> User**: Wallpaper ownership records use the Profile ID, which is the authenticated Clerk user ID. User consumes published wallpaper events into a minimal ownership projection to validate Biography embeds.
 - **User -> Web**: User accepts authenticated Profile commands; Web presents and edits Profiles.
 - **User <-> Web**: A [shared Markdown policy](./docs/adr/0005-share-the-profile-markdown-policy.md) keeps Biography acceptance and React rendering aligned.
+- **Web <-> Media**: The planned HDR editing flow sends temporary sources and crop settings from Web to Media, which returns processed images for Web to upload to User. The [processing ownership decision](./docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md) records why Media owns this stateless conversion while User owns the accepted Asset.
 
 - **Ingestor -> Color Extractor**: Uploaded wallpaper events identify immutable originals for color extraction.
 - **Color Extractor -> Gateway**: Published matching-area and quality measurements provide the source for color-ranked discovery.

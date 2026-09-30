@@ -222,28 +222,19 @@ describe('Native color ranking port contract', () => {
       await client.delete({ index: fixture.options.wallpaperIndex, id, refresh: true });
     }
   });
-  it.each([
-    'timeout',
-    'shards',
-    'missing-id',
-    'duplicate-id',
-    'score',
-    'sort',
-    'order',
-    'order-asc',
-    'stale',
-    'stale-asc',
-    'total',
-    'truncated',
-  ] as const)('rejects an incomplete or malformed %s ranking', async (fault) => {
-    let corrupt = false;
+  describe('Malformed ranking responses', () => {
+    let fault: string | undefined;
     let firstHit: unknown;
-    const orderedSelection: SearchSelection = {
-      ...selection(),
-      sortOrder: fault.endsWith('-asc') ? 'asc' : 'desc',
-    };
-    const full = await Effect.runPromise(resource.adapter.read.search(orderedSelection));
+    let proxied: Awaited<ReturnType<typeof acquireSearchFixture>> | undefined;
     const proxy = createServer((incoming, outgoing) => {
+      const requestChunks: Buffer[] = [];
+      let hasCursor = false;
+      incoming.on('data', (chunk) => requestChunks.push(Buffer.from(chunk)));
+      incoming.on('end', () => {
+        if (incoming.url?.includes('/_search'))
+          hasCursor =
+            JSON.parse(Buffer.concat(requestChunks).toString()).search_after !== undefined;
+      });
       const forwarded = request(
         new URL(incoming.url ?? '/', fixture.options.url),
         { method: incoming.method, headers: incoming.headers },
@@ -253,7 +244,7 @@ describe('Native color ranking port contract', () => {
             response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
             response.on('end', () => {
               const body = JSON.parse(Buffer.concat(chunks).toString());
-              if (!corrupt) firstHit = body.hits.hits[0];
+              if (fault === undefined) firstHit = body.hits.hits[0];
               else {
                 if (fault === 'timeout') body.timed_out = true;
                 if (fault === 'shards') body._shards.failed = 1;
@@ -263,6 +254,11 @@ describe('Native color ranking port contract', () => {
                 if (fault === 'sort') body.hits.hits[0].sort[1] = 'different';
                 if (fault.startsWith('order')) body.hits.hits.reverse();
                 if (fault.startsWith('stale')) body.hits.hits[0] = firstHit;
+                if (fault.startsWith('cursor') && hasCursor) {
+                  if (fault.includes('interior')) body.hits.hits.splice(1, 1);
+                  if (fault.includes('terminal')) body.hits.hits.pop();
+                  if (fault.includes('empty')) body.hits.hits = [];
+                }
                 if (fault === 'total') body.hits.total.relation = 'gte';
                 if (fault === 'truncated') body.hits.hits.pop();
               }
@@ -280,8 +276,7 @@ describe('Native color ranking port contract', () => {
       forwarded.on('error', () => outgoing.destroy());
       incoming.pipe(forwarded);
     });
-    let proxied: Awaited<ReturnType<typeof acquireSearchFixture>> | undefined;
-    try {
+    beforeAll(async () => {
       proxy.listen(0, '127.0.0.1');
       await once(proxy, 'listening');
       const address = proxy.address();
@@ -290,19 +285,8 @@ describe('Native color ranking port contract', () => {
         ...fixture.options,
         url: `http://127.0.0.1:${address.port}`,
       });
-      expect(
-        (await Effect.runPromise(proxied.adapter.read.search(orderedSelection))).entries.length
-      ).toBe(12);
-      corrupt = true;
-      const cursor = full.entries[3]?.cursor;
-      if (!cursor) throw new Error('Expected a complete ranking fixture');
-      const requested = fault.startsWith('stale')
-        ? { ...orderedSelection, size: 3, searchAfter: cursor }
-        : orderedSelection;
-      expect(
-        await Effect.runPromise(Effect.flip(proxied.adapter.read.search(requested)))
-      ).toMatchObject({ _tag: 'CatalogueUnavailable' });
-    } finally {
+    });
+    afterAll(async () => {
       try {
         await proxied?.dispose();
       } finally {
@@ -311,6 +295,59 @@ describe('Native color ranking port contract', () => {
           proxy.close((error) => (error ? reject(error) : resolve()))
         );
       }
-    }
+    });
+    it.each([
+      'timeout',
+      'shards',
+      'missing-id',
+      'duplicate-id',
+      'score',
+      'sort',
+      'order',
+      'order-asc',
+      'stale',
+      'stale-asc',
+      'cursor-interior-final',
+      'cursor-interior-final-asc',
+      'cursor-terminal-final',
+      'cursor-terminal-final-asc',
+      'cursor-interior-full',
+      'cursor-interior-full-asc',
+      'cursor-terminal-full',
+      'cursor-terminal-full-asc',
+      'cursor-empty',
+      'cursor-empty-asc',
+      'total',
+      'truncated',
+    ] as const)('rejects an incomplete or malformed %s ranking', async (selectedFault) => {
+      if (!proxied) throw new Error('Expected an acquired proxy fixture');
+      const orderedSelection: SearchSelection = {
+        ...selection(),
+        sortOrder: selectedFault.endsWith('-asc') ? 'asc' : 'desc',
+      };
+      const full = await Effect.runPromise(resource.adapter.read.search(orderedSelection));
+      try {
+        expect(
+          (await Effect.runPromise(proxied.adapter.read.search(orderedSelection))).entries.length
+        ).toBe(12);
+        fault = selectedFault;
+        const cursor = full.entries[selectedFault.startsWith('cursor') ? 6 : 3]?.cursor;
+        if (!cursor) throw new Error('Expected a complete ranking fixture');
+        const requested =
+          selectedFault.startsWith('stale') || selectedFault.startsWith('cursor')
+            ? {
+                ...orderedSelection,
+                size: selectedFault.includes('final') ? 6 : 3,
+                searchAfter: cursor,
+              }
+            : orderedSelection;
+        expect(
+          await Effect.runPromise(Effect.flip(proxied.adapter.read.search(requested)))
+        ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+      } finally {
+        fault = undefined;
+        firstHit = undefined;
+      }
+    });
   });
 });

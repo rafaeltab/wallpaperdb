@@ -1,6 +1,7 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { Image, ImagePlus } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useBrowseFilterPanel } from '@/components/browse-filter-panel-context';
 import {
   Sidebar,
   SidebarContent,
@@ -29,6 +30,7 @@ const navItems = [
 
 export function AppSidebar() {
   const router = useRouterState();
+  const { onBrowseLinkClick } = useBrowseFilterPanel();
   const currentPath = router.location.pathname;
 
   return (
@@ -42,7 +44,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link to="/">
+              <Link to="/" onClick={onBrowseLinkClick}>
                 <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                   <Image className="size-4" />
                 </div>
@@ -66,7 +68,7 @@ export function AppSidebar() {
                     isActive={currentPath === item.url}
                     tooltip={item.title}
                   >
-                    <Link to={item.url}>
+                    <Link to={item.url} onClick={item.url === '/' ? onBrowseLinkClick : undefined}>
                       <item.icon />
                       <span>{item.title}</span>
                     </Link>

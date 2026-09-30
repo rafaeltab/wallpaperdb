@@ -113,6 +113,86 @@ describe('OpenSearch catalogue port contract', () => {
     })
   );
 
+  it.each([
+    { label: 'non-nested variants', field: 'variants', replacement: { type: 'object' } },
+    {
+      label: 'dynamically indexed measurements',
+      field: 'colorSnapshot',
+      replacement: { enabled: true },
+    },
+    {
+      label: 'dynamically indexed variant occurrence order',
+      field: 'variantOrder',
+      replacement: { enabled: true },
+    },
+    {
+      label: 'unretrievable wallpaper IDs',
+      field: 'wallpaperId',
+      replacement: { doc_values: false },
+    },
+    {
+      label: 'unsearchable contributor Profiles',
+      field: 'userId',
+      replacement: { index: false, doc_values: false },
+    },
+    {
+      label: 'unsearchable color readiness',
+      field: 'colorReady',
+      replacement: { index: false, doc_values: false },
+    },
+    { label: 'indexed color occurrence order', field: 'colorOrder', replacement: { index: true } },
+    { label: 'incompatible upload timestamps', field: 'uploadedAt', replacement: { type: 'long' } },
+    { label: 'incompatible update timestamps', field: 'updatedAt', replacement: { type: 'long' } },
+  ])('rejects an existing wallpaper mapping with $label at startup', async ({
+    field,
+    replacement,
+  }) => {
+    const index = searchFixture.index(`malformed-${field.toLowerCase()}`);
+    const required = await client.indices.getMapping({
+      index: searchFixture.options.wallpaperIndex,
+    });
+    const mapping = required.body[searchFixture.options.wallpaperIndex].mappings;
+    try {
+      await client.indices.create({
+        index,
+        body: {
+          settings: { 'index.mapping.total_fields.limit': 10100 },
+          mappings: {
+            ...mapping,
+            properties: {
+              ...mapping.properties,
+              [field]: { ...mapping.properties[field], ...replacement },
+            },
+          },
+        },
+      });
+      const result = await Effect.runPromise(
+        Layer.build(openSearchLayer({ ...searchFixture.options, wallpaperIndex: index })).pipe(
+          Effect.scoped,
+          Effect.result
+        )
+      );
+      expect(result._tag).toBe('Failure');
+      if (result._tag === 'Failure')
+        expect(result.failure.diagnostic).toMatchObject({
+          dependency: 'opensearch',
+          operation: 'inspect-index',
+          index,
+        });
+    } finally {
+      await client.indices.delete({ index, ignore_unavailable: true });
+    }
+  });
+
+  it('accepts an existing complete wallpaper mapping with implicit native defaults', async () => {
+    const existing = await acquireSearchFixture(searchFixture.options);
+    try {
+      expect(await Effect.runPromise(existing.adapter.check())).toBe(true);
+    } finally {
+      await existing.dispose();
+    }
+  });
+
   it('aborts interrupted requests and closes in-flight transport work with the layer scope', async () => {
     let stalledRequests = 0;
     let activeRequests = 0;

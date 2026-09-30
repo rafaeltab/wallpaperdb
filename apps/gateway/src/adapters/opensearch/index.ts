@@ -456,7 +456,17 @@ type IndexMapping = {
   source?: { excludes: string[] };
   properties: Record<string, unknown>;
 };
-const verifyUtilityMapping = Effect.fnUntraced(function* (
+const indexedMappingField = (type: 'keyword' | 'float' | 'integer' | 'long' | 'date') =>
+  Schema.Struct({
+    type: Schema.Literal(type),
+    index: Schema.optionalKey(Schema.Boolean),
+    doc_values: Schema.optionalKey(Schema.Boolean),
+  }).check(Schema.makeFilter((field) => field.index !== false && field.doc_values !== false));
+const disabledMappingObject = Schema.Struct({
+  type: Schema.Literal('object'),
+  enabled: Schema.Literal(false),
+});
+const verifyWallpaperMapping = Effect.fnUntraced(function* (
   adapter: SearchProjection,
   client: Client,
   name: string,
@@ -476,16 +486,30 @@ const verifyUtilityMapping = Effect.fnUntraced(function* (
             enabled: Schema.optionalKey(Schema.Boolean),
           }),
           properties: Schema.Struct({
-            colorReady: Schema.Struct({ type: Schema.Literal('keyword') }),
+            wallpaperId: indexedMappingField('keyword'),
+            userId: indexedMappingField('keyword'),
+            variants: Schema.Struct({
+              type: Schema.Literal('nested'),
+              properties: Schema.Struct({
+                width: indexedMappingField('integer'),
+                height: indexedMappingField('integer'),
+                aspectRatio: indexedMappingField('float'),
+                format: indexedMappingField('keyword'),
+                fileSizeBytes: indexedMappingField('long'),
+                createdAt: indexedMappingField('date'),
+              }),
+            }),
+            colorReady: indexedMappingField('keyword'),
+            colorSnapshot: disabledMappingObject,
+            colorOrder: Schema.Struct({
+              type: Schema.Literal('keyword'),
+              index: Schema.Literal(false),
+            }),
+            variantOrder: disabledMappingObject,
+            uploadedAt: indexedMappingField('date'),
+            updatedAt: indexedMappingField('date'),
             utilities: Schema.Struct({
-              properties: Schema.Record(
-                Schema.String,
-                Schema.Struct({
-                  type: Schema.Literal('float'),
-                  index: Schema.optionalKey(Schema.Boolean),
-                  doc_values: Schema.optionalKey(Schema.Boolean),
-                })
-              ),
+              properties: Schema.Record(Schema.String, indexedMappingField('float')),
             }),
           }),
         }),
@@ -499,14 +523,13 @@ const verifyUtilityMapping = Effect.fnUntraced(function* (
     observed.value[name].mappings._source.excludes[0] !== 'utilities' ||
     Object.keys(observed.value[name].mappings.properties.utilities.properties).length !==
       colorUtilityFields.length ||
-    !colorUtilityFields.every((key) => {
-      const field = observed.value[name].mappings.properties.utilities.properties[key];
-      return field !== undefined && field.index !== false && field.doc_values !== false;
-    })
+    !colorUtilityFields.every(
+      (key) => observed.value[name].mappings.properties.utilities.properties[key] !== undefined
+    )
   )
     return yield* startupFailure(
       'inspect-index',
-      new Error('Catalogue utility mapping differs from the required fresh index'),
+      new Error('Catalogue wallpaper mapping differs from the required fresh index'),
       name
     );
 });
@@ -520,7 +543,7 @@ const ensureIndex = Effect.fn('catalogue.storage.ensure-index')(function* (
     .request(() => client.indices.exists({ index: name }))
     .pipe(Effect.mapError((cause) => startupFailure('inspect-index', cause, name)));
   if (exists.body) {
-    if (mapping.source !== undefined) yield* verifyUtilityMapping(adapter, client, name, mapping);
+    if (mapping.source !== undefined) yield* verifyWallpaperMapping(adapter, client, name, mapping);
     else
       yield* adapter
         .request(() =>
@@ -553,5 +576,5 @@ const ensureIndex = Effect.fn('catalogue.storage.ensure-index')(function* (
           )
       )
     );
-  yield* verifyUtilityMapping(adapter, client, name, mapping);
+  yield* verifyWallpaperMapping(adapter, client, name, mapping);
 });

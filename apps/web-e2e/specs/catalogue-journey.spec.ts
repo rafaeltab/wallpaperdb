@@ -236,6 +236,20 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
     },
   });
   expect((await ownedResponse.json()).errors).toBeUndefined();
+  const ownedColorCursor = await waitForCataloguePage(
+    page,
+    wallpaperId,
+    "#336699",
+    owner.id,
+  );
+  if (ownedColorCursor) {
+    const selectedPage = new URL(page.url());
+    selectedPage.searchParams.set("after", ownedColorCursor);
+    await page.goto(selectedPage.toString());
+    await page
+      .getByRole("button", { name: "Toggle filters", exact: true })
+      .click();
+  }
   await expect(card).toBeVisible();
   await page.getByRole("button", { name: "Clear color", exact: true }).click();
   await expect(page).not.toHaveURL(/color=/);

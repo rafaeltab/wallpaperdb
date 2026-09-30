@@ -263,7 +263,7 @@ describe('Native wallpaper search port contract', () => {
                   body.hits.hits[0].sort[0] = 2;
                 }
                 if (fault === 'missing-ready') delete body.hits.hits[0]._source.colorReady;
-                if (fault === 'stale-ready')
+                if (fault === 'incompatible-ready')
                   body.hits.hits[0]._source.colorReady = 'older-utility-version';
                 if (fault.includes('wrong-profile'))
                   body.hits.hits[0]._source.userId = 'outside-profile';
@@ -326,7 +326,7 @@ describe('Native wallpaper search port contract', () => {
       'score-and-sort',
       'utility-above-one',
       'missing-ready',
-      'stale-ready',
+      'incompatible-ready',
       'wrong-profile',
       'split-variants',
       'sort',

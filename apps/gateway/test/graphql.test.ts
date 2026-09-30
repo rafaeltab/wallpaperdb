@@ -141,10 +141,19 @@ async function setup(media: Partial<MediaUrls> = {}) {
   };
 }
 describe('GraphQL driving adapter contract', () => {
-  it('translates filters, legacy identity, pagination and color preferences into the inbound query', async () => {
+  it('rejects retired color sort arguments before invoking catalogue search', async () => {
     const { query, inbound } = await setup();
     const response = await query(
-      `{ searchWallpapers(filter:{profileId:"profile_a",userId:"ignored",variants:{width:1920,height:1080,aspectRatio:1.77,format:"image/webp"}},sort:{color:{colors:[{color:"#FF0000",amount:2,spread:0.3}]}},first:2,after:"cursor") {edges{node{wallpaperId}}pageInfo{hasNextPage hasPreviousPage startCursor endCursor}} }`
+      '{searchWallpapers(sort:{color:{colors:[{color:"#FF0000",amount:1}]}}){edges{node{wallpaperId}}}}'
+    );
+    expect(response.status).toBe(400);
+    expect(response.body.errors[0].message).toContain('Unknown argument "sort"');
+    expect(inbound.calls).toEqual([]);
+  });
+  it('translates filters, legacy identity and pagination into the inbound query', async () => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      `{ searchWallpapers(filter:{profileId:"profile_a",userId:"ignored",variants:{width:1920,height:1080,aspectRatio:1.77,format:"image/webp"}},first:2,after:"cursor") {edges{node{wallpaperId}}pageInfo{hasNextPage hasPreviousPage startCursor endCursor}} }`
     );
     expect(response.status).toBe(200);
     expect(response.body.errors).toBeUndefined();
@@ -154,7 +163,6 @@ describe('GraphQL driving adapter contract', () => {
         input: {
           profileId: 'profile_a',
           variants: { width: 1920, height: 1080, aspectRatio: 1.77, format: 'image/webp' },
-          colors: [{ color: '#FF0000', amount: 2, spread: 0.3 }],
           first: 2,
           after: 'cursor',
         },
@@ -165,25 +173,10 @@ describe('GraphQL driving adapter contract', () => {
       pageInfo: page.pageInfo,
     });
   });
-  it('translates omitted and null color spread into the capability default', async () => {
-    const { query, inbound } = await setup();
-    const response = await query(
-      '{searchWallpapers(sort:{color:{colors:[{color:"#FF0000",amount:1},{color:"#0000FF",amount:2,spread:null}]}}){edges{node{wallpaperId}}}}'
-    );
-    expect(response.body.errors).toBeUndefined();
-    expect(inbound.calls[0]).toMatchObject({
-      input: {
-        colors: [
-          { color: '#FF0000', amount: 1, spread: undefined },
-          { color: '#0000FF', amount: 2, spread: undefined },
-        ],
-      },
-    });
-  });
   it('maps deprecated userId to the local Profile identifier and translates nullable inputs', async () => {
     const { query, inbound } = await setup();
     const response = await query(
-      `{searchWallpapers(filter:{userId:"legacy",variants:{width:null}},sort:null,first:null,last:3,before:"before",after:null){edges{node{userId profileId}}}}`
+      `{searchWallpapers(filter:{userId:"legacy",variants:{width:null}},first:null,last:3,before:"before",after:null){edges{node{userId profileId}}}}`
     );
     expect(response.body.data.searchWallpapers.edges).toEqual([
       { node: { userId: 'profile_a', profileId: 'profile_a' } },
@@ -506,10 +499,7 @@ describe('GraphQL driving adapter contract', () => {
   it('rejects structurally invalid resolver arguments without leaking library details', async () => {
     const { graphql, inbound } = await setup();
     await expect(
-      graphql.resolvers.Query.searchWallpapers(
-        {},
-        { sort: { color: { colors: [{ color: '#FF0000', amount: 'secret' }] } } }
-      )
+      graphql.resolvers.Query.searchWallpapers({}, { filter: { variants: { width: 'secret' } } })
     ).rejects.toMatchObject({
       message: 'Invalid query arguments',
       extensions: { code: 'BAD_USER_INPUT' },

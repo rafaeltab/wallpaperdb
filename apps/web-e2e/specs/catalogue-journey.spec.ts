@@ -147,16 +147,18 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
       request.variables?.sort?.color
     );
   });
-  await page.getByLabel("Color", { exact: true }).fill("#336699");
+  await page
+    .getByRole("button", { name: "Add color or feature", exact: true })
+    .click();
+  await page.getByRole("textbox", { name: "Hex color" }).fill("#336699");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   const response = await filtered;
   expect(response.ok()).toBe(true);
   expect(response.request().postDataJSON().variables).toMatchObject({
     filter: { variants: { format: "image/png" } },
     sort: {
       color: {
-        mode: "VIBE",
-        quality: "FAVORITE",
-        targets: [{ color: "#336699" }],
+        targets: [{ color: "#336699", mode: "VIBE", quality: "FAVORITE" }],
       },
     },
     after: null,
@@ -179,7 +181,7 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
   await expect(
     page.getByRole("button", { name: "PNG", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page).toHaveURL(/color=%23336699/);
+  await expect(page).toHaveURL(/colors=/);
   if (colorCursor) {
     const selectedPage = new URL(page.url());
     selectedPage.searchParams.set("after", colorCursor);
@@ -230,9 +232,7 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
     filter: { profileId: owner.id, variants: { format: "image/png" } },
     sort: {
       color: {
-        mode: "VIBE",
-        quality: "FAVORITE",
-        targets: [{ color: "#336699" }],
+        targets: [{ color: "#336699", mode: "VIBE", quality: "FAVORITE" }],
       },
     },
   });
@@ -252,29 +252,67 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
       .click();
   }
   await expect(card).toBeVisible();
-  const cleared = page.waitForResponse((response) => {
+  await page
+    .getByRole("button", { name: "Add color or feature", exact: true })
+    .click();
+  const editor = page.getByRole("dialog", { name: "Add color or feature" });
+  await editor.getByRole("tab", { name: "Features" }).click();
+  await editor.getByRole("button", { name: "Dark", exact: true }).click();
+  await editor.getByRole("button", { name: "Add percentage" }).click();
+  await editor.getByRole("slider", { name: "Match preference" }).fill("2");
+  const mixed = page.waitForResponse((response) => {
     if (
       !response.url().endsWith("/gateway/graphql") ||
       response.request().method() !== "POST"
     )
       return false;
-    const request = response.request().postDataJSON();
     return (
-      request.query.includes("SearchWallpapers") &&
-      request.variables?.filter?.profileId === owner.id &&
-      !request.variables?.sort
+      response.request().postDataJSON().variables?.sort?.color?.targets
+        ?.length === 2
     );
   });
-  await page.getByRole("button", { name: "Clear color", exact: true }).click();
-  const clearedResponse = await cleared;
-  expect(clearedResponse.ok()).toBe(true);
-  expect(clearedResponse.request().postDataJSON().variables).toEqual({
-    first: 20,
-    after: null,
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
+  const mixedResponse = await mixed;
+  expect(mixedResponse.request().postDataJSON().variables).toMatchObject({
     filter: { profileId: owner.id, variants: { format: "image/png" } },
+    after: null,
+    sort: {
+      color: {
+        targets: [
+          { color: "#336699", mode: "VIBE", quality: "FAVORITE" },
+          { name: "DARK", mode: "PROPORTIONS", quality: "STRICT", percent: 40 },
+        ],
+      },
+    },
   });
-  expect((await clearedResponse.json()).errors).toBeUndefined();
-  await expect(page).not.toHaveURL(/color=/);
+  const mixedBody = await mixedResponse.json();
+  expect(mixedBody.errors).toBeUndefined();
+  expect(
+    mixedBody.data.searchWallpapers.edges.some(
+      (edge: { node: { wallpaperId: string } }) =>
+        edge.node.wallpaperId === wallpaperId,
+    ),
+  ).toBe(true);
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Toggle filters", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Edit Dark", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Edit Dark", exact: true }).click();
+  await expect(
+    page.getByRole("slider", { name: "Match preference" }),
+  ).toHaveValue("2");
+  await expect(page.getByRole("slider", { name: "Percentage" })).toHaveValue(
+    "40",
+  );
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Remove Dark", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Remove #336699", exact: true })
+    .click();
+  await expect(page).not.toHaveURL(/colors?=/);
   await expect(page).toHaveURL(new RegExp(`profileId=${owner.id}`));
   await expect(
     page.getByRole("button", { name: "PNG", exact: true }),

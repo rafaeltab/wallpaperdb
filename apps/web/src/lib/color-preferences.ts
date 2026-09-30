@@ -109,6 +109,7 @@ export function parseColorPreferences(input: unknown): ColorPreference[] | undef
       preferences.push({ name: option.name, quality, ...amount });
     }
   }
+  if (new Set(preferences.map(colorPreferenceKey)).size !== preferences.length) return undefined;
   return preferences.reduce((sum, target) => sum + (target.percent ?? 0), 0) <= 100
     ? preferences
     : undefined;

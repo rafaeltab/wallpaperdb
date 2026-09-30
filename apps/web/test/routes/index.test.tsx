@@ -203,7 +203,8 @@ describe('HomePage browse filters', () => {
 
     render(<HomePage />);
 
-    expect(screen.getByText('No color selected')).toBeInTheDocument();
+    expect(screen.getByRole('button', {name:'Add color or feature'})).toBeInTheDocument();
+    expect(screen.queryByRole('button', {name:/^Edit #/})).not.toBeInTheDocument();
     expect(screen.queryByText('#000000')).not.toBeInTheDocument();
   });
 
@@ -233,44 +234,19 @@ describe('HomePage browse filters', () => {
     });
   });
 
-  it('debounces route search updates when the color changes', () => {
-    vi.useFakeTimers();
-
-    mockUseSearch.mockReturnValue({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined });
-    (useBrowseFilterPanel as Mock).mockReturnValue({
-      isOpen: true,
-      setIsOpen: vi.fn(),
-      toggle: vi.fn(),
-    });
-
+  it('commits a saved color once, resets pagination, and preserves metadata and Profile filters', () => {
+    mockUseSearch.mockReturnValue({ after: 'cursor_123', format: 'png', profileId: 'artist' });
+    (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
     render(<HomePage />);
-
-    fireEvent.input(screen.getByLabelText('Color'), {
-      target: { value: '#00ff00' },
-    });
-
+    fireEvent.click(screen.getByRole('button', {name:'Add color or feature'}));
+    fireEvent.change(screen.getByRole('textbox', {name:'Hex color'}), {target:{value:'#00FF00'}});
     expect(mockNavigate).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(299);
-    expect(mockNavigate).not.toHaveBeenCalled();
-
-    vi.advanceTimersByTime(1);
-    expect(mockNavigate).toHaveBeenCalledWith({
-      search: expect.any(Function),
-      to: '/',
+    fireEvent.click(screen.getByRole('button',{name:'Save'}));
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    const search=mockNavigate.mock.calls[0][0].search;
+    expect(search({after:'cursor_123',format:'png',profileId:'artist'})).toEqual({
+      after:undefined, color:undefined, colors:[{color:'#00FF00',quality:'FAVORITE'}], format:'png', profileId:'artist',
     });
-
-    const navigateCall = mockNavigate.mock.calls[0][0];
-    expect(
-      navigateCall.search({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined })
-    ).toEqual({
-      after: undefined,
-      color: '#00FF00',
-      format: 'png',
-      aspectRatio: undefined,
-    });
-
-    vi.useRealTimers();
   });
 
   it('can apply the displayed fallback white without changing the native picker value', () => {
@@ -401,35 +377,15 @@ describe('HomePage browse filters', () => {
     expect(await screen.findByRole('button', { name: 'Device 9:16' })).toBeInTheDocument();
   });
 
-  it('clears the color filter immediately and cancels a pending picker update', () => {
-    vi.useFakeTimers();
-    mockUseSearch.mockReturnValue({ after: 'cursor_123', color: '#FF0000', format: 'png', aspectRatio: undefined });
-    (useBrowseFilterPanel as Mock).mockReturnValue({
-      isOpen: true,
-      setIsOpen: vi.fn(),
-      toggle: vi.fn(),
-    });
-
+  it('removes a color immediately while keeping metadata and Profile filters', () => {
+    mockUseSearch.mockReturnValue({after:'cursor',color:'#FF0000',format:'png',profileId:'artist'});
+    (useBrowseFilterPanel as Mock).mockReturnValue({isOpen:true});
     render(<HomePage />);
-
-    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Clear color' }));
-
-    expect(mockNavigate).toHaveBeenCalledWith({
-      search: expect.any(Function),
-      to: '/',
-    });
-
-    const navigateCall = mockNavigate.mock.calls[0][0];
-    expect(navigateCall.search({ after: 'cursor_123', color: '#FF0000', format: 'png', aspectRatio: undefined })).toEqual({
-      after: undefined,
-      color: undefined,
-      format: 'png',
-      aspectRatio: undefined,
-    });
-    vi.advanceTimersByTime(300);
+    fireEvent.click(screen.getByRole('button',{name:'Remove #FF0000'}));
     expect(mockNavigate).toHaveBeenCalledTimes(1);
-    vi.useRealTimers();
+    expect(mockNavigate.mock.calls[0][0].search({after:'cursor',color:'#FF0000',format:'png',profileId:'artist'})).toEqual({
+      after:undefined, color:undefined, colors:undefined, format:'png',profileId:'artist',
+    });
   });
 
   it.each(['loading', 'empty', 'failed'] as const)(
@@ -443,7 +399,7 @@ describe('HomePage browse filters', () => {
       });
       render(<HomePage />);
 
-      expect(screen.getByRole('button', { name: 'Clear color' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Remove #FF0000' })).toBeEnabled();
       if (state === 'loading') expect(screen.getByTestId('wallpaper-grid-skeleton')).toBeInTheDocument();
       if (state === 'empty') {
         expect(screen.getByText('No wallpapers match these filters.')).toBeInTheDocument();

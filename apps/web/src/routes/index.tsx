@@ -180,7 +180,7 @@ export function HomePage() {
     cancelPendingColorChange();
 
     setDraftColor(color ?? FALLBACK_COLOR_INPUT_VALUE);
-  }, [cancelPendingColorChange, color]);
+  }, [cancelPendingColorChange, after, color, format, aspectRatio, profileId]);
 
   useEffect(() => {
     return cancelPendingColorChange;

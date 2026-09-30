@@ -324,6 +324,22 @@ describe('HomePage browse filters', () => {
     expect(screen.getByLabelText('Color')).toHaveValue('#123456');
   });
 
+  it('cancels a pending picker update when Back or Forward changes another browse filter', () => {
+    vi.useFakeTimers();
+    mockUseSearch.mockReturnValue({ color: '#FF0000', format: undefined });
+    (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
+
+    const view = render(<HomePage />);
+    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
+
+    mockUseSearch.mockReturnValue({ color: '#FF0000', format: 'png' });
+    view.rerender(<HomePage />);
+    vi.advanceTimersByTime(300);
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Color')).toHaveValue('#ff0000');
+  });
+
   it('updates the route search state when an aspect ratio is selected', () => {
     mockUseSearch.mockReturnValue({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined });
     (useBrowseFilterPanel as Mock).mockReturnValue({

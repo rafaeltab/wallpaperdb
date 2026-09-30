@@ -190,6 +190,44 @@ describe('Native wallpaper search port contract', () => {
     }
     expect(backward.reverse()).toEqual(full.entries);
   });
+  it('continues after a cursor document is removed from an otherwise unchanged ranking', async () => {
+    const id = 'removed-cursor';
+    const bank = Object.fromEntries(
+      Object.keys(utilitiesReference.cases[0].utilities).map((key) => [key, 1])
+    );
+    await client.index({
+      index: fixture.options.wallpaperIndex,
+      id,
+      refresh: true,
+      body: {
+        wallpaperId: id,
+        userId: 'ranking',
+        variants: [variant],
+        uploadedAt: timestamp,
+        updatedAt: timestamp,
+        colorReady: COLOR_UTILITY_VERSION,
+        utilities: bank,
+      },
+    });
+    let removed = false;
+    try {
+      const full = await Effect.runPromise(resource.adapter.read.search(selection()));
+      const position = full.entries.findIndex((entry) => entry.wallpaper.wallpaperId === id);
+      expect(position).toBeGreaterThanOrEqual(0);
+      expect(full.entries.length - position).toBeGreaterThan(3);
+      const cursor = full.entries[position]?.cursor;
+      if (!cursor) throw new Error('Expected an indexed cursor document');
+      await client.delete({ index: fixture.options.wallpaperIndex, id, refresh: true });
+      removed = true;
+      const page = await Effect.runPromise(
+        resource.adapter.read.search({ ...selection(), size: 3, searchAfter: cursor })
+      );
+      expect(page.entries).toEqual(full.entries.slice(position + 1, position + 4));
+    } finally {
+      if (!removed)
+        await client.delete({ index: fixture.options.wallpaperIndex, id, refresh: true });
+    }
+  });
   it('rejects a ready bank missing a requested utility', async () => {
     const color = references.find((reference) => reference.ranking.utilities.length > 1)?.ranking;
     const missing = color?.utilities.at(-1)?.key;
@@ -225,15 +263,19 @@ describe('Native wallpaper search port contract', () => {
   describe('Malformed ranking responses', () => {
     let fault: string | undefined;
     let firstHit: unknown;
+    let referenceHits: Array<{ _id: string }> = [];
     let proxied: Awaited<ReturnType<typeof acquireSearchFixture>> | undefined;
     const proxy = createServer((incoming, outgoing) => {
       const requestChunks: Buffer[] = [];
       let hasCursor = false;
+      let scoreOrder: string | undefined;
       incoming.on('data', (chunk) => requestChunks.push(Buffer.from(chunk)));
       incoming.on('end', () => {
-        if (incoming.url?.includes('/_search'))
-          hasCursor =
-            JSON.parse(Buffer.concat(requestChunks).toString()).search_after !== undefined;
+        if (incoming.url?.includes('/_search')) {
+          const requested = JSON.parse(Buffer.concat(requestChunks).toString());
+          hasCursor = requested.search_after !== undefined;
+          scoreOrder = requested.sort?.[0]?._score;
+        }
       });
       const forwarded = request(
         new URL(incoming.url ?? '/', fixture.options.url),
@@ -244,8 +286,10 @@ describe('Native wallpaper search port contract', () => {
             response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
             response.on('end', () => {
               const body = JSON.parse(Buffer.concat(chunks).toString());
-              if (fault === undefined) firstHit = body.hits.hits[0];
-              else {
+              if (fault === undefined) {
+                firstHit = body.hits.hits[0];
+                if (!hasCursor) referenceHits = body.hits.hits;
+              } else {
                 if (fault === 'timeout') body.timed_out = true;
                 if (fault === 'shards') body._shards.failed = 1;
                 if (fault === 'missing-id') delete body.hits.hits[0].fields.wallpaperId;
@@ -275,6 +319,19 @@ describe('Native wallpaper search port contract', () => {
                 if (fault === 'sort') body.hits.hits[0].sort[1] = 'different';
                 if (fault.startsWith('order')) body.hits.hits.reverse();
                 if (fault.startsWith('stale')) body.hits.hits[0] = firstHit;
+                if (
+                  fault.startsWith('cursor-skip-full') &&
+                  hasCursor &&
+                  scoreOrder === (fault.endsWith('-asc') ? 'asc' : 'desc')
+                ) {
+                  const lastId = body.hits.hits.at(-1)?._id;
+                  const lastPosition = referenceHits.findIndex((hit) => hit._id === lastId);
+                  const replacement = referenceHits[lastPosition + 1];
+                  if (replacement) {
+                    body.hits.hits.splice(1, 1);
+                    body.hits.hits.push(replacement);
+                  }
+                }
                 if (fault.includes('cursor') && hasCursor) {
                   if (fault.includes('interior')) body.hits.hits.splice(1, 1);
                   if (fault.includes('terminal')) body.hits.hits.pop();
@@ -344,6 +401,8 @@ describe('Native wallpaper search port contract', () => {
       'cursor-terminal-full-asc',
       'cursor-empty',
       'cursor-empty-asc',
+      'cursor-skip-full',
+      'cursor-skip-full-asc',
       'total',
       'truncated',
     ] as const)('rejects an incomplete or malformed %s ranking', async (selectedFault) => {

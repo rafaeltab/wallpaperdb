@@ -332,12 +332,34 @@ describe('HomePage browse filters', () => {
     const view = render(<HomePage />);
     fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
 
+    fireEvent(window, new PopStateEvent('popstate'));
     mockUseSearch.mockReturnValue({ color: '#FF0000', format: 'png' });
     view.rerender(<HomePage />);
     vi.advanceTimersByTime(300);
 
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Color')).toHaveValue('#ff0000');
+  });
+
+  it('keeps a pending picker color when the visitor selects PNG during its debounce', () => {
+    vi.useFakeTimers();
+    mockUseSearch.mockReturnValue({ color: undefined, format: undefined });
+    (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
+
+    const view = render(<HomePage />);
+    fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#00ff00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'PNG' }));
+
+    mockUseSearch.mockReturnValue({ color: undefined, format: 'png' });
+    view.rerender(<HomePage />);
+    vi.advanceTimersByTime(300);
+
+    expect(mockNavigate).toHaveBeenCalledTimes(2);
+    expect(mockNavigate.mock.calls[1][0].search({ color: undefined, format: 'png' })).toEqual({
+      color: '#00FF00',
+      format: 'png',
+      after: undefined,
+    });
   });
 
   it('updates the route search state when an aspect ratio is selected', () => {

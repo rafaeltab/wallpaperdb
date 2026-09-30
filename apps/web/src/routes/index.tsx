@@ -180,7 +180,17 @@ export function HomePage() {
     cancelPendingColorChange();
 
     setDraftColor(color ?? FALLBACK_COLOR_INPUT_VALUE);
-  }, [cancelPendingColorChange, after, color, format, aspectRatio, profileId]);
+  }, [cancelPendingColorChange, color]);
+
+  useEffect(() => {
+    const handleHistoryNavigation = () => {
+      cancelPendingColorChange();
+      setDraftColor(color ?? FALLBACK_COLOR_INPUT_VALUE);
+    };
+
+    window.addEventListener('popstate', handleHistoryNavigation);
+    return () => window.removeEventListener('popstate', handleHistoryNavigation);
+  }, [cancelPendingColorChange, color]);
 
   useEffect(() => {
     return cancelPendingColorChange;

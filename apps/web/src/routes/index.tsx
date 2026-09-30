@@ -141,58 +141,50 @@ export function HomePage() {
     [navigate]
   );
 
+  const cancelPendingColorChange = useCallback(() => {
+    if (colorChangeTimeoutRef.current !== undefined) {
+      window.clearTimeout(colorChangeTimeoutRef.current);
+      colorChangeTimeoutRef.current = undefined;
+    }
+  }, []);
+
   const handleColorInputChange = useCallback(
     (nextColor: string) => {
       const normalizedColor = nextColor.toUpperCase();
 
       setDraftColor(normalizedColor);
 
-      if (colorChangeTimeoutRef.current) {
-        window.clearTimeout(colorChangeTimeoutRef.current);
-      }
+      cancelPendingColorChange();
 
       colorChangeTimeoutRef.current = window.setTimeout(() => {
         handleColorChange(normalizedColor);
       }, COLOR_INPUT_DEBOUNCE_MS);
     },
-    [handleColorChange]
+    [cancelPendingColorChange, handleColorChange]
   );
 
   const handleClearColor = useCallback(() => {
-    if (colorChangeTimeoutRef.current) {
-      window.clearTimeout(colorChangeTimeoutRef.current);
-      colorChangeTimeoutRef.current = undefined;
-    }
+    cancelPendingColorChange();
 
     setDraftColor(FALLBACK_COLOR_INPUT_VALUE);
     handleColorChange(undefined);
-  }, [handleColorChange]);
+  }, [cancelPendingColorChange, handleColorChange]);
 
   const handleApplyColor = useCallback(() => {
-    if (colorChangeTimeoutRef.current !== undefined) {
-      window.clearTimeout(colorChangeTimeoutRef.current);
-      colorChangeTimeoutRef.current = undefined;
-    }
+    cancelPendingColorChange();
 
     handleColorChange(draftColor);
-  }, [draftColor, handleColorChange]);
+  }, [cancelPendingColorChange, draftColor, handleColorChange]);
 
   useEffect(() => {
-    if (colorChangeTimeoutRef.current !== undefined) {
-      window.clearTimeout(colorChangeTimeoutRef.current);
-      colorChangeTimeoutRef.current = undefined;
-    }
+    cancelPendingColorChange();
 
     setDraftColor(color ?? FALLBACK_COLOR_INPUT_VALUE);
-  }, [color]);
+  }, [cancelPendingColorChange, color]);
 
   useEffect(() => {
-    return () => {
-      if (colorChangeTimeoutRef.current) {
-        window.clearTimeout(colorChangeTimeoutRef.current);
-      }
-    };
-  }, []);
+    return cancelPendingColorChange;
+  }, [cancelPendingColorChange]);
   const wallpapers = data?.pages.flatMap((page) => page.edges.map((edge) => edge.node)) ?? [];
 
   return (

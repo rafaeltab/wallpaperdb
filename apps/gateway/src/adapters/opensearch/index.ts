@@ -483,6 +483,7 @@ const verifyWallpaperMapping = Effect.fnUntraced(function* (
         mappings: Schema.Struct({
           _source: Schema.Struct({
             excludes: Schema.Array(Schema.String),
+            includes: Schema.optionalKey(Schema.Array(Schema.String)),
             enabled: Schema.optionalKey(Schema.Boolean),
           }),
           properties: Schema.Struct({
@@ -522,6 +523,7 @@ const verifyWallpaperMapping = Effect.fnUntraced(function* (
   if (
     observed._tag === 'None' ||
     observed.value[name].mappings._source.enabled === false ||
+    (observed.value[name].mappings._source.includes?.length ?? 0) !== 0 ||
     observed.value[name].mappings._source.excludes.length !== 1 ||
     observed.value[name].mappings._source.excludes[0] !== 'utilities' ||
     Object.keys(observed.value[name].mappings.properties.utilities.properties).length !==

@@ -7,7 +7,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -17,6 +17,7 @@ import {
 import { SearchBar } from '@/components/search-bar';
 import { parseBrowseSearch } from '@/lib/browse-filters';
 import { HomePage } from '@/routes/index';
+import { triggerIntersection } from '../setup';
 
 function BrowseLayout() {
   const { isOpen, toggle } = useBrowseFilterPanel();
@@ -61,42 +62,72 @@ function renderBrowse(initialEntry: string) {
 describe('Profile filter navigation', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('ignores a retired color URL and requests the supported catalogue operation', async () => {
-    const requests: Array<GraphQLRequest & { query: string }> = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (_url: string, init: RequestInit) => {
-        const request = JSON.parse(String(init.body));
-        requests.push(request);
-        return new Response(
-          JSON.stringify({
-            data: {
-              searchWallpapers: {
-                edges: [],
-                pageInfo: { hasNextPage: false, hasPreviousPage: false },
-              },
-            },
-          }),
-          { headers: { 'content-type': 'application/json' } }
-        );
-      })
-    );
+  it('selects and clears a favorite vibe while retaining combined filters and the next-page sort', async () => {
+    const requests: GraphQLRequest[] = [];
+    const filter = {
+      profileId: 'user_Ada',
+      variants: { format: 'image/png', aspectRatio: 16 / 9 },
+    };
+    const sort = {
+      color: { mode: 'VIBE', quality: 'FAVORITE', targets: [{ color: '#FF0000' }] },
+    };
+    const profile = {
+      id: 'user_Ada', handle: 'ada', displayName: 'Ada', picture: null,
+      canonicalPath: '/profiles/@ada', biographyMarkdown: '',
+    };
+    const wallpaper = (wallpaperId: string) => ({
+      wallpaperId, profileId: profile.id,
+      uploadedAt: '2026-09-30T00:00:00.000Z', updatedAt: '2026-09-30T00:00:00.000Z',
+      variants: [{
+        width: 1920, height: 1080, aspectRatio: 16 / 9, format: 'image/png',
+        fileSizeBytes: 100, createdAt: '2026-09-30T00:00:00.000Z',
+        url: 'https://example.com/wallpaper.png',
+      }],
+    });
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
+      const request: GraphQLRequest = JSON.parse(String(init.body));
+      requests.push(request);
+      const ranked = Boolean(request.variables.sort);
+      const nextPage = request.variables.after === 'ranked_cursor';
+      const data = request.operationName === 'GetProfile' ? { profile } : {
+        searchWallpapers: {
+          edges: [{ node: wallpaper(ranked ? nextPage ? 'ranked_second' : 'ranked_first' : 'ordinary') }],
+          pageInfo: { hasNextPage: ranked && !nextPage, hasPreviousPage: nextPage, endCursor: 'ranked_cursor' },
+        },
+      };
+      return new Response(JSON.stringify({ data }), { headers: { 'content-type': 'application/json' } });
+    }));
     const user = userEvent.setup();
-    const { view, queryClient } = renderBrowse('/?color=%23ff0000&format=png');
+    const { router, view, queryClient } = renderBrowse(
+      '/?profileId=user_Ada&format=png&aspectRatio=16-9&after=old_cursor'
+    );
     try {
-      expect(await screen.findByText('No wallpapers match these filters.')).toBeInTheDocument();
-      expect(requests).toHaveLength(1);
-      expect(requests[0].variables).toEqual({
-        first: 20,
-        after: null,
-        filter: { variants: { format: 'image/png' } },
-      });
-      expect(requests[0].query).not.toContain('WallpaperSort');
-      expect(requests[0].query).not.toContain('sort:');
-      await user.click(screen.getByRole('button', { name: 'Toggle filters' }));
-      expect(screen.queryByLabelText('Color')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Clear color' })).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'PNG' })).toHaveAttribute('aria-pressed', 'true');
+      expect(await screen.findByRole('button', { name: 'Wallpaper ordinary', exact: true })).toBeInTheDocument();
+      await user.click(await screen.findByRole('button', { name: 'Toggle filters' }));
+      fireEvent.input(screen.getByLabelText('Color'), { target: { value: '#ff0000' } });
+      await waitFor(() => expect(router.state.location.search).toEqual({
+        profileId: 'user_Ada', format: 'png', aspectRatio: '16-9', color: '#FF0000',
+      }));
+      await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
+        operationName: 'SearchWallpapers', variables: { filter, sort, first: 20, after: null },
+      })));
+      expect(await screen.findByRole('button', { name: 'Wallpaper ranked_first', exact: true })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Wallpaper ordinary', exact: true })).not.toBeInTheDocument();
+      act(() => triggerIntersection(true));
+      await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
+        operationName: 'SearchWallpapers', variables: { filter, sort, first: 20, after: 'ranked_cursor' },
+      })));
+      expect(await screen.findByRole('button', { name: 'Wallpaper ranked_second', exact: true })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Wallpaper ranked_first', exact: true })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Clear color' }));
+      await waitFor(() => expect(router.state.location.search).toEqual({
+        profileId: 'user_Ada', format: 'png', aspectRatio: '16-9',
+      }));
+      await waitFor(() => expect(requests).toContainEqual(expect.objectContaining({
+        operationName: 'SearchWallpapers', variables: { filter, first: 20, after: null },
+      })));
+      expect(await screen.findByRole('button', { name: 'Wallpaper ordinary', exact: true })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Wallpaper ranked_first', exact: true })).not.toBeInTheDocument();
     } finally {
       view.unmount();
       queryClient.clear();

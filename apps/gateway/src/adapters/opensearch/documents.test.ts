@@ -56,6 +56,14 @@ describe('OpenSearch color ranking response', () => {
     expect(result.hits.hits[0]?._score).toBe(score);
   });
 
+  it('accepts exact zero and one utility values', async () => {
+    const score = Math.fround(1 / 3);
+    const result = await Effect.runPromise(
+      wallpaperSearchResponse(selection, index)(response(score, 0, 1))
+    );
+    expect(result.hits.hits[0]?._score).toBe(score);
+  });
+
   it('rejects a changed score even when the sort cursor changes with it', async () => {
     const changed = response(0.5);
     await expect(
@@ -67,6 +75,19 @@ describe('OpenSearch color ranking response', () => {
     const changed = response(0.01, 0, 0);
     await expect(
       Effect.runPromise(wallpaperSearchResponse(selection, index)(changed))
+    ).rejects.toThrow();
+  });
+
+  it.each([
+    { first: 1.25, second: 0 },
+    { first: -0.25, second: 0.75 },
+  ])('rejects an out-of-range utility even with a matching score and sort', async ({
+    first,
+    second,
+  }) => {
+    const score = Math.fround((2 * first + second) / 3);
+    await expect(
+      Effect.runPromise(wallpaperSearchResponse(selection, index)(response(score, first, second)))
     ).rejects.toThrow();
   });
 });

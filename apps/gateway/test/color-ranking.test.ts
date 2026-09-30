@@ -256,6 +256,12 @@ describe('Native color ranking port contract', () => {
                   body.hits.hits[0]._score = changed;
                   body.hits.hits[0].sort[0] = changed;
                 }
+                if (fault === 'utility-above-one') {
+                  const key = references[0].ranking.utilities[0].key;
+                  body.hits.hits[0].fields[`utilities.${key}`] = [2];
+                  body.hits.hits[0]._score = 2;
+                  body.hits.hits[0].sort[0] = 2;
+                }
                 if (fault === 'sort') body.hits.hits[0].sort[1] = 'different';
                 if (fault.startsWith('order')) body.hits.hits.reverse();
                 if (fault.startsWith('stale')) body.hits.hits[0] = firstHit;
@@ -308,6 +314,7 @@ describe('Native color ranking port contract', () => {
       'duplicate-id',
       'score',
       'score-and-sort',
+      'utility-above-one',
       'sort',
       'order',
       'order-asc',

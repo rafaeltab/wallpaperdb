@@ -141,19 +141,10 @@ async function setup(media: Partial<MediaUrls> = {}) {
   };
 }
 describe('GraphQL driving adapter contract', () => {
-  it('rejects retired color sort arguments before invoking catalogue search', async () => {
+  it('translates filters, legacy identity, pagination and color targets into the inbound query', async () => {
     const { query, inbound } = await setup();
     const response = await query(
-      '{searchWallpapers(sort:{color:{colors:[{color:"#FF0000",amount:1}]}}){edges{node{wallpaperId}}}}'
-    );
-    expect(response.status).toBe(400);
-    expect(response.body.errors[0].message).toContain('Unknown argument "sort"');
-    expect(inbound.calls).toEqual([]);
-  });
-  it('translates filters, legacy identity and pagination into the inbound query', async () => {
-    const { query, inbound } = await setup();
-    const response = await query(
-      `{ searchWallpapers(filter:{profileId:"profile_a",userId:"ignored",variants:{width:1920,height:1080,aspectRatio:1.77,format:"image/webp"}},first:2,after:"cursor") {edges{node{wallpaperId}}pageInfo{hasNextPage hasPreviousPage startCursor endCursor}} }`
+      `{ searchWallpapers(filter:{profileId:"profile_a",userId:"ignored",variants:{width:1920,height:1080,aspectRatio:1.77,format:"image/webp"}},sort:{color:{mode:PROPORTIONS,quality:STRICT,targets:[{color:"#FF0000",percent:20},{name:NEAR_NEUTRAL,percent:0}]}},first:2,after:"cursor") {edges{node{wallpaperId}}pageInfo{hasNextPage hasPreviousPage startCursor endCursor}} }`
     );
     expect(response.status).toBe(200);
     expect(response.body.errors).toBeUndefined();
@@ -163,6 +154,14 @@ describe('GraphQL driving adapter contract', () => {
         input: {
           profileId: 'profile_a',
           variants: { width: 1920, height: 1080, aspectRatio: 1.77, format: 'image/webp' },
+          color: {
+            mode: 'proportions',
+            quality: 'strict',
+            targets: [
+              { color: '#FF0000', percent: 20 },
+              { name: 'near_neutral', percent: 0 },
+            ],
+          },
           first: 2,
           after: 'cursor',
         },
@@ -173,10 +172,121 @@ describe('GraphQL driving adapter contract', () => {
       pageInfo: page.pageInfo,
     });
   });
+  it.each([
+    '',
+    'mode:null,quality:null,',
+  ])('leaves omitted and null color options for the capability defaults: %s', async (options) => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      `{searchWallpapers(sort:{color:{${options}targets:[{color:"#FF0000",name:null},{name:BLUE,color:null,percent:null}]}}){edges{node{wallpaperId}}}}`
+    );
+    expect(response.body.errors).toBeUndefined();
+    expect(inbound.calls[0]).toMatchObject({
+      input: {
+        color: {
+          mode: undefined,
+          quality: undefined,
+          targets: [
+            { color: '#FF0000', name: undefined, percent: undefined },
+            { name: 'blue', color: undefined, percent: undefined },
+          ],
+        },
+      },
+    });
+  });
+  it.each([
+    ['VIBE', 'RELAXED', 'vibe', 'relaxed'],
+    ['VIBE', 'FAVORITE', 'vibe', 'favorite'],
+    ['PROPORTIONS', 'STRICT', 'proportions', 'strict'],
+  ])('translates mode %s and quality %s without changing targets', async (mode, quality, localMode, localQuality) => {
+    const { query, inbound } = await setup();
+    const percent = mode === 'PROPORTIONS' ? ',percent:100' : '';
+    const response = await query(
+      `{searchWallpapers(sort:{color:{mode:${mode},quality:${quality},targets:[{name:RED${percent}}]}}){edges{node{wallpaperId}}}}`
+    );
+    expect(response.body.errors).toBeUndefined();
+    expect(inbound.calls[0]).toMatchObject({
+      input: {
+        color: {
+          mode: localMode,
+          quality: localQuality,
+          targets: [{ name: 'red', percent: mode === 'PROPORTIONS' ? 100 : undefined }],
+        },
+      },
+    });
+  });
+  it.each([
+    'RED',
+    'ORANGE',
+    'YELLOW',
+    'GREEN',
+    'TEAL',
+    'CYAN',
+    'BLUE',
+    'PURPLE',
+    'PINK',
+    'BROWN',
+    'BLACK',
+    'GRAY',
+    'WHITE',
+    'GRAYSCALE',
+    'STRICT_GRAYSCALE',
+    'NEAR_NEUTRAL',
+    'DARK',
+    'LIGHT',
+    'BRIGHT',
+    'VIVID',
+    'MUTED',
+    'MONOCHROMATIC',
+    'RAINBOW',
+  ])('translates the named target %s', async (name) => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      `{searchWallpapers(sort:{color:{targets:[{name:${name}}]}}){edges{node{wallpaperId}}}}`
+    );
+    expect(response.body.errors).toBeUndefined();
+    expect(inbound.calls[0]).toMatchObject({
+      input: { color: { targets: [{ name: name.toLowerCase() }] } },
+    });
+  });
+  it.each([
+    [
+      '[{name:RED,percent:0},{name:BLUE,percent:0}]',
+      [
+        { name: 'red', percent: 0 },
+        { name: 'blue', percent: 0 },
+      ],
+    ],
+    [
+      '[{name:RED,percent:100},{name:BLUE,percent:100}]',
+      [
+        { name: 'red', percent: 100 },
+        { name: 'blue', percent: 100 },
+      ],
+    ],
+    ['[{name:RED,percent:20}]', [{ name: 'red', percent: 20 }]],
+    [
+      '[{name:RED,percent:20},{name:RED,percent:20}]',
+      [
+        { name: 'red', percent: 20 },
+        { name: 'red', percent: 20 },
+      ],
+    ],
+  ] as const)('preserves independent proportions, duplicates and partial compositions: %s', async (targets, localTargets) => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      `{searchWallpapers(sort:{color:{mode:PROPORTIONS,targets:${targets}}}){edges{node{wallpaperId}}}}`
+    );
+    expect(response.body.errors).toBeUndefined();
+    expect(inbound.calls).toHaveLength(1);
+    expect(inbound.calls[0]).toMatchObject({
+      input: { color: { mode: 'proportions', targets: localTargets } },
+    });
+  });
   it('maps deprecated userId to the local Profile identifier and translates nullable inputs', async () => {
     const { query, inbound } = await setup();
     const response = await query(
-      `{searchWallpapers(filter:{userId:"legacy",variants:{width:null}},first:null,last:3,before:"before",after:null){edges{node{userId profileId}}}}`
+      `{searchWallpapers(filter:{userId:"legacy",variants:{width:null}},sort:null,first:null,last:3,before:"before",after:null){edges{node{userId profileId}}}}`
     );
     expect(response.body.data.searchWallpapers.edges).toEqual([
       { node: { userId: 'profile_a', profileId: 'profile_a' } },
@@ -496,10 +606,42 @@ describe('GraphQL driving adapter contract', () => {
     expect(response.body.errors.length).toBeGreaterThan(0);
     expect(inbound.calls).toEqual([]);
   });
-  it('rejects structurally invalid resolver arguments without leaking library details', async () => {
+  it.each([
+    '{colors:[{color:"#FF0000",amount:1}]}',
+    '{targets:[{color:"#FF0000",amount:1}]}',
+    '{targets:[{color:"#FF0000",spread:0.5}]}',
+    '{targets:[{name:UNKNOWN}]}',
+    '{targets:[{name:red}]}',
+    '{targets:[{name:RED,percent:10.5}]}',
+    '{mode:UNKNOWN,targets:[{name:RED}]}',
+    '{quality:UNKNOWN,targets:[{name:RED}]}',
+    '{targets:null}',
+    '{targets:[null]}',
+    '{}',
+  ])('rejects malformed color protocol inputs before invoking the capability: %s', async (color) => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      `{searchWallpapers(sort:{color:${color}}){edges{node{wallpaperId}}}}`
+    );
+    expect(response.status).toBe(400);
+    expect(response.body.errors.length).toBeGreaterThan(0);
+    expect(inbound.calls).toEqual([]);
+  });
+  it.each([
+    { targets: [{ color: 123 }] },
+    { targets: [{ name: 'red' }] },
+    { targets: [{ color: '#FF0000', percent: 'secret' }] },
+    { targets: [{ color: '#FF0000', percent: Number.NaN }] },
+    { targets: [{ color: '#FF0000', percent: Number.POSITIVE_INFINITY }] },
+    { targets: [{ color: '#FF0000', percent: Number.NEGATIVE_INFINITY }] },
+    { targets: [{ color: '#FF0000' }], mode: 'vibe' },
+    { targets: [{ color: '#FF0000' }], quality: 'favorite' },
+    { targets: null },
+    { targets: [null] },
+  ])('rejects structurally invalid resolver color arguments without leaking library details: %j', async (color) => {
     const { graphql, inbound } = await setup();
     await expect(
-      graphql.resolvers.Query.searchWallpapers({}, { filter: { variants: { width: 'secret' } } })
+      graphql.resolvers.Query.searchWallpapers({}, { sort: { color } })
     ).rejects.toMatchObject({
       message: 'Invalid query arguments',
       extensions: { code: 'BAD_USER_INPUT' },

@@ -1,8 +1,9 @@
 export type {
-  CatalogueConfig,
   ColorDescriptor,
   ColorQuality,
-  ColorPreference,
+  ColorQuery,
+  ColorTarget,
+  ColorRanking,
   CursorValue,
   HandleResolution,
   InvalidCursor,

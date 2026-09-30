@@ -56,10 +56,22 @@ export interface HandleResolution {
   canonicalHandle: string;
 }
 
-export interface ColorPreference {
-  color: string;
-  amount: number;
-  spread?: number;
+export interface ColorTarget {
+  color?: string;
+  name?: string;
+  percent?: number;
+}
+
+/** Targets contribute independently. Percentages describe the whole image. */
+export interface ColorQuery {
+  mode?: 'vibe' | 'proportions';
+  quality?: ColorQuality;
+  targets: ColorTarget[];
+}
+
+export interface ColorRanking {
+  readonly targetCount: number;
+  readonly utilities: ReadonlyArray<{ readonly key: string; readonly multiplicity: number }>;
 }
 
 export interface VariantSelection {
@@ -72,8 +84,8 @@ export interface VariantSelection {
 export interface SearchWallpapers {
   profileId?: string;
   variants?: VariantSelection;
-  /** Color ranking accepts one through 64 preferences. Amounts express relative contributions. */
-  colors?: ColorPreference[];
+  /** Color ranking accepts one through ten independently scored targets. */
+  color?: ColorQuery;
   first?: number;
   after?: string;
   last?: number;
@@ -127,7 +139,7 @@ export type ProfileSearchOutcome =
 export interface SearchSelection {
   profileId?: string;
   variantFilters?: VariantSelection;
-  colorVector?: number[];
+  color?: ColorRanking;
   searchAfter?: CursorValue[];
   size: number;
   sortOrder: 'asc' | 'desc';
@@ -153,6 +165,10 @@ export interface ProfileSearchBatch {
  * with stable cursor values for every entry. Variant predicates match one variant.
  * Missing records are null; batches preserve input order, duplicates and null slots.
  * Unavailability includes malformed persisted data and never exposes vendor errors.
+ * Color search ranks every compatible complete bank after metadata eligibility,
+ * including zero scores. Native numeric scores descend, then wallpaper IDs ascend;
+ * ascending order reverses both components for backward pagination. IDs come from
+ * doc values. Timeouts, shard failures and incomplete responses are unavailable.
  * Profile discovery orders exact current Handles, current prefixes, exact active
  * aliases, alias prefixes, Display name phrase/prefix matches, then fuzzy names.
  * Fixed ranks 6 through 1 use Profile ID ascending to break ties. Biography is excluded.
@@ -196,7 +212,3 @@ export interface Catalogue {
 }
 
 export const Catalogue = Context.Service<Catalogue>('wallpaperdb.gateway.catalogue');
-
-export interface CatalogueConfig {
-  colorSpreadStrategy: 'linear' | 'exponential' | 'exact';
-}

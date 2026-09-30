@@ -4,6 +4,7 @@ import { GraphQLError } from 'graphql';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import type { HttpExecution } from '../runtime.js';
 import { Catalogue, type CatalogueUnavailable } from '../capabilities/catalogue/index.js';
+import { colorModes, colorQualities, colorTargetNames } from './schema.js';
 import type {
   Profile,
   ProfileSearchOutcome,
@@ -67,6 +68,23 @@ const searchArguments = Schema.Struct({
       ),
     })
   ),
+  sort: nullableOptional(
+    Schema.Struct({
+      color: nullableOptional(
+        Schema.Struct({
+          mode: nullableOptional(Schema.Literals(colorModes)),
+          quality: nullableOptional(Schema.Literals(colorQualities)),
+          targets: Schema.Array(
+            Schema.Struct({
+              color: nullableOptional(Schema.String),
+              name: nullableOptional(Schema.Literals(colorTargetNames)),
+              percent: nullableOptional(Schema.Finite),
+            })
+          ),
+        })
+      ),
+    })
+  ),
 });
 const profileSearchArguments = Schema.Struct({
   query: Schema.String,
@@ -82,6 +100,9 @@ function parse<A>(schema: Schema.ConstraintDecoder<A>, input: unknown): A {
 function searchInput(input: unknown): SearchWallpapers {
   const args = parse(searchArguments, input);
   const variants = args.filter?.variants;
+  const color = args.sort?.color;
+  const modes = { VIBE: 'vibe', PROPORTIONS: 'proportions' } as const;
+  const qualities = { RELAXED: 'relaxed', FAVORITE: 'favorite', STRICT: 'strict' } as const;
   return {
     first: args.first ?? undefined,
     last: args.last ?? undefined,
@@ -94,6 +115,17 @@ function searchInput(input: unknown): SearchWallpapers {
           height: variants.height ?? undefined,
           aspectRatio: variants.aspectRatio ?? undefined,
           format: variants.format ?? undefined,
+        }
+      : undefined,
+    color: color
+      ? {
+          mode: color.mode ? modes[color.mode] : undefined,
+          quality: color.quality ? qualities[color.quality] : undefined,
+          targets: color.targets.map((target) => ({
+            color: target.color ?? undefined,
+            name: target.name?.toLowerCase(),
+            percent: target.percent ?? undefined,
+          })),
         }
       : undefined,
   };

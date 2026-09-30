@@ -2,7 +2,7 @@ import { GatewayAdmissionError } from '@/lib/graphql/admission';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as renderComponent, screen } from '@testing-library/react';
 import type { ReactElement, ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 const mockUseSearch = vi.fn(() => ({}));
 const mockNavigate = vi.fn();
@@ -66,6 +66,8 @@ import { useWallpaperInfiniteQuery } from '@/hooks/useWallpaperInfiniteQuery';
 import { HomePage } from '@/routes/index';
 
 describe('HomePage browse filters', () => {
+  afterEach(() => vi.useRealTimers());
+
   beforeEach(() => {
     vi.clearAllMocks();
     setScreenSize(1920, 1080);

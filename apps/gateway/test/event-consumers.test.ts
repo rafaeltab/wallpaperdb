@@ -1,6 +1,13 @@
 import { Effect } from 'effect';
 import { headers, type MsgHdrs } from 'nats';
 import { describe, expect, it } from 'vitest';
+import {
+  COLOR_ANCHORS_SHA256,
+  COLOR_REFERENCE_COMMIT,
+  COLOR_CUTOFFS,
+  COLOR_FEATURE_NAMES,
+  ColorMeasurementsSchema,
+} from '@wallpaperdb/events';
 import { deliverProjection } from '../src/adapters/events/index.js';
 import {
   ProjectCatalogue,
@@ -57,8 +64,25 @@ const colors = {
   ...base,
   eventType: 'wallpaper.colors.extracted',
   wallpaperId: 'wallpaper-1',
-  colorHistogram: Array(64).fill(1),
-  colorSpace: 'hsv',
+  schemaVersion: 1,
+  original: { owner: 'ingestor', id: 'wallpaper-1' },
+  provenance: {
+    referenceCommit: COLOR_REFERENCE_COMMIT,
+    anchorsSha256: COLOR_ANCHORS_SHA256,
+    originalSha256: 'a'.repeat(64),
+  },
+  measurements: ColorMeasurementsSchema.parse({
+    version: 'shade-hue-256-v1',
+    sampleCount: 16384,
+    layers: COLOR_CUTOFFS.map((cutoff) => ({
+      cutoff,
+      coverage: Array(256).fill(0),
+      quality: Array(256).fill(0),
+    })),
+    named: Object.fromEntries(
+      COLOR_FEATURE_NAMES.map((name) => [name, { coverage: 0, quality: 0 }])
+    ),
+  }),
 };
 const created = {
   ...base,
@@ -210,15 +234,16 @@ describe('Projection event driving adapter contract', () => {
     ]);
   });
 
-  it('translates colors into a local complete histogram snapshot', async () => {
+  it('translates the validated complete measurement fact into local values', async () => {
     const project = new ControlledProjection();
     await deliver(colors.eventType, colors, project);
     expect(project.changes).toEqual([
       {
-        _tag: 'ColorsExtracted',
+        _tag: 'ColorsMeasured',
         wallpaperId: 'wallpaper-1',
-        colorHistogram: Array(64).fill(1),
-        colorSpace: 'hsv',
+        descriptor: colors.measurements,
+        original: colors.original,
+        provenance: colors.provenance,
         occurrence: { source: 'wallpaperdb/color-extractor', id: 'event-1', occurredAt: timestamp },
       },
     ]);

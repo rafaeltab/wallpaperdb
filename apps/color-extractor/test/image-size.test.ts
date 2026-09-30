@@ -3,7 +3,7 @@ import { Effect, ManagedRuntime, Result } from 'effect';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { imageLayer } from '../src/adapters/image/index.js';
-import { ImageHistogram } from '../src/capabilities/extraction/index.js';
+import { ImageMeasurements } from '../src/capabilities/extraction/index.js';
 
 const maxImageBytes = 50 * 1024 * 1024;
 
@@ -52,7 +52,7 @@ describe('Stored image byte limit', () => {
       const result = await runtime.runPromise(
         Effect.result(
           Effect.gen(function* () {
-            return yield* (yield* ImageHistogram).extract({
+            return yield* (yield* ImageMeasurements).extract({
               bucket: 'wallpapers',
               key: 'image.png',
             });
@@ -62,7 +62,7 @@ describe('Stored image byte limit', () => {
       );
       if (scenario === 'exact boundary') {
         expect(Result.isSuccess(result)).toBe(true);
-        if (Result.isSuccess(result)) expect(result.success[3]).toBe(1);
+        if (Result.isSuccess(result)) expect(result.success.measurements.sampleCount).toBe(16384);
       } else {
         expect(Result.isFailure(result)).toBe(true);
         if (Result.isFailure(result)) {

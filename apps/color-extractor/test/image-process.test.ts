@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { Effect, Layer, ManagedRuntime, Result } from 'effect';
 import { TestClock } from 'effect/testing';
 import { describe, expect, it, vi } from 'vitest';
-import { histogramFromImage } from '../src/adapters/image/index.js';
+import { measurementsFromImage } from '../src/adapters/image/index.js';
 
 async function decoderProcess(): Promise<number> {
   return vi.waitFor(
@@ -41,7 +41,7 @@ describe.skipIf(process.platform !== 'linux')('Native image process ownership', 
     let child: number | undefined;
     try {
       const operation = runtime.runPromise(
-        Effect.result(histogramFromImage(Buffer.from('bytes'))),
+        Effect.result(measurementsFromImage(Buffer.from('bytes'))),
         {
           signal: controller.signal,
         }

@@ -9,6 +9,9 @@ const reference = JSON.parse(
   await readFile(new URL('./fixtures/prototype/expected.json', import.meta.url), 'utf8')
 );
 
+// Expected values come from executing extractHue and extractSampleFeatures at the
+// recorded frozen commit. Named quality uses the reference index's float32 storage.
+
 describe('Sharp image measurements against the frozen prototype', () => {
   it('retains the exact anchor bank, traversal order and original IDs', () => {
     expect(createHash('sha256').update(JSON.stringify(COLOR_ANCHORS)).digest('hex')).toBe(

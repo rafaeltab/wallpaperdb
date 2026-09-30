@@ -16,6 +16,8 @@ export const projectionLayer: Layer.Layer<ProjectCatalogue, never, ProjectionSto
     const record = Effect.fn('catalogue.project')(function* (
       change: ProjectionChange
     ): Effect.fn.Return<ProjectionOutcome, ProjectionUnavailable> {
+      // Utility projection is introduced by #306. The complete fact remains in retained NATS history.
+      if (change._tag === 'ColorsMeasured') return { _tag: 'Ignored' };
       if (change._tag === 'ColorsExtracted' && !validHistogram(change.colorHistogram)) {
         return { _tag: 'Rejected', reason: 'invalid-color-histogram' } satisfies ProjectionOutcome;
       }
@@ -33,7 +35,9 @@ export const projectionLayer: Layer.Layer<ProjectCatalogue, never, ProjectionSto
   })
 );
 
-function toMutation(change: ProjectionChange): ProjectionMutation {
+function toMutation(
+  change: Exclude<ProjectionChange, { readonly _tag: 'ColorsMeasured' }>
+): ProjectionMutation {
   switch (change._tag) {
     case 'WallpaperUploaded':
       return { ...change, _tag: 'PublishWallpaper' };

@@ -10,6 +10,29 @@ export interface Occurrence {
 
 export type ProjectionChange =
   | {
+      readonly _tag: 'ColorsMeasured';
+      readonly occurrence: Occurrence;
+      readonly wallpaperId: string;
+      readonly descriptor: {
+        readonly version: string;
+        readonly sampleCount: number;
+        readonly layers: readonly {
+          readonly cutoff: number;
+          readonly coverage: readonly number[];
+          readonly quality: readonly number[];
+        }[];
+        readonly named: Readonly<
+          Record<string, { readonly coverage: number; readonly quality: number }>
+        >;
+      };
+      readonly original: { readonly owner: 'ingestor'; readonly id: string };
+      readonly provenance: {
+        readonly referenceCommit: string;
+        readonly anchorsSha256: string;
+        readonly originalSha256: string;
+      };
+    }
+  | {
       readonly _tag: 'WallpaperUploaded';
       readonly occurrence: Occurrence;
       readonly wallpaperId: string;

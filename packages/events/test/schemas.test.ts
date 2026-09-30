@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  COLOR_ANCHORS_SHA256,
+  COLOR_REFERENCE_COMMIT,
+  COLOR_CUTOFFS,
+  COLOR_FEATURE_NAMES,
+  ColorMeasurementsSchema,
   WALLPAPER_UPLOADED_SUBJECT,
   WALLPAPER_VARIANT_AVAILABLE_SUBJECT,
   WALLPAPER_COLORS_EXTRACTED_SUBJECT,
@@ -521,8 +526,25 @@ describe("Event Schemas", () => {
       eventType: "wallpaper.colors.extracted" as const,
       timestamp: new Date().toISOString(),
       wallpaperId: "wlpr_01HXYZ123456789",
-      colorHistogram: new Array(64).fill(0).map((_, i) => (i === 0 ? 1.0 : 0)) as number[],
-      colorSpace: "hsv",
+      schemaVersion: 1,
+      original: { owner: "ingestor", id: "wlpr_01HXYZ123456789" },
+      provenance: {
+        referenceCommit: COLOR_REFERENCE_COMMIT,
+        anchorsSha256: COLOR_ANCHORS_SHA256,
+        originalSha256: "a".repeat(64),
+      },
+      measurements: ColorMeasurementsSchema.parse({
+        version: "shade-hue-256-v1",
+        sampleCount: 16384,
+        layers: COLOR_CUTOFFS.map((cutoff) => ({
+          cutoff,
+          coverage: Array(256).fill(0),
+          quality: Array(256).fill(0),
+        })),
+        named: Object.fromEntries(
+          COLOR_FEATURE_NAMES.map((name) => [name, { coverage: 0, quality: 0 }])
+        ),
+      }),
     };
 
     it("should validate a correct event", () => {
@@ -542,14 +564,17 @@ describe("Event Schemas", () => {
       expect(result.success).toBe(false);
     });
 
-    it("should reject event with empty colorHistogram", () => {
-      const invalid = { ...validEvent, colorHistogram: [] };
+    it("should reject event with incomplete measurements", () => {
+      const invalid = { ...validEvent, measurements: {} };
       const result = WallpaperColorsExtractedEventSchema.safeParse(invalid);
       expect(result.success).toBe(false);
     });
 
-    it("should reject event with empty colorSpace", () => {
-      const invalid = { ...validEvent, colorSpace: "" };
+    it("should reject event with incompatible descriptor provenance", () => {
+      const invalid = {
+        ...validEvent,
+        provenance: { ...validEvent.provenance, anchorsSha256: "unknown" },
+      };
       const result = WallpaperColorsExtractedEventSchema.safeParse(invalid);
       expect(result.success).toBe(false);
     });

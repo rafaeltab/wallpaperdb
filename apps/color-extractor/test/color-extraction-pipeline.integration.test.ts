@@ -7,6 +7,8 @@ import {
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { InProcessColorExtractorTesterBuilder } from './builders/index.js';
+import { WallpaperColorsExtractedCloudEventSchema } from '@wallpaperdb/events';
+import { createHash } from 'node:crypto';
 
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
@@ -30,29 +32,31 @@ async function createTestImage(
 
 function createWallpaperUploadedEvent(overrides: {
   wallpaperId: string;
-  storageKey: string;
   width: number;
   height: number;
   fileSizeBytes: number;
   fileType?: 'image' | 'video';
 }) {
   return {
-    eventId: `evt_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-    eventType: 'wallpaper.uploaded' as const,
-    timestamp: new Date().toISOString(),
-    wallpaper: {
-      id: overrides.wallpaperId,
-      userId: 'user_test',
-      fileType: overrides.fileType ?? ('image' as const),
-      mimeType: 'image/png',
-      fileSizeBytes: overrides.fileSizeBytes,
-      width: overrides.width,
-      height: overrides.height,
-      aspectRatio: overrides.width / overrides.height,
-      storageKey: overrides.storageKey,
-      storageBucket: 'wallpapers',
-      originalFilename: 'test.png',
-      uploadedAt: new Date().toISOString(),
+    specversion: '1.0',
+    source: 'https://wallpaperdb/ingestor',
+    id: 'pipeline-upload',
+    type: 'wallpaper.uploaded',
+    time: '2026-09-24T10:00:00.000Z',
+    datacontenttype: 'application/json',
+    data: {
+      wallpaper: {
+        id: overrides.wallpaperId,
+        userId: 'user_test',
+        fileType: overrides.fileType ?? ('image' as const),
+        mimeType: 'image/png',
+        fileSizeBytes: overrides.fileSizeBytes,
+        width: overrides.width,
+        height: overrides.height,
+        aspectRatio: overrides.width / overrides.height,
+        asset: { owner: 'ingestor', id: overrides.wallpaperId },
+        uploadedAt: '2026-09-24T10:00:00.000Z',
+      },
     },
   };
 }
@@ -78,14 +82,13 @@ describe('Color Extraction Pipeline', () => {
   });
 
   it('should extract colors and publish wallpaper.colors.extracted event for an uploaded image', async () => {
-    const wallpaperId = `wlpr_pipe_${Date.now()}`;
+    const wallpaperId = 'wlpr_pipeline';
     const storageKey = `${wallpaperId}/original.png`;
     const imageBuffer = await createTestImage(100, 100, { r: 255, g: 0, b: 0 });
     await tester.s3.uploadObject('wallpapers', storageKey, imageBuffer);
 
     const event = createWallpaperUploadedEvent({
       wallpaperId,
-      storageKey,
       width: 100,
       height: 100,
       fileSizeBytes: imageBuffer.length,
@@ -102,15 +105,27 @@ describe('Color Extraction Pipeline', () => {
 
     expect(msg).toBeDefined();
     if (!msg) throw new Error('No extracted event');
-    const envelope = JSON.parse(new TextDecoder().decode(msg.data));
+    const envelope = WallpaperColorsExtractedCloudEventSchema.parse(
+      JSON.parse(new TextDecoder().decode(msg.data))
+    );
     expect(envelope.specversion).toBe('1.0');
+    expect(envelope.causationid).toBe(event.id);
+    expect(envelope.causationsource).toBe(event.source);
     const data = envelope.data;
     expect(data.wallpaperId).toBe(wallpaperId);
-    expect(data.colorHistogram).toHaveLength(64);
-    expect(data.colorSpace).toBe('hsv');
-    expect(data.colorHistogram.reduce((sum: number, v: number) => sum + v, 0)).toBeCloseTo(1.0, 3);
-
-    const redBin = 0 * 4 + 1 * 2 + 1;
-    expect(data.colorHistogram[redBin]).toBeCloseTo(1.0, 3);
+    expect(data.original).toEqual({ owner: 'ingestor', id: wallpaperId });
+    expect(data.provenance.originalSha256).toBe(
+      createHash('sha256').update(imageBuffer).digest('hex')
+    );
+    expect(data.measurements.sampleCount).toBe(16384);
+    expect(data.measurements.layers).toHaveLength(5);
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'color-extractor-wallpaper-uploaded-consumer'))
+            .num_ack_pending
+      )
+      .toBe(0);
   });
 });

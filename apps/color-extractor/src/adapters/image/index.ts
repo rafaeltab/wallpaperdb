@@ -6,9 +6,8 @@ import { resolveOriginalAsset } from '@wallpaperdb/core/assets';
 import { decodePixels } from './process.js';
 import { measurePixels } from './measurements.js';
 import {
-  computeHistogram,
   ExtractionUnavailable,
-  ImageHistogram,
+  ImageMeasurements,
   type OriginalImage,
 } from '../../capabilities/extraction/index.js';
 
@@ -41,14 +40,6 @@ const request = <A>(operation: string, send: (signal: AbortSignal) => Promise<A>
     )
   );
 
-/** Decode in a killable process; keep pure histogram policy in the capability. */
-export const histogramFromImage = Effect.fn('color-extraction.image.decode')(function* (
-  bytes: Uint8Array
-) {
-  const pixels = yield* decodePixels(bytes);
-  return computeHistogram(pixels);
-});
-
 export const measurementsFromImage = Effect.fn('color-extraction.image.measure')(function* (
   bytes: Uint8Array
 ) {
@@ -59,7 +50,7 @@ export const measurementsFromImage = Effect.fn('color-extraction.image.measure')
   };
 });
 
-class StoredImageHistogram implements ImageHistogram {
+class StoredImageMeasurements implements ImageMeasurements {
   constructor(
     private readonly client: S3Client,
     private readonly nativeWork: Semaphore.Semaphore,
@@ -67,7 +58,7 @@ class StoredImageHistogram implements ImageHistogram {
   ) {}
 
   readonly extract = Effect.fn('color-extraction.image.extract')(function* (
-    this: StoredImageHistogram,
+    this: StoredImageMeasurements,
     storage: OriginalImage
   ) {
     return yield* this.nativeWork
@@ -114,7 +105,7 @@ class StoredImageHistogram implements ImageHistogram {
               body.destroy();
             }
           });
-          return yield* histogramFromImage(bytes);
+          return yield* measurementsFromImage(bytes);
         })
       )
       .pipe(
@@ -136,7 +127,7 @@ class StoredImageHistogram implements ImageHistogram {
   });
 }
 
-export function imageLayer(config: ImageConfig): Layer.Layer<ImageHistogram | ImageHealth> {
+export function imageLayer(config: ImageConfig): Layer.Layer<ImageMeasurements | ImageHealth> {
   return Layer.effectContext(
     Effect.gen(function* () {
       const client = yield* Effect.acquireRelease(
@@ -156,8 +147,8 @@ export function imageLayer(config: ImageConfig): Layer.Layer<ImageHistogram | Im
       );
       const nativeWork = yield* Semaphore.make(1);
       return Context.make(
-        ImageHistogram,
-        new StoredImageHistogram(client, nativeWork, config.bucket)
+        ImageMeasurements,
+        new StoredImageMeasurements(client, nativeWork, config.bucket)
       ).pipe(
         Context.add(ImageHealth, {
           check: () =>

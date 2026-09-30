@@ -57,16 +57,36 @@ export const ColorMeasurementsSchema = z
     version: z.literal(COLOR_MEASUREMENT_VERSION),
     sampleCount: z.literal(16384),
     layers: z.array(layer).length(5),
-    named: z.record(z.enum(COLOR_FEATURE_NAMES), pair),
+    named: z
+      .object({
+        red: pair,
+        orange: pair,
+        yellow: pair,
+        green: pair,
+        teal: pair,
+        cyan: pair,
+        blue: pair,
+        purple: pair,
+        pink: pair,
+        brown: pair,
+        black: pair,
+        gray: pair,
+        white: pair,
+        grayscale: pair,
+        strict_grayscale: pair,
+        near_neutral: pair,
+        dark: pair,
+        light: pair,
+        bright: pair,
+        vivid: pair,
+        muted: pair,
+        monochromatic: pair,
+        rainbow: pair,
+      })
+      .strict(),
   })
   .strict()
   .superRefine((value, context) => {
-    if (Object.keys(value.named).length !== COLOR_FEATURE_NAMES.length)
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["named"],
-        message: "Every named target is required",
-      });
     for (let level = 0; level < value.layers.length; level++) {
       const measured = value.layers[level];
       if (measured.cutoff !== COLOR_CUTOFFS[level])

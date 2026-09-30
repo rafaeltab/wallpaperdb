@@ -1,19 +1,26 @@
-import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { COLOR_ANCHORS, ColorMeasurementsSchema } from "../src/index.js";
-
-const fixtures = JSON.parse(
-  await readFile(
-    new URL("../../../apps/color-extractor/test/fixtures/prototype/expected.json", import.meta.url),
-    "utf8"
-  )
-);
-const measurements = fixtures.cases[0].measurements;
+import {
+  COLOR_ANCHORS,
+  COLOR_CUTOFFS,
+  COLOR_FEATURE_NAMES,
+  ColorMeasurementsSchema,
+} from "../src/index.js";
+const measurements = {
+  version: "shade-hue-256-v1",
+  sampleCount: 16384,
+  layers: COLOR_CUTOFFS.map((cutoff) => ({
+    cutoff,
+    coverage: Array<number>(256).fill(10000),
+    quality: Array<number>(256).fill(1),
+  })),
+  named: Object.fromEntries(
+    COLOR_FEATURE_NAMES.map((name) => [name, { coverage: 10000, quality: 1 }])
+  ),
+};
 
 describe("versioned color measurement contract", () => {
-  it("accepts every complete frozen prototype descriptor", () => {
-    for (const fixture of fixtures.cases)
-      expect(ColorMeasurementsSchema.safeParse(fixture.measurements).success).toBe(true);
+  it("accepts the complete descriptor layout", () => {
+    expect(ColorMeasurementsSchema.safeParse(measurements).success).toBe(true);
     expect(COLOR_ANCHORS).toHaveLength(256);
     expect(new Set(COLOR_ANCHORS.map((anchor) => anchor.index)).size).toBe(256);
   });
@@ -26,6 +33,39 @@ describe("versioned color measurement contract", () => {
     { extra: true },
   ])("rejects incomplete or incompatible descriptors %j", (change) => {
     expect(ColorMeasurementsSchema.safeParse({ ...measurements, ...change }).success).toBe(false);
+  });
+
+  it("rejects wrong array sizes, fractional coverage, missing named targets and empty-layer quality", () => {
+    for (const mutate of [
+      (value: typeof measurements) => {
+        value.layers[0].coverage.pop();
+      },
+      (value: typeof measurements) => {
+        value.layers[0].quality.push(1);
+      },
+      (value: typeof measurements) => {
+        value.layers[0].coverage[0] = 0.5;
+      },
+      (value: typeof measurements) => {
+        value.layers[0].coverage[0] = -1;
+      },
+      (value: typeof measurements) => {
+        value.layers[0].coverage[0] = 10001;
+      },
+      (value: typeof measurements) => {
+        delete value.named.red;
+      },
+      (value: typeof measurements) => {
+        value.named.unknown = { coverage: 0, quality: 0 };
+      },
+      (value: typeof measurements) => {
+        value.layers[0].coverage[0] = 0;
+      },
+    ]) {
+      const invalid = structuredClone(measurements);
+      mutate(invalid);
+      expect(ColorMeasurementsSchema.safeParse(invalid).success).toBe(false);
+    }
   });
 
   it.each([

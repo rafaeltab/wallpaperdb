@@ -8,16 +8,16 @@ import { Effect, ManagedRuntime, Result } from 'effect';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
-import { ImageHistogram } from '../src/capabilities/extraction/index.js';
+import { ImageMeasurements } from '../src/capabilities/extraction/index.js';
 
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
   .with(S3TesterBuilder)
   .build();
 
-describe('Stored image histogram adapter', () => {
+describe('Stored image measurements adapter', () => {
   let tester: InstanceType<typeof TesterClass>;
-  let runtime: ManagedRuntime.ManagedRuntime<ImageHistogram | ImageHealth, never>;
+  let runtime: ManagedRuntime.ManagedRuntime<ImageMeasurements | ImageHealth, never>;
 
   beforeAll(async () => {
     tester = new TesterClass();
@@ -52,21 +52,21 @@ describe('Stored image histogram adapter', () => {
       .png()
       .toBuffer();
     await tester.s3.uploadObject('other-wallpapers', 'test/red.png', red);
-    const histogram = await runtime.runPromise(
+    const measured = await runtime.runPromise(
       Effect.gen(function* () {
-        const images = yield* ImageHistogram;
+        const images = yield* ImageMeasurements;
         return yield* images.extract({ bucket: 'other-wallpapers', key: 'test/red.png' });
       })
     );
-    expect(histogram).toHaveLength(64);
-    expect(histogram[3]).toBeCloseTo(1, 5);
+    expect(measured.measurements.sampleCount).toBe(16384);
+    expect(measured.measurements.named.red.coverage).toBe(10000);
   });
 
   it('reports a typed failure when the object is missing', async () => {
     const result = await runtime.runPromise(
       Effect.result(
         Effect.gen(function* () {
-          const images = yield* ImageHistogram;
+          const images = yield* ImageMeasurements;
           return yield* images.extract({ bucket: 'wallpapers', key: 'missing.png' });
         })
       )
@@ -84,11 +84,11 @@ describe('Stored image histogram adapter', () => {
       .toBuffer();
     const reference = { owner: 'ingestor', id: 'logical-red', mimeType: 'image/png' } as const;
     await tester.s3.uploadObject('wallpapers', 'logical-red/original.png', red);
-    const histogram = await runtime.runPromise(
-      Effect.flatMap(ImageHistogram, (images) => images.extract(reference))
+    const measured = await runtime.runPromise(
+      Effect.flatMap(ImageMeasurements, (images) => images.extract(reference))
     );
-    expect(histogram).toHaveLength(64);
-    expect(histogram[3]).toBeCloseTo(1, 5);
+    expect(measured.measurements.sampleCount).toBe(16384);
+    expect(measured.measurements.named.red.coverage).toBe(10000);
   });
 
   it('reports missing image storage and recovers when restored', async () => {

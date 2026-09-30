@@ -4,10 +4,11 @@ import {
   ColorEvents,
   ExtractColors,
   ExtractionUnavailable,
-  ImageHistogram,
+  ImageMeasurements,
   extractionLayer,
   type ExtractionInput,
 } from '../src/capabilities/extraction/index.js';
+import { measuredImage } from './fixtures/measurements.js';
 
 const input: ExtractionInput = {
   wallpaperId: 'wallpaper-1',
@@ -17,18 +18,18 @@ const input: ExtractionInput = {
   timestamp: '2026-09-24T00:00:00.000Z',
 };
 describe('color extraction', () => {
-  it('reads the original and publishes its exact histogram before reporting completion', async () => {
-    const histogram = [0.1, 0.9];
+  it('reads the original and publishes its exact measurements before reporting completion', async () => {
+    const image = measuredImage();
     const reads: unknown[] = [];
     const publications: unknown[] = [];
     const layer = extractionLayer.pipe(
       Layer.provide(
         Layer.mergeAll(
-          Layer.succeed(ImageHistogram, {
+          Layer.succeed(ImageMeasurements, {
             extract: (storage) =>
               Effect.sync(() => {
                 reads.push(storage);
-                return histogram;
+                return image;
               }),
           }),
           Layer.succeed(ColorEvents, {
@@ -47,7 +48,7 @@ describe('color extraction', () => {
     );
     expect(outcome).toEqual({ _tag: 'Extracted' });
     expect(reads).toEqual([input.storage]);
-    expect(publications).toEqual([{ input, histogram, colorSpace: 'hsv' }]);
+    expect(publications).toEqual([{ input, ...image }]);
   });
 });
 
@@ -55,7 +56,7 @@ it('skips videos without reading or publishing', async () => {
   const layer = extractionLayer.pipe(
     Layer.provide(
       Layer.mergeAll(
-        Layer.succeed(ImageHistogram, { extract: () => Effect.die('must not read video') }),
+        Layer.succeed(ImageMeasurements, { extract: () => Effect.die('must not read video') }),
         Layer.succeed(ColorEvents, { publish: () => Effect.die('must not publish video') })
       )
     )
@@ -67,13 +68,18 @@ it('skips videos without reading or publishing', async () => {
   );
   expect(outcome).toEqual({ _tag: 'Skipped' });
 });
-it('skips an original with no visible pixels without publishing an unusable histogram', async () => {
+it('publishes a transparent original measured against black', async () => {
+  const publications: unknown[] = [];
+  const image = measuredImage('transparent');
   const layer = extractionLayer.pipe(
     Layer.provide(
       Layer.mergeAll(
-        Layer.succeed(ImageHistogram, { extract: () => Effect.succeed(Array(64).fill(0)) }),
+        Layer.succeed(ImageMeasurements, { extract: () => Effect.succeed(image) }),
         Layer.succeed(ColorEvents, {
-          publish: () => Effect.die('must not publish a colorless original'),
+          publish: (result) =>
+            Effect.sync(() => {
+              publications.push(result);
+            }),
         })
       )
     )
@@ -83,7 +89,8 @@ it('skips an original with no visible pixels without publishing an unusable hist
       return yield* (yield* ExtractColors).extract(input);
     }).pipe(Effect.provide(layer))
   );
-  expect(outcome).toEqual({ _tag: 'Skipped' });
+  expect(outcome).toEqual({ _tag: 'Extracted' });
+  expect(publications).toEqual([{ input, ...image }]);
 });
 it('preserves the typed extraction failure and does not publish', async () => {
   const failure = new ExtractionUnavailable({
@@ -93,7 +100,7 @@ it('preserves the typed extraction failure and does not publish', async () => {
   const layer = extractionLayer.pipe(
     Layer.provide(
       Layer.mergeAll(
-        Layer.succeed(ImageHistogram, { extract: () => Effect.fail(failure) }),
+        Layer.succeed(ImageMeasurements, { extract: () => Effect.fail(failure) }),
         Layer.succeed(ColorEvents, {
           publish: () => Effect.die('must not publish failed extraction'),
         })
@@ -115,7 +122,7 @@ it('reports publication failure instead of completion', async () => {
   const layer = extractionLayer.pipe(
     Layer.provide(
       Layer.mergeAll(
-        Layer.succeed(ImageHistogram, { extract: () => Effect.succeed([1]) }),
+        Layer.succeed(ImageMeasurements, { extract: () => Effect.succeed(measuredImage()) }),
         Layer.succeed(ColorEvents, { publish: () => Effect.fail(failure) })
       )
     )

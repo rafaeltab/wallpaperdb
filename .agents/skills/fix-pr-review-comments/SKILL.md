@@ -48,6 +48,8 @@ Re-read the selected conversation and PR head before publishing a verdict. Reass
 
 For valid feedback, reply with the fix commit or existing fix and the verification performed, then add thumbs up to the original comment. For invalid feedback, post the evidence-backed reason first, then add thumbs down to the original comment. Apply the verdict to each actionable comment, including duplicate reports, rather than reacting only to your reply or the PR itself.
 
+If a valid comment's required fix has not passed its checks or reached the remote PR head, a status reply may explain the blocker, but defer thumbs up until delivery is verified.
+
 Resolve a review thread only when every actionable claim in that conversation has been handled, all required fixes are verified and pushed, and the replies and required reactions succeeded. Mixed comments require the user's decision and completion of the agreed actions; they receive no reaction. Threads with uncertain claims, unanswered questions, failed checks, or failed publication stay open. Review summaries and ordinary PR comments have no thread-resolution operation; acknowledge them without claiming they were resolved.
 
 On an API error or lost response, inspect the current remote state before retrying. Reuse an existing equivalent reply or reaction rather than duplicating it. Preserve other users' reactions. Report permission failures and unsupported operations instead of marking them complete.

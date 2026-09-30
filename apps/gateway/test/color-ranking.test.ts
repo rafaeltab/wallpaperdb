@@ -262,6 +262,13 @@ describe('Native color ranking port contract', () => {
                   body.hits.hits[0]._score = 2;
                   body.hits.hits[0].sort[0] = 2;
                 }
+                if (fault.includes('wrong-profile'))
+                  body.hits.hits[0]._source.userId = 'outside-profile';
+                if (fault.includes('split-variants'))
+                  body.hits.hits[0]._source.variants = [
+                    { ...variant, height: 720 },
+                    { ...variant, width: 800 },
+                  ];
                 if (fault === 'sort') body.hits.hits[0].sort[1] = 'different';
                 if (fault.startsWith('order')) body.hits.hits.reverse();
                 if (fault.startsWith('stale')) body.hits.hits[0] = firstHit;
@@ -315,6 +322,8 @@ describe('Native color ranking port contract', () => {
       'score',
       'score-and-sort',
       'utility-above-one',
+      'wrong-profile',
+      'split-variants',
       'sort',
       'order',
       'order-asc',
@@ -389,6 +398,28 @@ describe('Native color ranking port contract', () => {
         fault = `non-color-cursor-${omission}`;
         expect(
           await Effect.runPromise(Effect.flip(proxied.adapter.read.search(requested)))
+        ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+      } finally {
+        fault = undefined;
+        firstHit = undefined;
+      }
+    });
+
+    it.each([
+      'wrong-profile',
+      'split-variants',
+    ] as const)('rejects a non-color hit with %s despite a matching ID and cursor', async (selectedFault) => {
+      if (!proxied) throw new Error('Expected an acquired proxy fixture');
+      const uncolored: SearchSelection = {
+        profileId: 'ranking',
+        variantFilters: { width: 1920, height: 1080 },
+        size: 100,
+        sortOrder: 'asc',
+      };
+      try {
+        fault = selectedFault;
+        expect(
+          await Effect.runPromise(Effect.flip(proxied.adapter.read.search(uncolored)))
         ).toMatchObject({ _tag: 'CatalogueUnavailable' });
       } finally {
         fault = undefined;

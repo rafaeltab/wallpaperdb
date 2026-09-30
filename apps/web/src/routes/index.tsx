@@ -209,7 +209,10 @@ export function HomePage() {
       ) : isLoading ? (
         <LoadingState />
       ) : wallpapers.length === 0 ? (
-        <EmptyState hasCursor={!!after} hasFilters={Boolean(profileId || format || aspectRatio)} />
+        <EmptyState
+          hasCursor={!!after}
+          hasFilters={Boolean(color || profileId || format || aspectRatio)}
+        />
       ) : (
         <>
           <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isFetchingNextPage} />

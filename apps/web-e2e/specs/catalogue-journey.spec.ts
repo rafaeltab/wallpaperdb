@@ -131,9 +131,34 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
     await details.close();
   }
 
-  const colorCursor = await waitForCataloguePage(page, wallpaperId, "#336699");
-  await page.getByRole("button", { name: /filter/i }).click();
+  const ownerResponse = await page.request.post("/gateway/graphql", {
+    data: {
+      query:
+        "query($id:ID!){getWallpaper(wallpaperId:$id){profileId profile{handle displayName}}}",
+      variables: { id: wallpaperId },
+    },
+  });
+  expect(ownerResponse.ok()).toBe(true);
+  const ownerResult = await ownerResponse.json();
+  expect(ownerResult.errors).toBeUndefined();
+  const owner = ownerResult.data.getWallpaper;
+  expect(owner.profile).toBeTruthy();
+  const filteredCursor = await waitForCataloguePage(
+    page,
+    wallpaperId,
+    owner.profileId,
+  );
+  await page
+    .getByRole("button", { name: "Toggle filters", exact: true })
+    .click();
+  await expect(page.getByLabel("Color", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Clear color", exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "PNG", exact: true }).click();
+  await page
+    .getByRole("searchbox", { name: "Profile", exact: true })
+    .fill(owner.profile.handle);
   const filtered = page.waitForResponse((response) => {
     if (
       !response.url().endsWith("/gateway/graphql") ||
@@ -143,41 +168,52 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
     const request = response.request().postDataJSON();
     return (
       request.query.includes("SearchWallpapers") &&
-      request.variables?.sort?.color
+      request.variables?.filter?.profileId === owner.profileId
     );
   });
-  await page.getByLabel("Color", { exact: true }).fill("#336699");
+  await page
+    .getByRole("button", {
+      name: `Select ${owner.profile.displayName} (@${owner.profile.handle})`,
+      exact: true,
+    })
+    .click();
   const response = await filtered;
   expect(response.ok()).toBe(true);
+  expect(response.request().postDataJSON().variables).toEqual({
+    filter: { variants: { format: "image/png" }, profileId: owner.profileId },
+    first: 20,
+    after: null,
+  });
+  expect(response.request().postDataJSON().query).not.toContain(
+    "WallpaperSort",
+  );
   const results = await response.json();
   expect(results.errors).toBeUndefined();
   expect(results.data.searchWallpapers.edges.length).toBeGreaterThan(0);
-  const first = results.data.searchWallpapers.edges[0].node;
-  expect(
-    first.variants.some(
-      (variant: { format: string }) => variant.format === "image/png",
-    ),
-  ).toBe(true);
-  await expect(
-    page.getByRole("button", {
-      name: `Wallpaper ${first.wallpaperId}`,
-      exact: true,
-    }),
-  ).toBeVisible();
+  for (const { node } of results.data.searchWallpapers.edges) {
+    expect(node.profileId).toBe(owner.profileId);
+    expect(
+      node.variants.some(
+        (variant: { format: string }) => variant.format === "image/png",
+      ),
+    ).toBe(true);
+  }
   await expect(
     page.getByRole("button", { name: "PNG", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page).toHaveURL(/color=%23336699/);
-  if (colorCursor) {
+  expect(new URL(page.url()).searchParams.get("profileId")).toBe(
+    owner.profileId,
+  );
+  if (filteredCursor) {
     const selectedPage = new URL(page.url());
-    selectedPage.searchParams.set("after", colorCursor);
+    selectedPage.searchParams.set("after", filteredCursor);
     await page.goto(selectedPage.toString());
-    await page
-      .getByRole("button", { name: "Toggle filters", exact: true })
-      .click();
   }
   await expect(card).toBeVisible();
-  await page.getByRole("button", { name: "Clear color", exact: true }).click();
-  await expect(page).not.toHaveURL(/color=/);
+  await page
+    .getByRole("button", { name: "Clear Profile filter", exact: true })
+    .click();
+  await expect(page).not.toHaveURL(/profileId=/);
+  expect(new URL(page.url()).searchParams.get("format")).toBe("png");
   expect(pageErrors).toEqual([]);
 });

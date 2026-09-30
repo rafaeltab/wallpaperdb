@@ -5,6 +5,17 @@ export {
 } from "./base-event.js";
 
 export { AssetReferenceSchema, type AssetReference } from "./asset-reference.js";
+export {
+  COLOR_ANCHORS,
+  COLOR_MEASUREMENT_VERSION,
+  COLOR_REFERENCE_COMMIT,
+  COLOR_ANCHORS_SHA256,
+  COLOR_CUTOFFS,
+  COLOR_FEATURE_NAMES,
+  ColorMeasurementsSchema,
+  type ColorMeasurements,
+  type ColorFeatureName,
+} from "./color-measurements.js";
 
 export {
   WallpaperUploadedEventSchema,

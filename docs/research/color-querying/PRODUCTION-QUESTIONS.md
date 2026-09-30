@@ -66,33 +66,49 @@ scope recorded in [EVIDENCE.md](EVIDENCE.md).
 
 ## Measurements, utilities, and retained facts
 
-Color Extractor owns image measurements; Gateway owns the Catalogue projection
-and query interpretation. Measurements describe coverage and conditional quality
-at each anchor/cutoff, plus named visual properties. Utilities are derived fit
-scores for a target, mode, proportion, and quality preference. Retaining
-measurements permits utility calculation without decoding originals again when
-the descriptor definition is unchanged.
+Color Extractor owns image sampling and the versioned measurement fact; Gateway
+owns Catalogue utilities and query interpretation. Measurements describe coverage
+and conditional quality at each anchor/cutoff, plus named visual properties.
+Utilities are derived fit scores for a target, mode, proportion, and quality
+preference. Retaining measurements permits utility calculation without decoding
+originals again when the descriptor definition is unchanged.
 
-Retain versioned extraction facts through NATS under the existing retention
-decision. Begin with the extractor publishing measurements and Gateway deriving
-utilities; the computation split may change if correctness or performance
-warrants it within the repository's context boundaries. A new Postgres store is
-not required. The broader retention/privacy review remains in
-[#162](https://github.com/rafaeltab/wallpaperdb/issues/162).
-
-Record descriptor provenance and version the metric, anchor bank, cutoffs,
-named features, presets, and utility schema so incompatible data cannot be mixed.
-Consumers must remain replay-safe, and incomplete banks cannot participate in
-color ranking. These are ordinary delivery and projection guarantees; they do
-not require an operator replay or index-rebuild command in this feature.
-
+The [measurement contract](../../../packages/events/src/schemas/color-measurements.ts)
+and [published fact](../../../packages/events/src/schemas/wallpaper-colors-extracted.ts)
+freeze descriptor geometry, provenance, and structural validation. Retained NATS
+history keeps the measurements after consumer acknowledgement; Gateway rejects
+incompatible definitions before projection. Consumers remain replay-safe, and
+incomplete banks cannot participate in color ranking. The broader retention and
+privacy review remains in [#162](https://github.com/rafaeltab/wallpaperdb/issues/162).
 The source-event budget is 64 KiB including headers, enforced by the
 [Gateway message-budget adapter](../../../apps/gateway/src/adapters/events/message-budget.ts).
-Measure the chosen serialized contract rather than assuming that a numeric
-value count predicts event size. An encoding must fit that budget; if a durable
-logical reference is used, its measurement bytes must remain available for the
-event replay lifetime. Contract details and complete-bank eligibility are owned
-by the extraction and indexing issues linked above.
+
+Gateway computes the complete bank with the selected encoder's float32 casts and
+calculation order. The [retained utility fixtures](../../../apps/gateway/test/fixtures/prototype/utilities.json)
+contain every value produced by the frozen linked-three encoder, independently
+of production code. The [mapping](../../../apps/gateway/src/adapters/opensearch/mappings.ts)
+keeps Catalogue metadata, measurements, and provenance in the wallpaper document
+while excluding utilities from stored source. Utilities are numeric float fields
+with indexing and doc values; wallpaper IDs also have doc values. A complete
+compatible bank and readiness marker become visible in one document replacement.
+A bank arriving before upload remains hidden until the wallpaper is published.
+
+Source exclusion makes ordinary source-based metadata updates unsafe because
+reconstructing the document would discard utilities. The
+[projection adapter](../../../apps/gateway/src/adapters/opensearch/index.ts)
+therefore replaces the complete document using sequence-number and primary-term
+compare-and-set. Every accepted wallpaper metadata change recomputes utilities
+from retained measurements. Definite conflicts trigger a bounded reread; unknown
+write outcomes rely on ordinary replay and stable occurrence identity. Contributor
+Profile snapshots keep their separate document and version contract. No
+transaction spans a wallpaper, Profile document, and broker acknowledgement.
+
+Writes are bounded by serialized bytes. This consumer writes one complete
+wallpaper at a time and checks its acknowledgement; it does not batch partial
+banks or add operator replay/rebuild tooling. Future bulk delivery must retain
+byte-bounded batches, complete item acknowledgements, and restricted retries for
+definite HTTP 429 admission rejection. Experimental shard, replica, and refresh
+settings are not deployment requirements.
 
 ## Fresh installation and picker scope
 

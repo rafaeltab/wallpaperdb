@@ -31,8 +31,12 @@ A requested overall color impression without a specified image proportion.
 The desired fraction of the whole image matching a color target, or the requested strength of a named distribution property. It is not a relative palette weight; unrequested image area remains unspecified.
 
 **Color utility**:
-A single target's relevance score for a color preference, derived from the wallpaper's color measurements. It is not a measured image percentage.
-_Avoid_: Coverage, histogram
+A single target's relevance score for a request mode, proportion, and quality preference, derived from wallpaper color measurements. It is not a measured image percentage.
+_Avoid_: Coverage, histogram, extracted color measurement
+
+**Utility bank**:
+The complete set of color utilities supported by Catalogue discovery for a wallpaper.
+_Avoid_: Color histogram, disjoint palette
 
 **Projection**:
 The catalogue's interpretation of a published fact from an owning context.

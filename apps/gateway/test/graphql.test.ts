@@ -648,6 +648,16 @@ describe('GraphQL driving adapter contract', () => {
     });
     expect(inbound.calls).toEqual([]);
   });
+  it('rejects structurally invalid non-color resolver arguments without leaking library details', async () => {
+    const { graphql, inbound } = await setup();
+    await expect(
+      graphql.resolvers.Query.searchWallpapers({}, { filter: { variants: { width: 'secret' } } })
+    ).rejects.toMatchObject({
+      message: 'Invalid query arguments',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    expect(inbound.calls).toEqual([]);
+  });
   it('preserves the query throughput, duration and result count dashboard metrics', async () => {
     const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
     const reader = new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 60_000 });

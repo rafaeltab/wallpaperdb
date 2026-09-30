@@ -17,10 +17,16 @@ import {
 } from '../src/adapters/events/index.js';
 import {
   ProjectCatalogue,
+  ProjectionStore,
+  projectionLayer,
+  type ProjectionMutation,
+  type ProjectionWrite,
   ProjectionUnavailable,
   type ProjectionChange,
   type ProjectionOutcome,
 } from '../src/capabilities/projection/index.js';
+
+import { measuredColors } from './helpers/colors.js';
 
 const timestamp = '2026-09-15T12:00:00.000Z';
 
@@ -181,6 +187,68 @@ describe('NATS projection adapter contract', () => {
     });
     return JSON.parse(new TextDecoder().decode(message.data));
   }
+
+  it('retains complete measurements and preserves duplicate occurrence identity through projection', async () => {
+    class Store implements ProjectionStore {
+      readonly changes: ProjectionMutation[] = [];
+      readonly occurrences = new Set<string>();
+      apply(mutation: ProjectionMutation): Effect.Effect<ProjectionWrite> {
+        return Effect.sync(() => {
+          this.changes.push(mutation);
+          const identity = JSON.stringify([mutation.occurrence.source, mutation.occurrence.id]);
+          if (this.occurrences.has(identity)) return { _tag: 'Unchanged' };
+          this.occurrences.add(identity);
+          return { _tag: 'Applied' };
+        });
+      }
+    }
+    const store = new Store();
+    const project = await Effect.runPromise(
+      ProjectCatalogue.pipe(
+        Effect.provide(projectionLayer.pipe(Layer.provide(Layer.succeed(ProjectionStore, store))))
+      )
+    );
+    await consumer(project);
+    const change = measuredColors('duplicate-measurements', timestamp);
+    const payload = JSON.stringify({
+      specversion: '1.0',
+      source: change.occurrence.source,
+      id: change.occurrence.id,
+      type: 'wallpaper.colors.extracted',
+      time: timestamp,
+      datacontenttype: 'application/json',
+      data: {
+        schemaVersion: 1,
+        wallpaperId: change.wallpaperId,
+        original: change.original,
+        provenance: change.provenance,
+        measurements: change.descriptor,
+      },
+    });
+    const js = await tester.nats.getJsClient();
+    await js.publish('wallpaper.colors.extracted', payload);
+    await js.publish('wallpaper.colors.extracted', payload);
+    await expect.poll(() => store.changes.length, { timeout: 10000 }).toBe(2);
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await expect
+      .poll(
+        async () => {
+          const info = await manager.consumers.info(
+            'WALLPAPER',
+            'gateway-wallpaper-colors-extracted'
+          );
+          return [info.num_pending, info.num_ack_pending];
+        },
+        { timeout: 10000 }
+      )
+      .toEqual([0, 0]);
+    expect(store.occurrences.size).toBe(1);
+    expect(store.changes).toEqual(Array(2).fill({ ...change, _tag: 'PublishMeasurements' }));
+    const retained = await manager.streams.getMessage('WALLPAPER', {
+      last_by_subj: 'wallpaper.colors.extracted',
+    });
+    expect(new TextDecoder().decode(retained.data)).toBe(payload);
+  });
 
   it('continues acknowledging subsequent deliveries when metric recording fails', async () => {
     const project = new ControlledProjection();

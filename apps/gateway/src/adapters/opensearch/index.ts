@@ -2,6 +2,7 @@ import { Client } from '@opensearch-project/opensearch';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { Clock, Context, DateTime, Effect, Exit, Layer, Schema } from 'effect';
 import {
+  colorUtilityFields,
   CatalogueRead,
   CatalogueUnavailable,
   type ProfileSearchSelection,
@@ -29,7 +30,13 @@ import {
 import { profilesIndexMapping, wallpapersIndexMapping } from './mappings.js';
 import { aliasClaimSearch, profileSearchBody } from './profiles.js';
 import { searchBody } from './query.js';
-import { projectionUpdate } from './scripts.js';
+import { profileUpdate } from './scripts.js';
+import {
+  completeWallpaper,
+  indexResponse,
+  nextWallpaper,
+  storedWallpaperResponse,
+} from './wallpaper-projection.js';
 
 export interface OpenSearchGatewayOptions {
   readonly url: string;
@@ -79,12 +86,7 @@ const startupStatusCode = Schema.decodeUnknownOption(
 );
 
 function startupFailure(
-  operation:
-    | 'initialize-client'
-    | 'inspect-index'
-    | 'update-index-mapping'
-    | 'create-index'
-    | 'recheck-index',
+  operation: 'initialize-client' | 'inspect-index' | 'create-index' | 'recheck-index',
   cause: unknown,
   index?: string
 ): OpenSearchStartupError {
@@ -253,7 +255,7 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
     const operation = {
       PublishWallpaper: 'upsert',
       PublishVariant: 'add_variant',
-      PublishColors: 'add_color_data',
+      PublishMeasurements: 'add_color_utilities',
       PublishProfile: 'profile_project',
     }[mutation._tag];
     return measure(
@@ -262,11 +264,12 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
         ProjectionWrite,
         SearchRequestError | Schema.SchemaError
       > {
+        if (mutation._tag !== 'PublishProfile') return yield* this.applyWallpaper(mutation);
         const result = yield* this.request(() =>
           this.client.update({
-            index: mutation._tag === 'PublishProfile' ? this.profilesIndex : this.wallpapers,
-            id: mutation._tag === 'PublishProfile' ? mutation.profile.id : mutation.wallpaperId,
-            body: projectionUpdate(mutation),
+            index: this.profilesIndex,
+            id: mutation.profile.id,
+            body: profileUpdate(mutation.profile),
             refresh: true,
             retry_on_conflict: 5,
           })
@@ -284,6 +287,62 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
           : Effect.fail(new ProjectionUnavailable({ cause: error }));
       })
     );
+  });
+  private readonly applyWallpaper = Effect.fnUntraced(function* (
+    this: SearchProjection,
+    mutation: Exclude<ProjectionMutation, { _tag: 'PublishProfile' }>
+  ): Effect.fn.Return<ProjectionWrite, SearchRequestError | Schema.SchemaError> {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const existing = yield* this.get(this.wallpapers, mutation.wallpaperId);
+      const stored = existing === null ? null : yield* storedWallpaperResponse(existing);
+      if (
+        stored !== null &&
+        (stored._id !== mutation.wallpaperId ||
+          stored._index !== this.wallpapers ||
+          stored._source.wallpaperId !== mutation.wallpaperId)
+      )
+        return yield* new SearchRequestError({
+          cause: new Error('Wallpaper source identity differs'),
+        });
+      const next = nextWallpaper(stored?._source ?? null, mutation);
+      if (next === null) return { _tag: 'Unchanged' };
+      const body = completeWallpaper(next);
+      if (Buffer.byteLength(JSON.stringify(body)) > 5 * 1024 * 1024)
+        return yield* new SearchRequestError({
+          cause: new Error('Wallpaper indexing payload exceeds byte limit'),
+        });
+      const written = yield* this.request(() =>
+        this.client.index({
+          index: this.wallpapers,
+          id: mutation.wallpaperId,
+          body,
+          refresh: true,
+          ...(stored === null
+            ? { op_type: 'create' as const }
+            : { if_seq_no: stored._seq_no, if_primary_term: stored._primary_term }),
+        })
+      ).pipe(
+        Effect.map((response) => ({ _tag: 'Written' as const, body: response.body })),
+        Effect.catch((error) => {
+          const status = storageError(error.cause);
+          return status._tag === 'Some' &&
+            status.value.meta.statusCode === 409 &&
+            status.value.meta.body?.error?.type === 'version_conflict_engine_exception'
+            ? Effect.succeed({ _tag: 'Conflict' as const })
+            : Effect.fail(error);
+        })
+      );
+      if (written._tag === 'Conflict') continue;
+      const acknowledged = yield* indexResponse(written.body);
+      if (acknowledged._id !== mutation.wallpaperId || acknowledged._index !== this.wallpapers)
+        return yield* new SearchRequestError({
+          cause: new Error('Wallpaper indexing acknowledgement differs'),
+        });
+      return { _tag: 'Applied' };
+    }
+    return yield* new SearchRequestError({
+      cause: new Error('Concurrent wallpaper projection retry limit reached'),
+    });
   });
   private readonly get = Effect.fnUntraced(function* (
     this: SearchProjection,
@@ -387,28 +446,94 @@ export function openSearchLayer(
     })
   );
 }
+type IndexMapping = {
+  settings?: Record<string, unknown>;
+  source?: { excludes: string[] };
+  properties: Record<string, unknown>;
+};
+const verifyUtilityMapping = Effect.fnUntraced(function* (
+  adapter: SearchProjection,
+  client: Client,
+  name: string,
+  mapping: IndexMapping
+) {
+  if (mapping.source === undefined) return;
+
+  const actual = yield* adapter
+    .request(() => client.indices.getMapping({ index: name }))
+    .pipe(Effect.mapError((cause) => startupFailure('inspect-index', cause, name)));
+  const observed = Schema.decodeUnknownOption(
+    Schema.Struct({
+      [name]: Schema.Struct({
+        mappings: Schema.Struct({
+          _source: Schema.Struct({
+            excludes: Schema.Array(Schema.String),
+            enabled: Schema.optionalKey(Schema.Boolean),
+          }),
+          properties: Schema.Struct({
+            colorReady: Schema.Struct({ type: Schema.Literal('keyword') }),
+            utilities: Schema.Struct({
+              properties: Schema.Record(
+                Schema.String,
+                Schema.Struct({
+                  type: Schema.Literal('float'),
+                  index: Schema.optionalKey(Schema.Boolean),
+                  doc_values: Schema.optionalKey(Schema.Boolean),
+                })
+              ),
+            }),
+          }),
+        }),
+      }),
+    })
+  )(actual.body);
+  if (
+    observed._tag === 'None' ||
+    observed.value[name].mappings._source.enabled === false ||
+    observed.value[name].mappings._source.excludes.length !== 1 ||
+    observed.value[name].mappings._source.excludes[0] !== 'utilities' ||
+    Object.keys(observed.value[name].mappings.properties.utilities.properties).length !==
+      colorUtilityFields.length ||
+    !colorUtilityFields.every((key) => {
+      const field = observed.value[name].mappings.properties.utilities.properties[key];
+      return field !== undefined && field.index !== false && field.doc_values !== false;
+    })
+  )
+    return yield* startupFailure(
+      'inspect-index',
+      new Error('Catalogue utility mapping differs from the required fresh index'),
+      name
+    );
+});
 const ensureIndex = Effect.fn('catalogue.storage.ensure-index')(function* (
   adapter: SearchProjection,
   client: Client,
   name: string,
-  mapping: { settings?: Record<string, unknown>; properties: Record<string, unknown> }
+  mapping: IndexMapping
 ) {
   const exists = yield* adapter
     .request(() => client.indices.exists({ index: name }))
     .pipe(Effect.mapError((cause) => startupFailure('inspect-index', cause, name)));
   if (exists.body) {
-    yield* adapter
+    if (mapping.source !== undefined)
+      return yield* verifyUtilityMapping(adapter, client, name, mapping);
+    return yield* adapter
       .request(() =>
         client.indices.putMapping({ index: name, body: { properties: mapping.properties } })
       )
       .pipe(Effect.mapError((cause) => startupFailure('update-index-mapping', cause, name)));
-    return;
   }
   yield* adapter
     .request(() =>
       client.indices.create({
         index: name,
-        body: { settings: mapping.settings, mappings: { properties: mapping.properties } },
+        body: {
+          settings: mapping.settings,
+          mappings: {
+            properties: mapping.properties,
+            ...(mapping.source === undefined ? {} : { _source: mapping.source }),
+          },
+        },
       })
     )
     .pipe(
@@ -422,4 +547,5 @@ const ensureIndex = Effect.fn('catalogue.storage.ensure-index')(function* (
           )
       )
     );
+  yield* verifyUtilityMapping(adapter, client, name, mapping);
 });

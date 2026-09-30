@@ -1,5 +1,5 @@
-import { COLOR_ANCHORS, COLOR_CUTOFFS, COLOR_FEATURE_NAMES } from '@wallpaperdb/events';
-import type { ColorDescriptor } from './contract.js';
+import { COLOR_ANCHORS, COLOR_CUTOFFS, COLOR_FEATURE_NAMES } from './color-definition.js';
+import type { ColorDescriptor, ColorQuality } from './contract.js';
 
 export const COLOR_UTILITY_VERSION = 'linked-3-linear-10-v1';
 export const COLOR_QUALITY_PRESETS = {
@@ -7,7 +7,6 @@ export const COLOR_QUALITY_PRESETS = {
   favorite: { influence: 0.5, weighting: 1 },
   strict: { influence: 1, weighting: 3 },
 } as const;
-export type ColorQuality = keyof typeof COLOR_QUALITY_PRESETS;
 
 export function colorUtilityKey(
   target: string,

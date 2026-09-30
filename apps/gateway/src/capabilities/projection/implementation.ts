@@ -1,13 +1,7 @@
-import { Effect, Layer, Schema } from 'effect';
+import { Effect, Layer } from 'effect';
 import type { ProjectionChange, ProjectionMutation, ProjectionOutcome } from './contract.js';
+import { compatibleMeasurements } from './measurements.js';
 import { ProjectCatalogue, ProjectionStore, type ProjectionUnavailable } from './contract.js';
-
-const validHistogram = Schema.is(
-  Schema.Array(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))).check(
-    Schema.isLengthBetween(64, 64),
-    Schema.makeFilter((values) => values.some((value) => value > 0))
-  )
-);
 
 export const projectionLayer: Layer.Layer<ProjectCatalogue, never, ProjectionStore> = Layer.effect(
   ProjectCatalogue,
@@ -16,10 +10,8 @@ export const projectionLayer: Layer.Layer<ProjectCatalogue, never, ProjectionSto
     const record = Effect.fn('catalogue.project')(function* (
       change: ProjectionChange
     ): Effect.fn.Return<ProjectionOutcome, ProjectionUnavailable> {
-      // Utility projection is introduced by #306. The complete fact remains in retained NATS history.
-      if (change._tag === 'ColorsMeasured') return { _tag: 'Ignored' };
-      if (change._tag === 'ColorsExtracted' && !validHistogram(change.colorHistogram)) {
-        return { _tag: 'Rejected', reason: 'invalid-color-histogram' } satisfies ProjectionOutcome;
+      if (change._tag === 'ColorsMeasured' && !compatibleMeasurements(change)) {
+        return { _tag: 'Rejected', reason: 'incompatible-color-measurements' };
       }
       const outcome = yield* store.apply(toMutation(change));
       switch (outcome._tag) {
@@ -35,16 +27,14 @@ export const projectionLayer: Layer.Layer<ProjectCatalogue, never, ProjectionSto
   })
 );
 
-function toMutation(
-  change: Exclude<ProjectionChange, { readonly _tag: 'ColorsMeasured' }>
-): ProjectionMutation {
+function toMutation(change: ProjectionChange): ProjectionMutation {
   switch (change._tag) {
     case 'WallpaperUploaded':
       return { ...change, _tag: 'PublishWallpaper' };
     case 'VariantAvailable':
       return { ...change, _tag: 'PublishVariant' };
-    case 'ColorsExtracted':
-      return { ...change, _tag: 'PublishColors' };
+    case 'ColorsMeasured':
+      return { ...change, _tag: 'PublishMeasurements' };
     case 'ProfilePublished':
       return { ...change, _tag: 'PublishProfile' };
   }

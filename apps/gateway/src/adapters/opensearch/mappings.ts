@@ -1,3 +1,4 @@
+import { colorUtilityFields } from '../../capabilities/catalogue/index.js';
 /**
  * OpenSearch index mappings for the Gateway service
  */
@@ -11,11 +12,8 @@
  * - format enum for easy filtering by image type
  */
 export const wallpapersIndexMapping = {
-  settings: {
-    index: {
-      knn: true,
-    },
-  },
+  settings: { 'index.mapping.total_fields.limit': 10100 },
+  source: { excludes: ['utilities'] },
   properties: {
     wallpaperId: { type: 'keyword' },
     userId: { type: 'keyword' },
@@ -33,16 +31,15 @@ export const wallpapersIndexMapping = {
       },
     },
 
-    colorHistogram: {
-      type: 'knn_vector',
-      dimension: 64,
-      method: {
-        name: 'hnsw',
-        engine: 'lucene',
-        space_type: 'cosinesimil',
-      },
+    utilities: {
+      type: 'object',
+      dynamic: 'strict',
+      properties: Object.fromEntries(
+        colorUtilityFields.map((key) => [key, { type: 'float', index: true, doc_values: true }])
+      ),
     },
-    colorSpace: { type: 'keyword' },
+    colorReady: { type: 'keyword' },
+    colorSnapshot: { type: 'object', enabled: false },
     colorOrder: { type: 'keyword', index: false },
     variantOrder: { type: 'object', enabled: false },
 

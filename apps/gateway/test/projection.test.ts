@@ -1,5 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
+import { measuredColors } from './helpers/colors.js';
 import {
   ProjectCatalogue,
   projectionLayer,
@@ -32,33 +33,71 @@ const occurrence = {
   occurredAt: '2026-01-01T00:00:00.000Z',
 };
 
+function invalidLayer(
+  change: Partial<
+    import('../src/capabilities/catalogue/index.js').ColorDescriptor['layers'][number]
+  >
+) {
+  const descriptor = measuredColors('wallpaper').descriptor;
+  return {
+    descriptor: {
+      ...descriptor,
+      layers: descriptor.layers.map((layer, index) =>
+        index === 0 ? { ...layer, ...change } : layer
+      ),
+    },
+  };
+}
+
 describe('Catalogue projection', () => {
-  it.each(
-    [
-      [],
-      [1],
-      Array(64).fill(0),
-      [-1, ...Array(63).fill(1)],
-      [Number.NaN, ...Array(63).fill(1)],
-      [Number.POSITIVE_INFINITY, ...Array(63).fill(1)],
-    ].map((colorHistogram) => ({ colorHistogram }))
-  )('rejects a histogram that cannot represent catalogue color similarity', async ({
-    colorHistogram,
-  }) => {
+  it.each([
+    { descriptor: { ...measuredColors('wallpaper').descriptor, version: 'unsupported' } },
+    { descriptor: { ...measuredColors('wallpaper').descriptor, layers: [] } },
+    { descriptor: { ...measuredColors('wallpaper').descriptor, sampleCount: 1 } },
+    { descriptor: { ...measuredColors('wallpaper').descriptor, named: {} } },
+    invalidLayer({ cutoff: 0.25 }),
+    invalidLayer({ coverage: [] }),
+    invalidLayer({ quality: [] }),
+    invalidLayer({
+      coverage: [-1, ...measuredColors('wallpaper').descriptor.layers[0].coverage.slice(1)],
+    }),
+    invalidLayer({
+      quality: [Number.NaN, ...measuredColors('wallpaper').descriptor.layers[0].quality.slice(1)],
+    }),
+    invalidLayer({
+      quality: [0.123, ...measuredColors('wallpaper').descriptor.layers[0].quality.slice(1)],
+    }),
+    {
+      descriptor: {
+        ...measuredColors('wallpaper').descriptor,
+        named: {
+          ...measuredColors('wallpaper').descriptor.named,
+          red: { coverage: 0, quality: 1 },
+        },
+      },
+    },
+    { original: { owner: 'ingestor' as const, id: 'another-wallpaper' } },
+    { provenance: { ...measuredColors('wallpaper').provenance, anchorsSha256: 'unsupported' } },
+  ])('rejects incompatible measurements without changing persistence', async (invalid) => {
     const store = new ControlledProjection();
     const outcome = await Effect.runPromise(
       ProjectCatalogue.use((projection) =>
-        projection.record({
-          _tag: 'ColorsExtracted',
-          occurrence,
-          wallpaperId: 'wallpaper',
-          colorHistogram,
-          colorSpace: 'hsv',
-        })
+        projection.record({ ...measuredColors('wallpaper'), ...invalid })
       ).pipe(Effect.provide(layer(store)))
     );
-    expect(outcome).toEqual({ _tag: 'Rejected', reason: 'invalid-color-histogram' });
+    expect(outcome).toEqual({ _tag: 'Rejected', reason: 'incompatible-color-measurements' });
     expect(store.changes).toEqual([]);
+  });
+  it('publishes validated measurements with their provenance for complete atomic indexing', async () => {
+    const store = new ControlledProjection();
+    const event = measuredColors('wallpaper');
+    const outcome = await Effect.runPromise(
+      ProjectCatalogue.use((projection) => projection.record(event)).pipe(
+        Effect.provide(layer(store))
+      )
+    );
+    expect(outcome).toEqual({ _tag: 'Completed' });
+    expect(store.changes).toEqual([{ ...event, _tag: 'PublishMeasurements' }]);
   });
   it('preserves occurrence identity and creates a deterministic upload snapshot', async () => {
     const store = new ControlledProjection();
@@ -87,15 +126,10 @@ describe('Catalogue projection', () => {
   it('propagates typed persistence unavailability', async () => {
     const unavailable = new ProjectionUnavailable({ cause: 'controlled outage' });
     const outcome = await Effect.runPromise(
-      ProjectCatalogue.use((projection) =>
-        projection.record({
-          _tag: 'ColorsExtracted',
-          occurrence,
-          wallpaperId: 'wallpaper',
-          colorHistogram: Array(64).fill(1),
-          colorSpace: 'hsv',
-        })
-      ).pipe(Effect.flip, Effect.provide(layer(new ControlledProjection(unavailable))))
+      ProjectCatalogue.use((projection) => projection.record(measuredColors('wallpaper'))).pipe(
+        Effect.flip,
+        Effect.provide(layer(new ControlledProjection(unavailable)))
+      )
     );
     expect(outcome).toBe(unavailable);
   });

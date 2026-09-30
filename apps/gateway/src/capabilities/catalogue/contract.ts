@@ -1,5 +1,7 @@
 import { Context, type Effect, Schema } from 'effect';
 
+export type ColorQuality = 'relaxed' | 'favorite' | 'strict';
+
 export interface ColorDescriptor {
   readonly version: string;
   readonly sampleCount: number;

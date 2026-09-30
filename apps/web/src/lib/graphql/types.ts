@@ -40,6 +40,47 @@ export interface WallpaperFilter {
   variants?: VariantFilter;
 }
 
+export interface WallpaperSort {
+  color?: ColorSort;
+}
+
+export interface ColorSort {
+  mode?: 'VIBE' | 'PROPORTIONS';
+  quality?: 'RELAXED' | 'FAVORITE' | 'STRICT';
+  targets: ColorTarget[];
+}
+
+export type ColorTargetName =
+  | 'RED'
+  | 'ORANGE'
+  | 'YELLOW'
+  | 'GREEN'
+  | 'TEAL'
+  | 'CYAN'
+  | 'BLUE'
+  | 'PURPLE'
+  | 'PINK'
+  | 'BROWN'
+  | 'BLACK'
+  | 'GRAY'
+  | 'WHITE'
+  | 'GRAYSCALE'
+  | 'STRICT_GRAYSCALE'
+  | 'NEAR_NEUTRAL'
+  | 'DARK'
+  | 'LIGHT'
+  | 'BRIGHT'
+  | 'VIVID'
+  | 'MUTED'
+  | 'MONOCHROMATIC'
+  | 'RAINBOW';
+
+export interface ColorTarget {
+  color?: string;
+  name?: ColorTargetName;
+  percent?: number;
+}
+
 export interface VariantFilter {
   width?: number;
   height?: number;

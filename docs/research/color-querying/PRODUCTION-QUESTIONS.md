@@ -1,116 +1,148 @@
-# Questions for production implementation
+# Production color-search decisions and validation
 
-The [three-option direction](README.md) is accepted. These questions identify
-work needed to implement it faithfully and validate deployment; they do not
-reopen the completed method-selection discussion. No production work is
-implemented by these documents.
+The [three-option direction](README.md) was accepted on September 24, 2026.
+The maintainer confirmed the integration decisions below on September 30, 2026;
+[ADR 0006](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions)
+records their rationale. The selected prototype already provides the desired
+behavior. Correct final values and rankings come first, then performance, then
+responsibility split. These documents do not implement the replacement.
 
-## Behavior to preserve
+Implementation is tracked by [#266](https://github.com/rafaeltab/wallpaperdb/issues/266)
+and its approved sub-issues: [extraction](https://github.com/rafaeltab/wallpaperdb/issues/305),
+[utility indexing](https://github.com/rafaeltab/wallpaperdb/issues/306),
+[the full query contract and ranking](https://github.com/rafaeltab/wallpaperdb/issues/307),
+and [the existing picker integration](https://github.com/rafaeltab/wallpaperdb/issues/308).
+The approved breakdown replaces the parent's earlier backfill requirement.
 
-- Use the 256-bin shade-aware, strict-hue measurements and all five cutoff layers.
-  Preserve the selected metric, anchor bank, sampling, and score parameters as
-  versioned definitions; changes require comparison with the frozen favorite.
-- Offer the three linked quality preferences, with linear influence 0.5 and
-  cutoff weighting 1 as the default. Do not replace linear 0.5 with smooth-power
-  0.5: they have different effects, with no single exact equivalent exponent.
-- Keep whole-image target percentages in 10% steps. A partial request retains
-  its unspecified remainder; it is not normalized into a closed palette.
-- Apply semantic/metadata eligibility in OpenSearch before global ranking.
-  Preserve score/tie ordering and stable pagination. Do not introduce a capped
-  application-side rerank as an optimization.
-- Keep unsupported query behavior explicit. A target-percentage query does not
-  implicitly become an accent, palette-purity, or relative-highlight query.
+## Behavior and numerical reference
 
-## Correctness decisions before implementation is finalized
+- Preserve the selected prototype's 256 overlapping anchors, shade-aware
+  strict-hue measurements, all five cutoff layers, named features, sampling,
+  and score parameters. Image sampling includes orientation, sRGB conversion,
+  a 128-by-128 fill sample, and alpha compositing onto black. The old histogram's
+  transparency treatment is not the new descriptor's definition.
+- Preserve all three linked quality settings, the linear quality curve, and
+  default influence 0.5 with cutoff weighting 1. Independent sliders or a
+  different quality curve would change the accepted behavior.
+- Keep vibe queries and whole-image target percentages in 10% steps. Partial
+  requests retain their unspecified remainder. Unsupported intermediate
+  percentages are rejected rather than normalized or rounded.
+- Preserve independent overlapping coverages and equal target contributions.
+  A request totaling 100% does not guarantee disjoint regions or palette purity.
+  No new purity, accent, or relative-highlight objective is part of this work.
+- Resolve hex colors to the nearest stored anchor. Preserve named features'
+  separate definitions; abstract distribution features do not become literal
+  pixel-area measurements. Named features have no layered cutoff weighting.
+- Use the selected native numeric OpenSearch executor, float32 utility values,
+  and aggregation order as the reference. Apply metadata eligibility before
+  global ranking and retain eligible zero-score records. Sort by descending
+  relevance and ascending wallpaper ID for ties, preserving existing pagination.
+  Capped application reranking, direct single-target sorting, global bounds,
+  and other experimental executors are outside this implementation.
 
-**Repeated or overlapping targets.** The selected prototype inherits a numeric
-query issue where identical resolved utility clauses can lose their intended
-multiplicity. Decide how repeated targets and two precise colors resolving to
-the same bin should behave, then validate the implementation against that
-explicit objective. The separate
-[multiplicity refinement](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-OPTIMIZATION-RESULTS.md)
-has arithmetic/service evidence; existing human judgments contain no such
-cases. Accepting the architecture is not accepting a known weighting bug as a
-product rule.
+The selected utility bank contains 10,044 scores per wallpaper: 256 anchors and
+23 named targets, with one vibe and eleven proportion profiles for each of
+three quality settings. Preserve numeric float fields and doc values, the
+source-disabled utility representation, and ID retrieval through doc values.
+Integrating Catalogue metadata and result retrieval must respect that layout.
+See [METHOD.md](METHOD.md) for the precise formula and stored-value definitions.
 
-**Composition semantics.** Independent overlapping coverages can double-count
-the same pixels across requested colors. They do not prove that requested areas
-occupy distinct regions or that a full palette excludes other colors. Preserve
-the user's closed-versus-partial composition examples in the evaluation set.
-Any purity or joint-assignment addition changes the objective and needs its own
-accuracy and performance comparison.
+The frozen linked query can lose multiplicity when Lucene collapses identical
+utility clauses. Apply the researched
+[multiplicity correction](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-MULTIPLICITY.md):
+group identical complete utility keys and apply multiplicity divided by the
+original target count. This preserves the intended mean without combining
+different percentages or redefining composition semantics. The historical
+snapshot retains its defect; validate corrected duplicate cases separately.
 
-**Precision and names.** Hex colors currently select their nearest stored anchor;
-they are not arbitrary exact-color predicates. Confirm acceptable precision
-and explain named grayscale/near-neutral/dark behavior consistently in the UI.
-Abstract named features have no layered cutoff weighting, so linked control
-positions need not change all named-query rankings.
+Correctness checks compare image measurements, complete utility values, and
+full ordered IDs and scores against the retained reference. Cover small score
+gaps, duplicate resolved keys, neutral/named targets, partial compositions,
+eligibility, zero-score records, and multiple pages of an unchanged index.
+The numerical baseline is the selected float32 OpenSearch path, not bitwise
+parity with every grouping of the original formula. Human preference agreement
+alone does not establish retrieval correctness; preserve the uncertainty and
+scope recorded in [EVIDENCE.md](EVIDENCE.md).
 
-**Numerical contract.** Establish float precision, aggregation order, duplicate
-handling, tie-break ID, and pagination behavior. Test full rankings and small
-score gaps against an exhaustive OpenSearch reference. Do not use human-pair
-agreement alone to establish retrieval correctness.
+## Measurements, utilities, and retained facts
 
-## Ingestion, schema, and migration
+Color Extractor owns image measurements; Gateway owns the Catalogue projection
+and query interpretation. Measurements describe coverage and conditional quality
+at each anchor/cutoff, plus named visual properties. Utilities are derived fit
+scores for a target, mode, proportion, and quality preference. Retaining
+measurements permits utility calculation without decoding originals again when
+the descriptor definition is unchanged.
 
-The existing architecture has a color extractor, NATS events, a gateway, and
-OpenSearch. Specify ownership of image sampling, measured descriptors, and
-precomputed scores before designing their production contracts. The research
-does not select an event schema or decide whether final utilities are computed
-in the extractor or during projection into the search index.
+Retain versioned extraction facts through NATS under the existing retention
+decision. Begin with the extractor publishing measurements and Gateway deriving
+utilities; the computation split may change if correctness or performance
+warrants it within the repository's context boundaries. A new Postgres store is
+not required. The broader retention/privacy review remains in
+[#162](https://github.com/rafaeltab/wallpaperdb/issues/162).
 
-Version the metric, anchor bank, cutoff definitions, named features, linked
-presets, utility schema, and descriptor provenance together. Plan idempotent
-event handling, backfill/reindex behavior, partial-document exclusion, and a
-complete-index readiness check. Preserve a reference dataset so that schema
-migrations can check behavior before switching queries.
+Record descriptor provenance and version the metric, anchor bank, cutoffs,
+named features, presets, and utility schema so incompatible data cannot be mixed.
+Consumers must remain replay-safe, and incomplete banks cannot participate in
+color ranking. These are ordinary delivery and projection guarantees; they do
+not require an operator replay or index-rebuild command in this feature.
 
-Decide where to retain measurements for future reindexing and debugging. The
-optimized experiment disabled OpenSearch stored source and fetched IDs through
-doc values; that is evidence about query/storage choices, not a complete
-durability or recovery strategy. Review mapping-field limits and per-field
-overhead for the 10,044-utility representation. Estimate event and indexing
-payload sizes from the chosen format rather than the image storage budget.
+The source-event budget is 64 KiB including headers, enforced by the
+[Gateway message-budget adapter](../../../apps/gateway/src/adapters/events/message-budget.ts).
+Measure the chosen serialized contract rather than assuming that a numeric
+value count predicts event size. An encoding must fit that budget; if a durable
+logical reference is used, its measurement bytes must remain available for the
+event replay lifetime. Contract details and complete-bank eligibility are owned
+by the extraction and indexing issues linked above.
 
-## Capacity validation still required
+## Fresh installation and picker scope
 
-Measure the **complete three-preset, 10%-step bank at one million records**.
-Report fully populated field counts and document counts, settled primary bytes,
-replica cost, merge/build headroom, and the resource configuration. Do not
-substitute the old 70-field projection or one-preset benchmark.
+The maintainer will recreate infrastructure and storage and upload images again.
+Replace the old color API, histogram extraction, and color index directly. There
+is no existing production installation or external client requiring preservation
+of old inputs, historical histogram data, parallel indexes, staged cutover,
+backfill, or migration/rebuild tooling. This exception does not remove ordinary
+event durability or replay-safe consumer requirements.
 
-Compare identical favorite queries with queries that rotate all three settings,
-using broad and selective metadata filters, single and multiple colors, and
-all supported profile keys. Include scheduled arrivals, bursts, cold/unseen
-queries, index updates, and the intended shard/replica topology. Count errors,
-timeouts, and every request at or above one second as failures; report those
-alongside latency percentiles.
+Build the full replacement color query contract in one step, including every
+supported quality setting and query mode. Then connect the current single-color
+picker using a default-quality vibe query. No new picker is included;
+[#36](https://github.com/rafaeltab/wallpaperdb/issues/36) owns the advanced picker.
 
-Measure gateway end-to-end latency and service CPU/memory as well as OpenSearch
-CPU, heap, page-cache/data reads, and storage. Earlier bounds reduced some work
-but could increase I/O and latency. No application-level setting that always
-keeps the favorite's physical index pages resident has been established by this
-research; test locality under actual memory pressure.
+## Deployment evidence deferred to the persistent environment
 
-Keep ordinary numeric scoring as the reference execution. Compare bounded
-execution or a workload-aware dispatcher only with global score/order parity,
-consistent pagination, cancellation, total request deadlines, and cleanup costs.
-The prototype results do not select one executor for all query shapes.
+The complete three-setting bank's million-record storage and concurrent mixed
+query capacity remain unmeasured. Earlier single-preset or partial-projection
+results do not establish those limits. A mandatory million-record campaign,
+predicted requests-per-second target, or Railway availability is not a completion
+gate for this feature. Deployment evidence belongs to the persistent environment
+work in [#240](https://github.com/rafaeltab/wallpaperdb/issues/240), with resource
+limits and load chosen when there is an actual environment to evaluate.
 
-## Relevance and future media
+Useful evidence includes complete field/document counts, primary and replica
+storage, build/merge headroom, hardware and shard topology, end-to-end latency,
+errors/timeouts, CPU/memory, and recovery behavior. Mixed settings, broad and
+selective filters, multi-target queries, cold/unseen queries, arrivals, bursts,
+and updates exercise different costs. These remain evaluation considerations,
+not newly imposed acceptance criteria for #266. The earlier one-second research
+failure threshold is historical evidence, not an agreed production service target.
 
-Add fresh wallpapers and independent reviewers, retain uncertain judgments,
-and separate tuning cases from held-out groups. Evaluate high-ranking unjudged
-results, precise neighboring shades, dark saturated colors, tinted neutrals,
-duplicate targets, and closed/partial palettes. Do not tune only to the highest
-score on the current single-reviewer dataset.
+Any later executor optimization needs full score/order parity with the numeric
+reference, existing pagination behavior, and bounded request/cancellation
+lifetimes. This implementation does not select a workload dispatcher or assume
+that favorite-preset index pages remain resident under memory pressure.
 
-Video and live wallpaper support still needs a definition of temporal sampling
-and aggregation: what colors should represent a changing scene? The current
-research measured still images. Additional image versions do not establish a
-video descriptor, nor does larger media storage make index throughput or memory
-constraints disappear.
+## Future relevance and media work
 
-The retained [feedback loop](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/evaluation/loop/README.md),
+Fresh wallpapers, independent reviewers, held-out groups, and uncertain judgments
+can support later relevance evaluation. They do not reopen the accepted scoring
+choice or make another relevance interview a prerequisite for implementation.
+
+Video and live wallpapers need their own temporal sampling and aggregation
+definition. The selected measurements describe still images; additional stored
+image versions do not establish a video descriptor.
+
+The retained
+[feedback loop](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/evaluation/loop/README.md),
 [favorite snapshot](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md),
-and [measurement record](EVIDENCE.md) provide the reference for this later work.
+and [measurement record](EVIDENCE.md) preserve the historical reference without
+claiming that the new application path or deployment capacity has been validated.

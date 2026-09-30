@@ -21,8 +21,18 @@ The catalogue's public view of the Profile that contributed a wallpaper. The Use
 _Avoid_: Authenticated User, account
 
 **Color preference**:
-A requested color, its relative amount, and the acceptable spread around it when ranking wallpapers.
+A requested color or named visual property, expressed as an overall impression or a desired whole-image proportion, with a quality preference.
 _Avoid_: Extracted color, dominant color
+
+**Color vibe**:
+A requested overall color impression without a specified image proportion.
+
+**Target proportion**:
+The desired fraction of the whole image matching a color target, or the requested strength of a named distribution property. It is not a relative palette weight; unrequested image area remains unspecified.
+
+**Color utility**:
+A single target's relevance score for a color preference, derived from the wallpaper's color measurements. It is not a measured image percentage.
+_Avoid_: Coverage, histogram
 
 **Projection**:
 The catalogue's interpretation of a published fact from an owning context.

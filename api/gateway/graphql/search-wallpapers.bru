@@ -11,8 +11,8 @@ post {
 }
 
 body:graphql {
-  query SearchWallpapers($first: Int, $filter: WallpaperFilter) {
-    searchWallpapers(first: $first, filter: $filter) {
+  query SearchWallpapers($first: Int, $after: String, $filter: WallpaperFilter, $sort: WallpaperSort) {
+    searchWallpapers(first: $first, after: $after, filter: $filter, sort: $sort) {
       edges {
         node {
           wallpaperId
@@ -43,11 +43,26 @@ body:graphql {
 body:graphql:vars {
   {
     "first": 10,
-    "filter": {}
+    "filter": {},
+    "sort": {
+      "color": {
+        "mode": "VIBE",
+        "quality": "FAVORITE",
+        "targets": [{ "color": "#FF0000" }]
+      }
+    }
   }
 }
 
 docs {
-  Search wallpapers with optional filters and cursor-based pagination. See the Gateway schema for supported inputs and selected fields:
-  https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/src/graphql/schema.ts
+  # Search Wallpapers
+
+  Search wallpapers with optional metadata and Profile filters, color ranking,
+  and cursor pagination. See the [authoritative GraphQL schema](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/src/graphql/schema.ts)
+  for the complete input and response contract.
+
+  The request uses one default-quality vibe target, matching the existing picker.
+  Add `filter.profileId` to limit results to one contributor Profile. For the
+  next page, set `after` to the returned `pageInfo.endCursor` and preserve the
+  same filter and sort.
 }

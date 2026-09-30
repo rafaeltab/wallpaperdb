@@ -60,7 +60,7 @@ export async function waitForWallpaper(page: Page, wallpaperId: string) {
 export async function waitForCataloguePage(
   page: Page,
   wallpaperId: string,
-  profileId?: string,
+  color?: string,
 ) {
   let matchingCursor: string | undefined;
   await expect
@@ -70,15 +70,24 @@ export async function waitForCataloguePage(
         do {
           const response = await page.request.post("/gateway/graphql", {
             data: {
-              query: `query BrowserCatalogue($after:String,$filter:WallpaperFilter) {
-            searchWallpapers(filter:$filter,first:20,after:$after) {
+              query: `query BrowserCatalogue($after:String,$filter:WallpaperFilter,$sort:WallpaperSort) {
+            searchWallpapers(filter:$filter,sort:$sort,first:20,after:$after) {
               edges { node { wallpaperId } } pageInfo { hasNextPage endCursor }
             }
           }`,
               variables: {
                 after,
-                filter: profileId
-                  ? { profileId, variants: { format: "image/png" } }
+                filter: color
+                  ? { variants: { format: "image/png" } }
+                  : undefined,
+                sort: color
+                  ? {
+                      color: {
+                        mode: "VIBE",
+                        quality: "FAVORITE",
+                        targets: [{ color }],
+                      },
+                    }
                   : undefined,
               },
             },
@@ -103,7 +112,9 @@ export async function waitForCataloguePage(
         return false;
       },
       {
-        message: "the fresh upload reaches the selected catalogue page",
+        message: color
+          ? "the fresh upload participates in colour-ranked catalogue results"
+          : "the fresh upload reaches catalogue search",
         timeout: 60000,
       },
     )

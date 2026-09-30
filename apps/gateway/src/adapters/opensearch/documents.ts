@@ -124,9 +124,28 @@ function matchesColorScore(hit: typeof wallpaperHit.Type, color: ColorRanking): 
   const tolerance = expected * (color.utilities.length + 2) * 2 ** -24;
   return hit._score !== null && Math.abs(hit._score - expected) <= tolerance;
 }
+function matchesMetadata(hit: typeof wallpaperHit.Type, selection: SearchSelection): boolean {
+  if (selection.profileId && hit._source.userId !== selection.profileId) return false;
+  const filters = selection.variantFilters;
+  if (
+    !filters ||
+    [filters.width, filters.height, filters.aspectRatio, filters.format].every(
+      (value) => value === undefined
+    )
+  )
+    return true;
+  return hit._source.variants.some(
+    (variant) =>
+      (filters.width === undefined || variant.width === filters.width) &&
+      (filters.height === undefined || variant.height === filters.height) &&
+      (filters.aspectRatio === undefined ||
+        Math.fround(variant.aspectRatio) === Math.fround(filters.aspectRatio)) &&
+      (filters.format === undefined || variant.format === filters.format)
+  );
+}
 function validHit(hit: typeof wallpaperHit.Type, selection: SearchSelection, index: string) {
   const id = hit._source.wallpaperId;
-  if (hit._id !== id || hit._index !== index) return false;
+  if (hit._id !== id || hit._index !== index || !matchesMetadata(hit, selection)) return false;
   if (!selection.color) return hit.sort.length === 1 && hit.sort[0] === id;
   const ids = hit.fields?.wallpaperId;
   return (
@@ -178,7 +197,7 @@ export function wallpaperSearchResponse(selection: SearchSelection, index: strin
         hits: Schema.Array(
           wallpaperHit.check(
             Schema.makeFilter((hit) => validHit(hit, selection, index), {
-              expected: 'a consistent wallpaper ID, score and cursor',
+              expected: 'a consistent wallpaper ID, metadata eligibility, score and cursor',
             })
           )
         ),

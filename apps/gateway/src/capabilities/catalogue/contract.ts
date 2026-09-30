@@ -1,5 +1,16 @@
 import { Context, type Effect, Schema } from 'effect';
 
+export interface ColorDescriptor {
+  readonly version: string;
+  readonly sampleCount: number;
+  readonly layers: readonly {
+    readonly cutoff: number;
+    readonly coverage: readonly number[];
+    readonly quality: readonly number[];
+  }[];
+  readonly named: Readonly<Record<string, { readonly coverage: number; readonly quality: number }>>;
+}
+
 export interface Variant {
   width: number;
   height: number;

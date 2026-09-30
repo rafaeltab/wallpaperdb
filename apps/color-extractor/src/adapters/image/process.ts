@@ -3,9 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
 import { ExtractionUnavailable } from '../../capabilities/extraction/index.js';
 
-// Retain Sharp's default 268402689-pixel input limit and the existing extreme
-// aspect-ratio resize behavior. Output cannot exceed this RGBA allocation.
-const maxPixelBytes = 268402689 * 4;
+// Sharp keeps its default 268402689-pixel input limit; the fill sample is fixed.
+const maxPixelBytes = 128 * 128 * 4;
 const maxDiagnosticBytes = 64 * 1024;
 
 /** Own the operating-system process until close, including interrupted execution. */

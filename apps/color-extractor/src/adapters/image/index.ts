@@ -1,8 +1,10 @@
 import { Readable } from 'node:stream';
+import { createHash } from 'node:crypto';
 import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Context, Effect, Layer, Semaphore } from 'effect';
 import { resolveOriginalAsset } from '@wallpaperdb/core/assets';
 import { decodePixels } from './process.js';
+import { measurePixels } from './measurements.js';
 import {
   computeHistogram,
   ExtractionUnavailable,
@@ -45,6 +47,16 @@ export const histogramFromImage = Effect.fn('color-extraction.image.decode')(fun
 ) {
   const pixels = yield* decodePixels(bytes);
   return computeHistogram(pixels);
+});
+
+export const measurementsFromImage = Effect.fn('color-extraction.image.measure')(function* (
+  bytes: Uint8Array
+) {
+  const pixels = yield* decodePixels(bytes);
+  return {
+    measurements: measurePixels(pixels),
+    originalSha256: createHash('sha256').update(bytes).digest('hex'),
+  };
 });
 
 class StoredImageHistogram implements ImageHistogram {

@@ -9,3 +9,4 @@ export type {
 export { ColorEvents, ExtractColors, ExtractionUnavailable } from './contract.js';
 export { ImageMeasurements } from './contract.js';
 export { extractionLayer } from './implementation.js';
+export { measurePixels } from './measurements.js';

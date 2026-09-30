@@ -6,6 +6,7 @@ import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
 import { createGatewayTester } from './setup.js';
 import { createApp } from '../src/app.js';
 import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
+import { measuredColors } from './helpers/colors.js';
 
 const timestamp = '2026-09-15T12:00:00.000Z';
 
@@ -88,6 +89,96 @@ describe('Gateway composition with real adapters', () => {
     const ready = await app.inject({ method: 'GET', url: '/ready' });
     expect(ready.statusCode).toBe(200);
     expect(ready.json()).toMatchObject({ ready: true });
+  });
+
+  it('projects retained actual-image measurements into the complete bank and default GraphQL ranking', async () => {
+    const id = 'wlpr_color_composition';
+    const profileId = 'user_color_composition';
+    const measured = measuredColors(id, timestamp);
+    // This descriptor is the frozen extraction result of color-extractor's red.png.
+    // Its decoding/publication contracts run in that workspace; this seam starts at the event.
+    const event = {
+      specversion: '1.0',
+      source: measured.occurrence.source,
+      id: measured.occurrence.id,
+      type: 'wallpaper.colors.extracted',
+      time: timestamp,
+      datacontenttype: 'application/json',
+      data: {
+        schemaVersion: 1,
+        wallpaperId: id,
+        original: measured.original,
+        provenance: {
+          ...measured.provenance,
+          originalSha256: '3a980711ab31ee89a710d34a74683686cfcae15a9ef3905245e3439837e5d54a',
+        },
+        measurements: measured.descriptor,
+      },
+    };
+    const js = await tester.nats.getJsClient();
+    await js.publish(event.type, JSON.stringify(event));
+    const upload: WallpaperUploadedEvent = {
+      eventId: 'evt_color_composition_upload',
+      eventType: 'wallpaper.uploaded',
+      timestamp,
+      wallpaper: {
+        id,
+        userId: profileId,
+        fileType: 'image',
+        mimeType: 'image/png',
+        fileSizeBytes: 100,
+        width: 128,
+        height: 128,
+        aspectRatio: 1,
+        storageKey: 'gateway/red.png',
+        storageBucket: 'wallpapers',
+        originalFilename: 'red.png',
+        uploadedAt: timestamp,
+      },
+    };
+    await js.publish(upload.eventType, JSON.stringify(upload));
+    await expect
+      .poll(
+        async () => {
+          const response = await tester.getApp().inject({
+            method: 'POST',
+            url: '/graphql',
+            payload: {
+              query: `{
+              vibe: searchWallpapers(filter:{profileId:"${profileId}"},sort:{color:{targets:[{color:"#ff0000"}]}}) { edges {node{wallpaperId profileId}} pageInfo{endCursor} }
+              repeated: searchWallpapers(filter:{profileId:"${profileId}"},sort:{color:{mode:PROPORTIONS,targets:[{color:"#ff0000",percent:100},{name:RED,percent:100}]}}) { edges {node{wallpaperId profileId}} pageInfo{endCursor} }
+          }`,
+            },
+          });
+          const body = response.json();
+          if (body.errors) throw new Error(JSON.stringify(body.errors));
+          return body;
+        },
+        { timeout: 10000, interval: 25 }
+      )
+      .toMatchObject({
+        data: {
+          vibe: {
+            edges: [{ node: { wallpaperId: id, profileId } }],
+            pageInfo: { endCursor: expect.any(String) },
+          },
+          repeated: {
+            edges: [{ node: { wallpaperId: id, profileId } }],
+            pageInfo: { endCursor: expect.any(String) },
+          },
+        },
+      });
+    const client = new Client({ node: tester.search.options.url });
+    try {
+      const result = await client.get({ index: tester.search.options.wallpaperIndex, id });
+      expect(result.body._source).toMatchObject({
+        colorReady: 'linked-3-linear-10-v1',
+        colorSnapshot: { descriptor: measured.descriptor, provenance: event.data.provenance },
+      });
+      expect(result.body._source.utilities).toBeUndefined();
+    } finally {
+      await client.close();
+    }
   });
 
   it('projects a Profile update into public discovery and canonical alias resolution', async () => {

@@ -4,7 +4,7 @@ Gateway lets visitors discover wallpapers and contributor Profiles through a cat
 
 ## Core capabilities
 
-- Search wallpapers by contributor, rendition dimensions, aspect ratio, and format, with color preference ranking and pagination.
+- Search wallpapers by contributor, rendition dimensions, aspect ratio, and format, with [color query ranking](src/graphql/schema.ts) and pagination.
 - Retrieve wallpapers with their contributor Profiles and media URLs.
 - Find Profiles by Handle, active alias, or Display name, and resolve earlier Handles to the current Profile address.
 - Keep the catalogue up to date as wallpapers, variants, colors, and Profiles are published, without allowing replayed events to undo newer state.

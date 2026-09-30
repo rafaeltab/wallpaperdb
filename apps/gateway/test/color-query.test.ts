@@ -114,3 +114,39 @@ describe('Catalogue color query admission', () => {
     expect(read.selections).toEqual([]);
   });
 });
+
+describe('Catalogue per-target color preferences', () => {
+  it('mixes vibe and proportion utilities and preserves per-target quality and duplicate weight', async () => {
+    const { read, catalogue } = await setup();
+    const color: ColorQuery = {
+      mode: 'proportions',
+      quality: 'strict',
+      targets: [
+        { color: '#ff0000', mode: 'vibe', quality: 'relaxed' },
+        { color: '#fe0000', mode: 'vibe', quality: 'relaxed' },
+        { name: 'dark', percent: 0, quality: 'favorite' },
+        { name: 'monochromatic', mode: 'proportions', percent: 40 },
+      ],
+    };
+    expect(await Effect.runPromise(catalogue.search({ color }))).toMatchObject({ _tag: 'Found' });
+    expect(read.selections[0]?.color).toEqual({
+      targetCount: 4,
+      utilities: [
+        { key: 'r0004_v_q000_w0', multiplicity: 2 },
+        { key: 'n_dark_p000_q050_w1', multiplicity: 1 },
+        { key: 'n_monochromatic_p040_q100_w3', multiplicity: 1 },
+      ],
+    });
+  });
+  it.each([
+    { color: '#ff0000', mode: 'vibe' as const, percent: 10 },
+    { name: 'dark', mode: 'proportions' as const },
+    { name: 'rainbow', mode: 'proportions' as const, percent: 15 },
+  ])('rejects incompatible per-target mode and percent before reading %j', async (target) => {
+    const { read, catalogue } = await setup();
+    expect(
+      await Effect.runPromise(catalogue.search({ color: { targets: [target] } }))
+    ).toMatchObject({ _tag: 'InvalidSearch' });
+    expect(read.selections).toEqual([]);
+  });
+});

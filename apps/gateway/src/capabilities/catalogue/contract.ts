@@ -57,6 +57,8 @@ export interface HandleResolution {
 }
 
 export interface ColorTarget {
+  mode?: 'vibe' | 'proportions';
+  quality?: ColorQuality;
   color?: string;
   name?: string;
   percent?: number;

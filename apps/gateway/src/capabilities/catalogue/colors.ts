@@ -55,6 +55,12 @@ export function resolveColorRanking(query: ColorQuery): ColorRanking | InvalidSe
     return reject('Color search accepts one through ten targets');
   const groups = new Map<string, number>();
   for (const target of query.targets) {
+    const targetMode = target.mode ?? mode;
+    const targetQuality = target.quality ?? quality;
+    if (targetMode !== 'vibe' && targetMode !== 'proportions')
+      return reject('Unknown color query mode');
+    if (!['relaxed', 'favorite', 'strict'].includes(targetQuality))
+      return reject('Unknown color quality');
     if ((target.color === undefined) === (target.name === undefined))
       return reject('Each target requires exactly one color or name');
     if (target.color !== undefined && !/^#[0-9a-f]{6}$/i.test(target.color))
@@ -62,7 +68,7 @@ export function resolveColorRanking(query: ColorQuery): ColorRanking | InvalidSe
     if (target.name !== undefined && !COLOR_FEATURE_NAMES.some((name) => name === target.name))
       return reject('Unknown named color target');
     if (
-      mode === 'proportions' &&
+      targetMode === 'proportions' &&
       (!Number.isInteger(target.percent) ||
         target.percent === undefined ||
         target.percent < 0 ||
@@ -72,12 +78,12 @@ export function resolveColorRanking(query: ColorQuery): ColorRanking | InvalidSe
       return reject(
         'Proportions require whole-image percentages from 0 through 100 in steps of ten'
       );
-    if (mode === 'vibe' && target.percent !== undefined)
+    if (targetMode === 'vibe' && target.percent !== undefined)
       return reject('Vibe targets do not take percentages');
     const hex =
       target.color ?? (target.name === undefined ? undefined : namedSwatches[target.name]);
     const resolved = hex === undefined ? `n_${target.name}` : nearestAnchor(hex);
-    const key = colorUtilityKey(resolved, target.percent, quality);
+    const key = colorUtilityKey(resolved, target.percent, targetQuality);
     groups.set(key, (groups.get(key) ?? 0) + 1);
   }
   return {

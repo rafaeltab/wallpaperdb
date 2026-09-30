@@ -76,6 +76,8 @@ const searchArguments = Schema.Struct({
           quality: nullableOptional(Schema.Literals(colorQualities)),
           targets: Schema.Array(
             Schema.Struct({
+              mode: nullableOptional(Schema.Literals(colorModes)),
+              quality: nullableOptional(Schema.Literals(colorQualities)),
               color: nullableOptional(Schema.String),
               name: nullableOptional(Schema.Literals(colorTargetNames)),
               percent: nullableOptional(Schema.Finite),
@@ -122,6 +124,8 @@ function searchInput(input: unknown): SearchWallpapers {
           mode: color.mode ? modes[color.mode] : undefined,
           quality: color.quality ? qualities[color.quality] : undefined,
           targets: color.targets.map((target) => ({
+            ...(target.mode ? { mode: modes[target.mode] } : {}),
+            ...(target.quality ? { quality: qualities[target.quality] } : {}),
             color: target.color ?? undefined,
             name: target.name?.toLowerCase(),
             percent: target.percent ?? undefined,

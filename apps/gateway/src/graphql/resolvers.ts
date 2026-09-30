@@ -67,21 +67,6 @@ const searchArguments = Schema.Struct({
       ),
     })
   ),
-  sort: nullableOptional(
-    Schema.Struct({
-      color: nullableOptional(
-        Schema.Struct({
-          colors: Schema.Array(
-            Schema.Struct({
-              color: Schema.String,
-              amount: Schema.Finite,
-              spread: nullableOptional(Schema.Finite),
-            })
-          ),
-        })
-      ),
-    })
-  ),
 });
 const profileSearchArguments = Schema.Struct({
   query: Schema.String,
@@ -111,11 +96,6 @@ function searchInput(input: unknown): SearchWallpapers {
           format: variants.format ?? undefined,
         }
       : undefined,
-    colors: args.sort?.color?.colors.map((color) => ({
-      color: color.color,
-      amount: color.amount,
-      spread: color.spread ?? undefined,
-    })),
   };
 }
 function wallpaperView(wallpaper: Wallpaper): WallpaperView {

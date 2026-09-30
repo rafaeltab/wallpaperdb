@@ -50,7 +50,7 @@ function RootLayoutContent({
   isBrowsePage: boolean;
   isWallpaperDetailsPage: boolean;
 }) {
-  const { isOpen, toggle } = useBrowseFilterPanel();
+  const { isOpen, toggle, onBrowseLinkClick } = useBrowseFilterPanel();
 
   const handleClose = () => {
     // Close the current tab/window
@@ -66,7 +66,11 @@ function RootLayoutContent({
             left={
               <>
                 <SidebarTrigger className="-ml-1" />
-                <Link to="/" className="flex items-center gap-2 shrink-0">
+                <Link
+                  to="/"
+                  className="flex items-center gap-2 shrink-0"
+                  onClick={onBrowseLinkClick}
+                >
                   <Image className="h-6 w-6 text-primary" />
                   <span className="text-xl font-bold text-foreground hidden sm:inline">
                     WallpaperDB

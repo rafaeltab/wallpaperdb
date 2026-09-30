@@ -41,7 +41,7 @@ export const Route = createFileRoute('/')({
 export function HomePage() {
   const { after, color, format, aspectRatio, profileId } = Route.useSearch();
   const navigate = useNavigate();
-  const { isOpen } = useBrowseFilterPanel();
+  const { isOpen, homeNavigationVersion } = useBrowseFilterPanel();
   const deviceAspectRatioPreset = useDeviceAspectRatioPreset();
   const [draftColor, setDraftColor] = useState(color ?? FALLBACK_COLOR_INPUT_VALUE);
   const colorChangeTimeoutRef = useRef<number | undefined>(undefined);
@@ -191,6 +191,12 @@ export function HomePage() {
     window.addEventListener('popstate', handleHistoryNavigation);
     return () => window.removeEventListener('popstate', handleHistoryNavigation);
   }, [cancelPendingColorChange, color]);
+
+  useEffect(() => {
+    if (!homeNavigationVersion) return;
+    cancelPendingColorChange();
+    setDraftColor(FALLBACK_COLOR_INPUT_VALUE);
+  }, [cancelPendingColorChange, homeNavigationVersion]);
 
   useEffect(() => {
     return cancelPendingColorChange;

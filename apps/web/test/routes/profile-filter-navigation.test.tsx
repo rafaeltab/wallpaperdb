@@ -62,6 +62,39 @@ function renderBrowse(initialEntry: string) {
 describe('Profile filter navigation', () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it('applies the displayed fallback white through the real route without changing the picker', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            data: {
+              searchWallpapers: {
+                edges: [],
+                pageInfo: { hasNextPage: false, hasPreviousPage: false, endCursor: null },
+              },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        )
+      )
+    );
+    const user = userEvent.setup();
+    const { router, view, queryClient } = renderBrowse('/?format=png&after=old_cursor');
+    try {
+      await user.click(await screen.findByRole('button', { name: 'Toggle filters' }));
+      expect(screen.getByLabelText('Color')).toHaveValue('#ffffff');
+      await user.click(screen.getByRole('button', { name: 'Apply color' }));
+
+      await waitFor(() =>
+        expect(router.state.location.search).toEqual({ format: 'png', color: '#FFFFFF' })
+      );
+    } finally {
+      view.unmount();
+      queryClient.clear();
+    }
+  });
+
   it('selects and clears a favorite vibe while retaining combined filters and the next-page sort', async () => {
     const requests: GraphQLRequest[] = [];
     const filter = {

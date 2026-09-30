@@ -282,6 +282,7 @@ describe('HomePage browse filters', () => {
     expect(screen.getByLabelText('Color')).toHaveValue('#ffffff');
     fireEvent.click(screen.getByRole('button', { name: 'Apply color' }));
 
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
     const navigateCall = mockNavigate.mock.calls[0][0];
     expect(navigateCall.search({ after: 'cursor_123', color: undefined, format: 'png' })).toEqual({
       after: undefined,

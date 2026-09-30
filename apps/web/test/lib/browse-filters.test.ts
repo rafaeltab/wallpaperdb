@@ -88,3 +88,31 @@ describe('browse filters', () => {
     expect(getDeviceAspectRatioOptionLabel('21-9')).toBe('Device 21:9');
   });
 });
+
+describe('advanced browse color preferences', () => {
+  it('restores a mixed color search from the URL and sends complete per-target utilities', () => {
+    const state = parseBrowseSearch({ colors: [
+      { color: '#004aff', quality: 'RELAXED' },
+      { name: 'DARK', percent: 0, quality: 'STRICT' },
+      { name: 'MONOCHROMATIC', percent: 40 },
+    ], profileId: 'artist', format: 'png', after: 'cursor' });
+    expect(state.colors).toEqual([
+      { color: '#004AFF', quality: 'RELAXED' },
+      { name: 'DARK', percent: 0, quality: 'STRICT' },
+      { name: 'MONOCHROMATIC', percent: 40, quality: 'FAVORITE' },
+    ]);
+    expect(buildWallpaperSort(state.colors)).toEqual({ color: { targets: [
+      { color: '#004AFF', mode: 'VIBE', quality: 'RELAXED' },
+      { name: 'DARK', mode: 'PROPORTIONS', percent: 0, quality: 'STRICT' },
+      { name: 'MONOCHROMATIC', mode: 'PROPORTIONS', percent: 40, quality: 'FAVORITE' },
+    ] } });
+  });
+  it.each([
+    [{ color: '#bad' }], [{ name: 'UNKNOWN' }], [{ color: '#004AFF', name: 'BLUE' }],
+    [{ name: 'DARK', percent: 15 }], [{ name: 'DARK', quality: 'BAD' }],
+    [{ name: 'DARK', percent: 70 }, { name: 'LIGHT', percent: 70 }],
+    Array.from({length:11},()=>({name:'DARK'})),
+  ].map(colors => ({ colors })))('does not admit malformed or over-budget URL preferences %j', ({ colors }) => {
+    expect(parseBrowseSearch({ colors }).colors).toBeUndefined();
+  });
+});

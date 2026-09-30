@@ -344,8 +344,8 @@ describe('HomePage browse filters', () => {
   });
 
   it.each(['loading', 'empty', 'failed'] as const)(
-    'keeps the selected color available to clear while results are %s', (state) => {
-      mockUseSearch.mockReturnValue({ color: '#FF0000', format: 'png' });
+    'keeps a color-only filter available to clear while results are %s', (state) => {
+      mockUseSearch.mockReturnValue({ color: '#FF0000' });
       (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
       (useWallpaperInfiniteQuery as Mock).mockReturnValue({
         data: undefined,
@@ -356,7 +356,10 @@ describe('HomePage browse filters', () => {
 
       expect(screen.getByRole('button', { name: 'Clear color' })).toBeEnabled();
       if (state === 'loading') expect(screen.getByTestId('wallpaper-grid-skeleton')).toBeInTheDocument();
-      if (state === 'empty') expect(screen.getByText('No wallpapers match these filters.')).toBeInTheDocument();
+      if (state === 'empty') {
+        expect(screen.getByText('No wallpapers match these filters.')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Upload wallpaper' })).not.toBeInTheDocument();
+      }
       if (state === 'failed') expect(screen.getByText('Failed to load wallpapers')).toBeInTheDocument();
     }
   );

@@ -86,7 +86,12 @@ const startupStatusCode = Schema.decodeUnknownOption(
 );
 
 function startupFailure(
-  operation: 'initialize-client' | 'inspect-index' | 'create-index' | 'recheck-index',
+  operation:
+    | 'initialize-client'
+    | 'inspect-index'
+    | 'create-index'
+    | 'recheck-index'
+    | 'update-index-mapping',
   cause: unknown,
   index?: string
 ): OpenSearchStartupError {
@@ -515,13 +520,14 @@ const ensureIndex = Effect.fn('catalogue.storage.ensure-index')(function* (
     .request(() => client.indices.exists({ index: name }))
     .pipe(Effect.mapError((cause) => startupFailure('inspect-index', cause, name)));
   if (exists.body) {
-    if (mapping.source !== undefined)
-      return yield* verifyUtilityMapping(adapter, client, name, mapping);
-    return yield* adapter
-      .request(() =>
-        client.indices.putMapping({ index: name, body: { properties: mapping.properties } })
-      )
-      .pipe(Effect.mapError((cause) => startupFailure('update-index-mapping', cause, name)));
+    if (mapping.source !== undefined) yield* verifyUtilityMapping(adapter, client, name, mapping);
+    else
+      yield* adapter
+        .request(() =>
+          client.indices.putMapping({ index: name, body: { properties: mapping.properties } })
+        )
+        .pipe(Effect.mapError((cause) => startupFailure('update-index-mapping', cause, name)));
+    return;
   }
   yield* adapter
     .request(() =>

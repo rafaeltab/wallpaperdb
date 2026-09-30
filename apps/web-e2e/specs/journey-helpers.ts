@@ -78,9 +78,10 @@ export async function waitForCataloguePage(
           }`,
               variables: {
                 after,
-                filter: color
-                  ? { profileId, variants: { format: "image/png" } }
-                  : undefined,
+                filter:
+                  color || profileId
+                    ? { profileId, variants: { format: "image/png" } }
+                    : undefined,
                 sort: color
                   ? {
                       color: {

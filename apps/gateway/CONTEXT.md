@@ -20,19 +20,29 @@ _Avoid_: Duplicate wallpaper
 The catalogue's public view of the Profile that contributed a wallpaper. The User context owns its identity and presentation.
 _Avoid_: Authenticated User, account
 
-**Color preference**:
-A requested color or named visual property, expressed as an overall impression or a desired whole-image proportion, with a quality preference.
-_Avoid_: Extracted color, dominant color
+**Color query**:
+A request to rank wallpapers by color targets, a vibe or requested-proportion mode, and a quality preference.
+_Avoid_: Color histogram query, color preference vector
+
+**Color target**:
+A concrete color or named visual quality that contributes independently to a color query's relevance score.
+_Avoid_: Extracted color, dominant color, exclusive palette bucket
 
 **Color vibe**:
-A requested overall color impression without a specified image proportion.
+The degree to which a wallpaper conveys a target color or visual quality, based on its matching area and match quality.
+_Avoid_: Exact palette, minimum coverage
 
-**Target proportion**:
-The desired fraction of the whole image matching a color target, or the requested strength of a named distribution property. It is not a relative palette weight; unrequested image area remains unspecified.
+**Requested proportion**:
+A desired whole-image amount for one color target. Other targets remain independent, and the unspecified remainder stays unconstrained.
+_Avoid_: Relative amount, blend weight
+
+**Quality preference**:
+The relaxed, favorite, or strict balance between matching area and color quality used by a color query.
+_Avoid_: Independent quality controls, coverage threshold
 
 **Color utility**:
-A single target's relevance score for a request mode, proportion, and quality preference, derived from wallpaper color measurements. It is not a measured image percentage.
-_Avoid_: Coverage, histogram, extracted color measurement
+The complete relevance score for one target, request mode, proportion, and quality preference.
+_Avoid_: Coverage percentage, extracted color measurement
 
 **Utility bank**:
 The complete set of color utilities supported by Catalogue discovery for a wallpaper.

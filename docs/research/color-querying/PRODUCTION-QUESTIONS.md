@@ -64,6 +64,25 @@ parity with every grouping of the original formula. Human preference agreement
 alone does not establish retrieval correctness; preserve the uncertainty and
 scope recorded in [EVIDENCE.md](EVIDENCE.md).
 
+## Query contract and verification
+
+The [GraphQL schema](../../../apps/gateway/src/graphql/schema.ts) exposes the
+complete replacement contract. [Catalogue admission](../../../apps/gateway/src/capabilities/catalogue/colors.ts)
+owns defaults, target resolution, and the one-to-ten target bound; the GraphQL
+adapter translates protocol values without repeating those decisions. A target
+supplies one six-digit sRGB color or supported name. Vibe omits percentages;
+proportions require exact 10% steps from zero through 100%. Concrete named
+colors resolve through fixed swatches, while abstract names use their own fields.
+
+The [native query adapter](../../../apps/gateway/src/adapters/opensearch/query.ts)
+applies complete-key multiplicity and filters metadata, contributor eligibility,
+and utility readiness before global ranking. IDs come from doc values; retained
+metadata comes from source. Timeouts, failed shards, or malformed results report
+unavailability. Existing reversible score/ID cursors cover unchanged-index pages;
+there is no new snapshot consistency model. GraphQL, Catalogue, and real
+OpenSearch contracts check these boundaries, while one representative composition
+test follows an actual-image measurement fact through utility indexing to the API.
+
 ## Measurements, utilities, and retained facts
 
 Color Extractor owns image sampling and the versioned measurement fact; Gateway

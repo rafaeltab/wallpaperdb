@@ -6,10 +6,11 @@ precomputed numeric scores ranked by OpenSearch.** Requested amounts use 10%
 steps. The middle preference preserves the user's favorite exactly at the
 mathematical-formula level.
 
-This describes the accepted prototype behavior and its limitations. It does not
-specify a finished production API, event contract, deployment, or migration.
-See [research path](RESEARCH-PATH.md), [evidence](EVIDENCE.md), and
-[production questions](PRODUCTION-QUESTIONS.md).
+This describes the selected method and its limitations. The production
+[GraphQL schema](../../../apps/gateway/src/graphql/schema.ts) and
+[Catalogue admission and target resolution](../../../apps/gateway/src/capabilities/catalogue/colors.ts)
+define its complete request contract. See [research path](RESEARCH-PATH.md),
+[historical evidence](EVIDENCE.md), and [production decisions and remaining work](PRODUCTION-QUESTIONS.md).
 
 ## The idea in plain language
 
@@ -91,6 +92,13 @@ Sources: [shade measurement](https://github.com/rafaeltab/wallpaperdb/blob/30edc
 
 The method distinguishes two query modes.
 
+Catalogue accepts one through ten targets. Each target supplies exactly one
+concrete six-digit sRGB hex color or supported name. Vibe is the default mode;
+favorite is the default quality preference. A vibe target omits its percentage.
+A proportion target supplies an integer from 0 through 100 in exact 10% steps;
+unsupported intermediate values are rejected. The schema owns the external
+representation, while Catalogue owns defaults, admission, and target resolution.
+
 **Color vibe:** reward a substantial matching area and good color quality.
 Coverage uses a square root, so increasing coverage has diminishing returns.
 This lets a smaller strong color region compete with a larger weaker one; it
@@ -108,6 +116,12 @@ However, it also has no independent penalty for an unwanted color outside the
 requested neighborhoods. Even when requested amounts total 100%, the method
 remains a set of marginal color targets; it does not enforce exclusive palette
 allocation or exact palette purity.
+
+Each proportion target is admitted independently, including requests in which
+every percentage is zero or the total exceeds 100%. This follows the
+[approved query ticket](https://github.com/rafaeltab/wallpaperdb/issues/307):
+overlapping target measurements do not require a disjoint composition summing
+to 100%. Historical prototype UI admission checks do not change this contract.
 
 For either mode, score each cutoff layer, combine the layers with their cutoff
 weights, then average requested targets equally. A larger requested percentage
@@ -169,14 +183,15 @@ doc values. It disables stored `_source` and retrieves IDs through doc values.
 On September 30, 2026, the maintainer selected this layout for production
 integration, as recorded in
 [ADR 0006](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions).
-Catalogue metadata projection and result retrieval must work within that
-representation; the decision does not require a separate metadata retrieval path.
-Retained versioned measurements through NATS provide the input for deriving
+The production [mapping](../../../apps/gateway/src/adapters/opensearch/mappings.ts)
+retains Catalogue metadata, measurements, and descriptor provenance in source
+while excluding the utility bank. Utilities and wallpaper IDs keep float and
+keyword doc values, respectively, in the same index; no separate metadata
+retrieval path is required. Retained versioned NATS measurements support deriving
 utilities again when the descriptor definition is unchanged. The initial
 installation uses fresh storage and uploads, so migration/backfill or operator
-rebuild tooling is not required. See the [production guidance](PRODUCTION-QUESTIONS.md)
-for those scope decisions. The actual million-record disk cost of this
-three-preset layout remains unmeasured.
+rebuild tooling is unnecessary. See [production guidance](PRODUCTION-QUESTIONS.md).
+The actual million-record disk cost of this three-preset layout remains unmeasured.
 
 For a search, select the stored field for each resolved target and preference.
 OpenSearch applies metadata eligibility filters and averages those utilities,
@@ -185,10 +200,27 @@ zero-score documents. No color candidate ranking is performed in TypeScript.
 An ordinary query reads one utility per requested target instead of five
 coverage/quality pairs per target.
 
+The [production query](../../../apps/gateway/src/adapters/opensearch/query.ts)
+uses the selected native numeric scoring path. Metadata, contributor, and exact
+utility-version readiness requirements apply before ranking. A zero-score base
+clause keeps eligible zero-score wallpapers in the results. Wallpaper IDs come
+from doc values and retained metadata comes from source. Timeout, shard failure,
+or malformed search responses produce unavailability rather than incomplete
+successful rankings.
+
+Results use descending native scores and ascending wallpaper-ID ties. Existing
+score/ID cursors support forward and reverse traversal on an unchanged index;
+this change does not introduce a snapshot consistency model. The
+[Catalogue pagination contract](../../../apps/gateway/src/capabilities/catalogue/implementation.ts)
+owns page size, cursor validation, and page information.
+
 The utility is stored as float32. Precomputing layer sums changes the grouping
 of floating-point operations relative to the original query. The formula is
 preserved at offered settings, but near-tie order is not promised to be bitwise
-identical. Measured parity and its tolerance are in [evidence](EVIDENCE.md).
+identical to earlier per-layer formulas. Production preserves the selected
+float32 utility encoder and native OpenSearch execution, including near-tie
+ordering. Historical parity measurements and their tolerance remain in
+[evidence](EVIDENCE.md).
 
 Sources: [utility definitions and native query](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/favorite-utilities.mjs),
 [linked index builder](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/linked-strictness-index.mjs),
@@ -196,20 +228,22 @@ Sources: [utility definitions and native query](https://github.com/rafaeltab/wal
 
 ## Named colors, vibes, and unsupported meanings
 
-By default, concrete color names resolve through their declared swatches to
-anchors. Abstract features such as dark, light, grayscale, strict grayscale,
-near-neutral, vivid, muted, monochromatic, and rainbow keep their separate
-hand-authored definitions. They are not all reduced to a single black, white, or
-gray swatch. The full utility bank retains 23 named-feature targets, including
-the alternate broad color-family interpretations.
+Production fixes the thirteen concrete color names to their selected swatches
+and resolves each swatch to its nearest anchor. The ten abstract names,
+grayscale, strict grayscale, near-neutral, dark, light, bright, vivid, muted,
+monochromatic, and rainbow, select their separate named utility fields. The
+[Catalogue resolver](../../../apps/gateway/src/capabilities/catalogue/colors.ts)
+owns this resolution. The full utility bank retains all 23 named-feature
+targets, including the alternate broad color-family measurements; they do not
+add another request interpretation for concrete names.
 
 Named features have one score component, so cutoff weighting has no effect on
 them. Quality influence still applies where the underlying feature uses it.
 Monochromatic and rainbow values describe distribution properties, not literal
 areas of pixels belonging to those words. The prototype can compare numeric
-targets for those features, but a displayed percentage would describe that
-distribution-strength value rather than physical image coverage. Whether to
-expose such controls needs an explicit product decision.
+targets for those features. GraphQL exposes the supported proportions, whose
+meaning is distribution strength rather than physical image coverage. Advanced
+picker design remains [#36](https://github.com/rafaeltab/wallpaperdb/issues/36).
 
 The selected prototype supports explicit combinations such as 80% grayscale /
 20% red. It does not implement “grayscale with red accents” without proportions
@@ -221,7 +255,7 @@ infer a city, flag, season, or other semantic subject from color alone.
 Source: [named-feature definitions](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/corpus-colors.mjs)
 and [query support checks](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/methods-cutoff.mjs).
 
-## Known duplicate-target limitation
+## Repeated resolved targets
 
 The intended aggregation averages every requested target contribution. The
 existing numeric prototype can deviate when multiple targets resolve to the
@@ -231,12 +265,17 @@ this by choosing the same anchor and amount.
 
 The linked prototype retains that historical behavior. A separate repeated-target
 weights prototype corrects it and has arithmetic regression evidence, but it was
-not silently incorporated into the linked snapshot. On September 30, 2026, the
-maintainer accepted that correction for production integration: group identical
-complete utility keys and apply multiplicity divided by the original target
-count. Distinct-target queries retain the selected numeric path. Verify duplicate
-cases separately from frozen-snapshot parity. See the
-[production decision](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions)
+not silently incorporated into the linked snapshot. Production adopts that
+correction: group targets by their complete resolved utility key and apply a
+field factor of `multiplicity / original target count`. Repeated targets keep
+all intended contributions. The complete key includes the resolved target,
+query mode, proportion, and quality preset; different proportions remain
+separate even when their anchors match. Distinct-target clauses retain the
+selected native path. The
+[resolver](../../../apps/gateway/src/capabilities/catalogue/colors.ts) records
+multiplicities and the [query adapter](../../../apps/gateway/src/adapters/opensearch/query.ts)
+applies their factors. Verify duplicate cases separately from frozen-snapshot
+parity; see the [production decision](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions)
 and [multiplicity findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-MULTIPLICITY.md).
 
 ## Appendix: precise mathematical definition

@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
-import type { SearchSelection } from '../../capabilities/catalogue/index.js';
-import { wallpaperSearchResponse } from './documents.js';
+import { COLOR_UTILITY_VERSION, type SearchSelection } from '../../capabilities/catalogue/index.js';
+import { toWallpaper, wallpaperSearchResponse } from './documents.js';
 
 const index = 'wallpapers';
 const id = 'wallpaper-1';
@@ -33,6 +33,7 @@ function response(score: number, first = 0.25, second = 0.75) {
             variants: [],
             uploadedAt: '2026-09-30T00:00:00Z',
             updatedAt: '2026-09-30T00:00:00Z',
+            colorReady: COLOR_UTILITY_VERSION,
           },
           _score: score,
           fields: {
@@ -62,6 +63,24 @@ describe('OpenSearch color ranking response', () => {
       wallpaperSearchResponse(selection, index)(response(score, 0, 1))
     );
     expect(result.hits.hits[0]?._score).toBe(score);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['incompatible', 'older-utility-version'],
+  ] as const)('rejects a color hit with %s utility readiness', async (_case, version) => {
+    const score = Math.fround((2 * 0.25 + 0.75) / 3);
+    const changed = response(score);
+    if (version === undefined) Reflect.deleteProperty(changed.hits.hits[0]._source, 'colorReady');
+    else changed.hits.hits[0]._source.colorReady = version;
+    await expect(
+      Effect.runPromise(wallpaperSearchResponse(selection, index)(changed))
+    ).rejects.toThrow();
+  });
+
+  it('does not expose the utility version in a returned wallpaper', () => {
+    const score = Math.fround((2 * 0.25 + 0.75) / 3);
+    expect(toWallpaper(response(score).hits.hits[0]._source)).not.toHaveProperty('colorReady');
   });
 
   it('rejects a changed score even when the sort cursor changes with it', async () => {

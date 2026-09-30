@@ -1,6 +1,6 @@
 # Media
 
-Media owns Asset inspection, rendition processing, temporary HDR Profile picture conversion, and authorized delivery. Producers own committed Assets; Media owns inspection, rendition generation, selection, its delivery catalog, and the [planned stateless conversion of temporary HDR Profile picture sources](../../docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md).
+Media owns Asset inspection, rendition processing, temporary HDR Profile picture conversion, and authorized delivery. Its delivery catalog identifies Assets and Materialized renditions available for delivery.
 
 ## Language
 

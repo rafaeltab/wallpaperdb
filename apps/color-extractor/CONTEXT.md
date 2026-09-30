@@ -4,18 +4,21 @@ This context describes the color distribution of an uploaded wallpaper for disco
 
 ## Language
 
-**Color histogram**:
-The normalized distribution of a wallpaper's visible colors. Fully transparent pixels contribute nothing.
+**Color anchor**:
+A reference color whose matching neighborhood can overlap those of other anchors.
 
-**Color measurement**:
-A description of how much of a wallpaper matches a color target and the quality of those matches, or of a named visual property. A measurement describes the image independently of a requested search proportion or quality preference.
+**Color measurements**:
+A wallpaper's matching area and conditional mean match quality for each color anchor and named target. Measurements describe the original image with transparency composited onto black, independently of a requested search proportion or quality preference.
 _Avoid_: Utility, relevance score
 
 **Coverage**:
-The fraction of a wallpaper's sampled area admitted by a color target's matching threshold. Overlapping targets can measure the same area.
+The fraction of the wallpaper admitted to a target's matching neighborhood. Coverage across overlapping neighborhoods does not form an exclusive palette.
 
-**Conditional quality**:
-The average similarity of the area admitted by a color target's matching threshold. It is zero when no area is admitted.
+**Conditional mean quality**:
+The average match quality among admitted pixels, or zero when no pixels match.
+
+**Named target**:
+A hand-authored color family or visual property. Monochromatic and rainbow describe distribution strength rather than physical pixel area.
 
 **Color extraction**:
-Measuring the color distribution of an immutable original still image for discovery. A color histogram is one description of that distribution; matching-area and quality measurements are another.
+Measuring colors in an immutable original still image and announcing the completed measurements. Video uploads do not receive color measurements. A fully transparent image has the measurements of black.

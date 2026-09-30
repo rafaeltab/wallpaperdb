@@ -26,7 +26,7 @@ Additional contexts are documented lazily as their domain language is resolved.
 - **User <-> Web**: A [shared Markdown policy](./docs/adr/0005-share-the-profile-markdown-policy.md) keeps Biography acceptance and React rendering aligned.
 
 - **Ingestor -> Color Extractor**: Uploaded wallpaper events identify immutable originals for color extraction.
-- **Color Extractor -> Gateway**: Published color measurements support color-ranked discovery. The current contract carries histograms; [ADR 0006](./docs/adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions) accepts versioned matching-area and quality measurements, from which the Catalogue derives target utilities. The replacement is tracked in [#305](https://github.com/rafaeltab/wallpaperdb/issues/305) and [#306](https://github.com/rafaeltab/wallpaperdb/issues/306).
+- **Color Extractor -> Gateway**: Published matching-area and quality measurements provide the source for color-ranked discovery.
 
 - **Ingestor -> Variant Generator**: Uploaded wallpaper events identify originals for variant generation.
 - **Variant Generator -> Media**: Stored variant announcements supply renditions for delivery.

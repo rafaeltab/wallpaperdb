@@ -11,7 +11,8 @@ test.use({ actionTimeout: 15000 });
 test("uploaded pixels survive catalogue delivery, filtering and accessible details", async ({
   page,
 }) => {
-  test.setTimeout(120000);
+  // Four readiness polls can each use 60 seconds before the UI assertions run.
+  test.setTimeout(300000);
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/web/upload");

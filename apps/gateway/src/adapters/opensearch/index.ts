@@ -477,7 +477,10 @@ const isoDateMappingField = Schema.Struct({
         field.format
           .split('||')
           .some(
-            (format) => format === 'strict_date_optional_time' || format === 'date_optional_time'
+            (format) =>
+              format === 'strict_date_optional_time' ||
+              format === 'strict_date_optional_time_nanos' ||
+              format === 'date_optional_time'
           ))
   )
 );

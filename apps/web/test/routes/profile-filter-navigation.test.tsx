@@ -61,6 +61,48 @@ function renderBrowse(initialEntry: string) {
 describe('Profile filter navigation', () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it('ignores a retired color URL and requests the supported catalogue operation', async () => {
+    const requests: Array<GraphQLRequest & { query: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const request = JSON.parse(String(init.body));
+        requests.push(request);
+        return new Response(
+          JSON.stringify({
+            data: {
+              searchWallpapers: {
+                edges: [],
+                pageInfo: { hasNextPage: false, hasPreviousPage: false },
+              },
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        );
+      })
+    );
+    const user = userEvent.setup();
+    const { view, queryClient } = renderBrowse('/?color=%23ff0000&format=png');
+    try {
+      expect(await screen.findByText('No wallpapers match these filters.')).toBeInTheDocument();
+      expect(requests).toHaveLength(1);
+      expect(requests[0].variables).toEqual({
+        first: 20,
+        after: null,
+        filter: { variants: { format: 'image/png' } },
+      });
+      expect(requests[0].query).not.toContain('WallpaperSort');
+      expect(requests[0].query).not.toContain('sort:');
+      await user.click(screen.getByRole('button', { name: 'Toggle filters' }));
+      expect(screen.queryByLabelText('Color')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Clear color' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'PNG' })).toHaveAttribute('aria-pressed', 'true');
+    } finally {
+      view.unmount();
+      queryClient.clear();
+    }
+  });
+
   it('carries a selected Profile ID through real navigation and wallpaper requests, then clears only ownership', async () => {
     const requests: GraphQLRequest[] = [];
     const profile = {

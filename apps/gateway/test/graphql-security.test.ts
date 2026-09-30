@@ -371,8 +371,8 @@ describe('GraphQL security driving contract', () => {
     });
     const app = await build(config, { catalogue });
     const text = `
-      query SearchWallpapers($filter:WallpaperFilter,$first:Int,$after:String) {
-        searchWallpapers(filter:$filter,first:$first,after:$after) {
+      query SearchWallpapers($filter:WallpaperFilter,$sort:WallpaperSort,$first:Int,$after:String) {
+        searchWallpapers(filter:$filter,sort:$sort,first:$first,after:$after) {
           edges {
             node {
               wallpaperId profileId uploadedAt updatedAt

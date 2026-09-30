@@ -504,22 +504,24 @@ it.each([
     serviceName: 'quarantine-partial-contract',
     retryDelayMs: 20,
   };
-  const runtime = ManagedRuntime.make(
-    natsConsumerLayer(options).pipe(
-      Layer.provide(natsEventsLayer(options)),
-      Layer.provide(
-        Layer.succeed(ExtractColors, {
-          extract: () =>
-            Effect.suspend(() => {
-              attempts++;
-              return Effect.fail(
-                new ExtractionUnavailable({ operation: 'controlled', cause: 'offline' })
-              );
-            }),
-        })
+  const makeRuntime = () =>
+    ManagedRuntime.make(
+      natsConsumerLayer(options).pipe(
+        Layer.provide(natsEventsLayer(options)),
+        Layer.provide(
+          Layer.succeed(ExtractColors, {
+            extract: () =>
+              Effect.suspend(() => {
+                attempts++;
+                return Effect.fail(
+                  new ExtractionUnavailable({ operation: 'controlled', cause: 'offline' })
+                );
+              }),
+          })
+        )
       )
-    )
-  );
+    );
+  let runtime = makeRuntime();
   const manager = await (await tester.nats.getConnection()).jetstreamManager();
   try {
     await runtime.runPromise(ConsumerHealth);
@@ -536,6 +538,9 @@ it.each([
         { timeout: 5000 }
       )
       .toBeGreaterThanOrEqual(4);
+    // Delivery does not mean the failed handoff has finished. Drain the writer before
+    // changing capacity or purging partial records that it may still be verifying.
+    await runtime.dispose();
     expect(attempts).toBe(3);
     expect((await manager.streams.info('COLOR_EXTRACTOR_QUARANTINE')).state.messages).toBe(1);
     expect(
@@ -544,6 +549,8 @@ it.each([
     ).toBe(1);
     if (purgePartial) await manager.streams.purge('COLOR_EXTRACTOR_QUARANTINE');
     await manager.streams.update('COLOR_EXTRACTOR_QUARANTINE', { max_msgs: -1 });
+    runtime = makeRuntime();
+    await runtime.runPromise(ConsumerHealth);
     await expect
       .poll(
         async () =>

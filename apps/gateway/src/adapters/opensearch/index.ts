@@ -249,7 +249,7 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
       Effect.gen({ self: this }, function* () {
         const hits = yield* this.searchPage(selection);
         const after = selection.searchAfter;
-        if (selection.color && after && hits.hits.length < selection.size) {
+        if (after && hits.hits.length < selection.size) {
           const tail = yield* this.searchPage({
             ...selection,
             searchAfter: undefined,
@@ -265,7 +265,7 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
             );
           if (!complete)
             return yield* new SearchRequestError({
-              cause: new Error('Incomplete or concurrently changed color search page'),
+              cause: new Error('Incomplete or concurrently changed search page'),
             });
         }
         yield* recordTelemetry(() =>

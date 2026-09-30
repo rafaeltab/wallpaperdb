@@ -265,7 +265,7 @@ describe('Native color ranking port contract', () => {
                 if (fault === 'sort') body.hits.hits[0].sort[1] = 'different';
                 if (fault.startsWith('order')) body.hits.hits.reverse();
                 if (fault.startsWith('stale')) body.hits.hits[0] = firstHit;
-                if (fault.startsWith('cursor') && hasCursor) {
+                if (fault.includes('cursor') && hasCursor) {
                   if (fault.includes('interior')) body.hits.hits.splice(1, 1);
                   if (fault.includes('terminal')) body.hits.hits.pop();
                   if (fault.includes('empty')) body.hits.hits = [];
@@ -354,6 +354,39 @@ describe('Native color ranking port contract', () => {
                 searchAfter: cursor,
               }
             : orderedSelection;
+        expect(
+          await Effect.runPromise(Effect.flip(proxied.adapter.read.search(requested)))
+        ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+      } finally {
+        fault = undefined;
+        firstHit = undefined;
+      }
+    });
+
+    it.each([
+      ['interior', 'desc'],
+      ['terminal', 'desc'],
+      ['empty', 'desc'],
+      ['interior', 'asc'],
+      ['terminal', 'asc'],
+      ['empty', 'asc'],
+    ] as const)('rejects an incomplete non-color %s cursor page in %s order', async (omission, sortOrder) => {
+      if (!proxied) throw new Error('Expected an acquired proxy fixture');
+      const uncolored: SearchSelection = {
+        profileId: 'ranking',
+        variantFilters: { width: 1920, height: 1080 },
+        size: 100,
+        sortOrder,
+      };
+      const full = await Effect.runPromise(resource.adapter.read.search(uncolored));
+      const cursor = full.entries.at(-5)?.cursor;
+      if (!cursor) throw new Error('Expected a complete non-color fixture');
+      const requested = { ...uncolored, size: 6, searchAfter: cursor };
+      expect(
+        (await Effect.runPromise(proxied.adapter.read.search(requested))).entries
+      ).toHaveLength(4);
+      try {
+        fault = `non-color-cursor-${omission}`;
         expect(
           await Effect.runPromise(Effect.flip(proxied.adapter.read.search(requested)))
         ).toMatchObject({ _tag: 'CatalogueUnavailable' });

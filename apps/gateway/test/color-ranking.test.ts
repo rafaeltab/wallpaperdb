@@ -291,6 +291,7 @@ describe('Native wallpaper search port contract', () => {
                 if (!hasCursor) referenceHits = body.hits.hits;
               } else {
                 if (fault === 'timeout') body.timed_out = true;
+                if (fault === 'non-color-first-reverse-timeout' && hasCursor) body.timed_out = true;
                 if (fault === 'shards') body._shards.failed = 1;
                 if (fault === 'missing-id') delete body.hits.hits[0].fields.wallpaperId;
                 if (fault === 'duplicate-id') body.hits.hits.push(body.hits.hits[0]);
@@ -329,6 +330,19 @@ describe('Native wallpaper search port contract', () => {
                   const replacement = referenceHits[lastPosition + 1];
                   if (replacement) {
                     body.hits.hits.splice(1, 1);
+                    body.hits.hits.push(replacement);
+                  }
+                }
+                if (
+                  fault.startsWith('first-skip-full') &&
+                  !hasCursor &&
+                  scoreOrder === (fault.endsWith('-asc') ? 'asc' : 'desc')
+                ) {
+                  const lastId = body.hits.hits.at(-1)?._id;
+                  const lastPosition = referenceHits.findIndex((hit) => hit._id === lastId);
+                  const replacement = referenceHits[lastPosition + 1];
+                  if (replacement) {
+                    body.hits.hits.shift();
                     body.hits.hits.push(replacement);
                   }
                 }
@@ -403,6 +417,8 @@ describe('Native wallpaper search port contract', () => {
       'cursor-empty-asc',
       'cursor-skip-full',
       'cursor-skip-full-asc',
+      'first-skip-full',
+      'first-skip-full-asc',
       'total',
       'truncated',
     ] as const)('rejects an incomplete or malformed %s ranking', async (selectedFault) => {
@@ -426,13 +442,33 @@ describe('Native wallpaper search port contract', () => {
                 size: selectedFault.includes('final') ? 6 : 3,
                 searchAfter: cursor,
               }
-            : orderedSelection;
+            : selectedFault.startsWith('first-skip-full')
+              ? { ...orderedSelection, size: 3 }
+              : orderedSelection;
         expect(
           await Effect.runPromise(Effect.flip(proxied.adapter.read.search(requested)))
         ).toMatchObject({ _tag: 'CatalogueUnavailable' });
       } finally {
         fault = undefined;
         firstHit = undefined;
+      }
+    });
+
+    it('serves a full non-color first page without requiring a reverse query', async () => {
+      if (!proxied) throw new Error('Expected an acquired proxy fixture');
+      const uncolored: SearchSelection = {
+        profileId: 'ranking',
+        variantFilters: { width: 1920, height: 1080 },
+        size: 3,
+        sortOrder: 'asc',
+      };
+      const expected = await Effect.runPromise(resource.adapter.read.search(uncolored));
+      try {
+        fault = 'non-color-first-reverse-timeout';
+        const actual = await Effect.runPromise(proxied.adapter.read.search(uncolored));
+        expect(actual).toEqual(expected);
+      } finally {
+        fault = undefined;
       }
     });
 

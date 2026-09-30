@@ -249,8 +249,8 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
       Effect.gen({ self: this }, function* () {
         const hits = yield* this.searchPage(selection);
         const after = selection.searchAfter;
-        if (after) {
-          const fullPage = hits.hits.length === selection.size;
+        const fullPage = hits.hits.length === selection.size;
+        if (after || (selection.color && fullPage)) {
           const anchor = fullPage ? hits.hits.at(-1) : undefined;
           if (fullPage && !anchor)
             return yield* new SearchRequestError({
@@ -263,7 +263,7 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
           });
           const expected = [...inverse.hits]
             .reverse()
-            .filter((hit) => followsSearchCursor(hit.sort, after, selection));
+            .filter((hit) => !after || followsSearchCursor(hit.sort, after, selection));
           const observed = fullPage ? hits.hits.slice(0, -1) : hits.hits;
           const complete =
             expected.length === observed.length &&

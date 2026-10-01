@@ -32,6 +32,9 @@ The characteristics Media has established about an Asset, including its displaye
 **Inspection**:
 Media's examination of an Asset to establish its Source facts. Inspection readiness is separate from the Asset's availability for unchanged delivery.
 
+**Original-delivery availability**:
+Media's confirmation that a source Asset has entered its delivery catalog for unchanged delivery, subject to its producer's lifecycle rules. This is independent of Inspection readiness and is not a continuous service-health guarantee.
+
 **Delivery capabilities**:
 The Rendition combinations Media can produce for an Asset under its current processing support and limits. They do not describe the inventory of Materialized renditions.
 
@@ -57,4 +60,4 @@ The existing name for a wallpaper-specific Materialized rendition. Use Rendition
 The Profile picture identified by the latest accepted Profile snapshot and still permitted by User's origin availability decision.
 
 **Availability announcement**:
-Media's statement that an image rendition has entered its delivery catalog.
+Media's published snapshot of a source Asset's original-delivery availability, Inspection readiness, and public Source facts. It does not expose Materialized rendition inventory.

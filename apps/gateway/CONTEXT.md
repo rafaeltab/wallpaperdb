@@ -1,6 +1,6 @@
 # Gateway Catalogue
 
-The Gateway Catalogue lets visitors discover wallpapers and their public contributors. It interprets published facts from the contexts that own wallpapers, variants, colors, and Profiles.
+The Gateway Catalogue lets visitors discover wallpapers and their public contributors. It interprets published wallpaper, Media delivery, color, and Profile facts.
 
 ## Language
 
@@ -12,9 +12,15 @@ _Avoid_: Write model, source of truth
 A published image available for discovery, associated with its contributor's Profile ID.
 _Avoid_: Upload command, asset file
 
-**Variant**:
-An available rendition of a wallpaper with particular dimensions and format.
-_Avoid_: Duplicate wallpaper
+**Wallpaper Asset**:
+The immutable source image identified by the Wallpaper ID, with Media's published delivery availability, inspection readiness, and known Source facts.
+_Avoid_: Variant, stored rendition inventory
+
+**Source facts**:
+Media-established characteristics of a wallpaper's source image used for discovery. Unknown characteristics remain unknown; conversion capabilities are not Source facts.
+
+**Discovery eligibility**:
+The catalogue's knowledge that a wallpaper has been published and Media has confirmed unchanged-source delivery. Inspection readiness is separate, and temporary delivery outages do not withdraw that confirmation.
 
 **Contributor Profile**:
 The catalogue's public view of the Profile that contributed a wallpaper. The User context owns its identity and presentation.

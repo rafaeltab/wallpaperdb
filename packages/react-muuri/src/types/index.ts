@@ -219,7 +219,7 @@ export interface MuuriContextValue {
   /** The grid instance */
   grid: Grid | null;
   /** Register an item element with the grid */
-  registerItem: (element: HTMLElement, key: string) => Item | null;
+  registerItem: (element: HTMLElement, key: string, onLayout?: () => void) => Item | null;
   /** Unregister an item from the grid */
   unregisterItem: (key: string) => void;
 }

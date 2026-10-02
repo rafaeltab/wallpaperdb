@@ -39,6 +39,7 @@ export const MuuriItem = forwardRef<HTMLDivElement, MuuriItemProps>(function Muu
   const generatedId = useId();
   const key = itemKey ?? generatedId;
   const elementRef = useRef<HTMLDivElement>(null);
+  const [isPositioned, setIsPositioned] = useState(false);
   const [item, setItem] = useState<MuuriItemType | null>(null);
   const muuriContext = useContext(MuuriContext);
   const isRegisteredRef = useRef(false);
@@ -48,7 +49,9 @@ export const MuuriItem = forwardRef<HTMLDivElement, MuuriItemProps>(function Muu
     if (!elementRef.current || !muuriContext || isRegisteredRef.current) return;
 
     isRegisteredRef.current = true;
-    const muuriItem = muuriContext.registerItem(elementRef.current, key);
+    const muuriItem = muuriContext.registerItem(elementRef.current, key, () =>
+      setIsPositioned(true)
+    );
     if (muuriItem) {
       setItem(muuriItem);
     }
@@ -76,8 +79,10 @@ export const MuuriItem = forwardRef<HTMLDivElement, MuuriItemProps>(function Muu
     () => ({
       position: 'absolute',
       ...style,
+      // Keep new items hidden during their first positioning animation.
+      visibility: isPositioned ? style?.visibility : 'hidden',
     }),
-    [style]
+    [style, isPositioned]
   );
 
   // Item context value

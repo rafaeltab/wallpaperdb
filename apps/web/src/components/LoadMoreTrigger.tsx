@@ -21,6 +21,6 @@ export function LoadMoreTrigger({ onLoadMore, hasMore, isLoading }: LoadMoreTrig
 
   if (!hasMore) return null;
 
-  // Invisible trigger element - skeletons are rendered in the grid itself
+  // The gallery displays its loading status above this trigger.
   return <div ref={ref} className="h-4" />;
 }

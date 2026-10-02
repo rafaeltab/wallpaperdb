@@ -98,7 +98,9 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [grid, setGrid] = useState<Muuri | null>(null);
-  const itemsMapRef = useRef<Map<string, { element: HTMLElement; item: Item | null }>>(new Map());
+  const itemsMapRef = useRef<
+    Map<string, { element: HTMLElement; item: Item | null; onLayout?: () => void }>
+  >(new Map());
   const pendingItemsRef = useRef<HTMLElement[]>([]);
   const isInitializedRef = useRef(false);
 
@@ -226,6 +228,12 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
       });
 
       muuriInstance.on('layoutEnd', (items) => {
+        const positionedElements = new Set(items.map((item) => item.getElement()));
+        for (const registration of itemsMapRef.current.values()) {
+          if (positionedElements.has(registration.element)) {
+            registration.onLayout?.();
+          }
+        }
         callbacksRef.current.onLayoutEnd?.(items);
       });
 
@@ -327,7 +335,7 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
 
   // Register item with grid
   const registerItem = useCallback(
-    (element: HTMLElement, key: string): Item | null => {
+    (element: HTMLElement, key: string, onLayout?: () => void): Item | null => {
       // Check if already registered
       const existing = itemsMapRef.current.get(key);
       if (existing) {
@@ -336,7 +344,7 @@ export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function Muuri
       }
 
       // Store in map
-      itemsMapRef.current.set(key, { element, item: null });
+      itemsMapRef.current.set(key, { element, item: null, onLayout });
 
       if (grid && isInitializedRef.current) {
         // Check if element is already a Muuri item (added during initialization)

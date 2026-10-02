@@ -18,9 +18,9 @@ const wallpaper: Wallpaper = {
 afterEach(cleanup);
 
 describe('WallpaperGrid pagination', () => {
-  it('keeps loading placeholders outside the gallery until dimensions are known', () => {
+  it('keeps loading placeholders outside the gallery until dimensions are known', async () => {
     const { container, rerender } = render(<WallpaperGrid wallpapers={[wallpaper]} />);
-    const existingCard = screen.getByRole('button', { name: 'Wallpaper landscape' });
+    const existingCard = await screen.findByRole('button', { name: 'Wallpaper landscape' });
 
     rerender(<WallpaperGrid wallpapers={[wallpaper]} isLoadingMore />);
 

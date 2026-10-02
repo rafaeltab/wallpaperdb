@@ -981,6 +981,41 @@ describe('NATS projection adapter contract', () => {
     await acknowledged();
   });
 
+  it('retains structured occurrence metadata and original bytes when projection rejects a precise event', async () => {
+    const project = new ControlledProjection();
+    project.outcomes = [{ _tag: 'Rejected', reason: 'invalid-projection' }];
+    await consumer(project);
+    const original = JSON.stringify(
+      {
+        specversion: '1.0',
+        source: '/contexts/ingestor',
+        id: 'precise-rejected-upload',
+        type: 'wallpaper.uploaded',
+        time: '2026-09-15T14:00:00.123100+02:00',
+        correlationid: 'upload-workflow',
+        causationid: 'upload-command',
+        causationsource: '/contexts/web',
+        data: { wallpaper: JSON.parse(upload('legacy-id')).wallpaper },
+      },
+      null,
+      2
+    );
+    await publish(original);
+    expect(await quarantine()).toMatchObject({
+      causationid: 'precise-rejected-upload',
+      causationsource: '/contexts/ingestor',
+      correlationid: 'upload-workflow',
+      data: { original: Buffer.from(original).toString('base64'), outcome: 'Rejected' },
+    });
+    expect(project.changes).toHaveLength(1);
+    expect(project.changes[0]?.occurrence).toEqual({
+      source: '/contexts/ingestor',
+      id: 'precise-rejected-upload',
+      occurredAt: '2026-09-15T12:00:00.1231Z',
+    });
+    await acknowledged();
+  });
+
   it('keeps responsibility with the broker when an unexpected defect occurs', async () => {
     const project = new ControlledProjection();
     project.defectNext = true;

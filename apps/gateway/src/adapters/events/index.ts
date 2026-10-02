@@ -47,10 +47,21 @@ export type DeliveryDecision =
   | { readonly _tag: 'Exhausted' };
 
 /** The broker owner durably quarantines Invalid, Rejected and Exhausted outcomes. */
-export const deliverProjection = Effect.fn('catalogue.delivery')(function* (
+export function deliverProjection(
   delivery: ProjectionDelivery
+): Effect.Effect<DeliveryDecision, never, ProjectCatalogue> {
+  return Effect.suspend(() =>
+    deliverTranslatedProjection(
+      translate(delivery.subject, delivery.payload, delivery.headers),
+      delivery
+    )
+  );
+}
+
+const deliverTranslatedProjection = Effect.fn('catalogue.delivery')(function* (
+  translated: TranslatedEvent,
+  delivery: Pick<ProjectionDelivery, 'subject' | 'attempt'>
 ): Effect.fn.Return<DeliveryDecision, never, ProjectCatalogue> {
-  const translated = translate(delivery.subject, delivery.payload, delivery.headers);
   if (translated._tag === 'Invalid') return { _tag: 'Invalid' };
   if (delivery.attempt > 4) return { _tag: 'Exhausted' };
   const attributes = {
@@ -236,6 +247,7 @@ const subscribe = Effect.fn('catalogue.events.subscribe')(function* (
 const quarantine = Effect.fn('catalogue.events.quarantine')(function* (
   js: JetStreamClient,
   message: JsMsg,
+  original: TranslatedEvent,
   outcome: string,
   options: NatsProjectionOptions
 ) {
@@ -255,7 +267,6 @@ const quarantine = Effect.fn('catalogue.events.quarantine')(function* (
     )
     .update(message.data)
     .digest('hex');
-  const original = translate(message.subject, message.data, message.headers);
   const span = yield* OtelTracer.currentOtelSpan.pipe(Effect.option);
   const traceCarrier: Record<string, string> = {};
   propagation.inject(
@@ -331,18 +342,17 @@ const processMessage = Effect.fn('catalogue.events.consume')(function* (
   const started = yield* Clock.currentTimeMillis;
   let status = 'error';
   let acknowledgementAttempted = false;
+  const translated = translate(message.subject, message.data, message.headers);
   const attributes = {
-    ...projectionAttributes(translate(message.subject, message.data, message.headers)),
+    ...projectionAttributes(translated),
     'event.subject': message.subject,
     'event.consumer': message.info.consumer,
     'event.delivery_attempt': attempt,
   };
   yield* Effect.annotateCurrentSpan(attributes);
   yield* Effect.gen(function* () {
-    const outcome = yield* deliverProjection({
+    const outcome = yield* deliverTranslatedProjection(translated, {
       subject: message.subject,
-      payload: message.data,
-      headers: message.headers,
       attempt,
     });
     yield* Effect.annotateCurrentSpan('event.outcome', outcome._tag);
@@ -358,7 +368,7 @@ const processMessage = Effect.fn('catalogue.events.consume')(function* (
       case 'Invalid':
       case 'Rejected':
       case 'Exhausted':
-        yield* quarantine(js, message, outcome._tag, options);
+        yield* quarantine(js, message, translated, outcome._tag, options);
         acknowledgementAttempted = true;
         yield* acknowledge(message);
         return;

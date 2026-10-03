@@ -116,6 +116,19 @@ describe('SignUpForm', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/invalid email format/i);
   });
 
+  it('shows field and global errors together, preferring the email error', () => {
+    (useSignUp as Mock).mockReturnValue(mockSignUpReturn({
+      errors: {
+        fields: { emailAddress: { message: 'Email is taken' }, password: { message: 'Weak password' } },
+        global: [{ code: 'unknown', message: 'Try again later', longMessage: 'Try again later' }],
+      },
+    }));
+    render(<SignUpForm />);
+    expect(screen.getAllByRole('alert').map((alert) => alert.textContent))
+      .toEqual(['Email is taken', 'Try again later']);
+    expect(screen.queryByText('Weak password')).not.toBeInTheDocument();
+  });
+
   it('calls signUp.finalize after successful sign-up', async () => {
     mockPassword.mockResolvedValue({ error: null });
     mockFinalize.mockResolvedValue(undefined);

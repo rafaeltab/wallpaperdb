@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { shareWallpaper } from '@/lib/services/wallpaper-share';
+import { shareWallpaper } from '@/features/wallpaper-details/adapters/share';
 import { toast } from 'sonner';
 
 // Mock sonner

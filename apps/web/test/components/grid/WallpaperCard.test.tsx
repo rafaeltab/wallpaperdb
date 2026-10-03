@@ -5,7 +5,7 @@ import { WallpaperCard } from '@/components/grid/WallpaperCard';
 import type { GridItem } from '@/components/grid/types';
 import type { Wallpaper } from '@/lib/graphql/types';
 import { downloadVariant } from '@/lib/utils/wallpaper';
-import { shareWallpaper } from '@/lib/services/wallpaper-share';
+import { shareWallpaper } from '@/features/wallpaper-details/adapters/share';
 import { toast } from 'sonner';
 
 // Mock dependencies
@@ -13,7 +13,7 @@ vi.mock('@/lib/utils/wallpaper', () => ({
 	downloadVariant: vi.fn(),
 }));
 
-vi.mock('@/lib/services/wallpaper-share', () => ({
+vi.mock('@/features/wallpaper-details/adapters/share', () => ({
 	shareWallpaper: vi.fn(),
 }));
 

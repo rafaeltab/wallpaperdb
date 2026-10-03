@@ -29,6 +29,10 @@ import { shareWallpaper } from '@/features/wallpaper-details/adapters/share';
 
 export function WallpaperDetailPage() {
   const { wallpaperId } = useParams({ strict: false }) as { wallpaperId: string };
+  return <WallpaperDetailContent key={wallpaperId} wallpaperId={wallpaperId} />;
+}
+
+function WallpaperDetailContent({ wallpaperId }: { wallpaperId: string }) {
   const isMobile = useMediaQuery('(max-width: 1024px)');
 
   // Panel state (persisted to localStorage)

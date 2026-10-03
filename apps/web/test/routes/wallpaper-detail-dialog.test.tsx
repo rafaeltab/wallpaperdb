@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Wallpaper } from '@/lib/graphql/types';
@@ -34,6 +34,33 @@ describe('Wallpaper detail dialog', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     localStorage.clear();
+  });
+
+  it('starts at the original with loading feedback on each A to B to A navigation', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
+    vi.stubGlobal('fetch', vi.fn((_url, options) => {
+      const id=JSON.parse(options.body).variables.wallpaperId;
+      return Promise.resolve(new Response(JSON.stringify({data:{getWallpaper:{...wallpaper,wallpaperId:id,variants:[
+        {...wallpaper.variants[0],url:`https://media.example/${id}-original.webp`},
+        {...wallpaper.variants[0],width:640,height:360,url:`https://media.example/${id}-small.webp`},
+      ]}}}),{headers:{'Content-Type':'application/json'}}));
+    }));
+    const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+    const root=createRootRoute();
+    const route=createRoute({getParentRoute:()=>root,path:'/wallpapers/$wallpaperId',component:WallpaperDetailPage});
+    const router=createRouter({routeTree:root.addChildren([route]),history:createMemoryHistory({initialEntries:['/wallpapers/a']})});
+    render(<QueryClientProvider client={client}><RouterProvider router={router}/></QueryClientProvider>);
+    const original=await screen.findByAltText('Wallpaper 1920×1080');
+    fireEvent.load(original);
+    fireEvent.keyDown(window,{key:'ArrowRight'});
+    fireEvent.load(await screen.findByAltText('Wallpaper 640×360'));
+    for(const id of ['b','a']) {
+      await act(async()=>{await router.navigate({to:'/wallpapers/$wallpaperId',params:{wallpaperId:id}});});
+      const image=await screen.findByAltText('Wallpaper 1920×1080');
+      expect(image).toHaveAttribute('src',`https://media.example/${id}-original.webp`);
+      expect(screen.getByTestId('wallpaper-skeleton')).toBeInTheDocument();
+      fireEvent.load(image);
+    }
   });
 
   it('opens a named, described metadata dialog after loading and preserves keyboard dismissal', async () => {

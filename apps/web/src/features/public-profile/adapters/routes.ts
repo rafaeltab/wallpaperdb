@@ -1,3 +1,4 @@
+import { canonicalProfileOutcome } from '../index';
 import { GatewayAdmissionError } from '@/features/request-admission/adapters/graphql';
 import type { QueryClient } from '@tanstack/react-query';
 import { notFound, redirect } from '@tanstack/react-router';
@@ -14,13 +15,10 @@ export async function loadCanonicalProfile(
     if (error instanceof GatewayAdmissionError && cached) return cached;
     throw error;
   });
-  if (!resolution) throw notFound();
-
-  if (resolution.canonicalHandle !== handle) {
-    throw redirectToCanonicalProfile(resolution.canonicalHandle);
-  }
-
-  return resolution.profile;
+  const outcome = canonicalProfileOutcome(resolution, handle);
+  if (outcome.kind === 'missing') throw notFound();
+  if (outcome.kind === 'redirect') throw redirectToCanonicalProfile(outcome.handle);
+  return outcome.profile;
 }
 
 export async function redirectHandleToCanonical(
@@ -28,8 +26,10 @@ export async function redirectHandleToCanonical(
   handle: string
 ): Promise<never> {
   const resolution = await queryClient.fetchQuery(profileByHandleQueryOptions(handle));
-  if (!resolution) throw notFound();
-  throw redirectToCanonicalProfile(resolution.canonicalHandle);
+  const outcome = canonicalProfileOutcome(resolution);
+  if (outcome.kind === 'missing') throw notFound();
+  if (outcome.kind === 'redirect') throw redirectToCanonicalProfile(outcome.handle);
+  throw notFound();
 }
 
 export async function redirectProfileIdToCanonical(

@@ -1,3 +1,9 @@
+import {
+  profileInitials,
+  profileFallbackColor,
+  projectionRetryDelay,
+  resolveProfilePicture,
+} from '@/features/public-profile';
 import { useEffect, useState } from 'react';
 import { useOwnerProfile } from '@/hooks/use-owner-profile';
 import type { Profile as OwnerProfile } from '@/lib/api/user';
@@ -12,27 +18,12 @@ interface ProfilePictureProps {
 
 export function ProfilePicture({ profile, className }: ProfilePictureProps) {
   const { profile: cachedOwner, refreshedAt } = useOwnerProfile(profile.id);
-  const owner =
-    'pictureAssetId' in profile
-      ? profile
-      : cachedOwner && cachedOwner.version >= (profile.version ?? 0)
-        ? cachedOwner
-        : null;
-  const picture = owner
-    ? owner.pictureAssetId
-      ? {
-          id: owner.pictureAssetId,
-          url: `${(import.meta.env.VITE_MEDIA_URL || '/media').replace(/\/+$/, '')}/profile-pictures/${encodeURIComponent(owner.pictureAssetId)}`,
-        }
-      : null
-    : 'picture' in profile
-      ? profile.picture
-      : null;
-  const resolved = {
-    id: profile.id,
-    displayName: owner?.displayName ?? profile.displayName,
-    picture,
-  };
+  const resolved = resolveProfilePicture(
+    profile,
+    cachedOwner,
+    import.meta.env.VITE_MEDIA_URL || '/media'
+  );
+  const picture = resolved.picture;
   const publicVersion = 'version' in profile ? profile.version : 0;
   return (
     <ProfilePictureImage
@@ -55,14 +46,12 @@ export function ProfilePictureImage({
   const accessibleName = `${profile.displayName}'s profile picture`;
 
   useEffect(() => {
-    if (!failed || retries >= 3) return;
-    const timeout = window.setTimeout(
-      () => {
-        setRetries((count) => count + 1);
-        setFailed(false);
-      },
-      1000 * 2 ** retries
-    );
+    const delay = projectionRetryDelay(retries, false);
+    if (!failed || delay === undefined) return;
+    const timeout = window.setTimeout(() => {
+      setRetries((count) => count + 1);
+      setFailed(false);
+    }, delay);
     return () => window.clearTimeout(timeout);
   }, [failed, retries]);
 
@@ -101,20 +90,9 @@ export function ProfilePictureImage({
       role="img"
       aria-label={accessibleName}
       className={className}
-      style={{ backgroundColor: fallbackColor(profile.id) }}
+      style={{ backgroundColor: profileFallbackColor(profile.id) }}
     >
-      {initials(profile.displayName)}
+      {profileInitials(profile.displayName)}
     </div>
   );
-}
-
-function initials(displayName: string): string {
-  const words = displayName.trim().split(/\s+/).filter(Boolean);
-  return `${words[0]?.[0] ?? '?'}${words.length > 1 ? (words.at(-1)?.[0] ?? '') : ''}`.toUpperCase();
-}
-
-function fallbackColor(profileId: string): string {
-  let hash = 0;
-  for (const character of profileId) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  return `hsl(${hash % 360} 58% 42%)`;
 }

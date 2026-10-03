@@ -5,7 +5,7 @@ import {
   loadCanonicalProfile,
   redirectHandleToCanonical,
   redirectProfileIdToCanonical,
-} from '@/lib/profile-route-loaders';
+} from '@/features/public-profile/adapters/routes';
 
 const profile = {
   id: 'user_ada',

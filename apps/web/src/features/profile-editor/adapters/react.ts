@@ -114,8 +114,24 @@ export function useProfileEditor(
   useEffect(() => editor.activate(), [editor]);
   useEffect(() => editor.receiveProfile(initial), [editor, initial]);
   useEffect(() => editor.setBusy(busy || writing), [editor, busy, writing]);
+  function coordinated<Args extends unknown[], Result>(action: (...args: Args) => Result) {
+    return (...args: Args): Result => {
+      editor.setBusy(
+        queryClient.isFetching({ queryKey: key }) > 0 ||
+          queryClient.isMutating({ mutationKey: key }) > 0
+      );
+      return action(...args);
+    };
+  }
   return {
-    editor,
+    editor: {
+      ...editor,
+      beginEdit: coordinated(editor.beginEdit),
+      change: coordinated(editor.change),
+      save: coordinated(editor.save),
+      confirmSave: coordinated(editor.confirmSave),
+      refresh: coordinated(editor.refresh),
+    },
     state: {
       ...state,
       busy: busy || writing || state.busy,

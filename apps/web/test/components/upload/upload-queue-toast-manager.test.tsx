@@ -14,7 +14,7 @@ vi.mock('@tanstack/react-router', () => ({ useRouter: () => ({ navigate }) }));
 vi.mock('@/lib/api/ingestor', () => ({ uploadWallpaperWithDetails: vi.fn() }));
 
 function QueueControls() {
-  const { addFiles, state } = useUploadQueue();
+  const { addFiles, state, retryFailed } = useUploadQueue();
   return (
     <>
       <button type="button" onClick={() => addFiles([new File(['picture'], 'wallpaper.jpg')])}>
@@ -22,6 +22,9 @@ function QueueControls() {
       </button>
       <button type="button" onClick={() => toast.success('Profile updated')}>
         Save profile
+      </button>
+      <button type="button" onClick={() => retryFailed()}>
+        Retry uploads
       </button>
       <output aria-label="Queue size">{state.files.length}</output>
     </>
@@ -143,6 +146,23 @@ describe('UploadQueueToastManager', () => {
       expect(screen.getByText('Upload complete')).toBeInTheDocument();
     });
     custom.mockRestore();
+  });
+
+  it('retains dismissed failed entries for retry through the page controls', async () => {
+    vi.mocked(uploadWallpaperWithDetails).mockResolvedValue({
+      success: false,
+      isDuplicate: false,
+      error: { type: 'network', message: 'Upload failed' },
+    });
+    const user = userEvent.setup();
+    renderQueue();
+    await user.click(screen.getByRole('button', { name: 'Add upload' }));
+    await user.click(await screen.findByRole('button', { name: 'Dismiss' }));
+    expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
+    vi.mocked(uploadWallpaperWithDetails).mockResolvedValue(uploaded);
+    await user.click(screen.getByRole('button', { name: 'Retry uploads' }));
+    await screen.findByText('1 uploaded');
+    expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
   });
 
   it('preserves expanded progress and controls while sharing and leaving the stack', async () => {

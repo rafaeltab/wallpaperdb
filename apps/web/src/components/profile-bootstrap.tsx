@@ -3,11 +3,11 @@ import { useIsMutating, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { userApi } from '@/lib/api/user';
 
-const profileQueryRoot = ['profile'] as const;
-
-export function profileQueryKey(userId: string) {
-  return [...profileQueryRoot, userId] as const;
-}
+import {
+  ownerProfileQueryRoot as profileQueryRoot,
+  profileQueryKey,
+} from '@/features/profile-management/adapters/query';
+export { profileQueryKey } from '@/features/profile-management/adapters/query';
 
 export function ProfileBootstrap() {
   const { getToken, isLoaded, isSignedIn, userId } = useAuth();

@@ -1,7 +1,10 @@
-import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
-import { profileQueryKey } from '@/components/profile-bootstrap';
+import {
+  profileQueryKey,
+  useOwnerProfileMutation,
+} from '@/features/profile-management/adapters/query';
 import { type Profile, UserApiError, userApi } from '@/lib/api/user';
 import { positiveIntegerEnv } from '@/lib/runtime-config';
 import {
@@ -28,11 +31,9 @@ export function useProfileEditor(
 ) {
   const queryClient = useQueryClient();
   const key = profileQueryKey(profile.id);
-  const busy = useIsFetching({ queryKey: key }) > 0;
-  const writing = useIsMutating({ mutationKey: key }) > 0;
-  const mutation = useMutation({
-    mutationKey: key,
-    mutationFn(command: ProfileDraft) {
+  const { mutation, busy, isBusy } = useOwnerProfileMutation(
+    profile.id,
+    (command: ProfileDraft) => {
       const options = {
         expectedVersion: command.baseVersion,
         expectedProfileId: profile.id,
@@ -41,8 +42,8 @@ export function useProfileEditor(
       return field === 'handle'
         ? userApi.updateHandle({ ...options, handle: command.value })
         : userApi.updateProfile({ ...options, [field]: command.value });
-    },
-  });
+    }
+  );
   const latest = useRef({ mutation, key });
   latest.current = { mutation, key };
   const initial = useMemo(() => editableProfile(profile), [profile]);
@@ -58,16 +59,9 @@ export function useProfileEditor(
       },
       {
         async save(command): Promise<SaveResult> {
-          const { key, mutation } = latest.current;
-          // The original query object identifies the owner session, even if its key is reused.
-          const ownerQuery = queryClient.getQueryCache().find({ queryKey: key, exact: true });
+          const { mutation } = latest.current;
           try {
             const updated = await mutation.mutateAsync(command);
-            if (
-              ownerQuery &&
-              queryClient.getQueryCache().find({ queryKey: key, exact: true }) === ownerQuery
-            )
-              queryClient.setQueryData(key, updated);
             return { success: true, profile: editableProfile(updated) };
           } catch (cause) {
             return {
@@ -113,13 +107,10 @@ export function useProfileEditor(
   const state = useSyncExternalStore(editor.subscribe, editor.getSnapshot, editor.getSnapshot);
   useEffect(() => editor.activate(), [editor]);
   useEffect(() => editor.receiveProfile(initial), [editor, initial]);
-  useEffect(() => editor.setBusy(busy || writing), [editor, busy, writing]);
+  useEffect(() => editor.setBusy(busy), [editor, busy]);
   function coordinated<Args extends unknown[], Result>(action: (...args: Args) => Result) {
     return (...args: Args): Result => {
-      editor.setBusy(
-        queryClient.isFetching({ queryKey: key }) > 0 ||
-          queryClient.isMutating({ mutationKey: key }) > 0
-      );
+      editor.setBusy(isBusy());
       return action(...args);
     };
   }
@@ -134,8 +125,8 @@ export function useProfileEditor(
     },
     state: {
       ...state,
-      busy: busy || writing || state.busy,
-      canSave: state.canSave && !busy && !writing,
+      busy: busy || state.busy,
+      canSave: state.canSave && !busy,
     },
   };
 }

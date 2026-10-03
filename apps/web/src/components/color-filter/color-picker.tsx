@@ -1,36 +1,15 @@
 import { Check } from 'lucide-react';
 import { useId, useState } from 'react';
-import { COLOR_TARGETS, type ColorPreference } from '@/features/browse';
+import {
+  COLOR_TARGETS,
+  type ColorPreference,
+  type Hsv,
+  hexToHsv,
+  hsvToHex,
+  spectrumPoint,
+  colorPickerTab,
+} from '@/features/browse';
 
-type Hsv = { h: number; s: number; v: number };
-function hexToHsv(hex: string): Hsv {
-  const [r, g, b] = [1, 3, 5].map(
-    (offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255
-  );
-  const max = Math.max(r, g, b),
-    min = Math.min(r, g, b),
-    delta = max - min;
-  const hue =
-    delta === 0
-      ? 0
-      : max === r
-        ? ((g - b) / delta + 6) % 6
-        : max === g
-          ? (b - r) / delta + 2
-          : (r - g) / delta + 4;
-  return { h: hue * 60, s: max === 0 ? 0 : (delta / max) * 100, v: max * 100 };
-}
-function hsvToHex({ h, s, v }: Hsv): string {
-  const channel = (offset: number) => {
-    const k = (offset + h / 60) % 6;
-    return Math.round(
-      255 * (v / 100 - (((v / 100) * s) / 100) * Math.max(0, Math.min(k, 4 - k, 1)))
-    )
-      .toString(16)
-      .padStart(2, '0');
-  };
-  return `#${channel(5)}${channel(3)}${channel(1)}`.toUpperCase();
-}
 export function ColorPicker({
   initial,
   onChoose,
@@ -71,18 +50,7 @@ export function ColorPicker({
             tabIndex={tab === name ? 0 : -1}
             onClick={() => setTab(name)}
             onKeyDown={(e) => {
-              const tabs = ['Spectrum', 'Swatches', 'Features'];
-              const index = tabs.indexOf(name);
-              const next =
-                e.key === 'ArrowRight'
-                  ? tabs[(index + 1) % 3]
-                  : e.key === 'ArrowLeft'
-                    ? tabs[(index + 2) % 3]
-                    : e.key === 'Home'
-                      ? tabs[0]
-                      : e.key === 'End'
-                        ? tabs[2]
-                        : undefined;
+              const next = colorPickerTab(e.key, name);
               if (next) {
                 e.preventDefault();
                 setTab(next);
@@ -104,20 +72,24 @@ export function ColorPicker({
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId);
                 const rect = e.currentTarget.getBoundingClientRect();
-                changeSpectrum({
-                  ...hsv,
-                  s: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)),
-                  v: 100 - Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)),
-                });
+                changeSpectrum(
+                  spectrumPoint(
+                    hsv.h,
+                    (e.clientX - rect.left) / rect.width,
+                    (e.clientY - rect.top) / rect.height
+                  )
+                );
               }}
               onPointerMove={(e) => {
                 if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
                 const rect = e.currentTarget.getBoundingClientRect();
-                changeSpectrum({
-                  ...hsv,
-                  s: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)),
-                  v: 100 - Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)),
-                });
+                changeSpectrum(
+                  spectrumPoint(
+                    hsv.h,
+                    (e.clientX - rect.left) / rect.width,
+                    (e.clientY - rect.top) / rect.height
+                  )
+                );
               }}
             >
               <span

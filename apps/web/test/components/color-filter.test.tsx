@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ColorFilter } from '@/components/color-filter';
-import { COLOR_TARGETS, type ColorPreference } from '@/lib/color-preferences';
+import { COLOR_TARGETS, type ColorPreference } from '@/features/browse';
 
 function Harness({
   initial = [],

@@ -6,7 +6,7 @@ import {
   colorPreferenceKey,
   colorPreferenceLabel,
   MATCH_LABELS,
-} from '@/lib/color-preferences';
+} from '@/features/browse';
 
 function layout(value: readonly ColorPreference[]) {
   const used = value.reduce((sum, target) => sum + (target.percent ?? 0), 0);

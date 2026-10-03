@@ -9,7 +9,7 @@ import {
   getFormatBadgeLabel,
   parseBrowseSearch,
   resolveClosestAspectRatioPreset,
-} from '@/lib/browse-filters';
+} from '@/features/browse';
 
 describe('browse filters', () => {
   it('preserves an exact Profile ID in the URL and combines it with wallpaper variant filters', () => {

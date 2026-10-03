@@ -15,7 +15,7 @@ import {
   useBrowseFilterPanel,
 } from '@/components/browse-filter-panel-context';
 import { SearchBar } from '@/components/search-bar';
-import { parseBrowseSearch } from '@/lib/browse-filters';
+import { parseBrowseSearch } from '@/features/browse';
 import { HomePage } from '@/routes/index';
 import { triggerIntersection } from '../setup';
 

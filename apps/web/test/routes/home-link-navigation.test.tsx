@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, createRoute, createRouter, RouterProvider } from '@tanstack/react-router';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { parseBrowseSearch } from '@/lib/browse-filters';
+import { parseBrowseSearch } from '@/features/browse';
 import { Route as RootRoute } from '@/routes/__root';
 import { HomePage } from '@/routes/index';
 

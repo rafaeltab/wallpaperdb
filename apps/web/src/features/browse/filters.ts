@@ -1,8 +1,4 @@
-import {
-  buildColorSort,
-  type ColorPreference,
-  parseColorPreferences,
-} from '@/lib/color-preferences';
+import { buildColorSort, type ColorPreference, parseColorPreferences } from './colors';
 import type { WallpaperFilter, WallpaperSort } from '@/lib/graphql/types';
 
 export const BROWSE_FORMAT_OPTIONS = [
@@ -211,4 +207,19 @@ function normalizeBrowseColorValue(value: unknown): string | undefined {
   }
 
   return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toUpperCase() : undefined;
+}
+
+export function updateBrowseSearch(
+  previous: BrowseSearchState,
+  changes: Partial<Omit<BrowseSearchState, 'after'>>
+): BrowseSearchState {
+  const next = { ...previous, ...changes, after: undefined };
+  if ('colors' in changes) {
+    next.color = undefined;
+    next.colors = changes.colors?.length ? changes.colors : undefined;
+  }
+  return next;
+}
+export function normalizeProfileSearch(value: string): string {
+  return value.trim().replace(/^@/, '').trim().toLowerCase();
 }

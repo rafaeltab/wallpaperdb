@@ -1,11 +1,14 @@
-import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
 import { ProfileDialog } from '@/components/profile/profile-dialog';
 import { ProfilePicture } from '@/components/profile/profile-picture';
-import { profileQueryKey } from '@/components/profile-bootstrap';
+import {
+  profileQueryKey,
+  useOwnerProfileMutation,
+} from '@/features/profile-management/adapters/query';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -38,8 +41,6 @@ export function ProfilePictureSettings({
   const input = useRef<HTMLInputElement>(null);
   const dialogContent = useRef<HTMLDivElement>(null);
   const removeOpener = useRef<HTMLButtonElement>(null);
-  const refreshing = useIsFetching({ queryKey: profileQueryKey(profile.id) }) > 0;
-  const writing = useIsMutating({ mutationKey: profileQueryKey(profile.id) }) > 0;
   const [selected, setSelected] = useState<{ picture: File; expectedVersion: number } | null>(null);
   const [removeVersion, setRemoveVersion] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -62,15 +63,17 @@ export function ProfilePictureSettings({
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [selected]);
-  const busy = () =>
-    queryClient.isFetching({ queryKey: profileQueryKey(profile.id) }) > 0 ||
-    queryClient.isMutating({ mutationKey: profileQueryKey(profile.id) }) > 0;
   const maxBytes = profile.pictureUploadLimits?.maxBytes ?? 5 * 1024 * 1024;
   const importing =
     profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
-  const mutation = useMutation({
-    mutationKey: profileQueryKey(profile.id),
-    mutationFn: (command: PictureCommand) => {
+  const {
+    mutation,
+    refreshing,
+    writing,
+    isBusy: busy,
+  } = useOwnerProfileMutation(
+    profile.id,
+    (command: PictureCommand) => {
       const options = {
         expectedVersion: command.expectedVersion,
         expectedProfileId: profile.id,
@@ -80,29 +83,23 @@ export function ProfilePictureSettings({
         ? userApi.uploadPicture({ ...options, picture: command.picture })
         : userApi.removePicture(options);
     },
-    onMutate: () =>
-      queryClient.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true }),
-    onSuccess: (updated, command, ownerQuery) => {
-      if (
-        ownerQuery &&
-        queryClient.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true }) ===
-          ownerQuery
-      )
-        queryClient.setQueryData(profileQueryKey(profile.id), updated);
-      if (!mounted.current) return;
-      setSelected(null);
-      if (input.current) input.current.value = '';
-      setError(null);
-      setOpen(false);
-      toast.success(
-        command.action === 'remove' ? 'Generated avatar selected' : 'Profile picture saved'
-      );
-    },
-    onError: (cause) => {
-      if (mounted.current)
-        toast.error('Could not save profile picture', { description: cause.message });
-    },
-  });
+    {
+      onSuccess: (_updated: Profile, command: PictureCommand) => {
+        if (!mounted.current) return;
+        setSelected(null);
+        if (input.current) input.current.value = '';
+        setError(null);
+        setOpen(false);
+        toast.success(
+          command.action === 'remove' ? 'Generated avatar selected' : 'Profile picture saved'
+        );
+      },
+      onError: (cause) => {
+        if (mounted.current)
+          toast.error('Could not save profile picture', { description: cause.message });
+      },
+    }
+  );
   const feedback =
     error ??
     (mutation.error instanceof UserApiError &&

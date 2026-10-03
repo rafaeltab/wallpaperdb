@@ -1,4 +1,4 @@
-import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Link2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ProfileDialog } from '@/components/profile/profile-dialog';
@@ -6,7 +6,10 @@ import {
   historicalHandleUnavailableMessage,
   ProfileHistoricalHandles,
 } from '@/components/profile/profile-historical-handles';
-import { profileQueryKey } from '@/components/profile-bootstrap';
+import {
+  profileQueryKey,
+  useOwnerProfileMutation,
+} from '@/features/profile-management/adapters/query';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -42,8 +45,6 @@ export function ProfileAliasSettings({
   tokenProvider: () => Promise<string | null>;
 }) {
   const queryClient = useQueryClient();
-  const refreshing = useIsFetching({ queryKey: profileQueryKey(profile.id) }) > 0;
-  const profileWritesPending = useIsMutating({ mutationKey: profileQueryKey(profile.id) }) > 0;
   const [pending, setPending] = useState<AliasCommand | null>(null);
   const [open, setOpen] = useState(false);
   const dialogContent = useRef<HTMLDivElement>(null);
@@ -55,33 +56,29 @@ export function ProfileAliasSettings({
       mounted.current = false;
     };
   }, []);
-  const busy = () =>
-    queryClient.isFetching({ queryKey: profileQueryKey(profile.id) }) > 0 ||
-    queryClient.isMutating({ mutationKey: profileQueryKey(profile.id) }) > 0;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [completed, setCompleted] = useState<AliasCommand | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
-  const mutation = useMutation({
-    mutationKey: profileQueryKey(profile.id),
-    mutationFn: ({ action, ...command }: AliasCommand) => {
+  const {
+    mutation,
+    refreshing,
+    writing,
+    isBusy: busy,
+  } = useOwnerProfileMutation(
+    profile.id,
+    ({ action, ...command }: AliasCommand) => {
       const options = { ...command, expectedProfileId: profile.id, tokenProvider };
       if (action === 'reactivate' || action === 'keep') return userApi.reactivateAlias(options);
       return action === 'expire'
         ? userApi.expireAlias(options)
         : userApi.scheduleAliasRemoval(options);
     },
-    onMutate: () =>
-      queryClient.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true }),
-    onSuccess: (updated, command, ownerQuery) => {
-      if (
-        ownerQuery &&
-        queryClient.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true }) ===
-          ownerQuery
-      )
-        queryClient.setQueryData(profileQueryKey(profile.id), updated);
-      if (mounted.current) setCompleted(command);
-    },
-  });
+    {
+      onSuccess: (_updated: Profile, command: AliasCommand) => {
+        if (mounted.current) setCompleted(command);
+      },
+    }
+  );
   const retained = (profile.aliases ?? []).filter((alias) => !alias.expiresAt);
   const expiring = (profile.aliases ?? []).filter((alias) => alias.expiresAt);
   const historical = (profile.historicalHandles ?? []).filter(
@@ -129,7 +126,7 @@ export function ProfileAliasSettings({
       onOpenChange={setOpen}
       title="Previous handles"
       description="Aliases redirect to your current profile handle. Expiring aliases no longer count toward your retained limit."
-      busy={profileWritesPending}
+      busy={writing}
       trigger={
         <button
           type="button"
@@ -151,7 +148,7 @@ export function ProfileAliasSettings({
           <Button
             variant="outline"
             size="sm"
-            disabled={refreshing || profileWritesPending}
+            disabled={refreshing || writing}
             onClick={() => void refresh()}
           >
             Refresh aliases
@@ -200,7 +197,7 @@ export function ProfileAliasSettings({
                     variant="outline"
                     size="sm"
                     aria-label={`Schedule removal for @${alias.handle}`}
-                    disabled={profileWritesPending || refreshing}
+                    disabled={writing || refreshing}
                     onClick={() => {
                       mutation.reset();
                       setRefreshError(null);
@@ -278,7 +275,7 @@ export function ProfileAliasSettings({
                           aria-describedby={
                             unavailable ? `keep-${alias.handle}-unavailable` : undefined
                           }
-                          disabled={profileWritesPending || refreshing || Boolean(unavailable)}
+                          disabled={writing || refreshing || Boolean(unavailable)}
                           onClick={() => {
                             mutation.reset();
                             setRefreshError(null);
@@ -298,7 +295,7 @@ export function ProfileAliasSettings({
                         variant="outline"
                         size="sm"
                         aria-label={`Expire @${alias.handle} now`}
-                        disabled={profileWritesPending || refreshing}
+                        disabled={writing || refreshing}
                         onClick={() => {
                           mutation.reset();
                           setRefreshError(null);
@@ -324,7 +321,7 @@ export function ProfileAliasSettings({
         </section>
         <ProfileHistoricalHandles
           profile={profile}
-          disabled={profileWritesPending || refreshing}
+          disabled={writing || refreshing}
           onReactivate={(handle) => {
             mutation.reset();
             setRefreshError(null);
@@ -350,7 +347,7 @@ export function ProfileAliasSettings({
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                disabled={refreshing || profileWritesPending}
+                disabled={refreshing || writing}
                 variant={pending?.action === 'expire' ? 'destructive' : 'default'}
                 onClick={() => {
                   if (pending && !busy()) mutation.mutate(pending);

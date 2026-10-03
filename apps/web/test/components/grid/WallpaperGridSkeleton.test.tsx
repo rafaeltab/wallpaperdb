@@ -2,17 +2,20 @@ import { cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WallpaperGridSkeleton } from '@/components/grid/WallpaperGridSkeleton';
 
+let viewportWidth = 2560;
+
 function intrinsicSize(element: HTMLElement, dimension: 'width' | 'height'): number {
-  if (dimension === 'width' && element.classList.contains('muuri')) return 2560;
+  if (dimension === 'width' && element.classList.contains('muuri')) return viewportWidth;
   const value = element.style[dimension];
   if (value.endsWith('px')) return Number.parseFloat(value);
   if (element.firstElementChild instanceof HTMLElement) {
     return intrinsicSize(element.firstElementChild, dimension);
   }
-  return dimension === 'width' ? 2560 : 0;
+  return dimension === 'width' ? viewportWidth : 0;
 }
 
 beforeEach(() => {
+  viewportWidth = 2560;
   vi.stubGlobal('innerWidth', 2560);
   vi.stubGlobal('innerHeight', 1440);
   // JSDOM has no layout engine. Supply intrinsic measurements while the real
@@ -30,6 +33,27 @@ afterEach(() => {
 });
 
 describe('WallpaperGridSkeleton', () => {
+  it.each([390, 768])('keeps every placeholder inside a %ipx container', async (width) => {
+    viewportWidth = width;
+    vi.stubGlobal('innerWidth', width);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(width);
+    const { container } = render(<WallpaperGridSkeleton />);
+    await waitFor(() => {
+      const skeletons = container.querySelectorAll('[data-slot="skeleton"]');
+      expect(skeletons).toHaveLength(12);
+      for (const skeleton of skeletons) expect(skeleton).toBeVisible();
+      const positioned = container.querySelectorAll<HTMLElement>('[style*="translateX"]');
+      expect(positioned).toHaveLength(12);
+      for (const element of positioned) {
+        const coordinates = element.style.transform.match(/translateX\(([-\d.]+)px\) translateY\(([-\d.]+)px\)/);
+        if (!coordinates) throw new Error('Placeholder has no final position');
+        const left = Number(coordinates[1]);
+        expect(left).toBeGreaterThanOrEqual(0);
+        expect(left + intrinsicSize(element, 'width')).toBeLessThanOrEqual(width);
+      }
+    });
+  });
+
   it('packs mixed placeholder shapes without reserving the tallest height for each row', async () => {
     const { container } = render(<WallpaperGridSkeleton />);
     const skeletons = container.querySelectorAll('[data-slot="skeleton"]');

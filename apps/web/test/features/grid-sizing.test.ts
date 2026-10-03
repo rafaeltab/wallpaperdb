@@ -27,3 +27,9 @@ it('creates stable varied skeleton identities across appended pages', () => {
   expect(new Set(initial.map(item => item.aspectRatio)).size).toBe(6);
   expect(appended[0].aspectRatio).toBe(initial[0].aspectRatio);
 });
+
+it('returns finite empty content dimensions for expanded zero-width cells', () => {
+  const item = { id: 'a', src: '/a', width: 500, height: 250, aspectRatio: 2 };
+  expect(gridItemDimensions(item, {cols:1,rows:1}, true, 0, 10, 0, 800)).toEqual({width:10,height:10,margin:5});
+  expect(gridItemDimensions(item, {cols:1,rows:1}, true, 0, 0, 0, 800)).toEqual({width:0,height:0,margin:0});
+});

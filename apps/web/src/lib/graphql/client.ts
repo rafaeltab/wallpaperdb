@@ -1,5 +1,5 @@
 import { GraphQLClient, type RequestMiddleware } from 'graphql-request';
-import { admissionError } from '@/lib/graphql/admission';
+import { admissionError } from '@/features/request-admission/adapters/graphql';
 import { getAuthToken } from '@/lib/auth/token-provider';
 
 function resolveGatewayUrl(url: string): string {

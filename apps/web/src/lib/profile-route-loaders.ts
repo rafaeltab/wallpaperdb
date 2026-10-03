@@ -1,4 +1,4 @@
-import { GatewayAdmissionError } from '@/lib/graphql/admission';
+import { GatewayAdmissionError } from '@/features/request-admission/adapters/graphql';
 import type { QueryClient } from '@tanstack/react-query';
 import { notFound, redirect } from '@tanstack/react-router';
 import type { Profile } from '@/lib/graphql/types';

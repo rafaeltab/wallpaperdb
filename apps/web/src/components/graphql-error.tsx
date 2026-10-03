@@ -1,4 +1,4 @@
-import { GatewayAdmissionError } from '@/lib/graphql/admission';
+import { GatewayAdmissionError } from '@/features/request-admission/adapters/graphql';
 import { Button } from '@/components/ui/button';
 
 export function GraphQLError({

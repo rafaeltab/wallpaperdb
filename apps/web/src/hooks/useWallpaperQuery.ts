@@ -1,4 +1,4 @@
-import { graphqlQueryOptions } from '@/lib/graphql/admission';
+import { graphqlQueryOptions } from '@/features/request-admission/adapters/graphql';
 import { useQuery } from '@tanstack/react-query';
 import { request } from '@/lib/graphql/client';
 import { GET_WALLPAPER } from '@/lib/graphql/queries';

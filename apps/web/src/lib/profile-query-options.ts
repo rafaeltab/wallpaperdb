@@ -1,4 +1,4 @@
-import { graphqlQueryOptions } from '@/lib/graphql/admission';
+import { graphqlQueryOptions } from '@/features/request-admission/adapters/graphql';
 import { queryOptions } from '@tanstack/react-query';
 import { fetchProfileByHandle, fetchProfileById } from '@/lib/graphql/profiles';
 

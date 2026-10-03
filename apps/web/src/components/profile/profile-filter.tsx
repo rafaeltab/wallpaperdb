@@ -1,3 +1,4 @@
+import { feedPresentation } from '@/features/browse';
 import { normalizeProfileSearch } from '@/features/browse';
 import { GraphQLError } from '@/components/graphql-error';
 import { graphqlQueryOptions } from '@/features/request-admission/adapters/graphql';
@@ -38,8 +39,12 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
   });
 
   const selectedError = selected.failureReason ?? selected.error;
-  const resultsError = results.failureReason ?? results.error;
-  const nextPageFailed = results.isFetchNextPageError || results.isFetchingNextPage;
+  const feed = feedPresentation({
+    ...results,
+    itemCount: results.data?.pages.reduce((count, page) => count + page.edges.length, 0) ?? 0,
+  });
+  const resultsError = feed.error;
+  const nextPageFailed = feed.retryTarget === 'next-page';
 
   return (
     <div className="flex max-w-lg flex-col gap-2">

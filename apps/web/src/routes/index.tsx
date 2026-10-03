@@ -1,3 +1,4 @@
+import { feedPresentation } from '@/features/browse';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { ArrowLeft, ImageOff, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -71,7 +72,6 @@ export function HomePage() {
     sort: buildWallpaperSort(colors ?? color),
   });
 
-  const error = failureReason ?? queryError;
   const handleLoadMore = useCallback(() => {
     fetchNextPage();
   }, [fetchNextPage]);
@@ -119,6 +119,15 @@ export function HomePage() {
     [navigate]
   );
   const wallpapers = data?.pages.flatMap((page) => page.edges.map((edge) => edge.node)) ?? [];
+  const feed = feedPresentation({
+    error: queryError,
+    failureReason,
+    itemCount: wallpapers.length,
+    isLoading,
+    isFetchNextPageError,
+    isFetchingNextPage,
+  });
+  const { error } = feed;
 
   return (
     <div>
@@ -135,7 +144,7 @@ export function HomePage() {
         onFormatChange={handleFormatChange}
         onAspectRatioChange={handleAspectRatioChange}
       />
-      {error && wallpapers.length === 0 ? (
+      {feed.initialError ? (
         <div className="max-w-2xl mx-auto px-4 py-12">
           <GraphQLError
             error={error}
@@ -158,7 +167,7 @@ export function HomePage() {
             <div className="max-w-2xl mx-auto px-4 py-6">
               <GraphQLError
                 error={error}
-                retry={isFetchNextPageError || isFetchingNextPage ? fetchNextPage : refetch}
+                retry={feed.retryTarget === 'next-page' ? fetchNextPage : refetch}
                 retrying={isFetching}
                 title="Could not load more wallpapers"
               />

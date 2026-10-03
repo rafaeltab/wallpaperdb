@@ -77,7 +77,11 @@ export function ProfileWallpapers({ profileId }: { profileId: string }) {
   } else if (wallpapers.length > 0 || isLoading) {
     content = (
       <>
-        <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isLoading || isFetchingNextPage} />
+        <WallpaperGrid
+          wallpapers={wallpapers}
+          isLoading={isLoading}
+          isLoadingMore={isFetchingNextPage}
+        />
         {error ? (
           <div className="mt-4">
             <GraphQLError

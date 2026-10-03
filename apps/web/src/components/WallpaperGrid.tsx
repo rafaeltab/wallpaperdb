@@ -1,13 +1,20 @@
 import type { Wallpaper } from '@/lib/graphql/types';
-import { MuuriGrid, wallpapersToGridItems } from './grid';
+import { MuuriGrid, WallpaperGridSkeleton, wallpapersToGridItems } from './grid';
 
 interface WallpaperGridProps {
   wallpapers: Wallpaper[];
+  /** Whether the initial results are being loaded */
+  isLoading?: boolean;
   /** Whether more items are being loaded */
   isLoadingMore?: boolean;
 }
 
-export function WallpaperGrid({ wallpapers, isLoadingMore = false }: WallpaperGridProps) {
+export function WallpaperGrid({
+  wallpapers,
+  isLoading = false,
+  isLoadingMore = false,
+}: WallpaperGridProps) {
+  if (isLoading) return <WallpaperGridSkeleton />;
   const items = wallpapersToGridItems(wallpapers);
 
   return (

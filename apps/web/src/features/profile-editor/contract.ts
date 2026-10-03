@@ -36,7 +36,6 @@ export interface EditorNotice {
 export interface ProfileEditorDependencies {
   save: (command: ProfileDraft) => Promise<SaveResult>;
   refresh: () => Promise<EditableProfile>;
-  isBusy: () => boolean;
   notify: (notice: EditorNotice) => void;
   clock: { now: () => number; schedule: (delayMs: number, callback: () => void) => () => void };
 }
@@ -55,6 +54,7 @@ export interface ProfileEditorSnapshot {
   refreshing: boolean;
   confirmation: { command: ProfileDraft; aliases: string[] } | null;
   validationError: string | undefined;
+  busy: boolean;
   locked: boolean;
   canSave: boolean;
   deadline: number;

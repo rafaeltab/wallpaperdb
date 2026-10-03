@@ -26,6 +26,7 @@ export function createProfileEditor(
   let error: string | null = null;
   let conflict = false;
   let refreshing = false;
+  let busy = false;
   let confirmation: ProfileEditorSnapshot['confirmation'] = null;
   let serverDeadline: number | undefined;
   let enabled = false;
@@ -63,6 +64,7 @@ export function createProfileEditor(
       confirmation,
       refreshing,
       validationError,
+      busy: busy || refreshing,
       locked,
       deadline,
       now,
@@ -73,7 +75,8 @@ export function createProfileEditor(
           !validationError &&
           phase === 'idle' &&
           !coolingDown &&
-          !refreshing
+          !refreshing &&
+          !busy
       ),
     };
   }
@@ -158,7 +161,7 @@ export function createProfileEditor(
       state.phase !== 'idle' ||
       state.coolingDown ||
       state.refreshing ||
-      dependencies.isBusy()
+      busy
     )
       return;
     const aliases = field === 'handle' ? aliasesToSchedule(command.baseProfile, command.value) : [];
@@ -186,7 +189,7 @@ export function createProfileEditor(
     else fail(result);
   }
   async function refresh() {
-    if (!enabled || getState().locked || refreshing || dependencies.isBusy()) return;
+    if (!enabled || getState().locked || refreshing || busy) return;
     refreshing = true;
     publish();
     const requestGeneration = generation;
@@ -238,6 +241,11 @@ export function createProfileEditor(
         cancelCooldown = undefined;
       };
     },
+    setBusy(value: boolean) {
+      if (busy === value) return;
+      busy = value;
+      publish();
+    },
     receiveProfile(updated: EditableProfile) {
       if (updated === profile || updated.id !== profile.id) return;
       profile = updated;
@@ -246,12 +254,12 @@ export function createProfileEditor(
       publish();
     },
     beginEdit() {
-      if (!enabled || getState().locked || getState().coolingDown || dependencies.isBusy()) return;
+      if (!enabled || getState().locked || getState().coolingDown || busy) return;
       edit = draft(profile);
       publish();
     },
     change(value: string) {
-      if (!edit || getState().locked || refreshing || dependencies.isBusy()) return;
+      if (!edit || getState().locked || refreshing || busy) return;
       edit = { ...edit, value };
       publish();
     },

@@ -20,11 +20,12 @@ import {
   WallpaperDisplay,
   WallpaperMetadata,
 } from '@/components/wallpaper-detail';
+import { detailShortcut, resolveVariantIndex } from '@/features/wallpaper-details';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useWallpaperQuery } from '@/hooks/useWallpaperQuery';
 import { downloadVariant, formatFileSize } from '@/lib/utils/wallpaper';
-import { shareWallpaper } from '@/lib/services/wallpaper-share';
+import { shareWallpaper } from '@/features/wallpaper-details/adapters/share';
 
 export function WallpaperDetailPage() {
   const { wallpaperId } = useParams({ strict: false }) as { wallpaperId: string };
@@ -34,7 +35,8 @@ export function WallpaperDetailPage() {
   const [isPanelOpen, setIsPanelOpen] = usePersistentState('wallpaper-detail-panel-open', true);
 
   // Variant selection (always start with original at index 0)
-  const [selectedVariantIndex, setSelectedVariantIndex] = useState(0);
+  const [selection, setSelection] = useState({ wallpaperId, index: 0 });
+  const setSelectedVariantIndex = (index: number) => setSelection({ wallpaperId, index });
 
   // Image loading state
   const [isImageLoading, setIsImageLoading] = useState(true);
@@ -49,6 +51,11 @@ export function WallpaperDetailPage() {
     isFetching,
   } = useWallpaperQuery(wallpaperId);
   const error = failureReason ?? queryError;
+  const selectedVariantIndex = resolveVariantIndex(
+    selection,
+    wallpaperId,
+    wallpaper?.variants.length ?? 0
+  );
 
   // Auto-collapse panel on mobile
   useEffect(() => {
@@ -72,51 +79,41 @@ export function WallpaperDetailPage() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input
       const target = event.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
-
-      switch (event.key.toLowerCase()) {
-        case 'i':
-          event.preventDefault();
-          setIsPanelOpen((prev) => !prev);
+      const command = detailShortcut(
+        event.key,
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable,
+        {
+          panelOpen: isPanelOpen,
+          index: selectedVariantIndex,
+          count: wallpaper?.variants.length ?? 0,
+        }
+      );
+      if (!command) return;
+      event.preventDefault();
+      switch (command.kind) {
+        case 'toggle-panel':
+          setIsPanelOpen((previous) => !previous);
           break;
-        case 'd':
-          event.preventDefault();
-          if (wallpaper?.variants[selectedVariantIndex]) {
-            downloadVariant(wallpaper.variants[selectedVariantIndex]);
-          }
+        case 'close-panel':
+          setIsPanelOpen(false);
           break;
-        case 's':
-          event.preventDefault();
-          handleShare();
+        case 'download':
+          if (wallpaper?.variants[selectedVariantIndex])
+            void downloadVariant(wallpaper.variants[selectedVariantIndex]);
           break;
-        case 'escape':
-          if (isPanelOpen) {
-            event.preventDefault();
-            setIsPanelOpen(false);
-          }
+        case 'share':
+          void handleShare();
           break;
-        case 'arrowleft':
-          event.preventDefault();
-          if (wallpaper && selectedVariantIndex > 0) {
-            setSelectedVariantIndex((prev) => prev - 1);
-          }
-          break;
-        case 'arrowright':
-          event.preventDefault();
-          if (wallpaper && selectedVariantIndex < wallpaper.variants.length - 1) {
-            setSelectedVariantIndex((prev) => prev + 1);
-          }
+        case 'select':
+          setSelection({ wallpaperId, index: command.index });
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPanelOpen, setIsPanelOpen, wallpaper, selectedVariantIndex, handleShare]);
+  }, [isPanelOpen, setIsPanelOpen, wallpaper, selectedVariantIndex, handleShare, wallpaperId]);
 
   // Handle download from dropdown
   const handleDownloadVariant = (variantIndex: number) => {
@@ -146,7 +143,7 @@ export function WallpaperDetailPage() {
   }
 
   // 404 Not Found error
-  if (!wallpaper) {
+  if (!wallpaper || wallpaper.variants.length === 0) {
     return (
       <div className="flex h-screen flex-col items-center justify-center p-4">
         <Alert variant="destructive" className="max-w-md">

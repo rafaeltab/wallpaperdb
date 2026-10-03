@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { downloadVariant } from '@/lib/utils/wallpaper';
-import { shareWallpaper } from '@/lib/services/wallpaper-share';
+import { shareWallpaper } from '@/features/wallpaper-details/adapters/share';
 import type { Wallpaper } from '@/lib/graphql/types';
 import type { GridItemRendererProps } from './types';
 

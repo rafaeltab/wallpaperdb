@@ -35,6 +35,20 @@ function renderFilter(profileId?: string) {
 describe('Profile wallpaper filter', () => {
   beforeEach(() => mockFetch.mockReset());
 
+  it('keeps a collapsed selection visible and removable without showing search', async () => {
+    mockFetch.mockResolvedValue(response({ profile: { ...ada, biographyMarkdown: '' } }));
+    const onChange = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}>
+      <ProfileFilter profileId={ada.id} collapsed onChange={onChange} />
+    </QueryClientProvider>);
+    expect(await screen.findByText('@ada-lovelace')).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear Profile filter' }));
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(undefined);
+    client.clear();
+  });
+
   it('searches a Handle alias and selects the current Profile identity by its exact ID', async () => {
     mockFetch.mockResolvedValue(response({
       searchProfiles: {

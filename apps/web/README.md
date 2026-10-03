@@ -17,8 +17,10 @@ React and TanStack Router provide the application and its navigation. TanStack Q
 
 Profile edits go to the owning User service; public pages read Gateway's projection, which can take a moment to catch up. See the [profile editing guide](../docs/content/docs/guides/profile-editing.mdx) for saving, aliases, cooldowns, and picture changes.
 
-## Upload queue pilot
+## Frontend feature pilots
 
-The upload queue separates interaction decisions from React so request ordering, cooldowns, and cancellation can be tested without mounting the application. Its [public workflow](src/features/upload-queue/index.ts) accepts controlled upload and clock adapters. The browser adapter owns transport cancellation and timers; React subscribes to snapshots and manages activation for its lifetime.
+The upload queue and inline Profile editor separate interaction decisions from React so request ordering, draft conflicts, cooldowns, and cancellation can be tested without mounting the application. Their public workflows accept controlled adapters; React subscribes to snapshots and owns browser focus. TanStack Query continues to own server data. Profile save responses update only the query object for the session that started the request, even if navigation unmounts the editor.
 
-[Workflow tests](test/features/upload-queue.test.ts) cover the decision matrix, while [provider/page tests](test/contexts/upload-queue-provider.test.tsx) cover user actions through the real UI and HTTP adapter. The [architecture test](test/features/upload-queue-architecture.test.ts) enforces the core's dependency direction and public entry point. This is a pilot for asynchronous features, not a required structure for every component.
+The grid layout pilot separates rectangle packing and expanded-item placement from DOM measurement. Geometry invariants belong in its pure tests; the Muuri adapter translates measured items and applies the resulting slots. Real-browser verification remains necessary for measurement, animation, and focus.
+
+See the [upload workflow](src/features/upload-queue/index.ts), [Profile editor workflow](src/features/profile-editor/index.ts), and [grid layout](src/features/grid-layout/index.ts), with public-interface tests under [test/features](test/features). Existing Profile UI tests and upload provider/page tests cover the React and cache connections. The [architecture test](test/features/feature-architecture.test.ts) enforces dependency direction and public entry points, allowing the Profile editor's shared pure Markdown policy. These are pilots for substantial behavior, not a required structure for every component.

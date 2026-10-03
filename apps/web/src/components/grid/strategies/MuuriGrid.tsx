@@ -1,10 +1,6 @@
-import {
-  type LayoutFunction,
-  MuuriGrid as MuuriGridComponent,
-  MuuriItem,
-  useRefresh,
-} from '@wallpaperdb/react-muuri';
+import { MuuriGrid as MuuriGridComponent, MuuriItem, useRefresh } from '@wallpaperdb/react-muuri';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createMuuriLayout, type GridLayoutState } from '@/features/grid-layout/adapters/muuri';
 import type { GridItem, GridProps, ItemSpan } from '../types';
 import {
   calculateExpandedDimensions,
@@ -13,17 +9,6 @@ import {
   getExpandedSpan,
 } from '../utils';
 import { WallpaperCard } from '../WallpaperCard';
-
-/**
- * Layout state stored in a ref so the layout function can read current values
- * without needing to be recreated (Muuri only uses layout function from init)
- */
-interface LayoutState {
-  expandedItemKey: string | null;
-  viewportCenter: { x: number; y: number } | null;
-  /** Left margin offset for items */
-  marginOffset: number;
-}
 
 interface GridItemWrapperProps {
   item: GridItem;
@@ -127,279 +112,6 @@ function GridItemWrapper({
 }
 
 /**
- * Rectangle representing free space in the grid.
- * Used for bin-packing algorithm.
- */
-interface FreeRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/**
- * Simple bin-packing layout using the "maxrects" approach.
- * This mimics Muuri's default "First Fit" algorithm.
- *
- * @param items - Array of items with getWidth() and getHeight() methods
- * @param gridWidth - Total width of the grid container
- * @param excludeRect - Optional rectangle to exclude (for expanded item)
- * @returns Array of [x, y] positions for each item
- */
-function binPackLayout(
-  items: Array<{ getWidth: () => number; getHeight: () => number }>,
-  gridWidth: number,
-  excludeRect?: { x: number; y: number; width: number; height: number } | null
-): number[] {
-  const slots: number[] = [];
-
-  // Track free rectangles - start with the entire grid (infinite height)
-  let freeRects: FreeRect[] = [{ x: 0, y: 0, width: gridWidth, height: Infinity }];
-
-  // If there's an excluded rect (expanded item), remove that space from free rects
-  if (excludeRect) {
-    freeRects = subtractRect(freeRects, excludeRect);
-  }
-
-  for (const item of items) {
-    const itemWidth = item.getWidth();
-    const itemHeight = item.getHeight();
-
-    // Find the best position (First Fit - lowest Y, then lowest X)
-    let bestRect: FreeRect | null = null;
-    let bestY = Infinity;
-    let bestX = Infinity;
-
-    for (const rect of freeRects) {
-      if (rect.width >= itemWidth && rect.height >= itemHeight) {
-        // This rect can fit the item
-        if (rect.y < bestY || (rect.y === bestY && rect.x < bestX)) {
-          bestY = rect.y;
-          bestX = rect.x;
-          bestRect = rect;
-        }
-      }
-    }
-
-    if (bestRect) {
-      // Place item at top-left of the best rect
-      slots.push(bestRect.x, bestRect.y);
-
-      // Remove the used space and split remaining space
-      const usedRect = {
-        x: bestRect.x,
-        y: bestRect.y,
-        width: itemWidth,
-        height: itemHeight,
-      };
-      freeRects = subtractRect(freeRects, usedRect);
-    } else {
-      // Fallback: place at bottom of grid (shouldn't happen with infinite height)
-      const maxY = freeRects.reduce((max, r) => Math.max(max, r.y), 0);
-      slots.push(0, maxY);
-    }
-  }
-
-  return slots;
-}
-
-/**
- * Subtract a rectangle from a list of free rectangles.
- * Returns new free rectangles representing remaining space.
- */
-function subtractRect(freeRects: FreeRect[], used: FreeRect): FreeRect[] {
-  const result: FreeRect[] = [];
-
-  for (const rect of freeRects) {
-    // Check if rectangles overlap
-    if (
-      used.x >= rect.x + rect.width ||
-      used.x + used.width <= rect.x ||
-      used.y >= rect.y + rect.height ||
-      used.y + used.height <= rect.y
-    ) {
-      // No overlap, keep original rect
-      result.push(rect);
-      continue;
-    }
-
-    // Split the rect into up to 4 pieces around the used area
-
-    // Left piece
-    if (used.x > rect.x) {
-      result.push({
-        x: rect.x,
-        y: rect.y,
-        width: used.x - rect.x,
-        height: rect.height,
-      });
-    }
-
-    // Right piece
-    if (used.x + used.width < rect.x + rect.width) {
-      result.push({
-        x: used.x + used.width,
-        y: rect.y,
-        width: rect.x + rect.width - (used.x + used.width),
-        height: rect.height,
-      });
-    }
-
-    // Top piece
-    if (used.y > rect.y) {
-      result.push({
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: used.y - rect.y,
-      });
-    }
-
-    // Bottom piece
-    if (used.y + used.height < rect.y + rect.height) {
-      result.push({
-        x: rect.x,
-        y: used.y + used.height,
-        width: rect.width,
-        height: rect.y + rect.height - (used.y + used.height),
-      });
-    }
-  }
-
-  // Remove redundant rectangles (fully contained in others)
-  return pruneRects(result);
-}
-
-/**
- * Remove rectangles that are fully contained within other rectangles.
- */
-function pruneRects(rects: FreeRect[]): FreeRect[] {
-  const result: FreeRect[] = [];
-
-  for (let i = 0; i < rects.length; i++) {
-    let isContained = false;
-
-    for (let j = 0; j < rects.length; j++) {
-      if (i !== j && isRectContained(rects[i], rects[j])) {
-        isContained = true;
-        break;
-      }
-    }
-
-    if (!isContained) {
-      result.push(rects[i]);
-    }
-  }
-
-  return result;
-}
-
-/**
- * Check if rect A is fully contained within rect B.
- */
-function isRectContained(a: FreeRect, b: FreeRect): boolean {
-  return (
-    a.x >= b.x && a.y >= b.y && a.x + a.width <= b.x + b.width && a.y + a.height <= b.y + b.height
-  );
-}
-
-/**
- * Creates a custom layout function that reads from a ref for current state.
- * Uses bin-packing algorithm similar to Muuri's default.
- */
-function createRefBasedLayout(layoutStateRef: React.RefObject<LayoutState>): LayoutFunction {
-  return (_grid, layoutId, items, gridWidth, _gridHeight, callback) => {
-    // Read current state from ref
-    const { expandedItemKey, viewportCenter } = layoutStateRef.current;
-
-    // Find the expanded item by checking the element's data attribute
-    let expandedItem: (typeof items)[number] | null = null;
-    let expandedIndex = -1;
-
-    if (expandedItemKey) {
-      for (let i = 0; i < items.length; i++) {
-        const element = items[i].getElement();
-        if (element?.querySelector(`[data-item-id="${expandedItemKey}"]`)) {
-          expandedItem = items[i];
-          expandedIndex = i;
-          break;
-        }
-      }
-    }
-
-    // Calculate expanded item position (centered in viewport)
-    let expandedRect: FreeRect | null = null;
-
-    if (expandedItem && viewportCenter) {
-      const expandedWidth = expandedItem.getWidth();
-      const expandedHeight = expandedItem.getHeight();
-
-      // Center the item at viewport center
-      let expandedX = viewportCenter.x - expandedWidth / 2;
-      const expandedY = viewportCenter.y - expandedHeight / 2;
-
-      // Keep within grid bounds (horizontally)
-      if (expandedX < 0) expandedX = 0;
-      if (expandedX + expandedWidth > gridWidth) {
-        expandedX = gridWidth - expandedWidth;
-      }
-
-      expandedRect = {
-        x: expandedX,
-        y: Math.max(0, expandedY),
-        width: expandedWidth,
-        height: expandedHeight,
-      };
-    }
-
-    // Separate expanded item from others for layout
-    const otherItems = items.filter((_, i) => i !== expandedIndex);
-
-    // Use bin-packing for other items, excluding expanded item's space
-    const otherSlots = binPackLayout(otherItems, gridWidth, expandedRect);
-
-    // Build final slots array in original order
-    const slots: number[] = [];
-    let otherIndex = 0;
-
-    for (let i = 0; i < items.length; i++) {
-      if (i === expandedIndex && expandedRect) {
-        slots.push(expandedRect.x, expandedRect.y);
-      } else {
-        slots.push(otherSlots[otherIndex * 2], otherSlots[otherIndex * 2 + 1]);
-        otherIndex++;
-      }
-    }
-
-    // Apply left margin offset to all X positions
-    const { marginOffset } = layoutStateRef.current;
-    for (let i = 0; i < slots.length; i += 2) {
-      slots[i] += marginOffset;
-    }
-
-    // Calculate container height from item positions
-    let maxHeight = 0;
-    for (let i = 0; i < items.length; i++) {
-      const y = slots[i * 2 + 1]; // Y position is at odd indices
-      const itemHeight = items[i].getHeight();
-      const bottom = y + itemHeight;
-      if (bottom > maxHeight) {
-        maxHeight = bottom;
-      }
-    }
-
-    callback({
-      id: layoutId,
-      items,
-      slots,
-      styles: {
-        height: `${maxHeight}px`,
-      },
-    });
-  };
-}
-
-/**
  * MuuriGrid - A grid layout component using the Muuri layout engine.
  *
  * Features:
@@ -425,14 +137,14 @@ export function MuuriGrid({
 
   // Layout state ref - the layout function reads from this
   // This allows us to change layout behavior without recreating the function
-  const layoutStateRef = useRef<LayoutState>({
+  const layoutStateRef = useRef<GridLayoutState>({
     expandedItemKey: null,
     viewportCenter: null,
     marginOffset: gap / 2,
   });
 
   // Create stable layout function once (reads from ref for current state)
-  const customLayout = useMemo(() => createRefBasedLayout(layoutStateRef), []);
+  const customLayout = useMemo(() => createMuuriLayout(() => layoutStateRef.current), []);
 
   // Track container width and viewport height for capping expanded items
   const containerRef = useRef<HTMLDivElement>(null);

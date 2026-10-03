@@ -43,3 +43,6 @@ export {
   colorEditLimits,
   saveColorPreference,
 } from './composition';
+
+export { hexToHsv, hsvToHex, spectrumPoint, colorPickerTab } from './spectrum';
+export type { Hsv } from './spectrum';

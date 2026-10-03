@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WallpaperGrid } from '@/components/WallpaperGrid';
 import type { Wallpaper } from '@/lib/graphql/types';
@@ -18,6 +18,20 @@ const wallpaper: Wallpaper = {
 afterEach(cleanup);
 
 describe('WallpaperGrid pagination', () => {
+  it('shows initial loading placeholders before a profile has any results', async () => {
+    const { container, rerender } = render(<WallpaperGrid wallpapers={[]} isLoading />);
+    const skeletons = container.querySelectorAll('[data-slot="skeleton"]');
+    expect(skeletons).toHaveLength(12);
+    await waitFor(() => {
+      for (const skeleton of skeletons) expect(skeleton).toBeVisible();
+    });
+    expect(screen.queryByText('Loading more wallpapers…')).toBeNull();
+
+    rerender(<WallpaperGrid wallpapers={[wallpaper]} />);
+    expect(container.querySelector('[data-item-id^="skeleton-"]')).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Wallpaper landscape' })).toBeVisible();
+  });
+
   it('keeps loading placeholders outside the gallery until dimensions are known', async () => {
     const { container, rerender } = render(<WallpaperGrid wallpapers={[wallpaper]} />);
     const existingCard = await screen.findByRole('button', { name: 'Wallpaper landscape' });

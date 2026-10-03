@@ -2,9 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { createUploadQueue, MAX_FILES_PER_BATCH, type UploadResult } from '@/features/upload-queue';
 
 const response = {
-  wallpaperId: 'wallpaper-1', userId: 'user-1', uploadState: 'processing',
-  fileType: 'image', mimeType: 'image/jpeg', fileSizeBytes: 100,
-  width: 10, height: 10, aspectRatio: 1, uploadedAt: '2026-10-03T00:00:00Z',
+  wallpaperId: 'wallpaper-1',
+  userId: 'user-1',
+  uploadState: 'processing',
+  fileType: 'image',
+  mimeType: 'image/jpeg',
+  fileSizeBytes: 100,
+  width: 10,
+  height: 10,
+  aspectRatio: 1,
+  uploadedAt: '2026-10-03T00:00:00Z',
 };
 const success: UploadResult = { success: true, isDuplicate: false, response };
 
@@ -16,7 +23,9 @@ function setup() {
     schedule(delay: number, callback: () => void) {
       const timer = { at: now + delay, callback };
       timers.add(timer);
-      return () => { timers.delete(timer); };
+      return () => {
+        timers.delete(timer);
+      };
     },
   };
   function advance(ms: number) {
@@ -25,15 +34,28 @@ function setup() {
       if (timer.at <= now && timers.delete(timer)) timer.callback();
     }
   }
-  const uploads: { file: string; resolve: (result: UploadResult) => void; reject: (error: unknown) => void; cancelled: boolean }[] = [];
+  const uploads: {
+    file: string;
+    resolve: (result: UploadResult) => void;
+    reject: (error: unknown) => void;
+    cancelled: boolean;
+  }[] = [];
   const queue = createUploadQueue<string>({
     upload(file) {
       let resolve!: (result: UploadResult) => void;
       let reject!: (error: unknown) => void;
-      const result = new Promise<UploadResult>((done, fail) => { resolve = done; reject = fail; });
+      const result = new Promise<UploadResult>((done, fail) => {
+        resolve = done;
+        reject = fail;
+      });
       const request = { file, resolve, reject, cancelled: false };
       uploads.push(request);
-      return { result, cancel: () => { request.cancelled = true; } };
+      return {
+        result,
+        cancel: () => {
+          request.cancelled = true;
+        },
+      };
     },
     clock,
   });
@@ -46,8 +68,16 @@ async function complete(request: ReturnType<typeof setup>['uploads'][number], re
   await Promise.resolve();
 }
 
-const rateLimited: UploadResult = { success: false, isDuplicate: false, error: { type: 'rate_limit', message: 'Slow down', retryAfter: 5 } };
-const failed: UploadResult = { success: false, isDuplicate: false, error: { type: 'validation', message: 'Invalid image' } };
+const rateLimited: UploadResult = {
+  success: false,
+  isDuplicate: false,
+  error: { type: 'rate_limit', message: 'Slow down', retryAfter: 5 },
+};
+const failed: UploadResult = {
+  success: false,
+  isDuplicate: false,
+  error: { type: 'validation', message: 'Invalid image' },
+};
 
 describe('upload queue workflow', () => {
   it('uploads in selection order with one active request and reports completion', async () => {
@@ -91,12 +121,18 @@ describe('upload queue controls', () => {
     expect(queue.getSnapshot().counts.success).toBe(1);
   });
 
-  it.each([new Error('Offline'), 'not an Error'])('handles a rejected upload and keeps processing', async (error) => {
+  it.each([
+    new Error('Offline'),
+    'not an Error',
+  ])('handles a rejected upload and keeps processing', async (error) => {
     const { queue, uploads } = setup();
     queue.addFiles(['a', 'b']);
     uploads[0].reject(error);
     await Promise.resolve();
-    expect(queue.getSnapshot().state.files[0].error).toEqual({ type: 'network', message: error instanceof Error ? error.message : 'Unknown error' });
+    expect(queue.getSnapshot().state.files[0].error).toEqual({
+      type: 'network',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
     expect(uploads[1].file).toBe('b');
   });
 
@@ -120,12 +156,20 @@ describe('upload queue controls', () => {
     expect(uploads[1].file).toBe('b');
   });
 
-  it.each([success, failed, { ...success, isDuplicate: true }])('clears a stopped queue when its last upload settles', async (result) => {
+  it.each([
+    success,
+    failed,
+    { ...success, isDuplicate: true },
+  ])('clears a stopped queue when its last upload settles', async (result) => {
     const { queue, uploads } = setup();
     queue.addFiles(['a']);
     queue.stopQueue();
     await complete(uploads[0], result);
-    expect(queue.getSnapshot().state).toMatchObject({ files: [], isStopped: false, isProcessing: false });
+    expect(queue.getSnapshot().state).toMatchObject({
+      files: [],
+      isStopped: false,
+      isProcessing: false,
+    });
   });
 
   it('waits for the rate limit and automatically retries only that file', async () => {
@@ -133,7 +177,11 @@ describe('upload queue controls', () => {
     queue.addFiles(['invalid', 'limited', 'next']);
     await complete(uploads[0], failed);
     await complete(uploads[1], rateLimited);
-    expect(queue.getSnapshot().state).toMatchObject({ isPaused: true, pausedUntil: 5000, isProcessing: false });
+    expect(queue.getSnapshot().state).toMatchObject({
+      isPaused: true,
+      pausedUntil: 5000,
+      isProcessing: false,
+    });
     queue.resumeQueue();
     queue.retryFailed();
     advance(4999);
@@ -189,16 +237,29 @@ describe('upload queue controls', () => {
     queue.addFiles(['a', 'b']);
     queue.stopQueue();
     await complete(uploads[0], rateLimited);
-    expect(queue.getSnapshot().state).toMatchObject({ isStopped: true, isPaused: false, pausedUntil: 5000 });
+    expect(queue.getSnapshot().state).toMatchObject({
+      isStopped: true,
+      isPaused: false,
+      pausedUntil: 5000,
+    });
     expect(timers.size).toBe(0);
     advance(5000);
     expect(uploads).toHaveLength(1);
   });
 
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, undefined])('uses a bounded default cooldown for invalid retry-after %s', async (retryAfter) => {
+  it.each([
+    0,
+    -1,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    undefined,
+  ])('uses a bounded default cooldown for invalid retry-after %s', async (retryAfter) => {
     const { queue, uploads, advance } = setup();
     queue.addFiles(['a']);
-    await complete(uploads[0], { ...rateLimited, error: { type: 'rate_limit', message: 'Wait', retryAfter } });
+    await complete(uploads[0], {
+      ...rateLimited,
+      error: { type: 'rate_limit', message: 'Wait', retryAfter },
+    });
     expect(queue.getSnapshot().state.pausedUntil).toBe(60000);
     advance(59999);
     expect(uploads).toHaveLength(1);
@@ -206,7 +267,11 @@ describe('upload queue controls', () => {
     expect(uploads).toHaveLength(2);
   });
 
-  it.each([success, rateLimited, failed])('cancels and ignores an old response after a new batch is added', async (result) => {
+  it.each([
+    success,
+    rateLimited,
+    failed,
+  ])('cancels and ignores an old response after a new batch is added', async (result) => {
     const { queue, uploads, timers } = setup();
     queue.addFiles(['old']);
     queue.cancelAll();
@@ -262,7 +327,9 @@ describe('upload queue controls', () => {
   it('notifies subscribers with stable snapshots and supports unsubscribe', () => {
     const { queue } = setup();
     const observations: number[] = [];
-    const unsubscribe = queue.subscribe(() => { observations.push(queue.getSnapshot().counts.total); });
+    const unsubscribe = queue.subscribe(() => {
+      observations.push(queue.getSnapshot().counts.total);
+    });
     expect(queue.getSnapshot()).toBe(queue.getSnapshot());
     queue.addFiles(['a']);
     expect(observations.at(-1)).toBe(1);

@@ -1,36 +1,14 @@
+import type { UploadResponse, UploadResult } from '@/features/upload-queue';
 import { getAuthToken } from '@/lib/auth/token-provider';
 
 const INGESTOR_URL = import.meta.env.VITE_INGESTOR_URL || '/ingestor';
 
-export interface UploadResponse {
-  wallpaperId: string;
-  userId: string;
-  uploadState: string;
-  fileType: string;
-  mimeType: string;
-  fileSizeBytes: number;
-  width: number;
-  height: number;
-  aspectRatio: number;
-  uploadedAt: string;
-}
-
-// Error types for structured error handling
-export type UploadErrorType = 'rate_limit' | 'validation' | 'server' | 'network';
-
-export interface UploadError {
-  type: UploadErrorType;
-  message: string;
-  retryAfter?: number;
-}
-
-// Structured upload result
-export interface UploadResult {
-  success: boolean;
-  isDuplicate: boolean;
-  response?: UploadResponse;
-  error?: UploadError;
-}
+export type {
+  UploadError,
+  UploadErrorType,
+  UploadResponse,
+  UploadResult,
+} from '@/features/upload-queue';
 
 // Default retry-after for rate limits when header is missing
 const DEFAULT_RETRY_AFTER = 60;
@@ -41,7 +19,8 @@ const DEFAULT_RETRY_AFTER = 60;
  */
 export async function uploadWallpaperWithDetails(
   file: File,
-  userId: string
+  userId: string,
+  signal?: AbortSignal
 ): Promise<UploadResult> {
   const formData = new FormData();
   formData.append('file', file);
@@ -56,6 +35,7 @@ export async function uploadWallpaperWithDetails(
 
     const response = await fetch(`${INGESTOR_URL}/upload`, {
       method: 'POST',
+      signal,
       body: formData,
       headers,
     });

@@ -46,3 +46,4 @@ export {
 
 export { hexToHsv, hsvToHex, spectrumPoint, colorPickerTab } from './spectrum';
 export type { Hsv } from './spectrum';
+export { feedPresentation } from './feed';

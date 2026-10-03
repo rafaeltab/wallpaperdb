@@ -1,3 +1,4 @@
+import { feedPresentation } from '@/features/browse';
 import { useAuth } from '@clerk/react';
 import { Link } from '@tanstack/react-router';
 import { Pencil } from 'lucide-react';
@@ -61,11 +62,19 @@ export function ProfileWallpapers({ profileId }: { profileId: string }) {
     hasNextPage,
     fetchNextPage,
   } = useWallpaperInfiniteQuery({ filter: { profileId } });
-  const error = failureReason ?? queryError;
   const wallpapers = data?.pages.flatMap((page) => page.edges.map((edge) => edge.node)) ?? [];
+  const feed = feedPresentation({
+    error: queryError,
+    failureReason,
+    itemCount: wallpapers.length,
+    isLoading,
+    isFetchNextPageError,
+    isFetchingNextPage,
+  });
+  const { error } = feed;
   let content: ReactNode;
 
-  if (error && wallpapers.length === 0) {
+  if (feed.initialError) {
     content = (
       <GraphQLError
         error={error}
@@ -74,7 +83,7 @@ export function ProfileWallpapers({ profileId }: { profileId: string }) {
         title="Could not load wallpapers"
       />
     );
-  } else if (wallpapers.length > 0 || isLoading) {
+  } else if (feed.showResults) {
     content = (
       <>
         <WallpaperGrid
@@ -86,7 +95,7 @@ export function ProfileWallpapers({ profileId }: { profileId: string }) {
           <div className="mt-4">
             <GraphQLError
               error={error}
-              retry={isFetchNextPageError || isFetchingNextPage ? fetchNextPage : refetch}
+              retry={feed.retryTarget === 'next-page' ? fetchNextPage : refetch}
               retrying={isFetching}
               title="Could not load more wallpapers"
             />

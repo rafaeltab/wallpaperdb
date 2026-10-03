@@ -35,12 +35,14 @@ vi.mock('@/hooks/useWallpaperInfiniteQuery', () => ({
 vi.mock('@/components/WallpaperGrid', () => ({
   WallpaperGrid: ({
     wallpapers,
+    isLoading = false,
     isLoadingMore,
   }: {
     wallpapers: Array<{ wallpaperId: string }>;
+    isLoading?: boolean;
     isLoadingMore: boolean;
   }) => (
-    <div data-testid="profile-wallpaper-grid" data-loading={isLoadingMore}>
+    <div data-testid="profile-wallpaper-grid" data-loading={isLoading} data-loading-more={isLoadingMore}>
       {wallpapers.map((wallpaper) => (
         <span key={wallpaper.wallpaperId}>{wallpaper.wallpaperId}</span>
       ))}
@@ -266,6 +268,7 @@ describe('PublicProfilePage', () => {
     };
     const { rerender } = render(<PublicProfilePage profile={profile} />);
     expect(screen.getByTestId('profile-wallpaper-grid')).toHaveAttribute('data-loading', 'true');
+    expect(screen.getByTestId('profile-wallpaper-grid')).toHaveAttribute('data-loading-more', 'false');
 
     (useWallpaperInfiniteQuery as Mock).mockReturnValue({
       data: { pages: [] },

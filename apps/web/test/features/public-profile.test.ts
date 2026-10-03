@@ -1,3 +1,4 @@
+import { resolveProfileContent } from '@/features/public-profile';
 import { expect, it } from 'vitest';
 import { canonicalProfileOutcome, embeddedWallpaperState, projectionRetryDelay, profileInitials, profileFallbackColor, resolveProfilePicture } from '@/features/public-profile';
 it('returns explicit canonical, missing, and redirect outcomes', () => {
@@ -29,4 +30,13 @@ it('renders deterministic initials and fallback colors', () => {
   expect(profileInitials('')).toBe('?');
   expect(profileFallbackColor('owner')).toBe(profileFallbackColor('owner'));
   expect(profileFallbackColor('other')).not.toBe(profileFallbackColor('owner'));
+});
+
+it('uses owner content only when identity matches and its version is at least as recent', () => {
+ const profile={id:'a',version:2,biographyMarkdown:'public'};
+ const owner={id:'a',version:3,biographyMarkdown:'owner'};
+ expect(resolveProfileContent(profile,owner)).toBe(owner);
+ expect(resolveProfileContent(profile,{...owner,id:'b'})).toBe(profile);
+ expect(resolveProfileContent(profile,{...owner,version:1})).toBe(profile);
+ expect(resolveProfileContent(profile,null)).toBe(profile);
 });

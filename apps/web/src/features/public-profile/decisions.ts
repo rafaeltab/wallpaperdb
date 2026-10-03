@@ -56,9 +56,7 @@ export function resolveProfilePicture(
   const owner =
     'pictureAssetId' in profile
       ? profile
-      : cachedOwner &&
-          cachedOwner.id === profile.id &&
-          cachedOwner.version >= (profile.version ?? 0)
+      : cachedOwner && resolveProfileContent(profile, cachedOwner) === cachedOwner
         ? cachedOwner
         : null;
   const picture = owner
@@ -70,4 +68,13 @@ export function resolveProfilePicture(
       : null
     : (profile.picture ?? null);
   return { id: profile.id, displayName: owner?.displayName ?? profile.displayName, picture };
+}
+
+export function resolveProfileContent<Profile extends { id: string; version?: number }>(
+  profile: Profile,
+  owner: Profile | null | undefined
+): Profile {
+  return owner?.id === profile.id && (owner.version ?? 0) >= (profile.version ?? 0)
+    ? owner
+    : profile;
 }

@@ -11,7 +11,7 @@ vi.mock('@wallpaperdb/react-muuri', () => ({
   useRefresh: () => ({ refresh: () => {} }),
 }));
 
-const items = ['first', 'second'].map((id) => ({ id, src: '/image.png', width: 100, height: 100, aspectRatio: 1 }));
+const items = ['first', 'second'].map((id) => ({ id, src: '/image.png', width: 1000, height: 1000, aspectRatio: 1 }));
 function Item({ item, isExpanded, span, onClick }: GridItemRendererProps) {
   return <button type="button" onClick={onClick} aria-expanded={isExpanded}>
     {item.id} {span.cols}x{span.rows}

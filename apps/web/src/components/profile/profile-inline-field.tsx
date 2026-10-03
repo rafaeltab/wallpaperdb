@@ -108,7 +108,6 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     );
     return confirmed ? editor.confirmSave() : editor.save();
   }
-  const refs = { container, confirmationDialog, input, textarea, opener, availability };
   const actions = <FieldActions field={field} state={state} busy={busy} finish={finish} />;
   const errorNotice = (
     <FieldError state={state} busy={busy} errorId={errorId} refresh={() => void editor.refresh()} />
@@ -116,9 +115,9 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   const view = {
     field,
     profile,
-    editor,
     state,
-    refs,
+    onEdit: editor.beginEdit,
+    onChange: editor.change,
     errorId,
     busy,
     actions,
@@ -129,17 +128,25 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   return field === 'biographyMarkdown' ? (
     <BiographyField
       {...view}
+      refs={{ container, textarea, opener }}
       preview={preview}
       setPreview={setPreview}
       previewRevision={previewRevision}
       refreshPreview={() => setPreviewRevision((revision) => revision + 1)}
     />
   ) : (
-    <IdentityField {...view} />
+    <IdentityField
+      {...view}
+      refs={{ container, confirmationDialog, input, opener, availability }}
+      dismissConfirmation={editor.dismissConfirmation}
+      restoreConfirmationFocus={() => {
+        if (!editor.getSnapshot().locked && input.current?.isConnected && !input.current.disabled)
+          input.current.focus();
+      }}
+    />
   );
 }
 
-type Editor = ReturnType<typeof useProfileEditor>['editor'];
 type EditorRefs = {
   container: RefObject<HTMLDivElement | null>;
   confirmationDialog: RefObject<HTMLDivElement | null>;
@@ -151,9 +158,9 @@ type EditorRefs = {
 type FieldViewProps = {
   field: Field;
   profile: Profile;
-  editor: Editor;
+  onEdit: () => void;
+  onChange: (value: string) => void;
   state: ProfileEditorSnapshot;
-  refs: EditorRefs;
   errorId: string;
   busy: boolean;
   actions: ReactNode;
@@ -248,7 +255,8 @@ function FieldError({
 
 function BiographyField({
   profile,
-  editor,
+  onEdit,
+  onChange,
   state,
   refs,
   errorId,
@@ -262,6 +270,7 @@ function BiographyField({
   previewRevision,
   refreshPreview,
 }: FieldViewProps & {
+  refs: Pick<EditorRefs, 'container' | 'textarea' | 'opener'>;
   preview: boolean;
   setPreview: (value: boolean) => void;
   previewRevision: number;
@@ -338,7 +347,7 @@ function BiographyField({
                 disabled={locked || busy}
                 aria-invalid={Boolean(validationError || error)}
                 aria-describedby={validationError || error ? errorId : undefined}
-                onChange={(event) => editor.change(event.target.value)}
+                onChange={(event) => onChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape' && !locked) finish();
                 }}
@@ -370,7 +379,7 @@ function BiographyField({
                 disabled={busy}
                 onClick={() => {
                   setPreview(false);
-                  editor.beginEdit();
+                  onEdit();
                 }}
               >
                 <Pencil className="size-3.5" />
@@ -395,7 +404,8 @@ function BiographyField({
 function IdentityField({
   field,
   profile,
-  editor,
+  onEdit,
+  onChange,
   state,
   refs,
   errorId,
@@ -404,7 +414,13 @@ function IdentityField({
   errorNotice,
   save,
   finish,
-}: FieldViewProps) {
+  dismissConfirmation,
+  restoreConfirmationFocus,
+}: FieldViewProps & {
+  refs: Pick<EditorRefs, 'container' | 'confirmationDialog' | 'input' | 'opener' | 'availability'>;
+  dismissConfirmation: () => void;
+  restoreConfirmationFocus: () => void;
+}) {
   const label = labels[field];
   const title = label[0].toUpperCase() + label.slice(1);
   const { edit, error, validationError, locked, coolingDown, confirmation, deadline, now } = state;
@@ -455,7 +471,7 @@ function IdentityField({
                 autoComplete={field === 'displayName' ? 'name' : 'off'}
                 autoCapitalize={field === 'handle' ? 'none' : undefined}
                 spellCheck={field === 'handle' ? false : undefined}
-                onChange={(event) => editor.change(event.target.value)}
+                onChange={(event) => onChange(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape' && !locked) finish();
                 }}
@@ -478,7 +494,7 @@ function IdentityField({
               textBaseline
               buttonClassName="size-6"
               disabled={coolingDown || busy}
-              onClick={() => editor.beginEdit()}
+              onClick={() => onEdit()}
             >
               <Pencil className={iconSize} />
             </ProfileActionButton>
@@ -512,20 +528,14 @@ function IdentityField({
       <AlertDialog
         open={Boolean(confirmation)}
         onOpenChange={(open) => {
-          if (!open) editor.dismissConfirmation();
+          if (!open) dismissConfirmation();
         }}
       >
         <AlertDialogContent
           ref={confirmationDialog}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            // Accepted changes retain their existing save-feedback focus lifecycle.
-            if (
-              !editor.getSnapshot().locked &&
-              input.current?.isConnected &&
-              !input.current.disabled
-            )
-              input.current.focus();
+            restoreConfirmationFocus();
           }}
         >
           <AlertDialogHeader>

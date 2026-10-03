@@ -1,3 +1,4 @@
+import { downloadVariant } from '@/features/wallpaper-details/adapters/download';
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { ChevronDown, Download, PanelRight, Share } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -24,7 +25,7 @@ import { detailShortcut, resolveVariantIndex } from '@/features/wallpaper-detail
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useWallpaperQuery } from '@/hooks/useWallpaperQuery';
-import { downloadVariant, formatFileSize } from '@/lib/utils/wallpaper';
+import { formatFileSize } from '@/lib/utils/wallpaper';
 import { shareWallpaper } from '@/features/wallpaper-details/adapters/share';
 
 export function WallpaperDetailPage() {

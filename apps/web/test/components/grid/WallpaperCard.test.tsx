@@ -1,15 +1,16 @@
+import { downloadVariant } from '@/features/wallpaper-details/adapters/download';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { WallpaperCard } from '@/components/grid/WallpaperCard';
 import type { GridItem } from '@/components/grid/types';
 import type { Wallpaper } from '@/lib/graphql/types';
-import { downloadVariant } from '@/lib/utils/wallpaper';
+
 import { shareWallpaper } from '@/features/wallpaper-details/adapters/share';
 import { toast } from 'sonner';
 
 // Mock dependencies
-vi.mock('@/lib/utils/wallpaper', () => ({
+vi.mock('@/features/wallpaper-details/adapters/download', () => ({
 	downloadVariant: vi.fn(),
 }));
 

@@ -1,3 +1,4 @@
+import { downloadVariant } from '@/features/wallpaper-details/adapters/download';
 import { Download, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Variant } from '@/lib/graphql/types';
-import { downloadVariant, formatFileSize } from '@/lib/utils/wallpaper';
+import { formatFileSize } from '@/lib/utils/wallpaper';
 
 interface VariantListProps {
   variants: Variant[];

@@ -10,6 +10,38 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { formatClerkGlobalErrors } from '@/lib/auth/clerk-errors';
 
+function SignUpErrors({
+  errors,
+  verifying = false,
+}: {
+  errors: ReturnType<typeof useSignUp>['errors'];
+  verifying?: boolean;
+}) {
+  const fieldMessage = verifying
+    ? errors?.fields?.code?.message
+    : errors?.fields?.emailAddress?.message || errors?.fields?.password?.message;
+  const globalMessage = formatClerkGlobalErrors(errors?.global);
+  return (
+    <>
+      {[
+        { key: 'field', message: fieldMessage },
+        { key: 'global', message: globalMessage },
+      ].map(
+        ({ key, message }) =>
+          message && (
+            <div
+              key={key}
+              role="alert"
+              className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+              {message}
+            </div>
+          )
+      )}
+    </>
+  );
+}
+
 export function SignUpForm() {
   const { signUp, errors, fetchStatus } = useSignUp();
   const { oauthUrls, finalizeNavigation } = useAuthNavigation();
@@ -77,22 +109,7 @@ export function SignUpForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleVerification} className="grid gap-4">
-            {errors?.fields?.code && (
-              <div
-                role="alert"
-                className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-              >
-                {errors.fields.code.message}
-              </div>
-            )}
-            {formatClerkGlobalErrors(errors?.global) && (
-              <div
-                role="alert"
-                className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-              >
-                {formatClerkGlobalErrors(errors?.global)}
-              </div>
-            )}
+            <SignUpErrors errors={errors} verifying />
             <Field>
               <FieldLabel htmlFor="verificationCode">Verification code</FieldLabel>
               <Input
@@ -124,22 +141,7 @@ export function SignUpForm() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-4">
-          {(errors?.fields?.emailAddress || errors?.fields?.password) && (
-            <div
-              role="alert"
-              className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-            >
-              {errors?.fields?.emailAddress?.message || errors?.fields?.password?.message}
-            </div>
-          )}
-          {formatClerkGlobalErrors(errors?.global) && (
-            <div
-              role="alert"
-              className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-            >
-              {formatClerkGlobalErrors(errors?.global)}
-            </div>
-          )}
+          <SignUpErrors errors={errors} />
           <Field>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input

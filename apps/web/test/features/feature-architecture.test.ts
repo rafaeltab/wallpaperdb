@@ -5,8 +5,6 @@ import ts from 'typescript';
 import { expect, it } from 'vitest';
 
 const src = path.resolve(import.meta.dirname, '../../src');
-const feature = path.join(src, 'features/upload-queue');
-const adapters = path.join(feature, 'adapters');
 const inside = (file: string, directory: string) => file.startsWith(`${directory}/`);
 
 function files(directory: string): string[] {
@@ -16,7 +14,13 @@ function files(directory: string): string[] {
   });
 }
 
-it('keeps the upload core independent and consumers behind its public entry', () => {
+it.each([
+  'upload-queue',
+  'profile-editor',
+  'grid-layout',
+])('keeps %s independent and consumers behind its public entry', (name) => {
+  const feature = path.join(src, 'features', name);
+  const adapters = path.join(feature, 'adapters');
   const errors: string[] = [];
   const browserGlobals = new Set([
     'window',
@@ -29,7 +33,7 @@ it('keeps the upload core independent and consumers behind its public entry', ()
     'clearTimeout',
     'Date',
   ]);
-  for (const filename of files(src)) {
+  for (const filename of [...files(src), ...files(path.resolve(src, '../test'))]) {
     const core = inside(filename, feature) && !inside(filename, adapters);
     const source = ts.createSourceFile(
       filename,
@@ -43,7 +47,13 @@ it('keeps the upload core independent and consumers behind its public entry', ()
         : specifier.startsWith('.')
           ? path.resolve(path.dirname(filename), specifier)
           : undefined;
-      if (core && (!target || !inside(target, feature) || inside(target, adapters)))
+      const allowedSharedPolicy =
+        name === 'profile-editor' && specifier === '@wallpaperdb/profile-markdown';
+      if (
+        core &&
+        !allowedSharedPolicy &&
+        (!target || !inside(target, feature) || inside(target, adapters))
+      )
         errors.push(`${filename}: core cannot import ${specifier}`);
       if (
         !inside(filename, feature) &&
@@ -52,7 +62,7 @@ it('keeps the upload core independent and consumers behind its public entry', ()
         !inside(target, adapters) &&
         target !== path.join(feature, 'index')
       )
-        errors.push(`${filename}: use the upload-queue entry point`);
+        errors.push(`${filename}: use the ${name} entry point`);
     }
     function visit(node: ts.Node) {
       if (

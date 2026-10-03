@@ -1,3 +1,4 @@
+import { embeddedWallpaperState, projectionRetryDelay } from '@/features/public-profile';
 import { GraphQLError } from '@/components/graphql-error';
 import { GatewayAdmissionError } from '@/features/request-admission/adapters/graphql';
 import { Link } from '@tanstack/react-router';
@@ -18,19 +19,18 @@ export function BiographyWallpaper({
   const error = query.failureReason ?? query.error;
   const admissionFailed = error instanceof GatewayAdmissionError;
   const wallpaper = query.data;
-  const variant = wallpaper?.variants?.[0];
-  const matches = wallpaper?.wallpaperId === wallpaperId && wallpaper.profileId === profileId;
-  const retryable = !wallpaper || (matches && !variant);
+  const { variant, matches, retryable, available } = embeddedWallpaperState(
+    wallpaper,
+    wallpaperId,
+    profileId
+  );
   useEffect(() => {
-    if (query.isPending || query.isFetching || admissionFailed || !retryable || retries >= 3)
-      return;
-    const timeout = window.setTimeout(
-      () => {
-        setRetries((count) => count + 1);
-        void query.refetch();
-      },
-      1000 * 2 ** retries
-    );
+    const delay = projectionRetryDelay(retries, admissionFailed);
+    if (query.isPending || query.isFetching || !retryable || delay === undefined) return;
+    const timeout = window.setTimeout(() => {
+      setRetries((count) => count + 1);
+      void query.refetch();
+    }, delay);
     return () => window.clearTimeout(timeout);
   }, [query.isPending, query.isFetching, query.refetch, admissionFailed, retryable, retries]);
   const errorDisplay = admissionFailed ? (
@@ -44,12 +44,7 @@ export function BiographyWallpaper({
   if (errorDisplay && (!matches || !variant)) return errorDisplay;
   if (query.isPending)
     return <output className="my-4 block text-sm text-muted-foreground">Loading wallpaper…</output>;
-  if (
-    !wallpaper ||
-    wallpaper.wallpaperId !== wallpaperId ||
-    wallpaper.profileId !== profileId ||
-    !variant
-  ) {
+  if (!available || !variant) {
     return (
       <span className="my-4 block rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
         Wallpaper unavailable.

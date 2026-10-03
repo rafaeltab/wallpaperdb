@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { formatTimeRemaining } from '@/lib/utils/upload-queue';
+import { formatTimeRemaining } from '@/features/upload-queue';
 
 export function useCountdown(pausedUntil: number | null): string | null {
   const [timeRemaining, setTimeRemaining] = useState<string | null>(null);

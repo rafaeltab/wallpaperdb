@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatTimeRemaining, getQueueStatusText } from '@/lib/utils/upload-queue';
+import { formatTimeRemaining, getQueueStatusText } from '@/features/upload-queue';
 
 describe('formatTimeRemaining', () => {
   it('formats seconds less than 60', () => {

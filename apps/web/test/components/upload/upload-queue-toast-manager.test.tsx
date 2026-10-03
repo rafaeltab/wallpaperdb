@@ -1,6 +1,7 @@
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
+import { isValidElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
@@ -117,6 +118,31 @@ describe('UploadQueueToastManager', () => {
 
     expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
     expect(screen.getByText('Uploading 0/1 files')).toBeInTheDocument();
+  });
+
+  it('keeps the current completion toast visible when an old dismissal runs', async () => {
+    const custom = vi.spyOn(toast, 'custom');
+    const user = userEvent.setup();
+    vi.mocked(uploadWallpaperWithDetails).mockResolvedValue(uploaded);
+    renderQueue();
+    await user.click(screen.getByRole('button', { name: 'Add upload' }));
+    await screen.findByText('Upload complete');
+    const renderToast = custom.mock.calls.at(-1)?.[0];
+    const oldToast = renderToast?.('old');
+    if (!isValidElement<{ onClearCompleted: () => void }>(oldToast)) {
+      throw new Error('Expected an upload toast');
+    }
+    await user.click(screen.getByRole('button', { name: 'Add upload' }));
+    await waitFor(() => expect(screen.getByText(/2 uploaded/)).toBeInTheDocument());
+    act(() => oldToast.props.onClearCompleted());
+    expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
+    await waitFor(() => {
+      const current = custom.mock.calls.at(-1)?.[0]('current');
+      if (!isValidElement<{ files: unknown[] }>(current)) throw new Error('Expected toast');
+      expect(current.props.files).toHaveLength(1);
+      expect(screen.getByText('Upload complete')).toBeInTheDocument();
+    });
+    custom.mockRestore();
   });
 
   it('preserves expanded progress and controls while sharing and leaving the stack', async () => {

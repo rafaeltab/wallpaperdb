@@ -34,3 +34,12 @@ export {
   buildColorSort,
 } from './colors';
 export type { MatchPreference, ColorPreference } from './colors';
+
+export {
+  compositionLayout,
+  moveColorBoundary,
+  colorBoundaryMaximum,
+  setColorPercentage,
+  colorEditLimits,
+  saveColorPreference,
+} from './composition';

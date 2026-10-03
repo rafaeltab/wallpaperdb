@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:unit": "vitest run --coverage",
     "test:integration": "node --test test/clean-checkout.test.mjs",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prototype:renditions": "vite --config vite.prototype.config.ts",
+    "prototype:format": "biome format --write src/prototypes vite.prototype.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",

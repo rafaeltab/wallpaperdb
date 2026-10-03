@@ -1,29 +1,21 @@
+import { signInNextAction } from '@/features/authentication';
+import { useAuthNavigation } from '@/features/authentication/adapters/navigation';
 import { useSignIn } from '@clerk/react';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { formatClerkGlobalErrors } from '@/lib/auth/clerk-errors';
 
-function buildUrl(path: string): string {
-  const basePath = import.meta.env.VITE_BASE_PATH || '';
-  const full = `${basePath}${path.startsWith('/') ? '' : '/'}${path}`;
-  return full.replace(/\/+/g, '/') || '/';
-}
-
 export function SignInForm() {
   const { signIn, errors, fetchStatus } = useSignIn();
-  const navigate = useNavigate();
+  const { oauthUrls, finalizeNavigation } = useAuthNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isAwaitingSignInStatus, setIsAwaitingSignInStatus] = useState(false);
-  const [redirectUrl] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('redirect') || '/';
-  });
 
   const isSubmitting = fetchStatus === 'fetching';
 
@@ -31,23 +23,15 @@ export function SignInForm() {
     if (!signIn || !isAwaitingSignInStatus) return;
 
     const finalizeSignIn = async () => {
-      if (signIn.status === 'complete') {
+      if (signInNextAction(signIn.status) === 'finalize') {
         setIsAwaitingSignInStatus(false);
         await signIn.finalize({
-          navigate: async ({ session, decorateUrl }) => {
-            if (session?.currentTask) return;
-            const url = decorateUrl(redirectUrl);
-            if (url.startsWith('http')) {
-              window.location.href = url;
-            } else {
-              void navigate({ to: url });
-            }
-          },
+          navigate: finalizeNavigation,
         });
         return;
       }
 
-      if (signIn.status === 'needs_second_factor' || signIn.status === 'needs_client_trust') {
+      if (signInNextAction(signIn.status) === 'second-factor') {
         setIsAwaitingSignInStatus(false);
         const emailCodeFactor = signIn.supportedSecondFactors?.find(
           (factor) => factor.strategy === 'email_code'
@@ -59,7 +43,7 @@ export function SignInForm() {
     };
 
     void finalizeSignIn();
-  }, [isAwaitingSignInStatus, navigate, redirectUrl, signIn]);
+  }, [isAwaitingSignInStatus, finalizeNavigation, signIn]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -81,8 +65,7 @@ export function SignInForm() {
     await signIn.reset();
     await signIn.sso({
       strategy,
-      redirectUrl: buildUrl(redirectUrl),
-      redirectCallbackUrl: buildUrl('/sso-callback'),
+      ...oauthUrls,
     });
   };
 

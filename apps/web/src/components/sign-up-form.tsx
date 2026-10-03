@@ -1,30 +1,22 @@
+import { signUpNextAction } from '@/features/authentication';
+import { useAuthNavigation } from '@/features/authentication/adapters/navigation';
 import { useSignUp } from '@clerk/react';
 import { Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { formatClerkGlobalErrors } from '@/lib/auth/clerk-errors';
 
-function buildUrl(path: string): string {
-  const basePath = import.meta.env.VITE_BASE_PATH || '';
-  const full = `${basePath}${path.startsWith('/') ? '' : '/'}${path}`;
-  return full.replace(/\/+/g, '/') || '/';
-}
-
 export function SignUpForm() {
   const { signUp, errors, fetchStatus } = useSignUp();
-  const navigate = useNavigate();
+  const { oauthUrls, finalizeNavigation } = useAuthNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pendingVerification, setPendingVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
-  const [redirectUrl] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('redirect') || '/';
-  });
 
   const isSubmitting = fetchStatus === 'fetching';
 
@@ -39,19 +31,11 @@ export function SignUpForm() {
 
     if (error) return;
 
-    if (signUp.status === 'complete') {
+    if (signUpNextAction(signUp.status) === 'finalize') {
       await signUp.finalize({
-        navigate: async ({ session, decorateUrl }) => {
-          if (session?.currentTask) return;
-          const url = decorateUrl(redirectUrl);
-          if (url.startsWith('http')) {
-            window.location.href = url;
-          } else {
-            void navigate({ to: url });
-          }
-        },
+        navigate: finalizeNavigation,
       });
-    } else if (signUp.status === 'missing_requirements') {
+    } else if (signUpNextAction(signUp.status) === 'send-email-code') {
       await signUp.verifications.sendEmailCode();
       setPendingVerification(true);
     }
@@ -65,17 +49,9 @@ export function SignUpForm() {
 
     if (error) return;
 
-    if (signUp.status === 'complete') {
+    if (signUpNextAction(signUp.status) === 'finalize') {
       await signUp.finalize({
-        navigate: async ({ session, decorateUrl }) => {
-          if (session?.currentTask) return;
-          const url = decorateUrl(redirectUrl);
-          if (url.startsWith('http')) {
-            window.location.href = url;
-          } else {
-            void navigate({ to: url });
-          }
-        },
+        navigate: finalizeNavigation,
       });
     }
   };
@@ -86,8 +62,7 @@ export function SignUpForm() {
     await signUp.reset();
     await signUp.sso({
       strategy,
-      redirectUrl: buildUrl(redirectUrl),
-      redirectCallbackUrl: buildUrl('/sso-callback'),
+      ...oauthUrls,
     });
   };
 

@@ -1,4 +1,5 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
+import { parseTheme } from '@/features/preferences';
 import { useTheme } from '@/components/theme-provider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
@@ -10,7 +11,7 @@ export function ThemeToggle() {
       type="single"
       value={theme}
       onValueChange={(value) => {
-        if (value) setTheme(value as 'light' | 'dark' | 'system');
+        if (value) setTheme(parseTheme(value));
       }}
       className="bg-muted rounded-md p-0.5"
     >

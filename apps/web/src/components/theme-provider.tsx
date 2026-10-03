@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'dark' | 'light' | 'system';
+import { parseTheme, resolvedTheme, type Theme } from '@/features/preferences';
 
 type ThemeProviderProps = {
   children: React.ReactNode;
@@ -20,23 +20,17 @@ export function ThemeProvider({
   defaultTheme = 'system',
   storageKey = 'wallpaperdb-theme',
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
+  const [theme, setTheme] = useState<Theme>(() =>
+    parseTheme(localStorage.getItem(storageKey), defaultTheme)
   );
 
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('light', 'dark');
 
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
-      root.classList.add(systemTheme);
-      return;
-    }
-
-    root.classList.add(theme);
+    root.classList.add(
+      resolvedTheme(theme, window.matchMedia('(prefers-color-scheme: dark)').matches)
+    );
   }, [theme]);
 
   const value = {

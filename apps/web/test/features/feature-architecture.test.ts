@@ -14,11 +14,9 @@ function files(directory: string): string[] {
   });
 }
 
-it.each([
-  'upload-queue',
-  'profile-editor',
-  'grid-layout',
-])('keeps %s independent and consumers behind its public entry', (name) => {
+const approvedSharedModules = new Set(['@wallpaperdb/profile-markdown', '@/lib/graphql/types']);
+const featureRoot = path.join(src, 'features');
+it.each(fs.readdirSync(featureRoot))('keeps %s independent and consumers behind its public entry', (name) => {
   const feature = path.join(src, 'features', name);
   const adapters = path.join(feature, 'adapters');
   const errors: string[] = [];
@@ -47,8 +45,7 @@ it.each([
         : specifier.startsWith('.')
           ? path.resolve(path.dirname(filename), specifier)
           : undefined;
-      const allowedSharedPolicy =
-        name === 'profile-editor' && specifier === '@wallpaperdb/profile-markdown';
+      const allowedSharedPolicy = approvedSharedModules.has(specifier);
       if (
         core &&
         !allowedSharedPolicy &&

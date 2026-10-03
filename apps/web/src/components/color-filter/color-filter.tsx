@@ -8,7 +8,7 @@ import {
   isDistributionPreference,
   MATCH_LABELS,
   MATCH_PREFERENCES,
-} from '@/lib/color-preferences';
+} from '@/features/browse';
 import { ColorComposition } from './color-composition';
 import { ColorPicker } from './color-picker';
 import './color-filter.css';

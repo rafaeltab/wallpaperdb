@@ -26,13 +26,14 @@ import {
   getAspectRatioLabel,
   getFormatBadgeLabel,
   parseBrowseSearch,
+  updateBrowseSearch,
   resolveClosestAspectRatioPreset,
-} from '@/lib/browse-filters';
+} from '@/features/browse';
 import {
   type ColorPreference,
   colorPreferenceAppearance,
   colorPreferenceLabel,
-} from '@/lib/color-preferences';
+} from '@/features/browse';
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -79,11 +80,8 @@ export function HomePage() {
     (nextProfileId?: string) => {
       void navigate({
         to: '/',
-        search: (previous: BrowseSearchState) => ({
-          ...previous,
-          after: undefined,
-          profileId: nextProfileId,
-        }),
+        search: (previous: BrowseSearchState) =>
+          updateBrowseSearch(previous, { profileId: nextProfileId }),
       });
     },
     [navigate]
@@ -93,15 +91,8 @@ export function HomePage() {
     (nextFormat?: BrowseFormatValue) => {
       void navigate({
         to: '/',
-        search: (previous: {
-          after?: string;
-          format?: BrowseFormatValue;
-          aspectRatio?: BrowseAspectRatioValue;
-        }) => ({
-          ...previous,
-          after: undefined,
-          format: nextFormat,
-        }),
+        search: (previous: BrowseSearchState) =>
+          updateBrowseSearch(previous, { format: nextFormat }),
       });
     },
     [navigate]
@@ -111,15 +102,8 @@ export function HomePage() {
     (nextAspectRatio?: BrowseAspectRatioValue) => {
       void navigate({
         to: '/',
-        search: (previous: {
-          after?: string;
-          format?: BrowseFormatValue;
-          aspectRatio?: BrowseAspectRatioValue;
-        }) => ({
-          ...previous,
-          after: undefined,
-          aspectRatio: nextAspectRatio,
-        }),
+        search: (previous: BrowseSearchState) =>
+          updateBrowseSearch(previous, { aspectRatio: nextAspectRatio }),
       });
     },
     [navigate]
@@ -129,12 +113,7 @@ export function HomePage() {
     (next: ColorPreference[]) => {
       void navigate({
         to: '/',
-        search: (previous: BrowseSearchState) => ({
-          ...previous,
-          after: undefined,
-          color: undefined,
-          colors: next.length ? next : undefined,
-        }),
+        search: (previous: BrowseSearchState) => updateBrowseSearch(previous, { colors: next }),
       });
     },
     [navigate]

@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
 import { useId, useState } from 'react';
-import { COLOR_TARGETS, type ColorPreference } from '@/lib/color-preferences';
+import { COLOR_TARGETS, type ColorPreference } from '@/features/browse';
 
 type Hsv = { h: number; s: number; v: number };
 function hexToHsv(hex: string): Hsv {

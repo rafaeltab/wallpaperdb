@@ -1,3 +1,4 @@
+import { normalizeProfileSearch } from '@/features/browse';
 import { GraphQLError } from '@/components/graphql-error';
 import { graphqlQueryOptions } from '@/lib/graphql/admission';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -17,7 +18,7 @@ interface ProfileFilterProps {
 export function ProfileFilter({ profileId, onChange, collapsed = false }: ProfileFilterProps) {
   const inputId = useId();
   const [input, setInput] = useState('');
-  const query = input.trim().replace(/^@/, '').trim().toLowerCase();
+  const query = normalizeProfileSearch(input);
   const [debouncedQuery, setDebouncedQuery] = useState('');
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(query), 250);

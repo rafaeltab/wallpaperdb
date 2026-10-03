@@ -459,12 +459,12 @@ export function MuuriGrid({
   // Calculate effective base size to fill container width
   // Available width = container - gap (for margins on each side)
   // We want N columns where each column is (effectiveBaseSize + gap) wide
+  const numColumns = Math.max(1, Math.floor((containerWidth - gap) / (baseSize + gap)));
   const effectiveBaseSize = useMemo(() => {
     const availableWidth = containerWidth - gap; // space for content (excluding margins)
-    const numColumns = Math.max(1, Math.floor(availableWidth / (baseSize + gap)));
     // Each column takes up availableWidth / numColumns, and gap is between items
     return availableWidth / numColumns - gap;
-  }, [containerWidth, baseSize, gap]);
+  }, [containerWidth, numColumns, gap]);
 
   // Update ref synchronously during render (before children's effects run)
   // This ensures the layout function sees the current state when refresh() is called
@@ -516,12 +516,10 @@ export function MuuriGrid({
   const getItemSpan = useCallback(
     (item: GridItem): ItemSpan => {
       const baseSpan = getSpan(item);
-      if (expandedId === item.id) {
-        return getExpandedSpan(baseSpan);
-      }
-      return baseSpan;
+      const span = expandedId === item.id ? getExpandedSpan(baseSpan) : baseSpan;
+      return { ...span, cols: numColumns === 1 ? 1 : span.cols };
     },
-    [getSpan, expandedId]
+    [getSpan, expandedId, numColumns]
   );
 
   // Calculate pixel dimensions from span and aspect ratio

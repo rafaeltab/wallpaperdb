@@ -1,15 +1,13 @@
+import { classifyAliases, historicalHandleAvailability } from '@/features/profile-management';
 import { Button } from '@/components/ui/button';
 import type { HistoricalHandle, Profile } from '@/lib/api/user';
 
 export function historicalHandleUnavailableMessage(history: HistoricalHandle): string | null {
-  if (Date.parse(history.eligibleUntil) <= Date.now()) {
-    return 'This Handle is no longer in your recent history. Refresh aliases.';
-  }
-  if (history.unavailableReason === 'claimed') return 'Another Profile has claimed this Handle.';
-  if (history.unavailableReason === 'alias-limit') {
-    return 'Your retained-alias limit is full.';
-  }
-  return null;
+  return historicalHandleAvailability(
+    Date.parse(history.eligibleUntil),
+    history.unavailableReason,
+    Date.now()
+  );
 }
 
 export function ProfileHistoricalHandles({
@@ -21,9 +19,7 @@ export function ProfileHistoricalHandles({
   disabled: boolean;
   onReactivate: (handle: string) => void;
 }) {
-  const history = (profile.historicalHandles ?? []).filter(
-    (entry) => !profile.aliases?.some((alias) => alias.handle === entry.handle)
-  );
+  const { historical: history } = classifyAliases(profile);
 
   return (
     <section aria-labelledby="historical-handles-heading">

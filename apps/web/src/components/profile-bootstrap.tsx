@@ -1,3 +1,4 @@
+import { pictureImportPollInterval, shouldClearOwnerProfile } from '@/features/profile-management';
 import { useAuth } from '@clerk/react';
 import { useIsMutating, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
@@ -20,10 +21,7 @@ export function ProfileBootstrap() {
     if (!isLoaded) return;
 
     const previous = previousUserId.current;
-    if (!activeUserId) {
-      void queryClient.cancelQueries({ queryKey: profileQueryRoot });
-      queryClient.removeQueries({ queryKey: profileQueryRoot });
-    } else if (previous && previous !== activeUserId) {
+    if (shouldClearOwnerProfile(previous, activeUserId, isLoaded)) {
       void queryClient.cancelQueries({ queryKey: profileQueryRoot });
       queryClient.removeQueries({ queryKey: profileQueryRoot });
     }
@@ -40,11 +38,8 @@ export function ProfileBootstrap() {
       }),
     enabled: Boolean(activeUserId),
     staleTime: Infinity,
-    refetchInterval: (query) => {
-      if (writing) return false;
-      const status = query.state.data?.pictureImportStatus;
-      return status === 'pending' || status === 'retrying' ? 5000 : false;
-    },
+    refetchInterval: (query) =>
+      pictureImportPollInterval(query.state.data?.pictureImportStatus, writing),
   });
 
   return null;

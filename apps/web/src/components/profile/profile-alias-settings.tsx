@@ -1,3 +1,9 @@
+import {
+  classifyAliases,
+  aliasChangeDialog,
+  aliasConflictMessage,
+  type AliasCommand,
+} from '@/features/profile-management';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Link2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -23,19 +29,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { type Profile, UserApiError, userApi } from '@/lib/api/user';
-
-interface AliasCommand {
-  action: 'schedule' | 'expire' | 'reactivate' | 'keep';
-  handle: string;
-  expectedVersion: number;
-}
-
-const actionVerbs = {
-  schedule: 'scheduling',
-  expire: 'expiring',
-  reactivate: 'reactivating',
-  keep: 'canceling removal',
-};
 
 export function ProfileAliasSettings({
   profile,
@@ -79,24 +72,14 @@ export function ProfileAliasSettings({
       },
     }
   );
-  const retained = (profile.aliases ?? []).filter((alias) => !alias.expiresAt);
-  const expiring = (profile.aliases ?? []).filter((alias) => alias.expiresAt);
-  const historical = (profile.historicalHandles ?? []).filter(
-    (entry) => !profile.aliases?.some((alias) => alias.handle === entry.handle)
-  );
-  const summary =
-    retained.length || expiring.length
-      ? `${retained.length} retained${expiring.length ? ` · ${expiring.length} expiring` : ''}`
-      : historical.length
-        ? `${historical.length} historical`
-        : 'No previous handles';
+  const { retained, expiring, summary } = classifyAliases(profile);
   const error =
     refreshError ??
     (mutation.error instanceof UserApiError &&
     mutation.error.type?.endsWith('/profile-version-conflict')
-      ? `Your Profile changed elsewhere. Refresh aliases before ${actionVerbs[mutation.variables?.action ?? 'schedule']} again.`
+      ? aliasConflictMessage(mutation.variables?.action ?? 'schedule')
       : mutation.error?.message);
-  const dialog = aliasDialog(pending, profile.handle);
+  const dialog = aliasChangeDialog(pending, profile.handle);
 
   function openConfirmation() {
     confirmationOpener.current =
@@ -361,34 +344,4 @@ export function ProfileAliasSettings({
       </div>
     </ProfileDialog>
   );
-}
-
-function aliasDialog(command: AliasCommand | null, currentHandle: string) {
-  const handle = command?.handle ?? '';
-  switch (command?.action) {
-    case 'keep':
-      return {
-        title: 'Keep this alias?',
-        description: `Cancel the scheduled removal of @${handle}. It will keep redirecting and use one retained alias slot. Your current Handle will stay @${currentHandle}, and its change cooldown will stay the same.`,
-        button: 'Keep alias',
-      };
-    case 'reactivate':
-      return {
-        title: 'Reactivate historical Handle?',
-        description: `@${handle} will redirect to your Profile and use one retained alias slot. Your current Handle will stay @${currentHandle}, and its change cooldown will stay the same.`,
-        button: 'Reactivate alias',
-      };
-    case 'expire':
-      return {
-        title: 'Expire alias now?',
-        description: `@${handle} will stop redirecting immediately. This Handle will become available for another User to claim. Existing links using this handle will no longer lead to your Profile.`,
-        button: 'Expire now',
-      };
-    default:
-      return {
-        title: 'Schedule alias removal?',
-        description: `@${handle} will expire 24 hours after you confirm. This profile handle will redirect until it expires, then stop redirecting to your Profile. It stops counting toward your retained limit immediately.`,
-        button: 'Schedule removal',
-      };
-  }
 }

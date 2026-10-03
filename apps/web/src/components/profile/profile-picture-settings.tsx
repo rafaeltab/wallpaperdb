@@ -1,3 +1,4 @@
+import { pictureSelection } from '@/features/profile-management';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -199,20 +200,13 @@ export function ProfilePictureSettings({
                   mutation.reset();
                   setError(null);
                   const picture = event.target.files?.[0];
-                  if (
-                    picture &&
-                    !['image/jpeg', 'image/png', 'image/webp'].includes(picture.type)
-                  ) {
-                    setSelected(null);
-                    setError('Choose a JPEG, PNG, or WebP picture.');
-                    return;
-                  }
-                  if (picture && picture.size > maxBytes) {
-                    setSelected(null);
-                    setError(`Picture must be at most ${maxBytes.toLocaleString()} bytes.`);
-                    return;
-                  }
-                  setSelected(picture ? { picture, expectedVersion: profile.version } : null);
+                  const result = pictureSelection(picture, maxBytes);
+                  setError(result.error);
+                  setSelected(
+                    result.selected
+                      ? { picture: result.selected, expectedVersion: profile.version }
+                      : null
+                  );
                 }}
               />
               <div className="flex min-w-0 flex-wrap items-center gap-3">

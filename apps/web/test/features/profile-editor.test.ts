@@ -14,7 +14,12 @@ const profile: EditableProfile = {
 };
 function setup(
   field: 'displayName' | 'handle' | 'biographyMarkdown' = 'displayName',
-  initial = profile
+  initial = profile,
+  refreshProfile: () => Promise<EditableProfile> = async () => ({
+    ...initial,
+    displayName: 'Remote',
+    version: 3,
+  })
 ) {
   let now = 0;
   let busy = false;
@@ -32,7 +37,7 @@ function setup(
           requests.push({ command, resolve });
         });
       },
-      refresh: async () => ({ ...initial, displayName: 'Remote', version: 3 }),
+      refresh: refreshProfile,
       isBusy: () => busy,
       notify: (notice) => {
         notices.push(notice);
@@ -306,5 +311,101 @@ describe('profile editor decisions', () => {
     unsubscribe();
     editor.change('Next');
     expect(changes).toBe(1);
+  });
+});
+
+describe('profile editor lifecycle and refresh failures', () => {
+  it('keeps the draft and conflict when refresh fails, and permits a later refresh', async () => {
+    const { editor, requests, notices } = setup('displayName', profile, async () => {
+      throw new Error('Offline');
+    });
+    editor.beginEdit();
+    editor.change('Draft');
+    void editor.save();
+    await resolveSave(requests[0], {
+      success: false,
+      error: { message: 'Conflict', versionConflict: true },
+    });
+    await editor.refresh();
+    expect(editor.getSnapshot()).toMatchObject({
+      refreshing: false,
+      conflict: true,
+      edit: { value: 'Draft', baseVersion: 1 },
+      error: 'Unable to refresh profile. Try again.',
+    });
+    expect(notices.at(-1)?.message).toBe('Unable to refresh profile');
+  });
+
+  it('serializes refreshes and ignores a refresh that finishes after deactivation', async () => {
+    let resolve!: (profile: EditableProfile) => void;
+    let refreshes = 0;
+    const { editor, deactivate, notices } = setup('displayName', profile, () => {
+      refreshes++;
+      return new Promise((done) => {
+        resolve = done;
+      });
+    });
+    editor.beginEdit();
+    editor.change('Draft');
+    const refreshing = editor.refresh();
+    void editor.refresh();
+    expect(refreshes).toBe(1);
+    expect(editor.getSnapshot().refreshing).toBe(true);
+    editor.change('Ignored');
+    expect(editor.getSnapshot().edit?.value).toBe('Draft');
+    deactivate();
+    const before = editor.getSnapshot();
+    resolve({ ...profile, version: 9 });
+    await refreshing;
+    expect(editor.getSnapshot()).toBe(before);
+    expect(notices).toEqual([]);
+  });
+
+  it('preserves a dirty draft on cancel during refresh and reopening after completion', async () => {
+    let resolve!: (profile: EditableProfile) => void;
+    const { editor } = setup(
+      'displayName',
+      profile,
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        })
+    );
+    editor.beginEdit();
+    editor.change('Draft');
+    const refreshing = editor.refresh();
+    editor.cancel();
+    resolve({ ...profile, displayName: 'Remote', version: 3 });
+    await refreshing;
+    expect(editor.getSnapshot().edit).toBeNull();
+    editor.beginEdit();
+    expect(editor.getSnapshot().edit).toMatchObject({ value: 'Remote', baseVersion: 3 });
+  });
+
+  it('never edits or cancels an in-flight save, and cleans feedback timers on deactivation', async () => {
+    const { editor, requests, deactivate, timers } = setup();
+    editor.beginEdit();
+    editor.change('Draft');
+    void editor.save();
+    editor.change('Ignored');
+    editor.cancel();
+    expect(editor.getSnapshot().edit?.value).toBe('Draft');
+    await resolveSave(requests[0], {
+      success: true,
+      profile: { ...profile, displayName: 'Draft', version: 2 },
+    });
+    expect(timers.size).toBe(1);
+    deactivate();
+    expect(timers.size).toBe(0);
+  });
+
+  it('reports a normalization-only handle save without imposing a new cooldown', async () => {
+    const { editor, requests, notices } = setup('handle');
+    editor.beginEdit();
+    editor.change('Áda!');
+    void editor.save();
+    await resolveSave(requests[0], { success: true, profile: { ...profile, version: 1 } });
+    expect(notices[0].message).toBe('Profile handle unchanged');
+    expect(editor.getSnapshot().coolingDown).toBe(false);
   });
 });

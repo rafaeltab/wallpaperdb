@@ -22,7 +22,6 @@ function setup(
   })
 ) {
   let now = 0;
-  let busy = false;
   const timers = new Set<{ at: number; callback: () => void }>();
   const requests: {
     command: { value: string; baseVersion: number };
@@ -38,7 +37,6 @@ function setup(
         });
       },
       refresh: refreshProfile,
-      isBusy: () => busy,
       notify: (notice) => {
         notices.push(notice);
       },
@@ -67,7 +65,7 @@ function setup(
     timers,
     deactivate,
     setBusy: (value: boolean) => {
-      busy = value;
+      editor.setBusy(value);
     },
   };
 }
@@ -174,6 +172,7 @@ describe('profile editor decisions', () => {
     expect(editor.getSnapshot().validationError).toContain('80 characters');
     editor.change('Valid');
     setBusy(true);
+    expect(editor.getSnapshot().canSave).toBe(false);
     void editor.save();
     setBusy(false);
     editor.cancel();

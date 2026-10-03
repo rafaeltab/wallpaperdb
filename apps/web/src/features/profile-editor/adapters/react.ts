@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { profileQueryKey } from '@/components/profile-bootstrap';
@@ -28,6 +28,8 @@ export function useProfileEditor(
 ) {
   const queryClient = useQueryClient();
   const key = profileQueryKey(profile.id);
+  const busy = useIsFetching({ queryKey: key }) > 0;
+  const writing = useIsMutating({ mutationKey: key }) > 0;
   const mutation = useMutation({
     mutationKey: key,
     mutationFn(command: ProfileDraft) {
@@ -93,9 +95,6 @@ export function useProfileEditor(
           if (!updated) throw new Error('Profile unavailable');
           return editableProfile(updated);
         },
-        isBusy: () =>
-          queryClient.isFetching({ queryKey: latest.current.key }) > 0 ||
-          queryClient.isMutating({ mutationKey: latest.current.key }) > 0,
         notify: ({ kind, message, description }) => {
           if (kind === 'success') toast.success(message);
           else if (description) toast.error(message, { description });
@@ -114,5 +113,13 @@ export function useProfileEditor(
   const state = useSyncExternalStore(editor.subscribe, editor.getSnapshot, editor.getSnapshot);
   useEffect(() => editor.activate(), [editor]);
   useEffect(() => editor.receiveProfile(initial), [editor, initial]);
-  return { editor, state };
+  useEffect(() => editor.setBusy(busy || writing), [editor, busy, writing]);
+  return {
+    editor,
+    state: {
+      ...state,
+      busy: busy || writing || state.busy,
+      canSave: state.canSave && !busy && !writing,
+    },
+  };
 }

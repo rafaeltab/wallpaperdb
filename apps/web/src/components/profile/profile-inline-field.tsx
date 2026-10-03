@@ -1,8 +1,6 @@
-import { useIsFetching, useIsMutating } from '@tanstack/react-query';
 import { countProfileMarkdownCharacters } from '@wallpaperdb/profile-markdown';
 import { Check, Loader2, Pencil, X } from 'lucide-react';
 import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from 'react';
-import { profileQueryKey } from '@/components/profile-bootstrap';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,13 +35,10 @@ export function ProfileInlineField(props: Props) {
 
 function InlineField({ field, profile, tokenProvider }: Props) {
   const errorId = useId();
-  const key = profileQueryKey(profile.id);
-  const refreshing = useIsFetching({ queryKey: key }) > 0;
-  const writing = useIsMutating({ mutationKey: key }) > 0;
   const [preview, setPreview] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);
   const { editor, state } = useProfileEditor(field, profile, tokenProvider);
-  const { edit, phase } = state;
+  const { edit, phase, busy } = state;
   const container = useRef<HTMLDivElement>(null);
   const confirmationDialog = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -85,7 +80,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     }
   }, [editing, field, preview]);
   useEffect(() => {
-    if (phase !== 'error' || writing || refreshing || !saveOwnsFocus.current) return;
+    if (phase !== 'error' || busy || !saveOwnsFocus.current) return;
     if (document.activeElement !== document.body) {
       saveOwnsFocus.current = false;
       return;
@@ -97,7 +92,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     }
     (field === 'biographyMarkdown' ? textarea.current : input.current)?.focus();
     saveOwnsFocus.current = false;
-  }, [phase, writing, refreshing, field, preview]);
+  }, [phase, busy, field, preview]);
   function finish() {
     restoreFocus.current = Boolean(
       container.current?.contains(document.activeElement) ||
@@ -113,7 +108,6 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     );
     return confirmed ? editor.confirmSave() : editor.save();
   }
-  const busy = refreshing || writing || state.refreshing;
   const refs = { container, confirmationDialog, input, textarea, opener, availability };
   const actions = <FieldActions field={field} state={state} busy={busy} finish={finish} />;
   const errorNotice = (

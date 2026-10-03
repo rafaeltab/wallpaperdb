@@ -1,3 +1,4 @@
+import { resolveProfileContent } from '@/features/public-profile';
 import {
   profileMarkdownSanitizeSchema,
   remarkProfileMarkdown,
@@ -18,8 +19,7 @@ export function ProfileBiography({
   profile: Pick<Profile, 'id' | 'version' | 'biographyMarkdown'>;
 }) {
   const { profile: owner } = useOwnerProfile(profile.id);
-  const current =
-    owner?.id === profile.id && owner.version >= (profile.version ?? 0) ? owner : profile;
+  const current = resolveProfileContent(profile, owner);
   return (
     <BiographyMarkdown
       markdown={current.biographyMarkdown}

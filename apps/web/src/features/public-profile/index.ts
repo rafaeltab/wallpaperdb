@@ -6,3 +6,4 @@ export {
   profileFallbackColor,
   resolveProfilePicture,
 } from './decisions';
+export { resolveProfileContent } from './decisions';

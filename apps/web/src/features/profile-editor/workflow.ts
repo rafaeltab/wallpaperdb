@@ -148,8 +148,19 @@ export function createProfileEditor(
     scheduleCooldown();
     publish();
   }
-  async function save(command = edit, confirmed = false) {
-    if (!enabled || !command || !getState().canSave || dependencies.isBusy()) return;
+  async function submit(command: ProfileDraft | null, confirmed: boolean) {
+    const state = getState();
+    if (
+      !enabled ||
+      !command ||
+      command.value === command.baseValue ||
+      fieldError(field, command.value, profile, displayNameMaxLength) ||
+      state.phase !== 'idle' ||
+      state.coolingDown ||
+      state.refreshing ||
+      dependencies.isBusy()
+    )
+      return;
     const aliases = field === 'handle' ? aliasesToSchedule(command.baseProfile, command.value) : [];
     if (!confirmed && aliases.length) {
       confirmation = { command, aliases };
@@ -253,9 +264,9 @@ export function createProfileEditor(
       publish();
     },
     confirmSave() {
-      if (confirmation) return save(confirmation.command, true);
+      if (confirmation) return submit(confirmation.command, true);
     },
-    save,
+    save: () => submit(edit, false),
     refresh,
   };
 }

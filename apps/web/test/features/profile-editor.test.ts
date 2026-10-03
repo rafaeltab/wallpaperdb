@@ -216,6 +216,21 @@ describe('profile editor decisions', () => {
     expect(requests[0].command).toMatchObject({ value: 'Áda Byron!', baseVersion: 1 });
   });
 
+  it('validates the captured confirmation command rather than a subsequently changed draft', () => {
+    const { editor, requests } = setup('handle', {
+      ...profile,
+      retainedAliasLimit: 1,
+      aliases: [{ handle: 'old' }],
+    });
+    editor.beginEdit();
+    editor.change('new-handle');
+    void editor.save();
+    editor.change('');
+    expect(editor.getSnapshot().canSave).toBe(false);
+    void editor.confirmSave();
+    expect(requests[0]?.command.value).toBe('new-handle');
+  });
+
   it('requires no alias-removal confirmation for normalization to the same handle or promotion', () => {
     const { editor, requests } = setup('handle', {
       ...profile,

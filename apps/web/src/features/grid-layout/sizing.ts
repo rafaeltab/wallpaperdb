@@ -1,5 +1,5 @@
 import type { Wallpaper } from '@/lib/graphql/types';
-import type { GridItem, ItemSpan } from './types';
+import type { GridItem, ItemSpan } from './items';
 
 /**
  * Aspect ratios used for skeleton items to create visual variety.
@@ -181,4 +181,37 @@ export function calculateExpandedDimensions(
     width: idealWidth * scaleFactor,
     height: idealHeight * scaleFactor,
   };
+}
+
+export function gridCellSize(containerWidth: number, baseSize: number, gap: number): number {
+  const availableWidth = Math.max(0, containerWidth - gap);
+  const columns = Math.max(1, Math.floor(availableWidth / (baseSize + gap)));
+  return Math.max(0, availableWidth / columns - gap);
+}
+
+export function gridItemDimensions(
+  item: GridItem,
+  span: ItemSpan,
+  isExpanded: boolean,
+  cellSize: number,
+  gap: number,
+  containerWidth: number,
+  viewportHeight: number
+): { width: number; height: number; margin: number } {
+  let width = span.cols * cellSize + (span.cols - 1) * gap;
+  let height = width / item.aspectRatio;
+  if (isExpanded) {
+    const config = DEFAULT_EXPANSION_CONFIG;
+    const expanded = calculateExpandedDimensions(
+      width,
+      height,
+      item.aspectRatio,
+      Math.max(0, Math.min(containerWidth * config.maxWidthFraction - gap, item.width)),
+      Math.max(0, Math.min(viewportHeight * config.maxHeightFraction, item.height)),
+      config.areaMultiplier
+    );
+    width = expanded.width;
+    height = expanded.height;
+  }
+  return { width: width + gap, height: height + gap, margin: gap / 2 };
 }

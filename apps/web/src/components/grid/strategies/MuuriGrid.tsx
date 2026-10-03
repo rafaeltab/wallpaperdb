@@ -3,11 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createMuuriLayout, type GridLayoutState } from '@/features/grid-layout/adapters/muuri';
 import type { GridItem, GridProps, ItemSpan } from '../types';
 import {
-  calculateExpandedDimensions,
-  DEFAULT_EXPANSION_CONFIG,
+  gridCellSize,
+  gridItemDimensions,
   getDefaultSpan,
   getExpandedSpan,
-} from '../utils';
+} from '@/features/grid-layout';
 import { WallpaperCard } from '../WallpaperCard';
 
 interface GridItemWrapperProps {
@@ -168,15 +168,8 @@ export function MuuriGrid({
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // Calculate effective base size to fill container width
-  // Available width = container - gap (for margins on each side)
-  // We want N columns where each column is (effectiveBaseSize + gap) wide
   const numColumns = Math.max(1, Math.floor((containerWidth - gap) / (baseSize + gap)));
-  const effectiveBaseSize = useMemo(() => {
-    const availableWidth = containerWidth - gap; // space for content (excluding margins)
-    // Each column takes up availableWidth / numColumns, and gap is between items
-    return availableWidth / numColumns - gap;
-  }, [containerWidth, numColumns, gap]);
+  const effectiveBaseSize = gridCellSize(containerWidth, baseSize, gap);
 
   // Update ref synchronously during render (before children's effects run)
   // This ensures the layout function sees the current state when refresh() is called
@@ -243,42 +236,15 @@ export function MuuriGrid({
       containerW: number,
       viewportH: number
     ) => {
-      // Base dimensions from span columns
-      // Account for internal gaps when spanning multiple columns
-      let width = span.cols * effectiveBaseSize + (span.cols - 1) * gap;
-      let height = width / item.aspectRatio;
-
-      // Apply area-based expansion with dimension caps
-      if (isExpanded) {
-        const config = DEFAULT_EXPANSION_CONFIG;
-
-        // Calculate max constraints:
-        // 1. Viewport/container based limits
-        // 2. Image's native resolution (don't upscale beyond original)
-        const maxWidth = Math.min(containerW * config.maxWidthFraction - gap, item.width);
-        const maxHeight = Math.min(viewportH * config.maxHeightFraction, item.height);
-
-        // Use area-based algorithm for visually consistent expansion
-        const expanded = calculateExpandedDimensions(
-          width,
-          height,
-          item.aspectRatio,
-          maxWidth,
-          maxHeight,
-          config.areaMultiplier
-        );
-
-        width = expanded.width;
-        height = expanded.height;
-      }
-
-      // Add margin (half gap on each side = full gap between items)
-      const margin = gap / 2;
-      return {
-        width: width + gap,
-        height: height + gap,
-        margin,
-      };
+      return gridItemDimensions(
+        item,
+        span,
+        isExpanded,
+        effectiveBaseSize,
+        gap,
+        containerW,
+        viewportH
+      );
     },
     [effectiveBaseSize, gap]
   );

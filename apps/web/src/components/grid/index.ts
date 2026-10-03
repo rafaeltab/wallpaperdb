@@ -17,7 +17,7 @@ export {
   getExpandedSpan,
   wallpapersToGridItems,
   wallpaperToGridItem,
-} from './utils';
+} from '@/features/grid-layout';
 // Components
 export { WallpaperCard } from './WallpaperCard';
 export { WallpaperGridSkeleton } from './WallpaperGridSkeleton';

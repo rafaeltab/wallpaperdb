@@ -193,15 +193,24 @@ export function gridCellSize(containerWidth: number, baseSize: number, gap: numb
   return Math.max(0, availableWidth / columns - gap);
 }
 
-export function gridItemDimensions(
-  item: GridItem,
-  span: ItemSpan,
-  isExpanded: boolean,
-  cellSize: number,
-  gap: number,
-  containerWidth: number,
-  viewportHeight: number
-): { width: number; height: number; margin: number } {
+export interface GridItemDimensionsOptions {
+  item: GridItem;
+  span: ItemSpan;
+  isExpanded: boolean;
+  cellSize: number;
+  gap: number;
+  containerWidth: number;
+  viewportHeight: number;
+}
+export function gridItemDimensions({
+  item,
+  span,
+  isExpanded,
+  cellSize,
+  gap,
+  containerWidth,
+  viewportHeight,
+}: GridItemDimensionsOptions): { width: number; height: number; margin: number } {
   let width = span.cols * cellSize + (span.cols - 1) * gap;
   let height = width / item.aspectRatio;
   if (isExpanded) {

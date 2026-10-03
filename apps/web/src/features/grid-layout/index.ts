@@ -11,3 +11,4 @@ export {
   gridCellSize,
   gridItemDimensions,
 } from './sizing';
+export type { GridItemDimensionsOptions } from './sizing';

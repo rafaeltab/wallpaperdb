@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { MAX_FILES_PER_BATCH, useUploadQueue } from '@/contexts/upload-queue-context';
 import { useCountdown } from '@/hooks/useCountdown';
 import { queuePresentation } from '@/features/upload-queue';
-import { getQueueStatusText } from '@/lib/utils/upload-queue';
+import { getQueueStatusText } from '@/features/upload-queue';
 import { cn } from '@/lib/utils';
 
 export const Route = createFileRoute('/upload')({

@@ -160,6 +160,10 @@ export function calculateExpandedDimensions(
   maxHeight: number,
   areaMultiplier: number
 ): { width: number; height: number } {
+  if (baseWidth <= 0 || baseHeight <= 0 || maxWidth <= 0 || maxHeight <= 0) {
+    return { width: 0, height: 0 };
+  }
+
   // Step 1: Calculate target area
   const baseArea = baseWidth * baseHeight;
   const targetArea = baseArea * areaMultiplier;

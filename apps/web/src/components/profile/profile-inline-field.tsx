@@ -1,11 +1,7 @@
-import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  countProfileMarkdownCharacters,
-  validateProfileMarkdown,
-} from '@wallpaperdb/profile-markdown';
+import { useIsFetching, useIsMutating } from '@tanstack/react-query';
+import { countProfileMarkdownCharacters } from '@wallpaperdb/profile-markdown';
 import { Check, Loader2, Pencil, X } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { type ReactNode, type RefObject, useEffect, useId, useRef, useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import {
   AlertDialog,
@@ -20,21 +16,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { type Profile, UserApiError, userApi } from '@/lib/api/user';
-import { positiveIntegerEnv } from '@/lib/runtime-config';
+import type { ProfileEditorSnapshot, ProfileField } from '@/features/profile-editor';
+import { useProfileEditor } from '@/features/profile-editor/adapters/react';
+import type { Profile } from '@/lib/api/user';
 import { ProfileActionButton } from './profile-action-button';
 import { BiographyMarkdown } from './profile-biography';
 import './profile-edit-feedback.css';
 
-const DISPLAY_NAME_MAX_LENGTH = positiveIntegerEnv(
-  import.meta.env.VITE_PROFILE_DISPLAY_NAME_MAX_LENGTH,
-  80
-);
-
-type Field = 'displayName' | 'handle' | 'biographyMarkdown';
+type Field = ProfileField;
 type Props = { field: Field; profile: Profile; tokenProvider: () => Promise<string | null> };
-type Edit = { value: string; baseValue: string; baseVersion: number; baseProfile: Profile };
-type Phase = 'idle' | 'saving' | 'success' | 'error';
 const labels = {
   displayName: 'display name',
   handle: 'profile handle',
@@ -46,65 +36,23 @@ export function ProfileInlineField(props: Props) {
 }
 
 function InlineField({ field, profile, tokenProvider }: Props) {
-  const queryClient = useQueryClient();
   const errorId = useId();
   const key = profileQueryKey(profile.id);
   const refreshing = useIsFetching({ queryKey: key }) > 0;
   const writing = useIsMutating({ mutationKey: key }) > 0;
   const [preview, setPreview] = useState(false);
   const [previewRevision, setPreviewRevision] = useState(0);
-  const [edit, setEdit] = useState<Edit | null>(null);
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [error, setError] = useState<string | null>(null);
-  const [conflict, setConflict] = useState(false);
-  const [confirmation, setConfirmation] = useState<{ command: Edit; aliases: string[] } | null>(
-    null
-  );
-  const [serverDeadline, setServerDeadline] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now);
-  const deadline = serverDeadline
-    ? Date.parse(serverDeadline)
-    : profile.lastHandleChangedAt
-      ? Date.parse(profile.lastHandleChangedAt) + 7 * 24 * 60 * 60 * 1000
-      : Number.NaN;
-  // A refetch can introduce a deadline after this editor has been idle for days.
-  useEffect(() => {
-    if (Number.isFinite(deadline)) setNow(Date.now());
-  }, [deadline]);
-  const coolingDown = field === 'handle' && deadline > now;
-  useEffect(() => {
-    if (!coolingDown) return;
-    const tick = setTimeout(() => setNow(Date.now()), Math.min(deadline - now, 60_000));
-    return () => clearTimeout(tick);
-  }, [coolingDown, deadline, now]);
+  const { editor, state } = useProfileEditor(field, profile, tokenProvider);
+  const { edit, phase } = state;
   const container = useRef<HTMLDivElement>(null);
   const confirmationDialog = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const availability = useRef<HTMLButtonElement>(null);
-  const live = useRef(true);
-  const pending = useRef(false);
   const restoreFocus = useRef(false);
   const saveOwnsFocus = useRef(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const label = labels[field];
-  const title = label[0].toUpperCase() + label.slice(1);
-  const mutation = useMutation({
-    mutationKey: key,
-    mutationFn: (command: Edit) => {
-      const options = {
-        expectedVersion: command.baseVersion,
-        expectedProfileId: profile.id,
-        tokenProvider,
-      };
-      return field === 'handle'
-        ? userApi.updateHandle({ ...options, handle: command.value })
-        : userApi.updateProfile({ ...options, [field]: command.value });
-    },
-  });
   useEffect(() => {
-    live.current = true;
     function releaseFocusOwnership(event: Event) {
       const target = event.target;
       if (!saveOwnsFocus.current || !(target instanceof Node)) return;
@@ -117,9 +65,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     document.addEventListener('focusin', releaseFocusOwnership);
     document.addEventListener('pointerdown', releaseFocusOwnership, true);
     return () => {
-      live.current = false;
       saveOwnsFocus.current = false;
-      clearTimeout(timer.current);
       document.removeEventListener('focusin', releaseFocusOwnership);
       document.removeEventListener('pointerdown', releaseFocusOwnership, true);
     };
@@ -128,7 +74,11 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   useEffect(() => {
     if (editing && !preview)
       (field === 'biographyMarkdown' ? textarea.current : input.current)?.focus();
-    else if (!editing && restoreFocus.current) {
+    else if (
+      !editing &&
+      (restoreFocus.current || (saveOwnsFocus.current && document.activeElement === document.body))
+    ) {
+      saveOwnsFocus.current = false;
       restoreFocus.current = false;
       if (opener.current?.disabled) availability.current?.focus();
       else opener.current?.focus();
@@ -148,157 +98,93 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     (field === 'biographyMarkdown' ? textarea.current : input.current)?.focus();
     saveOwnsFocus.current = false;
   }, [phase, writing, refreshing, field, preview]);
-  useEffect(() => {
-    setEdit((current) =>
-      current && current.value === current.baseValue
-        ? {
-            value: profile[field],
-            baseValue: profile[field],
-            baseVersion: profile.version,
-            baseProfile: profile,
-          }
-        : current
-    );
-  }, [field, profile[field], profile.version]);
-  async function refresh() {
-    if (
-      pending.current ||
-      queryClient.isFetching({ queryKey: key }) ||
-      queryClient.isMutating({ mutationKey: key })
-    )
-      return;
-    try {
-      await queryClient.refetchQueries({ queryKey: key, exact: true }, { throwOnError: true });
-      if (!live.current) return;
-      const updated = queryClient.getQueryData<Profile>(key);
-      if (!updated) throw new Error('Profile unavailable');
-      setEdit((current) =>
-        current
-          ? {
-              value: current.value === current.baseValue ? updated[field] : current.value,
-              baseValue: updated[field],
-              baseVersion: updated.version,
-              baseProfile: updated,
-            }
-          : null
-      );
-      setConflict(false);
-      setError(null);
-      clearTimeout(timer.current);
-      setPhase('idle');
-    } catch {
-      if (!live.current) return;
-      setError('Unable to refresh profile. Try again.');
-      toast.error('Unable to refresh profile');
-    }
-  }
   function finish() {
     restoreFocus.current = Boolean(
       container.current?.contains(document.activeElement) ||
         (saveOwnsFocus.current && document.activeElement === document.body)
     );
     saveOwnsFocus.current = false;
-    setEdit(null);
-    setPhase('idle');
-    setError(null);
-    setConflict(false);
-    clearTimeout(timer.current);
+    editor.cancel();
   }
-  async function save(command = edit, confirmed = false) {
-    if (
-      !command ||
-      command.value === command.baseValue ||
-      fieldError(field, command.value, profile.biographyMaxLength ?? 5000) ||
-      pending.current ||
-      coolingDown ||
-      phase !== 'idle' ||
-      queryClient.isFetching({ queryKey: key }) ||
-      queryClient.isMutating({ mutationKey: key })
-    )
-      return;
+  function save(confirmed = false) {
     saveOwnsFocus.current = Boolean(
       container.current?.contains(document.activeElement) ||
         confirmationDialog.current?.contains(document.activeElement)
     );
-    const aliases = field === 'handle' ? aliasesToSchedule(command.baseProfile, command.value) : [];
-    if (!confirmed && aliases.length) {
-      setConfirmation({ command, aliases });
-      return;
-    }
-    setConfirmation(null);
-    pending.current = true;
-    setPhase('saving');
-    setError(null);
-    const ownerQuery = queryClient.getQueryCache().find({ queryKey: key, exact: true });
-    try {
-      const updated = await mutation.mutateAsync(command);
-      // Navigation may unmount this editor; keep an existing owner cache current.
-      // Logout removes the query; a later session may recreate the same key.
-      if (
-        ownerQuery &&
-        queryClient.getQueryCache().find({ queryKey: key, exact: true }) === ownerQuery
-      ) {
-        queryClient.setQueryData(key, updated);
-      }
-      if (!live.current) return;
-      setEdit({
-        value: updated[field],
-        baseValue: updated[field],
-        baseVersion: updated.version,
-        baseProfile: updated,
-      });
-      setPhase('success');
-      if (field === 'handle') {
-        setServerDeadline(null);
-        setNow(Date.now());
-      }
-      toast.success(
-        field === 'handle' && updated.handle === command.baseValue
-          ? 'Profile handle unchanged'
-          : `${title} updated`
-      );
-      timer.current = setTimeout(() => {
-        pending.current = false;
-        finish();
-      }, 1600);
-    } catch (cause) {
-      if (!live.current) return;
-      pending.current = false;
-      if (cause instanceof UserApiError && cause.nextHandleChangeAt) {
-        setServerDeadline(cause.nextHandleChangeAt);
-        setNow(Date.now());
-      }
-      const message = cause instanceof Error ? cause.message : `Unable to save ${label}.`;
-      const versionConflict =
-        cause instanceof UserApiError && Boolean(cause.type?.endsWith('/profile-version-conflict'));
-      setConflict(versionConflict);
-      setError(
-        versionConflict
-          ? 'Your profile changed elsewhere. Refresh profile to keep your draft and try again.'
-          : message
-      );
-      setPhase('error');
-      toast.error(`Unable to save ${label}`, { description: message });
-      timer.current = setTimeout(() => setPhase('idle'), 1600);
-    }
+    return confirmed ? editor.confirmSave() : editor.save();
   }
-  const maxCharacters = profile.biographyMaxLength ?? 5000;
-  const validationError = edit ? fieldError(field, edit.value, maxCharacters) : undefined;
-  const locked = phase === 'saving' || phase === 'success';
-  const actionLabel =
-    phase === 'saving'
-      ? `Saving ${label}`
-      : phase === 'success'
-        ? `${title} saved`
-        : phase === 'error'
-          ? `${title} save failed`
-          : `Save ${label}`;
-  const typography =
-    field === 'displayName'
-      ? 'text-3xl font-bold tracking-tight text-card-foreground sm:text-4xl'
-      : 'text-base font-normal text-muted-foreground sm:text-lg';
+  const busy = refreshing || writing || state.refreshing;
+  const refs = { container, confirmationDialog, input, textarea, opener, availability };
+  const actions = <FieldActions field={field} state={state} busy={busy} finish={finish} />;
+  const errorNotice = (
+    <FieldError state={state} busy={busy} errorId={errorId} refresh={() => void editor.refresh()} />
+  );
+  const view = {
+    field,
+    profile,
+    editor,
+    state,
+    refs,
+    errorId,
+    busy,
+    actions,
+    errorNotice,
+    save,
+    finish,
+  };
+  return field === 'biographyMarkdown' ? (
+    <BiographyField
+      {...view}
+      preview={preview}
+      setPreview={setPreview}
+      previewRevision={previewRevision}
+      refreshPreview={() => setPreviewRevision((revision) => revision + 1)}
+    />
+  ) : (
+    <IdentityField {...view} />
+  );
+}
+
+type Editor = ReturnType<typeof useProfileEditor>['editor'];
+type EditorRefs = {
+  container: RefObject<HTMLDivElement | null>;
+  confirmationDialog: RefObject<HTMLDivElement | null>;
+  input: RefObject<HTMLInputElement | null>;
+  textarea: RefObject<HTMLTextAreaElement | null>;
+  opener: RefObject<HTMLButtonElement | null>;
+  availability: RefObject<HTMLButtonElement | null>;
+};
+type FieldViewProps = {
+  field: Field;
+  profile: Profile;
+  editor: Editor;
+  state: ProfileEditorSnapshot;
+  refs: EditorRefs;
+  errorId: string;
+  busy: boolean;
+  actions: ReactNode;
+  errorNotice: ReactNode;
+  save: (confirmed?: boolean) => void | Promise<void>;
+  finish: () => void;
+};
+
+function FieldActions({
+  field,
+  state,
+  busy,
+  finish,
+}: Pick<FieldViewProps, 'field' | 'state' | 'busy' | 'finish'>) {
+  const label = labels[field];
+  const title = label[0].toUpperCase() + label.slice(1);
+  const { phase, locked, canSave } = state;
   const iconSize = field === 'displayName' ? 'size-[1ex]' : 'size-3.5';
-  const actions = (
+  const actionLabel = {
+    idle: `Save ${label}`,
+    saving: `Saving ${label}`,
+    success: `${title} saved`,
+    error: `${title} save failed`,
+  }[phase];
+  return (
     <>
       <output className="sr-only" aria-live="polite">
         {phase === 'idle' ? '' : actionLabel}
@@ -308,15 +194,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
         type="submit"
         textBaseline={field !== 'biographyMarkdown'}
         buttonClassName={phase === 'idle' ? 'size-6' : 'size-6 disabled:opacity-100'}
-        disabled={
-          Boolean(validationError) ||
-          phase !== 'idle' ||
-          coolingDown ||
-          refreshing ||
-          writing ||
-          !edit ||
-          edit.value === edit.baseValue
-        }
+        disabled={!canSave || busy}
       >
         {phase === 'saving' ? (
           <Loader2 className={`${iconSize} animate-spin motion-reduce:animate-none`} />
@@ -337,7 +215,21 @@ function InlineField({ field, profile, tokenProvider }: Props) {
       </ProfileActionButton>
     </>
   );
-  const errorNotice = (
+}
+
+function FieldError({
+  state,
+  busy,
+  errorId,
+  refresh,
+}: {
+  state: ProfileEditorSnapshot;
+  busy: boolean;
+  errorId: string;
+  refresh: () => void;
+}) {
+  const { error, validationError, conflict, locked } = state;
+  return (
     <>
       {(error || validationError) && (
         <div role="alert" id={errorId} className="mt-2 w-full text-sm text-destructive">
@@ -348,8 +240,8 @@ function InlineField({ field, profile, tokenProvider }: Props) {
               variant="outline"
               size="sm"
               className="ml-2"
-              disabled={refreshing || writing || locked}
-              onClick={() => void refresh()}
+              disabled={busy || locked}
+              onClick={refresh}
             >
               Refresh profile
             </Button>
@@ -358,133 +250,178 @@ function InlineField({ field, profile, tokenProvider }: Props) {
       )}
     </>
   );
-  if (field === 'biographyMarkdown')
-    return (
-      <div ref={container} className="min-w-0 w-full">
-        <section aria-label="Biography" className="w-full min-w-0">
-          {edit ? (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void save();
-              }}
-              className="w-full space-y-3"
-            >
-              <div className="flex min-h-5 items-center justify-between gap-3">
-                <fieldset className="flex gap-2" aria-label="Biography editor mode">
-                  <Button
-                    type="button"
-                    variant={preview ? 'ghost' : 'secondary'}
-                    size="sm"
-                    aria-pressed={!preview}
-                    disabled={locked}
-                    onClick={() => setPreview(false)}
-                  >
-                    Write
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={preview ? 'secondary' : 'ghost'}
-                    size="sm"
-                    aria-pressed={preview}
-                    disabled={locked}
-                    onClick={() => setPreview(true)}
-                  >
-                    Preview
-                  </Button>
-                </fieldset>
-                <div className="flex gap-1">{actions}</div>
-              </div>
-              {preview ? (
-                <section
-                  aria-label="Biography preview"
-                  className="min-h-48 w-full rounded-md border p-3"
-                >
-                  <BiographyMarkdown
-                    markdown={edit.value}
-                    profileId={profile.id}
-                    maxCharacters={maxCharacters}
-                    refreshKey={previewRevision}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="mt-3"
-                    disabled={locked}
-                    onClick={() => setPreviewRevision((revision) => revision + 1)}
-                  >
-                    Refresh preview
-                  </Button>
-                </section>
-              ) : (
-                <Textarea
-                  ref={textarea}
-                  aria-label="Biography Markdown"
-                  value={edit.value}
-                  rows={7}
-                  className="min-h-48 w-full font-mono text-sm"
-                  disabled={locked || refreshing || writing}
-                  aria-invalid={Boolean(validationError || error)}
-                  aria-describedby={validationError || error ? errorId : undefined}
-                  onChange={(event) => setEdit({ ...edit, value: event.target.value })}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape' && !locked) finish();
-                  }}
-                />
-              )}
-              <p className="text-right text-xs text-muted-foreground">
-                {countProfileMarkdownCharacters(edit.value)} / {maxCharacters} characters
-              </p>
-              {errorNotice}
-              <details className="text-xs text-muted-foreground">
-                <summary className="cursor-pointer">Formatting help</summary>
-                <p className="mt-2 leading-relaxed">
-                  Use headings, lists, emphasis, tables, and HTTPS links. Embed a published
-                  wallpaper you own with{' '}
-                  <code className="break-all">![Alt text](wallpaper:wallpaper-id)</code>. New
-                  uploads may take a moment to become available.
-                </p>
-              </details>
-            </form>
-          ) : (
-            <>
-              <div className="relative h-5">
-                <h2 className="sr-only">Biography</h2>
+}
+
+function BiographyField({
+  profile,
+  editor,
+  state,
+  refs,
+  errorId,
+  busy,
+  actions,
+  errorNotice,
+  save,
+  finish,
+  preview,
+  setPreview,
+  previewRevision,
+  refreshPreview,
+}: FieldViewProps & {
+  preview: boolean;
+  setPreview: (value: boolean) => void;
+  previewRevision: number;
+  refreshPreview: () => void;
+}) {
+  const { edit, error, validationError, locked } = state;
+  const { container, textarea, opener } = refs;
+  const maxCharacters = profile.biographyMaxLength ?? 5000;
+  return (
+    <div ref={container} className="min-w-0 w-full">
+      <section aria-label="Biography" className="w-full min-w-0">
+        {edit ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save();
+            }}
+            className="w-full space-y-3"
+          >
+            <div className="flex min-h-5 items-center justify-between gap-3">
+              <fieldset className="flex gap-2" aria-label="Biography editor mode">
                 <Button
-                  ref={opener}
                   type="button"
-                  variant="outline"
+                  variant={preview ? 'ghost' : 'secondary'}
                   size="sm"
-                  className="absolute -top-1.5 right-0"
-                  disabled={refreshing || writing}
-                  onClick={() => {
-                    setPreview(false);
-                    setEdit({
-                      value: profile[field],
-                      baseValue: profile[field],
-                      baseVersion: profile.version,
-                      baseProfile: profile,
-                    });
-                  }}
+                  aria-pressed={!preview}
+                  disabled={locked}
+                  onClick={() => setPreview(false)}
                 >
-                  <Pencil className="size-3.5" />
-                  Edit biography
+                  Write
                 </Button>
-              </div>
-              <div className="mt-3">
+                <Button
+                  type="button"
+                  variant={preview ? 'secondary' : 'ghost'}
+                  size="sm"
+                  aria-pressed={preview}
+                  disabled={locked}
+                  onClick={() => setPreview(true)}
+                >
+                  Preview
+                </Button>
+              </fieldset>
+              <div className="flex gap-1">{actions}</div>
+            </div>
+            {preview ? (
+              <section
+                aria-label="Biography preview"
+                className="min-h-48 w-full rounded-md border p-3"
+              >
                 <BiographyMarkdown
-                  markdown={profile.biographyMarkdown}
+                  markdown={edit.value}
                   profileId={profile.id}
                   maxCharacters={maxCharacters}
-                  refreshKey={profile.version}
+                  refreshKey={previewRevision}
                 />
-              </div>
-            </>
-          )}
-        </section>
-      </div>
-    );
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-3"
+                  disabled={locked}
+                  onClick={refreshPreview}
+                >
+                  Refresh preview
+                </Button>
+              </section>
+            ) : (
+              <Textarea
+                ref={textarea}
+                aria-label="Biography Markdown"
+                value={edit.value}
+                rows={7}
+                className="min-h-48 w-full font-mono text-sm"
+                disabled={locked || busy}
+                aria-invalid={Boolean(validationError || error)}
+                aria-describedby={validationError || error ? errorId : undefined}
+                onChange={(event) => editor.change(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && !locked) finish();
+                }}
+              />
+            )}
+            <p className="text-right text-xs text-muted-foreground">
+              {countProfileMarkdownCharacters(edit.value)} / {maxCharacters} characters
+            </p>
+            {errorNotice}
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer">Formatting help</summary>
+              <p className="mt-2 leading-relaxed">
+                Use headings, lists, emphasis, tables, and HTTPS links. Embed a published wallpaper
+                you own with <code className="break-all">![Alt text](wallpaper:wallpaper-id)</code>.
+                New uploads may take a moment to become available.
+              </p>
+            </details>
+          </form>
+        ) : (
+          <>
+            <div className="relative h-5">
+              <h2 className="sr-only">Biography</h2>
+              <Button
+                ref={opener}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="absolute -top-1.5 right-0"
+                disabled={busy}
+                onClick={() => {
+                  setPreview(false);
+                  editor.beginEdit();
+                }}
+              >
+                <Pencil className="size-3.5" />
+                Edit biography
+              </Button>
+            </div>
+            <div className="mt-3">
+              <BiographyMarkdown
+                markdown={profile.biographyMarkdown}
+                profileId={profile.id}
+                maxCharacters={maxCharacters}
+                refreshKey={profile.version}
+              />
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function IdentityField({
+  field,
+  profile,
+  editor,
+  state,
+  refs,
+  errorId,
+  busy,
+  actions,
+  errorNotice,
+  save,
+  finish,
+}: FieldViewProps) {
+  const label = labels[field];
+  const title = label[0].toUpperCase() + label.slice(1);
+  const { edit, error, validationError, locked, coolingDown, confirmation, deadline, now } = state;
+  const { container, confirmationDialog, input, opener, availability } = refs;
+  const editing = edit !== null;
+  const typography =
+    field === 'displayName'
+      ? 'text-3xl font-bold tracking-tight text-card-foreground sm:text-4xl'
+      : 'text-base font-normal text-muted-foreground sm:text-lg';
+  const iconSize = field === 'displayName' ? 'size-[1ex]' : 'size-3.5';
+
   return (
     <div
       ref={container}
@@ -520,11 +457,11 @@ function InlineField({ field, profile, tokenProvider }: Props) {
                 aria-describedby={validationError || error ? errorId : undefined}
                 className="h-[1lh] min-w-0 max-w-full [field-sizing:content] rounded border-0 bg-transparent p-0 text-[length:inherit] leading-[inherit] tracking-[inherit] outline-none [font-weight:inherit] focus-visible:ring-2 focus-visible:ring-ring"
                 value={edit.value}
-                disabled={locked || refreshing || writing}
+                disabled={locked || busy}
                 autoComplete={field === 'displayName' ? 'name' : 'off'}
                 autoCapitalize={field === 'handle' ? 'none' : undefined}
                 spellCheck={field === 'handle' ? false : undefined}
-                onChange={(event) => setEdit({ ...edit, value: event.target.value })}
+                onChange={(event) => editor.change(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === 'Escape' && !locked) finish();
                 }}
@@ -546,15 +483,8 @@ function InlineField({ field, profile, tokenProvider }: Props) {
               label={`Edit ${label}`}
               textBaseline
               buttonClassName="size-6"
-              disabled={coolingDown || refreshing || writing}
-              onClick={() =>
-                setEdit({
-                  value: profile[field],
-                  baseValue: profile[field],
-                  baseVersion: profile.version,
-                  baseProfile: profile,
-                })
-              }
+              disabled={coolingDown || busy}
+              onClick={() => editor.beginEdit()}
             >
               <Pencil className={iconSize} />
             </ProfileActionButton>
@@ -588,7 +518,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
       <AlertDialog
         open={Boolean(confirmation)}
         onOpenChange={(open) => {
-          if (!open) setConfirmation(null);
+          if (!open) editor.dismissConfirmation();
         }}
       >
         <AlertDialogContent
@@ -596,7 +526,11 @@ function InlineField({ field, profile, tokenProvider }: Props) {
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             // Accepted changes retain their existing save-feedback focus lifecycle.
-            if (!pending.current && input.current?.isConnected && !input.current.disabled)
+            if (
+              !editor.getSnapshot().locked &&
+              input.current?.isConnected &&
+              !input.current.disabled
+            )
               input.current.focus();
           }}
         >
@@ -613,9 +547,9 @@ function InlineField({ field, profile, tokenProvider }: Props) {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              disabled={refreshing || writing || coolingDown}
+              disabled={busy || coolingDown}
               onClick={() => {
-                if (confirmation) void save(confirmation.command, true);
+                if (confirmation) void save(true);
               }}
             >
               Confirm handle change
@@ -635,32 +569,4 @@ function relativeDeadline(milliseconds: number) {
   if (hours > 1) return `${hours} hours`;
   const minutes = Math.ceil(milliseconds / 60_000);
   return minutes > 1 ? `${minutes} minutes` : 'less than a minute';
-}
-
-function aliasesToSchedule(profile: Profile, requestedHandle: string): string[] {
-  const normalized = requestedHandle
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  if (normalized === profile.handle) return [];
-  const retained = (profile.aliases ?? []).filter(
-    (alias) => !alias.expiresAt && alias.handle !== normalized
-  );
-  const candidates = [...retained.map((alias) => alias.handle), profile.handle];
-  return candidates.slice(0, Math.max(0, candidates.length - (profile.retainedAliasLimit ?? 3)));
-}
-
-function fieldError(field: Field, value: string, maxCharacters: number): string | undefined {
-  if (field === 'biographyMarkdown') {
-    const result = validateProfileMarkdown(value, { maxCharacters });
-    return result.valid ? undefined : result.errors[0]?.message;
-  }
-  const normalized = value.replace(/\s+/gu, ' ').trim();
-  if (!normalized)
-    return `${field === 'displayName' ? 'Display name' : 'Profile handle'} must not be blank.`;
-  if (field === 'displayName' && [...normalized].length > DISPLAY_NAME_MAX_LENGTH)
-    return `Display name must be at most ${DISPLAY_NAME_MAX_LENGTH} characters.`;
-  return undefined;
 }

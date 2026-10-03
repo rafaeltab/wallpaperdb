@@ -1,10 +1,10 @@
+import { downloadVariant } from '@/features/wallpaper-details/adapters/download';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   formatFileSize,
   formatAspectRatio,
   formatDate,
   truncateId,
-  downloadVariant,
   sortVariantsByQuality,
 } from '@/lib/utils/wallpaper';
 import type { Variant } from '@/lib/graphql/types';

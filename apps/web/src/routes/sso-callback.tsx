@@ -1,3 +1,4 @@
+import { buildAuthUrl } from '@/features/authentication';
 import { AuthenticateWithRedirectCallback } from '@clerk/react';
 import { createFileRoute } from '@tanstack/react-router';
 import { Loader2 } from 'lucide-react';
@@ -9,15 +10,9 @@ export const Route = createFileRoute('/sso-callback')({
   }),
 });
 
-function buildUrl(path: string): string {
-  const basePath = import.meta.env.VITE_BASE_PATH || '';
-  const full = `${basePath}${path.startsWith('/') ? '' : '/'}${path}`;
-  return full.replace(/\/+/g, '/') || '/';
-}
-
 export function SSOCallbackPage() {
   const search = Route.useSearch();
-  const redirectUrl = buildUrl(search.redirect || '/');
+  const redirectUrl = buildAuthUrl(import.meta.env.VITE_BASE_PATH || '', search.redirect || '/');
 
   return (
     <div className="flex min-h-[calc(100svh-var(--header-height))] items-center justify-center">

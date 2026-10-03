@@ -29,6 +29,30 @@ async function flush() { await act(async () => { await vi.advanceTimersByTimeAsy
 describe('production inline profile fields', () => {
   beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); vi.mocked(userApi.updateProfile).mockReset(); vi.mocked(userApi.updateHandle).mockReset(); vi.mocked(userApi.ensureProfile).mockReset(); });
   afterEach(() => vi.useRealTimers());
+  it('serializes writes across fields before Query notifications flush', async () => {
+    vi.mocked(userApi.updateProfile).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(userApi.updateHandle).mockImplementation(() => new Promise(() => {}));
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    client.setQueryData(profileQueryKey(profile.id), profile);
+    render(<QueryClientProvider client={client}>
+      <ProfileInlineField field="displayName" profile={profile} tokenProvider={tokenProvider} />
+      <ProfileInlineField field="handle" profile={profile} tokenProvider={tokenProvider} />
+    </QueryClientProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit display name' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const name = screen.getByRole('textbox', { name: 'Display name' });
+    const handle = screen.getByRole('textbox', { name: 'Profile handle' });
+    fireEvent.change(name, { target: { value: 'Byron' } });
+    fireEvent.change(handle, { target: { value: 'byron' } });
+    act(() => {
+      fireEvent.submit(name.closest('form')!);
+      fireEvent.submit(handle.closest('form')!);
+    });
+    await flush();
+    expect(userApi.updateProfile).toHaveBeenCalledTimes(1);
+    expect(userApi.updateHandle).not.toHaveBeenCalled();
+  });
+
   it('waits for the actual save, commits the complete owner response, then finishes its success feedback', async () => {
     let resolve: ((value: Profile) => void) | undefined;
     vi.mocked(userApi.updateProfile).mockImplementation(() => new Promise((done) => { resolve = done; }));

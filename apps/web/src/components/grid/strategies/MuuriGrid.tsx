@@ -236,15 +236,15 @@ export function MuuriGrid({
       containerW: number,
       viewportH: number
     ) => {
-      return gridItemDimensions(
+      return gridItemDimensions({
         item,
         span,
         isExpanded,
-        effectiveBaseSize,
+        cellSize: effectiveBaseSize,
         gap,
-        containerW,
-        viewportH
-      );
+        containerWidth: containerW,
+        viewportHeight: viewportH,
+      });
     },
     [effectiveBaseSize, gap]
   );

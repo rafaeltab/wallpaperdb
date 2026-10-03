@@ -1,6 +1,9 @@
 import { X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import {
+  compositionLayout,
+  moveColorBoundary,
+  colorBoundaryMaximum,
   type ColorPreference,
   colorPreferenceAppearance,
   colorPreferenceKey,
@@ -8,43 +11,6 @@ import {
   MATCH_LABELS,
 } from '@/features/browse';
 
-function layout(value: readonly ColorPreference[]) {
-  const used = value.reduce((sum, target) => sum + (target.percent ?? 0), 0);
-  const unspecified = value.filter((target) => target.percent === undefined).length;
-  const zeros = value.filter((target) => target.percent === 0).length;
-  const share = unspecified ? Math.max((100 - used) / unspecified, 12) : 0;
-  const free = unspecified ? 0 : 100 - used;
-  const zeroWidth = Math.min(8, 100 / Math.max(value.length, 1));
-  const flexible = value.reduce((sum, target) => sum + (target.percent ?? share), 0) + free;
-  const scale = flexible > 0 ? (100 - zeros * zeroWidth) / flexible : 1;
-  return {
-    weights: value.map((target) =>
-      target.percent === 0 ? zeroWidth : (target.percent ?? share) * scale
-    ),
-    free: free * scale,
-    scale,
-  };
-}
-function moveBoundary(
-  value: readonly ColorPreference[],
-  index: number,
-  requested: number
-): ColorPreference[] {
-  const target = value[index];
-  if (target?.percent === undefined) return [...value];
-  const nextIndex = value.findIndex((target, i) => i > index && target.percent !== undefined);
-  const next = nextIndex < 0 ? undefined : value[nextIndex];
-  const used = value.reduce((sum, target) => sum + (target.percent ?? 0), 0);
-  const pair = target.percent + (next?.percent ?? 0);
-  const amount = Math.max(0, Math.min(pair + 100 - used, Math.round(requested / 10) * 10));
-  return value.map((target, i) =>
-    i === index
-      ? { ...target, percent: amount }
-      : i === nextIndex
-        ? { ...target, percent: Math.max(0, pair - amount) }
-        : target
-  );
-}
 export function ColorComposition({
   value,
   onChange,
@@ -67,7 +33,7 @@ export function ColorComposition({
   } | null>(null);
   const [preview, setPreview] = useState<readonly ColorPreference[] | null>(null);
   const targets = preview ?? value;
-  const { weights, free, scale } = layout(targets);
+  const { weights, free, scale } = compositionLayout(targets);
   return (
     <div ref={track} className="color-composition" aria-label={undefined}>
       <div className="color-composition-segments">
@@ -119,9 +85,7 @@ export function ColorComposition({
         const percent = target.percent;
         if (percent === undefined) return null;
         const position = weights.slice(0, index + 1).reduce((sum, weight) => sum + weight, 0);
-        const next = targets.find((target, i) => i > index && target.percent !== undefined);
-        const remaining = 100 - targets.reduce((sum, target) => sum + (target.percent ?? 0), 0);
-        const maximum = percent + (next?.percent ?? 0) + remaining;
+        const maximum = colorBoundaryMaximum(targets, index);
         return (
           <button
             key={`boundary-${colorPreferenceKey(target)}`}
@@ -142,7 +106,7 @@ export function ColorComposition({
               const start = drag.current,
                 rect = track.current?.getBoundingClientRect();
               if (!start || !rect || !e.currentTarget.hasPointerCapture(e.pointerId)) return;
-              start.updated = moveBoundary(
+              start.updated = moveColorBoundary(
                 start.original,
                 start.index,
                 (start.original[start.index].percent ?? 0) +
@@ -174,7 +138,7 @@ export function ColorComposition({
                         : undefined;
               if (amount !== undefined) {
                 e.preventDefault();
-                onChange(moveBoundary(value, index, amount));
+                onChange(moveColorBoundary(value, index, amount));
               }
             }}
           >

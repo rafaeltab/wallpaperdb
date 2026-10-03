@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   type ColorPreference,
-  colorPreferenceKey,
+  colorEditLimits,
+  saveColorPreference,
+  setColorPercentage,
   isDistributionPreference,
   MATCH_LABELS,
   MATCH_PREFERENCES,
@@ -87,24 +89,17 @@ export function ColorFilter({
               initial={initial ?? { color: '#5D80D6', quality: 'FAVORITE' }}
               adding={editing === 'new'}
               maximum={
-                100 -
-                value.reduce(
-                  (sum, target, index) => sum + (index === editing ? 0 : (target.percent ?? 0)),
-                  0
-                )
+                colorEditLimits(
+                  value,
+                  editing,
+                  initial ?? { color: '#5D80D6', quality: 'FAVORITE' }
+                ).maximum
               }
-              duplicate={(draft) =>
-                value.some(
-                  (target, index) =>
-                    index !== editing && colorPreferenceKey(target) === colorPreferenceKey(draft)
-                )
-              }
+              duplicate={(draft) => colorEditLimits(value, editing, draft).duplicate}
               onSave={(draft) => {
-                onChange(
-                  editing === 'new'
-                    ? [...value, draft]
-                    : value.map((target, index) => (index === editing ? draft : target))
-                );
+                const next = saveColorPreference(value, editing, draft);
+                if (!next) return;
+                onChange(next);
                 setEditing(null);
               }}
             />
@@ -136,13 +131,7 @@ function ColorEditor({
     heading.current?.focus();
   }, []);
   function percent(value: number | undefined) {
-    setDraft((old) => {
-      const { percent: previous, ...rest } = old;
-      void previous;
-      return value === undefined
-        ? rest
-        : { ...rest, percent: Math.max(0, Math.min(maximum, Math.round(value / 10) * 10)) };
-    });
+    setDraft((old) => setColorPercentage(old, value, maximum));
   }
   return (
     <form

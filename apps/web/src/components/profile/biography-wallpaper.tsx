@@ -1,5 +1,5 @@
 import { GraphQLError } from '@/components/graphql-error';
-import { GatewayAdmissionError } from '@/lib/graphql/admission';
+import { GatewayAdmissionError } from '@/features/request-admission/adapters/graphql';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { useWallpaperQuery } from '@/hooks/useWallpaperQuery';

@@ -1,6 +1,6 @@
 import { normalizeProfileSearch } from '@/features/browse';
 import { GraphQLError } from '@/components/graphql-error';
-import { graphqlQueryOptions } from '@/lib/graphql/admission';
+import { graphqlQueryOptions } from '@/features/request-admission/adapters/graphql';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { ProfilePicture } from '@/components/profile/profile-picture';

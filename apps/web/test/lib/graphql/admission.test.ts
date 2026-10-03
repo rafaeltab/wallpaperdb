@@ -1,7 +1,7 @@
 import { QueryClient, QueryObserver, focusManager, onlineManager } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { graphqlClient } from '@/lib/graphql/client';
-import { GatewayAdmissionError, graphqlQueryOptions } from '@/lib/graphql/admission';
+import { GatewayAdmissionError, graphqlQueryOptions } from '@/features/request-admission/adapters/graphql';
 
 function denied(status: number, retryAfter = '2') {
   return new Response(JSON.stringify({ errors: [{ message: 'private infrastructure details' }] }), {

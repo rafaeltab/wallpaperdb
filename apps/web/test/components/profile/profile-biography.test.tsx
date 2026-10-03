@@ -1,4 +1,4 @@
-import { GatewayAdmissionError } from '@/lib/graphql/admission';
+import { GatewayAdmissionError } from '@/features/request-admission/adapters/graphql';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

@@ -3,7 +3,7 @@ import { createMemoryHistory, createRootRoute, createRoute, createRouter, Router
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProfileRouteError, ProfileRoutePending, ProfileQueryStatus } from '@/components/profile/profile-route-state';
-import { loadCanonicalProfile, redirectHandleToCanonical, redirectProfileIdToCanonical } from '@/lib/profile-route-loaders';
+import { loadCanonicalProfile, redirectHandleToCanonical, redirectProfileIdToCanonical } from '@/features/public-profile/adapters/routes';
 
 const profile = { id: 'user_ada', handle: 'ada', displayName: 'Ada', biographyMarkdown: '', picture: null, canonicalPath: '/profiles/@ada' };
 const resolution = { profile, canonicalHandle: 'ada', requestedHandle: 'ada', isAlias: false };

@@ -1,0 +1,11 @@
+--- a/src/gainmap.c
++++ b/src/gainmap.c
+@@ -358,7 +358,7 @@
+ avifResult avifFindMinMaxWithoutOutliers(const float * gainMapF, size_t numPixels, float * rangeMin, float * rangeMax)
+ {
+     const float bucketSize = 0.01f;        // Size of one bucket. Empirical value.
+-    const float maxOutliersRatio = 0.001f; // 0.1%
++    const float maxOutliersRatio = 0.0f; // Proof variant: preserve every finite source gain.
+     const int maxOutliersOnEachSide = (int)avifRoundf(numPixels * maxOutliersRatio / 2.0f);
+ 
+     float min = gainMapF[0];

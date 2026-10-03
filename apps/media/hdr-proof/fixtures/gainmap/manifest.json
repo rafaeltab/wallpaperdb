@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "upstream_commit": "8da5b8e5ad873f73b02875057015c27d7c327cbe",
+  "upstream_provenance": "https://github.com/AOMediaCodec/libavif/blob/8da5b8e5ad873f73b02875057015c27d7c327cbe/tests/data/README.md",
+  "license_file": "LICENSE.libavif",
+  "metadata_notice": "Public upstream camera metadata is intentionally present in source fixtures to test removal from transformed public outputs. Original no-ops must retain exact bytes.",
+  "fixtures": [
+    {
+      "id": "gainmap-apple-old",
+      "file": "gainmap-apple-old.jpg",
+      "sha256": "2e4310a0dd37a98678e057e25d936bbc4f936bb6fe17380c0ce99e58ecaa603b",
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/libavif/8da5b8e5ad873f73b02875057015c27d7c327cbe/tests/data/apple_gainmap_old.jpg",
+      "provenance": "Upstream personal iPhone photo, resized with Preview. Old Apple gain-map XMP lacks HDR headroom; the reader obtains it from EXIF MakerNotes.",
+      "expected": { "width": 384, "height": 512, "base_depth": 8, "map_depth": 8, "gamut": "p3" }
+    },
+    {
+      "id": "gainmap-apple-new",
+      "file": "gainmap-apple-new.jpg",
+      "sha256": "492a94bd0636bcf15b3f560c68142a7783936c1597e78b0d0461d8be7fddc078",
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/libavif/8da5b8e5ad873f73b02875057015c27d7c327cbe/tests/data/apple_gainmap_new.jpg",
+      "provenance": "Same pixels as old fixture. Upstream copied XMP from a newer iPhone capture to exercise HDRGainMapHeadroom. This is a metadata variant, not a second independent camera scene.",
+      "expected": { "width": 384, "height": 512, "base_depth": 8, "map_depth": 8, "gamut": "p3" }
+    },
+    {
+      "id": "gainmap-android-xmp",
+      "file": "gainmap-android-xmp.jpg",
+      "sha256": "d22fd05e210df1067ebd6a1f63d0e5d94c5fa9042fe2ebd7067a10a301402271",
+      "url": "https://raw.githubusercontent.com/AOMediaCodec/libavif/8da5b8e5ad873f73b02875057015c27d7c327cbe/tests/data/paris_exif_xmp_gainmap_bigendian.jpg",
+      "provenance": "Upstream personal Google Pixel 4a photo edited in Gimp, with a gain map authored in Photoshop and MPF manually changed to big endian. Covers Android/Adobe hdrgm XMP representation, not untouched Android Ultra HDR camera capture.",
+      "expected": { "width": 403, "height": 302, "base_depth": 8, "map_depth": 8, "gamut": "srgb" }
+    },
+    {
+      "id": "gainmap-android-iso",
+      "file": "gainmap-android-iso.jpg",
+      "sha256": "f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e",
+      "source_fixture": "gainmap-apple-new",
+      "generator": "node gainmap-fixture.cjs <output.jpg>",
+      "native_versions": { "sharp": "0.35.5", "libvips": "8.18.7", "libultrahdr": "2.0.2", "libc": "musl" },
+      "provenance": "Deterministically regenerated ISO 21496-1 representation from the Apple new fixture inside the pinned proof image. Its filename names the Android/ISO source class, not an Android camera origin. It has ISO binary metadata only. Android XMP is exercised by the separate XMP fixture; emitted dual-metadata derivatives have separate file and reader qualifications in the conversion matrix.",
+      "expected": { "width": 384, "height": 512, "base_depth": 8, "map_depth": 8, "gamut": "p3" }
+    }
+  ],
+  "remaining_corpus_gaps": [
+    "An untouched Android handset dual ISO/XMP camera capture with redistribution provenance.",
+    "An independent newer Apple scene rather than the upstream metadata variant.",
+    "Non-8-bit gain-map JPEG source parts, if supported by an accepted source representation. No path is qualified for untested coded base/map depths.",
+    "Additional RGB maps, asymmetric map aspect ratios, and creator-authored SDR/HDR reference pairs."
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "generator": "apple_orientation_source.generate; copy the locked original then native ExifTool -overwrite_original -Orientation#=6",
+  "scope": "Real old Apple EXIF6 metadata variant; stored base/map codes, actual ICC and documented full-effect metadata must equal the canonical source",
+  "parent_sha256": "2e4310a0dd37a98678e057e25d936bbc4f936bb6fe17380c0ce99e58ecaa603b",
+  "sha256": "691ce29e25ba756cf0d9d2a4e498fcb4f246eaa0fd7046b15fb10f38b58053c9",
+  "map_sha256": "fbe1522aabb91ad7b56710b3bcb8b1ceb7e35c908eba6a0730217b041ddf6348",
+  "orientation": 6
+}

@@ -1,0 +1,65 @@
+--- a/src/gainmap.c
++++ b/src/gainmap.c
+@@ -517,7 +517,8 @@
+     return AVIF_RESULT_OK;
+ }
+ 
+-avifResult avifRGBImageComputeGainMap(const avifRGBImage * baseRgbImage,
++static avifResult avifProofComputeGainMap(const float * linearBase,
++                                        const avifRGBImage * baseRgbImage,
+                                       avifColorPrimaries baseColorPrimaries,
+                                       avifTransferCharacteristics baseTransferCharacteristics,
+                                       const avifRGBImage * altRgbImage,
+@@ -664,7 +665,7 @@
+ 
+             // Convert to linear.
+             for (int c = 0; c < 3; ++c) {
+-                baseRGBA[c] = baseGammaToLinear(baseRGBA[c]);
++                baseRGBA[c] = linearBase ? linearBase[((size_t)j * width + i) * 3 + c] : baseGammaToLinear(baseRGBA[c]);
+                 altRGBA[c] = altGammaToLinear(altRGBA[c]);
+             }
+ 
+@@ -825,6 +826,43 @@
+     return res;
+ }
+ 
++// Proof-local entry point. Native ICC interpretation supplies the actual
++// compressed base in float32 linear RGB. Equal primaries keep its coordinates
++// unchanged. The original public entry point retains all existing behavior.
++avifResult avifProofComputeGainMapLinearBase(const avifRGBImage * baseRgbImage,
++                                            avifColorPrimaries primaries,
++                                            const float * linearBase,
++                                            size_t linearCount,
++                                            const avifRGBImage * altRgbImage,
++                                            avifTransferCharacteristics altTransfer,
++                                            avifGainMap * gainMap,
++                                            avifDiagnostics * diag)
++{
++    if (!baseRgbImage || !linearBase || linearCount != (size_t)baseRgbImage->width * baseRgbImage->height * 3) {
++        return AVIF_RESULT_INVALID_ARGUMENT;
++    }
++    for (size_t i = 0; i < linearCount; ++i) {
++        if (!isfinite(linearBase[i]) || linearBase[i] < 0.0f || linearBase[i] > 1.000001f) {
++            return AVIF_RESULT_INVALID_ARGUMENT;
++        }
++    }
++    return avifProofComputeGainMap(linearBase, baseRgbImage, primaries, AVIF_TRANSFER_CHARACTERISTICS_LINEAR,
++                                   altRgbImage, primaries, altTransfer, gainMap, diag);
++}
++
++avifResult avifRGBImageComputeGainMap(const avifRGBImage * baseRgbImage,
++                                      avifColorPrimaries baseColorPrimaries,
++                                      avifTransferCharacteristics baseTransferCharacteristics,
++                                      const avifRGBImage * altRgbImage,
++                                      avifColorPrimaries altColorPrimaries,
++                                      avifTransferCharacteristics altTransferCharacteristics,
++                                      avifGainMap * gainMap,
++                                      avifDiagnostics * diag)
++{
++    return avifProofComputeGainMap(NULL, baseRgbImage, baseColorPrimaries, baseTransferCharacteristics,
++                                   altRgbImage, altColorPrimaries, altTransferCharacteristics, gainMap, diag);
++}
++
+ avifResult avifImageComputeGainMap(const avifImage * baseImage, const avifImage * altImage, avifGainMap * gainMap, avifDiagnostics * diag)
+ {
+     avifDiagnosticsClearError(diag);

@@ -1,0 +1,328 @@
+"""Fixture/oracle regressions. Native outcomes are checked by suite.py."""
+import unittest
+import tempfile
+from pathlib import Path
+import numpy as np
+from avif import make_scene, encode_transfer, decode_transfer, geometry_reference, write_png, read_png, convert_frame
+from appearance import compare_appearance, sdr_signal_to_nits
+from sdr_reference import reference_srgb
+
+
+class FixtureTests(unittest.TestCase):
+    def test_white_stability_requires_unchanged_reference_samples_and_encoded_signal(self):
+        from avif import sequence_white_control
+        reference = geometry_reference(make_scene(True), 'contain')
+        frame = np.full_like(reference, .5)
+        unchanged = sequence_white_control([frame, frame], [reference, reference], 'contain')
+        self.assertTrue(unchanged['passed'])
+        self.assertEqual(unchanged['samples'], 48)
+        changed_signal = frame.copy()
+        changed_signal[0, 28, 0] += 1 / 255
+        changed = sequence_white_control([frame, changed_signal], [reference, reference], 'contain')
+        self.assertFalse(changed['passed'])
+        self.assertTrue(changed['reference_samples_identical'])
+        self.assertGreater(changed['maximum_signal_difference'], 0)
+        changed_reference = reference.copy()
+        changed_reference[0, 28, 0] += 1
+        invalid = sequence_white_control([frame, frame], [reference, changed_reference], 'contain')
+        self.assertFalse(invalid['passed'])
+        self.assertFalse(invalid['reference_samples_identical'])
+        self.assertEqual(invalid['maximum_signal_difference'], 0)
+
+    def test_sdr_without_geometry_retains_hidden_rgb_for_explicit_alpha_removal(self):
+        for transfer in ('pq', 'hlg'):
+            for gamut in ('p3', 'rec2020'):
+                for mode in ('identity', 'static'):
+                    with self.subTest(transfer=transfer, gamut=gamut, mode=mode), tempfile.TemporaryDirectory() as temporary:
+                        folder = Path(temporary)
+                        rgba = np.ones((8, 8, 4))
+                        rgba[..., :3] = encode_transfer(np.array([18, 100, 203]), transfer, gamut)
+                        rgba[..., 3] = np.linspace(0, 1, 8)
+                        source, output = folder/'source.png', folder/'sdr.png'
+                        write_png(source, rgba)
+                        stored = read_png(source)
+                        convert_frame(source, output, transfer, gamut, mode, sdr=True, peak_nits=1000)
+                        actual = read_png(output)
+                        expected = reference_srgb(decode_transfer(stored[..., :3], transfer, gamut), gamut, peak_nits=1000)
+                        measurement = compare_appearance(sdr_signal_to_nits(expected), sdr_signal_to_nits(actual[..., :3]),
+                            reference_gamut='srgb', actual_gamut='srgb', fixture_class='sdr-8')
+                        self.assertTrue(measurement['passed'], measurement['failures'])
+                        np.testing.assert_allclose(actual[..., 3], stored[..., 3], atol=1/65535)
+
+    def test_pq_hlg_round_trip_preserves_absolute_anchors(self):
+        scene = make_scene(False)[..., :3]
+        for transfer in ('pq', 'hlg'):
+            for gamut in ('p3', 'rec2020'):
+                recovered = decode_transfer(encode_transfer(scene, transfer, gamut), transfer, gamut)
+                np.testing.assert_allclose(recovered, scene, atol=1e-7)
+
+    def test_scene_has_fractional_alpha_and_three_luminance_regions(self):
+        scene = make_scene(True)
+        self.assertEqual(scene.shape, (64, 96, 4))
+        self.assertTrue(np.any((scene[..., 3] > 0) & (scene[..., 3] < 1)))
+        for lo, hi in ((0, 10), (10, 203), (203, 1001)):
+            self.assertTrue(np.any((scene[..., 0] > lo) & (scene[..., 0] < hi)))
+
+    def test_geometry_reference_is_centered_and_permits_upscaling(self):
+        scene = make_scene(False)
+        self.assertEqual(geometry_reference(scene, 'contain').shape, (38, 57, 4))
+        self.assertEqual(geometry_reference(scene, 'cover').shape, (40, 40, 4))
+        self.assertEqual(geometry_reference(scene, 'fill').shape, (48, 40, 4))
+        self.assertEqual(geometry_reference(scene, 'upscale').shape, (80, 120, 4))
+
+    def test_independent_libpng_keeps_all_sixteen_bits_and_alpha(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            values = np.arange(8*12*4, dtype=float).reshape(8,12,4)*131/65535
+            path = Path(temporary)/"codes.png"
+            write_png(path, values)
+            np.testing.assert_array_equal(read_png(path), np.rint(values*65535)/65535)
+
+    def test_native_hdr_resize_preserves_linear_light_and_fractional_alpha(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            cases = [(transfer, gamut, alpha, mode)
+                     for transfer in ('pq', 'hlg') for gamut in ('p3', 'rec2020')
+                     for alpha, mode in ((False, 'contain'), (False, 'upscale'), (True, 'upscale'))]
+            for transfer, gamut, alpha, mode in cases:
+                with self.subTest(transfer=transfer, gamut=gamut, alpha=alpha, mode=mode):
+                    scene = make_scene(alpha)
+                    signal = scene.copy()
+                    signal[..., :3] = encode_transfer(scene[..., :3], transfer, gamut)
+                    source, target = directory/'source.png', directory/'target.png'
+                    write_png(source, signal)
+                    reference = read_png(source)
+                    reference[..., :3] = decode_transfer(reference[..., :3], transfer, gamut)
+                    reference = geometry_reference(reference, mode)
+                    convert_frame(source, target, transfer, gamut, mode)
+                    actual = read_png(target)
+                    measurement = compare_appearance(
+                        reference[..., :3], decode_transfer(actual[..., :3], transfer, gamut),
+                        reference_gamut=gamut, actual_gamut=gamut,
+                        fixture_class='avif-12', alpha=reference[..., 3],
+                    )
+                    self.assertTrue(measurement['passed'], measurement)
+                    self.assertLessEqual(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
+
+    def test_alpha_downscale_normalizes_truncated_source_edge_weights(self):
+        # Native filtering must preserve the independently declared edge kernel,
+        # including the fractional alpha ramp crossing the white/black boundary.
+        with tempfile.TemporaryDirectory() as temporary:
+            source, target = Path(temporary)/'source.png', Path(temporary)/'target.png'
+            scene = make_scene(True)
+            signal = scene.copy()
+            signal[..., :3] = encode_transfer(scene[..., :3], 'pq', 'rec2020')
+            write_png(source, signal)
+            reference = read_png(source)
+            reference[..., :3] = decode_transfer(reference[..., :3], 'pq', 'rec2020')
+            reference = geometry_reference(reference, 'contain')
+            convert_frame(source, target, 'pq', 'rec2020', 'contain')
+            actual = read_png(target)
+            measurement = compare_appearance(
+                reference[..., :3], decode_transfer(actual[..., :3], 'pq', 'rec2020'),
+                reference_gamut='rec2020', actual_gamut='rec2020',
+                fixture_class='avif-12', alpha=reference[..., 3],
+            )
+            self.assertTrue(measurement['passed'], measurement)
+            self.assertLessEqual(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
+
+    def test_native_alpha_downscale_roundtrip_preserves_hdr_depths_and_animation(self):
+        from avif import fixture_specs, generate_fixture, decode_avif, encode_avif, inspect_avif, structure_checks
+        with tempfile.TemporaryDirectory() as temporary:
+            for spec in fixture_specs():
+                if not spec['alpha']:
+                    continue
+                folder = Path(temporary)/spec['id']
+                source, _, _ = generate_fixture(spec, folder)
+                source_frames = decode_avif(source, folder, spec['frames'])
+                references = []
+                for frame in source_frames:
+                    reference = frame.copy()
+                    reference[..., :3] = decode_transfer(frame[..., :3], spec['transfer'], spec['gamut'])
+                    references.append(reference)
+                for mode in ('contain', 'fill'):
+                    with self.subTest(fixture=spec['id'], mode=mode):
+                        case = folder/mode
+                        case.mkdir()
+                        matched = [geometry_reference(frame, mode) for frame in references]
+                        converted = []
+                        for index in range(spec['frames']):
+                            png = case/f'converted-{index}.png'
+                            convert_frame(folder/f'decoded-{index}.png', png, spec['transfer'], spec['gamut'], mode)
+                            converted.append(png)
+                        target = case/'output.avif'
+                        encode_avif(converted, target, spec['transfer'], spec['gamut'], spec['depth'])
+                        facts = inspect_avif(target)
+                        actual = decode_avif(target, case, spec['frames'])
+                        checks = structure_checks(facts, actual, spec, matched, spec['transfer'], spec['gamut'], spec['depth'], spec['frames'])
+                        self.assertTrue(all(checks.values()), checks)
+                        for reference, frame in zip(matched, actual):
+                            measured = compare_appearance(reference[..., :3], decode_transfer(frame[..., :3], spec['transfer'], spec['gamut']),
+                                reference_gamut=spec['gamut'], actual_gamut=spec['gamut'],
+                                fixture_class=f'avif-{spec["depth"]}', alpha=reference[..., 3])
+                            self.assertTrue(measured['passed'], measured)
+
+    def test_native_cover_filters_before_cropping_the_white_black_boundary(self):
+        for transfer, gamut in (('pq', 'rec2020'), ('hlg', 'p3')):
+            for alpha in (False, True):
+                with self.subTest(transfer=transfer, alpha=alpha), tempfile.TemporaryDirectory() as temporary:
+                    source, target = Path(temporary)/'source.png', Path(temporary)/'target.png'
+                    scene = make_scene(alpha)
+                    signal = scene.copy()
+                    signal[..., :3] = encode_transfer(scene[..., :3], transfer, gamut)
+                    write_png(source, signal)
+                    reference = read_png(source)
+                    reference[..., :3] = decode_transfer(reference[..., :3], transfer, gamut)
+                    reference = geometry_reference(reference, 'cover')
+                    convert_frame(source, target, transfer, gamut, 'cover')
+                    actual = read_png(target)
+                    measured = compare_appearance(reference[..., :3], decode_transfer(actual[..., :3], transfer, gamut),
+                        reference_gamut=gamut, actual_gamut=gamut, fixture_class='avif-12', alpha=reference[..., 3])
+                    self.assertTrue(measured['passed'], measured)
+                    self.assertLessEqual(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
+
+    def test_native_sdr_geometry_matches_independent_full_color_reference(self):
+        for transfer in ('pq', 'hlg'):
+            with self.subTest(transfer=transfer), tempfile.TemporaryDirectory() as temporary:
+                source, target = Path(temporary)/'source.png', Path(temporary)/'target.png'
+                scene = make_scene(True)
+                signal = scene.copy()
+                signal[..., :3] = encode_transfer(scene[..., :3], transfer, 'rec2020')
+                write_png(source, signal)
+                reference = read_png(source)
+                reference[..., :3] = decode_transfer(reference[..., :3], transfer, 'rec2020')
+                reference = geometry_reference(reference, 'upscale')
+                convert_frame(source, target, transfer, 'rec2020', 'upscale', sdr=True, peak_nits=1000)
+                actual = read_png(target)
+                expected = reference_srgb(reference[..., :3], 'rec2020', peak_nits=1000)
+                measured = compare_appearance(sdr_signal_to_nits(expected), sdr_signal_to_nits(actual[..., :3]),
+                    reference_gamut='srgb', actual_gamut='srgb', fixture_class='sdr-8', alpha=reference[..., 3])
+                self.assertTrue(measured['passed'], measured)
+                self.assertLessEqual(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
+
+    def test_eight_bit_tone_control_finds_authored_white_after_source_quantization(self):
+        from avif import generate_fixture, decode_avif, sdr_tone_control
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            spec = {'id': 'pq8-control', 'transfer': 'pq', 'gamut': 'rec2020', 'depth': 8, 'alpha': False, 'frames': 1}
+            source, _, authored = generate_fixture(spec, directory)
+            decoded = decode_avif(source, directory, 1)[0]
+            reference = decoded.copy()
+            reference[..., :3] = decode_transfer(decoded[..., :3], 'pq', 'rec2020')
+            control = sdr_tone_control(directory/'decoded-0.png', directory/'control.png',
+                                      reference, authored[0], 'pq', 'rec2020', peak_nits=1000)
+            self.assertTrue(control['passed'], control)
+            self.assertIn('ordinary_white_signal', control['measurement']['measurements'])
+
+    def test_native_optional_twelve_bit_sdr_keeps_required_eight_bit_failures(self):
+        from avif import run
+        from matrix import build_matrix, required_cases
+        spec = {'id': 'avif-pq-rec2020-10-opaque', 'transfer': 'pq', 'gamut': 'rec2020',
+                'depth': 10, 'alpha': False, 'frames': 1}
+        with tempfile.TemporaryDirectory() as temporary:
+            result = run(temporary, specs=[spec])
+            cases = {case['case_id']: case for case in result['evidence']}
+            self.assertEqual(len(cases), 51)
+            for geometry in ('contain', 'cover', 'fill', 'upscale', 'orientation'):
+                baseline_id = f'{spec["id"]}:sdr:avif:srgb:preserve:{geometry}'
+                baseline, candidate = cases[baseline_id], cases[baseline_id + ':depth-12']
+                self.assertEqual(baseline['selectors']['depth'], '8')
+                self.assertEqual(candidate['selectors']['depth'], '12')
+                self.assertEqual(candidate['facts']['depth'], 12)
+                self.assertEqual(candidate['status'], 'qualified', candidate['blockers'])
+                self.assertNotEqual(baseline['artifacts']['output'], candidate['artifacts']['output'])
+                self.assertTrue(candidate['optional_depth_variant'])
+                self.assertEqual(candidate['measurements']['frames'][0]['fixture_class'], 'sdr-8')
+                self.assertEqual(candidate['appearance_threshold_policy']['coded_depth'], 12)
+                gamma = cases[baseline_id + ':transfer-gamma22']
+                self.assertEqual(gamma['selectors'], baseline['selectors'])
+                self.assertEqual(gamma['status'], 'qualified', gamma['blockers'])
+                self.assertEqual(gamma['facts']['transfer'], 4)
+                self.assertEqual(gamma['facts']['depth'], 8)
+                self.assertTrue(gamma['optional_transfer_variant'])
+                self.assertEqual(gamma['measurements']['frames'][0]['fixture_class'], 'sdr-8')
+                gif = cases[f'{spec["id"]}:sdr:gif:srgb:preserve:{geometry}:transfer-gamma22']
+                self.assertEqual(gif['status'], 'qualified', gif['blockers'])
+                self.assertEqual(gif['facts']['format'], 'GIF')
+                self.assertTrue(gif['facts']['icc']['gamma22_srgb_primaries'])
+                alternative = cases[f'{spec["id"]}:sdr:gif:srgb:preserve:{geometry}:transfer-gamma32-nearest']
+                self.assertEqual(alternative['selectors'], gif['selectors'])
+                self.assertEqual(alternative['status'], 'qualified', alternative['blockers'])
+                self.assertEqual(alternative['facts']['format'], 'GIF')
+                self.assertEqual(alternative['facts']['icc']['gamut'], 'srgb')
+                np.testing.assert_allclose(alternative['facts']['icc']['gammas'], [3.2] * 3, atol=1/65536, rtol=0)
+                self.assertEqual(alternative['representation']['transfer'], 'gamma 3.2')
+                self.assertEqual(alternative['representation']['quantization'], 'nearest native zimg')
+            failed_eight = cases[f'{spec["id"]}:sdr:avif:srgb:preserve:contain']
+            self.assertEqual(failed_eight['status'], 'tested and failed')
+            matrix = build_matrix(result['evidence'])
+            self.assertEqual(len(required_cases()), 320)
+            self.assertEqual(matrix['evidence_errors'], [])
+            cell = next(cell for cell in matrix['cells'] if cell['id'] == 'static-avif:sdr:avif')
+            self.assertEqual(cell['status'], 'tested and failed')
+
+    def test_native_gamma_icc_animation_preserves_requested_motion_alpha_and_sdr_grade(self):
+        from avif import run
+        spec = {'id': 'animated-pq-alpha', 'transfer': 'pq', 'gamut': 'rec2020',
+                'depth': 10, 'alpha': True, 'frames': 2}
+        with tempfile.TemporaryDirectory() as temporary:
+            result = run(temporary, specs=[spec])
+            cases = {case['case_id']: case for case in result['evidence']}
+            preserved = [case for case in cases.values() if case['selectors']['motion'] == 'preserve']
+            self.assertEqual(len(preserved), 40)
+            for case in preserved:
+                control = case['measurements']['sequence_white_control']
+                self.assertTrue(control['passed'], (case['case_id'], control))
+                self.assertTrue(control['reference_samples_identical'])
+                self.assertGreater(control['samples'], 0)
+                self.assertEqual(control['maximum_signal_difference'], 0)
+            for geometry in ('contain', 'cover', 'fill', 'upscale', 'orientation'):
+                case_id = f'{spec["id"]}:sdr:webp:srgb:preserve:{geometry}:transfer-gamma22'
+                self.assertTrue(case_id in cases, case_id)
+                case = cases[case_id]
+                self.assertEqual(case['status'], 'qualified', (geometry, case['blockers'], case.get('structural_checks')))
+                self.assertEqual(case['facts']['durations_ms'], [300, 700])
+                self.assertEqual(case['facts']['loop'], 3)
+                self.assertTrue(case['facts']['icc']['gamma22_srgb_primaries'])
+                self.assertTrue(case['structural_checks']['alpha'])
+                self.assertTrue(case['checks']['privacy'])
+                gif_id = f'{spec["id"]}:sdr:gif:srgb:static:{geometry}:transfer-gamma32-nearest'
+                gif = cases[gif_id]
+                self.assertEqual(gif['status'], 'qualified', gif['blockers'])
+                self.assertEqual(gif['selectors']['motion'], 'static')
+                self.assertEqual(gif['selectors']['transparency'], 'coerce')
+                self.assertEqual(len(gif['measurements']['frames']), 1)
+                self.assertEqual(gif['facts']['alpha_measurement']['maximum_absolute_error'], 0)
+                animated_id = f'{spec["id"]}:sdr:gif:srgb:preserve:{geometry}:transfer-gamma32-animation-alpha16'
+                animated = cases[animated_id]
+                self.assertEqual(animated['status'], 'qualified', animated['blockers'])
+                self.assertEqual(animated['selectors']['motion'], 'preserve')
+                self.assertEqual(animated['selectors']['transparency'], 'coerce')
+                self.assertEqual(animated['facts']['durations_ms'], [300, 700])
+                self.assertEqual(animated['facts']['loop'], 2)
+                self.assertEqual(animated['facts']['plays'], 3)
+                self.assertEqual(animated['facts']['alpha_measurement']['frame_maximum_absolute_errors'], [0, 0])
+                self.assertEqual(len(animated['measurements']['frames']), 2)
+                self.assertTrue(all(frame['passed'] for frame in animated['measurements']['frames']))
+                self.assertTrue(all(check['passed'] for check in animated['measurements']['alpha_geometry']))
+
+    def test_native_sixteen_bit_png_rejects_eight_bit_fractional_alpha_precision(self):
+        from avif import encode_other
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            reference = np.full((8, 12, 4), .25)
+            reference[..., 3] = np.linspace(.03125, .96875, 8*12).reshape(8, 12)
+            reference = np.rint(reference*65535)/65535
+            spec = {'alpha': True, 'frames': 1}
+            for quantized in (False, True):
+                with self.subTest(eight_bit_alpha_in_sixteen_bit_png=quantized):
+                    pixels = reference.copy()
+                    if quantized:
+                        pixels[..., 3] = np.rint(pixels[..., 3]*255)/255
+                    source, output = directory/f'input-{quantized}.png', directory/f'output-{quantized}.png'
+                    write_png(source, pixels)
+                    facts, actual, checks = encode_other([source], output, 'png', 'srgb', 'srgb', [reference], 1, spec)
+                    self.assertEqual(facts['exiftool']['BitDepth'], 16)
+                    self.assertEqual(checks['alpha'], not quantized)
+                    self.assertEqual(facts['alpha_measurement']['absolute_error_limit'], 2/65535)
+                    actual_error = float(np.max(np.abs(actual[0][..., 3]-reference[..., 3])))
+                    self.assertEqual(facts['alpha_measurement']['maximum_absolute_error'], actual_error)

@@ -1,0 +1,2045 @@
+{
+  "schema_version": 1,
+  "platform": "linux/amd64",
+  "alpine_version": "3.24.1",
+  "base_image": "node:22.22.3-alpine@sha256:e58326d0d441090181ac150dc2078d3e2cf6a0d42e809aebba3ef5880935ffdd",
+  "policy": "Full installed APK dependency closure. Base packages are provided and byte-pinned by the immutable image digest, including old archives removed upstream. Additional packages use exact URLs and archive SHA-256; installation disables networking/repositories and verifies the complete final inventory. A removed additional archive is a hard reproducibility blocker; never resolve a replacement version.",
+  "packages": [
+    {
+      "name": "acl-libs",
+      "version": "2.3.2-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1jKUveSw3nvWaCR9eprC8phV8aqA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/acl-libs-2.3.2-r1.apk",
+      "sha256": "3f02851d586c25d97ba8b5b845615aacc209ae7eaeb6f7843eca76d85da2249d",
+      "bytes": 14335
+    },
+    {
+      "name": "alpine-baselayout",
+      "version": "3.7.2-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q18Pz9wvTaBYr2RzvEXE6rYpFiJbI=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "alpine-baselayout-data",
+      "version": "3.7.2-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1xvm97RfYRLbxsLtXZtLDXA1chQg=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "alpine-keys",
+      "version": "2.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q12Na4DlPAWad+SRXaeLqWTz/+okA=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "alpine-release",
+      "version": "3.24.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1vGkSolzcdzPgA17VCezqpAJpRuM=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "alsa-lib",
+      "version": "1.2.15.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1rwPJIBVSVLxnBPBc41rvUNUZhFc=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/alsa-lib-1.2.15.3-r0.apk",
+      "sha256": "052de5639df635a03cfae1d7504ed4ed75c4e2d2cfff59efc116bb847c1f4ac4",
+      "bytes": 484935
+    },
+    {
+      "name": "aom",
+      "version": "3.14.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1+8XIwV63/byX4MttrDSwlbr3vOY=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/aom-3.14.1-r0.apk",
+      "sha256": "9831eac613627ae98f9eece46dc2aa53d6ca0813479d581d24bc9639e4045e6f",
+      "bytes": 651999
+    },
+    {
+      "name": "aom-dev",
+      "version": "3.14.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1aC4Wh0EZdRKPZHbm4CiauHZ8jxA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/aom-dev-3.14.1-r0.apk",
+      "sha256": "cb1d5100c14ada0b3cba1e6b51d58a761fa123ca1dc307129a3eca7eb3244c11",
+      "bytes": 65305
+    },
+    {
+      "name": "aom-libs",
+      "version": "3.14.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1+owZ+EjlRnyn+TuagGVfzNRP3fQ=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/aom-libs-3.14.1-r0.apk",
+      "sha256": "075ea8eafeb9cca01aa158e54e3fea962834dc73bbddacceb522bceb5bdbfd35",
+      "bytes": 3213951
+    },
+    {
+      "name": "apk-tools",
+      "version": "3.0.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1BDMzWJeYofUuCa5j8CbGyPpnbTQ=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "binutils",
+      "version": "2.45.1-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1PoE7y6LhxU+kQVBIyMWyKRmhhjE=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/binutils-2.45.1-r1.apk",
+      "sha256": "15682887459d216585feb438bbfb7ec63e1f33e77c453f44637d2d9d8c35977d",
+      "bytes": 3229647
+    },
+    {
+      "name": "brotli-libs",
+      "version": "1.2.0-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1gviBUWwEXwbyLX3AqDzGTKVU7xA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/brotli-libs-1.2.0-r1.apk",
+      "sha256": "f0823de7c6d45859aeb6a7facfc5cfbf2dadb83ad4f27c794cb6ecc74e578cee",
+      "bytes": 429608
+    },
+    {
+      "name": "build-base",
+      "version": "0.5-r4",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1nzZkq3HEVZFi3l/qBevDd+H7QNc=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/build-base-0.5-r4.apk",
+      "sha256": "3ac72e74e96150995e8d797b6c33fc3b46d69e3667c47bd0ff25ce89f9fc4eaf",
+      "bytes": 1340
+    },
+    {
+      "name": "busybox",
+      "version": "1.37.0-r31",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1tUBevAL33YvpW2JlxUskPVRWq48=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "busybox-binsh",
+      "version": "1.37.0-r31",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1XL0UrMbxgExbrGx33CxJLwELD8c=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "c-ares",
+      "version": "1.34.8-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1ZAoo/2JF9wHUZPulOgWxvGV8N6c=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/c-ares-1.34.8-r0.apk",
+      "sha256": "123fdeadc5ec884b897787f98d865492bf70402697b251cd1f3591a00b8c9d73",
+      "bytes": 110689
+    },
+    {
+      "name": "ca-certificates-bundle",
+      "version": "20260611-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1yVNKA3UL3640HxCWkBYJD8Ef670=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "cjson",
+      "version": "1.7.19-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1vvdu7gxr14pTjSBpUJw4C4ooblo=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/cjson-1.7.19-r1.apk",
+      "sha256": "b1aca971a5ba46e42169311ef7bcfa96eac40d39207b22dbd3af8d4f3103d1d8",
+      "bytes": 12866
+    },
+    {
+      "name": "cmake",
+      "version": "4.2.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1pUGnCMsdIqzkmlLx8HP3cdqvKwE=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/cmake-4.2.3-r0.apk",
+      "sha256": "960e712886a5453c2c2573364ecc98c28fc7e081270396c5d9a69756caa102c8",
+      "bytes": 23946975
+    },
+    {
+      "name": "curl",
+      "version": "8.22.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1z7t4s42PaeMxKbfpiGPxdZh4AQ0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/curl-8.22.0-r0.apk",
+      "sha256": "9262352e6341bb87e3047d1ca0b4051b2a9f4011409df25e4190e6be0334b860",
+      "bytes": 178668
+    },
+    {
+      "name": "dav1d-dev",
+      "version": "1.5.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1O3ioC3vvl9USkwiFoewKu0TP60g=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/dav1d-dev-1.5.3-r0.apk",
+      "sha256": "dd9083da083829781bdd1aa2acf68a75086f53223ad13f8719e71ccd5b0d26de",
+      "bytes": 12992
+    },
+    {
+      "name": "dbus-libs",
+      "version": "1.16.2-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1LMt2GrBN+tecFdJaZ8jseUS5xc0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/dbus-libs-1.16.2-r2.apk",
+      "sha256": "105f6ba17454c587ca9345f9deb348012d1950588a22da42120c954d396c99b6",
+      "bytes": 130198
+    },
+    {
+      "name": "eudev-libs",
+      "version": "3.2.14-r6",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1EK3Gf4IDEuYXrkR0CV7elh0zAAI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/eudev-libs-3.2.14-r6.apk",
+      "sha256": "45fdbcf37c5c0e82067e98a818d3c1fd16d0261c62128dcb6b935b86b4ec6c86",
+      "bytes": 26137
+    },
+    {
+      "name": "exiftool",
+      "version": "13.55-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1m4a4fFNCEjoCeCRUB9C2WGAt2uc=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/exiftool-13.55-r0.apk",
+      "sha256": "1982275f1c47e7d7d4807473b095056edca2d7fc95a6bf95d6a9c1a760774ed7",
+      "bytes": 102239
+    },
+    {
+      "name": "ffmpeg",
+      "version": "8.1.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1jxvbGarQXIlv3KjZZxr4kolUtw4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/ffmpeg-8.1.2-r0.apk",
+      "sha256": "b8a7ddf8765ac2120d4124e468444f08e99966fdb9db65b80d4e109bea661da5",
+      "bytes": 276232
+    },
+    {
+      "name": "ffmpeg-libavcodec",
+      "version": "8.1.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1la5bbSwZ28kv5J3XwSDM0tCU0Ck=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/ffmpeg-libavcodec-8.1.2-r0.apk",
+      "sha256": "69506d3bfac6bd58dce73eaaf6d9d03a86143c728a16bf0625a4faef48a0baf0",
+      "bytes": 9328270
+    },
+    {
+      "name": "ffmpeg-libavdevice",
+      "version": "8.1.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1EW5/TMGd1Gq6QVSklmGf+AwynfM=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/ffmpeg-libavdevice-8.1.2-r0.apk",
+      "sha256": "c7fb3e0b4bb4092224b3ed4898656d502a26ddd70e9100b76423db67089f0e46",
+      "bytes": 47204
+    },
+    {
+      "name": "ffmpeg-libavfilter",
+      "version": "8.1.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1Io5F9S11JNxWjhAlrmrit8iRoGo=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/ffmpeg-libavfilter-8.1.2-r0.apk",
+      "sha256": "cd385b6d7d46abc645bf468d94d9b3cfb93bb8803c67c890f6bd79e66fad298e",
+      "bytes": 2592853
+    },
+    {
+      "name": "ffmpeg-libavformat",
+      "version": "8.1.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1alkomZiT3fLHgLAh9JwzIGmkhlw=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/ffmpeg-libavformat-8.1.2-r0.apk",
+      "sha256": "1c95557ea6ca4e4fea99bd4f8cd2334f5bc758604051f58ce3565472cb070f05",
+      "bytes": 1503900
+    },
+    {
+      "name": "ffmpeg-libavutil",
+      "version": "8.1.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q18mgvW2mHv7zXM7O48mBAlwXfbEw=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/ffmpeg-libavutil-8.1.2-r0.apk",
+      "sha256": "03707fda6d94ddd29517d1a82faafeb386a7cc5248aa86ba021d1b1afe44b87a",
+      "bytes": 452725
+    },
+    {
+      "name": "ffmpeg-libswresample",
+      "version": "8.1.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q146YZPdBjV/uQFNCV9EKBBd8ogNA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/ffmpeg-libswresample-8.1.2-r0.apk",
+      "sha256": "325ff071ba90602f977fdd336bdbefe42092f87585b1bb7a65c264f2732d2456",
+      "bytes": 65579
+    },
+    {
+      "name": "ffmpeg-libswscale",
+      "version": "8.1.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1y7ERXNSgsfFA7mhYL90Tw1JXSlk=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/ffmpeg-libswscale-8.1.2-r0.apk",
+      "sha256": "28548bed74288ebd41c0466e9054427a5e72d015f053df1fd889acbca5d5b762",
+      "bytes": 723763
+    },
+    {
+      "name": "file",
+      "version": "5.47-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1ityLcSZ9U7FF9Xzr4MpX502S6nI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/file-5.47-r2.apk",
+      "sha256": "4681c153c509aec126e2b9ea2c959730309b24a792d49fc8cc26fa5fa87e8fdd",
+      "bytes": 9722
+    },
+    {
+      "name": "fontconfig",
+      "version": "2.17.1-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1KigEPCtTgE7pePNWEk/JYw0I71s=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/fontconfig-2.17.1-r1.apk",
+      "sha256": "7634cf2fb1066ec97c8f41ec90ec9f036540e056276b7bf9a10dc4ec9e44d238",
+      "bytes": 163072
+    },
+    {
+      "name": "fortify-headers",
+      "version": "3.0.1-r2",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1a70PfqYWeMncq/N4TcBw4Ir7yWs=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/fortify-headers-3.0.1-r2.apk",
+      "sha256": "5ffaebd9f141ac3e3fa0cc99f798f64b4c0aa16fb06a7a77e68f63f350fe23aa",
+      "bytes": 7356
+    },
+    {
+      "name": "freetype",
+      "version": "2.14.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1inTeCTllWaiIzsEB0gXPSI2KScY=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/freetype-2.14.3-r0.apk",
+      "sha256": "09d76fde675a9ca3cfeb83d72fb09cb2e9ccf79b2937daa05a1af9a37a6b7815",
+      "bytes": 354367
+    },
+    {
+      "name": "fribidi",
+      "version": "1.0.16-r3",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1gS+zbhT4tRc1ucHlI2fww4Bh/pI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/fribidi-1.0.16-r3.apk",
+      "sha256": "be0cba50bc7bfdaadfba020fe8239ba3f25f35d309806a9e89e9e09860f985c0",
+      "bytes": 31217
+    },
+    {
+      "name": "g++",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1gKUtEcA4aYyx0evjHoLk3vRbn8Y=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/g++-15.2.0-r5.apk",
+      "sha256": "35c39e8d3667d8603fe209dbafe67681c64b1cda66bf9c836bfb4d05b19a71fd",
+      "bytes": 18449957
+    },
+    {
+      "name": "gcc",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1ReMw7n/rV2Z/hbIV2XSCr/AxfQ0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/gcc-15.2.0-r5.apk",
+      "sha256": "d1d482472ed91240731c60dbae8176bc1e32e1dfb694856da6759f6d32716325",
+      "bytes": 60496469
+    },
+    {
+      "name": "gdbm",
+      "version": "1.26-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1YZST2BJP5JqO4dj3oTcs9+OXczc=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/gdbm-1.26-r0.apk",
+      "sha256": "3278ccba30b241168ca4ab93c919be805411b918fdc062f06d3684d12dc33ae3",
+      "bytes": 31902
+    },
+    {
+      "name": "git",
+      "version": "2.54.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1KlCtqvgihl9rC6XaaIME3EjkW8c=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/git-2.54.0-r0.apk",
+      "sha256": "5a2c6782774d2e891fc2fc3fdc50c3c2743b8eb2dc7cda69b6b723af2eedcf78",
+      "bytes": 3546724
+    },
+    {
+      "name": "git-init-template",
+      "version": "2.54.0-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1Wr3MX1rbvj1gz82ht0ADMBTHI6s=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/git-init-template-2.54.0-r0.apk",
+      "sha256": "e8094a47bfa6e66b7d550ae12a7a8bcab0bc4af502aacd5d2a6fc62d2c5e488d",
+      "bytes": 10825
+    },
+    {
+      "name": "git-perl",
+      "version": "2.54.0-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1Q5yA7y7pHqvfLjHtX71LkU3gMPg=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/git-perl-2.54.0-r0.apk",
+      "sha256": "69be2602c82886c58109f4849dee4e2e935710944240994e85a284082be928b8",
+      "bytes": 15304
+    },
+    {
+      "name": "glib",
+      "version": "2.88.1-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1nwgRDuT0i7Sr+TesASg4HK9SGaY=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/glib-2.88.1-r1.apk",
+      "sha256": "2f32203b97789bc9a92e57e2d9b89eb2e6951b69534ba082a683c6e49031cb5d",
+      "bytes": 2061645
+    },
+    {
+      "name": "glslang-libs",
+      "version": "1.4.341.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1Vqi2+Lz9HkA4lWfrbyzAdttcrcA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/glslang-libs-1.4.341.0-r0.apk",
+      "sha256": "a2c7450ac81c486d333c3a40072912a6a1dac9cc8a26136f48c7f1ae35d27257",
+      "bytes": 779435
+    },
+    {
+      "name": "gmp",
+      "version": "6.3.0-r4",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1ubqhYMW2Z+LZyyQCCZknhvXStOk=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/gmp-6.3.0-r4.apk",
+      "sha256": "85323ef5bce8ff234736dc2d6592ea37aebdc6348a531e27430bdfe38364d256",
+      "bytes": 220074
+    },
+    {
+      "name": "graphite2",
+      "version": "1.3.14-r6",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1AUCVS0kUQNM5jVofUbKhgbEPo3g=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/graphite2-1.3.14-r6.apk",
+      "sha256": "2caa36d901f79215753ce3b614818ca71596baf2bbb2c21b6eadcf073d81b552",
+      "bytes": 64762
+    },
+    {
+      "name": "harfbuzz",
+      "version": "13.2.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1lx2ZwfHbq7wVFRmDPYUIiSzzLhk=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/harfbuzz-13.2.1-r0.apk",
+      "sha256": "01f7862265ef2256bbadd0fc998df3d1243dee606df3bd8284471cf390f86f29",
+      "bytes": 782321
+    },
+    {
+      "name": "hwdata-pci",
+      "version": "0.408-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1WkJlq1KrNxIV3zWCZ0uWhn/Dy9Q=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/hwdata-pci-0.408-r0.apk",
+      "sha256": "fe61404e6d2bd1e04c021d53641c0ebce97911084d77994e43a288a1278686c1",
+      "bytes": 369102
+    },
+    {
+      "name": "isl26",
+      "version": "0.26-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1h2aiavL175vZ/r5IDg4dnzU3m4c=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/isl26-0.26-r2.apk",
+      "sha256": "30999fb66e296c8ea7aa102cad0d3095519b3022abb622d2951dd29367310ea9",
+      "bytes": 915985
+    },
+    {
+      "name": "jansson",
+      "version": "2.15.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1stvtY3e3CwJPyWQOnjlB9nQqEvU=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/jansson-2.15.0-r0.apk",
+      "sha256": "7681b41486e1f2b2efce11875c839533464ae8857d30fc49130f0039c6585fdb",
+      "bytes": 48950
+    },
+    {
+      "name": "json-c",
+      "version": "0.18-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q12w0mSfr4pSQU34qdbkrNtgMDtAM=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/json-c-0.18-r1.apk",
+      "sha256": "22dc7a8fe3eda0d22635615cca682b2a575ef25e8c2f401445e12be4cbf77302",
+      "bytes": 27819
+    },
+    {
+      "name": "lame-libs",
+      "version": "3.100-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1zEPleXcO8hgXJyg8pX+nhzxIQTE=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/lame-libs-3.100-r5.apk",
+      "sha256": "3f9df27e0451f8e1b32941c70bf73d7f3ec136b1b665921538f638d039a04e25",
+      "bytes": 124664
+    },
+    {
+      "name": "lcms2",
+      "version": "2.19-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1W5Tp72Knc1v0HtRficgyY9Lb0To=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/lcms2-2.19-r0.apk",
+      "sha256": "b4cb038af3c2f02bedd8456ae876c97ac0a9f29789add77871bfd6ce084ff136",
+      "bytes": 153297
+    },
+    {
+      "name": "libSvtAv1Enc",
+      "version": "4.1.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1xDjDWsyR8GUVUIXmelGaaAZBf4c=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libSvtAv1Enc-4.1.0-r0.apk",
+      "sha256": "ff92cdb4ee475fa2d3a80b10c550b0e45f290c95b0e7854f094fa26c9efd35ef",
+      "bytes": 3006752
+    },
+    {
+      "name": "libapk",
+      "version": "3.0.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1UjqPWBBFifdPdD1QHIG/ZRcVU3g=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "libarchive",
+      "version": "3.8.7-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1mrlHV79h8vmcl8FIfzI5P4YqX68=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libarchive-3.8.7-r0.apk",
+      "sha256": "4b90cf43fdc4666015b7849f9459b9daf0ed4c81b17a533dc10eacdd361532e2",
+      "bytes": 318904
+    },
+    {
+      "name": "libass",
+      "version": "0.17.4-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1np6PVu2ngUtuI0tQGb0TF1dwQDQ=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libass-0.17.4-r1.apk",
+      "sha256": "847da82365228c66dc875efdf7e364019303c59fb28f013699e992795f0a152c",
+      "bytes": 91667
+    },
+    {
+      "name": "libasyncns",
+      "version": "0.8-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1Wr2amTb6sQDhbE/eRklHLC/tC3I=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libasyncns-0.8-r5.apk",
+      "sha256": "aa1c243b7ece661644ed262f00a2606ce3fe467156b403bee609f95d1626c780",
+      "bytes": 9821
+    },
+    {
+      "name": "libatomic",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1CYp9vyHwoo/+1nsRF1KjCO0RLLM=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libatomic-15.2.0-r5.apk",
+      "sha256": "c5ec550c73dd7b4e81e206fdff3cf4c46b0ae1b29fec1db5cd4e12d88416abbf",
+      "bytes": 10241
+    },
+    {
+      "name": "libavif",
+      "version": "1.4.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1JB+v1cBXvVXlQqgzLnQ9LL8QYYM=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libavif-1.4.1-r0.apk",
+      "sha256": "f7086bf6e2d1ad1b265038d94ae8d66eccefbead5eac013f455c6763cb50a481",
+      "bytes": 121307
+    },
+    {
+      "name": "libavif-apps",
+      "version": "1.4.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1rR/xSv9bqiXMD+m3IkJrs979Cnw=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libavif-apps-1.4.1-r0.apk",
+      "sha256": "baf703f385f2b1e88981169a906963aaf5ac84ff40a1f76076bfb023b5966802",
+      "bytes": 179859
+    },
+    {
+      "name": "libavif-dev",
+      "version": "1.4.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1QPuE4wOS9ZBDfPf4EWtXTRk5R6M=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libavif-dev-1.4.1-r0.apk",
+      "sha256": "58f499bbd40e7fdb900c71e794133bc23549794fb9ab6c371267544539954dfa",
+      "bytes": 30957
+    },
+    {
+      "name": "libblkid",
+      "version": "2.42.3-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1B0eyM6avTem7+AUq2YfRl/hqcrQ=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libblkid-2.42.3-r1.apk",
+      "sha256": "2512c2bff496ac2b8561a3c814d21d35ce10cda579b3d410f9f96da93a5aaac1",
+      "bytes": 98429
+    },
+    {
+      "name": "libbluray",
+      "version": "1.4.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1Ha5nZJGC/reD7NmvkcvCTmx5pYM=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libbluray-1.4.0-r0.apk",
+      "sha256": "b8d2940640d303cc943851bade5fbc75b6813b936014533dea304f0b72464795",
+      "bytes": 111647
+    },
+    {
+      "name": "libbsd",
+      "version": "0.12.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1gkX/ff7mAMnaZ+N1ehVr2FJ2QlE=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libbsd-0.12.2-r0.apk",
+      "sha256": "407597c04b41dbfe8a05b35d45a3453e32fae7df84aed3a06ff48dd4df1338b6",
+      "bytes": 30407
+    },
+    {
+      "name": "libbz2",
+      "version": "1.0.8-r6",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1CFZrpcevl8JUdL6LJOi0jwEWtn0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libbz2-1.0.8-r6.apk",
+      "sha256": "2737e2b23ed08d4911ee62cd0163b5f4bf0379cacf4dc35b23a00209584c98fd",
+      "bytes": 35467
+    },
+    {
+      "name": "libcrypto3",
+      "version": "3.5.7-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1SBr7xSvPBvIxbJOgqBzo9yvtUD4=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "libcurl",
+      "version": "8.22.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1eBYAa2ryJwq25+hfdK25TBa9xIs=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libcurl-8.22.0-r0.apk",
+      "sha256": "40b2a8e15a8d24bc95a5f42aaeb018313a1ff457cee71d8e15aaf1328da765e8",
+      "bytes": 358307
+    },
+    {
+      "name": "libdav1d",
+      "version": "1.5.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q19QMIkG43lvBAaJ48gBGbWDlGvKY=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libdav1d-1.5.3-r0.apk",
+      "sha256": "40a2b1b92cdcc6fd295934f799ee80ef67e2e384097624d565c6222d827f8480",
+      "bytes": 727596
+    },
+    {
+      "name": "libdisplay-info",
+      "version": "0.3.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q16FqiHWPsPBVy6H426zLGEsA6E1Y=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libdisplay-info-0.3.0-r0.apk",
+      "sha256": "f356bc2fd3ea269f58de6688a550503318216bba87899281c36dbb16285f873c",
+      "bytes": 79051
+    },
+    {
+      "name": "libdovi",
+      "version": "3.3.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1RWX7w05XNHfGt/Dc/w5YplygXwg=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libdovi-3.3.2-r0.apk",
+      "sha256": "3e1405d1da7bde37ae5672fc7e12b8bbf36357dd25b62ec6863a23535693e4fb",
+      "bytes": 214926
+    },
+    {
+      "name": "libdrm",
+      "version": "2.4.134-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1JfwxYBbLCtoCCs6kks6MxkdbfP8=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libdrm-2.4.134-r0.apk",
+      "sha256": "584fd84ad5030040e613fa1816097cd1706ddd542100070852b0eab6e09e12ca",
+      "bytes": 201551
+    },
+    {
+      "name": "libdvdcss",
+      "version": "1.4.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1iCzKdFFpUpAYxGIiezZMBlZRlA4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libdvdcss-1.4.3-r0.apk",
+      "sha256": "ee57c56316be61bd1a7a81a31a314dbe18fd6d3f50ae9c7d257d5364108d652a",
+      "bytes": 17213
+    },
+    {
+      "name": "libdvdnav",
+      "version": "6.1.1-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1ohWYBq3PyUZxZovi8CzqcIzfNXE=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libdvdnav-6.1.1-r1.apk",
+      "sha256": "0453bfc903301c7664dfc4b2e6558c753f586b10a03b325600807ff74520d02b",
+      "bytes": 34703
+    },
+    {
+      "name": "libdvdread",
+      "version": "6.1.3-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1I7FYgo5vqDFDXGaNvX1s0JFGmOQ=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libdvdread-6.1.3-r2.apk",
+      "sha256": "ab29b485893e06d71a0473efa3d18226c023030b1850440dc7ac324d664eccb9",
+      "bytes": 46570
+    },
+    {
+      "name": "libeconf",
+      "version": "0.8.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1M57ga4q1Zc6sMwKtO44cuhd6S2g=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libeconf-0.8.3-r0.apk",
+      "sha256": "2a791c7957961f830cf31b04f35f814a63afcf633badc9052425ff1cf2f64380",
+      "bytes": 26054
+    },
+    {
+      "name": "libelf",
+      "version": "0.195-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1jDk1so4Fk4hXYTF9Jgu116xuUAA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libelf-0.195-r0.apk",
+      "sha256": "78c5a1993342ab1bdcdce30639fd0937e8000f6d0d85cea171f573d31decd036",
+      "bytes": 43475
+    },
+    {
+      "name": "libexpat",
+      "version": "2.8.5-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1H6vHuQDzoSWyIP9VB9qmd331BI0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libexpat-2.8.5-r0.apk",
+      "sha256": "2e56946bc495cbed9eb1ad70859a79cba9db6420016453e065a0628848b32c7e",
+      "bytes": 61355
+    },
+    {
+      "name": "libffi",
+      "version": "3.5.2-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1L3smH3/OzE7r2LMw5/b7gHE7/jo=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libffi-3.5.2-r1.apk",
+      "sha256": "6da1a19313a40c56cac756fb11e2c4d5267831e1c22fc8323f24c943c94da6e0",
+      "bytes": 18348
+    },
+    {
+      "name": "libflac",
+      "version": "1.4.3-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1hOLZ255tf0WrE21fXekRlEPeCR4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libflac-1.4.3-r2.apk",
+      "sha256": "683e75654d71965a504acd09fa5829cd7f376b4317b9fc905ebc7944f97965bb",
+      "bytes": 205362
+    },
+    {
+      "name": "libgcc",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1N5wVbFPgzBQOh8ecCj3SK27lFVI=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "libgcc-static",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1LSywFilrZ7CEu/f6MfIEV5TB+sY=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libgcc-static-15.2.0-r5.apk",
+      "sha256": "563244a562f5c48b921f7f0b4a571e373cfcba65175fe2d4f752c5f975738bcd",
+      "bytes": 2249602
+    },
+    {
+      "name": "libgfortran",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1xKyw5Q0oCo3LaOkzM3GjSXR1sCs=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libgfortran-15.2.0-r5.apk",
+      "sha256": "256c1605c7f70075aef81e488099341205b915b7911924d6a9a6ad7cddf82451",
+      "bytes": 1219629
+    },
+    {
+      "name": "libgomp",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1pQKGM0/KCNQbVAnY4xg2u5d+RbI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libgomp-15.2.0-r5.apk",
+      "sha256": "e7204aad00e31d544e0a34eac5a7eb7d3586d2b7b22afd6e5907189c4e0337cc",
+      "bytes": 153729
+    },
+    {
+      "name": "libhwy",
+      "version": "1.3.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1GAAQbZLPQhQb7vW+q2kLsPICeUM=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libhwy-1.3.0-r0.apk",
+      "sha256": "a4356d71e627b5321a89a3f4cce1d491950e2358fecafc01b89d2cabe8c9e473",
+      "bytes": 25652
+    },
+    {
+      "name": "libidn2",
+      "version": "2.3.8-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1WADRTOieFhSPTMwt90I1znrt+AA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libidn2-2.3.8-r0.apk",
+      "sha256": "7d038ac558dde464964b033ce5126dd2eaf84cc414dc15e77c5424a321d0ebee",
+      "bytes": 104623
+    },
+    {
+      "name": "libimagequant",
+      "version": "4.2.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q19lhfeOqIyeIK7I/HZNJ56talyCU=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libimagequant-4.2.2-r0.apk",
+      "sha256": "70dd9326d1bb8f598e6b7fca9c8de70476ceb1133ab4144aaaba30a8dde2e0b8",
+      "bytes": 233065
+    },
+    {
+      "name": "libintl",
+      "version": "1.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1KC1mQsyshyN+Q6hkFZ1zz1q+dVA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libintl-1.0-r0.apk",
+      "sha256": "cb03919cba5624b5e8759d04f3b31913b02585355988b914bc31de4746ff5ef6",
+      "bytes": 39537
+    },
+    {
+      "name": "libjpeg-turbo",
+      "version": "3.1.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1XoUYPAUnQ5Fs2YfIwwW3cJrMu9k=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libjpeg-turbo-3.1.3-r0.apk",
+      "sha256": "6299627dd0a9156a7463511e4915a6294dfb592d8b4bdf85e55265adf1b8ea04",
+      "bytes": 203552
+    },
+    {
+      "name": "libjpeg-turbo-dev",
+      "version": "3.1.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1vwUodyI399iMdKHxdWQlB6QM8G4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libjpeg-turbo-dev-3.1.3-r0.apk",
+      "sha256": "1538e8ca2b4b5ed1a41b2da69d72c88611bbbe6ca6f0fdd8268c9c7c1bdf147a",
+      "bytes": 50226
+    },
+    {
+      "name": "libjxl",
+      "version": "0.11.2-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q10z/SwefqrLFA3fS52GgPIRbOnts=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libjxl-0.11.2-r1.apk",
+      "sha256": "47730997ac8b0d08de5461c78a5c571af1b9e42283dc0da2af400acc60d02693",
+      "bytes": 1621496
+    },
+    {
+      "name": "libltdl",
+      "version": "2.6.0-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1xN/elRqQdCGMDQYGDk/mBjj+trI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libltdl-2.6.0-r1.apk",
+      "sha256": "5a61ee2419f1ca973ee03655265a52ba9296827169872ad1b645badb56984610",
+      "bytes": 16509
+    },
+    {
+      "name": "libmagic",
+      "version": "5.47-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1ltPuxLs43HElRQ0kbH7Cm2J0cJc=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libmagic-5.47-r2.apk",
+      "sha256": "1820acd299025619a848b19ac98c7996fd92c06965255898800b6a790a8b03a2",
+      "bytes": 526164
+    },
+    {
+      "name": "libmd",
+      "version": "1.2.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1NHil8cK7mbjgH+nwTRdcKuhuC/M=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libmd-1.2.0-r0.apk",
+      "sha256": "f6d68d072fcefc8edd4ffe3afc341ca391f8a9a209130628fb065d98b18a2792",
+      "bytes": 27352
+    },
+    {
+      "name": "libmount",
+      "version": "2.42.3-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1wo9h/WfRT1pMKoyHQWQgQ4Jxykw=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libmount-2.42.3-r1.apk",
+      "sha256": "e2ae003260f2c1ec13666c6e108d5e8e3d64974b0667166a02432bd3be263a7a",
+      "bytes": 134799
+    },
+    {
+      "name": "libncursesw",
+      "version": "6.6_p20260516-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1nzGObjJNaCcnSCkZTPasavut7RI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libncursesw-6.6_p20260516-r0.apk",
+      "sha256": "cf8caa8a88bc4ce9d9e395567fefaf9ef7fbd55c50ae6155b35c1b58f3755023",
+      "bytes": 159438
+    },
+    {
+      "name": "libogg",
+      "version": "1.3.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1VaET5Bz6akl4cJ1GNKuzYAwNfDw=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libogg-1.3.6-r0.apk",
+      "sha256": "597c42559f346f9dc019e4165c9408baeb3d6aad828d548916b55fa51fe81183",
+      "bytes": 20892
+    },
+    {
+      "name": "libopenmpt",
+      "version": "0.8.9-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1YcT6doOomHMMIfNrDteEv9oWz60=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libopenmpt-0.8.9-r0.apk",
+      "sha256": "57e8c53487372c879350815418dda2698093ae9221bd3c25c5e6d05714c461e7",
+      "bytes": 658904
+    },
+    {
+      "name": "libpanelw",
+      "version": "6.6_p20260516-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1FJvcQ0Iy7RH8W7l1ulGaBxVKb1Y=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libpanelw-6.6_p20260516-r0.apk",
+      "sha256": "057be8b1b788580f4cb72c382a6dcc03467d15bd69700f32192bd709e7a57a12",
+      "bytes": 5563
+    },
+    {
+      "name": "libpciaccess",
+      "version": "0.19-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1uL2CK0H32JRLgUg9qtWLM2RuDfg=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libpciaccess-0.19-r0.apk",
+      "sha256": "03fdccd1e2a0825e7f7fabbac67212e05d271d31d2eff44cc92f707e69908ad4",
+      "bytes": 14743
+    },
+    {
+      "name": "libplacebo",
+      "version": "7.360.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q18UeOkZQ/mot/HKbkDf4UKDZcyzc=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libplacebo-7.360.1-r0.apk",
+      "sha256": "fbd0f174d5e56b22b6bd7b335519b7eb7a32bf25e2c66baec38e8d57d40f541a",
+      "bytes": 464485
+    },
+    {
+      "name": "libpng",
+      "version": "1.6.58-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1wsxAneG10hTX8gjHK+U+faF9XqY=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libpng-1.6.58-r1.apk",
+      "sha256": "7c1988460b88cbf22f0b7a25eaa1c456b3c9def3523580779d53dd0dd72357d4",
+      "bytes": 95802
+    },
+    {
+      "name": "libpng-dev",
+      "version": "1.6.58-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1aYaDknp81d76w/V6l7nvQBuCAg4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libpng-dev-1.6.58-r1.apk",
+      "sha256": "9b8fcef59c1abeb9c7de4b26c5387acc66be8930b3f986221220da5c80092110",
+      "bytes": 52501
+    },
+    {
+      "name": "libpsl",
+      "version": "0.21.5-r3",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1pVHd1dbLORPhofR7AvIa4Gi16Qo=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libpsl-0.21.5-r3.apk",
+      "sha256": "ec665a344b6e887f00f0a47015cc732c3a281b69e84641dc8662ea234fde6cdb",
+      "bytes": 54692
+    },
+    {
+      "name": "libpulse",
+      "version": "17.0-r7",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q19FX05GEG51uqhKfbiFdyPRQtTso=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libpulse-17.0-r7.apk",
+      "sha256": "d6dce9bdc404a69d4a7902d947de52e22ab96e867c7901f7ef51026e23534aa3",
+      "bytes": 567613
+    },
+    {
+      "name": "libquadmath",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1A/+sZ2ou2pHQQAwzNgALp/jGgrg=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libquadmath-15.2.0-r5.apk",
+      "sha256": "e968b32239b3fabc34d8c27be559f22f18d78aa68d7eb1020583b6f188fd7b1f",
+      "bytes": 161312
+    },
+    {
+      "name": "librist",
+      "version": "0.2.15-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1IFoK7O3TwFvfT2KBczLbdRu8CvU=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/librist-0.2.15-r0.apk",
+      "sha256": "11d25fc6691b34002c8d3b65c8a0587660c3cbc5d843424c80196583edf8b80d",
+      "bytes": 72240
+    },
+    {
+      "name": "libsharpyuv",
+      "version": "1.6.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1trZ9j68zMdqH8tS/RCaKY/wYkkk=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libsharpyuv-1.6.0-r0.apk",
+      "sha256": "34621ff53f43030d24d1224fe9cb53b1590ab614cbce6080005cde703e6c874a",
+      "bytes": 11999
+    },
+    {
+      "name": "libsndfile",
+      "version": "1.2.2-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1hgnbWxtqFGgcpY4M4iugbzAncvQ=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libsndfile-1.2.2-r2.apk",
+      "sha256": "56b9aff207756be28b7cbb013a5ae063761e2721ecc1b10ca393d670eff808f2",
+      "bytes": 217710
+    },
+    {
+      "name": "libsodium",
+      "version": "1.0.22-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q15b+nuMfgY59E1X1KqsJiHkZSOq0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libsodium-1.0.22-r0.apk",
+      "sha256": "9104e01a043d92f1f646e5750a6ba9d8a030f4d87f6c5690e8a015f0d9a4ab73",
+      "bytes": 199175
+    },
+    {
+      "name": "libsrt",
+      "version": "1.5.3-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1uO3ttRMwMztoTIfjO98267CopVk=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libsrt-1.5.3-r1.apk",
+      "sha256": "a7b2c3d08e8a4d2464629caa26b482b7f204e4fa5171b849565a4e82ab6144e9",
+      "bytes": 416300
+    },
+    {
+      "name": "libssh",
+      "version": "0.12.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1rFOgvxOnMiD1Kx237ML6O0MiuwA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libssh-0.12.2-r0.apk",
+      "sha256": "ad36fea448d82f3ed08fcd8eefeabb60f56ef94d1c8c66e1282443521fe72d01",
+      "bytes": 206002
+    },
+    {
+      "name": "libssl3",
+      "version": "3.5.7-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1JAyCUtHKFFhzwDyZeWZpjrUJ90U=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "libstdc++",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1X3oq12RhKLoCzA1vuUZytoRWSNU=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "libstdc++-dev",
+      "version": "15.2.0-r5",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q16OyN4lX+7wXQ0QH7GOJr46LbZ7U=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libstdc++-dev-15.2.0-r5.apk",
+      "sha256": "62ce308cdbf127dcac6eee1520a4ffec8dc98b30974653908842fe4cc7d90b43",
+      "bytes": 4145023
+    },
+    {
+      "name": "libtheora",
+      "version": "1.2.0-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1TiKmMjCXl/a+g44HUcBE2gBkGyc=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libtheora-1.2.0-r1.apk",
+      "sha256": "d3cd6213cbf316656c0d07eb195f9ad30204283d65c83233ca846c21b867b993",
+      "bytes": 371058
+    },
+    {
+      "name": "libturbojpeg",
+      "version": "3.1.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q11+BsImeed8U1anlSdBBQLrMXdH8=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libturbojpeg-3.1.3-r0.apk",
+      "sha256": "758d0dde2d877ef540fa8fe521765c663746f148181be19b5f43219605cef8d3",
+      "bytes": 261844
+    },
+    {
+      "name": "libudfread",
+      "version": "1.2.0-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1vabiwrjlgHeTsdKAaym6KipjcD4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libudfread-1.2.0-r1.apk",
+      "sha256": "8a5153b573d53af754211e3062b920745c4371b189294148399cd30ae7f5aeac",
+      "bytes": 13583
+    },
+    {
+      "name": "libunibreak",
+      "version": "6.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q19wGwXjQSpPXrH0busN/WP1rgoOU=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libunibreak-6.1-r0.apk",
+      "sha256": "8b8d7a9261ac6395bce3662a6dee673e581325d8675df2736c8c799d5112181b",
+      "bytes": 27980
+    },
+    {
+      "name": "libunistring",
+      "version": "1.4.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q19QnIAdBw+OqfdADVCTyIj/H+4C4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libunistring-1.4.2-r0.apk",
+      "sha256": "3aa6030e603e34d96192742f327c0509f409c6769ce2e7b1463685dede38d714",
+      "bytes": 743597
+    },
+    {
+      "name": "libuv",
+      "version": "1.52.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1htHtaGu526x5ZXLBpvOUAO1pAA0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libuv-1.52.1-r0.apk",
+      "sha256": "a0074b92335b4d8b16c001a9a580caced88aa5de0552a02dc32a9ee0ed5aaa03",
+      "bytes": 99585
+    },
+    {
+      "name": "libva",
+      "version": "2.23.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1KCyIfyfDpFH6lCtnp1bxfI7pl1Q=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libva-2.23.0-r0.apk",
+      "sha256": "90d7fa9a7a1ac5b9c879a218d0818bfb726b1d32482c6b6c174a01c4337c5bba",
+      "bytes": 82567
+    },
+    {
+      "name": "libvdpau",
+      "version": "1.5-r4",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1w6C71Z6nWUi2Jvi0duZoIv8dJ+U=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libvdpau-1.5-r4.apk",
+      "sha256": "1f200646e6d5fcd757d457d8e13232690fd6facfff9c5ee130b81c87da5f64ac",
+      "bytes": 25936
+    },
+    {
+      "name": "libvorbis",
+      "version": "1.3.7-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1WJhCIqu4fgL3OkjP953HUoC/QzU=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libvorbis-1.3.7-r2.apk",
+      "sha256": "3a9f459499e52caf84c091ddea59a4da183152ab97cff39980a5703674d40c47",
+      "bytes": 183892
+    },
+    {
+      "name": "libvpl",
+      "version": "2.15.0-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1xhv0pU51kqTI9argQ4i2z9hMZnw=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libvpl-2.15.0-r1.apk",
+      "sha256": "ce89c7c73f3615606dd94cde42868d1b4ca1ce6ec7feca8c8102c8e089dce0ba",
+      "bytes": 172958
+    },
+    {
+      "name": "libvpx",
+      "version": "1.15.2-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1LQqE6Z+DqGR4+324XIj6qKF++Pw=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/libvpx-1.15.2-r1.apk",
+      "sha256": "d5006c292a957a30d3c97e2d85e165051bb2366cb8e7c5b8ee1a601972d63a9f",
+      "bytes": 1332899
+    },
+    {
+      "name": "libwebp",
+      "version": "1.6.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1R8iOacTO/eYdlBdKzosRtSmHEso=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libwebp-1.6.0-r0.apk",
+      "sha256": "dc50c0280348330bb113079331c4a35d85e28351c7baa9268ee346aad8398288",
+      "bytes": 276581
+    },
+    {
+      "name": "libwebpdemux",
+      "version": "1.6.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1UM/N+cqAZ+PIN/tvVcw47h/M8To=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libwebpdemux-1.6.0-r0.apk",
+      "sha256": "a4fad211e35c4d87c44015259be007c1922868207cf75fec71127d1e5095b0da",
+      "bytes": 9613
+    },
+    {
+      "name": "libwebpmux",
+      "version": "1.6.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1J5EVeQdIvG6K4K0RuPuDPxy2/EE=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libwebpmux-1.6.0-r0.apk",
+      "sha256": "a1004424a4eb991f4db0cef3aa50a61d91f0221ce982d5fbd5e26ee87666558f",
+      "bytes": 21182
+    },
+    {
+      "name": "libx11",
+      "version": "1.8.13-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1LdyNF7O7mkXtXKt43TvITXj8otA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libx11-1.8.13-r0.apk",
+      "sha256": "eb7adb36436d82c54f36db61dd0493010f8bd2267320a04a6ed0809dffcb0a9b",
+      "bytes": 867519
+    },
+    {
+      "name": "libxau",
+      "version": "1.0.12-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1T7YttHMkJFjfa81G/zrQjSqogDg=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libxau-1.0.12-r0.apk",
+      "sha256": "3506cdba7ed916a6f814a010fbb127dbfdae4147107f64a15f5fa2651c5d8510",
+      "bytes": 5612
+    },
+    {
+      "name": "libxcb",
+      "version": "1.17.0-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1jKp0ng0vxHiOBwaTAmKsgdnNDhA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libxcb-1.17.0-r2.apk",
+      "sha256": "7935d5ad9c7137b7b3f1292d62f55f7e0cc5c919155218c3060ea46503b3f211",
+      "bytes": 236075
+    },
+    {
+      "name": "libxdmcp",
+      "version": "1.1.5-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1IE5BPAIitq56lK3FO5BX01Nv0gA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libxdmcp-1.1.5-r1.apk",
+      "sha256": "2a93f44f3f85c1eda9ed53691c35d0742b5fcd8e0057cd7380934025936cbf6f",
+      "bytes": 9361
+    },
+    {
+      "name": "libxext",
+      "version": "1.3.7-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1b2MeKzO2ZKVGs6Gn3WWAW4d2vvA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libxext-1.3.7-r0.apk",
+      "sha256": "8afe1ee6ab8cb656e12f20dc5b7fb2d4103faee4a38298b94f26ab52e597cbc8",
+      "bytes": 25347
+    },
+    {
+      "name": "libxfixes",
+      "version": "6.0.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1YnmzvrZmxx7WHqZGSYi5MOKepBQ=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libxfixes-6.0.2-r0.apk",
+      "sha256": "cb00578d1b83abe8baf291f311f194d4deca0f9cf525f47ab10e3bd7c0e54e24",
+      "bytes": 8578
+    },
+    {
+      "name": "libxml2",
+      "version": "2.13.9-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1wsLLRGR93IyCrnjIrKm9StWnNto=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libxml2-2.13.9-r2.apk",
+      "sha256": "4b2f986159c659f014b942fe8a5d70c67af475153ca826c3dd53389eea46a300",
+      "bytes": 495342
+    },
+    {
+      "name": "libxml2-dev",
+      "version": "2.13.9-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1tx0HnsqIm6XCHC/3F3aUGEYJB38=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libxml2-dev-2.13.9-r2.apk",
+      "sha256": "02137d27a68f7cdc4ae7d25fe8cdff4b4557037cd58c590a962ce4932d4ad91c",
+      "bytes": 87415
+    },
+    {
+      "name": "libxml2-utils",
+      "version": "2.13.9-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1Nh8jqHRsXbUY3IHlattLJbZhLY4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libxml2-utils-2.13.9-r2.apk",
+      "sha256": "4c45089cd1999f300cf244c8f4c2c2673844c0a7e27d05e5484c8ac8cf6ea8df",
+      "bytes": 28097
+    },
+    {
+      "name": "libxshmfence",
+      "version": "1.3.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1IyjDGlzmb5PmueK1VpEIK4uC8+0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libxshmfence-1.3.3-r0.apk",
+      "sha256": "53790552de7eea17a47aa4c082b06b735c545a0947c41128f97c7be95a7d3d92",
+      "bytes": 3898
+    },
+    {
+      "name": "libyuv",
+      "version": "0.0.1928-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q13MXzWFdDE6yRn5ZCgTgx7zABbbA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libyuv-0.0.1928-r0.apk",
+      "sha256": "f72ec03d1a1db08f7efa2d005765783e73188397a64e41090702105856b347b6",
+      "bytes": 714677
+    },
+    {
+      "name": "libzmq",
+      "version": "4.3.5-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1CL3OqVq5/qdC46wfdJ5qmSJ/nbU=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/libzmq-4.3.5-r2.apk",
+      "sha256": "6bdc93b3ca98fea14a1fb29c6874fc8c460096d03b956f92632cbad58cdf444d",
+      "bytes": 261408
+    },
+    {
+      "name": "lilv-libs",
+      "version": "0.24.26-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1l7ZxCS0xm+7/nTYBscW6GFSQM+M=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/lilv-libs-0.24.26-r1.apk",
+      "sha256": "f3b94634be78ac1f559d2931c3a5cf1980d1721cf21dae79068c861dc9a907f7",
+      "bytes": 35855
+    },
+    {
+      "name": "llvm22-libs",
+      "version": "22.1.3-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1VF2MAgWKlu0OUghoP2kVGwUj4XU=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/llvm22-libs-22.1.3-r0.apk",
+      "sha256": "de10a3114c14e4afec35fabaaf1a3834392d24f6f394532a301b56eca4f0065d",
+      "bytes": 67286194
+    },
+    {
+      "name": "lz4-libs",
+      "version": "1.10.0-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q11juy4XB6pMoLdahncG6gPfcLxb0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/lz4-libs-1.10.0-r1.apk",
+      "sha256": "3ad4912ab8ecf5f6236fdb751f88243006b3a8f152684e455b781e16284dd298",
+      "bytes": 79080
+    },
+    {
+      "name": "make",
+      "version": "4.4.1-r4",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q16u7esOU7FzmPmdhm1ULM2FUDXoc=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/make-4.4.1-r4.apk",
+      "sha256": "a916626a876f64c6b6fb32a6bf0fa93351d09fae0aa7684135642390da647e60",
+      "bytes": 116285
+    },
+    {
+      "name": "mbedtls3",
+      "version": "3.6.7-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1ykIMmHi7UI2INhimjybj0OYtKIo=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/mbedtls3-3.6.7-r0.apk",
+      "sha256": "d4ac9dec9efd61bb7cc72929eaf944279439068b0b07c7d2167bfab98dce9273",
+      "bytes": 413074
+    },
+    {
+      "name": "mesa",
+      "version": "26.1.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1Tu9nmlrTDgDYldiNCVYUmPHxGTc=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/mesa-26.1.6-r0.apk",
+      "sha256": "8fb0e3d386f09df4f3e3643108b38197558465b2558e6d66d6a9c055adc8d1a9",
+      "bytes": 13769605
+    },
+    {
+      "name": "mesa-vulkan-swrast",
+      "version": "26.1.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q13ifh3AQR4Z8J1CpTkKLUu+MgnT0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/mesa-vulkan-swrast-26.1.6-r0.apk",
+      "sha256": "53503ce34df9b6865937a758683d1b0baa64f58f962db6487585d8393969d1c0",
+      "bytes": 2896816
+    },
+    {
+      "name": "mpc1",
+      "version": "1.3.1-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1zoHFOiiws36XfRdKmvFr3Q6g86U=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/mpc1-1.3.1-r1.apk",
+      "sha256": "c2247438e163f1c11646428f07576ceb3cf3167f9a9a5c6526021f778d77adb6",
+      "bytes": 48549
+    },
+    {
+      "name": "mpdecimal",
+      "version": "4.0.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1DIHOsOi1lms8MPVXtY2cb+RvbvY=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/mpdecimal-4.0.1-r0.apk",
+      "sha256": "1278f374bbc8b4aad674244458cca5fc63e0780a921138eef400d5db64381a31",
+      "bytes": 78803
+    },
+    {
+      "name": "mpfr4",
+      "version": "4.2.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1WQj5oBtPWCI27xE1p9BXYXu0KnI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/mpfr4-4.2.2-r0.apk",
+      "sha256": "93620a803d416e8c05150fb14413796df14ea370322dff6bd106455deab15646",
+      "bytes": 313348
+    },
+    {
+      "name": "mpg123-libs",
+      "version": "1.33.5-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1YXsRtLXGCK9yVWd/kJmkt6zXQpA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/mpg123-libs-1.33.5-r0.apk",
+      "sha256": "3cab9a9a4b414a77dd9947e227e32d6108361ebdf8c6c1ee61345d9c42abc6f3",
+      "bytes": 171790
+    },
+    {
+      "name": "musl",
+      "version": "1.2.6-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1D35YJ+ThpzYxvtont4QxqLokDgU=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "musl-dev",
+      "version": "1.2.6-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1GLxvowsPniwgZS2WwkMNuxSTj0M=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/musl-dev-1.2.6-r2.apk",
+      "sha256": "6831e8b9e4821dae2c9121f0641f81e543f4ac27c03144c4876980ee84e6988f",
+      "bytes": 3421233
+    },
+    {
+      "name": "musl-utils",
+      "version": "1.2.6-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1da2jxI1j7F2HxC/fk0o/3REpjcU=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "ncurses-terminfo-base",
+      "version": "6.6_p20260516-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1nVUdgo6cjuUsWAHB1gRoKOvxV1I=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/ncurses-terminfo-base-6.6_p20260516-r0.apk",
+      "sha256": "ce83be6d0bd10584a53c3a5868cc1595ce5f0f8e0b621f8f7f70b6144e521fc9",
+      "bytes": 22172
+    },
+    {
+      "name": "nghttp2-libs",
+      "version": "1.69.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1UzG4xkH3qQkc4vQ9rSqZhRxPSxI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/nghttp2-libs-1.69.0-r0.apk",
+      "sha256": "7d7705cea464389989d3ca6b9505dbfce3cf25cfca1eeb06709a9909f93f4f11",
+      "bytes": 63231
+    },
+    {
+      "name": "numactl",
+      "version": "2.0.19-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1PcAOVrefQ5JrXxK1PMPrntCQZ4Y=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/numactl-2.0.19-r0.apk",
+      "sha256": "4a78670a16d9ae7377906e2084be7430197d4b4c24877d65712dd1d4597b59db",
+      "bytes": 20036
+    },
+    {
+      "name": "openblas",
+      "version": "0.3.30-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1y0YKQJgMP+NQPfrrP9iQhQh/fRE=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/openblas-0.3.30-r2.apk",
+      "sha256": "acdd95cda738a0902bc13d6d50b9b26e10b6e4ee0f9301b3974b4414e3fd3bbe",
+      "bytes": 11089751
+    },
+    {
+      "name": "openjpeg",
+      "version": "2.5.4-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1z39kHOZCtk94D+Wrv/x3Crd7Kq0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/openjpeg-2.5.4-r1.apk",
+      "sha256": "19ff1590a0885c35ac47b4b15c590d99745e368d0964c205f8dea26d4d0103fb",
+      "bytes": 135516
+    },
+    {
+      "name": "opus",
+      "version": "1.6.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1DHHBO1zyeGJTXduPomH5Yjx6iPI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/opus-1.6.1-r0.apk",
+      "sha256": "8aecfcbe5b02eb8642ebc8703880ac3bbcdbeac537495bd98c5e4269c904f9e0",
+      "bytes": 270024
+    },
+    {
+      "name": "orc",
+      "version": "0.4.41-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1SO7Qku4e700NiKYI/K2zJB5reW0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/orc-0.4.41-r0.apk",
+      "sha256": "4a340f33fa4e180a22e6428fb8089e2ef0a14bb07322138f9c2d87b7afa2e995",
+      "bytes": 194882
+    },
+    {
+      "name": "patch",
+      "version": "2.8-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1IfHyFnSWD3glaiuO9vGoKMk6Hkk=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/patch-2.8-r0.apk",
+      "sha256": "723c061ea3e2c3e61b457f8f614f0b87724aeae37564ba4c1bdd41c722118187",
+      "bytes": 69750
+    },
+    {
+      "name": "pcre2",
+      "version": "10.48-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1R8XO5zv/GM4xu1AQQ8Yo8E0q+Uo=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/pcre2-10.48-r0.apk",
+      "sha256": "cffaedb6cf404647619a8b0323958d293d9cd240e8f887c16bdf4b0a039f993a",
+      "bytes": 322467
+    },
+    {
+      "name": "perl",
+      "version": "5.42.2-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1clvjeUcP9oH3cO1yVEehtoqhJfo=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/perl-5.42.2-r1.apk",
+      "sha256": "0c57f655954b9183711d850b9ccb369f22aabd70f3ce617fe9f67eac2ef2afa7",
+      "bytes": 10169062
+    },
+    {
+      "name": "perl-error",
+      "version": "0.17030-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q14f6mlYLTVrj0kEoWMykrdAZOFAs=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/perl-error-0.17030-r0.apk",
+      "sha256": "8169a2bc811347acec8ddb0973d1f0a6aa398a92683034ec14ce3d75332afae5",
+      "bytes": 11920
+    },
+    {
+      "name": "perl-git",
+      "version": "2.54.0-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1u3GFhgJgPQsfkNo8M4eQ0sfcLM8=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/perl-git-2.54.0-r0.apk",
+      "sha256": "fe5ede50ae53f41b9561d12ff1035a8f57813ae38b3b8a11f80ccab54a1d1491",
+      "bytes": 33201
+    },
+    {
+      "name": "perl-image-exiftool",
+      "version": "13.55-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1fa7iZXgb2thrCksEIhEcn7aOj8Q=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/perl-image-exiftool-13.55-r0.apk",
+      "sha256": "080ac79085aaf92195b33ce236dba78a48e094b90e685982878c06b99ac84d4b",
+      "bytes": 5462305
+    },
+    {
+      "name": "pkgconf",
+      "version": "2.5.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1B0VN8FiPJzB3eATqTdiQ3m4d/d4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/pkgconf-2.5.1-r0.apk",
+      "sha256": "20cc47b76b82e9424a35ecc4fdd7bd904ef49ada1684214910fae31bc0cab737",
+      "bytes": 53905
+    },
+    {
+      "name": "py3-numpy",
+      "version": "2.4.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1aNgGU56UpliQah5hH6xiomVoEow=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/py3-numpy-2.4.6-r0.apk",
+      "sha256": "a145aa2dad0d3b99dd20682ac1c77df518ab697be070af2a8b0bf0a45df64836",
+      "bytes": 4263375
+    },
+    {
+      "name": "py3-numpy-pyc",
+      "version": "2.4.6-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1ze1Ep7XwJO7Y8gJjLUC3DtAc/CU=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/py3-numpy-pyc-2.4.6-r0.apk",
+      "sha256": "2cefa5dbeff08f69fd9f31967f6fd6c40ac799b7c4715201130b05a3ffcb8b08",
+      "bytes": 1453886
+    },
+    {
+      "name": "py3-numpy-tests",
+      "version": "2.4.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q13m9Rj8Tz47/nDToIL9lDnrocR38=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/py3-numpy-tests-2.4.6-r0.apk",
+      "sha256": "666eff14694f06668b3ec2a5bad8ae1b002e312a7668206838b4d781f2bfdb2d",
+      "bytes": 3899555
+    },
+    {
+      "name": "py3-pillow",
+      "version": "12.2.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1vbrsLnIHtgVx+k+fi90f7OLzy1E=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/py3-pillow-12.2.0-r0.apk",
+      "sha256": "009f412b5731e1c9beefac71e1e258406217b823661ba8c7d4f0878be531e1ad",
+      "bytes": 587793
+    },
+    {
+      "name": "py3-pillow-pyc",
+      "version": "12.2.0-r0",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q14Gyfw6hqYUB4rq0DYLbAEqNNOPg=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/py3-pillow-pyc-12.2.0-r0.apk",
+      "sha256": "72e842041fcef5c0a1f3a1426f40f49332f1dfe3b88067cf3e15c3c6ef105a70",
+      "bytes": 623017
+    },
+    {
+      "name": "pyc",
+      "version": "3.14.7-r1",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q1ITCblxEOKhTbtoJ5t+d8bZ3dxdE=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/pyc-3.14.7-r1.apk",
+      "sha256": "353665d585c0c54705794fea9667c6b8afe8accb525e30819e9c1d4b9383b673",
+      "bytes": 1268
+    },
+    {
+      "name": "python3",
+      "version": "3.14.7-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q19+7OPzdzLS4XWcfc51M9SrhalfA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/python3-3.14.7-r1.apk",
+      "sha256": "8b7e0ce40ab6f0955138e791caf3e16c8b4616befde61c840137cc1a16770985",
+      "bytes": 8371995
+    },
+    {
+      "name": "python3-pyc",
+      "version": "3.14.7-r1",
+      "architecture": "noarch",
+      "apk_control_checksum": "Q15qN3zzjdpHjWi7KfRqZf/xe37Rw=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/python3-pyc-3.14.7-r1.apk",
+      "sha256": "c9da22e6f75c460ebc9d157a2c46393cd9ab6da83b6ab64044910b43a87c8df1",
+      "bytes": 1314
+    },
+    {
+      "name": "python3-pycache-pyc0",
+      "version": "3.14.7-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1jV5OxVFMCyBHDQWCo+Rwm1kqQZk=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/python3-pycache-pyc0-3.14.7-r1.apk",
+      "sha256": "04c6f299bd36870a78e8afe1a04e8c64673d46ad3905f84b590b36281f947bd1",
+      "bytes": 4477662
+    },
+    {
+      "name": "rav1e-libs",
+      "version": "0.8.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q14iG3pb7z45YtmbyOyO8dGzvQu58=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/rav1e-libs-0.8.1-r0.apk",
+      "sha256": "32424451f71961f317df5d521cf980ae6eac92aa60c47d5a7b22903c1d6009d4",
+      "bytes": 921841
+    },
+    {
+      "name": "readline",
+      "version": "8.3.3-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1lFsW43i8AORNidTegSS7p2R/300=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/readline-8.3.3-r1.apk",
+      "sha256": "766911ecb986a6c5cf0841a6b556cd1e9dbbf22b3559726de32416486cd15c81",
+      "bytes": 127194
+    },
+    {
+      "name": "rhash-libs",
+      "version": "1.4.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1rJcxKkrWEKrZd/0Vl4TwtNnH9ik=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/rhash-libs-1.4.6-r0.apk",
+      "sha256": "7d14a70040f83f40ae5ea8829e3eb58d82f06d959478658b81b30033d390651f",
+      "bytes": 143468
+    },
+    {
+      "name": "scanelf",
+      "version": "1.3.9-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1AT+QPQuiGWc6673QT3S7XtgrAfA=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "serd-libs",
+      "version": "0.32.8-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1Krz4balOeyDTgI7TMZKnulhwKxM=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/serd-libs-0.32.8-r0.apk",
+      "sha256": "b26dd784ba24cb00acec0b850989dedd95ce47ca35abdb6c62e65b8fa612dae3",
+      "bytes": 30370
+    },
+    {
+      "name": "shaderc",
+      "version": "2026.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q17idedu06860zUCi8bXYQG9IGH7s=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/shaderc-2026.1-r0.apk",
+      "sha256": "8ffad05b20d790ea5b09f0d103376daea80941fffc020d698712179beab558dc",
+      "bytes": 90769
+    },
+    {
+      "name": "sord-libs",
+      "version": "0.16.22-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1zHD2gRGvEJ+t4CO5P88aKYz+LyI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/sord-libs-0.16.22-r0.apk",
+      "sha256": "2ab4e710b606ac2514ab4a886dbe3b6191e493c6c71f9db61788531b6fb9380a",
+      "bytes": 11982
+    },
+    {
+      "name": "soxr",
+      "version": "0.1.3-r7",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1bG+ny1CcsBzuUORQajRz1iMSHX8=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/soxr-0.1.3-r7.apk",
+      "sha256": "5a284c0485578e13c532846f26d6edf47ac6001476df185011f239ccf23702c7",
+      "bytes": 74087
+    },
+    {
+      "name": "speexdsp",
+      "version": "1.2.1-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q18vzCYvRdruO3+lXKKjLtaTZ/yS4=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/speexdsp-1.2.1-r2.apk",
+      "sha256": "4badc79354db263b3fc83b68152a6091c16bbfbbe76dec1b6c1b8d5c43edb232",
+      "bytes": 34802
+    },
+    {
+      "name": "spirv-tools",
+      "version": "1.4.341.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1ah36VvFW7hW2s05JJeiATjP6LJY=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/spirv-tools-1.4.341.0-r0.apk",
+      "sha256": "6034c22c4f61fb76e517c1d5b11ef5c26c7154d2baeacec8b0a9dcca94ff9a93",
+      "bytes": 1877316
+    },
+    {
+      "name": "sqlite-libs",
+      "version": "3.53.4-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q192MM6zfCMrZgmGGuq2zbnNEg5vo=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/sqlite-libs-3.53.4-r0.apk",
+      "sha256": "a8a216e53d22faa3f04d2e3650c1991af66f8d0b42fadff5afcdb9afb60b19e5",
+      "bytes": 877769
+    },
+    {
+      "name": "sratom",
+      "version": "0.6.20-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1/RdGVFIA6fN7cs224OWC8HR2NTg=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/sratom-0.6.20-r0.apk",
+      "sha256": "cf27a7eead059a191f6a511a2287fadaf83981386b02cb2049f3cb491b4f68aa",
+      "bytes": 12309
+    },
+    {
+      "name": "ssl_client",
+      "version": "1.37.0-r31",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1wiD0pRJaMTr3M+mN75QTK7Hp1A0=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "tdb-libs",
+      "version": "1.4.15-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1q3m+xlnxejlQY8//teO96PUEOhg=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/tdb-libs-1.4.15-r1.apk",
+      "sha256": "36479d87b3e9783a0093741a8f752c8d51082a01ad73836d144705c391de361e",
+      "bytes": 41561
+    },
+    {
+      "name": "tiff",
+      "version": "4.7.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1d8WdZ98T6Nq+XC6pRkVy4SkZ/RI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/tiff-4.7.1-r0.apk",
+      "sha256": "4ea5838c6f739d0c138aa6d6299e25ab2d2bc0092f16c8931fcc52b1b2511ed4",
+      "bytes": 166478
+    },
+    {
+      "name": "v4l-utils-libs",
+      "version": "1.32.0-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q12AaFBr88Ekt4iIfWlS5mPszY4i0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/v4l-utils-libs-1.32.0-r1.apk",
+      "sha256": "63112984a4e69707302ce7487556fb0cb77ddce4838f0024467cabdd353f45b3",
+      "bytes": 200077
+    },
+    {
+      "name": "vidstab",
+      "version": "1.1.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1TGoGM3bkd5O8gnjoHGkjfAkDpRI=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/vidstab-1.1.1-r0.apk",
+      "sha256": "810859baf5ba90b6012941a321025009fd2f45aaa45141ad682f57967e04fdec",
+      "bytes": 33373
+    },
+    {
+      "name": "vulkan-loader",
+      "version": "1.4.347-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1GAv93L5quIRFDKK/byTo3EXQy8Y=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/vulkan-loader-1.4.347-r0.apk",
+      "sha256": "ba6276bb7b16cd140dbaac9ed25648c9f967996ed5143cf049d7a326b7c5fe59",
+      "bytes": 185251
+    },
+    {
+      "name": "wayland-libs-client",
+      "version": "1.25.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1fTb7CIYS4EZu7Vn4we6m01MCPS0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/wayland-libs-client-1.25.0-r0.apk",
+      "sha256": "a728f7103217cafdc83ff6ad0d679c197dbbe280bd5788c8336259f7a39cb303",
+      "bytes": 22840
+    },
+    {
+      "name": "x264-libs",
+      "version": "0.164.3108-r1",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1sbYPdIabvGVemIeMJtDVYKBi7pU=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/x264-libs-0.164.3108-r1.apk",
+      "sha256": "a88add71624fe099b76d3b8e69cb7f4507da6b65695be9e1f04fdb9a40799ba3",
+      "bytes": 968172
+    },
+    {
+      "name": "x265-libs",
+      "version": "4.1-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1bBdKRlA7sjMAMIttZn4xketqAZo=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/x265-libs-4.1-r0.apk",
+      "sha256": "c33429b93d0c7c12beb79637c23d4a2f960153ff07ea86f47fc7fdc43e853e56",
+      "bytes": 4040606
+    },
+    {
+      "name": "xvidcore",
+      "version": "1.3.7-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1Kdouwbh2Er48RDeOWHxWBW2Rfm0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/xvidcore-1.3.7-r2.apk",
+      "sha256": "12d4497edecb8ae5f82fa149e1e9ecab3b2bb2644dfd3654dbcd3ee8ddd0f81b",
+      "bytes": 147709
+    },
+    {
+      "name": "xz",
+      "version": "5.8.4-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1b6Vyrwi0ZRH0+1IQ52luL1O+D8s=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/xz-5.8.4-r0.apk",
+      "sha256": "547866cbe6f4a93efc9cee3bba03629d37f5590446677bb800cf4eada4b22c7c",
+      "bytes": 64573
+    },
+    {
+      "name": "xz-dev",
+      "version": "5.8.4-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1Rpl+tHAygviFExYaKl+HarM5TGY=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/xz-dev-5.8.4-r0.apk",
+      "sha256": "9292f2044e1f93fff3997b449f95567fcd9356b931cdac1baa2578f24592732a",
+      "bytes": 56209
+    },
+    {
+      "name": "xz-libs",
+      "version": "5.8.4-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1hQEGWxhighYwF0xmO0WXRGLCluE=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/xz-libs-5.8.4-r0.apk",
+      "sha256": "ab362dd515ead04c31a6c302163248da7aa4813e283c971e6dd3f789b453a1d9",
+      "bytes": 118503
+    },
+    {
+      "name": "zimg",
+      "version": "3.0.6-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1OPtHO7Fi557DSjOTs1w5R5vrPC0=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/zimg-3.0.6-r0.apk",
+      "sha256": "e3ca9fe60ce24910956c2372ab92550daa41b9d8e8fb72ec9fbf108c6d83671b",
+      "bytes": 225722
+    },
+    {
+      "name": "zix-libs",
+      "version": "0.8.0-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q134ii59g/oxk30spi19KwdQZklbA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/x86_64/zix-libs-0.8.0-r0.apk",
+      "sha256": "3467af7fcaad89aeef62ed9d21a5e5b837465c02e685f4c006e939cdbfa382d9",
+      "bytes": 21037
+    },
+    {
+      "name": "zlib",
+      "version": "1.3.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q13Uw9ECrK7ypxoUlZUdVfq8hoBhM=",
+      "source": "pinned_base_image"
+    },
+    {
+      "name": "zlib-dev",
+      "version": "1.3.2-r0",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1FmjjpEPWAmQzM7l+DIi5LHB0jCM=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/zlib-dev-1.3.2-r0.apk",
+      "sha256": "8fdd47360b4b54c21e4ab91de858cfb4700c17887506e4ab1b0c7ae42746fefd",
+      "bytes": 34436
+    },
+    {
+      "name": "zstd-libs",
+      "version": "1.5.7-r2",
+      "architecture": "x86_64",
+      "apk_control_checksum": "Q1lWnOOpfEEJ6OU93enz4b0nJhNUA=",
+      "source": "apk_archive",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/zstd-libs-1.5.7-r2.apk",
+      "sha256": "23c6065b0049b2406441564bcf0032515a43f78e80d76fcb85535a3803ef5d4e",
+      "bytes": 376646
+    }
+  ]
+}

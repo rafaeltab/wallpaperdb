@@ -1,0 +1,15 @@
+{
+  "generator": "hdr_png8.py:generate_fixture; deterministic RGB8/RGBA8 stimuli, native FFmpeg PNG writer and ExifTool metadata",
+  "scope": "Source fixture hashes only; no conversion or display qualification",
+  "source_quantization_profile": "avif-8 from unchanged thresholds.json",
+  "sha256": {
+    "png-pq-p3-8-opaque": "43553925d143461c670f1d6ad9087d284d881f7195d955c6c5faeb14ed78a1f8",
+    "png-pq-p3-8-alpha": "10769b966f007c88fcbb6b29ae61a7331d2cb036ec23d8d0d0ee8eb6cb9cdc87",
+    "png-pq-rec2020-8-opaque": "b6e40162f8f1eb570327e0b925195c9e81b82e160349d735b7c4c3cf6d5ca89b",
+    "png-pq-rec2020-8-alpha": "e0fabc7f95e4060eb1ed8f94356503c439e1f2e50d525f90aeed32fecc2290c0",
+    "png-hlg-p3-8-opaque": "93d065f8d293b36965b9ab7b06cfa93ef1b3106c8243e702cd2cbdec3b195f24",
+    "png-hlg-p3-8-alpha": "60d7706bdfdf4b4e60c2499ec66f725406d4612fb0a64106e128e56af1871679",
+    "png-hlg-rec2020-8-opaque": "934921108acfbff1798c67919deaea9fe41c5cc67cc9d27591f6cb471dc13cb5",
+    "png-hlg-rec2020-8-alpha": "f0cecf9a93914d43f6a1ae0b94d2215c60da5916fa27f8a4e9c5931c4a909693"
+  }
+}

@@ -1,0 +1,17 @@
+--- a/apps/shared/avifjpeg.c
++++ b/apps/shared/avifjpeg.c
+@@ -1061,9 +1061,11 @@
+         if ((marker->marker == (JPEG_APP0 + 2)) && (marker->data_length > tagMpf.size) &&
+             !memcmp(marker->data, tagMpf.data, tagMpf.size)) {
+             avifImage * image = avifImageCreateEmpty();
+-            // Set jpeg native matrix coefficients to allow copying YUV values directly.
+-            image->matrixCoefficients = AVIF_MATRIX_COEFFICIENTS_BT601;
+-            assert(avifJPEGHasCompatibleMatrixCoefficients(image->matrixCoefficients));
++            // Gain samples are RGB values interpreted by gain metadata, not a
++            // display YCbCr image. Preserve native JPEG-decoded RGB codes with
++            // the existing identity-matrix copy path instead of another
++            // eight-bit RGB/YCbCr round trip. Grayscale duplicates exactly.
++            image->matrixCoefficients = AVIF_MATRIX_COEFFICIENTS_IDENTITY;
+ 
+             const avifROData mpfData = { (const uint8_t *)marker->data + tagMpf.size, marker->data_length - tagMpf.size };
+             if (!avifJPEGExtractGainMapImageFromMpf(f, sizeLimit, &mpfData, image, chromaDownsampling)) {

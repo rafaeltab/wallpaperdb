@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "frozen_before_native_run": true,
+  "fixture_class": "16x40 constant-color alpha steps, no resize, lossless native 4:4:4 AVIF or lossless PNG/WebP",
+  "alpha_steps": [0, 0.25, 0.5, 0.75, 1],
+  "sdr_signal_max_error": 0.011764705882352941,
+  "hdr_pq_signal_max_error": 0.0009768009768009768,
+  "hdr_reference_white_nits": 203,
+  "hdr_reference_white_tolerance_nits": 4.06,
+  "binary_alpha_threshold": 0.5,
+  "justification": "SDR permits three 8-bit code values for native blend rounding and two codec boundaries. HDR permits four 12-bit PQ code values for transfer LUT and encode/decode rounding, plus a separate 2% absolute ordinary-white check. Hidden RGB retention uses the same code-value limit with no visual-alpha masking. Every GIF alpha sample must match the declared 50% threshold exactly. These limits are scoped to constant-color selector controls, not photographic conversion qualification.",
+  "composition_reference": "Test oracle uses straight-alpha linear-light source-over. sRGB background channels are decoded, converted via D65 matrices, and scaled so HDR sRGB white is 203 cd/m2. Native production candidate is FFmpeg/libplacebo multi-input composition; reference math is only in the proof.",
+  "native_source": "https://ffmpeg.org/ffmpeg-filters.html#libplacebo"
+}

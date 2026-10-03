@@ -1,0 +1,15 @@
+--- a/apps/avifgainmaputil/combine_command.cc
++++ b/apps/avifgainmaputil/combine_command.cc
+@@ -140,6 +140,12 @@
+                       gain_map_pixel_format);
+   if (base_image->gainMap->image == nullptr) {
+     return AVIF_RESULT_OUT_OF_MEMORY;
++  }
++  // Proof variant: RGB gain-map samples must not acquire another 8-bit
++  // RGB/YCbCr rounding step before lossless AV1 storage.
++  if (gain_map_pixel_format == AVIF_PIXEL_FORMAT_YUV444) {
++    base_image->gainMap->image->matrixCoefficients =
++        AVIF_MATRIX_COEFFICIENTS_IDENTITY;
+   }
+   avifDiagnostics diag;
+   result = avifImageComputeGainMap(base_image.get(), alternate_image.get(),

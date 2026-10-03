@@ -1,0 +1,755 @@
+# HDR conversion proof
+
+This isolated native suite implements the empirical work in [#284](https://github.com/rafaeltab/wallpaperdb/issues/284). It does not implement Media delivery or change the accepted HDR policy. Its failed and untested paths remain unqualified.
+
+Run from the repository root with Docker and the repository's normal package tooling installed:
+
+```sh
+make run PACKAGE=media SCRIPT=proof:hdr
+```
+
+The first build downloads checksum-locked packages and native source archives. Tests then run without network access in a linux/amd64 Node 22 Alpine container. The image uses software Vulkan, so it needs no host GPU. Allow approximately 1 GB for the image and additional space for generated evidence. An ARM host needs Docker's amd64 emulation.
+
+Exit 0 is available only for passing helper tests through `make run PACKAGE=media SCRIPT=proof:unit`. The complete qualification command returns 2 while a required codec case or physical-display check remains unqualified. Exit 1 identifies broken suite integrity, dependency/hash drift, or failing helper tests. A failed conversion is a recorded result, not a reason to lower its thresholds or skip the rest of the matrix.
+
+Read the generated [report](results/report.md), [conversion matrix](results/conversion-matrix.json), [measurements](results/measurements.json), [commands](results/commands.json), and [native versions](results/native-versions.json). [Fixture facts](results/fixtures.json) and [gain-map provenance](fixtures/gainmap/manifest.json) identify exact inputs. [Thresholds](thresholds.json) explain the gates fixed before measurements. Native selector controls have a separate [threshold profile](selector-thresholds.json).
+
+The complete run replaces the generated report and measurement files under `results/`; it leaves complete intermediates and native diagnostics in ignored `work/`. Selected inspected files and their hashes are committed under [results/manual](results/manual/manifest.json). Follow [MANUAL.md](MANUAL.md) on the agreed Mac, iPad, Windows PC, and Galaxy. Browser and OS qualification stays pending until those devices have been checked by the user. A diagnostic file marked failed is not an approved SDR fallback.
+
+Keep the checkout and generated intermediates on disk. A full replay can retain
+several gigabytes under `work/`; running several copies in a RAM-backed `/tmp`
+can exhaust host memory and cause native-operation timeouts. Such timeouts stay
+failed in the recorded run. A later successful replay supplies separate evidence.
+
+Changes to fixtures require intentional review of their committed source hashes. `--update-fixture-lock` updates the original generated corpus; the separately declared PNG8 corpus retains its own lock. Dependency changes require new lock files and native qualification. The suite never downloads a floating fixture or silently refreshes an expected hash during normal execution. `fixtures/generated-sha256.json` covers generated AVIF, sixteen-bit HDR PNG/APNG and selector inputs; the committed JPEG fixture manifest and fixture tests cover the camera corpus and regenerated ISO representation.
+
+The Python color equations and request oracle exist only in this proof. FFmpeg/libplacebo, Sharp/libvips/libultrahdr, and libavif/AOM perform the native candidate conversions. dav1d, ExifTool, Pillow/libjpeg, a small reader linked to libpng, and the independent gain-map reader check the bytes. Their precise limitations are recorded in every affected case. Unit tests of the proof-side request oracle do not claim production endpoint behavior. Media's existing dependency versions, source admission, UI, migrations, generation policy and caching are unchanged.
+
+The proof image includes explicitly pinned experimental native patches. Apple
+retained-map experiments isolate libultrahdr PR484 and PR491 separately and
+together; the final candidate uses both plus a local per-channel XMP patch.
+A local libavif sequence-writing patch
+fixes animated orientation serialization. These patches do not upgrade Media's
+production dependencies. Their source, patch, recipe and binary hashes are
+recorded by the build and [native version evidence](results/native-versions.json).
+
+The [combined gain-map proof](combined_gainmap_proof.py) separately resizes the
+authored SDR base and reconstructed HDR intent, computes a new native gain map,
+and retains RGB8 base/map samples with native predictive lossless JPEG coding.
+Isolated libavif variants measure rare-gain retention, smaller offsets and identity
+matrix coding. Separate libultrahdr variants test RGB JPEG decoding and its
+existing exact transfer/gain formulas. The pinned libavif reader rejects these
+SOF3 JPEG files; file accuracy and physical consumer compatibility remain separate.
+
+Separate SOF0 RGB8 DCT candidates recompute the gain map against their actual
+compressed SDR base. The pinned libavif reader can decode that coding form,
+but some files still exceed the fixed authored-SDR shadow limits. Its extra
+JPEG-to-AVIF-to-PQ reconstruction also introduces eight-bit YCbCr map rounding;
+those appearance failures remain visible as a separate decoder diagnostic.
+Another pinned native libavif reader preserves the decoded RGB gain samples
+with identity matrix coding. Its independent dav1d/PQ readback has separate
+appearance measurements; it never replaces the original reader's failures or
+changes the conversion gates.
+Both independent JPEG/ISO and native libultrahdr reconstruction must pass the
+unchanged file gates. Every physical consumer remains pending.
+
+The separate [JPEGli experiment](jpegli_proof.py) tests another pinned native
+encoder against the same authored SDR bases. It records all combinations of
+uint8/float32 input transport, standard/JPEGli quantization tables and adaptive
+quantization, with unchanged RGB8 output depth and sRGB transfer. The complete
+suite regenerates [all trial measurements](results/jpegli-base-experiment.json),
+including failures, native commands and build/source hashes. A passing SDR base
+alone does not qualify a gain-map JPEG or establish physical compatibility.
+The separate `jpegli-base-dct-float-map` HDR candidate recomputes the gain map
+against the actual JPEGli-compressed base and encodes the map with the existing
+native floating-DCT helper. Both layers remain SOF0 RGB8. Its emitted JPEG must
+pass the complete independent SDR, HDR, metadata and privacy checks.
+
+The separate [MozJPEG experiment](mozjpeg_proof.py) fixes quality 100 and RGB8
+coding while varying native integer/floating DCT, trellis and deringing. Its
+static encoder is built from a checksum-pinned source archive. Optimized Huffman
+coding is required for the tested trellis setup. The original standard-table
+failures remain a separate replay, including malformed files that FFmpeg
+conceals while returning exit zero. Both proof command runners reject FFmpeg
+error diagnostics before any such raster can qualify.
+The `mozjpeg-base-dct-float-map` ISO crop candidate independently checks a complete
+HDR JPEG using the compressed native base, a regenerated floating-DCT gain map
+and the unchanged SDR/HDR gates. Native file success leaves consumer review pending.
+The complete replay also retains a bounded native trellis-precision experiment
+on the six remaining source/geometry cases. It raises the coefficient-distortion
+penalty under fixed quality-100 quantizers and unchanged source samples. Its
+default controls must reproduce their earlier JPEG bytes exactly; all failures
+remain in [their own measurements](results/mozjpeg-lambda-experiment.json).
+The [coefficient diagnostic](mozjpeg_diagnostics.py) reads actual compressed
+coefficients with pinned native libjpeg and checks the reference, native-input
+and output hashes. It distinguishes geometry error from coding error and counts
+failed shadow pixels in blocks with unchanged DC coefficients. This diagnostic
+does not qualify a conversion or prove every baseline JPEG encoder impossible.
+
+The separate [ICC-aware experiment](icc_gainmap.py) tests a gamma-3.2 RGB8 base
+with a regenerated RGB8 gain map. Native LittleCMS reads the actual compressed
+base's ICC profile before libavif computes gains; the independent reader uses
+FFmpeg JPEG samples and separate ICC/ISO equations. Two predeclared offset
+policies retain distinct failures: 1/4096 amplifies small JPEG decoder differences
+in shadows, while 1/65536 exceeds the fixed midtone and highlight limits. Both
+remain unqualified. Stock readers that assume sRGB transfer or reject ICC also
+remain separate limitations; this experiment does not establish interoperability.
+The complete command reproduces both experiments and includes their failed
+cases in the matrix, with separate measurements and inspected diagnostic files.
+A further native map-gamma-2 representation retains the small offset and uses
+matching AVIF, ISO, XMP and native metadata. Analytic zero, fractional and full
+headroom controls verify the reciprocal decoding exponent. This allocates more
+of the existing eight-bit map precision to the measured gain range; it changes
+neither image grade nor reference. Highlight error improves, but regional means
+and shadow error still fail. The earlier gamma-1 bytes remain pinned.
+A separate gamma-2 candidate uses the logarithmic midpoint offset, 1/16384.
+It passes midtone and highlight limits but fails both readers' shadow maxima
+and their cross-comparison. Exact emitted offsets, metadata agreement and
+headroom controls remain mandatory; this failure does not qualify the path.
+An integer-DCT map alternative keeps that exact compressed base and pre-JPEG
+gain map. Shadow failures persist, and cross-decoder agreement worsens. Both
+native map encodings remain separate failed evidence.
+A separate midpoint-offset map uses encoding gamma 1.5. This increases code
+precision near zero gain and passes every unchanged appearance gate for the ISO
+JPEG upscale. Native and independent HDR maximum error is 7.31 deltaE ITP;
+cross-reader maximum error is 5.53. The compressed gamma-3.2 base remains exact,
+and both actual JPEG layers remain eight-bit SOF0. This qualifies the experimental
+ICC-aware file path at display boost 16. The stock reader
+that assumes sRGB still fails, so consumer compatibility remains pending.
+The five preceding failures stay visible and retain their exact output hashes.
+The same recipe also passes the Android XMP upscale. This source uses the
+existing native libavif PQ16 bridge with requested depth 12; its source
+reference shares libavif gain application. The source comparison verifies that
+transport, while separate final HDR readers establish output accuracy.
+The ISO-only float32 source decoder remains narrowly scoped. Stock-reader
+failure and pending consumer review also apply to this XMP output.
+Old Apple containment and upscale pass the same map recipe against the retained
+libavif source convention.
+Its native source path requires the original headroom MakerNotes, and a real
+source stripped of those facts remains original-only. These two cases retain
+their PQ source precision evidence and separate final HDR-reader measurements.
+The separate [source-model diagnostic](apple_source_model.py) finds that this
+legacy convention fails six unchanged regional gates against
+[Apple's documented full effect](https://developer.apple.com/documentation/appkit/applying-apple-hdr-effect-to-your-photos).
+That effect linearizes the stored map with inverse Rec.709, then multiplies the
+linear SDR base by a linear gain using the actual MakerNote headroom of 8.
+Native libavif preserves the original map samples but applies an exponential
+coded-map gain. Midtone mean/p95 errors are 2.45608/6.41030; highlight mean/p95
+errors are 4.34848/6.23720. Both relative-luminance p95 gates also fail. The
+documented reference has its own revision and is required by the old Apple
+full-rendering gate. Earlier measurements remain evidence for their named
+legacy convention. This article does not establish intermediate adaptation or
+the newer fixture's transplanted XMP headroom precedence.
+The separate [native full-source preparation](apple_native_source.py) now
+implements that documented old Apple model using original native JPEG samples,
+native bilinear8 map expansion and FFmpeg float32 transfer/gain arithmetic.
+Independent source comparison passes the unchanged photographic gates, with
+maximum error 0.000027853 Delta E ITP. Analytic controls cover all 65,536
+base/map code pairs at full-effect headrooms 1 and 8, with maximum numeric
+error 0.000466684 nits. Source admission rejects unknown model, color or hashes.
+This establishes encoder input for a separate candidate; it does not qualify
+any derivative, intermediate adaptation or newer Apple model. The six legacy
+source-model failures remain recorded alongside it.
+The [corrected derivatives](apple_hdr_jpeg.py) now use that native
+full source, native P3 float geometry and a checked PQ16 intent to regenerate
+the map against the actual compressed authored SDR base. Their RGB8 SOF0 base
+and map pass metadata, privacy, source precision and appearance gates at boost
+16. Independent HDR maximum is 4.52892 and native maximum is 4.22494 against
+the unchanged limit of 8. Authored SDR maximum remains exactly 4.64090, as in
+the legacy control. This separately named file uses the documented source
+reference. Its gamma3.2 base still requires the experimental ICC-aware readers;
+stock-reader and physical results remain separate. Separately encoded crop,
+stretch and upscale pass with independent HDR maxima 4.84060, 4.69820 and
+7.34111. Containment retains its exact bytes and measurements. The default
+replay also includes a real EXIF6 orientation case, with independent HDR maximum
+5.33441. A locked native metadata edit preserves original coded base/map, ICC
+and MakerNotes. Both geometry paths rotate clockwise once after full source
+reconstruction; the output is 173 by 130 with identity orientation. The manual
+bundle includes this actual source and all five derivatives. Partial Apple
+adaptation remains unqualified by these full-effect results.
+The separate [explicit PQ P3 AVIF proofs](apple_hdr_avif.py) preserve that
+documented full image at 8, 10 and 12 bits after containment, crop, stretch,
+upscale and real EXIF6 orientation. All fifteen tuples pass; maximum Delta E
+ITP is 0.360346 at 12 bits, 0.821563 at 10 bits and 2.843320 at 8 bits. Containment12 retains its original bytes and measurements.
+They use the unchanged photographic gates without a source precision allowance.
+Native float preparation and geometry feed FFmpeg/zimg then AOM; dav1d
+independently decodes the emitted AV1. Actual depth, PQ/P3 signaling, geometry,
+square pixels, opacity, identity orientation and privacy pass. These single-layer
+outputs have no embedded authored SDR base or gain map. Each manual entry
+supplies a matched SDR comparison and inspected native HDR intent. Display tone
+mapping, other selectors and physical consumers require separate proof. The
+EXIF6 cases reconstruct the actual stored raster before one clockwise rotation
+in each geometry path; all twelve earlier outputs and measurements remain exact.
+Three separately named containment files request Rec.2020 explicitly at 8, 10
+and 12 bits. Their independent HDR maxima are 3.391872, 1.019600 and 0.545535.
+Native zimg converts the P3 geometry, while the unchanged P3 reference measures
+both the native Rec.2020 intent and emitted AVIF across gamuts. AOM and dav1d
+verify the actual Rec.2020 signaling and samples. All fifteen P3 outputs and
+measurements remain exact. Separate Rec.2020 crop, stretch, upscale and actual
+EXIF6 orientation now pass at all three depths. Across those fifteen Rec.2020
+tuples, maximum errors are 3.725792, 1.085030 and 0.736385 at 8, 10 and 12 bits.
+The three containment files and every P3 result remain exact. These results do
+not establish physical HDR presentation or an embedded SDR base.
+The [explicit PQ16 P3 PNG proofs](apple_hdr_png.py) also pass the documented
+full-effect containment, crop, stretch and upscale comparisons, with maximum
+Delta E ITP 0.258409, 0.275747, 0.270037 and 0.257913. A separately tested
+real EXIF6 variant passes with maximum 0.259544 after one clockwise rotation,
+producing a 173-by-130 identity-oriented file. The earlier four outputs and
+measurements remain exact. The
+native FFmpeg/zimg writer and independent libpng decoder agree exactly on
+RGB16 samples. Actual CICP, matching chromaticities, square pixels, static
+opaque structure, identity orientation and metadata privacy pass. Each manual
+entry includes its matched authored SDR comparison. These explicit depth16
+results do not qualify an embedded SDR base, adaptive gain map or physical
+consumer.
+The separate [opaque-plane PNG precision candidate](apple_hdr_png_precision.py)
+keeps that exact containment baseline and reduces maximum HDR error from
+0.258409 to 0.010890 under the same photographic gates. Native byte copying
+removes the float alpha plane only after verifying every alpha sample equals
+one and every copied RGB byte is unchanged. Explicit native PQ float,
+planar16 quantization and RGB16 packing avoid the earlier conversion loss.
+Independent libpng decoding matches the native packed RGB16 bytes exactly.
+Analytic nearest-code error falls from 16 codes to one; this is a diagnostic,
+not a replacement acceptance limit. Separate crop, stretch, upscale and actual
+EXIF6 orientation files pass with maxima 0.011055, 0.010527, 0.011214 and
+0.010703. Each preserves its original source and geometry gates, with one
+rotation for EXIF6, and has maximum code error one. All five original PNGs and
+the first precise containment retain their exact bytes and measurements. Only
+the five separately named precise outputs enter the matrix as new evidence;
+nested baseline records are not counted twice. Fractional alpha, other gamuts
+and depths require their own proof.
+The separate [explicit PNG8 containment](apple_hdr_png8.py) uses native
+nearest-code quantization of the inspected precise PNG16 intent. Its actual
+RGB8/P3/PQ signaling, square pixels, opaque structure and privacy pass; libpng,
+FFmpeg and native packed RGB8 samples agree exactly. Maximum HDR error rises
+from 0.010890 at 16 bits to 2.686236 at 8 bits, still within the unchanged
+photographic gates. All 27 regional error statistics increase and remain
+visible in the report. This is a different requested depth, with both PNG16
+baselines retained exactly, and no claim of improved precision or physical
+display compatibility.
+The [AVIF precision candidates](apple_hdr_avif_precision.py) feed that
+strictly inspected native PQ16 PNG to AOM and independently decodes with dav1d.
+Its maximum HDR error falls from 0.350934 to 0.174863; regional color means,
+p95 values and maxima also improve against the same documented P3 reference.
+Source, geometry and native preparation must pass first, and their hashes are
+checked before encoding, before output decoding and at completion. The earlier
+AVIF result stays exact as nested baseline evidence. Separate explicit P3
+AVIF10 and AVIF8 containment files also pass the unchanged gates, with their
+tradeoffs recorded. At 10 bits, maximum HDR error falls from 0.734999 to
+0.687237, while five regional luminance-error statistics increase. At 8 bits,
+maximum HDR error rises from 2.648045 to 2.686236; six regional error statistics
+increase. Every signed regional change is retained. More precise input does
+not guarantee that every metric improves after coarse output quantization.
+Four further AVIF12 candidates cover crop, stretch, upscale and actual EXIF6
+orientation. Their maximum HDR errors fall from 0.335492, 0.322892, 0.334609
+and 0.360346 to 0.174007, 0.173835, 0.178738 and 0.166216. Three regional
+luminance statistics increase; their signed changes remain visible in the
+report. Only the seven separately named candidates enter the matrix; earlier
+files and measurements remain exact. Non-containment AVIF8/10 selectors,
+intermediate adaptation and physical consumers remain outside this increment.
+New Apple containment also passes, while the original upscale remains failed at an
+independent HDR shadow maximum of 8.08225 against the unchanged limit of 8.
+This source requires its auxiliary XMP model, version and headroom. Native
+reconstruction remains byte-identical after removing unused MakerNotes;
+unknown required XMP facts reject transformation.
+A separate integer-DCT map retains the same new Apple upscale base, HDR intent
+and pre-JPEG gain samples. The shadow maximum stays at 8.08225, and both HDR
+readers also exceed the highlight p95 limit of 3. Both map encodings remain
+failed evidence under unchanged thresholds.
+A separate FLOAT-DCT base uses the identical native gamma-3.2 input and P3 ICC
+profile, then regenerates the original floating-DCT map against that compressed
+base. This new Apple upscale passes, with maximum HDR error 6.77896 and
+cross-reader error 5.73114. Together, the observed SOF0 alternatives cover all
+24 tested source/geometry tuples, including all 20 required tuples. This is
+file qualification within the declared decoder scope; stock-reader limitations
+and pending physical review remain unchanged.
+These gain-map endpoint measurements use display boost 16. They do not prove
+faithful adaptation at other display headroom values. The matrix separately
+requires ISO upscale at boost 2, using the same source/output display boost
+and an independently reconstructed, matched-geometry source reference. It also
+requires boost 64, which fully applies this source's gain map. One identical
+output file must pass boosts 2, 16 and 64; different files at different headroom
+values cannot satisfy the joint requirement. Display headroom is not a product
+selector. An unqualified rendering blocks faithful-HDR qualification even when all
+320 original fixture/geometry requests have passing endpoint alternatives.
+The adaptation inventory covers all 20 required gain-map fixture/geometry
+tuples. Each needs the same file at boosts 2 and 16; all five ISO geometries also
+need boost 64. This makes 25 additional rendering points and 20 same-file joins.
+Untested renderings remain unqualified. Existing boost-16 successes cannot fill
+a missing intermediate reference. A rendering point also
+requires explicit independent-source-decoder evidence, and endpoint records
+without an explicit boost cannot enter the same-file join.
+The [boost-2 proof](iso_intermediate_headroom.py) reruns the exact native
+converter and records a large appearance failure while both output readers
+agree. Its source capacity is about 49.26 times SDR white, compared with 4.47
+for the regenerated output. Read-only uncompressed-map and ideal-gain
+diagnostics retain the mismatch. Normalizing the interpolation weight removes
+much of the broad exposure bias but still fails the shadow and midtone maxima.
+Normalizing capacity to the boost-16 reference endpoint is insufficient in
+this diagnostic. Other capacity choices remain untested. These diagnostic
+pixels never enter the encoder or qualify a file.
+The original output also fails the separate boost-64 full-source comparison.
+Both output readers agree, and its decoded pixels are exactly equal to those
+at boost 16, while the independently reconstructed source becomes brighter.
+The earlier endpoint success therefore proves neither intermediate adaptation
+nor this source's fully applied HDR appearance.
+A separate [full-source candidate](iso_full_headroom_candidate.py) renders the
+native float32 source at boost 64 before geometry and map regeneration. Its
+boost-64 file rendering passes both HDR readers, with independent shadow maximum
+7.79985 against the unchanged limit of 8. The same output fails boosts 2 and 16.
+Its native regenerated capacity is 3.089498 log2, while the source is 5.622376.
+This improves the full-source endpoint but leaves the joint same-file adaptation
+requirement failed. It retains the exact compressed SDR base and every earlier
+candidate's evidence.
+The [source-capacity candidate](iso_source_capacity.py) changes only the two
+capacity fields using the pinned native compressed-image API. Exact compressed
+coding, ICC bytes and all other ISO metadata remain unchanged. Source/output
+weights now agree at all three boosts. Highlight mean error improves from
+20.4759 to 0.62918 at boost 2 and from 26.6022 to 1.02007 at boost 16. Shadow and
+midtone maxima still fail, so the same-file adaptation requirement remains
+failed. Full-source pixels and measurements stay exactly equal to the passing
+boost-64 control. The native packer header, library, source and binary are
+checksum-recorded; existing codec binaries remain unchanged.
+The [fixed-map diagnostic](iso_map_code_bound.py) then enumerates every RGB8
+map triple at the two worst shadow pixels across boosts 2 and 16. The same
+triple must meet the unchanged maximum gate at 2, 16 and 64. Minimum joint
+maximum errors are 109.491281 and 54.101789 against the limit of 8, after
+verifying the emitted-code model against actual independent decoding. This
+rules out map-code changes alone for this fixed base and metadata. The search
+optimistically ignores JPEG neighborhood coupling and does not bound other
+bases, offsets, capacities, metadata or representations. It records no
+conversion qualification. The default replay validates the native capacity
+report before reuse and writes its own hashed diagnostic record.
+The [shared-offset diagnostic](iso_global_offset_bound.py) then bounds all
+nonnegative global offset pairs for the same decoded P3 base and current
+positive ordered weights. Conservative RGB intervals enclosing the unchanged
+Delta E limit force contradictory green-offset differences at those two
+pixels, separated by 1.295977 nits. This also permits arbitrary per-pixel gains
+and map precision. It rules out an offset-only correction within this fixed
+model. Other bases, capacities, references and gain equations remain outside
+the bound. Linear support, monotone PQ inversion and signed matrix intervals
+supply the analytic argument; sampled probes only check the implementation.
+Float64 outward guards do not constitute a formal directed-rounding
+certificate or change the appearance gate. The diagnostic cannot qualify a
+conversion or physical consumer.
+The [same-ICC RGB8 base diagnostic](iso_base_code_bound.py) extends that result
+to every decoded RGB8 base triple under the actual gamma3.2 P3 profile. Of
+16,777,216 codes, 668 and 603 satisfy the unchanged authored SDR maximum gate
+at the two pixels. Even independently favorable green extrema leave a
+0.027353-nit contradiction in the shared offset difference. SDR code admission
+uses nominal white 100 nits; own-primary HDR inequalities use 203 nits. The
+diagnostic rechecks native evidence and source references, then establishes
+both strict gain directions afresh. Other ICC transfers/colorants, continuous
+or higher-precision bases, capacities and gain equations remain outside this
+result. Ignoring JPEG coupling and the other regional gates enlarges the
+admissible set. Numerical cutoff checks do not provide a formal
+directed-rounding certificate or change any conversion qualification.
+The [continuous-base diagnostic](iso_continuous_base_bound.py) admits every
+nonnegative own-primary base color, with no upper component cap or restriction
+to a transfer curve or bit depth. It retains the actual serialized P3 ICC
+colorants for SDR measurement at 100 nits and the existing nominal P3 HDR
+interpretation at 203 nits. Correlated color-distance bounds leave a
+1.192288-nit contradiction in the same shared offset difference. Arbitrary
+per-pixel gains, map precision and nonnegative offsets cannot satisfy these
+two pixels at the current positive ordered display weights. The search keeps
+unresolved boxes when its budget is exhausted, so its extrema are conservative
+outer bounds rather than exact optima. Guarded float64 arithmetic is not a
+formal directed-rounding or native LittleCMS certificate. Other colorants,
+HDR color interpretation, references, geometry, capacities and gain equations
+remain outside this result. The default replay records the diagnostic without
+adding or qualifying any conversion case.
+The [forward-capacity diagnostic](iso_capacity_bound.py) separately extends
+that ISO-upscale model to finite log2 capacity endpoints `0 <= a < b`. The
+unchanged boost-2 black requirement conflicts with an authored-base bypass
+by 2.467253 nits. Equal boost-16/64 weights violate a strict direction; other
+positive weights retain the shared-offset contradiction. Applying offsets
+at zero weight has its own complete case argument and the same contradiction.
+Actual unequal-offset white files distinguish pinned libavif's bypass from
+UltraHDR's offset application. Every imported metadata fraction and base/map
+sample is checked, and a positive-weight control verifies that gain metadata
+is active. These scalar controls do not establish general ICC support.
+The ICC-aware readers still reject positive base headroom. Finite-grid checks
+illustrate the real-domain argument; they do not establish its completeness.
+The diagnostic retains the continuous bound's guarded-float limitations and
+does not qualify a conversion or widen native admission. Other color models,
+negative offsets, reverse HDR bases and different gain equations remain
+outside this result.
+The [four other ISO geometries](iso_geometry_headroom.py) rerun their exact
+qualified recipes and preserve every original endpoint measurement. Each
+containment, crop, stretch and EXIF6 orientation file passes at boost 16 and
+fails appearance at 2 and 64. The independent reference reconstructs the
+canonical source at the requested boost before geometry, with one rotation
+for the orientation case. The extracted source map is hash-bound before and
+after decoding. All five required ISO geometries now have measured adaptation
+failures. The separate XMP measurements below cannot qualify Apple adaptation.
+
+The [independent XMP source reader](gainmap_xmp.py) now establishes the original
+photograph at boosts 2 and 16 with independently parsed XML gain arithmetic and
+the pinned point-bilinear map sampling convention. Original JPEG base/map samples
+and imported AV1 samples agree exactly, as do all gain metadata fields. Source
+maximum error against native libavif is 0.213356 under the unchanged gates.
+The independent float references have distinct names and hashes; the legacy
+native PQ endpoint reference remains unchanged. Native analytic controls cover
+nontrivial gamma, unequal offsets, channel gains and the zero-weight bypass.
+The source explicitly declares EXIF sRGB but lacks the ICC required by the
+Android container specification, so its scope is a legacy EXIF-sRGB renderer.
+The differing UltraHDR source renderer remains a failed diagnostic. This source
+proof does not qualify a derivative or physical display.
+
+The [XMP geometry rendering proof](xmp_containment_headroom.py) compares the five
+required native HDR JPEGs against those independent source references after
+matched geometry. It preserves the earlier endpoint files and measurements.
+Each passes at boost 16 and fails at boost 2. Containment's independent shadow
+maximum is 88.53405 against the unchanged limit of 8; the other boost-2 maxima
+range from 81.43344 to 93.56704. Both output readers agree, and all
+nonappearance gates pass. Containment's source gain weight is 2/7 at boost 2,
+while its regenerated output weight is 0.360639. The orientation case binds a
+real EXIF6 source and independently rotates canonical pixels once before
+geometry. Upscale retains its explicit experimental ICC-aware reader scope.
+All ten rendering records and references are included in the manual bundle;
+all five same-file requirements remain failed. Apple intermediate adaptation
+remains untested.
+
+A separate moderate-offset candidate uses native ISO offsets of 1/4096 in place
+of 1/65536. This narrows the encoded gain interval for 8-bit maps while retaining
+the same HDR intent and fixed appearance limits. Analytic near-black controls
+check the offset tradeoff; the earlier identity-map candidates and their upscale
+failures remain visible. Native ISO-only source reconstruction checks the ICC,
+base/map samples and metadata before applying gain. Its map expansion is limited
+to independently verified identity or two-times axes. Missing or conflicting
+color signaling, unknown ICC facts, nonidentity map orientation and unproved map
+ratios reject transformation.
+
+The ISO source also has a separate float32 reconstruction candidate. It calls
+the native codec's existing transfer and gain functions before half-float
+storage, then resamples in native float precision. Analytic channel/headroom
+controls and the unchanged independent source reference verify it. Its emitted
+JPEG cases retain the earlier PQ16 path and thresholds. A separate floating-DCT
+JPEG encoder tests the native library's `JDCT_FLOAT` method without changing
+the base transfer or gain-map interpretation.
+
+The [gain-map cross-format proof](gainmap_crossformat.py) separately evaluates
+single-layer PQ PNG16 and AVIF12 outputs from the native HDR intent. Independent
+libpng or dav1d decoding compares each emitted file with the reconstructed
+source at matched geometry. The requests explicitly select output depth and
+preserve primaries. Original base/map depths remain recorded as source facts;
+explicit SDR conversions continue to use the authored base. These additional
+HDR candidates do not establish browser or wallpaper compatibility.
+
+Its [versioned geometry reference](gainmap_reference.py) filters and clips in the
+requested gamut before conversion to metric coordinates. Clipping Lanczos
+excursions in Rec.2020 can create colors outside the requested P3 or sRGB gamut.
+Analytic tests prove this distinction and preserve identity colors. Original
+references, failing candidates and thresholds remain unchanged; new case IDs
+record `gainmap-hdr-target-gamut-v1` and retain diagnostic reference differences.
+
+The SDR candidate's [independent reference](sdr_reference.py) declares its tone
+curve and relative-colorimetric gamut clipping. Out-of-gamut saturation detail
+can be lost; this is a deliberate mapping choice to evaluate during physical
+review. The [native candidate](sdr_candidate.py) implements the conversion using
+FFmpeg, separately from that reference. Identity tone controls must pass, and
+every encoded derivative must also pass full appearance, signaling and privacy
+checks. Eight-bit output failures remain recorded even when a higher-precision
+PNG passes. No existing acceptance thresholds were relaxed.
+
+Additional SDR AVIF `depth=12` cases have distinct selector tuples and case IDs.
+They retain the predeclared `sdr-8` color and luminance limits as a minimum
+fidelity requirement; higher coded precision does not relax appearance or tone
+thresholds. Every explicit `depth=8` case remains in the original fixed coverage
+plan, including its failures. That plan's eight-bit SDR AVIF choice was a proof
+choice, not a product requirement. The accepted contract permits a suitable
+supported depth when depth is omitted.
+
+The matrix separately records `product_coverage`, matching product requests to
+qualified exact fixture/geometry/selector evidence. An omitted-depth SDR AVIF
+request can use a qualified 12-bit candidate; a failed explicit eight-bit request
+stays failed. WebP retains its eight-bit constraint. Schema version 2 preserves
+the legacy `required_case_count` and `diagnostic_summary.required_cases` fields
+as the original fixed 320-case coverage plan for comparison. Product milestones
+use `product_coverage`; physical browser, viewer and wallpaper checks remain
+pending. This is proof accounting, not a runtime depth-selection policy.
+
+The complete command also reproduces a [precision diagnostic](precision.py).
+It enumerates every full-range sRGB RGB8 triple for selected shadow references,
+then encodes and independently decodes an exact-code counterexample. Its bounds
+apply only to that transfer, matrix, grade and per-pixel metric. They do not
+declare a format impossible or qualify a conversion. Additional native YUV
+trials and all reference hashes remain in the generated `results/precision.json`.
+
+Separate gamma-2.2 candidates encode the same SDR grade with sRGB primaries.
+AVIF declares CICP `1/4/0`. JPEG and WebP embed a deterministic native LittleCMS
+profile whose actual curves, colorants and adaptation are independently checked.
+These are gamma-2.2 SDR files, not standard sRGB-transfer files. The accepted
+contract defines `gamut=srgb` as primaries, so these candidates retain the same
+selectors while recording different representation IDs. Profile-aware physical
+review remains mandatory; existing failed sRGB-transfer files stay failed.
+
+Separate GIF candidates use a gamma-3.2 ICC profile and native nearest rounding
+to eight bits. They retain the same SDR reference, selectors and appearance
+limits. Their case IDs identify the representation; earlier gamma-2.2 failures
+remain visible. This includes the two PQ APNG static orientation cases, which
+pass with the new representation. GIF still requires explicit coercion of
+fractional alpha to binary transparency.
+Optional animated APNG-to-GIF candidates also verify both fully composed frames,
+300/700 ms timing and three total plays. GIF encodes that as two repeats after
+the initial play. An exact binary-alpha mismatch is a failure, even when it
+comes from one half-opacity sample rounded across the cutoff by an intermediate.
+Another native candidate resamples alpha separately and rounds to sixteen bits
+after each axis. It must preserve every RGB16 code, keep intermediate alpha
+within the existing PNG16 precision ceiling and match every final binary decision.
+The original quantized failures remain separate cases.
+
+The [authored SDR JPEG proof](authored_sdr_proof.py) also evaluates gamma-3.2
+ICC encodings against the same independently decoded authored SDR base. These
+are real RGB JPEG8 files with independently checked sRGB or P3 primaries and
+actual profile curves. The coding transfer changes; the reference grade and
+appearance gates do not. These candidates cover the forty required gain-map
+source, gamut and geometry requests while standard sRGB-transfer failures stay
+visible. Native zimg applies fractional crop windows with normalized filter
+boundaries for cover geometry. Cropping to integer bounds before resampling
+would discard samples used by the independent reference. As with gamma-2.2,
+the accepted gamut selectors identify primaries. Every ICC representation
+still needs separate browser, viewer and wallpaper review.
+
+The [HDR PNG generator](hdr_png.py) creates eight deterministic static charts
+covering PQ/HLG, P3/Rec.2020 and opaque/fractional alpha at 16 bits. Native PNG
+encoding writes CICP; ExifTool checks signaling and the separate libpng reader
+decodes samples. Source and HDR derivative appearance use the existing stricter
+`avif-12` ceiling because their 16-bit precision exceeds the 12-bit fixture
+precision. SDR derivatives keep the existing `sdr-8` gates and independent tone
+reference. The scope covers identity, contain, cover, fill, upscale and a real
+EXIF-8 orientation variant. The eight orientation sources have separate hashes;
+native rotation is checked against an independent exact pixel rotation. Matching
+HDR PNG identity requests are exact-byte controls, including original metadata,
+and do not count as encoder evidence. Converted files must remove the source's
+numeric GPS, camera model, serial, EXIF and XMP data. Six metadata-only negative
+controls cover unknown transfer, conflicting or duplicate CICP, invalid CRC,
+and conflicting ICC/sRGB signaling. They retain exact originals and withhold
+transformation. Unlisted cross-products remain untested; this proof does not
+change source admission.
+
+The separate [eight-bit PNG source proof](hdr_png8.py) generates the same eight
+PQ/HLG, P3/Rec.2020 and alpha combinations at eight coded bits. Its source
+quantization uses the existing `avif-8` ceiling, declared before measurement,
+plus exact native libpng code recovery and a half-code quantization bound.
+[Source hashes](fixtures/png8-source-sha256.json) are locked separately.
+These source checks do not qualify derivatives or change the sixteen-bit
+fixtures, their hashes or their stricter appearance gates.
+The [PNG8 containment proof](hdr_png8_proof.py) separately evaluates HDR
+PNG8/AVIF8 and explicit SDR PNG16/AVIF8 outputs. A direct native input expansion
+changes normalized samples and leaves measured failures. A separate native
+zimg expansion preserves every RGB and alpha sample exactly before conversion.
+Its candidates use distinct IDs and the same references and output gates;
+the original bytes, measurements and failures remain unchanged. The complete
+suite includes both candidates, exact-byte no-ops and unknown-CICP controls.
+The [additional geometry proof](hdr_png8_geometry.py) extends the normalized
+candidate to cover, fill, upscale and real EXIF-8 orientation. Its eight
+orientation sources have a [separate reviewed hash lock](fixtures/png8-orientation-sha256.json).
+It checks unchanged coded samples after resetting orientation metadata, exact
+native precision expansion, and one native rotation against independent decoded
+pixels before resizing. These cases retain the containment appearance and alpha
+limits. No existing source hashes or failed containment results change.
+The [higher-depth candidates](hdr_png8_precision.py) separately test explicit
+HDR PNG16 and AVIF12 requests from these eight-bit sources. Both outputs use the
+existing, stricter `avif-12` appearance ceiling against decoded-source geometry.
+Source quantization remains separate. Alpha error must stay within two codes
+at the actual output depth. The complete suite includes these measurements and
+their inspected containment files for pending physical review.
+The same higher-depth cases also cover crop, fill, upscale and real EXIF-8
+orientation, with exact native rotation checked before resampling.
+The [SDR WebP cases](hdr_png8_webp.py) preserve the independently referenced SDR
+grade with gamma-2.2 ICC coding and fractional alpha. A restricted static VP8L
+reader checks container structure before native decoding. FFmpeg's native WebP
+decoder must match both Pillow/libwebp and the coded encoder input exactly;
+regional appearance, tone/gamut policy and privacy still have separate gates.
+A separate nearest-code quantizer must match independently rounded sixteen-bit
+RGB and alpha samples exactly, within half an output code. Both quantization
+candidates retain separate measurements and the same final appearance and alpha
+limits. The earlier JPEG and static/animated WebP defaults retain pinned bytes.
+Both candidates cover containment, crop, stretch, upscale and real EXIF-8
+orientation. Each rotated source has its own locked hash, and native rotation
+must exactly match the independently rotated source samples before resizing.
+
+The [gain-map AVIF source proof](gainmap_avif.py) regenerates one separately
+[hash-locked source](fixtures/gainmap-avif-source-sha256.json) from the Android
+XMP JPEG. Independent BMFF parsing reads base/map associations and per-channel
+gain fractions; direct AV1 packet decoding checks actual native depth and color
+signaling before any eight-bit conversion. The pinned libavif metadata printer
+repeats channel zero, so its text remains diagnostic evidence. The
+[authored-SDR derivative](gainmap_avif_proof.py) uses AOM source decoding and
+encoding, independent dav1d samples and unchanged photographic appearance gates.
+Containment, crop, stretch and upscale retain separate measurements. Cover uses
+the native fractional-window filter and an independently cropped SDR reference.
+Unknown required facts preserve exact originals and withhold transformation.
+Nonidentity orientation and untested selector tuples remain unqualified.
+The separate [SDR PNG8 candidates](gainmap_avif_png.py) retain the same authored
+base and photographic limits for containment, crop, stretch and upscale.
+Their actual native PNGs use standard sRGB/cHRM/gAMA signaling and explicitly square pixels. Independent
+libpng decoding must preserve the native encoder-input samples exactly;
+ExifTool and a strict chunk reader verify color, depth, geometry and privacy.
+Exact storage does not replace its regional appearance checks.
+The separate [SDR WebP proof](gainmap_avif_webp.py) covers containment, crop,
+stretch and upscale using that verified native preparation and an actual native sRGB ICC profile. Native libwebp and
+FFmpeg must agree on every stored RGB8 sample, with strict container, profile
+and privacy checks. Its authored SDR appearance gates remain unchanged; HDR
+rendering and physical consumer interpretation are separate.
+The separate [HDR AVIF12 proof](gainmap_avif_hdr.py) retains the original native
+sampling failures and tests native antialiased map resampling with float32 gain
+application. Both candidates use the same independently reconstructed source
+and unchanged photographic HDR gates. Source reconstruction, linear geometry
+and the emitted single-layer PQ12 AVIF must pass separately. PQ encoding honors
+each native input's actual luminance normalization. The map-sampling convention
+is fixed for this proof; it is not claimed as ISO's uniquely mandated filter.
+Containment, crop, stretch and upscale keep separate candidate results; the
+original source-sampling failures remain visible at every geometry.
+Named reconstruction profiles remain bound to the source hash. Physical consumer
+interoperability remains unqualified.
+The separate [HDR PNG16 proof](gainmap_avif_hdr_png.py) checks the same native
+source reconstruction and unchanged HDR reference. Its original PNG does not
+establish requested square pixels: pHYs reports 0:1. A native rewrite declares
+1:1 while preserving every decoded RGB16 and alpha sample. Independent libpng,
+FFmpeg and ExifTool verify storage, PQ signaling, dimensions and privacy;
+source, geometry and final appearance must still pass. The original aspect
+failure stays visible beside the corrected candidate.
+The separate [regenerated gain-map AVIF proof](gainmap_avif_preserve.py) preserves
+actual base, map and alternate depth at eight bits for containment, crop, stretch
+and upscale. Independent BMFF/tmap and
+AV1 packet inspection precede authored SDR, independent HDR and native HDR
+appearance checks. Stock depth-8 failures and automatic-depth-12 incompatibility
+remain visible. Qualification covers the declared full-headroom endpoints only:
+regenerated offsets and headroom differ from the source, so intermediate display
+adaptation remains untested. Physical consumers remain pending.
+The separate [authored SDR JPEG proof](gainmap_avif_jpeg.py) checks containment,
+crop, stretch and upscale from the same gain-map AVIF source. Standard sRGB
+RGB8 quality-100 JPEG passes
+the first three geometries. Upscale fails the unchanged shadow maximum at
+25.49485 in both native-input and full-reference comparisons. A separate
+gamma-3.2 ICC upscale passes the same gates, with shadow maximum 3.83562.
+Native conversion changes the coding transfer of the existing SDR samples;
+the authored reference and sRGB primaries remain unchanged. Regional mean
+errors increase but remain within the fixed limits. Exhaustive sample checks
+verify the native coding transfer, and the standard-sRGB failure stays visible.
+Independent inspection establishes color from actual ICC, RGB components and
+Adobe transform fields; decoder-guessed
+color defaults remain diagnostics. Actual dimensions are checked without
+inventing an absent JPEG aspect declaration. Physical interpretation remains
+pending independently from the lossless PNG, WebP and AVIF versions.
+The separate [HDR JPEG proof](gainmap_avif_hdr_jpeg.py) combines the
+verified native SDR and HDR preparations from this source. Its gamma-3.2 ICC
+base and regenerated midpoint-offset gamma-1.5 map pass the unchanged SDR,
+native HDR, independent HDR and cross-reader gates at display boost 16 for
+containment, crop, stretch and upscale. The original containment remains exact.
+Independent HDR maximum error is 6.10543 across these cases; both actual JPEG layers are RGB8
+SOF0. The source reference uses independent dav1d samples and parsed tmap
+metadata. A separate [boost-2 rendering proof](gainmap_avif_hdr_jpeg_headroom.py)
+retains the exact containment file but fails against the source reconstructed
+at that same boost. Both readers agree; independent shadow maximum is 75.26896.
+Capacity-normalized and uncompressed-map diagnostics still fail. Changing the
+authored SDR geometry to a linear-light reference would itself fail the existing
+SDR gate, so that reference remains unchanged. These are optional conversion
+measurements, not an additional required product path. Stock-reader failure and
+measured adaptation failure remain explicit; browser and wallpaper results are
+pending.
+The [separate-map experiment](gainmap_avif_separate_map.py) uses native map
+sampling and geometry with the original gain metadata. Its checked metadata
+carrier supplies no image pixels. Source and output weights match, and the
+actual-ICC authored SDR measurement stays exact, but all three renderings fail.
+Shadow maxima reach 146.7847 at boost 2 and 171.395 at source-full headroom.
+Uncompressed-map diagnostics retain those errors. The fixed references contain
+809 pixels with an exact channel-order violation for an equal-offset monotonic
+gain curve. This identifies a representation constraint, not proof that no
+approximate file can meet the regional limits.
+The [unresized format conversion](gainmap_avif_identity_jpeg.py) retains the
+original base raster, native sampled map and checked source gain metadata.
+One actual RGB8 HDR JPEG passes authored SDR and both HDR readers at boosts 2,
+source-full and 16. The independent HDR maximum across those renderings is
+4.666031, and the SDR maximum is 3.962015, under the unchanged regional gates.
+Actual ICC interpretation remains necessary. This optional identity conversion
+does not qualify resize, crop, orientation or other display headrooms. Its
+candidate and matched SDR reference are included for pending physical review;
+all failed resized experiments remain separate.
+The [original-size XMP JPEG-to-gain-map AVIF conversion](xmp_identity_avif.py)
+preserves the original 403-by-302 RGB8 base, 512-by-384 grayscale8 map and gain
+metadata. Independent parsing permits only the verified base/map/tmap item
+graph; dav1d decodes actual coded samples, and native whole-file readers must
+agree. One file passes authored SDR and HDR at boosts 2, source-full and 16,
+with exact source samples and maximum native HDR error 0.213356. The legacy
+source has EXIF-sRGB facts but lacks the ICC required by the Android container
+specification. That named source convention remains explicit. This optional
+conversion does not qualify resizing or physical gain-map AVIF presentation.
+
+The [static PQ8/P3 AVIF-to-HDR-JPEG experiment](static_avif_hdr_jpeg.py) compares
+two native RGB8 encodings at the original 96-by-64 geometry. Both use the
+existing 1000-nit Mobius SDR grade, P3 gamma3.2 ICC coding and regenerated
+dual ISO/XMP gain metadata. The no-dither file fails the emitted SDR base's
+highlight-flattening gate despite passing color comparisons. Native ordered
+dither resolves 30 of 37 highlight steps instead of 16 and passes every
+unchanged avif-8, sdr-8 and tone gate. Its SDR maximum error is 2.973248;
+native and independent HDR maxima are 2.790719 and 2.933713. These errors
+increase relative to no dither and remain recorded. Ordinary white is 0.885149
+SDR signal. Tone probes use an explicitly clipped nominal sRGB display, while
+SDR appearance compares unclipped actual ICC colors. Executable guards show
+clipping changes no white/shadow/midtone probe or neutral-curve decision.
+Only full boost 16 and ICC-aware readers qualify; stock-reader failures,
+intermediate adaptation and physical consumers remain separate.
+The [authored SDR GIF containment](gainmap_avif_gif.py) remains failed. Its real
+256-color native palette passes structure, ICC, opacity and independent decoding
+but exceeds the unchanged shadow and midtone appearance gates. A read-only
+comparison finds 900 reference pixels with no color in this exact palette
+within the maximum error of 8. Changing dithering alone cannot fix those pixels;
+this does not prove other palettes or GIF encoders impossible.
+A separate native libimagequant palette also fails. It improves regional means
+but raises the shadow maximum to 62.97; 951 pixels cannot meet the maximum gate
+with that exact palette. Both native outputs remain failed, with distinct
+case IDs and unchanged references. The native package version, library hash
+and its different version-API report are recorded separately.
+A third candidate applies the existing native gamma-3.2 coding transfer before
+the same libimagequant adapter, with an actual matching ICC profile. It reduces
+the shadow maximum to 46.78 and the exact-palette bound to 794 pixels, but still
+fails shadow and midtone gates. The optimizer's fixed gamma convention is
+recorded separately from the actual output color interpretation. All three
+photographic GIF candidates remain unqualified.
+
+The separate [APNG proof](apng.py) adds four animated RGBA16 fixtures covering
+PQ/HLG and P3/Rec.2020. Their two full-canvas frames use SOURCE blending, no
+disposal, 300/700 ms timing and three plays. Native FFmpeg encodes the animation;
+an independent chunk reader checks timing, loops and signaling, then gives
+untouched compressed frame data to the native libpng decoder. Exact source
+sample comparisons include fractional alpha. Contain, cover, fill, upscale and
+orientation derivatives cover HDR APNG and AVIF, plus explicit SDR APNG,
+gamma-2.2 AVIF and gamma-2.2 ICC WebP. Four separately hashed EXIF-8 sources
+exercise real nonidentity orientation; every native frame rotation is checked
+against an independent exact pixel rotation before geometry conversion.
+HDR APNG signals CICP; native SDR APNG uses the standard sRGB chunk. The unchanged
+SDR reference uses one declared sequence peak, 4000 nits for PQ or 1000 nits for
+the HLG reference display. Original-byte and unsupported-composition controls
+remain separate from codec qualification. Two native partial-rectangle fixtures
+verify exact SOURCE replacement, including fractional alpha and stored RGB under
+zero alpha. The independent reader checks rectangle bounds and requires the
+first default-image frame to fill the canvas. Explicit static extraction checks
+the first fully composed frame for HDR PNG/AVIF and SDR PNG/AVIF/WebP/JPEG/GIF
+at each tested geometry. JPEG opacity and GIF binary alpha require explicit
+coercion; preserve-alpha requests are rejected. The two original gamma-2.2 PQ
+static GIF orientation cases exceed the fixed shadow color-error ceiling and remain
+unqualified; their separately measured gamma-3.2 alternatives retain the same gates.
+OVER blending, disposal and unlisted geometries remain unqualified in this APNG subset.
+Browser, viewer and wallpaper interpretation remains pending manual review for
+every emitted representation.
+
+Authored SDR lossless PNG and WebP candidates pass all four gain-map sources,
+two requested gamuts and seven geometries using 8-bit samples with independently
+verified sRGB transfer and sRGB or P3 ICC primaries. Their 112 cases keep the authored SDR grade and
+unchanged appearance gates; physical consumer interpretation remains pending.
+
+The [authored SDR AVIF candidate](authored_avif.py) uses native AOM RGB8 encoding
+and independent dav1d decoding. It preserves the base's eight-bit depth with
+explicit sRGB-transfer CICP and either sRGB or P3 primaries. It rejects auxiliary
+gain maps, conflicting ICC profiles, motion, alpha and disagreeing color facts.
+The same authored-base geometry and regional appearance limits still apply.
+
+The appearance metric keeps signed color coordinates when a valid color lies
+outside an intermediate RGB gamut. P3 red, for example, has a negative blue
+coordinate in Rec.2020. It checks finite values, nonnegative luminance and the
+BT.2124 LMS domain without clipping those coordinates. Tests require identical
+measurements for the same color expressed in either gamut. Color-error and
+luminance-error thresholds remain unchanged.

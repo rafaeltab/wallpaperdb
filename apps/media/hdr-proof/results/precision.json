@@ -1,0 +1,1458 @@
+{
+  "schema_version": 1,
+  "status": "diagnostic_only",
+  "representation": "Full-range identity-matrix sRGB RGB8 at a nominal 100-nit display",
+  "scope": "A bound for the current reference and per-pixel metric; not a format-wide impossibility or support claim",
+  "exclusions": [
+    "Other transfer functions or YUV matrices",
+    "Higher coded precision",
+    "A different independently justified tone reference",
+    "Spatially integrated or physical-display appearance"
+  ],
+  "arithmetic": "IEEE 754 float64; no formal interval-arithmetic certificate",
+  "reference_sha256": "c29523ac2fef8961ba796f4828be9b35838aeb7dbd4a121217a5db2475d6cfe7",
+  "reference_hash_encoding": "Row-major little-endian float64 normalized sRGB, RGB channels only",
+  "reference_shape": [
+    38,
+    57,
+    3
+  ],
+  "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+  "fixed_maximum_delta_e_itp": 8,
+  "enumerated_codes_per_reference": 16777216,
+  "shadow_samples": 349,
+  "unique_shadow_colors": 19,
+  "selection": "Largest nearest-signal-rounding error among unique visible HDR shadow references",
+  "selected_samples_with_impossible_maximum_gate": 36,
+  "references": [
+    {
+      "reference_srgb": [
+        0.0014085475182930944,
+        0.0014085475182930923,
+        0.0014085475182930936
+      ],
+      "reference_rgb8_code_units": [
+        0.35917961716473906,
+        0.3591796171647385,
+        0.35917961716473884
+      ],
+      "visible_matching_samples": 18,
+      "best_rgb8_code": [
+        1,
+        1,
+        1
+      ],
+      "minimum_delta_e_itp": 10.291876569851711,
+      "exceeds_fixed_maximum_gate": true
+    },
+    {
+      "reference_srgb": [
+        0.0006757427932188037,
+        0.0006757427932188026,
+        0.0006757427932188032
+      ],
+      "reference_rgb8_code_units": [
+        0.17231441227079494,
+        0.17231441227079466,
+        0.1723144122707948
+      ],
+      "visible_matching_samples": 18,
+      "best_rgb8_code": [
+        0,
+        0,
+        0
+      ],
+      "minimum_delta_e_itp": 11.111861500659277,
+      "exceeds_fixed_maximum_gate": true
+    }
+  ],
+  "fixture_id": "avif-pq-rec2020-10-opaque",
+  "geometry": "contain",
+  "source_avif_sha256": "43a7c7cafbb2b596e819a04eac3bd87ab8e6e2cd2102c39c66f0252f3d2505d8",
+  "source_decoded_png_sha256": "4395d4196248268a3d714ff280be1c965414d583c78068ba99e28609ff06f64c",
+  "reference_recipe_sha256": "9365ef53d057206e324a99249df10fcde3576b210ff81aa22c9b054af4710826",
+  "geometry_and_transfer_reference_sha256": "28c87a831fe1b29333060b870e5f081e744b8dd3deec9ccbe21e07ed1bdac6e1",
+  "metric_source_sha256": "a0be551e0e7c27b9fb786c63d1fa72113c5f66415360ce3ae854c72aeb3809e8",
+  "native_counterexample": {
+    "status": "diagnostic_only",
+    "decoded_exactly_matches_supplied_rgb8": true,
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/precision/nearest-code.avif\n * Resolution     : 57x38\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "nearest-code.avif",
+        "FileSize": 1411,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "ImageWidth": 57,
+        "ImageHeight": 38,
+        "ImageSpatialExtent": "57 38",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 1,
+        "TransferCharacteristics": 13,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 1136,
+        "MediaDataOffset": 275,
+        "ImageSize": "57 38",
+        "Megapixels": 0.002166
+      },
+      "width": 57,
+      "height": 38,
+      "depth": 8,
+      "primaries": 1,
+      "transfer": 13,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "668d544cb8806d91d0d74215874e60bae03999e33c8918f93852b4bbbe53ac31"
+    },
+    "supplied_png_sha256": "89cb5927a8d21b76a04aabed9d89eaf6d19be30f181923430bf9c8169f4063e8",
+    "output_avif_sha256": "668d544cb8806d91d0d74215874e60bae03999e33c8918f93852b4bbbe53ac31",
+    "appearance": {
+      "passed": false,
+      "metric": "BT.2124 Delta E ITP",
+      "fixture_class": "sdr-8",
+      "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+      "region_basis": "appearance_reference_luminance_nits",
+      "regions": {
+        "shadow": {
+          "samples": 695,
+          "delta_e_itp": {
+            "mean": 1.0627551456741793,
+            "p95": 11.111861500659277,
+            "maximum": 16.151322442208777
+          },
+          "luminance_absolute_error_nits": {
+            "mean": 0.012011311596367109,
+            "p95": 0.026733643464140533,
+            "maximum": 0.08092730339237875
+          },
+          "luminance_relative_error_above_absolute_floor": {
+            "mean": 0.0,
+            "p95": 0.0,
+            "maximum": 0.0
+          },
+          "reference_mean_nits": 3.67276018029922,
+          "actual_mean_nits": 3.672606695989775
+        },
+        "midtone": {
+          "samples": 1471,
+          "delta_e_itp": {
+            "mean": 0.1618642722860143,
+            "p95": 0.3363253197614312,
+            "maximum": 0.5725643646512024
+          },
+          "luminance_absolute_error_nits": {
+            "mean": 0.14785763747036781,
+            "p95": 0.36252230166198274,
+            "maximum": 0.4150246576293881
+          },
+          "luminance_relative_error_above_absolute_floor": {
+            "mean": 0.0009195338037541964,
+            "p95": 0.002813369260061266,
+            "maximum": 0.004035328899204577
+          },
+          "reference_mean_nits": 65.02960286907543,
+          "actual_mean_nits": 65.05954882942518
+        },
+        "highlight": {
+          "samples": 0,
+          "status": "not_present_in_reference"
+        }
+      },
+      "failures": [
+        "shadow.delta_e_mean",
+        "shadow.delta_e_p95",
+        "shadow.delta_e_max"
+      ],
+      "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+    },
+    "commands": [
+      {
+        "argv": [
+          "ffmpeg",
+          "-v",
+          "error",
+          "-y",
+          "-f",
+          "rawvideo",
+          "-pix_fmt",
+          "rgba",
+          "-s",
+          "57x38",
+          "-i",
+          "pipe:0",
+          "-frames:v",
+          "1",
+          "-threads",
+          "1",
+          "/proof/work/precision/nearest-code.png"
+        ],
+        "exit_code": 0,
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "avifenc",
+          "-c",
+          "aom",
+          "-j",
+          "1",
+          "-s",
+          "8",
+          "-q",
+          "100",
+          "--qalpha",
+          "100",
+          "-y",
+          "444",
+          "-d",
+          "8",
+          "--cicp",
+          "1/13/0",
+          "--ignore-exif",
+          "--ignore-xmp",
+          "--ignore-profile",
+          "--timescale",
+          "10",
+          "--repetition-count",
+          "2",
+          "--creation-time",
+          "1",
+          "--modification-time",
+          "1",
+          "--duration",
+          "3",
+          "/proof/work/precision/nearest-code.png",
+          "/proof/work/precision/nearest-code.avif"
+        ],
+        "exit_code": 0,
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "avifdec",
+          "-j",
+          "1",
+          "-c",
+          "dav1d",
+          "-d",
+          "16",
+          "--index",
+          "0",
+          "/proof/work/precision/nearest-code.avif",
+          "/proof/work/precision/decoded-0.png"
+        ],
+        "exit_code": 0,
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "hdr-proof-png-decode",
+          "/proof/work/precision/decoded-0.png"
+        ],
+        "exit_code": 0,
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "avifdec",
+          "-j",
+          "1",
+          "-c",
+          "dav1d",
+          "--info",
+          "/proof/work/precision/nearest-code.avif"
+        ],
+        "exit_code": 0,
+        "stderr": ""
+      },
+      {
+        "argv": [
+          "exiftool",
+          "-j",
+          "-n",
+          "/proof/work/precision/nearest-code.avif"
+        ],
+        "exit_code": 0,
+        "stderr": ""
+      }
+    ]
+  },
+  "native_yuv_candidates": [
+    {
+      "status": "tested and failed",
+      "scope": "Appearance diagnostic only; no complete conversion qualification",
+      "exhaustive_representation_bound": false,
+      "requested_matrix": 1,
+      "requested_range": "full",
+      "input_png_sha256": "aa91814861022b52b0df6ee6b9cd94bfdb4cc32de583ba9737ca944695cf3890",
+      "appearance": {
+        "passed": false,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "sdr-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
+        "regions": {
+          "shadow": {
+            "samples": 695,
+            "delta_e_itp": {
+              "mean": 1.085777815256927,
+              "p95": 11.111861500659277,
+              "maximum": 16.151322442208777
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.014468948924367333,
+              "p95": 0.029207625374427337,
+              "maximum": 0.08092730339237875
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 3.67276018029922,
+            "actual_mean_nits": 3.6837652753830907
+          },
+          "midtone": {
+            "samples": 1471,
+            "delta_e_itp": {
+              "mean": 0.22416606115281296,
+              "p95": 0.6079253112414932,
+              "maximum": 0.8247578337422781
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.1607194139326309,
+              "p95": 0.3658217275409328,
+              "maximum": 0.4150246576293881
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0012263264158409867,
+              "p95": 0.004175850276537632,
+              "maximum": 0.004850428552409601
+            },
+            "reference_mean_nits": 65.02960286907543,
+            "actual_mean_nits": 65.02094752433838
+          },
+          "highlight": {
+            "samples": 0,
+            "status": "not_present_in_reference"
+          }
+        },
+        "failures": [
+          "shadow.delta_e_mean",
+          "shadow.delta_e_p95",
+          "shadow.delta_e_max"
+        ],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      },
+      "facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/precision/yuv/matrix-1-full/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 1\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 919,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "8 8 8",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 1,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 644,
+          "MediaDataOffset": 275,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 8,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 1,
+        "alpha": "Absent",
+        "sha256": "efea9bb33d97cd1e18dc4a19252ca10d489a4b4573141cb2ac11205c60281659"
+      },
+      "commands": [
+        {
+          "argv": [
+            "avifenc",
+            "-c",
+            "aom",
+            "-j",
+            "1",
+            "-s",
+            "8",
+            "-q",
+            "100",
+            "--qalpha",
+            "100",
+            "-y",
+            "444",
+            "-d",
+            "8",
+            "--cicp",
+            "1/13/1",
+            "-r",
+            "full",
+            "--ignore-exif",
+            "--ignore-xmp",
+            "--ignore-profile",
+            "/proof/work/avif/avif-pq-rec2020-10-opaque/sdr-avif-preserve-contain/converted-0.png",
+            "/proof/work/precision/yuv/matrix-1-full/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": "WARNING: [--lossless] Input data was RGB and matrixCoefficients isn't set to identity (--cicp x/x/0) or YCgCo-Re/Ro (--cicp x/x/16 or x/x/17); Output might not be lossless.\n"
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "-d",
+            "16",
+            "--index",
+            "0",
+            "/proof/work/precision/yuv/matrix-1-full/output.avif",
+            "/proof/work/precision/yuv/matrix-1-full/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "hdr-proof-png-decode",
+            "/proof/work/precision/yuv/matrix-1-full/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "--info",
+            "/proof/work/precision/yuv/matrix-1-full/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "exiftool",
+            "-j",
+            "-n",
+            "/proof/work/precision/yuv/matrix-1-full/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        }
+      ]
+    },
+    {
+      "status": "tested and failed",
+      "scope": "Appearance diagnostic only; no complete conversion qualification",
+      "exhaustive_representation_bound": false,
+      "requested_matrix": 1,
+      "requested_range": "limited",
+      "input_png_sha256": "aa91814861022b52b0df6ee6b9cd94bfdb4cc32de583ba9737ca944695cf3890",
+      "appearance": {
+        "passed": false,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "sdr-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
+        "regions": {
+          "shadow": {
+            "samples": 695,
+            "delta_e_itp": {
+              "mean": 1.130969748318499,
+              "p95": 11.111861500659277,
+              "maximum": 16.151322442208777
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.011668754356396159,
+              "p95": 0.04525992132811929,
+              "maximum": 0.11635881260429848
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 2.6309614793210573e-06,
+              "p95": 0.0,
+              "maximum": 0.0018285182281281348
+            },
+            "reference_mean_nits": 3.67276018029922,
+            "actual_mean_nits": 3.6778300022237214
+          },
+          "midtone": {
+            "samples": 1471,
+            "delta_e_itp": {
+              "mean": 0.18753184853748753,
+              "p95": 0.4216057309411979,
+              "maximum": 0.9761052547941437
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.15105738492461118,
+              "p95": 0.41976667703364967,
+              "maximum": 0.4955452026987075
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0010961318343471627,
+              "p95": 0.0038292913053934786,
+              "maximum": 0.006040670462984924
+            },
+            "reference_mean_nits": 65.02960286907543,
+            "actual_mean_nits": 65.05657625942513
+          },
+          "highlight": {
+            "samples": 0,
+            "status": "not_present_in_reference"
+          }
+        },
+        "failures": [
+          "shadow.delta_e_mean",
+          "shadow.delta_e_p95",
+          "shadow.delta_e_max"
+        ],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      },
+      "facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/precision/yuv/matrix-1-limited/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Limited\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 1\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 826,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "8 8 8",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 1,
+          "VideoFullRangeFlag": 0,
+          "MediaDataSize": 551,
+          "MediaDataOffset": 275,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 8,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 1,
+        "alpha": "Absent",
+        "sha256": "55b8da4e27f047f26a4b071698c1086506860dfe7c251fe4884dadb16f820c3c"
+      },
+      "commands": [
+        {
+          "argv": [
+            "avifenc",
+            "-c",
+            "aom",
+            "-j",
+            "1",
+            "-s",
+            "8",
+            "-q",
+            "100",
+            "--qalpha",
+            "100",
+            "-y",
+            "444",
+            "-d",
+            "8",
+            "--cicp",
+            "1/13/1",
+            "-r",
+            "limited",
+            "--ignore-exif",
+            "--ignore-xmp",
+            "--ignore-profile",
+            "/proof/work/avif/avif-pq-rec2020-10-opaque/sdr-avif-preserve-contain/converted-0.png",
+            "/proof/work/precision/yuv/matrix-1-limited/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": "WARNING: [--lossless] Input data was RGB and output range (-r) isn't full. Output might not be lossless.\nWARNING: [--lossless] Input data was RGB and matrixCoefficients isn't set to identity (--cicp x/x/0) or YCgCo-Re/Ro (--cicp x/x/16 or x/x/17); Output might not be lossless.\n"
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "-d",
+            "16",
+            "--index",
+            "0",
+            "/proof/work/precision/yuv/matrix-1-limited/output.avif",
+            "/proof/work/precision/yuv/matrix-1-limited/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "hdr-proof-png-decode",
+            "/proof/work/precision/yuv/matrix-1-limited/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "--info",
+            "/proof/work/precision/yuv/matrix-1-limited/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "exiftool",
+            "-j",
+            "-n",
+            "/proof/work/precision/yuv/matrix-1-limited/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        }
+      ]
+    },
+    {
+      "status": "tested and failed",
+      "scope": "Appearance diagnostic only; no complete conversion qualification",
+      "exhaustive_representation_bound": false,
+      "requested_matrix": 6,
+      "requested_range": "full",
+      "input_png_sha256": "aa91814861022b52b0df6ee6b9cd94bfdb4cc32de583ba9737ca944695cf3890",
+      "appearance": {
+        "passed": false,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "sdr-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
+        "regions": {
+          "shadow": {
+            "samples": 695,
+            "delta_e_itp": {
+              "mean": 1.0940910043101602,
+              "p95": 11.111861500659277,
+              "maximum": 16.151322442208777
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.015705789940131058,
+              "p95": 0.034513826028475414,
+              "maximum": 0.08092730339237875
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 3.67276018029922,
+            "actual_mean_nits": 3.6850021163988544
+          },
+          "midtone": {
+            "samples": 1471,
+            "delta_e_itp": {
+              "mean": 0.20448586724848797,
+              "p95": 0.5648639743489193,
+              "maximum": 0.7493047835453299
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.14836462532385433,
+              "p95": 0.3658217275409328,
+              "maximum": 0.5056201052510687
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0011092413366831657,
+              "p95": 0.003608303777873628,
+              "maximum": 0.005652114597478238
+            },
+            "reference_mean_nits": 65.02960286907543,
+            "actual_mean_nits": 65.01038152238488
+          },
+          "highlight": {
+            "samples": 0,
+            "status": "not_present_in_reference"
+          }
+        },
+        "failures": [
+          "shadow.delta_e_mean",
+          "shadow.delta_e_p95",
+          "shadow.delta_e_max"
+        ],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      },
+      "facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/precision/yuv/matrix-6-full/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 6\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 949,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "8 8 8",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 6,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 674,
+          "MediaDataOffset": 275,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 8,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 6,
+        "alpha": "Absent",
+        "sha256": "492c9e1d61dd9931f29583570d84a0bacfa679526cca220da010a3cb4ac6586c"
+      },
+      "commands": [
+        {
+          "argv": [
+            "avifenc",
+            "-c",
+            "aom",
+            "-j",
+            "1",
+            "-s",
+            "8",
+            "-q",
+            "100",
+            "--qalpha",
+            "100",
+            "-y",
+            "444",
+            "-d",
+            "8",
+            "--cicp",
+            "1/13/6",
+            "-r",
+            "full",
+            "--ignore-exif",
+            "--ignore-xmp",
+            "--ignore-profile",
+            "/proof/work/avif/avif-pq-rec2020-10-opaque/sdr-avif-preserve-contain/converted-0.png",
+            "/proof/work/precision/yuv/matrix-6-full/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": "WARNING: [--lossless] Input data was RGB and matrixCoefficients isn't set to identity (--cicp x/x/0) or YCgCo-Re/Ro (--cicp x/x/16 or x/x/17); Output might not be lossless.\n"
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "-d",
+            "16",
+            "--index",
+            "0",
+            "/proof/work/precision/yuv/matrix-6-full/output.avif",
+            "/proof/work/precision/yuv/matrix-6-full/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "hdr-proof-png-decode",
+            "/proof/work/precision/yuv/matrix-6-full/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "--info",
+            "/proof/work/precision/yuv/matrix-6-full/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "exiftool",
+            "-j",
+            "-n",
+            "/proof/work/precision/yuv/matrix-6-full/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        }
+      ]
+    },
+    {
+      "status": "tested and failed",
+      "scope": "Appearance diagnostic only; no complete conversion qualification",
+      "exhaustive_representation_bound": false,
+      "requested_matrix": 6,
+      "requested_range": "limited",
+      "input_png_sha256": "aa91814861022b52b0df6ee6b9cd94bfdb4cc32de583ba9737ca944695cf3890",
+      "appearance": {
+        "passed": false,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "sdr-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
+        "regions": {
+          "shadow": {
+            "samples": 695,
+            "delta_e_itp": {
+              "mean": 1.201063286053442,
+              "p95": 11.111861500659277,
+              "maximum": 16.151322442208777
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.020942482713138182,
+              "p95": 0.04525992132811929,
+              "maximum": 0.11635881260429848
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 2.6309614793210573e-06,
+              "p95": 0.0,
+              "maximum": 0.0018285182281281348
+            },
+            "reference_mean_nits": 3.67276018029922,
+            "actual_mean_nits": 3.6667533534195917
+          },
+          "midtone": {
+            "samples": 1471,
+            "delta_e_itp": {
+              "mean": 0.21771590597655857,
+              "p95": 0.5613633695756675,
+              "maximum": 0.7448753431848142
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.1617746300501869,
+              "p95": 0.41976667703364967,
+              "maximum": 0.6171215539002048
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.001194485132178861,
+              "p95": 0.0038425603064343294,
+              "maximum": 0.005993161734868233
+            },
+            "reference_mean_nits": 65.02960286907543,
+            "actual_mean_nits": 64.99706373320316
+          },
+          "highlight": {
+            "samples": 0,
+            "status": "not_present_in_reference"
+          }
+        },
+        "failures": [
+          "shadow.delta_e_mean",
+          "shadow.delta_e_p95",
+          "shadow.delta_e_max"
+        ],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      },
+      "facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/precision/yuv/matrix-6-limited/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Limited\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 6\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 868,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "8 8 8",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 6,
+          "VideoFullRangeFlag": 0,
+          "MediaDataSize": 593,
+          "MediaDataOffset": 275,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 8,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 6,
+        "alpha": "Absent",
+        "sha256": "d631d3ba6f7aff248e90453be0d733132130d4c5f8be88ea29e5d6197c32a24a"
+      },
+      "commands": [
+        {
+          "argv": [
+            "avifenc",
+            "-c",
+            "aom",
+            "-j",
+            "1",
+            "-s",
+            "8",
+            "-q",
+            "100",
+            "--qalpha",
+            "100",
+            "-y",
+            "444",
+            "-d",
+            "8",
+            "--cicp",
+            "1/13/6",
+            "-r",
+            "limited",
+            "--ignore-exif",
+            "--ignore-xmp",
+            "--ignore-profile",
+            "/proof/work/avif/avif-pq-rec2020-10-opaque/sdr-avif-preserve-contain/converted-0.png",
+            "/proof/work/precision/yuv/matrix-6-limited/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": "WARNING: [--lossless] Input data was RGB and output range (-r) isn't full. Output might not be lossless.\nWARNING: [--lossless] Input data was RGB and matrixCoefficients isn't set to identity (--cicp x/x/0) or YCgCo-Re/Ro (--cicp x/x/16 or x/x/17); Output might not be lossless.\n"
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "-d",
+            "16",
+            "--index",
+            "0",
+            "/proof/work/precision/yuv/matrix-6-limited/output.avif",
+            "/proof/work/precision/yuv/matrix-6-limited/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "hdr-proof-png-decode",
+            "/proof/work/precision/yuv/matrix-6-limited/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "--info",
+            "/proof/work/precision/yuv/matrix-6-limited/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "exiftool",
+            "-j",
+            "-n",
+            "/proof/work/precision/yuv/matrix-6-limited/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        }
+      ]
+    },
+    {
+      "status": "tested and failed",
+      "scope": "Appearance diagnostic only; no complete conversion qualification",
+      "exhaustive_representation_bound": false,
+      "requested_matrix": 9,
+      "requested_range": "full",
+      "input_png_sha256": "aa91814861022b52b0df6ee6b9cd94bfdb4cc32de583ba9737ca944695cf3890",
+      "appearance": {
+        "passed": false,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "sdr-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
+        "regions": {
+          "shadow": {
+            "samples": 695,
+            "delta_e_itp": {
+              "mean": 1.0977021139342185,
+              "p95": 11.111861500659277,
+              "maximum": 16.151322442208777
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.016097155474437942,
+              "p95": 0.036192832487384585,
+              "maximum": 0.08092730339237875
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 3.67276018029922,
+            "actual_mean_nits": 3.6853934819331613
+          },
+          "midtone": {
+            "samples": 1471,
+            "delta_e_itp": {
+              "mean": 0.21443655184464655,
+              "p95": 0.4399983329767396,
+              "maximum": 0.7294948926992607
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.1639664529225397,
+              "p95": 0.3658217275409328,
+              "maximum": 0.44373304909628075
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0011026132538950592,
+              "p95": 0.0030778308164951906,
+              "maximum": 0.004886005044567505
+            },
+            "reference_mean_nits": 65.02960286907543,
+            "actual_mean_nits": 65.04569786748664
+          },
+          "highlight": {
+            "samples": 0,
+            "status": "not_present_in_reference"
+          }
+        },
+        "failures": [
+          "shadow.delta_e_mean",
+          "shadow.delta_e_p95",
+          "shadow.delta_e_max"
+        ],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      },
+      "facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/precision/yuv/matrix-9-full/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 9\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 962,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "8 8 8",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 9,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 687,
+          "MediaDataOffset": 275,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 8,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 9,
+        "alpha": "Absent",
+        "sha256": "27c8fb76565d179ee0e0871f5881a329e8446244d3d83a0301b669da936c6337"
+      },
+      "commands": [
+        {
+          "argv": [
+            "avifenc",
+            "-c",
+            "aom",
+            "-j",
+            "1",
+            "-s",
+            "8",
+            "-q",
+            "100",
+            "--qalpha",
+            "100",
+            "-y",
+            "444",
+            "-d",
+            "8",
+            "--cicp",
+            "1/13/9",
+            "-r",
+            "full",
+            "--ignore-exif",
+            "--ignore-xmp",
+            "--ignore-profile",
+            "/proof/work/avif/avif-pq-rec2020-10-opaque/sdr-avif-preserve-contain/converted-0.png",
+            "/proof/work/precision/yuv/matrix-9-full/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": "WARNING: [--lossless] Input data was RGB and matrixCoefficients isn't set to identity (--cicp x/x/0) or YCgCo-Re/Ro (--cicp x/x/16 or x/x/17); Output might not be lossless.\n"
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "-d",
+            "16",
+            "--index",
+            "0",
+            "/proof/work/precision/yuv/matrix-9-full/output.avif",
+            "/proof/work/precision/yuv/matrix-9-full/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "hdr-proof-png-decode",
+            "/proof/work/precision/yuv/matrix-9-full/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "--info",
+            "/proof/work/precision/yuv/matrix-9-full/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "exiftool",
+            "-j",
+            "-n",
+            "/proof/work/precision/yuv/matrix-9-full/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        }
+      ]
+    },
+    {
+      "status": "tested and failed",
+      "scope": "Appearance diagnostic only; no complete conversion qualification",
+      "exhaustive_representation_bound": false,
+      "requested_matrix": 9,
+      "requested_range": "limited",
+      "input_png_sha256": "aa91814861022b52b0df6ee6b9cd94bfdb4cc32de583ba9737ca944695cf3890",
+      "appearance": {
+        "passed": false,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "sdr-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "region_basis": "appearance_reference_luminance_nits",
+        "regions": {
+          "shadow": {
+            "samples": 695,
+            "delta_e_itp": {
+              "mean": 1.1865991587991367,
+              "p95": 11.111861500659277,
+              "maximum": 16.151322442208777
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.018165281718467548,
+              "p95": 0.04525992132811929,
+              "maximum": 0.11635881260429848
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 2.6309614793210573e-06,
+              "p95": 0.0,
+              "maximum": 0.0018285182281281348
+            },
+            "reference_mean_nits": 3.67276018029922,
+            "actual_mean_nits": 3.669530554414262
+          },
+          "midtone": {
+            "samples": 1471,
+            "delta_e_itp": {
+              "mean": 0.18476250519874074,
+              "p95": 0.40656199563321227,
+              "maximum": 1.0882178467494306
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.13113215252526375,
+              "p95": 0.41976667703364967,
+              "maximum": 0.4955452026987075
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0008587542729842555,
+              "p95": 0.0038292913053934786,
+              "maximum": 0.00523078688031398
+            },
+            "reference_mean_nits": 65.02960286907543,
+            "actual_mean_nits": 65.02855556679232
+          },
+          "highlight": {
+            "samples": 0,
+            "status": "not_present_in_reference"
+          }
+        },
+        "failures": [
+          "shadow.delta_e_mean",
+          "shadow.delta_e_p95",
+          "shadow.delta_e_max"
+        ],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      },
+      "facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/precision/yuv/matrix-9-limited/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Limited\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 9\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 862,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "8 8 8",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 9,
+          "VideoFullRangeFlag": 0,
+          "MediaDataSize": 587,
+          "MediaDataOffset": 275,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 8,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 9,
+        "alpha": "Absent",
+        "sha256": "643fc6d15edbb07521d552cd39d9bb22792dcc079b21b3819b42a612193b697c"
+      },
+      "commands": [
+        {
+          "argv": [
+            "avifenc",
+            "-c",
+            "aom",
+            "-j",
+            "1",
+            "-s",
+            "8",
+            "-q",
+            "100",
+            "--qalpha",
+            "100",
+            "-y",
+            "444",
+            "-d",
+            "8",
+            "--cicp",
+            "1/13/9",
+            "-r",
+            "limited",
+            "--ignore-exif",
+            "--ignore-xmp",
+            "--ignore-profile",
+            "/proof/work/avif/avif-pq-rec2020-10-opaque/sdr-avif-preserve-contain/converted-0.png",
+            "/proof/work/precision/yuv/matrix-9-limited/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": "WARNING: [--lossless] Input data was RGB and output range (-r) isn't full. Output might not be lossless.\nWARNING: [--lossless] Input data was RGB and matrixCoefficients isn't set to identity (--cicp x/x/0) or YCgCo-Re/Ro (--cicp x/x/16 or x/x/17); Output might not be lossless.\n"
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "-d",
+            "16",
+            "--index",
+            "0",
+            "/proof/work/precision/yuv/matrix-9-limited/output.avif",
+            "/proof/work/precision/yuv/matrix-9-limited/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "hdr-proof-png-decode",
+            "/proof/work/precision/yuv/matrix-9-limited/decoded-0.png"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "avifdec",
+            "-j",
+            "1",
+            "-c",
+            "dav1d",
+            "--info",
+            "/proof/work/precision/yuv/matrix-9-limited/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "argv": [
+            "exiftool",
+            "-j",
+            "-n",
+            "/proof/work/precision/yuv/matrix-9-limited/output.avif"
+          ],
+          "exit_code": 0,
+          "stderr": ""
+        }
+      ]
+    }
+  ]
+}

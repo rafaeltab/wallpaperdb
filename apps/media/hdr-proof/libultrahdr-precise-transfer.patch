@@ -1,0 +1,17 @@
+--- a/lib/include/ultrahdr/gainmapmath.h
++++ b/lib/include/ultrahdr/gainmapmath.h
+@@ -24,12 +24,12 @@
+ #include <arm_neon.h>
+ #endif
+ 
+-#define USE_SRGB_INVOETF_LUT 1
++#define USE_SRGB_INVOETF_LUT 0
+ #define USE_HLG_OETF_LUT 1
+ #define USE_PQ_OETF_LUT 1
+ #define USE_HLG_INVOETF_LUT 1
+ #define USE_PQ_INVOETF_LUT 1
+-#define USE_APPLY_GAIN_LUT 1
++#define USE_APPLY_GAIN_LUT 0
+ 
+ #define CLIP3(x, min, max) ((x) < (min)) ? (min) : ((x) > (max)) ? (max) : (x)
+ 

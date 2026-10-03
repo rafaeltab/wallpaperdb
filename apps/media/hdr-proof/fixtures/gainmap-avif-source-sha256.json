@@ -1,0 +1,12 @@
+{
+  "generator": "gainmap_avif.py:generate_source; pinned native libavif 1.4.1 JPEG gain-map import with lossless AOM AV1",
+  "scope": "One static sRGB authored-base AVIF source; no HDR derivative or physical display qualification",
+  "provenance": "Same native source bytes as gainmap.py independent_hdr for the committed Android XMP JPEG fixture; that fixture's original provenance remains in gainmap/manifest.json",
+  "parent": {
+    "path": "gainmap/gainmap-android-xmp.jpg",
+    "sha256": "d22fd05e210df1067ebd6a1f63d0e5d94c5fa9042fe2ebd7067a10a301402271"
+  },
+  "sha256": {
+    "avif-gainmap-from-android-xmp": "2c744ec754e5953db4b2e0787ef2e729d9c3d5c00f685cfb7243cc3ea93630bd"
+  }
+}

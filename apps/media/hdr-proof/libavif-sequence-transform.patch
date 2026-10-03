@@ -1,0 +1,11 @@
+--- a/src/write.c
++++ b/src/write.c
+@@ -3722,7 +3722,7 @@
+             if (item->itemCategory == AVIF_ITEM_COLOR) {
+                 AVIF_CHECKRES(avifEncoderWriteColorProperties(&s, imageMetadata, NULL, NULL));
+                 AVIF_CHECKRES(avifEncoderWriteHDRProperties(NULL, &s, imageMetadata, NULL, NULL));
+-                AVIF_CHECKRES(avifEncoderWriteTransformativeProperties(NULL, &s, imageMetadata, NULL, NULL));
++                AVIF_CHECKRES(avifEncoderWriteTransformativeProperties(&s, &s, imageMetadata, NULL, NULL));
+             }
+ 
+             avifBoxMarker ccst;

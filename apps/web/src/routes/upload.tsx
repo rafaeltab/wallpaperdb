@@ -208,7 +208,7 @@ export function UploadPage() {
                   onResumeQueue={resumeQueue}
                   onClearAll={handleClearAll}
                   onRetryFailed={retryFailed}
-                  onClearCompleted={clearCompleted}
+                  onClearCompleted={() => clearCompleted()}
                 />
               </div>
             )}

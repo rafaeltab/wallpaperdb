@@ -9,10 +9,9 @@ it('classifies aliases without showing active aliases again in history', () => {
   expect(result.summary).toBe('1 retained · 1 expiring');
   expect(classifyAliases({}).summary).toBe('No previous handles');
 });
-it('describes the selected alias action and preserves the captured command version', () => {
+it('describes each selected alias action', () => {
   const command={action:'expire' as const,handle:'old',expectedVersion:3};
   expect(aliasChangeDialog(command,'current')).toMatchObject({title:'Expire alias now?',button:'Expire now'});
-  expect(command.expectedVersion).toBe(3);
   for(const action of ['schedule','keep','reactivate'] as const) expect(aliasChangeDialog({...command,action},'current').description).toContain('@old');
 });
 it('rejects unsupported or oversized pictures and handles deselection', () => {

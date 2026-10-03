@@ -16,6 +16,56 @@ interface ProfileFilterProps {
   collapsed?: boolean;
 }
 
+function SelectedProfile({ profileId, onClear }: { profileId: string; onClear: () => void }) {
+  const selected = useQuery(profileByIdQueryOptions(profileId));
+
+  const selectedError = selected.failureReason ?? selected.error;
+  return (
+    <>
+      <div className="flex items-center gap-3 rounded-lg border bg-background p-3">
+        {selected.data ? (
+          <>
+            <ProfilePicture
+              profile={selected.data}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full object-cover text-sm font-semibold text-white"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">
+                {selected.data.displayName}
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                @{selected.data.handle}
+              </span>
+            </span>
+          </>
+        ) : selectedError ? null : (
+          <span className="flex-1 text-sm text-muted-foreground">
+            {selected.isLoading ? 'Loading selected Profile…' : 'Selected Profile is unavailable.'}
+          </span>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label="Clear Profile filter"
+          onClick={onClear}
+        >
+          Clear
+        </Button>
+      </div>
+      {selectedError ? (
+        <GraphQLError
+          error={selectedError}
+          retry={() => selected.refetch()}
+          retrying={selected.isFetching}
+          title="Could not load the selected Profile."
+          retryLabel="Retry selected Profile"
+        />
+      ) : null}
+    </>
+  );
+}
+
 export function ProfileFilter({ profileId, onChange, collapsed = false }: ProfileFilterProps) {
   const inputId = useId();
   const [input, setInput] = useState('');
@@ -33,12 +83,6 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
     getNextPageParam: (page) => (page.pageInfo.hasNextPage ? page.pageInfo.endCursor : undefined),
     enabled: Boolean(debouncedQuery),
   });
-  const selected = useQuery({
-    ...profileByIdQueryOptions(profileId ?? ''),
-    enabled: Boolean(profileId),
-  });
-
-  const selectedError = selected.failureReason ?? selected.error;
   const feed = feedPresentation({
     ...results,
     itemCount: results.data?.pages.reduce((count, page) => count + page.edges.length, 0) ?? 0,
@@ -49,50 +93,12 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
   return (
     <div className="flex max-w-lg flex-col gap-2">
       {profileId ? (
-        <div className="flex items-center gap-3 rounded-lg border bg-background p-3">
-          {selected.data ? (
-            <>
-              <ProfilePicture
-                profile={selected.data}
-                className="flex size-10 shrink-0 items-center justify-center rounded-full object-cover text-sm font-semibold text-white"
-              />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">
-                  {selected.data.displayName}
-                </span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  @{selected.data.handle}
-                </span>
-              </span>
-            </>
-          ) : selectedError ? null : (
-            <span className="flex-1 text-sm text-muted-foreground">
-              {selected.isLoading
-                ? 'Loading selected Profile…'
-                : 'Selected Profile is unavailable.'}
-            </span>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-label="Clear Profile filter"
-            onClick={() => {
-              setInput('');
-              onChange(undefined);
-            }}
-          >
-            Clear
-          </Button>
-        </div>
-      ) : null}
-      {profileId && selectedError ? (
-        <GraphQLError
-          error={selectedError}
-          retry={() => selected.refetch()}
-          retrying={selected.isFetching}
-          title="Could not load the selected Profile."
-          retryLabel="Retry selected Profile"
+        <SelectedProfile
+          profileId={profileId}
+          onClear={() => {
+            setInput('');
+            onChange(undefined);
+          }}
         />
       ) : null}
       {!collapsed ? (

@@ -194,13 +194,20 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
       publish();
       processNext();
     },
-    clearCompleted() {
+    clearCompleted(ids?: readonly string[]) {
       state = {
         ...state,
         files: state.files.filter(
-          (file) => file.status !== 'success' && file.status !== 'duplicate'
+          (file) =>
+            (ids && !ids.includes(file.id)) ||
+            (file.status !== 'success' && file.status !== 'duplicate')
         ),
       };
+      if (!state.files.length) {
+        clearTimer();
+        rateLimitedId = undefined;
+        state = initialState<TFile>();
+      }
       publish();
     },
     retryFailed() {

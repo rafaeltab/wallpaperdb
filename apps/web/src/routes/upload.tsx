@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { MAX_FILES_PER_BATCH, useUploadQueue } from '@/contexts/upload-queue-context';
 import { useCountdown } from '@/hooks/useCountdown';
+import { queuePresentation } from '@/features/upload-queue';
 import { getQueueStatusText } from '@/lib/utils/upload-queue';
 import { cn } from '@/lib/utils';
 
@@ -53,11 +54,7 @@ export function UploadPage() {
   } = useUploadQueue();
   const queryClient = useQueryClient();
 
-  const hasFiles = state.files.length > 0;
-  const isUploading = counts.uploading > 0 || counts.pending > 0;
-  const isRunning = isUploading && !state.isPaused && !state.isStopped;
-  const isComplete = hasFiles && !isUploading && !state.isPaused && !state.isStopped;
-  const hasFailures = counts.failed > 0;
+  const { hasFiles, isUploading, isRunning, isComplete, hasFailures } = queuePresentation(state);
   const timeRemaining = useCountdown(state.pausedUntil);
 
   const statusText = getQueueStatusText({

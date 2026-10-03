@@ -1,3 +1,4 @@
+import { queuePresentation } from '@/features/upload-queue';
 import {
   AlertCircle,
   Check,
@@ -77,9 +78,11 @@ export function UploadQueueToast({
   const setIsExpanded = onExpandedChange ?? setLocalExpanded;
   const timeRemaining = useCountdown(pausedUntil);
 
-  const isUploading = counts.uploading > 0 || counts.pending > 0;
-  const isComplete = !isUploading && !isPaused && !isStopped;
-  const hasFailures = counts.failed > 0;
+  const { isUploading, isComplete, hasFailures } = queuePresentation({
+    files,
+    isPaused,
+    isStopped,
+  });
   const completedCount = counts.success + counts.failed + counts.duplicate;
 
   let headerText = '';

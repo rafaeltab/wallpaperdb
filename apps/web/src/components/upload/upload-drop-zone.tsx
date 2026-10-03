@@ -1,3 +1,4 @@
+import { acceptedUploads } from '@/features/upload-queue';
 import { Upload } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -27,30 +28,8 @@ export function UploadDropZone({
     (fileList: FileList | null) => {
       if (!fileList || fileList.length === 0) return;
 
-      const supportedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
-      const maxImageSize = 50 * 1024 * 1024;
-      const selectedFiles = Array.from(fileList);
-      const hasUnsupportedType = selectedFiles.some((file) => !supportedTypes.has(file.type));
-      const hasOversizedImage = selectedFiles.some(
-        (file) => supportedTypes.has(file.type) && file.size > maxImageSize
-      );
-      setRejectionMessage(
-        [
-          hasUnsupportedType && 'Only JPEG, PNG, and WebP images are supported.',
-          hasOversizedImage && 'Images must be 50 MiB or smaller.',
-        ]
-          .filter(Boolean)
-          .join(' ') || null
-      );
-
-      let files = selectedFiles.filter(
-        (file) => supportedTypes.has(file.type) && file.size <= maxImageSize
-      );
-
-      // Apply maxFiles limit if specified
-      if (maxFiles && files.length > maxFiles) {
-        files = files.slice(0, maxFiles);
-      }
+      const { files, rejectionMessage } = acceptedUploads(Array.from(fileList), maxFiles);
+      setRejectionMessage(rejectionMessage);
 
       if (files.length > 0) onFilesSelected(files);
     },

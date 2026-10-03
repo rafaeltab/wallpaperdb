@@ -1,3 +1,4 @@
+import { queuePresentation } from '@/features/upload-queue';
 import { useRouter } from '@tanstack/react-router';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -7,16 +8,8 @@ import { UploadQueueToast } from './upload-queue-toast';
 const AUTO_DISMISS_DELAY = 5000; // 5 seconds
 
 export function UploadQueueToastManager() {
-  const {
-    state,
-    counts,
-    progress,
-    clearCompleted,
-    retryFailed,
-    cancelAll,
-    stopQueue,
-    resumeQueue,
-  } = useUploadQueue();
+  const { state, counts, progress, clearCompleted, retryFailed, stopQueue, resumeQueue } =
+    useUploadQueue();
   const router = useRouter();
   const toastPrefix = useId();
   const toastGeneration = useRef(0);
@@ -25,20 +18,24 @@ export function UploadQueueToastManager() {
   const [isExpanded, setIsExpanded] = useState(false);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const hasFiles = state.files.length > 0;
-  const isUploading = counts.uploading > 0 || counts.pending > 0;
-  const isComplete = hasFiles && !isUploading && !state.isPaused && !state.isStopped;
-  const hasFailuresOrDuplicates = counts.failed > 0 || counts.duplicate > 0;
+  const { hasFiles, isUploading, autoDismiss } = queuePresentation(state);
+
+  const currentFiles = useRef(state.files);
+  currentFiles.current = state.files;
 
   const handleDismiss = useCallback(() => {
-    setIsVisible(false);
-    setIsExpanded(false);
-    // Sonner owns the exit animation. Clear now so a later upload cannot be cancelled.
-    clearCompleted();
-    if (!state.files.some((f) => f.status !== 'success' && f.status !== 'duplicate')) {
-      cancelAll();
+    const dismissedIds = new Set(state.files.map((file) => file.id));
+    const hasRemainingFiles = currentFiles.current.some(
+      (file) =>
+        !dismissedIds.has(file.id) || file.status === 'pending' || file.status === 'uploading'
+    );
+    if (!hasRemainingFiles) {
+      setIsVisible(false);
+      setIsExpanded(false);
     }
-  }, [clearCompleted, cancelAll, state.files]);
+    // Sonner owns the exit animation. Clear now so a later upload cannot be cancelled.
+    clearCompleted(state.files.map((file) => file.id));
+  }, [clearCompleted, state.files]);
 
   // Show toast when files are added
   useEffect(() => {
@@ -60,7 +57,7 @@ export function UploadQueueToastManager() {
       autoDismissTimerRef.current = null;
     }
 
-    if (isComplete && !hasFailuresOrDuplicates) {
+    if (autoDismiss) {
       autoDismissTimerRef.current = setTimeout(() => {
         handleDismiss();
       }, AUTO_DISMISS_DELAY);
@@ -71,7 +68,7 @@ export function UploadQueueToastManager() {
         clearTimeout(autoDismissTimerRef.current);
       }
     };
-  }, [isComplete, hasFailuresOrDuplicates, handleDismiss]);
+  }, [autoDismiss, handleDismiss]);
 
   useEffect(() => {
     if (!isVisible || !hasFiles) {

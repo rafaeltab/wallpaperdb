@@ -286,6 +286,24 @@ describe('upload queue controls', () => {
     expect(queue.getSnapshot().counts.success).toBe(1);
   });
 
+  it('clears only the completed entries belonging to a dismissed toast', async () => {
+    const { queue, uploads }=setup();
+    queue.addFiles(['old']);
+    await complete(uploads[0]);
+    const oldIds=queue.getSnapshot().state.files.map(file=>file.id);
+    queue.addFiles(['new']);
+    await complete(uploads[1]);
+    queue.clearCompleted(oldIds);
+    expect(queue.getSnapshot().state.files.map(file=>file.file)).toEqual(['new']);
+  });
+
+  it('resets an empty stopped queue so the next batch starts normally', async () => {
+    const {queue,uploads}=setup();
+    queue.addFiles(['old']);await complete(uploads[0]);queue.stopQueue();
+    queue.clearCompleted();queue.addFiles(['new']);
+    expect(uploads[1]?.file).toBe('new');
+  });
+
   it('cancels scheduled retries when cleared', async () => {
     const { queue, uploads, advance, timers } = setup();
     queue.addFiles(['a']);

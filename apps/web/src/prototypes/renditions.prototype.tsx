@@ -56,7 +56,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
@@ -73,6 +72,8 @@ import {
   initialFilters,
   limits,
   matches,
+  exclusionReasons,
+  browseVariables,
   preview,
   resolve,
   statusText,
@@ -84,6 +85,8 @@ import {
 } from './renditions-model.prototype';
 import '@/index.css';
 import { ExpandingDownload } from './expanding-download.prototype';
+import { BrowseShapeComparison } from './browse-shape-comparison.prototype';
+import { BrowseResolutionPicker, browsePresetGroups } from './browse-resolution-picker.prototype';
 
 const variants = [
   { key: 'A', name: 'Quick download menu' },
@@ -98,7 +101,7 @@ const rootRoute = createRootRoute({
     variant:
       typeof search.variant === 'string' && variants.some((v) => v.key === search.variant)
         ? search.variant
-        : 'A',
+        : 'E',
   }),
 });
 const browseRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: Browse });
@@ -122,7 +125,7 @@ const router = createRouter({
 });
 function navigate(
   path: string,
-  variant = new URLSearchParams(location.search).get('variant') || 'A'
+  variant = new URLSearchParams(location.search).get('variant') || 'E'
 ) {
   void router.navigate({ href: `${path}?variant=${variant}` });
 }
@@ -131,6 +134,8 @@ interface ReviewState {
   setFixtures: (value: Asset[]) => void;
   filters: Filters;
   setFilters: (value: Filters) => void;
+  colors: ColorPreference[];
+  setColors: (value: ColorPreference[]) => void;
   path: string;
   setPath: (value: string) => void;
   still: boolean;
@@ -163,6 +168,7 @@ function original(a: Asset, review: ReviewState) {
 function PrototypeRoot() {
   const [fixtures, setFixtures] = useState(() => structuredClone(assets));
   const [filters, setFilters] = useState(initialFilters);
+  const [colors, setColors] = useState<ColorPreference[]>([]);
   const [path, setPath] = useState('sdr'),
     [still, setStill] = useState(true),
     [outage, setOutage] = useState(false),
@@ -175,6 +181,8 @@ function PrototypeRoot() {
         setFixtures,
         filters,
         setFilters,
+        colors,
+        setColors,
         path,
         setPath,
         still,
@@ -198,7 +206,7 @@ function PrototypeRoot() {
 }
 function useVariant() {
   const search = useRouterState({ select: (state) => state.location.searchStr });
-  return new URLSearchParams(search).get('variant') || 'A';
+  return new URLSearchParams(search).get('variant') || 'E';
 }
 function Shell() {
   const variant = useVariant();
@@ -309,10 +317,6 @@ const sizeGroups = [
   { name: 'Phone', sizes: ['1080x1920', '1080x2400', '1170x2532', '1290x2796', '1440x3200'] },
 ];
 const sizeLabel = (value: string) => value.replace('x', ' × ');
-const resolutionOptions: [string, string][] = [
-  ['any', 'Any resolution'],
-  ...sizeGroups.flatMap((g) => g.sizes.map((v) => [v, sizeLabel(v)] satisfies [string, string])),
-];
 function SizePicker({
   label,
   value,
@@ -335,7 +339,7 @@ function SizePicker({
           <SelectItem value={browse ? 'any' : 'source'}>
             {browse ? 'Any resolution' : 'Source size'}
           </SelectItem>
-          {sizeGroups.map((g) => (
+          {(browse ? browseSizeGroups : sizeGroups).map((g) => (
             <SelectGroup key={g.name}>
               <SelectLabel>{g.name}</SelectLabel>
               {g.sizes.map((size) => (
@@ -351,94 +355,127 @@ function SizePicker({
     </label>
   );
 }
-const shapeOptions: [string, string][] = [
-  ['preset', 'Preset default'],
-  ['any', 'Any shape'],
-  [String(16 / 9), '16:9'],
-  [String(16 / 10), '16:10'],
-  [String(4 / 3), '4:3'],
-  [String(9 / 16), '9:16'],
-  ['1', 'Square'],
-  [String(21 / 9), '21:9'],
-];
-function ResolutionChips() {
-  const r = useReview();
-  return (
-    <div className="w-52">
-      <SizePicker
-        label="Minimum resolution"
-        value={r.filters.resolution}
-        browse
-        onChange={(resolution) => r.setFilters({ ...r.filters, resolution })}
-      />
-    </div>
-  );
-}
+// Accepted browse presets and column layout. Download choices remain unchanged.
+const browseSizeGroups = browsePresetGroups;
 function Browse() {
   const r = useReview(),
-    variant = useVariant(),
     { isOpen } = useBrowseFilterPanel();
-  const [colors, setColors] = useState<ColorPreference[]>([]);
-  const filtered = r.fixtures.filter((a) => matches(a, r.filters));
+  const { colors, setColors } = r;
+  const [reviewOpen, setReviewOpen] = useState(true);
+  const [scenario, setScenario] = useState('boundaries');
+  // Synthetic utilities only. This demo checks eligibility/order/reset, not color scoring.
+  const colorReady = (a: Asset) =>
+    !['wlpr_pending', 'wlpr_unknown', 'wlpr_waiting', 'wlpr_failed'].includes(a.id);
+  const score = (a: Asset) =>
+    a.id === 'wlpr_alpine'
+      ? 0
+      : colors.reduce(
+          (total, color) =>
+            total +
+            [...(a.id + JSON.stringify(color))].reduce(
+              (sum, char) => (sum * 31 + char.charCodeAt(0)) % 101,
+              0
+            ) /
+              100 /
+              colors.length,
+          0
+        );
+  const filtered = r.fixtures.filter(
+    (a) => matches(a, r.filters) && (!colors.length || colorReady(a))
+  );
+  if (colors.length) filtered.sort((a, b) => score(b) - score(a) || a.id.localeCompare(b.id));
+  const clear = () => {
+    r.setFilters({
+      ...initialFilters,
+      tolerance: r.filters.tolerance,
+    });
+    setColors([]);
+  };
+  const scenarios: Record<
+    string,
+    { description: string; steps: [string, Partial<Filters>, ColorPreference[]?][] }
+  > = {
+    boundaries: {
+      description:
+        'Compare just inside, exactly on, and one pixel beyond the proposed symmetric boundary. Dimensions are checked separately.',
+      steps: [
+        ['Start with 1080p desktop', { selection: '1920x1080' }],
+        ['Try 1%', { tolerance: '1' }],
+        ['Try 2%', { tolerance: '2' }],
+        ['Try 3%', { tolerance: '3' }],
+        ['Use accepted 5%', { tolerance: '5' }],
+      ],
+    },
+    presets: {
+      description:
+        'Presets use their actual pixel ratio. 3440 × 1440 is 43:18. Choosing 21:9 replaces that preset with a shape-only query.',
+      steps: [
+        ['Start with 3440 × 1440', { selection: '3440x1440' }],
+        ['Override to exact 21:9', { selection: 'ratio:21/9' }],
+        ['Choose the 3440 × 1440 preset again', { selection: '3440x1440' }],
+        ['Try 1080 × 2400 phone', { selection: '1080x2400' }],
+      ],
+    },
+    overrides: {
+      description:
+        'One active size-and-shape choice. Ratio-only replaces the preset and removes its dimension minimum. A new preset replaces the ratio-only choice. Other filters remain selected.',
+      steps: [
+        ['Start with 1080p desktop', { selection: '1920x1080' }],
+        ['Choose 9:16 instead', { selection: 'ratio:9/16' }],
+        ['Choose unrestricted size and shape', { selection: 'any' }],
+        ['Choose a phone preset', { selection: '1080x1920' }],
+        ['Choose shape without a size', { selection: 'ratio:9/16' }],
+      ],
+    },
+    intersection: {
+      description:
+        'Source filters intersect. Conversions do not qualify sources. Color ranks eligible records, including zero scores; unknown color banks exclude only color queries.',
+      steps: [
+        ['Start with 1080p desktop', { selection: '1920x1080' }],
+        ['Require HDR', { range: 'hdr' }],
+        ['Require animation', { motion: 'animated' }],
+        ['Require transparency', { alpha: 'transparent' }],
+        ['Require AVIF source', { format: 'avif' }],
+        ['Rank by blue', {}, [{ name: 'BLUE', quality: 'FAVORITE' }]],
+        ['Switch to PNG source, empty result', { format: 'png' }],
+      ],
+    },
+    unknown: {
+      description:
+        'Pending/failed inspection does not hide a confirmed source. A temporary outage does not change the browse set. Unknown facts exclude only queries that need them.',
+      steps: [
+        ['Start unfiltered', {}],
+        ['Require known dimensions', { selection: '1920x1080' }],
+        ['Remove dimensions, require HDR', { selection: 'any', range: 'hdr' }],
+        [
+          'Remove range, require complete color bank',
+          { range: 'any' },
+          [{ name: 'BLUE', quality: 'FAVORITE' }],
+        ],
+      ],
+    },
+  };
+  const startScenario = (name: string) => {
+    setScenario(name);
+    clear();
+    r.setOutage(false);
+  };
+  const reasons = (a: Asset) => [
+    ...exclusionReasons(a, r.filters),
+    ...(colors.length && !colorReady(a) ? ['Color utilities unknown'] : []),
+  ];
   const t = target(r.filters);
   const set = (key: keyof Filters, value: string) => r.setFilters({ ...r.filters, [key]: value });
   return (
     <>
       <section className="border-b bg-muted/20 px-4 py-3">
         <div className="mx-auto flex max-w-6xl flex-col gap-3">
-          {variant === 'A' ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <ResolutionChips />
-            </div>
-          ) : variant === 'B' ? (
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="w-48">
-                <Choice
-                  label="Suitable for"
-                  value={r.filters.resolution}
-                  options={resolutionOptions}
-                  onChange={(value) => set('resolution', value)}
-                />
-              </div>
-              <div className="w-44">
-                <Choice
-                  label="Display shape"
-                  value={r.filters.shape}
-                  options={shapeOptions}
-                  onChange={(value) => set('shape', value)}
-                />
-              </div>
-              <span className="pb-2 text-xs text-muted-foreground">
-                Matches larger sources of the same shape.
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <SlidersHorizontal className="size-4" />
-                    Find wallpapers for{' '}
-                    {r.filters.resolution === 'any'
-                      ? 'any resolution'
-                      : resolutionOptions.find(([key]) => key === r.filters.resolution)?.[1]}
-                    <ChevronDown className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-60">
-                  <DropdownMenuLabel>Minimum source resolution</DropdownMenuLabel>
-                  {resolutionOptions.map(([value, label]) => (
-                    <DropdownMenuItem key={value} onSelect={() => set('resolution', value)}>
-                      {label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <span className="hidden text-xs text-muted-foreground sm:inline">
-                Shape overrides in Filters
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <BrowseResolutionPicker
+              value={r.filters.selection}
+              onChange={(value) => set('selection', value)}
+            />
+          </div>
           {isOpen && (
             <>
               <ColorFilter value={colors} onChange={setColors} />
@@ -452,14 +489,6 @@ function Browse() {
                   ])}
                   onChange={(v) => set('format', v)}
                 />
-                {variant !== 'B' && (
-                  <Choice
-                    label="Aspect ratio"
-                    value={r.filters.shape}
-                    options={shapeOptions}
-                    onChange={(v) => set('shape', v)}
-                  />
-                )}
                 <Choice
                   label="Source dynamic range"
                   value={r.filters.range}
@@ -495,27 +524,206 @@ function Browse() {
               {t.width
                 ? `At least ${t.width} × ${t.height} displayed pixels`
                 : 'Any source dimensions'}
-              {t.ratio ? ' · close shape match' : ' · any shape'}
+              {t.ratio ? ` · shape within ${r.filters.tolerance}% inclusive` : ' · any shape'}
             </span>
             {Object.entries(r.filters)
               .filter(
-                ([key, value]) => value !== 'any' && value !== 'preset' && key !== 'resolution'
+                ([key, value]) =>
+                  value !== 'any' && value !== 'preset' && !['selection', 'tolerance'].includes(key)
               )
               .map(([key, value]) => (
                 <Badge key={key} variant="secondary">
-                  {key}: {key === 'shape' ? shapeOptions.find(([v]) => v === value)?.[1] : value}
+                  {key}: {value}
                 </Badge>
               ))}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6"
-              onClick={() => r.setFilters(initialFilters)}
-            >
+            <Button variant="ghost" size="sm" className="h-6" onClick={clear}>
               Clear filters
             </Button>
           </div>
         </div>
+      </section>
+      <section className="mx-auto max-w-6xl space-y-4 p-4">
+        <Button variant="outline" onClick={() => setReviewOpen(!reviewOpen)}>
+          {reviewOpen ? 'Hide' : 'Show'} #326 browse review
+        </Button>
+        {reviewOpen && (
+          <div className="space-y-4 rounded-xl border p-4">
+            <h1 className="text-lg font-semibold">Accepted suitable-resolution browse rules</h1>
+            <p className="text-sm text-muted-foreground">
+              Throwaway prototype. Inclusive 5% tolerance and the nine presets in device columns are
+              accepted. The combined chooser replaces conflicting preset and shape pairs with one
+              selection. Ratio-only choices have no size minimum. Other filter selections stay
+              independent, with separate chooser and full-filter resets. Request field names remain
+              a proposal for #259. Download design E remains accepted. Source facts are simulated
+              and photos are placeholders. These controls are review aids.
+            </p>
+            <BrowseShapeComparison />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Choice
+                label="Review tolerance, accepted 5%"
+                value={r.filters.tolerance}
+                options={['0', '1', '2', '3', '5'].map((v) => [v, `${v}% inclusive`])}
+                onChange={(v) => set('tolerance', v)}
+              />
+            </div>
+            <p className="text-xs">
+              Shape distance is max(source ratio, target ratio) / min(source ratio, target ratio) −
+              1. Exactly on the boundary qualifies; display rounding does not decide eligibility.
+              Preset shape uses its exact dimensions. A ratio-only choice replaces the preset and
+              removes its size minimum.
+            </p>
+            <div className="flex flex-wrap gap-2" role="tablist" aria-label="Browse walkthroughs">
+              {Object.keys(scenarios).map((name) => (
+                <Button
+                  key={name}
+                  size="sm"
+                  variant={scenario === name ? 'default' : 'outline'}
+                  role="tab"
+                  aria-selected={scenario === name}
+                  onClick={() => startScenario(name)}
+                >
+                  {name}
+                </Button>
+              ))}
+            </div>
+            <p className="text-sm">{scenarios[scenario].description}</p>
+            <div className="flex flex-wrap gap-2">
+              {scenarios[scenario].steps.map(([label, patch, targets], index) => (
+                <Button
+                  key={label}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (index === 0) {
+                      r.setFilters({
+                        ...initialFilters,
+                        tolerance: r.filters.tolerance,
+                        ...patch,
+                      });
+                      setColors(targets || []);
+                    } else {
+                      r.setFilters({ ...r.filters, ...patch });
+                      if (targets) setColors(targets);
+                    }
+                  }}
+                >
+                  {index + 1}. {label}
+                </Button>
+              ))}
+              <Button size="sm" variant="outline" onClick={() => r.setOutage(!r.outage)}>
+                {r.outage ? 'Restore delivery' : 'Simulate delivery outage'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => set('selection', 'any')}>
+                Clear size and shape only
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setColors([])}>
+                Clear color only
+              </Button>
+              <Button size="sm" onClick={clear}>
+                Clear all browse filters
+              </Button>
+            </div>
+            <div className="rounded-lg bg-muted p-3 text-sm" aria-live="polite">
+              <p>
+                {t.width ? `Minimum ${t.width} × ${t.height}` : 'No minimum source dimensions'};
+                shape {t.ratio?.toFixed(6) || 'unrestricted'}; tolerance {r.filters.tolerance}%;
+                selection {r.filters.selection}.
+              </p>
+              <p>
+                Source format {r.filters.format}; range {r.filters.range}; motion {r.filters.motion}
+                ; transparency {r.filters.alpha}; delivery {r.outage ? 'outage' : 'normal'};{' '}
+                {filtered.length} matches.
+              </p>
+              <p>
+                Color targets{' '}
+                {colors.length
+                  ? colors
+                      .map(
+                        (c) =>
+                          `${c.name || c.color}, ${c.quality}, ${c.percent === undefined ? 'vibe' : `${c.percent}%`}`
+                      )
+                      .join('; ')
+                  : 'none'}
+                . Synthetic color scores demonstrate ordering only, not the accepted scoring
+                algorithm. Zero-score records remain eligible.
+              </p>
+            </div>
+            <details className="rounded-lg border p-3" open>
+              <summary className="cursor-pointer text-sm">
+                Proposed GraphQL variables, not a live API
+              </summary>
+              <p className="my-2 text-xs text-muted-foreground">
+                Gateway filters verified source facts. Web expands the selected preset; no preset
+                names or download fit options go to Media. Field names are a proposal for #259.
+              </p>
+              <pre className="overflow-x-auto text-xs">
+                {JSON.stringify(
+                  {
+                    ...browseVariables(r.filters),
+                    ...(colors.length
+                      ? {
+                          sort: {
+                            color: {
+                              targets: colors.map((c) => ({
+                                ...c,
+                                mode: c.percent === undefined ? 'VIBE' : 'PROPORTIONS',
+                              })),
+                            },
+                          },
+                        }
+                      : {}),
+                  },
+                  null,
+                  2
+                )}
+              </pre>
+            </details>
+            <div className="max-h-80 overflow-auto rounded-lg border">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-background">
+                  <tr>
+                    <th className="p-2">Source example</th>
+                    <th className="p-2">Displayed dimensions / shape distance</th>
+                    <th className="p-2">Outcome</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {r.fixtures.map((a) => (
+                    <tr key={a.id} className="border-t">
+                      <td className="p-2">
+                        {a.title}
+                        <br />
+                        {a.format} · {a.range || 'range unknown'} · {a.motion || 'motion unknown'} ·{' '}
+                        {a.alpha === undefined
+                          ? 'transparency unknown'
+                          : a.alpha
+                            ? 'transparent'
+                            : 'opaque'}
+                      </td>
+                      <td className="p-2">
+                        {a.width || '?'} × {a.height || '?'}
+                        <br />
+                        {t.ratio && a.width && a.height
+                          ? `${((Math.max(a.width / a.height, t.ratio) / Math.min(a.width / a.height, t.ratio) - 1) * 100).toFixed(4)}%`
+                          : 'Shape not required or unknown'}
+                      </td>
+                      <td className="p-2">
+                        {reasons(a).join('; ') ||
+                          `Included${colors.length ? ` · synthetic score ${score(a).toFixed(2)}` : ''}`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <a
+              className="text-sm text-primary underline"
+              href="/prototypes/suitable-resolution.prototype.html"
+            >
+              Open portable logic walkthrough
+            </a>
+          </div>
+        )}
       </section>
       <AssetGrid list={filtered} />
       {!filtered.length && (
@@ -525,7 +733,7 @@ function Browse() {
           <p className="my-3 text-muted-foreground">
             Try another resolution or remove a source filter.
           </p>
-          <Button variant="outline" onClick={() => r.setFilters(initialFilters)}>
+          <Button variant="outline" onClick={clear}>
             Clear filters
           </Button>
         </div>
@@ -534,6 +742,7 @@ function Browse() {
   );
 }
 function AssetGrid({ list }: { list: Asset[] }) {
+  const mobile = useIsMobile();
   const items = useMemo(
     () =>
       list.map((a) => ({
@@ -545,7 +754,7 @@ function AssetGrid({ list }: { list: Asset[] }) {
       })),
     [list]
   );
-  return <MuuriGrid items={items} baseSize={375} gap={16} ItemRenderer={AssetCard} />;
+  return <MuuriGrid items={items} baseSize={mobile ? 90 : 375} gap={16} ItemRenderer={AssetCard} />;
 }
 function AssetCard({
   item,
@@ -1490,9 +1699,8 @@ function PrototypeSwitcher() {
                   needing them.
                 </div>
                 <div>
-                  Proposed browse tolerance: max(source ratio, target ratio) / min(source ratio,
-                  target ratio) ≤ 1.02. Resolution overrides keep the short-edge threshold; explicit
-                  Any shape removes only shape matching.
+                  Inclusive 5% tolerance is accepted in #326. Open Browse review to settle preset
+                  sizes, exact preset shapes and minimum dimensions under overrides.
                 </div>
                 <div>
                   Generation and selection policy remain with #256. These fixtures are not a

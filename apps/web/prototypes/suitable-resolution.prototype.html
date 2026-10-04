@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Suitable-resolution browse review · #326</title>
+<style>body{font:15px system-ui;background:#fafafa;color:#18232d;margin:auto;padding:24px;max-width:1100px}h1{font-size:24px}section{border:1px solid #d7dde3;border-radius:12px;background:white;margin:20px 0;padding:18px}label{display:inline-grid;gap:5px;margin:6px}select,button{font:inherit;padding:8px;border:1px solid #bac7d2;border-radius:6px;background:white;color:inherit;cursor:pointer}button:hover,button[aria-selected=true],button[aria-pressed=true]{background:#d8eaf7}nav{display:flex;flex-wrap:wrap;gap:6px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.frame{aspect-ratio:16/9;background:#111;position:relative;overflow:hidden}.image{position:absolute;background:linear-gradient(145deg,#b4d8ff 20%,#609fc5 45%,#c5e7f4 46%,#426b51 65%,#183e40 90%);box-shadow:inset 0 0 0 3px #ffd34f}.image:after{content:'Source edges';position:absolute;inset:4px;text-align:center;font-size:10px;color:#111}p{line-height:1.55}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:9px;border-bottom:1px solid #dde3e9}.scroll{overflow:auto;max-height:430px}.device-columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}.device-columns button{display:block;width:100%;font-size:12px;margin:6px 0}.device-columns span{font-size:12px}#state{white-space:pre-line;background:#edf4f9;padding:15px;border-radius:8px}@media(max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}body{padding:12px}}</style>
+<h1>Accepted suitable-resolution browse rules</h1><p>Throwaway logic prototype for #326. Inclusive 5% tolerance is accepted. The nine device-column presets are accepted. A combined size-and-shape choice prevents conflicts. Ratio-only choices have no size minimum. Other filters stay independent, with separate chooser and full-filter resets. Request field names remain a proposal for #259. All source facts and color utilities are illustrative. State stays in memory. This file works offline. Download design E remains accepted and unchanged.</p>
+<section><h2>Compare 1%, 2%, 3% and 5%</h2><p>The yellow border marks a simulated source's edges. Each source is narrower than 16:9. Fit keeps the whole source; Fill crops top and bottom. Browsing itself does not crop or transform images.</p><div id="visuals" class="grid"></div></section>
+<section><h2>Current rules and free play</h2><div id="preset-columns"></div><div id="controls"></div><p id="state" aria-live="polite"></p><nav><button id="clear">Clear all filters</button><button id="size">Clear size and shape only</button><button id="shape">Choose desktop 1080p</button><button id="color">Clear color only</button><button id="outage">Toggle delivery outage</button></nav></section>
+<section><h2>Guided walkthroughs</h2><nav id="tabs" role="tablist"></nav><p id="explain"></p><nav id="steps"></nav></section>
+<section><h2>Proposed GraphQL variables, not a live API</h2><p>Gateway matches verified source facts. Field names are a proposal for #259. Preset names and download fit choices do not enter generic Media semantics.</p><pre id="variables" style="overflow:auto;font-size:13px"></pre></section><section><h2>Source examples</h2><p>Symmetric distance = max(source ratio, target ratio) / min(source ratio, target ratio) − 1. Boundary is inclusive. Minimum displayed width and height are checked separately. Color ranks eligible wallpapers and retains zero scores. Unknown required facts exclude only queries requiring them.</p><div class="scroll"><table><thead><tr><th>Source</th><th>Dimensions and shape distance</th><th>Outcome</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+<script>
+// Accepted browse policy, copied from the throwaway browse model. No DOM dependencies.
+const initialFilters = {
+    selection: 'any',
+    format: 'any',
+    range: 'any',
+    motion: 'any',
+    alpha: 'any',
+    tolerance: '5',
+};
+function target(f) {
+    const shapeOnly = f.selection.startsWith('ratio:');
+    const unrestricted = f.selection === 'any';
+    const parts = unrestricted
+        ? [0, 0]
+        : shapeOnly
+            ? f.selection.slice(6).split('/').map(Number)
+            : f.selection.split('x').map(Number);
+    return {
+        width: shapeOnly || unrestricted ? 0 : parts[0],
+        height: shapeOnly || unrestricted ? 0 : parts[1],
+        ratio: unrestricted ? undefined : parts[0] / parts[1],
+        shapeWidth: parts[0],
+        shapeHeight: parts[1],
+    };
+}
+// Proposed Gateway variables for review only. These fields are not a live schema.
+// Pixel presets and browse names stay in Web; Media still publishes only source facts.
+function browseVariables(f) {
+    const t = target(f);
+    const source = {
+        ...(t.width ? { minimumWidth: t.width, minimumHeight: t.height } : {}),
+        ...(t.ratio
+            ? {
+                aspectRatio: {
+                    width: t.shapeWidth,
+                    height: t.shapeHeight,
+                    tolerancePercent: Number(f.tolerance),
+                },
+            }
+            : {}),
+        ...(f.format !== 'any' ? { sourceFormat: f.format } : {}),
+        ...(f.range !== 'any' ? { dynamicRange: f.range } : {}),
+        ...(f.motion !== 'any' ? { motion: f.motion } : {}),
+        ...(f.alpha !== 'any' ? { hasTransparency: f.alpha === 'transparent' } : {}),
+    };
+    return Object.keys(source).length ? { filter: { source } } : {};
+}
+function exclusionReasons(a, f) {
+    const reasons = [];
+    if (!a.confirmed || !a.uploaded)
+        reasons.push('Upload and Media confirmation required');
+    const t = target(f);
+    if (t.width && (!a.width || !a.height))
+        reasons.push('Source dimensions unknown');
+    else if (t.width && a.width && a.height && (a.width < t.width || a.height < t.height))
+        reasons.push(`Below ${t.width} × ${t.height} minimum`);
+    if (t.ratio &&
+        (!a.width ||
+            !a.height ||
+            100 * Math.max(a.width * t.shapeHeight, a.height * t.shapeWidth) >
+                (100 + Number(f.tolerance)) * Math.min(a.width * t.shapeHeight, a.height * t.shapeWidth)))
+        reasons.push(a.width && a.height ? `Outside ${f.tolerance}% shape tolerance` : 'Source shape unknown');
+    if (f.format !== 'any' && a.format !== f.format)
+        reasons.push('Source format mismatch');
+    if (f.range !== 'any' && a.range !== f.range)
+        reasons.push(a.range ? 'Source range mismatch' : 'Source range unknown');
+    if (f.motion !== 'any' && a.motion !== f.motion)
+        reasons.push(a.motion ? 'Source motion mismatch' : 'Source motion unknown');
+    if (f.alpha !== 'any' && a.alpha !== (f.alpha === 'transparent'))
+        reasons.push(a.alpha === undefined ? 'Source transparency unknown' : 'Source transparency mismatch');
+    return reasons;
+}
+function matches(a, f) {
+    return exclusionReasons(a, f).length === 0;
+}
+
+const assets = [{"id":"wlpr_alpine","title":"Alpine light","image":"mountain","width":3840,"height":2160,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_lake","title":"Quiet lake","image":"lake","width":3800,"height":2160,"format":"png","range":"sdr","gamut":"srgb","depth":16,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_portrait","title":"Tall forest","image":"forest","width":4320,"height":7680,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_hdr","title":"Authored HDR sunset","image":"sunset","width":6000,"height":3375,"format":"jpg","range":"hdr","gamut":"p3","depth":8,"mapDepth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_motion","title":"Moving night sky","image":"night","width":3840,"height":2160,"format":"avif","range":"hdr","gamut":"rec2020","depth":10,"motion":"animated","alpha":true,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_small","title":"Soft morning","image":"trees","width":1600,"height":900,"format":"webp","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_outside","title":"Wider than it looks","image":"lake","width":3750,"height":2160,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_pending","title":"New upload","image":"forest","format":"jpg","readiness":"pending","confirmed":true,"uploaded":true},{"id":"wlpr_unknown","title":"Unknown color facts","image":"trees","width":3840,"height":2160,"format":"png","motion":"static","alpha":false,"readiness":"original-only","confirmed":true,"uploaded":true},{"id":"wlpr_waiting","title":"Waiting for Media","image":"mountain","format":"jpg","readiness":"pending","confirmed":false,"uploaded":true},{"id":"wlpr_ultrawide","title":"Wide horizon","image":"lake","width":6880,"height":2880,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_superwide","title":"Across the valley","image":"mountain","width":7680,"height":2160,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_phone","title":"Forest canopy","image":"trees","width":2160,"height":4800,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_exact","title":"Exact 1080p","image":"mountain","width":1920,"height":1080,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_below","title":"One pixel below minimum width","image":"mountain","width":1919,"height":1080,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_wider_inside","title":"Just inside wider 5% boundary","image":"mountain","width":5039,"height":2700,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_wider_on","title":"Exactly wider 5% boundary","image":"mountain","width":5040,"height":2700,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_wider_outside","title":"One pixel beyond wider 5% boundary","image":"mountain","width":5041,"height":2700,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_narrow_inside","title":"Just inside narrower 5% boundary","image":"mountain","width":4801,"height":2835,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_narrow_on","title":"Exactly narrower 5% boundary","image":"mountain","width":4800,"height":2835,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_narrow_outside","title":"One pixel beyond narrower 5% boundary","image":"mountain","width":4799,"height":2835,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_phone_min","title":"Exact 1080p portrait","image":"mountain","width":1080,"height":1920,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_small_portrait","title":"Small portrait, shape only","image":"mountain","width":540,"height":960,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_square_min","title":"1080 × 1080 square source","image":"mountain","width":1080,"height":1080,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_wide_2560","title":"Exact 2560 × 1080 ultrawide","image":"mountain","width":2560,"height":1080,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_wide_3440","title":"Exact 3440 × 1440 ultrawide","image":"mountain","width":3440,"height":1440,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_wide_5120","title":"Exact 5120 × 1440 superwide","image":"mountain","width":5120,"height":1440,"format":"jpg","range":"sdr","gamut":"srgb","depth":8,"motion":"static","alpha":false,"readiness":"ready","confirmed":true,"uploaded":true},{"id":"wlpr_failed","title":"Confirmed, failed inspection","image":"forest","format":"jpg","readiness":"failed","confirmed":true,"uploaded":true}];
+// Page shell. No persistence, no real delivery requests, no production implementation.
+let state={...initialFilters}, color=false, outage=false, scenario='boundaries';
+const presets=['1920x1080','2560x1440','3840x2160','2560x1080','3440x1440','5120x1440','1080x1920','1080x2400','1440x3200'];
+const controls={format:['any','jpg','png','webp','avif','gif'],range:['any','sdr','hdr'],motion:['any','static','animated'],alpha:['any','opaque','transparent'],tolerance:['0','1','2','3','5']};
+const labels={format:'Source format',range:'Source range',motion:'Source motion',alpha:'Actual transparency',tolerance:'Review tolerance %, accepted 5%'};
+const examples={boundaries:{text:'Check inclusive boundaries and the independent dimension threshold.',steps:[['Start with desktop 1080p',{selection:'1920x1080'}],['Try 1%',{tolerance:'1'}],['Try 2%',{tolerance:'2'}],['Try 3%',{tolerance:'3'}],['Use accepted 5%',{tolerance:'5'}]]},presets:{text:'3440 × 1440 has exact shape 43:18. Explicit 21:9 is a 2.38% change.',steps:[['Start with 3440 × 1440',{selection:'3440x1440'}],['Choose 21:9 only',{selection:'ratio:21/9'}],['Choose 3440 × 1440 again',{selection:'3440x1440'}],['Try tall phone',{selection:'1080x2400'}]]},overrides:{text:'Choose exactly one preset or aspect ratio. Ratio-only choices replace a preset and have no minimum dimensions. Presets replace ratio-only choices. Other filters remain unchanged.',steps:[['Start with desktop 1080p',{selection:'1920x1080'}],['Choose 9:16 instead',{selection:'ratio:9/16'}],['Try unrestricted shape',{selection:'any'}],['Remove size',{selection:'any'}],['Shape without size',{selection:'ratio:9/16'}]]},intersection:{text:'Source facts intersect. Color ranks only eligible sources. Conversion support and delivery health do not change source eligibility.',steps:[['Start with desktop 1080p',{selection:'1920x1080'}],['Require HDR',{range:'hdr'}],['Require animation',{motion:'animated'}],['Require actual transparency',{alpha:'transparent'}],['Require AVIF source',{format:'avif'}],['Rank by illustrative blue',{},true],['PNG source creates empty results',{format:'png'}]]},unknown:{text:'Confirmed pending and failed inspection remain unfiltered. Missing required facts and incomplete color utilities exclude only corresponding queries.',steps:[['Start unfiltered',{}],['Require dimensions',{selection:'1920x1080'}],['Require range only',{selection:'any',range:'hdr'}],['Color only',{range:'any'},true]]}};
+function clear(){state={...initialFilters,tolerance:state.tolerance};color=false;}
+function reasons(a){return [...exclusionReasons(a,state),...(color&&['wlpr_pending','wlpr_unknown','wlpr_waiting','wlpr_failed'].includes(a.id)?['Color utilities unknown']:[])];}
+function score(a){return a.id==='wlpr_alpine'?0:[...a.id+'BLUE'].reduce((n,c)=>(n*31+c.charCodeAt(0))%101,0)/100;}
+function render(){const t=target(state);for(const key in controls)document.querySelector('[name="'+key+'"]').value=state[key];for(const button of document.querySelectorAll('[data-selection]'))button.setAttribute('aria-pressed',button.dataset.selection===state.selection);document.getElementById('variables').textContent=JSON.stringify({...browseVariables(state),...(color?{sort:{color:{targets:[{name:'BLUE',quality:'FAVORITE',mode:'VIBE'}]}}}:{})},null,2);let list=[...assets];if(color)list.sort((a,b)=>score(b)-score(a)||a.id.localeCompare(b.id));document.getElementById('state').textContent=(t.width?'Minimum '+t.width+' × '+t.height+' displayed pixels':'No minimum source dimensions')+'; target shape '+(t.ratio||'unrestricted')+'; tolerance '+state.tolerance+'% inclusive.\nSource '+state.format+'; range '+state.range+'; motion '+state.motion+'; transparency '+state.alpha+'.\nColor '+(color?'illustrative blue ranking':'none')+'; delivery '+(outage?'outage':'normal')+'; '+assets.filter(a=>!reasons(a).length).length+' matches.';document.getElementById('rows').innerHTML=list.map(a=>'<tr><td>'+a.title+'<br>'+a.format+' · '+(a.range||'range unknown')+' · '+(a.motion||'motion unknown')+' · '+(a.alpha===undefined?'transparency unknown':a.alpha?'transparent':'opaque')+'</td><td>'+(a.width||'?')+' × '+(a.height||'?')+'<br>'+(t.ratio&&a.width&&a.height?((Math.max(a.width/a.height,t.ratio)/Math.min(a.width/a.height,t.ratio)-1)*100).toFixed(4)+'%':'shape unrestricted or unknown')+'</td><td>'+(reasons(a).join('; ')||'Included'+(color?' · synthetic score '+score(a).toFixed(2):''))+'</td></tr>').join('');}
+for(const key in controls){const label=document.createElement('label');label.textContent=labels[key];const select=document.createElement('select');select.name=key;for(const entry of controls[key]){const pair=Array.isArray(entry)?entry:[entry,entry];select.add(new Option(pair[1],pair[0]));}select.onchange=()=>{state={...state,[key]:select.value};render();};label.append(select);document.getElementById('controls').append(label);}
+const presetPanel=document.getElementById('preset-columns');
+const anySize=document.createElement('button');anySize.textContent='Any size and shape';anySize.dataset.selection='any';anySize.onclick=()=>{state.selection='any';render();};presetPanel.append(anySize);
+const columns=document.createElement('div');columns.className='device-columns';
+[['Desktop',presets.slice(0,3)],['Ultrawide',presets.slice(3,6)],['Phone',presets.slice(6,9)]].forEach(([title,sizes])=>{const column=document.createElement('div');const label=document.createElement('span');label.textContent=title;column.append(label);sizes.forEach(size=>{const button=document.createElement('button');button.textContent=size.replace('x',' × ');button.dataset.selection=size;button.onclick=()=>{state.selection=size;render();};column.append(button);});columns.append(column);});presetPanel.append(columns);
+const ratios=document.createElement('nav');
+['16/9','16/10','4/3','1/1','9/16','9/20','21/9','43/18','64/27','32/9'].forEach(ratio=>{const button=document.createElement('button');button.textContent=ratio.replace('/',':');button.dataset.selection='ratio:'+ratio;button.onclick=()=>{state.selection='ratio:'+ratio;render();};ratios.append(button);});const ratioLabel=document.createElement('p');ratioLabel.textContent='Aspect ratio only, no minimum source size';presetPanel.append(ratioLabel,ratios);
+function start(name){clear();outage=false;scenario=name;for(const tab of document.querySelectorAll('[role="tab"]'))tab.setAttribute('aria-selected',tab.textContent===name);document.getElementById('explain').textContent=examples[name].text;const steps=document.getElementById('steps');steps.replaceChildren();examples[name].steps.forEach(([text,patch,useColor],i)=>{const button=document.createElement('button');button.textContent=(i+1)+'. '+text;button.onclick=()=>{if(!i)clear();state={...state,...patch};if(useColor!==undefined)color=useColor;render();};steps.append(button);});render();}
+for(const name in examples){const button=document.createElement('button');button.textContent=name;button.setAttribute('role','tab');button.onclick=()=>start(name);document.getElementById('tabs').append(button);}
+document.getElementById('clear').onclick=()=>{clear();render();};document.getElementById('size').onclick=()=>{state.selection='any';render();};document.getElementById('shape').onclick=()=>{state.selection='1920x1080';render();};document.getElementById('color').onclick=()=>{color=false;render();};document.getElementById('outage').onclick=()=>{outage=!outage;render();};
+for(const p of [1,2,3,5]){const factor=1+p/100,loss=100*(1-1/factor);document.getElementById('visuals').innerHTML+='<div><h3>'+p+'% shape distance</h3><p>'+loss.toFixed(2)+'% of one axis</p><p>Fit</p><div class="frame"><div class="image" style="height:100%;width:'+100/factor+'%;left:'+loss/2+'%"></div></div><p>Fill</p><div class="frame"><div class="image" style="width:100%;height:'+100*factor+'%;top:'+(-p/2)+'%"></div></div><p>At 1080p, about '+Math.round(1920*loss/100)+' px empty width or '+Math.round(1080*loss/100)+' px source height cropped at display scale, split across two edges.</p></div>';}
+start(scenario);
+</script></html>

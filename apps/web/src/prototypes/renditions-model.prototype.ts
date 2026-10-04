@@ -211,6 +211,37 @@ assets.push(
     height: 4800,
   }
 );
+// #326 boundary and override examples. Facts and photos are illustrative.
+assets.push(
+  ...[
+    ['exact', 'Exact 1080p', 1920, 1080],
+    ['below', 'One pixel below minimum width', 1919, 1080],
+    ['wider_inside', 'Just inside wider 5% boundary', 5039, 2700],
+    ['wider_on', 'Exactly wider 5% boundary', 5040, 2700],
+    ['wider_outside', 'One pixel beyond wider 5% boundary', 5041, 2700],
+    ['narrow_inside', 'Just inside narrower 5% boundary', 4801, 2835],
+    ['narrow_on', 'Exactly narrower 5% boundary', 4800, 2835],
+    ['narrow_outside', 'One pixel beyond narrower 5% boundary', 4799, 2835],
+    ['phone_min', 'Exact 1080p portrait', 1080, 1920],
+    ['small_portrait', 'Small portrait, shape only', 540, 960],
+    ['square_min', '1080 × 1080 square source', 1080, 1080],
+    ['wide_2560', 'Exact 2560 × 1080 ultrawide', 2560, 1080],
+    ['wide_3440', 'Exact 3440 × 1440 ultrawide', 3440, 1440],
+    ['wide_5120', 'Exact 5120 × 1440 superwide', 5120, 1440],
+  ].map(([id, title, width, height]) => ({
+    ...assets[0],
+    id: `wlpr_${id}`,
+    title: String(title),
+    width: Number(width),
+    height: Number(height),
+  }))
+);
+assets.push({
+  ...assets[7],
+  id: 'wlpr_failed',
+  title: 'Confirmed, failed inspection',
+  readiness: 'failed',
+});
 export const limits = { width: 8192, height: 8192, pixels: 33554432 };
 export const statusText: Record<Readiness, string> = {
   ready: 'Renditions available',
@@ -364,69 +395,89 @@ export function resolve(a: Asset, r: Request) {
   };
 }
 export interface Filters {
-  resolution: string;
-  shape: string;
+  selection: string; // any, a pixel preset, or ratio:<width>/<height>. Exactly one choice.
   format: string;
   range: string;
   motion: string;
   alpha: string;
+  tolerance: string;
 }
 export const initialFilters: Filters = {
-  resolution: 'any',
-  shape: 'preset',
+  selection: 'any',
   format: 'any',
   range: 'any',
   motion: 'any',
   alpha: 'any',
+  tolerance: '5',
 };
 export function target(f: Filters) {
-  const dimensions = f.resolution.split('x').map(Number);
-  const short =
-    f.resolution === 'any'
-      ? 0
-      : dimensions.length === 2
-        ? Math.min(...dimensions)
-        : Number(f.resolution);
-  const presetRatio = dimensions.length === 2 ? dimensions[0] / dimensions[1] : 16 / 9;
-  const ratio =
-    f.shape === 'preset'
-      ? short
-        ? presetRatio
-        : undefined
-      : f.shape === 'any'
-        ? undefined
-        : Number(f.shape);
+  const shapeOnly = f.selection.startsWith('ratio:');
+  const unrestricted = f.selection === 'any';
+  const parts = unrestricted
+    ? [0, 0]
+    : shapeOnly
+      ? f.selection.slice(6).split('/').map(Number)
+      : f.selection.split('x').map(Number);
   return {
-    width: short
-      ? f.shape === 'preset' && dimensions.length === 2
-        ? dimensions[0]
-        : Math.ceil(short * Math.max(1, ratio || 1) - 1e-9)
-      : 0,
-    height: short
-      ? f.shape === 'preset' && dimensions.length === 2
-        ? dimensions[1]
-        : Math.ceil(short * Math.max(1, ratio ? 1 / ratio : 1) - 1e-9)
-      : 0,
-    ratio,
+    width: shapeOnly || unrestricted ? 0 : parts[0],
+    height: shapeOnly || unrestricted ? 0 : parts[1],
+    ratio: unrestricted ? undefined : parts[0] / parts[1],
+    shapeWidth: parts[0],
+    shapeHeight: parts[1],
   };
 }
-export function matches(a: Asset, f: Filters) {
-  if (!a.confirmed || !a.uploaded) return false;
+// Proposed Gateway variables for review only. These fields are not a live schema.
+// Pixel presets and browse names stay in Web; Media still publishes only source facts.
+export function browseVariables(f: Filters) {
   const t = target(f);
-  if (t.width && (!a.width || !a.height || a.width < t.width || a.height < t.height)) return false;
+  const source = {
+    ...(t.width ? { minimumWidth: t.width, minimumHeight: t.height } : {}),
+    ...(t.ratio
+      ? {
+          aspectRatio: {
+            width: t.shapeWidth,
+            height: t.shapeHeight,
+            tolerancePercent: Number(f.tolerance),
+          },
+        }
+      : {}),
+    ...(f.format !== 'any' ? { sourceFormat: f.format } : {}),
+    ...(f.range !== 'any' ? { dynamicRange: f.range } : {}),
+    ...(f.motion !== 'any' ? { motion: f.motion } : {}),
+    ...(f.alpha !== 'any' ? { hasTransparency: f.alpha === 'transparent' } : {}),
+  };
+  return Object.keys(source).length ? { filter: { source } } : {};
+}
+export function exclusionReasons(a: Asset, f: Filters) {
+  const reasons: string[] = [];
+  if (!a.confirmed || !a.uploaded) reasons.push('Upload and Media confirmation required');
+  const t = target(f);
+  if (t.width && (!a.width || !a.height)) reasons.push('Source dimensions unknown');
+  else if (t.width && a.width && a.height && (a.width < t.width || a.height < t.height))
+    reasons.push(`Below ${t.width} × ${t.height} minimum`);
   if (
     t.ratio &&
     (!a.width ||
       !a.height ||
-      Math.max(a.width / a.height, t.ratio) / Math.min(a.width / a.height, t.ratio) > 1.02)
+      100 * Math.max(a.width * t.shapeHeight, a.height * t.shapeWidth) >
+        (100 + Number(f.tolerance)) * Math.min(a.width * t.shapeHeight, a.height * t.shapeWidth))
   )
-    return false;
-  return (
-    (f.format === 'any' || a.format === f.format) &&
-    (f.range === 'any' || a.range === f.range) &&
-    (f.motion === 'any' || a.motion === f.motion) &&
-    (f.alpha === 'any' || a.alpha === (f.alpha === 'transparent'))
-  );
+    reasons.push(
+      a.width && a.height ? `Outside ${f.tolerance}% shape tolerance` : 'Source shape unknown'
+    );
+  if (f.format !== 'any' && a.format !== f.format) reasons.push('Source format mismatch');
+  if (f.range !== 'any' && a.range !== f.range)
+    reasons.push(a.range ? 'Source range mismatch' : 'Source range unknown');
+  if (f.motion !== 'any' && a.motion !== f.motion)
+    reasons.push(a.motion ? 'Source motion mismatch' : 'Source motion unknown');
+  if (f.alpha !== 'any' && a.alpha !== (f.alpha === 'transparent'))
+    reasons.push(
+      a.alpha === undefined ? 'Source transparency unknown' : 'Source transparency mismatch'
+    );
+  return reasons;
+}
+export function matches(a: Asset, f: Filters) {
+  return exclusionReasons(a, f).length === 0;
 }
 export function preview(a: Asset, path: string, still: boolean, placement = 'detail') {
   if (a.readiness !== 'ready') return undefined;

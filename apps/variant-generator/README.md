@@ -13,4 +13,4 @@ Variant Generator creates lower-resolution renditions of uploaded wallpapers so 
 
 Sharp resizes and encodes images in an isolated process so deadlines and shutdown can stop native work. Object storage holds the originals and variants; NATS JetStream retains generation requests and variant announcements.
 
-See the [domain context](CONTEXT.md), [replay decision](docs/adr/0001-replay-safe-variant-generation.md), [upgrade and replay procedures](../docs/content/docs/guides/service-upgrades.mdx), and [contributor setup](../../CONTRIBUTING.md).
+See the [domain context](GLOSSARY.md), [replay decision](docs/adr/0001-replay-safe-variant-generation.md), [upgrade and replay procedures](../docs/content/docs/guides/service-upgrades.mdx), and [contributor setup](../../CONTRIBUTING.md).

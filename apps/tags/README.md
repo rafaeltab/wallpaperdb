@@ -11,4 +11,4 @@ This workspace reserves the service boundary for wallpaper classification. It is
 
 Fastify provides the HTTP interface, and Effect scopes application resources to each running service instance. The PostgreSQL and NATS connections currently support operational checks; the service does not store tags or process classification events.
 
-Resolve its [domain language and ownership](CONTEXT.md) before adding classification features. Follow [contributor setup](../../CONTRIBUTING.md) to run and check the workspace.
+Resolve its [domain language and ownership](GLOSSARY.md) before adding classification features. Follow [contributor setup](../../CONTRIBUTING.md) to run and check the workspace.

@@ -28,7 +28,7 @@ For concurrent writes and persistence enforcement, follow [persistence adapters]
 
 ## Domain policy
 
-- Each capability consistently chooses language-only DDD or tactical DDD. Introduce entities, value objects, aggregates, repositories, domain services, and other tactical patterns only where they protect a real modeling need; `CONTEXT.md` records language, not implementation patterns.
+- Each capability consistently chooses language-only DDD or tactical DDD. Introduce entities, value objects, aggregates, repositories, domain services, and other tactical patterns only where they protect a real modeling need; `GLOSSARY.md` records language, not implementation patterns.
 - Domain events are optional. Prefer explicit calls and transition results, do not use an internal event bus to hide control flow, and treat event sourcing as a separate architectural decision.
 - Domain construction and transitions enforce business invariants. Internal code may rely on values that have crossed the structural and domain boundaries instead of repeatedly revalidating them. Invariants susceptible to concurrent or external writes also need [persistence enforcement](adapters.md#persistence-adapters).
 - Application and domain policy authorize every protected operation. Authentication mechanisms must not leak inward, and caller-supplied ownership claims must not override the authenticated principal. [Driving adapters translate authentication](adapters.md#driving-adapters).

@@ -49,4 +49,4 @@ Before removing a checkout, run `make worktree-remove` there. It releases the sl
 
 ## Change the documentation
 
-Keep human setup here, domain terms in [context documents](CONTEXT-MAP.md), decisions in ADRs, and coding rules under [the guidelines index](CODING_STANDARDS.md). The [documentation site](apps/docs/README.md) holds user guides and operational procedures. Link to these homes instead of repeating them.
+Keep human setup here, domain terms in [context documents](GLOSSARY-MAP.md), decisions in ADRs, and coding rules under [the guidelines index](CODING_STANDARDS.md). The [documentation site](apps/docs/README.md) holds user guides and operational procedures. Link to these homes instead of repeating them.

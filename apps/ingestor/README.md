@@ -15,4 +15,4 @@ Ingestor accepts authenticated wallpaper uploads, validates their contents, and 
 
 File-type identifies formats from the uploaded bytes. Sharp reads image metadata with decompression limits before Ingestor accepts an image.
 
-See the [domain context](CONTEXT.md) for acceptance rules and the [durable publication decision](docs/adr/0001-effect-ingestion-and-durable-publication.md) for recovery guarantees.
+See the [domain context](GLOSSARY.md) for acceptance rules and the [durable publication decision](docs/adr/0001-effect-ingestion-and-durable-publication.md) for recovery guarantees.

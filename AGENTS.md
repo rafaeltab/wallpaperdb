@@ -14,7 +14,7 @@ Use the five canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, 
 
 ### Domain docs
 
-WallpaperDB uses a multi-context layout rooted at `CONTEXT-MAP.md`; system-wide ADRs live in `docs/adr/`. See `docs/agents/domain.md`.
+WallpaperDB uses a multi-context layout rooted at `GLOSSARY-MAP.md`; system-wide ADRs live in `docs/adr/`. See `docs/agents/domain.md`.
 
 ### Documentation
 

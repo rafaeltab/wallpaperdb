@@ -2,19 +2,19 @@
 
 ## Contexts
 
-- [User](./apps/user/CONTEXT.md) - owns Profiles and their community-facing identity
-- [Gateway Catalogue](./apps/gateway/CONTEXT.md) - owns public wallpaper discovery and its interpretations of contributor Profiles
-- [Wallpaper Ingestion](./apps/ingestor/CONTEXT.md) - owns upload acceptance, immutable originals, and durable upload announcements
+- [User](./apps/user/GLOSSARY.md) - owns Profiles and their community-facing identity
+- [Gateway Catalogue](./apps/gateway/GLOSSARY.md) - owns public wallpaper discovery and its interpretations of contributor Profiles
+- [Wallpaper Ingestion](./apps/ingestor/GLOSSARY.md) - owns upload acceptance, immutable originals, and durable upload announcements
 
 Additional contexts are documented lazily as their domain language is resolved.
 
-- [Wallpaper color extraction](./apps/color-extractor/CONTEXT.md) - owns measurements of an original wallpaper's color distribution
+- [Wallpaper color extraction](./apps/color-extractor/GLOSSARY.md) - owns measurements of an original wallpaper's color distribution
 
-- [Wallpaper variant generation (legacy)](./apps/variant-generator/CONTEXT.md) - currently produces lower-resolution wallpaper variants; the [accepted delivery plan](https://github.com/rafaeltab/wallpaperdb/issues/250) moves generation ownership to Media
+- [Wallpaper variant generation (legacy)](./apps/variant-generator/GLOSSARY.md) - currently produces lower-resolution wallpaper variants; the [accepted delivery plan](https://github.com/rafaeltab/wallpaperdb/issues/250) moves generation ownership to Media
 
-- [Media](./apps/media/CONTEXT.md) - currently owns on-request rendition processing, the delivery catalog, and delivery of immutable Assets. The [accepted target model](https://github.com/rafaeltab/wallpaperdb/issues/250) assigns Asset inspection and all rendition generation to Media, including migration of legacy variant generation. [ADR 0009](./docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md) adds temporary HDR Profile picture conversion to that target ownership.
+- [Media](./apps/media/GLOSSARY.md) - currently owns on-request rendition processing, the delivery catalog, and delivery of immutable Assets. The [accepted target model](https://github.com/rafaeltab/wallpaperdb/issues/250) assigns Asset inspection and all rendition generation to Media, including migration of legacy variant generation. [ADR 0009](./docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md) adds temporary HDR Profile picture conversion to that target ownership.
 
-- [Tagging](./apps/tags/CONTEXT.md) - reserved for wallpaper classification; domain language remains undefined
+- [Tagging](./apps/tags/GLOSSARY.md) - reserved for wallpaper classification; domain language remains undefined
 
 ## Relationships
 

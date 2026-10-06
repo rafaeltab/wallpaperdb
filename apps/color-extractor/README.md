@@ -12,4 +12,4 @@ Color Extractor measures uploaded still images so users can discover wallpapers 
 
 Sharp decodes and resamples images in an isolated process so deadlines and shutdown can stop native image work. Complete measurement bytes travel inline in retained NATS JetStream events, allowing replay without rereading the original. The [event contract](../../packages/events/src/schemas/wallpaper-colors-extracted.ts) binds measurements to their original image hash and frozen descriptor definition. Gateway owns utility calculation and search ranking.
 
-See the [domain context](CONTEXT.md), [decoding isolation decision](docs/adr/0001-isolate-native-image-decoding.md), [upgrade and replay procedures](../docs/content/docs/guides/service-upgrades.mdx), and [contributor setup](../../CONTRIBUTING.md).
+See the [domain context](GLOSSARY.md), [decoding isolation decision](docs/adr/0001-isolate-native-image-decoding.md), [upgrade and replay procedures](../docs/content/docs/guides/service-upgrades.mdx), and [contributor setup](../../CONTRIBUTING.md).

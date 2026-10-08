@@ -7,6 +7,8 @@ import {
   type UploadResult,
 } from './contract';
 
+const MAX_AUTOMATIC_RATE_LIMIT_RETRIES = 2;
+
 function initialState<TFile>(): UploadQueueState<TFile> {
   return { files: [], isProcessing: false, isPaused: false, isStopped: false, pausedUntil: null };
 }
@@ -43,6 +45,7 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
   let active: { id: string; cancel: () => void } | undefined;
   let cancelTimer: (() => void) | undefined;
   let rateLimitedId: string | undefined;
+  const rateLimitRetries = new Map<string, number>();
   const listeners = new Set<() => void>();
 
   function publish() {
@@ -83,6 +86,7 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
 
   function settle(id: string, result: UploadResult) {
     if (result.success && result.response) {
+      rateLimitRetries.delete(id);
       updateFile(id, {
         status: result.isDuplicate ? 'duplicate' : 'success',
         response: result.response,
@@ -92,7 +96,10 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
       const error = result.error ?? { type: 'server', message: 'Upload returned no result' };
       updateFile(id, { status: 'failed', error });
       if (error.type === 'rate_limit') {
-        rateLimitedId = id;
+        const retries = rateLimitRetries.get(id) ?? 0;
+        rateLimitedId = retries < MAX_AUTOMATIC_RATE_LIMIT_RETRIES ? id : undefined;
+        if (rateLimitedId) rateLimitRetries.set(id, retries + 1);
+        // The cooldown also protects later files when this file exhausts its retries.
         const delay = retryDelay(error.retryAfter);
         state = {
           ...state,
@@ -111,6 +118,7 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
     ) {
       state = initialState<TFile>();
       rateLimitedId = undefined;
+      rateLimitRetries.clear();
     }
     publish();
     processNext();
@@ -211,6 +219,9 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
       publish();
     },
     retryFailed() {
+      for (const file of state.files) {
+        if (file.status === 'failed') rateLimitRetries.delete(file.id);
+      }
       state = {
         ...state,
         files: state.files.map((file) =>
@@ -224,6 +235,7 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
       clearTimer();
       cancelActive();
       rateLimitedId = undefined;
+      rateLimitRetries.clear();
       state = initialState<TFile>();
       publish();
     },

@@ -70,6 +70,19 @@ describe('UploadDropZone', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Only JPEG, PNG, and WebP images are supported');
   });
 
+  it.each(['picker', 'drop'])('explains a full queue when selecting through the %s', (method) => {
+    const onFilesSelected = vi.fn();
+    render(<UploadDropZone onFilesSelected={onFilesSelected} maxFiles={0} />);
+    const files = [createMockFile()];
+    if (method === 'picker') {
+      fireEvent.change(screen.getByTestId('file-input'), { target: { files } });
+    } else {
+      fireEvent.drop(screen.getByTestId('drop-zone'), { dataTransfer: createDataTransfer(files) });
+    }
+    expect(onFilesSelected).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('The upload queue is full. Clear files before adding more.');
+  });
+
   it('queues supported dropped files and rejects unsupported ones', () => {
     const onFilesSelected = vi.fn();
     const image = createMockFile('a.png', 'image/png');

@@ -193,6 +193,30 @@ describe('upload queue controls', () => {
     expect(uploads[3].file).toBe('limited');
   });
 
+  it('limits automatic rate-limit retries, honors the final cooldown, and continues later files', async () => {
+    const { queue, uploads, advance, timers } = setup();
+    queue.addFiles(['limited', 'next']);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      expect(uploads[attempt].file).toBe('limited');
+      await complete(uploads[attempt], rateLimited);
+      advance(4999);
+      expect(uploads).toHaveLength(attempt + 1);
+      advance(1);
+    }
+    expect(uploads.map((request) => request.file)).toEqual(['limited', 'limited', 'limited', 'next']);
+    expect(queue.getSnapshot().state.files[0]).toMatchObject({ status: 'failed', error: rateLimited.error });
+    await complete(uploads[3]);
+    expect(timers.size).toBe(0);
+    expect(queue.getSnapshot().state).toMatchObject({ isPaused: false, pausedUntil: null });
+    advance(60000);
+    expect(uploads).toHaveLength(4);
+    queue.retryFailed();
+    expect(uploads[4].file).toBe('limited');
+    await complete(uploads[4], rateLimited);
+    advance(5000);
+    expect(uploads[5].file).toBe('limited');
+  });
+
   it('leaves unrelated failures alone on automatic resume', async () => {
     const { queue, uploads, advance } = setup();
     queue.addFiles(['invalid', 'limited']);

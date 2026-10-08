@@ -19,10 +19,10 @@ Profile edits go to the owning User service; public pages read Gateway's project
 
 ## Frontend feature decisions
 
-This branch applies the frontend architecture example across the app. Feature decisions are plain TypeScript behind public entries under [src/features](src/features). Pure policies cover browse filters and colors, feed errors, grid sizing and packing, wallpaper actions, authentication stages, Profile management and public projections, request admission, and appearance preferences. The upload queue and inline Profile editor use workflows because they coordinate asynchronous requests, drafts, conflicts, cooldowns, and cancellation.
+Feature decisions are plain TypeScript behind public entries under [src/features](src/features). Pure policies cover browse filters and colors, feed errors, grid sizing and packing, wallpaper actions, authentication stages, Profile management and public projections, request admission, and appearance preferences. The upload queue and inline Profile editor use workflows because they coordinate asynchronous requests, drafts, conflicts, cooldowns, and cancellation.
 
 React owns rendering, focus, gestures, and local UI state. TanStack Router owns URL state, TanStack Query owns service data, and Clerk owns authentication. Adapters translate those systems into feature inputs and execute browser effects. Profile mutation responses update only the query object for the session that started the request, even if navigation unmounts the editor. Simple browser hooks and presentational components retain their existing structure.
 
 Tests under [test/features](test/features) exercise public decisions and workflows with controlled inputs and adapters. React and Query tests cover composition, focus, and cache ownership. Browser journeys cover measurements, animation, navigation, and complete interactions. The [architecture test](test/features/feature-architecture.test.ts) discovers feature directories, enforces their public entries, and prevents their cores from importing framework or browser dependencies. Shared pure Markdown policy and GraphQL value types are explicit exceptions.
 
-This is an architectural example for review. A workflow is justified by coordination behavior; straightforward decisions stay functions, and UI components do not need an extra store.
+A workflow is justified by coordination behavior; straightforward decisions stay functions, and UI components do not need an extra store.

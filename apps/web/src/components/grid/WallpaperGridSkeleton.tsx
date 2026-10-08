@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { MuuriGrid } from './strategies';
-import { generateSkeletonItems } from './utils';
+import { generateSkeletonItems } from '@/features/grid-layout';
 
 interface WallpaperGridSkeletonProps {
   count?: number;

@@ -14,6 +14,10 @@ export function acceptedUploads<T extends { type: string; size: number }>(
       [
         unsupported && 'Only JPEG, PNG, and WebP images are supported.',
         oversized && 'Images must be 50 MiB or smaller.',
+        maxFiles !== undefined &&
+          maxFiles <= 0 &&
+          files.length > 0 &&
+          'The upload queue is full. Clear files before adding more.',
       ]
         .filter(Boolean)
         .join(' ') || null,

@@ -42,12 +42,14 @@ function SignUpErrors({
   );
 }
 
-export function SignUpForm() {
+export function SignUpForm({ redirectUrl = '/' }: { redirectUrl?: string }) {
   const { signUp, errors, fetchStatus } = useSignUp();
-  const { oauthUrls, finalizeNavigation } = useAuthNavigation();
+  const { oauthUrls, finalizeNavigation } = useAuthNavigation(redirectUrl);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [pendingVerification, setPendingVerification] = useState(false);
+  const [verificationNavigation, setVerificationNavigation] = useState<
+    typeof finalizeNavigation | null
+  >(null);
   const [verificationCode, setVerificationCode] = useState('');
 
   const isSubmitting = fetchStatus === 'fetching';
@@ -69,13 +71,13 @@ export function SignUpForm() {
       });
     } else if (signUpNextAction(signUp.status) === 'send-email-code') {
       await signUp.verifications.sendEmailCode();
-      setPendingVerification(true);
+      setVerificationNavigation(() => finalizeNavigation);
     }
   };
 
   const handleVerification = async (e: FormEvent) => {
     e.preventDefault();
-    if (!signUp) return;
+    if (!signUp || !verificationNavigation) return;
 
     const { error } = await signUp.verifications.verifyEmailCode({ code: verificationCode });
 
@@ -83,7 +85,7 @@ export function SignUpForm() {
 
     if (signUpNextAction(signUp.status) === 'finalize') {
       await signUp.finalize({
-        navigate: finalizeNavigation,
+        navigate: verificationNavigation,
       });
     }
   };
@@ -98,7 +100,7 @@ export function SignUpForm() {
     });
   };
 
-  if (pendingVerification) {
+  if (verificationNavigation) {
     return (
       <Card className="border-0 shadow-none sm:border sm:shadow-sm">
         <CardHeader className="text-center">

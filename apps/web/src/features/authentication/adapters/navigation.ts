@@ -1,12 +1,9 @@
 import { useNavigate } from '@tanstack/react-router';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { buildAuthUrl, postAuthDestination } from '../index';
 
-export function useAuthNavigation() {
+export function useAuthNavigation(redirectUrl: string) {
   const navigate = useNavigate();
-  const [redirectUrl] = useState(
-    () => new URLSearchParams(window.location.search).get('redirect') || '/'
-  );
   const finalizeNavigation = useCallback(
     async ({
       session,

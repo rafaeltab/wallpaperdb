@@ -1,4 +1,4 @@
-import { downloadVariant } from '@/features/wallpaper-details/adapters/download';
+import { useWallpaperActions } from '@/features/wallpaper-details/adapters/react';
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { ChevronDown, Download, PanelRight, Share } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -26,7 +26,6 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useWallpaperQuery } from '@/hooks/useWallpaperQuery';
 import { formatFileSize } from '@/lib/utils/wallpaper';
-import { shareWallpaper } from '@/features/wallpaper-details/adapters/share';
 
 export function WallpaperDetailPage() {
   const { wallpaperId } = useParams({ strict: false }) as { wallpaperId: string };
@@ -35,6 +34,7 @@ export function WallpaperDetailPage() {
 
 function WallpaperDetailContent({ wallpaperId }: { wallpaperId: string }) {
   const isMobile = useMediaQuery('(max-width: 1024px)');
+  const { share, download } = useWallpaperActions(wallpaperId);
 
   // Panel state (persisted to localStorage)
   const [isPanelOpen, setIsPanelOpen] = usePersistentState('wallpaper-detail-panel-open', true);
@@ -78,8 +78,8 @@ function WallpaperDetailContent({ wallpaperId }: { wallpaperId: string }) {
   // Share functionality
   const handleShare = useCallback(async () => {
     if (!wallpaper) return;
-    await shareWallpaper(wallpaper.wallpaperId);
-  }, [wallpaper]);
+    await share();
+  }, [wallpaper, share]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -105,7 +105,7 @@ function WallpaperDetailContent({ wallpaperId }: { wallpaperId: string }) {
           break;
         case 'download':
           if (wallpaper?.variants[selectedVariantIndex])
-            void downloadVariant(wallpaper.variants[selectedVariantIndex]);
+            void download(wallpaper.variants[selectedVariantIndex]);
           break;
         case 'share':
           void handleShare();
@@ -118,12 +118,20 @@ function WallpaperDetailContent({ wallpaperId }: { wallpaperId: string }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPanelOpen, setIsPanelOpen, wallpaper, selectedVariantIndex, handleShare, wallpaperId]);
+  }, [
+    isPanelOpen,
+    setIsPanelOpen,
+    wallpaper,
+    selectedVariantIndex,
+    handleShare,
+    wallpaperId,
+    download,
+  ]);
 
   // Handle download from dropdown
   const handleDownloadVariant = (variantIndex: number) => {
     if (wallpaper?.variants[variantIndex]) {
-      downloadVariant(wallpaper.variants[variantIndex]);
+      void download(wallpaper.variants[variantIndex]);
     }
   };
 

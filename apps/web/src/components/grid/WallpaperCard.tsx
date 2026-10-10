@@ -1,4 +1,4 @@
-import { downloadVariant } from '@/features/wallpaper-details/adapters/download';
+import { useWallpaperActions } from '@/features/wallpaper-details/adapters/react';
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Eye, Download, Share2 } from 'lucide-react';
@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-import { shareWallpaper } from '@/features/wallpaper-details/adapters/share';
 import type { Wallpaper } from '@/lib/graphql/types';
 import type { GridItemRendererProps } from './types';
 
@@ -34,6 +33,7 @@ export function WallpaperCard({
 
   // Extract wallpaper from metadata
   const wallpaper = item.metadata?.wallpaper as Wallpaper | undefined;
+  const { share, download } = useWallpaperActions(wallpaper?.wallpaperId);
 
   // Render skeleton placeholder for loading items
   if (item.isSkeleton) {
@@ -48,11 +48,7 @@ export function WallpaperCard({
       return;
     }
 
-    try {
-      await downloadVariant(wallpaper.variants[0]);
-    } catch (_error) {
-      toast.error('Failed to download wallpaper');
-    }
+    await download(wallpaper.variants[0]);
   };
 
   const handleShare = async (e: React.MouseEvent) => {
@@ -63,7 +59,7 @@ export function WallpaperCard({
       return;
     }
 
-    await shareWallpaper(wallpaper.wallpaperId);
+    await share();
   };
 
   return (

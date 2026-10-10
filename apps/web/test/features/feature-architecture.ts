@@ -12,6 +12,7 @@ const publicAdapters = new Set([
   'request-admission/adapters/graphql.ts',
   'upload-queue/adapters/browser.ts',
   'wallpaper-details/adapters/download.ts',
+  'wallpaper-details/adapters/react.ts',
   'wallpaper-details/adapters/share.ts',
 ]);
 const browserGlobals = new Set([

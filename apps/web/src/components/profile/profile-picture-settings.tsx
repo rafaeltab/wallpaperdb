@@ -1,15 +1,11 @@
 import { pictureSelection } from '@/features/profile-management';
-import { useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
 import { ProfileDialog } from '@/components/profile/profile-dialog';
 import { ProfilePicture } from '@/components/profile/profile-picture';
-import {
-  profileQueryKey,
-  useOwnerProfileMutation,
-} from '@/features/profile-management/adapters/query';
+import { useOwnerProfileMutation } from '@/features/profile-management/adapters/query';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -38,7 +34,6 @@ export function ProfilePictureSettings({
   profile: Profile;
   tokenProvider: () => Promise<string | null>;
 }) {
-  const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const dialogContent = useRef<HTMLDivElement>(null);
   const removeOpener = useRef<HTMLButtonElement>(null);
@@ -48,13 +43,6 @@ export function ProfilePictureSettings({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const mounted = useRef(false);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
   useEffect(() => {
     if (!selected) {
       setPreviewUrl(null);
@@ -71,7 +59,8 @@ export function ProfilePictureSettings({
     mutation,
     refreshing,
     writing,
-    isBusy: busy,
+    availability,
+    refresh: refreshProfile,
   } = useOwnerProfileMutation(
     profile.id,
     (command: PictureCommand) => {
@@ -86,7 +75,6 @@ export function ProfilePictureSettings({
     },
     {
       onSuccess: (_updated: Profile, command: PictureCommand) => {
-        if (!mounted.current) return;
         setSelected(null);
         if (input.current) input.current.value = '';
         setError(null);
@@ -96,8 +84,7 @@ export function ProfilePictureSettings({
         );
       },
       onError: (cause) => {
-        if (mounted.current)
-          toast.error('Could not save profile picture', { description: cause.message });
+        toast.error('Could not save profile picture', { description: cause.message });
       },
     }
   );
@@ -109,16 +96,13 @@ export function ProfilePictureSettings({
       : mutation.error?.message);
 
   async function refresh() {
-    if (busy()) return;
+    if (availability.isBusy()) return;
     mutation.reset();
     setError(null);
     setSelected(null);
     if (input.current) input.current.value = '';
     try {
-      await queryClient.refetchQueries(
-        { queryKey: profileQueryKey(profile.id), exact: true },
-        { throwOnError: true }
-      );
+      await refreshProfile();
     } catch {
       setError('Unable to refresh your Profile. Try again.');
     }
@@ -180,7 +164,7 @@ export function ProfilePictureSettings({
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              if (selected && !busy()) mutation.mutate({ ...selected, action: 'upload' });
+              if (selected) mutation.mutate({ ...selected, action: 'upload' });
             }}
           >
             <Field>
@@ -277,7 +261,7 @@ export function ProfilePictureSettings({
                 <AlertDialogAction
                   disabled={refreshing || writing}
                   onClick={() => {
-                    if (removeVersion !== null && !busy())
+                    if (removeVersion !== null)
                       mutation.mutate({ action: 'remove', expectedVersion: removeVersion });
                   }}
                 >

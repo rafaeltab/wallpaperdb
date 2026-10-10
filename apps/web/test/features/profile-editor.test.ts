@@ -21,6 +21,8 @@ function setup(
     version: 3,
   })
 ) {
+  let busy = false;
+  const availabilityListeners = new Set<() => void>();
   let now = 0;
   const timers = new Set<{ at: number; callback: () => void }>();
   const requests: {
@@ -31,6 +33,15 @@ function setup(
   const editor = createProfileEditor(
     { field, profile: initial, displayNameMaxLength: 80 },
     {
+      availability: {
+        isBusy: () => busy,
+        subscribe(listener: () => void) {
+          availabilityListeners.add(listener);
+          return () => {
+            availabilityListeners.delete(listener);
+          };
+        },
+      },
       save(command) {
         return new Promise<SaveResult>((resolve) => {
           requests.push({ command, resolve });
@@ -63,9 +74,11 @@ function setup(
     notices,
     advance,
     timers,
+    availabilityListeners,
     deactivate,
-    setBusy: (value: boolean) => {
-      editor.setBusy(value);
+    setBusy: (value: boolean, notify = true) => {
+      busy = value;
+      if (notify) for (const listener of availabilityListeners) listener();
     },
   };
 }
@@ -422,4 +435,62 @@ describe('profile editor lifecycle and refresh failures', () => {
     expect(notices[0].message).toBe('Profile handle unchanged');
     expect(editor.getSnapshot().coolingDown).toBe(false);
   });
+});
+
+it('derives command availability without replacing the draft and releases subscriptions on cleanup', () => {
+  const { editor, setBusy, requests, deactivate, availabilityListeners } = setup();
+  editor.beginEdit();
+  editor.change('Draft');
+  const captured = editor.getSnapshot().edit;
+  setBusy(true);
+  expect(editor.getSnapshot()).toMatchObject({ busy: true, canSave: false });
+  editor.change('Blocked');
+  void editor.save();
+  expect(requests).toHaveLength(0);
+  expect(editor.getSnapshot().edit).toBe(captured);
+  setBusy(false);
+  expect(editor.getSnapshot().canSave).toBe(true);
+  deactivate();
+  expect(availabilityListeners.size).toBe(0);
+  setBusy(true);
+  const cleanup = editor.activate();
+  expect(availabilityListeners.size).toBe(1);
+  expect(editor.getSnapshot()).toMatchObject({ busy: true, canSave: false });
+  cleanup();
+  expect(availabilityListeners.size).toBe(0);
+});
+
+it('checks live availability at command time even before subscribers are notified', () => {
+  const { editor, setBusy, requests } = setup();
+  editor.beginEdit();
+  editor.change('Draft');
+  setBusy(true, false);
+  void editor.save();
+  editor.change('Competing change');
+  expect(requests).toHaveLength(0);
+  expect(editor.getSnapshot().edit?.value).toBe('Draft');
+  setBusy(false);
+  void editor.save();
+  expect(requests).toHaveLength(1);
+});
+
+it('ignores an older save after cleanup and reactivation of the same editor', async () => {
+  const { editor, requests, notices, deactivate, timers } = setup();
+  editor.beginEdit();
+  editor.change('Original request');
+  void editor.save();
+  deactivate();
+  const cleanup = editor.activate();
+  editor.change('Current draft');
+  await resolveSave(requests[0], {
+    success: true,
+    profile: { ...profile, displayName: 'Original request', version: 2 },
+  });
+  expect(editor.getSnapshot()).toMatchObject({
+    phase: 'idle',
+    edit: { value: 'Current draft', baseVersion: 1 },
+  });
+  expect(notices).toEqual([]);
+  expect(timers.size).toBe(0);
+  cleanup();
 });

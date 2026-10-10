@@ -149,4 +149,49 @@ describe('feature dependency enforcement', () => {
       }).join('\n')
     ).toContain('cycle');
   });
+  it.each(['import', 'require'])('checks static template-literal %s calls', (call) => {
+    expect(
+      check({
+        'features/editor/adapters/browser.ts': `${call}(\`../../management\`); ${call}(\`react\`);`,
+        'features/management/index.ts': '',
+      })
+    ).toEqual([]);
+    expect(
+      check({
+        'features/editor/adapters/browser.ts': `${call}(\`../../management/private\`);`,
+        'features/management/private.ts': '',
+      }).join('\n')
+    ).toContain('entry point');
+    expect(
+      check({
+        'features/editor/index.ts': `${call}(\`react\`);`,
+      }).join('\n')
+    ).toContain('core cannot import');
+  });
+  it.each(['import', 'require'])(
+    'rejects adapter-mediated cycles through static template-literal %s calls',
+    (call) => {
+      expect(
+        check({
+          'features/editor/index.ts': '',
+          'features/editor/adapters/browser.ts': `${call}(\`../../management\`);`,
+          'features/management/index.ts': '',
+          'features/management/adapters/browser.ts': `${call}(\`../../editor\`);`,
+        }).join('\n')
+      ).toContain('cycle');
+    }
+  );
+  it.each(['import(variable);', 'import(`../../${feature}`);', 'require(variable);'])(
+    'rejects computed dependencies in feature adapters: %s',
+    (content) => {
+      expect(
+        check({
+          'features/editor/adapters/browser.ts': content,
+        }).join('\n')
+      ).toContain('computed imports');
+    }
+  );
+  it('allows computed imports outside feature ownership', () => {
+    expect(check({ 'components/lazy.tsx': 'import(variable);' })).toEqual([]);
+  });
 });

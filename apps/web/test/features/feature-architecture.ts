@@ -91,8 +91,8 @@ export function featureArchitectureErrors(src: string, sources: Map<string, stri
           (ts.isIdentifier(node.expression) && node.expression.text === 'require'))
       ) {
         const argument = node.arguments[0];
-        if (argument && ts.isStringLiteral(argument)) checkImport(argument.text);
-        else if (core) errors.push(`${filename}: core cannot use computed imports`);
+        if (argument && ts.isStringLiteralLike(argument)) checkImport(argument.text);
+        else if (feature) errors.push(`${filename}: feature cannot use computed imports`);
       }
       if (core && ts.isIdentifier(node) && browserGlobals.has(node.text))
         errors.push(`${filename}: inject ${node.text} through an adapter`);

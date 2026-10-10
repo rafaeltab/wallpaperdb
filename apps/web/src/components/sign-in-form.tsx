@@ -10,29 +10,31 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { formatClerkGlobalErrors } from '@/lib/auth/clerk-errors';
 
-export function SignInForm() {
+export function SignInForm({ redirectUrl = '/' }: { redirectUrl?: string }) {
   const { signIn, errors, fetchStatus } = useSignIn();
-  const { oauthUrls, finalizeNavigation } = useAuthNavigation();
+  const { oauthUrls, finalizeNavigation } = useAuthNavigation(redirectUrl);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isAwaitingSignInStatus, setIsAwaitingSignInStatus] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<typeof finalizeNavigation | null>(
+    null
+  );
 
   const isSubmitting = fetchStatus === 'fetching';
 
   useEffect(() => {
-    if (!signIn || !isAwaitingSignInStatus) return;
+    if (!signIn || !pendingNavigation) return;
 
     const finalizeSignIn = async () => {
       if (signInNextAction(signIn.status) === 'finalize') {
-        setIsAwaitingSignInStatus(false);
+        setPendingNavigation(null);
         await signIn.finalize({
-          navigate: finalizeNavigation,
+          navigate: pendingNavigation,
         });
         return;
       }
 
       if (signInNextAction(signIn.status) === 'second-factor') {
-        setIsAwaitingSignInStatus(false);
+        setPendingNavigation(null);
         const emailCodeFactor = signIn.supportedSecondFactors?.find(
           (factor) => factor.strategy === 'email_code'
         );
@@ -43,7 +45,7 @@ export function SignInForm() {
     };
 
     void finalizeSignIn();
-  }, [isAwaitingSignInStatus, finalizeNavigation, signIn]);
+  }, [pendingNavigation, signIn]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -56,7 +58,7 @@ export function SignInForm() {
 
     if (result.error) return;
 
-    setIsAwaitingSignInStatus(true);
+    setPendingNavigation(() => finalizeNavigation);
   };
 
   const handleOAuthSignIn = async (strategy: 'oauth_google' | 'oauth_github') => {

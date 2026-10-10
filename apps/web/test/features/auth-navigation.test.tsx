@@ -12,8 +12,7 @@ afterEach(() => {
 });
 
 it('decorates a saved return destination and passes relative URLs to the router', async () => {
-  window.history.replaceState(null, '', '/sign-in?redirect=%2Fupload');
-  const { result } = renderHook(useAuthNavigation);
+  const { result } = renderHook(() => useAuthNavigation('/upload'));
   const decorateUrl = vi.fn((url: string) => `${url}?session=ready`);
   await act(() => result.current.finalizeNavigation({ session: null, decorateUrl }));
   expect(decorateUrl).toHaveBeenCalledExactlyOnceWith('/upload');
@@ -21,7 +20,7 @@ it('decorates a saved return destination and passes relative URLs to the router'
 });
 
 it('waits for a session task without decorating or navigating', async () => {
-  const { result } = renderHook(useAuthNavigation);
+  const { result } = renderHook(() => useAuthNavigation('/'));
   const decorateUrl = vi.fn((url: string) => url);
   await act(() => result.current.finalizeNavigation({ session: { currentTask: { key: 'choose-organization' } }, decorateUrl }));
   expect(decorateUrl).not.toHaveBeenCalled();
@@ -29,7 +28,7 @@ it('waits for a session task without decorating or navigating', async () => {
 });
 
 it('sends an absolute decorated URL to document navigation', async () => {
-  const { result } = renderHook(useAuthNavigation);
+  const { result } = renderHook(() => useAuthNavigation('/'));
   const location = { href: '' };
   // Control the browser navigation boundary, leaving the hook and its policy real.
   vi.stubGlobal('window', { location });

@@ -212,7 +212,10 @@ describe('OpenSearch catalogue port contract', () => {
         expect(result.failure.diagnostic).toMatchObject({
           dependency: 'opensearch',
           operation: 'inspect-index',
+          code: 'IncompatibleWallpaperMapping',
           index,
+          remediation:
+            'Use a fresh OPENSEARCH_INDEX with the current wallpaper mapping. Preserve the old index and review the service upgrade guide before rebuilding catalogue data.',
         });
     } finally {
       await client.indices.delete({ index, ignore_unavailable: true });

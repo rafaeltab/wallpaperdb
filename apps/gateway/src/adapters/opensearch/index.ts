@@ -588,11 +588,17 @@ const verifyWallpaperMapping = Effect.fnUntraced(function* (
       (key) => observed.value[name].mappings.properties.utilities.properties[key] !== undefined
     )
   )
-    return yield* startupFailure(
-      'inspect-index',
-      new Error('Catalogue wallpaper mapping differs from the required fresh index'),
-      name
-    );
+    return yield* new OpenSearchStartupError({
+      diagnostic: {
+        dependency: 'opensearch',
+        operation: 'inspect-index',
+        code: 'IncompatibleWallpaperMapping',
+        index: name,
+        remediation:
+          'Use a fresh OPENSEARCH_INDEX with the current wallpaper mapping. Preserve the old index and review the service upgrade guide before rebuilding catalogue data.',
+      },
+      cause: new Error('Catalogue wallpaper mapping differs from the required fresh index'),
+    });
 });
 const ensureIndex = Effect.fn('catalogue.storage.ensure-index')(function* (
   adapter: SearchProjection,

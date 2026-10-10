@@ -67,6 +67,16 @@ Use the [shared quarantine replay procedure](#quarantine-replay), including its 
 
 ## Gateway
 
+### Wallpaper index compatibility
+
+The color-utility catalogue requires a fresh wallpaper mapping. An index from the histogram-based catalogue is incompatible, and startup reports `IncompatibleWallpaperMapping` with the affected index and remediation. Restarting containers or running `make infra-start` preserves the old mapping in the OpenSearch volume.
+
+The color-query replacement assumes a [fresh installation](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/research/color-querying/PRODUCTION-QUESTIONS.md#fresh-installation-and-picker-scope). For disposable local data, stop the applications with `make apps-stop`, run `make infra-reset`, then `make infra-start` and `make dev`. The reset deletes all infrastructure data for the checkout, including databases, object storage, and retained NATS events. It is not an index-only repair.
+
+If data must be retained, preserve the old index and original assets before planning recovery into a new `OPENSEARCH_INDEX` with the [required mapping](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/src/adapters/opensearch/mappings.ts). Legacy histograms cannot supply current measurements; copying catalogue metadata restores ordinary browsing but leaves those wallpapers out of color-ranked results until their originals are measured again. Already acknowledged Gateway consumers do not repopulate a new index merely because its name changed. Utilities are excluded from stored `_source`, so source-only reindexing of a current catalogue also loses its utility bank. Regenerate utilities through Gateway's projection path from retained compatible measurements before marking restored documents color-ready.
+
+### Retained events and message budgets
+
 Upgrading projections does not recover information older versions discarded. Existing color projections lack occurrence ordering metadata, so the first stale result after upgrade can replace their colors. Replay the complete retained color history before reopening catalogue traffic if historical ordering must be preserved. The same applies to timestamp precision lost by older millisecond-only projections.
 
 The wallpaper and Profile source streams admit messages up to 64 KiB including headers. Quarantine and the broker's `max_payload` must each allow at least 256 KiB for the quarantine envelope. Gateway startup fails before subscribing when these limits are incompatible.
@@ -108,6 +118,8 @@ If telemetry is intentionally disabled, also disable the missing-signal alert. O
 Deploy a Gateway that accepts CloudEvents color results before upgrading Color Extractor. Stop legacy worker replicas before relying on durable quarantine, because they retain their earlier termination behavior. Broker-exhausted legacy messages require operator replay; changing the consumer configuration does not recover them automatically.
 
 Variant Generator and Color Extractor quarantine have a thirty-day repair horizon and one-GiB capacity with file-backed storage and discard-new overflow. Startup rejects incompatible policies. Explicitly migrate existing Color stream settings while preserving retained evidence.
+
+Container restarts and infrastructure setup preserve existing quarantine configuration. If Color Extractor rejects `COLOR_EXTRACTOR_QUARANTINE`, inspect that stream before restarting the worker. Export retained evidence before tightening its age or capacity limit, or confirm the stream is empty. Update the existing stream configuration in place, preserving its other settings, to satisfy the [startup validation](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/color-extractor/src/adapters/events/quarantine.ts). The required byte limit is at most 1 GiB and greater than zero; the age is exactly thirty days. When retaining data, do not delete the stream or reset the NATS volume to bypass this check.
 
 Both workers use the [shared quarantine replay procedure](#quarantine-replay). Inputs that exceed the complete message budget or JetStream's 64 KiB header limit after quarantine metadata is added use bounded chunks and, when necessary, the versioned original-message frame. Every chunk and the completion manifest require durable acknowledgement before the source is acknowledged. Monitor pending inputs, quarantine capacity, and publication failures.
 

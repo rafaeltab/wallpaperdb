@@ -3,3 +3,9 @@ export interface AliasCommand {
   handle: string;
   expectedVersion: number;
 }
+
+/** Live shared command availability, without copying request state into an editor. */
+export interface ProfileCommandAvailability {
+  isBusy: () => boolean;
+  subscribe: (listener: () => void) => () => void;
+}

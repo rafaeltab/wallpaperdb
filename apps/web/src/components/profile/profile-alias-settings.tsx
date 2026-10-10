@@ -4,18 +4,14 @@ import {
   aliasConflictMessage,
   type AliasCommand,
 } from '@/features/profile-management';
-import { useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Link2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ProfileDialog } from '@/components/profile/profile-dialog';
 import {
   historicalHandleUnavailableMessage,
   ProfileHistoricalHandles,
 } from '@/components/profile/profile-historical-handles';
-import {
-  profileQueryKey,
-  useOwnerProfileMutation,
-} from '@/features/profile-management/adapters/query';
+import { useOwnerProfileMutation } from '@/features/profile-management/adapters/query';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -37,18 +33,10 @@ export function ProfileAliasSettings({
   profile: Profile;
   tokenProvider: () => Promise<string | null>;
 }) {
-  const queryClient = useQueryClient();
   const [pending, setPending] = useState<AliasCommand | null>(null);
   const [open, setOpen] = useState(false);
   const dialogContent = useRef<HTMLDivElement>(null);
   const confirmationOpener = useRef<HTMLElement | null>(null);
-  const mounted = useRef(false);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [completed, setCompleted] = useState<AliasCommand | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -56,7 +44,8 @@ export function ProfileAliasSettings({
     mutation,
     refreshing,
     writing,
-    isBusy: busy,
+    availability,
+    refresh: refreshProfile,
   } = useOwnerProfileMutation(
     profile.id,
     ({ action, ...command }: AliasCommand) => {
@@ -68,7 +57,7 @@ export function ProfileAliasSettings({
     },
     {
       onSuccess: (_updated: Profile, command: AliasCommand) => {
-        if (mounted.current) setCompleted(command);
+        setCompleted(command);
       },
     }
   );
@@ -88,15 +77,12 @@ export function ProfileAliasSettings({
   }
 
   async function refresh() {
-    if (busy()) return;
+    if (availability.isBusy()) return;
     mutation.reset();
     setCompleted(null);
     setRefreshError(null);
     try {
-      await queryClient.refetchQueries(
-        { queryKey: profileQueryKey(profile.id), exact: true },
-        { throwOnError: true }
-      );
+      await refreshProfile();
     } catch {
       setRefreshError('Unable to refresh aliases. Try again.');
     }
@@ -333,7 +319,7 @@ export function ProfileAliasSettings({
                 disabled={refreshing || writing}
                 variant={pending?.action === 'expire' ? 'destructive' : 'default'}
                 onClick={() => {
-                  if (pending && !busy()) mutation.mutate(pending);
+                  if (pending) mutation.mutate(pending);
                 }}
               >
                 {dialog.button}

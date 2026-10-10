@@ -1,10 +1,6 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
-import {
-  profileQueryKey,
-  useOwnerProfileMutation,
-} from '@/features/profile-management/adapters/query';
+import { useOwnerProfileMutation } from '@/features/profile-management/adapters/query';
 import { type Profile, UserApiError, userApi } from '@/lib/api/user';
 import { positiveIntegerEnv } from '@/lib/runtime-config';
 import {
@@ -29,9 +25,7 @@ export function useProfileEditor(
   profile: Profile,
   tokenProvider: () => Promise<string | null>
 ) {
-  const queryClient = useQueryClient();
-  const key = profileQueryKey(profile.id);
-  const { mutation, busy, isBusy } = useOwnerProfileMutation(
+  const { mutation, refresh, availability } = useOwnerProfileMutation(
     profile.id,
     (command: ProfileDraft) => {
       const options = {
@@ -44,89 +38,67 @@ export function useProfileEditor(
         : userApi.updateProfile({ ...options, [field]: command.value });
     }
   );
-  const latest = useRef({ mutation, key });
-  latest.current = { mutation, key };
   const initial = useMemo(() => editableProfile(profile), [profile]);
-  const [editor] = useState(() =>
-    createProfileEditor(
-      {
-        field,
-        profile: initial,
-        displayNameMaxLength: positiveIntegerEnv(
-          import.meta.env.VITE_PROFILE_DISPLAY_NAME_MAX_LENGTH,
-          80
-        ),
-      },
-      {
-        async save(command): Promise<SaveResult> {
-          const { mutation } = latest.current;
-          try {
-            const updated = await mutation.mutateAsync(command);
-            return { success: true, profile: editableProfile(updated) };
-          } catch (cause) {
-            return {
-              success: false,
-              error: {
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : `Unable to save ${field === 'handle' ? 'profile handle' : field === 'displayName' ? 'display name' : 'biography'}.`,
-                versionConflict:
-                  cause instanceof UserApiError &&
-                  Boolean(cause.type?.endsWith('/profile-version-conflict')),
-                nextHandleChangeAt:
-                  cause instanceof UserApiError && cause.nextHandleChangeAt
-                    ? Date.parse(cause.nextHandleChangeAt)
-                    : undefined,
-              },
-            };
-          }
+  const latest = useRef({ mutation, refresh, initial });
+  latest.current = { mutation, refresh, initial };
+  const editor = useMemo(
+    () =>
+      createProfileEditor(
+        {
+          field,
+          profile: latest.current.initial,
+          displayNameMaxLength: positiveIntegerEnv(
+            import.meta.env.VITE_PROFILE_DISPLAY_NAME_MAX_LENGTH,
+            80
+          ),
         },
-        async refresh() {
-          const { key } = latest.current;
-          await queryClient.refetchQueries({ queryKey: key, exact: true }, { throwOnError: true });
-          const updated = queryClient.getQueryData<Profile>(key);
-          if (!updated) throw new Error('Profile unavailable');
-          return editableProfile(updated);
-        },
-        notify: ({ kind, message, description }) => {
-          if (kind === 'success') toast.success(message);
-          else if (description) toast.error(message, { description });
-          else toast.error(message);
-        },
-        clock: {
-          now: () => Date.now(),
-          schedule(delay, callback) {
-            const timer = setTimeout(callback, delay);
-            return () => clearTimeout(timer);
+        {
+          availability,
+          async save(command): Promise<SaveResult> {
+            const { mutation } = latest.current;
+            try {
+              const updated = await mutation.mutateAsync(command);
+              return { success: true, profile: editableProfile(updated) };
+            } catch (cause) {
+              return {
+                success: false,
+                error: {
+                  message:
+                    cause instanceof Error
+                      ? cause.message
+                      : `Unable to save ${field === 'handle' ? 'profile handle' : field === 'displayName' ? 'display name' : 'biography'}.`,
+                  versionConflict:
+                    cause instanceof UserApiError &&
+                    Boolean(cause.type?.endsWith('/profile-version-conflict')),
+                  nextHandleChangeAt:
+                    cause instanceof UserApiError && cause.nextHandleChangeAt
+                      ? Date.parse(cause.nextHandleChangeAt)
+                      : undefined,
+                },
+              };
+            }
           },
-        },
-      }
-    )
+          async refresh() {
+            return editableProfile(await latest.current.refresh());
+          },
+          notify: ({ kind, message, description }) => {
+            if (kind === 'success') toast.success(message);
+            else if (description) toast.error(message, { description });
+            else toast.error(message);
+          },
+          clock: {
+            now: () => Date.now(),
+            schedule(delay, callback) {
+              const timer = setTimeout(callback, delay);
+              return () => clearTimeout(timer);
+            },
+          },
+        }
+      ),
+    [field, availability]
   );
   const state = useSyncExternalStore(editor.subscribe, editor.getSnapshot, editor.getSnapshot);
   useEffect(() => editor.activate(), [editor]);
   useEffect(() => editor.receiveProfile(initial), [editor, initial]);
-  useEffect(() => editor.setBusy(busy), [editor, busy]);
-  function coordinated<Args extends unknown[], Result>(action: (...args: Args) => Result) {
-    return (...args: Args): Result => {
-      editor.setBusy(isBusy());
-      return action(...args);
-    };
-  }
-  return {
-    editor: {
-      ...editor,
-      beginEdit: coordinated(editor.beginEdit),
-      change: coordinated(editor.change),
-      save: coordinated(editor.save),
-      confirmSave: coordinated(editor.confirmSave),
-      refresh: coordinated(editor.refresh),
-    },
-    state: {
-      ...state,
-      busy: busy || state.busy,
-      canSave: state.canSave && !busy,
-    },
-  };
+  return { editor, state };
 }

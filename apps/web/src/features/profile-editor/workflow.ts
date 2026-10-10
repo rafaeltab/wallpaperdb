@@ -26,7 +26,6 @@ export function createProfileEditor(
   let error: string | null = null;
   let conflict = false;
   let refreshing = false;
-  let busy = false;
   let confirmation: ProfileEditorSnapshot['confirmation'] = null;
   let serverDeadline: number | undefined;
   let enabled = false;
@@ -45,6 +44,7 @@ export function createProfileEditor(
   }
 
   function getState(): ProfileEditorSnapshot {
+    const busy = dependencies.availability.isBusy() || refreshing;
     const now = dependencies.clock.now();
     const deadline =
       serverDeadline ??
@@ -64,7 +64,7 @@ export function createProfileEditor(
       confirmation,
       refreshing,
       validationError,
-      busy: busy || refreshing,
+      busy,
       locked,
       deadline,
       now,
@@ -75,7 +75,6 @@ export function createProfileEditor(
           !validationError &&
           phase === 'idle' &&
           !coolingDown &&
-          !refreshing &&
           !busy
       ),
     };
@@ -160,8 +159,7 @@ export function createProfileEditor(
       fieldError(field, command.value, profile, displayNameMaxLength) ||
       state.phase !== 'idle' ||
       state.coolingDown ||
-      state.refreshing ||
-      busy
+      state.busy
     )
       return;
     const aliases = field === 'handle' ? aliasesToSchedule(command.baseProfile, command.value) : [];
@@ -189,7 +187,8 @@ export function createProfileEditor(
     else fail(result);
   }
   async function refresh() {
-    if (!enabled || getState().locked || refreshing || busy) return;
+    const state = getState();
+    if (!enabled || state.locked || state.busy) return;
     refreshing = true;
     publish();
     const requestGeneration = generation;
@@ -231,20 +230,17 @@ export function createProfileEditor(
       generation++;
       phase = 'idle';
       refreshing = false;
+      const unsubscribe = dependencies.availability.subscribe(publish);
       scheduleCooldown();
       publish();
       return () => {
+        unsubscribe();
         enabled = false;
         generation++;
         clearFeedback();
         cancelCooldown?.();
         cancelCooldown = undefined;
       };
-    },
-    setBusy(value: boolean) {
-      if (busy === value) return;
-      busy = value;
-      publish();
     },
     receiveProfile(updated: EditableProfile) {
       if (updated === profile || updated.id !== profile.id) return;
@@ -254,12 +250,14 @@ export function createProfileEditor(
       publish();
     },
     beginEdit() {
-      if (!enabled || getState().locked || getState().coolingDown || busy) return;
+      const state = getState();
+      if (!enabled || state.locked || state.coolingDown || state.busy) return;
       edit = draft(profile);
       publish();
     },
     change(value: string) {
-      if (!edit || getState().locked || refreshing || busy) return;
+      const state = getState();
+      if (!edit || state.locked || state.busy) return;
       edit = { ...edit, value };
       publish();
     },

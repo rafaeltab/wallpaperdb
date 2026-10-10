@@ -1,3 +1,5 @@
+import type { ProfileCommandAvailability } from '@/features/profile-management';
+
 export type ProfileField = 'displayName' | 'handle' | 'biographyMarkdown';
 export type SavePhase = 'idle' | 'saving' | 'success' | 'error';
 
@@ -34,6 +36,7 @@ export interface EditorNotice {
 }
 
 export interface ProfileEditorDependencies {
+  availability: ProfileCommandAvailability;
   save: (command: ProfileDraft) => Promise<SaveResult>;
   refresh: () => Promise<EditableProfile>;
   notify: (notice: EditorNotice) => void;

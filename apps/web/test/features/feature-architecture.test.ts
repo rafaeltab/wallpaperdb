@@ -1,94 +1,123 @@
 /// <reference types="node" />
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { featureArchitectureErrors } from './feature-architecture';
 
 const src = path.resolve(import.meta.dirname, '../../src');
-const inside = (file: string, directory: string) => file.startsWith(`${directory}/`);
-
 function files(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const filename = path.join(directory, entry.name);
     return entry.isDirectory() ? files(filename) : /\.tsx?$/.test(filename) ? [filename] : [];
   });
 }
-
-const approvedSharedModules = new Set(['@wallpaperdb/profile-markdown', '@/lib/graphql/types']);
-const featureRoot = path.join(src, 'features');
-it.each(fs.readdirSync(featureRoot))('keeps %s independent and consumers behind its public entry', (name) => {
-  const feature = path.join(src, 'features', name);
-  const adapters = path.join(feature, 'adapters');
-  const errors: string[] = [];
-  const browserGlobals = new Set([
-    'window',
-    'document',
-    'fetch',
-    'File',
-    'Blob',
-    'AbortController',
-    'setTimeout',
-    'clearTimeout',
-    'Date',
-  ]);
-  for (const filename of [...files(src), ...files(path.resolve(src, '../test'))]) {
-    const core = inside(filename, feature) && !inside(filename, adapters);
-    const source = ts.createSourceFile(
+it('keeps feature imports public, pure and acyclic', () => {
+  const sources = new Map(
+    [...files(src), ...files(path.resolve(src, '../test'))].map((filename) => [
       filename,
       fs.readFileSync(filename, 'utf8'),
-      ts.ScriptTarget.Latest,
-      true
-    );
-    function checkImport(specifier: string) {
-      const target = specifier.startsWith('@/')
-        ? path.join(src, specifier.slice(2))
-        : specifier.startsWith('.')
-          ? path.resolve(path.dirname(filename), specifier)
-          : undefined;
-      const allowedSharedPolicy = approvedSharedModules.has(specifier);
-      if (
-        core &&
-        !allowedSharedPolicy &&
-        (!target || !inside(target, feature) || inside(target, adapters))
-      )
-        errors.push(`${filename}: core cannot import ${specifier}`);
-      if (
-        !inside(filename, feature) &&
-        target &&
-        inside(target, feature) &&
-        !inside(target, adapters) &&
-        target !== path.join(feature, 'index')
-      )
-        errors.push(`${filename}: use the ${name} entry point`);
-    }
-    function visit(node: ts.Node) {
-      if (
-        (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
-        node.moduleSpecifier &&
-        ts.isStringLiteral(node.moduleSpecifier)
-      )
-        checkImport(node.moduleSpecifier.text);
-      if (
-        ts.isCallExpression(node) &&
-        (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-          (ts.isIdentifier(node.expression) && node.expression.text === 'require'))
-      ) {
-        const argument = node.arguments[0];
-        if (argument && ts.isStringLiteral(argument)) checkImport(argument.text);
-        else if (core) errors.push(`${filename}: core cannot use computed imports`);
-      }
-      if (core && ts.isIdentifier(node) && browserGlobals.has(node.text))
-        errors.push(`${filename}: inject ${node.text} through an adapter`);
-      if (
-        core &&
-        ts.isPropertyAccessExpression(node) &&
-        node.expression.getText(source) === 'Math' &&
-        node.name.text === 'random'
-      )
-        errors.push(`${filename}: inject randomness through an adapter`);
-      ts.forEachChild(node, visit);
-    }
-    visit(source);
-  }
-  expect(errors).toEqual([]);
+    ])
+  );
+  expect(featureArchitectureErrors(src, sources)).toEqual([]);
+});
+function check(sources: Record<string, string>) {
+  return featureArchitectureErrors(
+    src,
+    new Map(Object.entries(sources).map(([file, content]) => [path.join(src, file), content]))
+  );
+}
+describe('feature dependency enforcement', () => {
+  it('allows deliberate pure-core collaboration through alias and relative public entries', () => {
+    expect(
+      check({
+        'features/editor/index.ts': 'export { edit } from "./workflow";',
+        'features/editor/workflow.ts': 'import { policy } from "@/features/management";',
+        'features/management/index.ts': 'export { policy } from "./policy";',
+        'features/management/policy.ts': '',
+        'features/consumer/index.ts': 'import { edit } from "../editor/index.ts";',
+      })
+    ).toEqual([]);
+  });
+  it.each([
+    '@/features/management/policy',
+    '../management/policy.ts',
+    '@/features/management/adapters/private',
+  ])('rejects private cross-feature imports of %s', (specifier) => {
+    expect(
+      check({
+        'features/editor/index.ts': `export * from "${specifier}";`,
+        'features/management/index.ts': '',
+        'features/management/policy.ts': '',
+        'features/management/adapters/private.ts': '',
+      }).join('\n')
+    ).toContain('entry point');
+  });
+  it('permits named public adapters for consumers while rejecting them in pure cores', () => {
+    expect(
+      check({
+        'components/field.tsx':
+          'import { useProfileEditor } from "@/features/profile-editor/adapters/react";',
+        'features/profile-editor/index.ts': '',
+        'features/profile-editor/adapters/react.ts': 'import React from "react";',
+      })
+    ).toEqual([]);
+    expect(
+      check({
+        'features/profile-editor/index.ts': 'export * from "./adapters/react";',
+        'features/profile-editor/adapters/react.ts': '',
+      }).join('\n')
+    ).toContain('core cannot import');
+  });
+  it('rejects adapters that were not deliberately made public, even for UI consumers', () => {
+    expect(
+      check({
+        'components/field.tsx':
+          'import { helper } from "@/features/profile-editor/adapters/helper";',
+        'features/profile-editor/index.ts': '',
+        'features/profile-editor/adapters/helper.ts': '',
+      }).join('\n')
+    ).toContain('entry point');
+  });
+  it.each([
+    'import "react";',
+    'export * from "@tanstack/react-query";',
+    'import("@/lib/api/user");',
+    'require("../management/policy");',
+    'import(variable);',
+    'window.fetch("/");',
+    'Date.now();',
+    'Math.random();',
+  ])('keeps effects and private dependencies out of cores: %s', (content) => {
+    expect(
+      check({
+        'features/editor/index.ts': content,
+        'features/management/index.ts': '',
+        'features/management/policy.ts': '',
+      })
+    ).not.toEqual([]);
+  });
+  it('preserves the approved shared pure policy and value-type dependencies', () => {
+    expect(
+      check({
+        'features/editor/index.ts':
+          'import { validateProfileMarkdown } from "@wallpaperdb/profile-markdown"; import type { Wallpaper } from "@/lib/graphql/types";',
+      })
+    ).toEqual([]);
+  });
+  it('rejects cycles through public entries, including type imports and adapters', () => {
+    expect(
+      check({
+        'features/editor/index.ts': 'import type { Profile } from "../management";',
+        'features/management/index.ts': 'export * from "../editor";',
+      }).join('\n')
+    ).toContain('cycle');
+    expect(
+      check({
+        'features/profile-editor/index.ts': '',
+        'features/profile-editor/adapters/react.ts': 'import "@/features/profile-management";',
+        'features/profile-management/index.ts': '',
+        'features/profile-management/adapters/query.ts': 'import "@/features/profile-editor";',
+      }).join('\n')
+    ).toContain('cycle');
+  });
 });

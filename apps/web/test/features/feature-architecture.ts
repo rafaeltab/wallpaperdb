@@ -80,6 +80,12 @@ export function featureArchitectureErrors(src: string, sources: Map<string, stri
       )
         checkImport(node.moduleSpecifier.text);
       if (
+        ts.isImportTypeNode(node) &&
+        ts.isLiteralTypeNode(node.argument) &&
+        ts.isStringLiteral(node.argument.literal)
+      )
+        checkImport(node.argument.literal.text);
+      if (
         ts.isCallExpression(node) &&
         (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
           (ts.isIdentifier(node.expression) && node.expression.text === 'require'))

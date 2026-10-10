@@ -120,4 +120,33 @@ describe('feature dependency enforcement', () => {
       }).join('\n')
     ).toContain('cycle');
   });
+  it('allows type-query imports through public entries and approved shared modules', () => {
+    expect(
+      check({
+        'features/editor/index.ts':
+          'type Profile = import("@/features/management").Profile; type Wallpaper = import("@/lib/graphql/types").Wallpaper;',
+        'features/management/index.ts': '',
+      })
+    ).toEqual([]);
+  });
+  it.each(['@/features/management/policy', '../management/policy.ts'])(
+    'rejects private type-query imports of %s',
+    (specifier) => {
+      expect(
+        check({
+          'features/editor/index.ts': `type Profile = import("${specifier}").Profile;`,
+          'features/management/index.ts': '',
+          'features/management/policy.ts': '',
+        }).join('\n')
+      ).toContain('entry point');
+    }
+  );
+  it('rejects feature cycles expressed through type-query imports', () => {
+    expect(
+      check({
+        'features/editor/index.ts': 'type Profile = import("../management").Profile;',
+        'features/management/index.ts': 'type Editor = import("../editor").Editor;',
+      }).join('\n')
+    ).toContain('cycle');
+  });
 });

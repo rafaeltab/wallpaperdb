@@ -50,7 +50,7 @@ describe('wallpaper-share service', () => {
 			});
 		});
 
-		it('does not show toast when native share succeeds', async () => {
+		it('returns the native share outcome without UI feedback', async () => {
 			const mockShare = vi.fn().mockResolvedValue(undefined);
 			Object.defineProperty(navigator, 'share', {
 				value: mockShare,
@@ -58,7 +58,7 @@ describe('wallpaper-share service', () => {
 				configurable: true,
 			});
 
-			await shareWallpaper(mockWallpaperId);
+			await expect(shareWallpaper(mockWallpaperId)).resolves.toBe('shared');
 
 			expect(toast.success).not.toHaveBeenCalled();
 			expect(toast.error).not.toHaveBeenCalled();
@@ -80,10 +80,10 @@ describe('wallpaper-share service', () => {
 				configurable: true,
 			});
 
-			await shareWallpaper(mockWallpaperId);
+			await expect(shareWallpaper(mockWallpaperId)).resolves.toBe('copied');
 
 			expect(mockWriteText).toHaveBeenCalledWith(expectedUrl);
-			expect(toast.success).toHaveBeenCalledWith('Link copied to clipboard');
+			expect(toast.success).not.toHaveBeenCalled();
 		});
 
 		it('falls back to clipboard when native share fails', async () => {
@@ -131,7 +131,7 @@ describe('wallpaper-share service', () => {
 			expect(mockWriteText).toHaveBeenCalledWith(expectedUrl);
 		});
 
-		it('shows success toast on successful clipboard copy', async () => {
+		it('returns copied on successful clipboard copy', async () => {
 			const mockWriteText = vi.fn().mockResolvedValue(undefined);
 			Object.defineProperty(navigator, 'clipboard', {
 				value: { writeText: mockWriteText },
@@ -139,12 +139,12 @@ describe('wallpaper-share service', () => {
 				configurable: true,
 			});
 
-			await shareWallpaper(mockWallpaperId);
+			await expect(shareWallpaper(mockWallpaperId)).resolves.toBe('copied');
 
-			expect(toast.success).toHaveBeenCalledWith('Link copied to clipboard');
+			expect(toast.success).not.toHaveBeenCalled();
 		});
 
-		it('shows error toast on clipboard failure', async () => {
+		it('returns failed on clipboard failure', async () => {
 			const mockWriteText = vi.fn().mockRejectedValue(new Error('Clipboard denied'));
 			Object.defineProperty(navigator, 'clipboard', {
 				value: { writeText: mockWriteText },
@@ -152,9 +152,9 @@ describe('wallpaper-share service', () => {
 				configurable: true,
 			});
 
-			await shareWallpaper(mockWallpaperId);
+			await expect(shareWallpaper(mockWallpaperId)).resolves.toBe('failed');
 
-			expect(toast.error).toHaveBeenCalledWith('Failed to copy link');
+			expect(toast.error).not.toHaveBeenCalled();
 		});
 
 		it('handles clipboard not available', async () => {
@@ -164,9 +164,9 @@ describe('wallpaper-share service', () => {
 				configurable: true,
 			});
 
-			await shareWallpaper(mockWallpaperId);
+			await expect(shareWallpaper(mockWallpaperId)).resolves.toBe('failed');
 
-			expect(toast.error).toHaveBeenCalledWith('Failed to copy link');
+			expect(toast.error).not.toHaveBeenCalled();
 		});
 	});
 

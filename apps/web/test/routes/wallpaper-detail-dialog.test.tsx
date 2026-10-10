@@ -9,8 +9,11 @@ import {
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 import type { Wallpaper } from '@/lib/graphql/types';
 import { WallpaperDetailPage } from '@/routes/wallpapers.$wallpaperId';
+
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const wallpaper: Wallpaper = {
   wallpaperId: 'wlpr_dialog',
@@ -29,6 +32,80 @@ const wallpaper: Wallpaper = {
   uploadedAt: '2026-03-01T00:00:00.000Z',
   updatedAt: '2026-03-01T00:00:00.000Z',
 };
+
+describe('Wallpaper detail action feedback', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  it.each([
+    'mounted',
+    'away',
+    'returned',
+  ] as const)('keeps keyboard share feedback with its originating page: %s', async (destination) => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+    localStorage.setItem('wallpaper-detail-panel-open', 'false');
+    let complete: () => void = () => {};
+    const copied = new Promise<void>((resolve) => {
+      complete = resolve;
+    });
+    const copy = vi.fn().mockReturnValueOnce(copied).mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText: copy } });
+    const client = new QueryClient();
+    for (const id of ['a', 'b'])
+      client.setQueryData(['wallpaper', id], { ...wallpaper, wallpaperId: id });
+    const root = createRootRoute();
+    const route = createRoute({
+      getParentRoute: () => root,
+      path: '/wallpapers/$wallpaperId',
+      component: WallpaperDetailPage,
+    });
+    const router = createRouter({
+      routeTree: root.addChildren([route]),
+      history: createMemoryHistory({ initialEntries: ['/wallpapers/a'] }),
+    });
+    const view = render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    );
+    try {
+      await screen.findByRole('button', { name: 'Share' });
+      fireEvent.keyDown(window, { key: 's' });
+      expect(copy).toHaveBeenCalledWith(expect.stringContaining('/wallpapers/a'));
+      if (destination !== 'mounted')
+        await act(() =>
+          router.navigate({ to: '/wallpapers/$wallpaperId', params: { wallpaperId: 'b' } })
+        );
+      if (destination === 'returned')
+        await act(() =>
+          router.navigate({ to: '/wallpapers/$wallpaperId', params: { wallpaperId: 'a' } })
+        );
+      await act(async () => {
+        complete();
+      });
+      if (destination === 'mounted')
+        expect(toast.success).toHaveBeenCalledExactlyOnceWith('Link copied to clipboard');
+      else expect(toast.success).not.toHaveBeenCalled();
+      if (destination === 'returned') {
+        fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+        await act(async () => {});
+        expect(toast.success).toHaveBeenCalledExactlyOnceWith('Link copied to clipboard');
+      }
+    } finally {
+      view.unmount();
+      client.clear();
+    }
+  });
+});
 
 describe('Wallpaper detail dialog', () => {
   afterEach(() => {

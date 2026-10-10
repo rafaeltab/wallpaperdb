@@ -15,4 +15,5 @@
 | Backend capability or domain tests | [Application and domain testing](docs/coding-standards/application-and-domain.md#testing) |
 | Backend driving/driven adapter tests | [Adapter testing](docs/coding-standards/adapters.md#testing) |
 | Backend composition, deployment, or telemetry tests | [Composition and operations testing](docs/coding-standards/composition-and-operations.md#testing) |
-| Frontend or shared UI code; frontend-specific guidelines are pending | [Project-wide module organization](docs/coding-standards/project-organization.md#module-organization) and [shared testing principles](docs/coding-standards/project-organization.md#shared-testing-principles) |
+| Frontend state, feature interfaces, or request/UI lifetimes | [Frontend design](docs/coding-standards/frontend.md) |
+| Frontend calculations, workflows, React/query integration, or browser behavior tests | [Frontend testing](docs/coding-standards/frontend.md#testing) |

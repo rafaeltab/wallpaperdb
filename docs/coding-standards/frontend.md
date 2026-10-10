@@ -13,6 +13,12 @@ Scope: browser application code and shared frontend/UI modules. The [project-wid
 - Cross-feature dependencies use deliberately public entries. Keep private implementation details private and feature dependencies acyclic.
 - Designate effectful adapter entries explicitly. A file's placement in an adapter directory does not make it public.
 
+## Command coordination
+
+- Enforce shared command restrictions in the operation that accepts and executes the commands. Disabled controls communicate availability; they must not be the only enforcement.
+- When overlapping commands are disallowed, check and reserve availability before yielding to asynchronous work. All callers subject to that restriction use the same coordination owner, which releases availability when the operation finishes.
+- Choose rejection, queuing, or concurrency according to the intended behavior and scope the restriction to the affected resource. For example, name and picture updates for one Profile may share a restriction while updates to different Profiles proceed concurrently. Two submissions arriving before React renders disabled controls must still obey that policy.
+
 ## Request and UI lifetimes
 
 - An accepted request retains its intended command and owner. Define whether it continues after navigation and where its result may be published.

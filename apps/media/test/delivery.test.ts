@@ -27,6 +27,9 @@ function fixture(
     maxOutputPixels?: number;
     authorityFailure?: boolean;
     readFailure?: boolean;
+    wallpaper?: Wallpaper;
+    maxResizeWidth?: number;
+    maxResizeHeight?: number;
   } = {}
 ) {
   const reads: string[] = [];
@@ -37,7 +40,7 @@ function fixture(
   let missingOriginal = false;
   const dependencies = Layer.mergeAll(
     Layer.succeed(Catalog, {
-      findWallpaper: () => Effect.succeed(original),
+      findWallpaper: () => Effect.succeed(overrides.wallpaper ?? original),
       findSmallestVariant: (_id, w, h) => {
         queries.push([w, h]);
         return Effect.succeed(
@@ -106,8 +109,8 @@ function fixture(
         effect.pipe(
           Effect.provide(
             deliveryLayer({
-              maxResizeWidth: 16384,
-              maxResizeHeight: 16384,
+              maxResizeWidth: overrides.maxResizeWidth ?? 16384,
+              maxResizeHeight: overrides.maxResizeHeight ?? 16384,
               maxOutputPixels: overrides.maxOutputPixels ?? 268435456,
               maxPictureBytes: overrides.maxPictureBytes,
             }).pipe(Layer.provide(dependencies))
@@ -117,6 +120,22 @@ function fixture(
   };
 }
 describe('media delivery', () => {
+  it('delivers a portrait original requested at its source dimensions above resize limits', async () => {
+    const f = fixture({
+      wallpaper: { ...original, width: 3000, height: 6000 },
+      maxResizeWidth: 7680,
+      maxResizeHeight: 4320,
+    });
+    const outcome = await f.run(
+      Effect.flatMap(MediaDelivery, (d) =>
+        d.wallpaper('wall_1', { width: 3000, height: 6000, fit: 'contain' })
+      )
+    );
+    expect(outcome).toMatchObject({ _tag: 'Found', mimeType: 'image/png', fileSizeBytes: 3 });
+    expect(f.reads).toEqual(['original']);
+    expect(f.resizes).toEqual([]);
+    expect(f.queries).toEqual([]);
+  });
   it.each([
     'contain',
     'cover',

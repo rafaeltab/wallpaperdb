@@ -146,6 +146,17 @@ describe('Profile picture settings', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('drops a local picture into the editor and submits the processed replacement', async () => {
+    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'dropped' });
+    await renderPage();
+    const picture = new File(['png'], 'dropped.png', { type: 'image/png' });
+    fireEvent.drop(screen.getByRole('dialog', { name: 'Profile picture' }), { dataTransfer: { files: [picture] } });
+    expect(await screen.findByRole('slider', { name: 'Zoom' })).toHaveValue('1');
+    expect(screen.getByText('dropped.png')).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 1, picture: expect.objectContaining({ type: 'image/webp', size: canonical.size }) })));
+  });
+
   it('opens picture controls from the avatar and returns focus when closed', async () => {
     await renderPage(profile, false);
     const user = userEvent.setup();

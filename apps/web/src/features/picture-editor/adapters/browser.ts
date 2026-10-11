@@ -176,7 +176,7 @@ async function runJob(
     };
     worker.onerror = () => {
       cleanup();
-      reject(new Error('Picture processing failed. Try again or choose another picture.'));
+      resolve({ ok: false, message: 'Worker unavailable.', unsupported: true });
     };
     worker.postMessage(job);
   });

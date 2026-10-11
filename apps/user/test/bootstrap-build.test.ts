@@ -69,7 +69,18 @@ it('keeps production HTTP and storage clients behind the post-SDK dynamic import
       process.execPath,
       [
         'dist/picture-encoder.mjs',
-        JSON.stringify({ maxBytes: 10000, maxPixels: 1000, maxDecodedBytes: 10000 }),
+        JSON.stringify({
+          maxBytes: 10000,
+          maxPixels: 1000,
+          maxDecodedBytes: 10000,
+          policy: {
+            output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+            maxOutputBytes: 10000,
+            acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
+            animation: { available: false },
+            encoding: { staticQuality: 85 },
+          },
+        }),
       ],
       { stdio: ['pipe', 'pipe', 'pipe'] }
     );
@@ -88,11 +99,11 @@ it('keeps production HTTP and storage clients behind the post-SDK dynamic import
   const processed = JSON.parse(result);
   expect(processed).toMatchObject({
     _tag: 'Processed',
-    picture: { mimeType: 'image/webp', width: 2, height: 3 },
+    picture: { mimeType: 'image/webp', width: 512, height: 512 },
   });
   expect(await sharp(Buffer.from(processed.picture.bytes, 'base64')).metadata()).toMatchObject({
     format: 'webp',
-    width: 2,
-    height: 3,
+    width: 512,
+    height: 512,
   });
 });

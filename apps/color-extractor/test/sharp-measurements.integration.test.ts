@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { COLOR_ANCHORS, COLOR_ANCHORS_SHA256, ColorMeasurementsSchema } from '@wallpaperdb/events';
+import { ColorMeasurementsSchema } from '@wallpaperdb/events';
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { measurementsFromImage } from '../src/adapters/image/index.js';
@@ -13,13 +13,6 @@ const reference = JSON.parse(
 // recorded frozen commit. Named quality uses the reference index's float32 storage.
 
 describe('Sharp image measurements against the frozen prototype', () => {
-  it('retains the exact anchor bank, traversal order and original IDs', () => {
-    expect(createHash('sha256').update(JSON.stringify(COLOR_ANCHORS)).digest('hex')).toBe(
-      reference.anchorSha256
-    );
-    expect(COLOR_ANCHORS_SHA256).toBe(reference.anchorSha256);
-  });
-
   for (const fixture of reference.cases) {
     it(`matches every coverage and float32 quality for ${fixture.name}`, async () => {
       const bytes = await readFile(

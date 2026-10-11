@@ -45,7 +45,7 @@ The `gh stack` commands require the [GitHub CLI extension](https://github.com/gi
 
 7. Once all tickets are implemented, use [code-review](../code-review/SKILL.md) on the top branch against `main` to review the complete spec. Put each fix in the ticket layer that owns it, then rebase descendants and rerun validation for changed file trees. Validate the combined result on the top branch.
 
-8. Mark the PRs ready for review and report the stack's PR URLs, validation results, and native GitHub stack status. Keep tickets and the spec open while their changes are unlanded. Opening PRs or completing implementation does not authorize landing the stack.
+8. Mark the PRs ready for review and report the stack's PR URLs, validation results, and native GitHub stack status. Apply the issue tracker's [landing and issue-closure policy](../../../docs/agents/issue-tracker.md#relationships). Opening PRs or completing implementation does not authorize landing the stack.
 
 9. If a temporary stack worktree was created, clean it up after all commits are published, preserving the stack branches and PRs.
 
@@ -61,4 +61,4 @@ When landing is explicitly requested, inspect the target branch's effective merg
 
 If a merge queue applies, follow the extension's [queue behavior](https://github.com/github/gh-stack/blob/main/skills/gh-stack/references/commands.md#merge). The queue overrides method flags and may land the requested PRs in separate groups. Verify that its configured method is rebase or an allowed squash before submitting; if it would introduce merge commits or its method cannot be established, report the blocker before enqueueing. Report queued PRs as queued until each reaches `main`. Verify each landing individually and apply the partial-landing rules below whenever only part of the prefix has landed.
 
-After a partial landing, fetch `main` from the selected remote, rebase the remaining layers onto their new parents, and update the stack. Close each ticket only after its changes reach `main`; close the spec after every ticket has landed and the complete spec is validated.
+After a partial landing, fetch `main` from the selected remote, rebase the remaining layers onto their new parents, and update the stack.

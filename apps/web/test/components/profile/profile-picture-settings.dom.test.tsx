@@ -7,6 +7,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileSettingsPage } from '@/components/profile/profile-settings-page';
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
+import { openPictureSource } from '@/features/picture-editor/adapters/browser';
+
+vi.mock('@/features/picture-editor/adapters/browser', () => ({ openPictureSource: vi.fn() }));
 
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -28,6 +31,9 @@ vi.mock('@tanstack/react-router', () => ({
 }));
 
 const picturePolicy = { output: { width: 512, height: 512, mimeType: 'image/webp' as const, colorSpace: 'srgb' as const }, maxOutputBytes: 5242880, acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'], animation: { available: false }, encoding: { staticQuality: 85 } };
+const canonical = new Blob(['canonical-webp'], { type: 'image/webp' });
+const processPicture = vi.fn();
+const disposePicture = vi.fn();
 
 const profile: Profile = {
   id: 'user_123',
@@ -114,6 +120,30 @@ describe('Profile picture settings', () => {
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.uploadPicture).mockReset();
     vi.mocked(userApi.removePicture).mockReset();
+    processPicture.mockReset().mockResolvedValue(canonical);
+    disposePicture.mockReset();
+    vi.mocked(openPictureSource).mockReset().mockResolvedValue({ width: 800, height: 400, preview: new Blob(['preview']), process: processPicture, dispose: disposePicture });
+  });
+
+  it('edits a large local source and uploads only canonical bytes with its captured Profile version', async () => {
+    const updated = { ...profile, pictureAssetId: 'saved-picture', version: 3 };
+    vi.mocked(userApi.uploadPicture).mockResolvedValue(updated);
+    const { client } = await renderPage();
+    const user = userEvent.setup();
+    const original = new File([new Uint8Array(6000000)], 'large.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Choose picture'), original);
+    const zoom = await screen.findByRole('slider', { name: 'Zoom' });
+    zoom.focus();
+    await user.keyboard('{ArrowRight}');
+    act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, version: 2 }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
+    const command = vi.mocked(userApi.uploadPicture).mock.calls[0][0];
+    expect(command).toMatchObject({ expectedVersion: 1, expectedProfileId: profile.id });
+    expect(command.picture).not.toBe(original);
+    expect(command.picture.size).toBe(canonical.size);
+    expect(command.picture.type).toBe('image/webp');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('opens picture controls from the avatar and returns focus when closed', async () => {
@@ -155,10 +185,10 @@ describe('Profile picture settings', () => {
     );
     expect(screen.getByText('portrait.png')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Selected avatar' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Upload unavailable');
     expect(screen.getByText('portrait.png')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute(
       'src',
@@ -181,7 +211,7 @@ describe('Profile picture settings', () => {
       screen.getByLabelText('Choose picture'),
       new File(['png'], 'portrait.png', { type: 'image/png' })
     );
-    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     unmount();
     client.removeQueries({ queryKey: profileQueryKey(profile.id) });
     const newSession = { ...profile, version: 5 };
@@ -206,7 +236,7 @@ describe('Profile picture settings', () => {
       screen.getByLabelText('Choose picture'),
       new File(['png'], 'portrait.png', { type: 'image/png' })
     );
-    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(screen.getByRole('button', { name: 'Refresh Profile' })).toBeDisabled();
     expect(screen.getByLabelText('Choose picture')).toBeDisabled();
     expect(userApi.ensureProfile).not.toHaveBeenCalled();
@@ -234,17 +264,17 @@ describe('Profile picture settings', () => {
       screen.getByLabelText('Choose picture'),
       new File(['png'], 'portrait.png', { type: 'image/png' })
     );
-    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Your Profile changed elsewhere. Refresh Profile before trying again.'
     );
     await user.click(screen.getByRole('button', { name: 'Refresh Profile' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Replace picture' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
   });
 
-  it('enforces the server byte limit and shows its picture constraints before upload', async () => {
+  it('shows effective output constraints and retains a source when processed bytes exceed the limit', async () => {
     vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, maxOutputBytes: 4 });
     await renderPage();
     const user = userEvent.setup();
@@ -252,9 +282,12 @@ describe('Profile picture settings', () => {
       screen.getByLabelText('Choose picture'),
       new File(['12345'], 'large.png', { type: 'image/png' })
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('Picture must be at most 4 bytes.');
+    processPicture.mockRejectedValue(new Error('Processed picture exceeds the 4 byte limit. Choose another picture.'));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Processed picture exceeds the 4 byte limit.');
+    expect(screen.getByText('large.png')).toBeInTheDocument();
     expect(screen.getByText(/Up to 4 B/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upload picture' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
   });
 
@@ -266,7 +299,7 @@ describe('Profile picture settings', () => {
       new File(['<svg/>'], 'picture.svg', { type: 'image/svg+xml' })
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Choose a JPEG, PNG, or WebP picture.');
-    expect(screen.getByRole('button', { name: 'Upload picture' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
   });
 
@@ -330,10 +363,10 @@ describe('Profile picture settings', () => {
     const picture = new File(['png'], 'portrait.png', { type: 'image/png' });
     await user.upload(screen.getByLabelText('Choose picture'), picture);
     act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, version: 2 }));
-    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
     expect(userApi.uploadPicture).toHaveBeenCalledWith({
-      picture,
+      picture: expect.objectContaining({ type: 'image/webp', size: canonical.size }),
       expectedVersion: 1,
       expectedProfileId: profile.id,
       tokenProvider: expect.any(Function),

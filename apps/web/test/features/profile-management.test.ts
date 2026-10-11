@@ -14,11 +14,11 @@ it('describes each selected alias action', () => {
   expect(aliasChangeDialog(command,'current')).toMatchObject({title:'Expire alias now?',button:'Expire now'});
   for(const action of ['schedule','keep','reactivate'] as const) expect(aliasChangeDialog({...command,action},'current').description).toContain('@old');
 });
-it('rejects unsupported or oversized pictures and handles deselection', () => {
-  expect(pictureSelection({type:'image/gif',size:1},10,['image/jpeg','image/png','image/webp']).error).toContain('JPEG');
-  expect(pictureSelection({type:'image/png',size:11},10,['image/jpeg','image/png','image/webp']).selected).toBeNull();
-  const file={type:'image/webp',size:10};expect(pictureSelection(file,10,['image/jpeg','image/png','image/webp'])).toEqual({selected:file,error:null});
-  expect(pictureSelection(undefined,10,['image/jpeg','image/png','image/webp'])).toEqual({selected:null,error:null});
+it('rejects unsupported pictures, permits large local sources, and handles deselection', () => {
+  expect(pictureSelection({type:'image/gif',size:1},['image/jpeg','image/png','image/webp']).error).toContain('JPEG');
+  expect(pictureSelection({type:'image/png',size:6000000},['image/jpeg','image/png','image/webp']).selected).not.toBeNull();
+  const file={type:'image/webp',size:10};expect(pictureSelection(file,['image/jpeg','image/png','image/webp'])).toEqual({selected:file,error:null});
+  expect(pictureSelection(undefined,['image/jpeg','image/png','image/webp'])).toEqual({selected:null,error:null});
 });
 it('prioritizes expired history and maps unavailable reasons', () => {
   expect(historicalHandleAvailability(5,'claimed',5)).toContain('recent history');

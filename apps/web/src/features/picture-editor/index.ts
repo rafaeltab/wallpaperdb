@@ -10,3 +10,7 @@ export {
   wheelPictureCrop,
   pinchPictureCrop,
 } from './crop';
+export { decodePictureGif, pictureAnimationTiming } from './animation';
+export type { PictureGifStep } from './animation';
+export { encodePictureAnimation } from './webp-animation';
+export type { PictureEncodedFrame } from './webp-animation';

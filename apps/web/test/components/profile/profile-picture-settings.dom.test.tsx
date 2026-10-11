@@ -504,6 +504,109 @@ describe('Profile picture settings', () => {
     expect(processPicture.mock.calls[1][0]).toMatchObject({ size: 400, zoom: 1 });
   });
 
+  it('retries the current crop after upload failure rather than the crop from the failed command', async () => {
+    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce({ ...profile, version: 2, pictureAssetId: 'accepted' });
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'current.png', { type: 'image/png' }));
+    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Offline');
+    fireEvent.change(screen.getByRole('slider', { name: 'Zoom' }), { target: { value: '4' } });
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(processPicture.mock.calls[1][0]).toMatchObject({ x: 350, y: 150, size: 100, zoom: 4 });
+    expect(userApi.uploadPicture).toHaveBeenNthCalledWith(2, expect.objectContaining({ expectedVersion: 1 }));
+  });
+
+  it('keeps valid cache refresh publication separate from a closed and reopened dialog', async () => {
+    let finishRefresh: ((value: Profile) => void) | undefined;
+    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new UserApiError('Conflict', 409, { type: 'https://wallpaperdb.test/problems/profile-version-conflict' }));
+    vi.mocked(userApi.ensureProfile).mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
+    const { client } = await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'old.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(finishRefresh).toBeDefined());
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
+    const refreshed = { ...profile, version: 5, pictureAssetId: 'latest_picture' };
+    await act(async () => finishRefresh?.(refreshed));
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(refreshed);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Latest saved picture' })).not.toBeInTheDocument();
+    expect(screen.getByText('No picture selected')).toBeInTheDocument();
+    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('abandons conflict recovery when the owner query is removed and recreated', async () => {
+    let finishRefresh: ((value: Profile) => void) | undefined;
+    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new UserApiError('Conflict', 409, { type: 'https://wallpaperdb.test/problems/profile-version-conflict' }));
+    vi.mocked(userApi.ensureProfile).mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
+    const { client, rerender } = await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'old.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(finishRefresh).toBeDefined());
+    const replacement = { ...profile, version: 20, pictureAssetId: 'replacement_picture' };
+    act(() => {
+      client.removeQueries({ queryKey: profileQueryKey(profile.id) });
+      client.setQueryData(profileQueryKey(profile.id), replacement);
+    });
+    rerender(<QueryClientProvider client={client}><ProfileSettingsPage /></QueryClientProvider>);
+    await act(async () => finishRefresh?.({ ...profile, version: 5, pictureAssetId: 'obsolete_picture' }));
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(replacement);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
+    expect(screen.getByText('No picture selected')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it.each(['navigation', 'sign-out', 'owner switch'])('aborts picture processing across %s without a late upload or feedback', async (transition) => {
+    let finish: ((value: Blob) => void) | undefined;
+    let signal: AbortSignal | undefined;
+    processPicture.mockImplementationOnce((_crop, _policy, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
+    const { client, rerender, unmount } = await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'old.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    const other = { ...profile, id: 'other-owner', displayName: 'Other owner' };
+    if (transition === 'navigation') unmount();
+    else {
+      client.setQueryData(profileQueryKey(other.id), other);
+      if (transition === 'owner switch')
+        vi.mocked(useAuth, { partial: true }).mockReturnValue({ getToken: vi.fn().mockResolvedValue('other-token'), isLoaded: true, isSignedIn: true, userId: other.id });
+      else
+        vi.mocked(useAuth, { partial: true }).mockReturnValue({ getToken: vi.fn().mockResolvedValue(null), isLoaded: true, isSignedIn: false, userId: null });
+      rerender(<QueryClientProvider client={client}><ProfileSettingsPage /></QueryClientProvider>);
+    }
+    expect(signal?.aborted).toBe(true);
+    expect(disposePicture).toHaveBeenCalled();
+    await act(async () => finish?.(canonical));
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    if (transition === 'owner switch') expect(client.getQueryData(profileQueryKey(other.id))).toEqual(other);
+  });
+
+  it('publishes an accepted picture to its valid owner cache after navigation without obsolete UI feedback', async () => {
+    let finish: ((value: Profile) => void) | undefined;
+    vi.mocked(userApi.uploadPicture).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const { client, unmount } = await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(finish).toBeDefined());
+    unmount();
+    const accepted = { ...profile, version: 2, pictureAssetId: 'accepted_picture' };
+    await act(async () => finish?.(accepted));
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(accepted);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it('shows effective output constraints and retains a source when processed bytes exceed the limit', async () => {
     vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, maxOutputBytes: 4 });
     await renderPage();

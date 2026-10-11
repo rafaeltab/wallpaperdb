@@ -103,6 +103,30 @@ export function ProfilePictureSettings({
       },
     }
   );
+  function abandonDialog() {
+    session.current++;
+    editor.clear();
+    mutation.reset();
+    setError(null);
+    setRecovery(null);
+    setDialogOpen(false);
+    setRemoveVersion(null);
+    setOpen(false);
+  }
+  const checkOwner = useEffectEvent(() => {
+    if (
+      ownerQuery.current !==
+      client.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true })
+    )
+      abandonDialog();
+  });
+  useEffect(() => {
+    if (!open) return;
+    checkOwner();
+    return client.getQueryCache().subscribe((event) => {
+      if (event.type === 'removed' && event.query === ownerQuery.current) checkOwner();
+    });
+  }, [open, client]);
   const feedback = error ?? editor.error;
   function currentDialog(originatingSession: number, originatingQuery = ownerQuery.current) {
     return (
@@ -181,18 +205,15 @@ export function ProfilePictureSettings({
         ref={dialogContent}
         open={open}
         onOpenChange={(next) => {
-          setOpen(next);
-          session.current++;
-          if (next)
-            ownerQuery.current = client
-              .getQueryCache()
-              .find({ queryKey: profileQueryKey(profile.id), exact: true });
           if (!next) {
-            editor.clear();
-            mutation.reset();
-            setError(null);
-            setRecovery(null);
+            abandonDialog();
+            return;
           }
+          setOpen(true);
+          session.current++;
+          ownerQuery.current = client
+            .getQueryCache()
+            .find({ queryKey: profileQueryKey(profile.id), exact: true });
         }}
         title="Profile picture"
         description="Your picture appears on your profile and wallpaper contributions. Choose, drop, or paste an image to begin."

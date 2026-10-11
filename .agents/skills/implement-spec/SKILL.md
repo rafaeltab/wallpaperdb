@@ -47,7 +47,7 @@ The `gh stack` commands require the [GitHub CLI extension](https://github.com/gi
 
 ## Rebasing and landing
 
-Use `gh stack rebase --remote <remote>` to rebase the stack onto the updated trunk and cascade changes through descendants. Preserve the old parent tips before rewriting history. If rebasing manually, transplant only a layer's own commits with `git rebase --onto <new-parent-tip> <old-parent-tip> <ticket-branch>`, working from the bottom upward. This boundary also prevents replaying landed prerequisite commits after a squash or rebase landing.
+Use `gh stack rebase --remote <remote>` to rebase the stack onto the updated trunk and cascade changes through descendants. Preserve the old parent tips before rewriting history. If rebasing manually, follow Git's [transplanting branches with `--onto` documentation](https://git-scm.com/docs/git-rebase#_transplanting_a_topic_branch_with_onto). Transplant only a layer's own commits with `git rebase --onto <new-parent-tip> <old-parent-tip> <ticket-branch>`, working from the bottom upward. This boundary also prevents replaying landed prerequisite commits after a squash or rebase landing.
 
 Refresh every rewritten layer's recorded commit in its ticket issue, even when its file tree is unchanged. Reuse successful validation for an identical tree and record that comparison; rerun required checks for changed trees. Apply this rule after every history rewrite, including restacks and partial landings.
 

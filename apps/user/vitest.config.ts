@@ -1,9 +1,5 @@
 import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
-const fastTests = [
-  'test/{config,cors,health,http,http-lifecycle,maintenance,picture-http,picture-imports,pictures,profile-capability,workers}.test.ts',
-];
-
 export default defineBaseConfig({
   test: {
     name: 'user',
@@ -12,14 +8,13 @@ export default defineBaseConfig({
     projects: [
       {
         extends: true,
-        test: { name: 'user-unit', include: fastTests },
+        test: { name: 'user-unit', include: ['test/**/*.unit.test.ts'] },
       },
       {
         extends: true,
         test: {
           name: 'user-integration',
-          include: ['test/**/*.test.ts'],
-          exclude: fastTests,
+          include: ['test/**/*.integration.test.ts'],
         },
       },
     ],

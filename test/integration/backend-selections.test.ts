@@ -20,7 +20,7 @@ test.each([
   },
   {
     service: 'user',
-    unit: 'test/profile-capability.test.ts',
+    unit: 'test/profile-capability.unit.test.ts',
     integration: 'test/profile.integration.test.ts',
   },
   { service: 'ingestor', unit: 'test/ingestion.test.ts', integration: 'test/composition.test.ts' },
@@ -46,7 +46,7 @@ test.each([
       if (selection === 'unit') {
         expect(files).toContain(unit);
         expect(files).not.toContain(integration);
-        if (service === 'gateway' || service === 'media')
+        if (service !== 'ingestor')
           expect(files.every((file) => file.endsWith('.unit.test.ts'))).toBe(true);
         for (const project of runner.projects) expect(project.config.globalSetup).toEqual([]);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(
@@ -54,7 +54,7 @@ test.each([
         );
       } else {
         expect(files).toContain(integration);
-        if (service === 'gateway' || service === 'media')
+        if (service !== 'ingestor')
           expect(files.every((file) => file.endsWith('.integration.test.ts'))).toBe(true);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(
           path.join(root, 'coverage/integration')
@@ -103,6 +103,7 @@ test.each([
 test.each([
   'gateway',
   'media',
+  'user',
 ])('%s selects new tests by type without a config edit', async (service) => {
   const root = await mkdtemp(path.join(tmpdir(), 'wallpaperdb-test-selection-'));
   try {

@@ -166,7 +166,7 @@ test('CRAP commands pass the optional workspace selector to the shared analyzer'
 test('focused tests select one workspace and serialize dependency builds and tests', () => {
   assert.notEqual(make('test-focused').status, 0);
   for (const [workspace, file] of [
-    ['web', 'test/components/profile/public-profile-page.test.tsx'],
+    ['web', 'test/components/profile/public-profile-page.dom.test.tsx'],
     ['gateway', 'test/catalogue.test.ts'],
   ]) {
     const focused = output('test-focused', `PACKAGE=${workspace}`, `ARGS=${file}`);

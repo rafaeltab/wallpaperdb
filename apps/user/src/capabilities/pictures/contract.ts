@@ -30,10 +30,14 @@ export interface PictureRejection {
   readonly message: string;
 }
 
-/** Decodes bounded still images, strips source metadata, and stops native work on interruption. */
+/** Fully decodes bounded accepted sources before returning canonical sRGB SDR output.
+ * Applies orientation, preserves alpha, removes source metadata and stops native work
+ * on interruption. Safe canonical WebP retains its exact bytes; all other sources
+ * are normalized according to the effective policy or rejected. */
 export interface PictureCodec {
   process(
-    bytes: Buffer
+    bytes: Buffer,
+    policy: EffectivePicturePolicy
   ): Effect.Effect<
     { readonly _tag: 'Processed'; readonly picture: ProcessedPicture } | PictureRejection,
     PictureUnavailable

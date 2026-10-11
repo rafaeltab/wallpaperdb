@@ -4,17 +4,29 @@ import { syncBuiltinESMExports } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { pictureCodecLayer } from '../src/adapters/pictures/index.js';
-import { PictureCodec, type PictureLimits } from '../src/capabilities/pictures/index.js';
+import {
+  PictureCodec,
+  type PictureLimits,
+  type EffectivePicturePolicy,
+} from '../src/capabilities/pictures/index.js';
 
 async function processProfilePicture(bytes: Buffer, limits: PictureLimits) {
   const outcome = await Effect.runPromise(
-    Effect.flatMap(PictureCodec, (codec) => codec.process(bytes)).pipe(
+    Effect.flatMap(PictureCodec, (codec) => codec.process(bytes, policy)).pipe(
       Effect.provide(pictureCodecLayer(limits))
     )
   );
   if (outcome._tag === 'Rejected') throw new Error(outcome.message);
   return outcome.picture;
 }
+
+const policy: EffectivePicturePolicy = {
+  output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+  maxOutputBytes: 5242880,
+  acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
+  animation: { available: false },
+  encoding: { staticQuality: 85 },
+};
 
 const limits = {
   maxBytes: 5 * 1024 * 1024,
@@ -23,6 +35,16 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it('preserves exact canonical static WebP bytes after fully decoding them', async () => {
+    const input = await sharp({
+      create: { width: 512, height: 512, channels: 4, background: '#3578aa80' },
+    })
+      .webp({ quality: 73 })
+      .toBuffer();
+    const picture = await processProfilePicture(input, limits);
+    expect(picture.bytes).toEqual(input);
+    expect(picture).toMatchObject({ width: 512, height: 512 });
+  });
   it('rejects oversized encoded pictures before decoding', async () => {
     const input = await sharp({
       create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
@@ -108,12 +130,12 @@ describe('Profile picture processing', () => {
       .toBuffer();
     const picture = await processProfilePicture(input, limits);
     const metadata = await sharp(picture.bytes).metadata();
-    expect(picture).toMatchObject({ mimeType: 'image/webp', width: 2, height: 3 });
-    expect(metadata).toMatchObject({ format: 'webp', width: 2, height: 3 });
+    expect(picture).toMatchObject({ mimeType: 'image/webp', width: 512, height: 512 });
+    expect(metadata).toMatchObject({ format: 'webp', width: 512, height: 512 });
     expect(metadata.exif).toBeUndefined();
     expect(metadata.icc).toBeUndefined();
     expect(metadata.orientation).toBeUndefined();
-    expect(await sharp(picture.bytes).raw().toBuffer()).toHaveLength(2 * 3 * 3);
+    expect(await sharp(picture.bytes).raw().toBuffer()).toHaveLength(512 * 512 * 3);
   });
   it('kills and reaps its native encoder before interrupted work completes', async () => {
     const input = await sharp({
@@ -125,7 +147,7 @@ describe('Profile picture processing', () => {
     const spawn = vi.spyOn(childProcess, 'spawn');
     syncBuiltinESMExports();
     const running = Effect.runPromise(
-      Effect.flatMap(PictureCodec, (codec) => codec.process(input)).pipe(
+      Effect.flatMap(PictureCodec, (codec) => codec.process(input, policy)).pipe(
         Effect.provide(pictureCodecLayer(limits))
       ),
       { signal: abort.signal }

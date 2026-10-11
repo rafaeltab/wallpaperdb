@@ -8,6 +8,13 @@ interface PictureLimits {
   maxBytes: number;
   maxPixels: number;
   maxDecodedBytes: number;
+  policy: {
+    output: { width: number; height: number; mimeType: 'image/webp'; colorSpace: 'srgb' };
+    maxOutputBytes: number;
+    acceptedSourceFormats: readonly string[];
+    animation: { available: boolean };
+    encoding: { staticQuality: number };
+  };
 }
 
 interface ProcessedPicture {
@@ -66,17 +73,65 @@ function validateStillFormat(metadata: Metadata): void {
 }
 
 function decodedByteCount(metadata: Metadata, pixels: number): number {
-  const bytesPerSample = ['ushort', 'short'].includes(metadata.depth ?? '') ? 2 : 1;
+  const bytesPerSample =
+    metadata.depth === 'double'
+      ? 8
+      : ['float', 'int', 'uint'].includes(metadata.depth ?? '')
+        ? 4
+        : ['ushort', 'short'].includes(metadata.depth ?? '')
+          ? 2
+          : 1;
   return pixels * (metadata.channels ?? 4) * bytesPerSample;
 }
 
 function validatePictureMetadata(metadata: Metadata, limits: PictureLimits): void {
   validateStillFormat(metadata);
+  if (!limits.policy.acceptedSourceFormats.includes(`image/${metadata.format}`))
+    throw new InvalidProfilePictureError('Picture format is unavailable');
+  if (
+    !['srgb', 'rgb', 'rgb16', 'b-w', 'grey16', 'cmyk'].includes(metadata.space ?? '') ||
+    ['float', 'double'].includes(metadata.depth ?? '')
+  )
+    throw new InvalidProfilePictureError('Picture color interpretation is unsupported');
   const pixels = Number(metadata.width) * Number(metadata.height);
   if (!(pixels > 0) || pixels > limits.maxPixels)
     throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
   if (decodedByteCount(metadata, pixels) > limits.maxDecodedBytes)
     throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');
+}
+
+function isCanonical(input: Buffer, metadata: Metadata, limits: PictureLimits): boolean {
+  const output = limits.policy.output;
+  if (
+    metadata.format !== 'webp' ||
+    metadata.width !== output.width ||
+    metadata.height !== output.height ||
+    metadata.space !== 'srgb' ||
+    metadata.depth !== 'uchar' ||
+    metadata.orientation !== undefined ||
+    metadata.exif ||
+    metadata.xmp ||
+    metadata.icc ||
+    metadata.iptc
+  )
+    return false;
+  if (input.length < 12 || input.readUInt32LE(4) + 8 !== input.length) return false;
+  let offset = 12;
+  while (offset + 8 <= input.length) {
+    const type = input.toString('ascii', offset, offset + 4);
+    const size = input.readUInt32LE(offset + 4);
+    if (!['VP8 ', 'VP8L', 'VP8X', 'ALPH'].includes(type) || size > input.length - offset - 8)
+      return false;
+    if (
+      type === 'VP8X' &&
+      (size !== 10 ||
+        (input[offset + 8] & ~0x10) !== 0 ||
+        !input.subarray(offset + 9, offset + 12).equals(Buffer.alloc(3)))
+    )
+      return false;
+    offset += 8 + size + (size % 2);
+  }
+  return offset === input.length;
 }
 
 async function processProfilePicture(
@@ -92,11 +147,26 @@ async function processProfilePicture(
     });
     const metadata = await decoder.metadata();
     validatePictureMetadata(metadata, limits);
+    if (isCanonical(input, metadata, limits)) {
+      await decoder.clone().raw().timeout({ seconds: 10 }).toBuffer();
+      if (input.length > limits.policy.maxOutputBytes)
+        throw new ProfilePictureTooLargeError('Picture exceeds the processed output byte limit');
+      return {
+        bytes: input,
+        mimeType: 'image/webp',
+        width: metadata.width,
+        height: metadata.height,
+      };
+    }
     const result = await decoder
       .rotate()
-      .webp({ quality: 85 })
+      .resize(limits.policy.output.width, limits.policy.output.height, { fit: 'cover' })
+      .toColourspace('srgb')
+      .webp({ quality: limits.policy.encoding.staticQuality })
       .timeout({ seconds: 10 })
       .toBuffer({ resolveWithObject: true });
+    if (result.data.length > limits.policy.maxOutputBytes)
+      throw new ProfilePictureTooLargeError('Picture exceeds the processed output byte limit');
     return {
       bytes: result.data,
       mimeType: 'image/webp',
@@ -104,7 +174,8 @@ async function processProfilePicture(
       height: result.info.height,
     };
   } catch (error) {
-    if (error instanceof InvalidProfilePictureError) throw error;
+    if (error instanceof InvalidProfilePictureError || error instanceof ProfilePictureTooLargeError)
+      throw error;
     if (error instanceof Error && /pixel limit/i.test(error.message)) {
       throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
     }
@@ -117,6 +188,18 @@ const limitsSchema = z.object({
   maxBytes: z.number().int().positive(),
   maxPixels: z.number().int().positive(),
   maxDecodedBytes: z.number().int().positive(),
+  policy: z.object({
+    output: z.object({
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+      mimeType: z.literal('image/webp'),
+      colorSpace: z.literal('srgb'),
+    }),
+    maxOutputBytes: z.number().int().positive(),
+    acceptedSourceFormats: z.array(z.string()),
+    animation: z.object({ available: z.boolean() }),
+    encoding: z.object({ staticQuality: z.number().int().min(1).max(100) }),
+  }),
 });
 try {
   const limits = limitsSchema.parse(JSON.parse(process.argv[2] ?? 'null'));

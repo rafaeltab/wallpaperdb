@@ -17,7 +17,8 @@ afterEach(async () => {
   await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
 });
 
-function setup(maxOutputBytes = 5242880) {
+function setup(maxOutputBytes = 5242880, normalize: (bytes: Buffer) => Buffer = (bytes) => bytes) {
+  const policies: unknown[] = [];
   const assets = new Map<string, StoredPicture & { state: 'uploading' | 'staged' | 'deleting' }>();
   const objects = new Map<string, Buffer>();
   const adoptions: Array<{ profileId: string; assetId: string | null; expectedVersion: number }> =
@@ -120,8 +121,9 @@ function setup(maxOutputBytes = 5242880) {
           Layer.succeed(PictureStore, store),
           Layer.succeed(PictureObjects, objectStore),
           Layer.succeed(PictureCodec, {
-            process: (bytes) =>
-              Effect.succeed(
+            process: (bytes, policy) => {
+              policies.push(policy);
+              return Effect.succeed(
                 bytes.length === 0
                   ? {
                       _tag: 'Rejected',
@@ -130,9 +132,15 @@ function setup(maxOutputBytes = 5242880) {
                     }
                   : {
                       _tag: 'Processed',
-                      picture: { bytes, mimeType: 'image/webp', width: 2, height: 3 },
+                      picture: {
+                        bytes: normalize(bytes),
+                        mimeType: 'image/webp',
+                        width: 512,
+                        height: 512,
+                      },
                     }
-              ),
+              );
+            },
           }),
           Layer.succeed(PictureSource, { download: () => Effect.die('Unexpected source download') })
         )
@@ -142,6 +150,7 @@ function setup(maxOutputBytes = 5242880) {
   runtimes.push(runtime);
   return {
     assets,
+    policies,
     objects,
     adoptions,
     failStorage: () => {
@@ -156,6 +165,39 @@ function setup(maxOutputBytes = 5242880) {
 }
 
 describe('Picture capability', () => {
+  it('supplies effective normalization policy and rejects oversized final output before creating an Asset', async () => {
+    const test = setup(4, () => Buffer.from('normalized'));
+    const outcome = await test.run((pictures) =>
+      pictures.upload({ profileId: 'owner' }, Buffer.from('src'), 4)
+    );
+    expect(outcome).toMatchObject({ _tag: 'Rejected', reason: 'picture-too-large' });
+    expect(test.assets.size).toBe(0);
+    expect(test.objects.size).toBe(0);
+    expect(test.adoptions).toEqual([]);
+    expect(test.policies).toEqual([
+      {
+        output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+        maxOutputBytes: 4,
+        acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
+        animation: { available: false },
+        encoding: { staticQuality: 85 },
+      },
+    ]);
+  });
+  it('stores canonical passthrough and normalized codec output without changing their bytes', async () => {
+    for (const normalized of [false, true]) {
+      const output = Buffer.from(normalized ? 'normalized' : 'canonical');
+      const test = setup(100, () => output);
+      const staged = await test.run((pictures) =>
+        pictures.stage({ profileId: 'owner' }, Buffer.from('source'))
+      );
+      expect(staged._tag).toBe('Staged');
+      expect([...test.objects.values()]).toEqual([output]);
+      expect([...test.assets.values()]).toMatchObject([
+        { width: 512, height: 512, fileSizeBytes: output.length },
+      ]);
+    }
+  });
   it('resolves effective static policy for the authenticated User with configurable output bytes', async () => {
     const test = setup(123456);
     expect(await test.run((pictures) => pictures.policy({ profileId: 'owner' }))).toEqual({

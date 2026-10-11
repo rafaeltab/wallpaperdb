@@ -86,3 +86,22 @@ it('fits a normal-rate animation by lowering quality while preserving every inte
     expect(new Set(result.frames.map((frame) => frame.samples[1].join(","))).size).toBe(4);
   } finally { source.dispose(); }
 });
+
+it('fits excessive frame rates without trimming elapsed time or flattening the animation', async () => {
+  const controller = new AbortController();
+  const source = await openPictureSource(await fixture('profile-fast-fitting.gif'), controller.signal);
+  try {
+    const crop = initialPictureCrop(source);
+    const lowQualityPolicy = { ...policy, encoding: { ...policy.encoding, animationQuality: 20 } };
+    const full = await source.process(crop, lowQualityPolicy, controller.signal);
+    const limit = Math.floor(full.size * 0.75);
+    const fitted = await source.process(crop, { ...lowQualityPolicy, maxOutputBytes: limit }, controller.signal);
+    expect(fitted.size).toBeLessThanOrEqual(limit);
+    const result = await decodedAnimation(fitted, [[256, 10], [256, 256]]);
+    expect(result.repetitions).toBe(2);
+    expect(result.frames.map((frame) => [frame.timestamp, frame.duration])).toEqual([[0, 40000], [40000, 40000]]);
+    for (const frame of result.frames) expect(frame).toMatchObject({ width: 512, height: 512, colorSpace: 'srgb' });
+    expect(result.frames.map((frame) => frame.samples.map((pixel) => pixel[3]))).toEqual([[0, 255], [0, 255]]);
+    expect(new Set(result.frames.map((frame) => frame.samples[1].join(','))).size).toBe(2);
+  } finally { source.dispose(); }
+});

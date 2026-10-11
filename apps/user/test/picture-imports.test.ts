@@ -114,7 +114,9 @@ function setup(ids = ['a_failed', 'b_healthy']) {
         Layer.mergeAll(
           Layer.succeed(PictureStore, store),
           Layer.succeed(PictureObjects, { put: unexpected, delete: unexpected }),
-          Layer.succeed(PictureCodec, { process: (bytes) => Effect.suspend(() => codec(bytes)) }),
+          Layer.succeed(PictureCodec, {
+            process: (bytes, policy) => Effect.suspend(() => codec(bytes, policy)),
+          }),
           Layer.succeed(PictureSource, {
             download: (url) =>
               Effect.suspend(() => {

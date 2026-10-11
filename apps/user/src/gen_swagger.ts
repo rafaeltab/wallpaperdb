@@ -27,6 +27,7 @@ const services = Layer.mergeAll(
     adoptImportedPicture: unavailable,
   }),
   Layer.succeed(Pictures, {
+    policy: unavailable,
     stage: unavailable,
     upload: unavailable,
     pictureAvailable: unavailable,

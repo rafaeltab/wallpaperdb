@@ -45,11 +45,37 @@ function hasPngAnimation(input: Buffer): boolean {
   return false;
 }
 
+function validateWebpContainer(input: Buffer): void {
+  if (input.toString('ascii', 0, 4) !== 'RIFF') return;
+  if (input.length < 12 || input.readUInt32LE(4) + 8 !== input.length)
+    throw new InvalidProfilePictureError('Picture could not be decoded');
+  let offset = 12;
+  let imageChunks = 0;
+  const chunks = new Set<string>();
+  while (offset + 8 <= input.length) {
+    const type = input.toString('ascii', offset, offset + 4);
+    if (['VP8 ', 'VP8L'].includes(type)) imageChunks++;
+    if (
+      imageChunks > 1 ||
+      (['VP8X', 'ALPH'].includes(type) && chunks.has(type)) ||
+      (type === 'VP8X' && offset !== 12)
+    )
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    chunks.add(type);
+    const size = input.readUInt32LE(offset + 4);
+    if (size > input.length - offset - 8)
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    offset += 8 + size + (size % 2);
+  }
+  if (offset !== input.length) throw new InvalidProfilePictureError('Picture could not be decoded');
+}
+
 function validateEncodedPicture(input: Buffer, limits: PictureLimits): void {
   if (input.length > limits.maxBytes)
     throw new ProfilePictureTooLargeError('Picture exceeds the upload byte limit');
   if (!hasSupportedSignature(input))
     throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+  validateWebpContainer(input);
   if (hasPngAnimation(input))
     throw new InvalidProfilePictureError('Animated pictures are not accepted');
 }
@@ -154,8 +180,8 @@ async function processProfilePicture(
       return {
         bytes: input,
         mimeType: 'image/webp',
-        width: metadata.width,
-        height: metadata.height,
+        width: limits.policy.output.width,
+        height: limits.policy.output.height,
       };
     }
     const result = await decoder

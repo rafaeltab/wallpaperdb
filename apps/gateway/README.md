@@ -18,12 +18,6 @@ Read the [domain context](GLOSSARY.md) for ownership and the [recovery guide](..
 
 The [admission contract](../docs/content/docs/guides/gateway-admission.mdx) explains quota and overload responses, degraded operation, and required production ingress controls. [Load evidence](docs/admission-load-test.md) records initial limits and the checks required before deployment.
 
-## Testing
-
-The [unit selection](vitest.config.ts) runs controlled Catalogue, Projection, admission, and HTTP contracts without search setup. The [integration selection](package.json) retains OpenSearch, Redis, NATS, application startup, and telemetry tests. Gateway still shares one OpenSearch fixture per invocation, namespaces each search index, and isolates SDK instrumentation in its own process.
-
-The [workspace scripts](package.json) expose both selections with coverage and retain `test` for the complete suite. Use the [Make workspace selectors](../../Makefile) to run them. CI combines their complementary reports from `coverage/unit` and `coverage/integration` through the [root coverage script](../../package.json).
-
 ## API documentation
 
 Gateway serves Swagger UI at `/documentation` and its OpenAPI document at `/documentation/json`, registered by the [HTTP adapter](src/http/index.ts) and the [shared OpenAPI plugin](../../packages/core/src/openapi/plugin.ts).

@@ -53,7 +53,7 @@ Require generated and adopted ticket branch names to match `^[A-Za-z0-9][A-Za-z0
 
 6. Repeat steps 3 through 5 for each remaining ticket. When `main` or an earlier layer changes, restack before continuing or publishing. Follow the rebase rules below for every affected layer's recorded commit and validation evidence.
 
-7. Once all tickets are implemented, use [code-review](../code-review/SKILL.md) on the top branch against `main` to review the complete spec. Put each fix in the ticket layer that owns it, then rebase descendants and rerun validation for changed file trees. Validate the combined result on the top branch.
+7. Once all tickets are implemented, use [code-review](../code-review/SKILL.md) on the top branch against `main` to review the complete spec. Put each fix in the ticket layer that owns it, then rebase descendants and apply the layer review and validation rules above. Validate the combined result on the top branch and repeat the complete-spec review after any fixes or rewrites. Continue until both review axes pass for the current top SHA against the current `main` SHA, and record that passing pair before step 8. A later top or trunk change requires another complete-spec review before readiness.
 
 8. Mark the PRs ready for review and report the stack's PR URLs, validation results, and native GitHub stack status. Apply the issue tracker's [landing and issue-closure policy](../../../docs/agents/issue-tracker.md#relationships). Opening PRs or completing implementation does not authorize landing the stack.
 

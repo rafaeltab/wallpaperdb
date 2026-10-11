@@ -1,23 +1,11 @@
 import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
-export default defineBaseConfig({
+export const configuration = {
   test: {
     name: 'user',
     globals: true,
     environment: 'node',
-    projects: [
-      {
-        extends: true,
-        test: { name: 'user-unit', include: ['test/**/*.unit.test.ts'] },
-      },
-      {
-        extends: true,
-        test: {
-          name: 'user-integration',
-          include: ['test/**/*.integration.test.ts'],
-        },
-      },
-    ],
+    include: ['test/**/*.test.ts'],
     testTimeout: 60000,
     hookTimeout: 60000,
     maxConcurrency: 5,
@@ -29,4 +17,6 @@ export default defineBaseConfig({
       reportsDirectory: './coverage/integration',
     },
   },
-});
+} satisfies Parameters<typeof defineBaseConfig>[0];
+
+export default defineBaseConfig(configuration);

@@ -65,7 +65,10 @@ test.each([
       expect(runner.config.coverage.include).toEqual(['src/**/*.ts']);
       coveragePolicies.push({
         include: runner.config.coverage.include,
-        exclude: runner.config.coverage.exclude,
+        // Vitest appends test/config paths outside the source inclusion to each selection.
+        exclude: runner.config.coverage.exclude.filter(
+          (pattern) => !pattern.startsWith('test/') && !pattern.startsWith('vitest.')
+        ),
         thresholds: runner.config.coverage.thresholds,
         reporter: runner.config.coverage.reporter,
       });
@@ -103,6 +106,33 @@ test.each([
 });
 
 test.each([
+  'media',
+  'user',
+])('%s complete suite schedules both test types in one project', async (service) => {
+  const root = path.join(repository, 'apps', service);
+  const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+  const runner = await createVitest({
+    ...parseCLI(manifest.scripts.test).options,
+    root,
+    watch: false,
+  });
+  try {
+    const specifications = await runner.globTestSpecifications();
+    expect(
+      specifications.some((specification) => specification.moduleId.endsWith('.unit.test.ts'))
+    ).toBe(true);
+    expect(
+      specifications.some((specification) =>
+        specification.moduleId.endsWith('.integration.test.ts')
+      )
+    ).toBe(true);
+    expect(new Set(specifications.map((specification) => specification.project)).size).toBe(1);
+  } finally {
+    await runner.close();
+  }
+});
+
+test.each([
   'gateway',
   'media',
   'user',
@@ -121,9 +151,10 @@ test.each([
       ['unit', unit],
       ['integration', integration],
     ]) {
+      const { options } = parseCLI(manifest.scripts[`test:${selection}`]);
       const runner = await createVitest({
-        ...parseCLI(manifest.scripts[`test:${selection}`]).options,
-        config: path.join(workspace, 'vitest.config.ts'),
+        ...options,
+        config: path.resolve(workspace, options.config || 'vitest.config.ts'),
         root,
         watch: false,
       });

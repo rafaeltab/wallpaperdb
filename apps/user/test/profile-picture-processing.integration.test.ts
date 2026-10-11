@@ -168,6 +168,24 @@ describe('Profile picture processing', () => {
       processProfilePicture(canonical, limits, { ...policy, maxOutputBytes: 1 })
     ).rejects.toThrow('processed output byte limit');
   });
+  it('allows canonical output larger than the source decoded-byte budget when it fits output policy', async () => {
+    const pixels = Buffer.alloc(16 * 16 * 3);
+    let seed = 123456;
+    for (let index = 0; index < pixels.length; index++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      pixels[index] = seed >>> 24;
+    }
+    const input = await sharp(pixels, { raw: { width: 16, height: 16, channels: 3 } })
+      .png()
+      .toBuffer();
+    const picture = await processProfilePicture(input, {
+      ...limits,
+      maxDecodedBytes: pixels.length,
+    });
+    expect(picture.bytes.length).toBeGreaterThan(pixels.length * 2 + 4096);
+    expect(picture.bytes.length).toBeLessThan(policy.maxOutputBytes);
+    expect(await sharp(picture.bytes).metadata()).toMatchObject({ width: 512, height: 512 });
+  });
   it('rejects malformed WebP containers even when their first image can be decoded', async () => {
     const webp = await sharp({
       create: { width: 512, height: 512, channels: 3, background: '#3578aa' },

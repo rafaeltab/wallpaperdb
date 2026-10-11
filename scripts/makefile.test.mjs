@@ -145,7 +145,7 @@ test('typecheck cache inputs include test files compiled by the workspace', () =
   const task = plannedTask('check-types', 'media', 'check-types');
   const tsconfig = JSON.parse(readFileSync('apps/media/tsconfig.json', 'utf8'));
   assert.ok(tsconfig.include.includes('test/**/*'));
-  assert.ok(Object.hasOwn(task.inputs, 'test/catalog-postgres.test.ts'),
+  assert.ok(Object.hasOwn(task.inputs, 'test/catalog-postgres.integration.test.ts'),
     'test-only TypeScript errors must invalidate a cached successful typecheck');
 });
 

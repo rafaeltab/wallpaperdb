@@ -13,7 +13,11 @@ test.each([
     unit: 'test/catalogue.unit.test.ts',
     integration: 'test/search/opensearch.integration.test.ts',
   },
-  { service: 'media', unit: 'test/delivery.test.ts', integration: 'test/health.test.ts' },
+  {
+    service: 'media',
+    unit: 'test/delivery.unit.test.ts',
+    integration: 'test/health.integration.test.ts',
+  },
   {
     service: 'user',
     unit: 'test/profile-capability.test.ts',
@@ -42,7 +46,7 @@ test.each([
       if (selection === 'unit') {
         expect(files).toContain(unit);
         expect(files).not.toContain(integration);
-        if (service === 'gateway')
+        if (service === 'gateway' || service === 'media')
           expect(files.every((file) => file.endsWith('.unit.test.ts'))).toBe(true);
         for (const project of runner.projects) expect(project.config.globalSetup).toEqual([]);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(
@@ -50,7 +54,7 @@ test.each([
         );
       } else {
         expect(files).toContain(integration);
-        if (service === 'gateway')
+        if (service === 'gateway' || service === 'media')
           expect(files.every((file) => file.endsWith('.integration.test.ts'))).toBe(true);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(
           path.join(root, 'coverage/integration')
@@ -96,7 +100,10 @@ test.each([
   }
 });
 
-test.each(['gateway'])('%s selects new tests by type without a config edit', async (service) => {
+test.each([
+  'gateway',
+  'media',
+])('%s selects new tests by type without a config edit', async (service) => {
   const root = await mkdtemp(path.join(tmpdir(), 'wallpaperdb-test-selection-'));
   try {
     await mkdir(path.join(root, 'test/new-capability'), { recursive: true });

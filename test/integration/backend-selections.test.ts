@@ -52,4 +52,12 @@ test.each([
   ))).flat();
   expect(owned.sort()).toEqual(files.sort());
   expect(coveragePolicies[0]).toEqual(coveragePolicies[1]);
+  const full = await createVitest({ ...parseCLI(manifest.scripts.test).options, root, watch: false });
+  try {
+    const specifications = await full.globTestSpecifications();
+    expect(specifications.map((specification) => path.relative(root, specification.moduleId)).sort())
+      .toEqual(files.sort());
+  } finally {
+    await full.close();
+  }
 });

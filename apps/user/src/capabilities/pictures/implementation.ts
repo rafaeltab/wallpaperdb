@@ -5,6 +5,7 @@ import type {
   PictureImport,
   PictureImportCursor,
   EffectivePicturePolicy,
+  PicturePolicyOutcome,
   PicturesPolicy,
   StoredPicture,
 } from './contract.js';
@@ -104,14 +105,14 @@ export const picturesLayer = (policy: PicturesPolicy) =>
         });
       return Pictures.of({
         policy: (principal) =>
-          Effect.succeed(
+          Effect.succeed<PicturePolicyOutcome>(
             principal.profileId
               ? {
                   _tag: 'Policy',
                   policy: effectivePolicy(principal),
                 }
               : { _tag: 'Rejected', reason: 'unauthorized', message: 'Authentication is required' }
-          ),
+          ).pipe(Effect.withSpan('pictures.policy')),
         stage,
         upload: Effect.fn('pictures.upload')(function* (principal, bytes, expectedVersion) {
           const candidate = yield* stage(principal, bytes);

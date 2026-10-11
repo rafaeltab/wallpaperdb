@@ -75,7 +75,7 @@ function encode(
     child.stdin.once('error', stop);
     child.stdout.on('data', (chunk: Buffer) => {
       size += chunk.length;
-      if (size > limits.maxDecodedBytes * 2 + 4096)
+      if (size > 4 * Math.ceil(policy.maxOutputBytes / 3) + 4096)
         stop(new Error('Encoder output exceeds its limit'));
       else chunks.push(chunk);
     });

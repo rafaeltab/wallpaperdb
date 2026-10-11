@@ -253,6 +253,26 @@ test("Profile picture upload reaches public delivery and removal retires the old
             .getByRole("button", { name: "Reset", exact: true })
             .click();
           await expect(zoom).toHaveValue("1");
+          const selectedImage = dialog.getByRole("img", {
+            name: "Selected avatar",
+          });
+          const centered = await selectedImage.boundingBox();
+          const moveLeft = dialog.getByRole("button", {
+            name: "Move picture left",
+            exact: true,
+          });
+          await moveLeft.focus();
+          await expect(moveLeft).toBeFocused();
+          await moveLeft.press("Enter");
+          const repositioned = await selectedImage.boundingBox();
+          if (!centered || !repositioned)
+            throw new Error("Keyboard crop preview was not measured");
+          expect(repositioned.x).toBeLessThan(centered.x);
+          await dialog
+            .getByRole("button", { name: "Move picture right", exact: true })
+            .press("Space");
+          const restored = await selectedImage.boundingBox();
+          expect(restored?.x).toBeCloseTo(centered.x, 1);
           const crop = dialog.getByRole("group", {
             name: "Picture crop",
             exact: true,

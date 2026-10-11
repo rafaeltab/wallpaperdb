@@ -74,6 +74,34 @@ describe('Profile picture settings', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Retry picture rules' }));
     await waitFor(() => expect(screen.getByLabelText('Choose picture')).toBeEnabled());
   });
+  it('allows picture removal while the independent upload-policy request is pending', async () => {
+    let resolvePolicy = (_policy: typeof picturePolicy) => {};
+    vi.mocked(userApi.picturePolicy).mockReturnValue(new Promise((resolve) => {
+      resolvePolicy = resolve;
+    }));
+    const initial = { ...profile, pictureAssetId: 'existing-picture' };
+    const updated = { ...profile, version: 2 };
+    vi.mocked(userApi.removePicture).mockResolvedValue(updated);
+    const { client } = await renderPage(initial);
+    try {
+      expect(screen.getByText('Loading picture rules…')).toBeInTheDocument();
+      expect(screen.getByLabelText('Choose picture')).toBeDisabled();
+      const remove = screen.getByRole('button', { name: 'Remove picture' });
+      expect(remove).toBeEnabled();
+      const user = userEvent.setup();
+      await user.click(remove);
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: 'Use generated avatar',
+      }));
+      await waitFor(() => expect(userApi.removePicture).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedVersion: 1, expectedProfileId: profile.id })
+      ));
+      await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
+      expect(screen.queryByRole('dialog', { name: 'Profile picture' })).not.toBeInTheDocument();
+    } finally {
+      await act(async () => resolvePolicy(picturePolicy));
+    }
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(userApi.picturePolicy).mockReset().mockResolvedValue(picturePolicy);

@@ -1,4 +1,5 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
@@ -7,18 +8,22 @@ import { createVitest, parseCLI } from 'vitest/node';
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 
 test.each([
-  { service: 'gateway', fast: 'test/catalogue.test.ts', slow: 'test/opensearch.test.ts' },
-  { service: 'media', fast: 'test/delivery.test.ts', slow: 'test/health.test.ts' },
+  {
+    service: 'gateway',
+    unit: 'test/catalogue.unit.test.ts',
+    integration: 'test/search/opensearch.integration.test.ts',
+  },
+  { service: 'media', unit: 'test/delivery.test.ts', integration: 'test/health.test.ts' },
   {
     service: 'user',
-    fast: 'test/profile-capability.test.ts',
-    slow: 'test/profile.integration.test.ts',
+    unit: 'test/profile-capability.test.ts',
+    integration: 'test/profile.integration.test.ts',
   },
-  { service: 'ingestor', fast: 'test/ingestion.test.ts', slow: 'test/composition.test.ts' },
-])('$service CI selections own every test file once and keep infrastructure setup out of fast tests', async ({
+  { service: 'ingestor', unit: 'test/ingestion.test.ts', integration: 'test/composition.test.ts' },
+])('$service CI selections own every test file once and keep infrastructure setup out of unit tests', async ({
   service,
-  fast,
-  slow,
+  unit,
+  integration,
 }) => {
   const root = path.join(repository, 'apps', service);
   const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
@@ -35,14 +40,18 @@ test.each([
       );
       expect(files.length).toBeGreaterThan(0);
       if (selection === 'unit') {
-        expect(files).toContain(fast);
-        expect(files).not.toContain(slow);
+        expect(files).toContain(unit);
+        expect(files).not.toContain(integration);
+        if (service === 'gateway')
+          expect(files.every((file) => file.endsWith('.unit.test.ts'))).toBe(true);
         for (const project of runner.projects) expect(project.config.globalSetup).toEqual([]);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(
           path.join(root, 'coverage/unit')
         );
       } else {
-        expect(files).toContain(slow);
+        expect(files).toContain(integration);
+        if (service === 'gateway')
+          expect(files.every((file) => file.endsWith('.integration.test.ts'))).toBe(true);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(
           path.join(root, 'coverage/integration')
         );
@@ -84,5 +93,39 @@ test.each([
     ).toEqual(files.sort());
   } finally {
     await full.close();
+  }
+});
+
+test.each(['gateway'])('%s selects new tests by type without a config edit', async (service) => {
+  const root = await mkdtemp(path.join(tmpdir(), 'wallpaperdb-test-selection-'));
+  try {
+    await mkdir(path.join(root, 'test/new-capability'), { recursive: true });
+    const unit = 'test/new-capability/behavior.unit.test.ts';
+    const integration = 'test/new-capability/adapter.integration.test.ts';
+    await writeFile(path.join(root, unit), '');
+    await writeFile(path.join(root, integration), '');
+    const workspace = path.join(repository, 'apps', service);
+    const manifest = JSON.parse(await readFile(path.join(workspace, 'package.json'), 'utf8'));
+    for (const [selection, expected] of [
+      ['unit', unit],
+      ['integration', integration],
+    ]) {
+      const runner = await createVitest({
+        ...parseCLI(manifest.scripts[`test:${selection}`]).options,
+        config: path.join(workspace, 'vitest.config.ts'),
+        root,
+        watch: false,
+      });
+      try {
+        const specifications = await runner.globTestSpecifications();
+        expect(
+          specifications.map((specification) => path.relative(root, specification.moduleId))
+        ).toEqual([expected]);
+      } finally {
+        await runner.close();
+      }
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });

@@ -1,4 +1,5 @@
 import type { PictureJob, PictureJobResult } from './protocol';
+import { withoutPictureMetadata } from './webp';
 
 // Each worker owns one job. Termination cancels native decode/encode and frees its bitmap.
 self.addEventListener('message', async (event: MessageEvent<PictureJob>) => {
@@ -48,10 +49,11 @@ self.addEventListener('message', async (event: MessageEvent<PictureJob>) => {
         width,
         height
       );
-    const blob = await canvas.convertToBlob({
+    const encoded = await canvas.convertToBlob({
       type: job.action === 'preview' ? 'image/png' : 'image/webp',
       quality: job.action === 'process' ? job.policy.encoding.staticQuality / 100 : undefined,
     });
+    const blob = job.action === 'process' ? await withoutPictureMetadata(encoded) : encoded;
     self.postMessage({
       ok: true,
       blob,

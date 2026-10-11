@@ -1,5 +1,6 @@
 import type { PictureSource } from '../index';
 import type { PictureJob, PictureJobResult } from './protocol';
+import { withoutPictureMetadata } from './webp';
 
 function cancelled() {
   return new DOMException('Picture processing cancelled.', 'AbortError');
@@ -100,7 +101,7 @@ async function fallback(
         strip
       );
     }
-    const blob = await new Promise<Blob>((resolve, reject) =>
+    const encoded = await new Promise<Blob>((resolve, reject) =>
       canvas.toBlob(
         (result) =>
           result ? resolve(result) : reject(new Error('Unable to encode this picture.')),
@@ -108,6 +109,7 @@ async function fallback(
         job.action === 'process' ? job.policy.encoding.staticQuality / 100 : undefined
       )
     );
+    const blob = job.action === 'process' ? await withoutPictureMetadata(encoded) : encoded;
     signal.throwIfAborted();
     return { ok: true, blob, width: sourceWidth, height: sourceHeight };
   } finally {

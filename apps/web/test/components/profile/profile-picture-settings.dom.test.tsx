@@ -240,6 +240,22 @@ describe('Profile picture settings', () => {
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
   });
 
+  it('aborts UI-owned processing on unmount and prevents its late result from starting an upload', async () => {
+    let finish: ((value: Blob) => void) | undefined;
+    let signal: AbortSignal | undefined;
+    processPicture.mockImplementationOnce((_crop, _policy, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
+    const { unmount } = await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    unmount();
+    expect(signal?.aborted).toBe(true);
+    expect(disposePicture).toHaveBeenCalled();
+    await act(async () => finish?.(canonical));
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it.each(['cancel', 'escape'])('returns focus to Remove picture after dismissing its confirmation with %s', async (dismissal) => {
     await renderPage({ ...profile, pictureAssetId: 'original-picture' });
     const user = userEvent.setup();

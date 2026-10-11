@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { initialPictureCrop, movePictureCrop, zoomPictureCrop, wheelPictureCrop } from '@/features/picture-editor';
+import { initialPictureCrop, movePictureCrop, zoomPictureCrop, wheelPictureCrop, pinchPictureCrop } from '@/features/picture-editor';
 
 it('frames a landscape source centrally and clamps dragging to covered source pixels', () => {
   const crop = initialPictureCrop({ width: 800, height: 400 });
@@ -30,4 +30,15 @@ it('zooms wheel input in either direction with the same source-region and low-re
   expect(wheelPictureCrop(wheelPictureCrop(crop, source, -10000), source, 10000)).toEqual(crop);
   const small = { width: 32, height: 48 };
   expect(wheelPictureCrop(initialPictureCrop(small), small, -10000)).toEqual(initialPictureCrop(small));
+});
+
+it('scales a pinch around the current crop and ignores coincident touch points', () => {
+  const source = { width: 800, height: 400 };
+  const crop = initialPictureCrop(source);
+  expect(pinchPictureCrop(crop, source, 100, 200)).toMatchObject({ x: 300, y: 100, size: 200, zoom: 2 });
+  expect(pinchPictureCrop(crop, source, 100, 10000)).toMatchObject({ size: 64, zoom: 6.25 });
+  expect(pinchPictureCrop(crop, source, 0, 100)).toEqual(crop);
+  expect(pinchPictureCrop(crop, source, 100, 0)).toEqual(crop);
+  const small = { width: 32, height: 48 };
+  expect(pinchPictureCrop(initialPictureCrop(small), small, 100, 200)).toEqual(initialPictureCrop(small));
 });

@@ -52,3 +52,13 @@ export function wheelPictureCrop(
 ): PictureCrop {
   return zoomPictureCrop(crop, source, crop.zoom * Math.exp(-deltaPixels / 500));
 }
+
+export function pinchPictureCrop(
+  crop: PictureCrop,
+  source: PictureDimensions,
+  previousDistance: number,
+  distance: number
+): PictureCrop {
+  if (previousDistance <= 0 || distance <= 0) return crop;
+  return zoomPictureCrop(crop, source, crop.zoom * (distance / previousDistance));
+}

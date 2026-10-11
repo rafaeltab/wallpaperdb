@@ -1,19 +1,24 @@
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
-import { Pictures, PictureUnavailable } from '../src/capabilities/pictures/index.js';
+import {
+  Pictures,
+  PictureUnavailable,
+  type EffectivePicturePolicy,
+} from '../src/capabilities/pictures/index.js';
 import type { Profiles } from '../src/capabilities/profile/index.js';
 import { auth, profile, services } from './http-fixture.js';
 
 const unexpected = () => Effect.die('Unexpected picture command');
 const pictureServices = (
   upload: Pictures['upload'] = unexpected,
-  adoptPicture: Profiles['adoptPicture'] = unexpected
+  adoptPicture: Profiles['adoptPicture'] = unexpected,
+  policy: Pictures['policy'] = unexpected
 ) =>
   Layer.merge(
     services(unexpected, unexpected, { adoptPicture }),
     Layer.succeed(Pictures, {
-      policy: unexpected,
+      policy,
       stage: unexpected,
       upload,
       pictureAvailable: unexpected,
@@ -36,6 +41,36 @@ function multipart(bytes: Buffer, version = '4') {
 }
 
 describe('Picture HTTP translation', () => {
+  it('queries policy for the authenticated principal and ignores caller identity', async () => {
+    const observed: unknown[] = [];
+    const policy: EffectivePicturePolicy = {
+      output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+      maxOutputBytes: 1234,
+      acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
+      animation: { available: false },
+      encoding: { staticQuality: 85 },
+    };
+    const app = await createHttpApp(
+      config,
+      pictureServices(unexpected, unexpected, (principal) => {
+        observed.push(principal);
+        return Effect.succeed({ _tag: 'Policy', policy });
+      })
+    );
+    try {
+      expect((await app.inject({ url: '/profile/me/picture-policy' })).statusCode).toBe(401);
+      const response = await app.inject({
+        url: '/profile/me/picture-policy?profileId=another',
+        headers: auth,
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(policy);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(observed).toEqual([{ profileId: 'user_owner' }]);
+    } finally {
+      await app.close();
+    }
+  });
   it('requires owner authentication before either picture command', async () => {
     const app = await createHttpApp(config, pictureServices());
     try {

@@ -159,6 +159,21 @@ describe('Profile picture settings', () => {
     expect(edit).toHaveFocus();
   });
 
+  it('applies keyboard repositioning through the picture command', async () => {
+    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2 });
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], 'picture.png', { type: 'image/png' }));
+    await user.click(await screen.findByRole('button', { name: 'Move picture left' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
+    expect(processPicture).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 240, y: 0, size: 400 }),
+      picturePolicy,
+      expect.any(AbortSignal)
+    );
+  });
+
   it('retains its edit and reports that a competing Profile command blocked submission after processing', async () => {
     let finishProcessing: ((value: Blob) => void) | undefined;
     processPicture.mockImplementation(() => new Promise((resolve) => { finishProcessing = resolve; }));

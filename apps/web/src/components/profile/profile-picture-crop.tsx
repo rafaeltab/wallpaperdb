@@ -70,6 +70,28 @@ export function ProfilePictureCrop({
           }}
         />
       </fieldset>
+      <fieldset aria-label="Move picture" className="flex flex-wrap justify-center gap-2">
+        {[
+          { label: 'Left', x: -1, y: 0 },
+          { label: 'Right', x: 1, y: 0 },
+          { label: 'Up', x: 0, y: -1 },
+          { label: 'Down', x: 0, y: 1 },
+        ].map(({ label, x, y }) => (
+          <Button
+            key={label}
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={`Move picture ${label.toLowerCase()}`}
+            disabled={disabled}
+            onClick={() =>
+              onChange(movePictureCrop(crop, source, (x * crop.size) / 10, (y * crop.size) / 10))
+            }
+          >
+            {label}
+          </Button>
+        ))}
+      </fieldset>
       <div className="flex items-center gap-3">
         <label htmlFor="picture-zoom" className="text-sm">
           Zoom

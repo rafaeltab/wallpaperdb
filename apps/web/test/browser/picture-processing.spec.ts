@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { initialPictureCrop } from '../../src/features/picture-editor';
+import { initialPictureCrop, movePictureCrop, zoomPictureCrop } from '../../src/features/picture-editor';
 import { openPictureSource } from '../../src/features/picture-editor/adapters/browser';
 
 const policy = {
@@ -71,7 +71,7 @@ it('fits a normal-rate animation by lowering quality while preserving every inte
   const controller = new AbortController();
   const source = await openPictureSource(await fixture("profile-fitting.gif"), controller.signal);
   try {
-    const crop = { x: 32, y: 0, size: 64, zoom: 2 };
+    const crop = movePictureCrop(zoomPictureCrop(initialPictureCrop(source), source, 2), source, 0, 32);
     const initial = await source.process(crop, policy, controller.signal);
     const lowQuality = await source.process(crop, { ...policy, encoding: { ...policy.encoding, animationQuality: 20 } }, controller.signal);
     expect(lowQuality.size).toBeLessThan(initial.size);

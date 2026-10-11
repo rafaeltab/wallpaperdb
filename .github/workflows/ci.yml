@@ -57,6 +57,9 @@ jobs:
       - name: Build, lint, and type-check
         run: make check
 
+      - name: Measure Color Extractor fast feedback
+        run: time make run PACKAGE=color-extractor SCRIPT=test:unit
+
       - name: Run unit and integration tests
         run: |
           make test-unit

@@ -24,6 +24,50 @@ interface ProcessedPicture {
   height: number;
 }
 
+function hasJpegGainMapDeclaration(marker: number, payload: Buffer): boolean {
+  if (marker === 0xe2) {
+    const isoHeader = Buffer.from('urn:iso:std:iso:ts:21496:-1\0');
+    return (
+      payload.subarray(0, 4).equals(Buffer.from('MPF\0')) ||
+      payload.subarray(0, isoHeader.length).equals(isoHeader)
+    );
+  }
+  if (marker !== 0xe1) return false;
+  const xmp = ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/xmp/extension/\0'].some(
+    (header) => payload.subarray(0, header.length).equals(Buffer.from(header))
+  );
+  if (!xmp) return false;
+  return /xmlns(?::[\w.-]+)?\s*=\s*(['"])(?:http:\/\/ns\.adobe\.com\/hdr-gain-map\/1\.0\/|urn:com:apple:photo:2020:aux:hdrgainmap)\1/.test(
+    payload.toString('utf8')
+  );
+}
+
+function validateJpegSource(input: Buffer): void {
+  if (!input.subarray(0, 2).equals(Buffer.from([0xff, 0xd8]))) return;
+  let offset = 2;
+  while ((offset = input.indexOf(0xff, offset)) !== -1) {
+    offset++;
+    while (input[offset] === 0xff) offset++;
+    const marker = input[offset++];
+    if (marker === 0xd9) {
+      if (offset !== input.length)
+        throw new InvalidProfilePictureError('Picture could not be decoded');
+      return;
+    }
+    if (marker === 0 || marker === 1 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (marker === 0xd8 || offset + 2 > input.length)
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    const length = input.readUInt16BE(offset);
+    if (length < 2 || length > input.length - offset)
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    // MPF and gain-map APP metadata can advertise HDR despite an SDR primary image.
+    if (hasJpegGainMapDeclaration(marker, input.subarray(offset + 2, offset + length)))
+      throw new InvalidProfilePictureError('Picture color interpretation is unsupported');
+    offset += length;
+  }
+  throw new InvalidProfilePictureError('Picture could not be decoded');
+}
+
 function readPngChunk(input: Buffer, offset: number): { type: string; nextOffset: number } {
   const length = input.readUInt32BE(offset);
   if (length > input.length - offset - 12)
@@ -112,6 +156,7 @@ function validateEncodedPicture(input: Buffer, limits: PictureLimits): void {
     throw new ProfilePictureTooLargeError('Picture exceeds the upload byte limit');
   if (!hasSupportedSignature(input))
     throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+  validateJpegSource(input);
   validateWebpContainer(input);
   validatePngSource(input);
 }

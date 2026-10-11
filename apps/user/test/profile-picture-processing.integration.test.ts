@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { pictureCodecLayer } from '../src/adapters/pictures/index.js';
@@ -39,6 +40,91 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it.each([
+    'old',
+    'new',
+  ])('rejects the real Apple %s gain-map JPEG instead of storing only its SDR base', async (generation) => {
+    const input = await readFile(
+      new URL(`./fixtures/profile-picture-hdr/apple_gainmap_${generation}.jpg`, import.meta.url)
+    );
+    expect(await sharp(input).metadata()).toMatchObject({
+      format: 'jpeg',
+      space: 'srgb',
+      depth: 'uchar',
+    });
+    await sharp(input, { failOn: 'warning' }).raw().toBuffer();
+    await expect(processProfilePicture(input, limits)).rejects.toThrow(
+      'Picture color interpretation is unsupported'
+    );
+  });
+  it.each([
+    [
+      'Ultra HDR',
+      0xe1,
+      Buffer.from(
+        'http://ns.adobe.com/xap/1.0/\0<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/" hdrgm:Version="1.0"/></rdf:RDF></x:xmpmeta>'
+      ),
+    ],
+    [
+      'ISO gain-map',
+      0xe2,
+      Buffer.concat([Buffer.from('urn:iso:std:iso:ts:21496:-1\0'), Buffer.alloc(4)]),
+    ],
+  ] as const)('rejects JPEGs declaring %s before the SDR decoder discards that declaration', async (_format, marker, payload) => {
+    const jpeg = await sharp({
+      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+    })
+      .jpeg()
+      .toBuffer();
+    const header = Buffer.from([0xff, marker, 0, 0]);
+    header.writeUInt16BE(payload.length + 2, 2);
+    const input = Buffer.concat([jpeg.subarray(0, 2), header, payload, jpeg.subarray(2)]);
+    expect(await sharp(input).metadata()).toMatchObject({
+      format: 'jpeg',
+      space: 'srgb',
+      depth: 'uchar',
+    });
+    await sharp(input, { failOn: 'warning' }).raw().toBuffer();
+    await expect(processProfilePicture(input, limits)).rejects.toThrow(
+      'Picture color interpretation is unsupported'
+    );
+  });
+  it.each([
+    'EXIF',
+    'XMP',
+  ])('normalizes SDR JPEG %s containing gain-map text without a gain-map declaration', async (metadataType) => {
+    const source = sharp({
+      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+    });
+    const namespace = 'http://ns.adobe.com/hdr-gain-map/1.0/';
+    let input: Buffer;
+    if (metadataType === 'EXIF') {
+      input = await source
+        .withExifMerge({ IFD0: { Model: namespace } })
+        .jpeg()
+        .toBuffer();
+    } else {
+      const jpeg = await source.jpeg({ progressive: true }).toBuffer();
+      const payload = Buffer.from(
+        `http://ns.adobe.com/xap/1.0/\0<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:description>${namespace}</dc:description></rdf:Description></rdf:RDF></x:xmpmeta>`
+      );
+      const header = Buffer.from([0xff, 0xe1, 0, 0]);
+      header.writeUInt16BE(payload.length + 2, 2);
+      input = Buffer.concat([jpeg.subarray(0, 2), header, payload, jpeg.subarray(2)]);
+    }
+    expect(input.includes(Buffer.from(namespace))).toBe(true);
+    const picture = await processProfilePicture(input, limits);
+    expect(await sharp(picture.bytes).metadata()).toMatchObject({
+      format: 'webp',
+      width: 512,
+      height: 512,
+      space: 'srgb',
+      depth: 'uchar',
+    });
+    expect((await sharp(picture.bytes).metadata()).xmp).toBeUndefined();
+    expect((await sharp(picture.bytes).metadata()).exif).toBeUndefined();
+    expect(picture.bytes.includes(Buffer.from(namespace))).toBe(false);
+  });
   it.each([
     ['PQ', '0000000463494350091000014d2323fe'],
     ['HLG', '0000000463494350091200014ea7f790'],

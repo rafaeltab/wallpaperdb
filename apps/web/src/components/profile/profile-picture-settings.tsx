@@ -193,6 +193,10 @@ export function ProfilePictureSettings({
                     ownerQuery.current
                 )
                   return;
+                if (availability.isBusy())
+                  throw new Error(
+                    'Your Profile is busy. Apply the picture again after the current change finishes.'
+                  );
                 mutation.mutate({
                   picture,
                   expectedVersion,

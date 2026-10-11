@@ -5,7 +5,7 @@ description: Monitor a pull request until CI passes and Codex approves its curre
 
 # Babysit a PR
 
-An invocation authorizes tested fixes and pushes to the selected PR, review replies and reactions, thread resolution, Codex review requests, failed-job reruns, and GitHub issues for proven pre-existing flaky tests. Honor user-specified scope and retry limits. Completion hands the PR back to the user without merging it.
+An invocation authorizes tested fixes and pushes to the selected PR, review replies and reactions, thread resolution, Codex review requests, bounded CI reruns, and GitHub issues for proven pre-existing flaky tests. Honor user-specified scope and retry limits. Completion hands the PR back to the user without merging it.
 
 ## 1. Establish the target and retain progress
 

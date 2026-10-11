@@ -27,7 +27,7 @@ For every fix in this workflow, including fixes delegated to other skills, prese
 
 Invoke [fix-pr-review-comments](../fix-pr-review-comments/SKILL.md) for each batch of unhandled actionable feedback. Its verification, incremental commits, checks, replies, reactions, and resolution rules govern the batch. An outdated comment or an existing reaction alone does not establish completion.
 
-Record each actionable comment whose concern was fixed by a verified change pushed during this babysitting session. Count each comment ID once, including distinct comments reporting the same defect. Track invalid feedback and concerns already fixed before this session separately; neither increases the number of comments fixed. CI-only fixes do not increase this count.
+Record each actionable comment whose concern was fixed by a verified change pushed during this babysitting session. Count each comment ID once, including distinct comments reporting the same defect. Track invalid feedback and concerns already fixed before this session separately; neither increases the number of comments fixed. CI-only fixes do not increase this count. On each head change, audit delivered fixes against the new tree. Verify each fix commit remains reachable and its mapped concern remains fixed; ancestry alone does not detect a later revert. For rewritten history, verify an equivalent replacement and record its commit and evidence. If a concern returns, explicitly select that comment for fix-pr-review-comments even when its thread remains resolved, mark it pending, and repair it before success. Count its comment ID only once after the verified fix is delivered again.
 
 Mixed or uncertain verdicts require the user's answer under that skill. Finish independent work, then return the pending question and incomplete status to the user. A disputed finding that Codex continues to reject also needs the user's decision rather than an endless fix-and-review loop.
 
@@ -84,7 +84,7 @@ There is no fixed deadline while runs are progressing. Investigate evidence of s
 
 ## 6. Verify and hand back
 
-Before reporting success, re-fetch the PR head, base ref and SHA, latest CI results, Codex results and reaction, and feedback state. Both gates must hold for the same current comparison. If the head or base identity changed during verification, repeat the gates for the new comparison.
+Before reporting success, re-fetch the PR head, base ref and SHA, latest CI results, Codex results and reaction, and feedback state. Audit every delivered fix against this final head under section 2, recording the verified head and evidence for each mapped concern. A resolved thread or historical delivery record does not prove the fix survived. Both gates must hold for the same current comparison, with every recorded concern still handled. If the head or base identity changed during verification, repeat the gates for the new comparison.
 
 Before every terminal handoff, including success, blockers, pending user questions, and a closed or merged PR, call `unwatch_pull_request` when available so the thread returns to the user's inbox. Perform this cleanup explicitly rather than relying on automatic watcher cleanup. Check `list_thread_pull_requests` and register the selected PR if its link is missing. Report watcher or linking errors accurately.
 

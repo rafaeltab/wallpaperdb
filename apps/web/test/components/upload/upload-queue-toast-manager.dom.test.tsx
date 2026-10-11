@@ -1,4 +1,13 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  configure,
+  getConfig,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { isValidElement } from 'react';
@@ -10,6 +19,7 @@ import { UploadQueueProvider, useUploadQueue } from '@/contexts/upload-queue-con
 import { type UploadResult, uploadWallpaperWithDetails } from '@/lib/api/ingestor';
 
 const navigate = vi.fn();
+const originalAsyncWrapper = getConfig().asyncWrapper;
 vi.mock('@tanstack/react-router', () => ({ useRouter: () => ({ navigate }) }));
 vi.mock('@/lib/api/ingestor', () => ({ uploadWallpaperWithDetails: vi.fn() }));
 
@@ -47,6 +57,15 @@ function renderQueue() {
   return render(<QueueApp />);
 }
 
+async function finishToastExit() {
+  // Sonner publishes dismissals over two animation frames, then starts its exit timer.
+  await act(async () => {
+    vi.advanceTimersToNextFrame();
+    vi.advanceTimersToNextFrame();
+  });
+  await act(async () => vi.advanceTimersByTimeAsync(200));
+}
+
 const uploaded: UploadResult = {
   success: true,
   isDuplicate: false,
@@ -70,9 +89,20 @@ describe('UploadQueueToastManager', () => {
     vi.mocked(uploadWallpaperWithDetails).mockImplementation(() => new Promise(() => {}));
   });
 
-  afterEach(() => {
-    act(() => toast.dismiss());
-    cleanup();
+  afterEach(async () => {
+    try {
+      act(() => toast.dismiss());
+      cleanup();
+      if (vi.isFakeTimers()) {
+        // Drain Sonner's deferred publication and exit callbacks after unmounting.
+        await act(async () => vi.runOnlyPendingTimersAsync());
+        expect(vi.getTimerCount()).toBe(0);
+      }
+    } finally {
+      configure({ asyncWrapper: originalAsyncWrapper });
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
   });
 
   it('uses the selected application theme for the shared notification stack', async () => {
@@ -115,9 +145,12 @@ describe('UploadQueueToastManager', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add upload' }));
     // Upload completion reaches the shared toast asynchronously, even for a fast API.
-    await user.click(await screen.findByRole('button', { name: 'Dismiss' }));
+    const dismiss = await screen.findByRole('button', { name: 'Dismiss' });
+    const previousToast = dismiss.closest('[data-sonner-toast]');
+    expect(previousToast).toBeInTheDocument();
+    await user.click(dismiss);
     await user.click(screen.getByRole('button', { name: 'Add upload' }));
-    await act(() => new Promise((resolve) => setTimeout(resolve, 350)));
+    await waitFor(() => expect(previousToast).not.toBeInTheDocument());
 
     expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
     expect(screen.getByText('Uploading 0/1 files')).toBeInTheDocument();
@@ -197,24 +230,129 @@ describe('UploadQueueToastManager', () => {
     expect(screen.getByText('Profile updated')).toBeInTheDocument();
   });
 
-  it('automatically clears successful uploads after five seconds', async () => {
-    const user = userEvent.setup();
-    let completeUpload: ((result: UploadResult) => void) | undefined;
-    vi.mocked(uploadWallpaperWithDetails).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          completeUpload = resolve;
-        })
-    );
-    renderQueue();
-    await user.click(screen.getByRole('button', { name: 'Add upload' }));
+  describe('completion expiry', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({
+        toFake: [
+          'Date',
+          'setTimeout',
+          'clearTimeout',
+          'setInterval',
+          'clearInterval',
+          'requestAnimationFrame',
+          'cancelAnimationFrame',
+        ],
+      });
+      // RTL's default async wrapper waits on a zero-delay timer and only advances
+      // Jest timers. Keep user-event's async work inside act with Vitest timers.
+      configure({ asyncWrapper: async (callback) => act(callback) });
+    });
 
-    await act(async () => completeUpload?.(uploaded));
-    expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
-    await waitFor(
-      () => expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('0'),
-      { timeout: 6000 }
-    );
-    await waitFor(() => expect(screen.queryByText('Upload complete')).not.toBeInTheDocument());
+    it('automatically clears successful uploads after five seconds', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTimeAsync });
+      let completeUpload: ((result: UploadResult) => void) | undefined;
+      vi.mocked(uploadWallpaperWithDetails).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            completeUpload = resolve;
+          })
+      );
+      renderQueue();
+      await user.click(screen.getByRole('button', { name: 'Add upload' }));
+
+      await act(async () => completeUpload?.(uploaded));
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(screen.getByText('Upload complete')).toBeInTheDocument();
+      expect(screen.getByText('1 uploaded')).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTimeAsync(4999));
+      expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
+      expect(screen.getByText('Upload complete')).toBeInTheDocument();
+
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+      expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('0');
+      await finishToastExit();
+      expect(screen.queryByText('Upload complete')).not.toBeInTheDocument();
+    });
+
+    it('cancels the previous expiry when a new upload arrives and restarts on completion', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTimeAsync });
+      let completeSecondUpload: ((result: UploadResult) => void) | undefined;
+      vi.mocked(uploadWallpaperWithDetails)
+        .mockResolvedValueOnce(uploaded)
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              completeSecondUpload = resolve;
+            })
+        );
+      renderQueue();
+      await user.click(screen.getByRole('button', { name: 'Add upload' }));
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(screen.getByText('1 uploaded')).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTimeAsync(4999));
+
+      await user.click(screen.getByRole('button', { name: 'Add upload' }));
+      await act(async () => vi.advanceTimersByTimeAsync(5000));
+      expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('2');
+      expect(screen.getByText('Uploading 1/2 files')).toBeInTheDocument();
+
+      await act(async () => completeSecondUpload?.(uploaded));
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(screen.getByText('2 uploaded')).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTimeAsync(4999));
+      expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('2');
+      expect(screen.getByText('Upload complete')).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+      expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('0');
+    });
+
+    it.each([
+      {
+        label: 'failed',
+        result: {
+          success: false,
+          isDuplicate: false,
+          error: { type: 'network' as const, message: 'Upload failed' },
+        },
+      },
+      { label: 'duplicate', result: { ...uploaded, isDuplicate: true } },
+    ])('retains a $label upload and its successful sibling past the expiry', async ({
+      label,
+      result,
+    }) => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTimeAsync });
+      vi.mocked(uploadWallpaperWithDetails)
+        .mockResolvedValueOnce(result)
+        .mockResolvedValueOnce(uploaded);
+      renderQueue();
+      await user.click(screen.getByRole('button', { name: 'Add upload' }));
+      await user.click(screen.getByRole('button', { name: 'Add upload' }));
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(screen.getByText('1 uploaded')).toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTimeAsync(5000));
+      expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('2');
+      expect(screen.getByText('Upload complete')).toBeInTheDocument();
+      expect(screen.getByText('1 uploaded')).toBeInTheDocument();
+      expect(screen.getByText(`1 ${label}`)).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+      expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent(
+        label === 'failed' ? '1' : '0'
+      );
+    });
+
+    it('cancels completion expiry when the manager unmounts', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTimeAsync });
+      vi.mocked(uploadWallpaperWithDetails).mockResolvedValue(uploaded);
+      const view = renderQueue();
+      await user.click(screen.getByRole('button', { name: 'Add upload' }));
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(screen.getByText('Upload complete')).toBeInTheDocument();
+      view.rerender(<QueueApp showManager={false} />);
+      await finishToastExit();
+      expect(screen.queryByText('Upload complete')).not.toBeInTheDocument();
+      await act(async () => vi.advanceTimersByTimeAsync(5000));
+      expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
+    });
   });
 });

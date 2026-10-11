@@ -1,78 +1,85 @@
 import { Client } from "@opensearch-project/opensearch";
-import { describe, expect, it } from "vitest";
-import { OpenSearchContainer } from "../src/index";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { OpenSearchContainer, type StartedOpenSearchContainer } from "../src/index";
 
 const image = "opensearchproject/opensearch:2.19.2";
 
-describe("OpenSearchContainer", { timeout: 180_000 }, () => {
-    it("should create an index with %s", async () => {
-        // opensearchCreateIndex {
-        await using container = await new OpenSearchContainer(image).start();
-
-        const client = new Client({
-            node: container.getHttpUrl("host"),
-            auth: {
-                username: container.getUsername(),
-                password: container.getPassword(),
-            },
-            ssl: {
-                rejectUnauthorized: false,
-            },
-        });
-
-        await client.indices.create({ index: "people" });
-
-        const { body } = await client.indices.exists({ index: "people" });
-        expect(body).toBe(true);
-        // }
+function createClient(container: StartedOpenSearchContainer, index: string) {
+    const client = new Client({
+        node: container.getHttpUrl("host"),
+        auth: {
+            username: container.getUsername(),
+            password: container.getPassword(),
+        },
+        ssl: {
+            rejectUnauthorized: false,
+        },
     });
 
-    it("should index a document", async () => {
-        // opensearchIndexDocument {
-        await using container = await new OpenSearchContainer(image).start();
+    return Object.assign(client, {
+        async [Symbol.asyncDispose]() {
+            try {
+                await client.indices.delete({ index, ignore_unavailable: true });
+            } finally {
+                await client.close();
+            }
+        },
+    });
+}
 
-        const client = new Client({
-            node: container.getHttpUrl("host"),
-            auth: {
-                username: container.getUsername(),
-                password: container.getPassword(),
-            },
-            ssl: {
-                rejectUnauthorized: false,
-            },
+describe("OpenSearchContainer", { timeout: 180_000 }, () => {
+    describe("default configuration", () => {
+        let container: StartedOpenSearchContainer;
+
+        beforeAll(async () => {
+            container = await new OpenSearchContainer(image).start();
+        }, 180_000);
+
+        afterAll(async () => {
+            await container?.stop();
+        }, 180_000);
+
+        it("should create an index with %s", async () => {
+            // opensearchCreateIndex {
+            const index = "people-create-index";
+            await using client = createClient(container, index);
+
+            await client.indices.create({ index });
+
+            const { body } = await client.indices.exists({ index });
+            expect(body).toBe(true);
+            // }
         });
 
-        const document = { id: "1", name: "John Doe" };
+        it("should index a document", async () => {
+            // opensearchIndexDocument {
+            const index = "people-index-document";
+            await using client = createClient(container, index);
 
-        await client.index({
-            index: "people",
-            id: document.id,
-            body: document,
+            const document = { id: "1", name: "John Doe" };
+
+            await client.index({
+                index,
+                id: document.id,
+                body: document,
+            });
+
+            const { body } = await client.get({ index, id: document.id });
+            expect(body._source).toEqual(document);
+            // }
         });
-
-        const { body } = await client.get({ index: "people", id: document.id });
-        expect(body._source).toEqual(document);
-        // }
     });
 
     it("should work with restarted container", async () => {
         await using container = await new OpenSearchContainer(image).start();
         await container.restart();
 
-        const client = new Client({
-            node: container.getHttpUrl("host"),
-            auth: {
-                username: container.getUsername(),
-                password: container.getPassword(),
-            },
-            ssl: {
-                rejectUnauthorized: false,
-            },
-        });
+        const index = "people";
+        await using client = createClient(container, index);
 
-        await client.indices.create({ index: "people" });
+        await client.indices.create({ index });
 
-        const existsResponse = await client.indices.exists({ index: "people" });
+        const existsResponse = await client.indices.exists({ index });
         expect(existsResponse.body).toBe(true);
     });
 
@@ -89,20 +96,12 @@ describe("OpenSearchContainer", { timeout: 180_000 }, () => {
             .start();
         // }
 
-        const client = new Client({
-            node: container.getHttpUrl("host"),
-            auth: {
-                username: container.getUsername(),
-                password: container.getPassword(),
-            },
-            ssl: {
-                rejectUnauthorized: false,
-            },
-        });
+        const index = "people";
+        await using client = createClient(container, index);
 
-        await client.indices.create({ index: "people" });
+        await client.indices.create({ index });
 
-        const { body } = await client.indices.exists({ index: "people" });
+        const { body } = await client.indices.exists({ index });
         expect(body).toBe(true);
     });
 });

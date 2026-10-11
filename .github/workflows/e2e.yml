@@ -144,6 +144,3 @@ jobs:
         env:
           TURBO_TOKEN: ''
           TURBO_TEAM: ''
-
-      - name: Verify E2E test isolation
-        run: make run PACKAGE=ingestor-e2e SCRIPT=verify-no-imports

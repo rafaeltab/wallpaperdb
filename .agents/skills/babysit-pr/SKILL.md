@@ -66,6 +66,8 @@ Establish expected workflows and jobs from the trusted current base policy and t
 
 Use [T3's linked-PR documentation](https://github.com/pingdotgg/t3code/blob/main/docs/user/source-control.md#linked-pull-requests) and the live `watch_pull_request` tool description for watcher semantics. When the tool is available, handle existing feedback and failures first, then call it and end the turn while waiting. On each wake, refresh GitHub state and evaluate both gates again. Use this watcher instead of polling or running a separate watcher. Preserve progress in the ledger before yielding. If it is unavailable, use a resumable monitoring mechanism available in the environment or bounded polling waits of at most 60 seconds with progress updates. Report inability to continue monitoring as a blocker.
 
+Before yielding, verify that outstanding gates have a supported completion wake. T3 documents successful required-check completion, but does not guarantee a wake for successful optional checks. If only applicable optional checks remain pending, use a host-supported completion wake when available and permitted by the runtime; otherwise report that monitoring gap as a blocker. Keep the all-applicable-checks gate intact and use polling only under the watcher-unavailable fallback above.
+
 There is no fixed deadline while runs are progressing. Investigate evidence of stalled or missing CI and review runs, and return an actionable blocker when progress needs the user. A closed or merged PR ends babysitting. Perform the handoff cleanup below, then report its actual state and which gates were verified.
 
 ## 6. Verify and hand back

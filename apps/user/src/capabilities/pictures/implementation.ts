@@ -111,7 +111,7 @@ export const picturesLayer = (policy: PicturesPolicy) =>
                   policy: effectivePolicy(principal),
                 }
               : { _tag: 'Rejected', reason: 'unauthorized', message: 'Authentication is required' }
-          ),
+          ).pipe(Effect.withSpan('pictures.policy')),
         stage,
         upload: Effect.fn('pictures.upload')(function* (principal, bytes, expectedVersion) {
           const candidate = yield* stage(principal, bytes);

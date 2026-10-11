@@ -15,6 +15,7 @@ test.each([
   const root = path.join(repository, 'apps', service);
   const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const owned: string[] = [];
+  const coveragePolicies = [];
   for (const selection of ['unit', 'integration']) {
     expect(manifest.scripts[`test:${selection}`]).toBeTypeOf('string');
     const { options } = parseCLI(manifest.scripts[`test:${selection}`]);
@@ -33,6 +34,12 @@ test.each([
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(path.join(root, 'coverage/integration'));
       }
       expect(runner.config.coverage.include).toEqual(['src/**/*.ts']);
+      coveragePolicies.push({
+        include: runner.config.coverage.include,
+        exclude: runner.config.coverage.exclude,
+        thresholds: runner.config.coverage.thresholds,
+        reporter: runner.config.coverage.reporter,
+      });
       owned.push(...files);
     } finally {
       await runner.close();
@@ -44,4 +51,5 @@ test.each([
       .map((file) => path.join(directory, file))
   ))).flat();
   expect(owned.sort()).toEqual(files.sort());
+  expect(coveragePolicies[0]).toEqual(coveragePolicies[1]);
 });

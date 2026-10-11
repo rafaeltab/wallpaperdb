@@ -192,6 +192,8 @@
                 "$TURBO_ROOT$/apps/user/vitest.config.ts",
                 "$TURBO_ROOT$/apps/ingestor/package.json",
                 "$TURBO_ROOT$/apps/ingestor/vitest.config.ts",
+                "$TURBO_ROOT$/apps/{gateway,media,user,ingestor}/src/**",
+                "$TURBO_ROOT$/apps/{gateway,media,user,ingestor}/test/**",
                 "$TURBO_ROOT$/packages/crap-typescript-core/src/**",
                 "$TURBO_ROOT$/packages/crap-typescript-core/package.json"
             ],

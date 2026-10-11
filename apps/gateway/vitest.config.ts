@@ -10,7 +10,7 @@ const instrumentationTests = ['test/unit/otel.test.ts'];
 const fastTests = [
   'test/{catalogue,color-query,color-utilities,cursor.service,event-consumers,event-envelope-conformance,graphql-security,health,http-lifecycle,projection}.test.ts',
   'test/unit/{admission,availability,availability-adapter,config,runtime,startup-diagnostics}.test.ts',
-  'src/**/*.test.ts',
+  'src/adapters/opensearch/documents.test.ts',
 ];
 
 export default mergeConfig(

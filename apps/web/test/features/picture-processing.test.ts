@@ -1,0 +1,88 @@
+import { Blob as NativeBlob } from 'node:buffer';
+import { readFile } from 'node:fs/promises';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { initialPictureCrop, type PictureEncodingPolicy } from '@/features/picture-editor';
+import { openPictureSource } from '@/features/picture-editor/adapters/browser';
+
+const policy: PictureEncodingPolicy = {
+  output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+  maxOutputBytes: 4096,
+  encoding: { staticQuality: 85 },
+};
+let source: Blob;
+let encoded: Blob;
+const closed = vi.fn();
+const draw = vi.fn();
+
+beforeEach(async () => {
+  vi.stubGlobal('Blob', NativeBlob);
+  vi.stubGlobal('Worker', undefined);
+  vi.stubGlobal('HTMLImageElement', class {});
+  closed.mockReset(); draw.mockReset();
+  source = new Blob([await readFile(new URL('../../../web-e2e/fixtures/profile-small.png', import.meta.url))]);
+  // Real canonical pixels from the browser journey, with an encoder-added XMP chunk.
+  const bytes = await readFile(new URL('../fixtures/profile-canonical.webp', import.meta.url));
+  bytes[20] |= 4;
+  const metadata = Buffer.from('PRIVATE_CAMERA');
+  const chunk = Buffer.alloc(8 + metadata.length + metadata.length % 2);
+  chunk.write('XMP '); chunk.writeUInt32LE(metadata.length, 4); chunk.set(metadata, 8);
+  bytes.writeUInt32LE(bytes.length + chunk.length - 8, 4);
+  encoded = new Blob([bytes, chunk], { type: 'image/webp' });
+  vi.stubGlobal('createImageBitmap', async () => ({ width: 32, height: 48, close: closed }));
+  // Controlled platform ports isolate adapter cancellation, output admission and metadata handling.
+  vi.stubGlobal('document', {
+    createElement: () => ({
+      width: 0, height: 0,
+      getContext: () => ({ drawImage: draw, imageSmoothingQuality: 'low' }),
+      toBlob: (callback: (blob: Blob) => void, type: string) => callback(type === 'image/png' ? new Blob(['preview'], { type }) : encoded),
+    }),
+  });
+});
+afterEach(() => vi.unstubAllGlobals());
+
+it('returns metadata-free WebP through the yielding fallback and releases decoded bitmaps', async () => {
+  const picture = await openPictureSource(source, new AbortController().signal);
+  expect(picture).toMatchObject({ width: 32, height: 48 });
+  const result = await picture.process(initialPictureCrop(picture), policy, new AbortController().signal);
+  expect(result.type).toBe('image/webp');
+  const bytes = Buffer.from(await result.arrayBuffer());
+  expect(bytes.includes(Buffer.from('PRIVATE_CAMERA'))).toBe(false);
+  expect(bytes.includes(Buffer.from('XMP '))).toBe(false);
+  expect(bytes[20] & 4).toBe(0);
+  expect(bytes.readUInt32LE(4) + 8).toBe(bytes.length);
+  expect(closed).toHaveBeenCalledTimes(2);
+  picture.dispose();
+});
+
+it('rejects an encoded result exceeding the effective output byte limit', async () => {
+  const picture = await openPictureSource(source, new AbortController().signal);
+  await expect(picture.process(initialPictureCrop(picture), { ...policy, maxOutputBytes: 1 }, new AbortController().signal)).rejects.toThrow('Processed picture exceeds');
+  expect(closed).toHaveBeenCalledTimes(2);
+  picture.dispose();
+});
+
+it('reports unsupported browser WebP encoding instead of returning another format', async () => {
+  encoded = new Blob(['jpeg'], { type: 'image/jpeg' });
+  const picture = await openPictureSource(source, new AbortController().signal);
+  await expect(picture.process(initialPictureCrop(picture), policy, new AbortController().signal)).rejects.toThrow('cannot encode WebP');
+  expect(closed).toHaveBeenCalledTimes(2);
+  picture.dispose();
+});
+
+it('cancels fallback drawing without returning partially processed bytes', async () => {
+  const picture = await openPictureSource(source, new AbortController().signal);
+  const controller = new AbortController();
+  draw.mockImplementation(() => controller.abort());
+  await expect(picture.process(initialPictureCrop(picture), policy, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  expect(closed).toHaveBeenCalledTimes(2);
+  picture.dispose();
+});
+
+it('disposes outstanding processing and refuses further work from an abandoned source', async () => {
+  const picture = await openPictureSource(source, new AbortController().signal);
+  const crop = initialPictureCrop(picture);
+  const processing = picture.process(crop, policy, new AbortController().signal);
+  picture.dispose();
+  await expect(processing).rejects.toMatchObject({ name: 'AbortError' });
+  await expect(picture.process(crop, policy, new AbortController().signal)).rejects.toMatchObject({ name: 'AbortError' });
+});

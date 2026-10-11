@@ -361,7 +361,7 @@ describe('Gateway composition with real adapters', () => {
         expect(
           await Effect.runPromise(
             search.projectionStore.apply({
-              _tag: 'PublishWallpaper',
+              _tag: 'WallpaperUploaded',
               wallpaperId: 'shared-wallpaper',
               profileId: name,
               uploadedAt: timestamp,
@@ -372,7 +372,7 @@ describe('Gateway composition with real adapters', () => {
         expect(
           await Effect.runPromise(
             search.projectionStore.apply({
-              _tag: 'PublishProfile',
+              _tag: 'ProfilePublished',
               profile: {
                 id: 'shared-profile',
                 displayName: name,

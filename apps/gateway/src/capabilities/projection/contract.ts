@@ -40,34 +40,6 @@ export type ProjectionChange =
       readonly profile: Profile;
     };
 
-export type ProjectionMutation =
-  | {
-      readonly _tag: 'PublishWallpaper';
-      readonly occurrence: Occurrence;
-      readonly wallpaperId: string;
-      readonly profileId: string;
-      readonly uploadedAt: string;
-    }
-  | {
-      readonly _tag: 'PublishVariant';
-      readonly occurrence: Occurrence;
-      readonly wallpaperId: string;
-      readonly variant: Variant;
-    }
-  | {
-      readonly _tag: 'PublishMeasurements';
-      readonly occurrence: Occurrence;
-      readonly wallpaperId: string;
-      readonly descriptor: ColorDescriptor;
-      readonly original: { readonly owner: 'ingestor'; readonly id: string };
-      readonly provenance: {
-        readonly referenceCommit: string;
-        readonly anchorsSha256: string;
-        readonly originalSha256: string;
-      };
-    }
-  | { readonly _tag: 'PublishProfile'; readonly occurrence: Occurrence; readonly profile: Profile };
-
 export class ProjectionUnavailable extends Schema.TaggedError<ProjectionUnavailable>()(
   'ProjectionUnavailable',
   { cause: Schema.Defect() }
@@ -86,7 +58,7 @@ export type ProjectionWrite =
  * snapshots only advance version. Reads see completed writes. Independent target
  * documents and the broker acknowledgement do not share a transaction. */
 export interface ProjectionStore {
-  apply(mutation: ProjectionMutation): Effect.Effect<ProjectionWrite, ProjectionUnavailable>;
+  apply(change: ProjectionChange): Effect.Effect<ProjectionWrite, ProjectionUnavailable>;
 }
 
 export const ProjectionStore = Context.Service<ProjectionStore>(

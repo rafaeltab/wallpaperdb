@@ -1,7 +1,6 @@
 export type {
   Occurrence,
   ProjectionChange,
-  ProjectionMutation,
   ProjectionOutcome,
   ProjectionWrite,
 } from './contract.js';

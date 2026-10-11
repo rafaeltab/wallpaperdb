@@ -20,7 +20,6 @@ import {
   ProjectCatalogue,
   ProjectionStore,
   projectionLayer,
-  type ProjectionMutation,
   type ProjectionWrite,
   ProjectionUnavailable,
   type ProjectionChange,
@@ -193,9 +192,9 @@ describe('NATS projection adapter contract', () => {
     10000, 0,
   ])('retains monochromatic coverage %i and duplicate occurrence identity through projection', async (coverage) => {
     class Store implements ProjectionStore {
-      readonly changes: ProjectionMutation[] = [];
+      readonly changes: ProjectionChange[] = [];
       readonly occurrences = new Set<string>();
-      apply(mutation: ProjectionMutation): Effect.Effect<ProjectionWrite> {
+      apply(mutation: ProjectionChange): Effect.Effect<ProjectionWrite> {
         return Effect.sync(() => {
           this.changes.push(mutation);
           const identity = JSON.stringify([mutation.occurrence.source, mutation.occurrence.id]);
@@ -256,7 +255,7 @@ describe('NATS projection adapter contract', () => {
       )
       .toEqual([0, 0]);
     expect(store.occurrences.size).toBe(1);
-    expect(store.changes).toEqual(Array(2).fill({ ...change, _tag: 'PublishMeasurements' }));
+    expect(store.changes).toEqual(Array(2).fill(change));
     const retained = await manager.streams.getMessage('WALLPAPER', {
       last_by_subj: 'wallpaper.colors.extracted',
     });

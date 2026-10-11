@@ -39,6 +39,29 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it('rejects an alpha chunk after the image even when the native decoder accepts the image', async () => {
+    const webp = await sharp({
+      create: { width: 512, height: 512, channels: 3, background: '#3578aa' },
+    })
+      .webp()
+      .toBuffer();
+    const extension = Buffer.alloc(18);
+    extension.write('VP8X');
+    extension.writeUInt32LE(10, 4);
+    extension.writeUIntLE(511, 12, 3);
+    extension.writeUIntLE(511, 15, 3);
+    const malformed = Buffer.concat([
+      webp.subarray(0, 12),
+      extension,
+      webp.subarray(12),
+      Buffer.from('414c5048010000000000', 'hex'),
+    ]);
+    malformed.writeUInt32LE(malformed.length - 8, 4);
+    expect(await sharp(malformed).raw().toBuffer()).toHaveLength(512 * 512 * 3);
+    await expect(processProfilePicture(malformed, limits)).rejects.toThrow(
+      'Picture could not be decoded'
+    );
+  });
   it('rejects a canonical-sized WebP containing duplicate image chunks', async () => {
     const webp = await sharp({
       create: { width: 512, height: 512, channels: 3, background: '#3578aa' },
@@ -48,6 +71,24 @@ describe('Profile picture processing', () => {
     const duplicate = Buffer.concat([webp, webp.subarray(12)]);
     duplicate.writeUInt32LE(duplicate.length - 8, 4);
     await expect(processProfilePicture(duplicate, limits)).rejects.toThrow(
+      'Picture could not be decoded'
+    );
+  });
+  it('rejects an extended header that omits alpha present in the lossless image', async () => {
+    const webp = await sharp({
+      create: { width: 512, height: 512, channels: 4, background: '#3578aa80' },
+    })
+      .webp({ lossless: true })
+      .toBuffer();
+    expect(webp.toString('ascii', 12, 16)).toBe('VP8L');
+    const extension = Buffer.alloc(18);
+    extension.write('VP8X');
+    extension.writeUInt32LE(10, 4);
+    extension.writeUIntLE(511, 12, 3);
+    extension.writeUIntLE(511, 15, 3);
+    const malformed = Buffer.concat([webp.subarray(0, 12), extension, webp.subarray(12)]);
+    malformed.writeUInt32LE(malformed.length - 8, 4);
+    await expect(processProfilePicture(malformed, limits)).rejects.toThrow(
       'Picture could not be decoded'
     );
   });
@@ -137,11 +178,14 @@ describe('Profile picture processing', () => {
       processProfilePicture(Buffer.concat([webp, Buffer.from('hidden trailing bytes')]), limits)
     ).rejects.toThrow('Picture could not be decoded');
   });
-  it('preserves exact canonical static WebP bytes after fully decoding them', async () => {
+  it.each([
+    false,
+    true,
+  ])('preserves exact canonical static WebP bytes after fully decoding them with lossless=%s', async (lossless) => {
     const input = await sharp({
       create: { width: 512, height: 512, channels: 4, background: '#3578aa80' },
     })
-      .webp({ quality: 73 })
+      .webp({ quality: 73, lossless })
       .toBuffer();
     const picture = await processProfilePicture(input, limits);
     expect(picture.bytes).toEqual(input);

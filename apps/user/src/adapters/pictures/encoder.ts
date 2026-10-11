@@ -51,9 +51,32 @@ function validateWebpContainer(input: Buffer): void {
     throw new InvalidProfilePictureError('Picture could not be decoded');
   let offset = 12;
   let imageChunks = 0;
+  let features: number | undefined;
+  let imageHasAlpha = false;
   const chunks = new Set<string>();
   while (offset + 8 <= input.length) {
     const type = input.toString('ascii', offset, offset + 4);
+    const size = input.readUInt32LE(offset + 4);
+    if (size > input.length - offset - 8)
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    if (type === 'VP8X') {
+      if (
+        size !== 10 ||
+        (input[offset + 8] & 0xc1) !== 0 ||
+        !input.subarray(offset + 9, offset + 12).equals(Buffer.alloc(3))
+      )
+        throw new InvalidProfilePictureError('Picture could not be decoded');
+      features = input[offset + 8];
+    }
+    if (type === 'ALPH' && (imageChunks > 0 || !((features ?? 0) & 0x10)))
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    if (type === 'ICCP' && (imageChunks > 0 || chunks.has('ALPH')))
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    if (type === 'VP8L') {
+      if (chunks.has('ALPH') || size < 5)
+        throw new InvalidProfilePictureError('Picture could not be decoded');
+      imageHasAlpha = Boolean(input[offset + 12] & 0x10);
+    }
     if (['VP8 ', 'VP8L'].includes(type)) imageChunks++;
     if (
       imageChunks > 1 ||
@@ -62,12 +85,22 @@ function validateWebpContainer(input: Buffer): void {
     )
       throw new InvalidProfilePictureError('Picture could not be decoded');
     chunks.add(type);
-    const size = input.readUInt32LE(offset + 4);
-    if (size > input.length - offset - 8)
+    if (size % 2 && input[offset + 8 + size] !== 0)
       throw new InvalidProfilePictureError('Picture could not be decoded');
     offset += 8 + size + (size % 2);
   }
   if (offset !== input.length) throw new InvalidProfilePictureError('Picture could not be decoded');
+  if (features !== undefined) {
+    if (imageChunks === 1 && Boolean(features & 0x10) !== (chunks.has('ALPH') || imageHasAlpha))
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    for (const [type, flag] of [
+      ['ICCP', 0x20],
+      ['EXIF', 0x08],
+      ['XMP ', 0x04],
+    ] as const)
+      if (Boolean(features & flag) !== chunks.has(type))
+        throw new InvalidProfilePictureError('Picture could not be decoded');
+  }
 }
 
 function validateEncodedPicture(input: Buffer, limits: PictureLimits): void {

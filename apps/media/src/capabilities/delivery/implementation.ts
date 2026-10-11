@@ -22,10 +22,16 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
           id: string,
           options?: ResizeOptions
         ) {
+          const hasBothDimensions = options?.width !== undefined && options?.height !== undefined;
           if (
             options &&
             [options.width, options.height].some(
-              (n) => n !== undefined && (!Number.isSafeInteger(n) || n < 1)
+              (n, index) =>
+                n !== undefined &&
+                (!Number.isSafeInteger(n) ||
+                  n < 1 ||
+                  (!hasBothDimensions &&
+                    n > (index === 0 ? limits.maxResizeWidth : limits.maxResizeHeight)))
             )
           ) {
             return {

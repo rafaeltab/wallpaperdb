@@ -27,6 +27,7 @@ function fixture(
     maxOutputPixels?: number;
     authorityFailure?: boolean;
     readFailure?: boolean;
+    catalogFailure?: boolean;
     wallpaper?: Wallpaper;
     maxResizeWidth?: number;
     maxResizeHeight?: number;
@@ -34,13 +35,21 @@ function fixture(
 ) {
   const reads: string[] = [];
   const queries: number[][] = [];
+  const wallpaperLookups: string[] = [];
   const resizes: ResizeOptions[] = [];
   let allowed = true;
   let missingVariant = false;
   let missingOriginal = false;
   const dependencies = Layer.mergeAll(
     Layer.succeed(Catalog, {
-      findWallpaper: () => Effect.succeed(overrides.wallpaper ?? original),
+      findWallpaper: (id) => {
+        wallpaperLookups.push(id);
+        return overrides.catalogFailure
+          ? Effect.fail(
+              new DeliveryUnavailable({ operation: 'catalog', cause: new Error('offline') })
+            )
+          : Effect.succeed(overrides.wallpaper ?? original);
+      },
       findSmallestVariant: (_id, w, h) => {
         queries.push([w, h]);
         return Effect.succeed(
@@ -94,6 +103,7 @@ function fixture(
   return {
     reads,
     queries,
+    wallpaperLookups,
     resizes,
     loseOriginal: () => {
       missingOriginal = true;
@@ -120,6 +130,19 @@ function fixture(
   };
 }
 describe('media delivery', () => {
+  it.each([
+    { width: 7681 },
+    { height: 4321 },
+  ])('rejects oversized one-dimensional requests without consulting an unavailable catalog: %j', async (options) => {
+    const f = fixture({ catalogFailure: true, maxResizeWidth: 7680, maxResizeHeight: 4320 });
+    expect(
+      await f.run(
+        Effect.flatMap(MediaDelivery, (d) => d.wallpaper('wall_1', { ...options, fit: 'contain' }))
+      )
+    ).toEqual({ _tag: 'Rejected', reason: 'Requested dimensions exceed media limits' });
+    expect(f.wallpaperLookups).toEqual([]);
+    expect(f.reads).toEqual([]);
+  });
   it('counts exact-original delivery as no resize rather than a variant miss', async () => {
     const f = fixture();
     const snapshots = await f.run(

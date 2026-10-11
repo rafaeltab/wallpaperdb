@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { pictureSelection } from '@/features/profile-management';
 import { LoaderCircle, Pencil, X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { usePictureEditor } from '@/features/picture-editor/adapters/react';
 import { ProfilePictureCrop } from '@/components/profile/profile-picture-crop';
 import { toast } from 'sonner';
@@ -116,6 +116,21 @@ export function ProfilePictureSettings({
     else editor.clear();
   }
 
+  const pastePicture = useEffectEvent((event: ClipboardEvent) => {
+    const item = Array.from(event.clipboardData?.items ?? []).find(
+      (item) => item.kind === 'file' && item.type.startsWith('image/')
+    );
+    const picture = item?.getAsFile();
+    if (!picture) return;
+    event.preventDefault();
+    selectPicture(picture);
+  });
+  useEffect(() => {
+    if (!open) return;
+    document.addEventListener('paste', pastePicture);
+    return () => document.removeEventListener('paste', pastePicture);
+  }, [open]);
+
   async function refresh() {
     if (availability.isBusy()) return;
     mutation.reset();
@@ -149,7 +164,7 @@ export function ProfilePictureSettings({
           }
         }}
         title="Profile picture"
-        description="Your picture appears on your profile and wallpaper contributions. Choose or drop an image to begin."
+        description="Your picture appears on your profile and wallpaper contributions. Choose, drop, or paste an image to begin."
         busy={writing}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {

@@ -56,13 +56,44 @@ export async function waitForWallpaper(page: Page, wallpaperId: string) {
     .toBe(3);
 }
 
-/** Search pagination keeps these checks independent of earlier uploaded data. */
+interface CatalogueQuery {
+  query: string;
+  variables: Record<string, unknown>;
+}
+
+/** Search pagination supports one color or the exact query captured from the UI. */
 export async function waitForCataloguePage(
   page: Page,
   wallpaperId: string,
-  color?: string,
+  search?: string | CatalogueQuery,
   profileId?: string,
 ) {
+  const color = typeof search === "string" ? search : undefined;
+  const catalogue =
+    typeof search === "object"
+      ? search
+      : {
+          query: `query BrowserCatalogue($after:String,$filter:WallpaperFilter,$sort:WallpaperSort) {
+      searchWallpapers(filter:$filter,sort:$sort,first:20,after:$after) {
+        edges { node { wallpaperId } } pageInfo { hasNextPage endCursor }
+      }
+    }`,
+          variables: {
+            filter:
+              color || profileId
+                ? { profileId, variants: { format: "image/png" } }
+                : undefined,
+            sort: color
+              ? {
+                  color: {
+                    mode: "VIBE",
+                    quality: "FAVORITE",
+                    targets: [{ color }],
+                  },
+                }
+              : undefined,
+          },
+        };
   let matchingCursor: string | undefined;
   await expect
     .poll(
@@ -71,27 +102,8 @@ export async function waitForCataloguePage(
         do {
           const response = await page.request.post("/gateway/graphql", {
             data: {
-              query: `query BrowserCatalogue($after:String,$filter:WallpaperFilter,$sort:WallpaperSort) {
-            searchWallpapers(filter:$filter,sort:$sort,first:20,after:$after) {
-              edges { node { wallpaperId } } pageInfo { hasNextPage endCursor }
-            }
-          }`,
-              variables: {
-                after,
-                filter:
-                  color || profileId
-                    ? { profileId, variants: { format: "image/png" } }
-                    : undefined,
-                sort: color
-                  ? {
-                      color: {
-                        mode: "VIBE",
-                        quality: "FAVORITE",
-                        targets: [{ color }],
-                      },
-                    }
-                  : undefined,
-              },
+              query: catalogue.query,
+              variables: { ...catalogue.variables, after: after ?? null },
             },
           });
           expect(response.ok()).toBe(true);
@@ -114,9 +126,10 @@ export async function waitForCataloguePage(
         return false;
       },
       {
-        message: color
-          ? "the fresh upload participates in colour-ranked catalogue results"
-          : "the fresh upload reaches catalogue search",
+        message:
+          color || typeof search === "object"
+            ? "the fresh upload participates in ranked catalogue results"
+            : "the fresh upload reaches catalogue search",
         timeout: 60000,
       },
     )

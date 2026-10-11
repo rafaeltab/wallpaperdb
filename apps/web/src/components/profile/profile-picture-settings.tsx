@@ -269,14 +269,7 @@ export function ProfilePictureSettings({
               setError(null);
               mutation.reset();
               void editor.apply(policy, (picture, expectedVersion) => {
-                if (
-                  originatingSession !== session.current ||
-                  client
-                    .getQueryCache()
-                    .find({ queryKey: profileQueryKey(profile.id), exact: true }) !==
-                    ownerQuery.current
-                )
-                  return;
+                if (!currentDialog(originatingSession)) return;
                 if (availability.isBusy())
                   throw new Error(
                     'Your Profile is busy. Apply the picture again after the current change finishes.'

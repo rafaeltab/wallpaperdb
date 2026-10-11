@@ -1,23 +1,11 @@
 import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
-export default defineBaseConfig({
+export const configuration = {
   test: {
     name: 'media',
     globals: true,
     environment: 'node',
-    projects: [
-      {
-        extends: true,
-        test: { name: 'media-unit', include: ['test/**/*.unit.test.ts'] },
-      },
-      {
-        extends: true,
-        test: {
-          name: 'media-integration',
-          include: ['test/**/*.integration.test.ts'],
-        },
-      },
-    ],
+    include: ['test/**/*.test.ts'],
     testTimeout: 60000, // 60 seconds for testcontainers
     hookTimeout: 60000,
     // Enable parallel test execution within files
@@ -30,4 +18,6 @@ export default defineBaseConfig({
       reportsDirectory: './coverage/integration',
     },
   },
-});
+} satisfies Parameters<typeof defineBaseConfig>[0];
+
+export default defineBaseConfig(configuration);

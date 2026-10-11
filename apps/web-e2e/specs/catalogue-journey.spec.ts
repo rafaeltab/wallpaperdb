@@ -11,7 +11,7 @@ test.use({ actionTimeout: 15000 });
 test("uploaded pixels survive catalogue delivery, filtering and accessible details", async ({
   page,
 }) => {
-  // Five readiness polls can each use 60 seconds before the UI assertions run.
+  // Projection and search readiness polls share this bounded journey deadline.
   test.setTimeout(360000);
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -273,6 +273,7 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
   });
   await editor.getByRole("button", { name: "Save", exact: true }).click();
   const mixedResponse = await mixed;
+  expect(mixedResponse.ok()).toBe(true);
   expect(mixedResponse.request().postDataJSON().variables).toMatchObject({
     filter: { profileId: owner.id, variants: { format: "image/png" } },
     after: null,
@@ -287,12 +288,17 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
   });
   const mixedBody = await mixedResponse.json();
   expect(mixedBody.errors).toBeUndefined();
-  expect(
-    mixedBody.data.searchWallpapers.edges.some(
-      (edge: { node: { wallpaperId: string } }) =>
-        edge.node.wallpaperId === wallpaperId,
-    ),
-  ).toBe(true);
+  const mixedCursor = await waitForCataloguePage(
+    page,
+    wallpaperId,
+    mixedResponse.request().postDataJSON(),
+  );
+  if (mixedCursor) {
+    const selectedPage = new URL(page.url());
+    selectedPage.searchParams.set("after", mixedCursor);
+    await page.goto(selectedPage.toString());
+  }
+  await expect(card).toBeVisible();
   await page.reload();
   await page
     .getByRole("button", { name: "Toggle filters", exact: true })

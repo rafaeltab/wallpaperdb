@@ -6,8 +6,11 @@ import { createVitest, parseCLI } from 'vitest/node';
 
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 
-test('Gateway CI selections own every test file once and keep search setup out of fast tests', async () => {
-  const root = path.join(repository, 'apps/gateway');
+test.each([
+  { service: 'gateway', fast: 'test/catalogue.test.ts', slow: 'test/opensearch.test.ts' },
+  { service: 'media', fast: 'test/delivery.test.ts', slow: 'test/health.test.ts' },
+])('$service CI selections own every test file once and keep infrastructure setup out of fast tests', async ({ service, fast, slow }) => {
+  const root = path.join(repository, 'apps', service);
   const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const owned: string[] = [];
   for (const selection of ['unit', 'integration']) {
@@ -19,12 +22,12 @@ test('Gateway CI selections own every test file once and keep search setup out o
       const files = specifications.map((specification) => path.relative(root, specification.moduleId));
       expect(files.length).toBeGreaterThan(0);
       if (selection === 'unit') {
-        expect(files).toContain('test/catalogue.test.ts');
-        expect(files).not.toContain('test/opensearch.test.ts');
+        expect(files).toContain(fast);
+        expect(files).not.toContain(slow);
         for (const project of runner.projects) expect(project.config.globalSetup).toEqual([]);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(path.join(root, 'coverage/unit'));
       } else {
-        expect(files).toContain('test/opensearch.test.ts');
+        expect(files).toContain(slow);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(path.join(root, 'coverage/integration'));
       }
       expect(runner.config.coverage.include).toEqual(['src/**/*.ts']);

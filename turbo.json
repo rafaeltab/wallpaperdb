@@ -186,6 +186,8 @@
                 "test/fixtures/crap/**",
                 "$TURBO_ROOT$/apps/gateway/package.json",
                 "$TURBO_ROOT$/apps/gateway/vitest.config.ts",
+                "$TURBO_ROOT$/apps/media/package.json",
+                "$TURBO_ROOT$/apps/media/vitest.config.ts",
                 "$TURBO_ROOT$/packages/crap-typescript-core/src/**",
                 "$TURBO_ROOT$/packages/crap-typescript-core/package.json"
             ],

@@ -2,7 +2,12 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Effect, Layer, Semaphore } from 'effect';
 import { z } from 'zod';
-import { PictureCodec, type PictureLimits, PictureUnavailable } from '../../capabilities/pictures/index.js';
+import {
+  PictureCodec,
+  type PictureLimits,
+  type EffectivePicturePolicy,
+  PictureUnavailable,
+} from '../../capabilities/pictures/index.js';
 
 const outputSchema = z.discriminatedUnion('_tag', [
   z.object({
@@ -21,7 +26,11 @@ const outputSchema = z.discriminatedUnion('_tag', [
   }),
 ]);
 
-function encode(bytes: Buffer, limits: PictureLimits): ReturnType<PictureCodec['process']> {
+function encode(
+  bytes: Buffer,
+  limits: PictureLimits,
+  policy: EffectivePicturePolicy
+): ReturnType<PictureCodec['process']> {
   if (bytes.length > limits.maxBytes)
     return Effect.succeed({
       _tag: 'Rejected',
@@ -35,7 +44,7 @@ function encode(bytes: Buffer, limits: PictureLimits): ReturnType<PictureCodec['
     );
     const child = spawn(
       process.execPath,
-      ['--experimental-strip-types', fileURLToPath(worker), JSON.stringify(limits)],
+      ['--experimental-strip-types', fileURLToPath(worker), JSON.stringify({ ...limits, policy })],
       {
         stdio: ['pipe', 'pipe', 'pipe'],
       }
@@ -113,7 +122,9 @@ export function pictureCodecLayer(limits: PictureLimits): Layer.Layer<PictureCod
     PictureCodec,
     Effect.gen(function* () {
       const nativeWork = yield* Semaphore.make(2);
-      return PictureCodec.of({ process: (bytes) => nativeWork.withPermit(encode(bytes, limits)) });
+      return PictureCodec.of({
+        process: (bytes, policy) => nativeWork.withPermit(encode(bytes, limits, policy)),
+      });
     })
   );
 }

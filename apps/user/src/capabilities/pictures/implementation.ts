@@ -4,6 +4,7 @@ import type {
   PictureCursor,
   PictureImport,
   PictureImportCursor,
+  EffectivePicturePolicy,
   PicturesPolicy,
   StoredPicture,
 } from './contract.js';
@@ -21,6 +22,13 @@ export const picturesLayer = (policy: PicturesPolicy) =>
       const retention = yield* Semaphore.make(1);
       let cursor: PictureCursor | undefined;
       let importCursor: PictureImportCursor | undefined;
+      const effectivePolicy = (_principal: ProfilePrincipal): EffectivePicturePolicy => ({
+        output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+        maxOutputBytes: policy.profilePictureMaxBytes,
+        acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
+        animation: { available: false },
+        encoding: { staticQuality: 85 },
+      });
       const stage = Effect.fn('pictures.stage')(function* (
         principal: ProfilePrincipal,
         bytes: Buffer
@@ -31,9 +39,16 @@ export const picturesLayer = (policy: PicturesPolicy) =>
             reason: 'unauthorized',
             message: 'Authentication is required',
           } as const;
-        const decoded = yield* codec.process(bytes);
+        const resolved = effectivePolicy(principal);
+        const decoded = yield* codec.process(bytes, resolved);
         if (decoded._tag === 'Rejected') return decoded;
         const { picture } = decoded;
+        if (picture.bytes.length > resolved.maxOutputBytes)
+          return {
+            _tag: 'Rejected',
+            reason: 'picture-too-large',
+            message: 'Picture exceeds the processed output byte limit',
+          } as const;
         const now = new Date(yield* Clock.currentTimeMillis);
         const asset = yield* store.createCandidate({
           profileId: principal.profileId,
@@ -93,13 +108,7 @@ export const picturesLayer = (policy: PicturesPolicy) =>
             principal.profileId
               ? {
                   _tag: 'Policy',
-                  policy: {
-                    output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
-                    maxOutputBytes: policy.profilePictureMaxBytes,
-                    acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
-                    animation: { available: false },
-                    encoding: { staticQuality: 85 },
-                  },
+                  policy: effectivePolicy(principal),
                 }
               : { _tag: 'Rejected', reason: 'unauthorized', message: 'Authentication is required' }
           ),

@@ -34,15 +34,19 @@ function readPngChunk(input: Buffer, offset: number): { type: string; nextOffset
   };
 }
 
-function hasPngAnimation(input: Buffer): boolean {
-  if (!input.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return false;
+function validatePngSource(input: Buffer): void {
+  if (!input.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return;
   for (let offset = 8; offset + 12 <= input.length; ) {
     const chunk = readPngChunk(input, offset);
-    if (chunk.type === 'acTL') return true;
+    if (chunk.type === 'acTL')
+      throw new InvalidProfilePictureError('Animated pictures are not accepted');
+    // The native decoder does not expose cICP interpretation, including PQ/HLG.
+    // Reject these sources rather than infer SDR from RGB16 sample metadata.
+    if (chunk.type === 'cICP')
+      throw new InvalidProfilePictureError('Picture color interpretation is unsupported');
     if (chunk.type === 'IEND') break;
     offset = chunk.nextOffset;
   }
-  return false;
 }
 
 function validateWebpContainer(input: Buffer): void {
@@ -109,8 +113,7 @@ function validateEncodedPicture(input: Buffer, limits: PictureLimits): void {
   if (!hasSupportedSignature(input))
     throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
   validateWebpContainer(input);
-  if (hasPngAnimation(input))
-    throw new InvalidProfilePictureError('Animated pictures are not accepted');
+  validatePngSource(input);
 }
 
 function hasSupportedSignature(input: Buffer): boolean {

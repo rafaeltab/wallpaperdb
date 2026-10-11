@@ -199,7 +199,7 @@ describe('Dynamic Items Integration', () => {
 
       await waitFor(
         () => {
-          expect(screen.getByTestId('item-2')).toBeInTheDocument();
+          expect(screen.getByTestId('item-2')).toBeVisible();
         },
         { timeout: 1000 }
       );

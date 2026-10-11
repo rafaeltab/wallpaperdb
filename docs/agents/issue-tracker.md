@@ -14,6 +14,10 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repository from `git remote -v`; `gh` does this automatically inside the clone.
 
+## Claiming an issue
+
+When picking up a GitHub issue, assign it to the authenticated GitHub account used by the agent before implementation. Use [gh issue edit](https://cli.github.com/manual/gh_issue_edit) with `<number-or-url> --add-assignee @me` and preserve existing assignees. Read back the issue with [gh issue view](https://cli.github.com/manual/gh_issue_view) using `<number-or-url> --json assignees` and verify the account is assigned. If assignment or verification fails, report the failure rather than treating the issue as claimed.
+
 ## Pull requests as a triage surface
 
 External pull requests are not a request or triage surface. Triage GitHub issues only.

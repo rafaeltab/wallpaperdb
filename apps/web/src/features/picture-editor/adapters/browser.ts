@@ -1,0 +1,196 @@
+import type { PictureSource } from '../index';
+import type { PictureJob, PictureJobResult } from './protocol';
+
+function cancelled() {
+  return new DOMException('Picture processing cancelled.', 'AbortError');
+}
+
+function yieldToUi(signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      clearTimeout(timer);
+      reject(cancelled());
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    }, 0);
+    signal.addEventListener('abort', abort, { once: true });
+  });
+}
+
+async function validateSource(file: Blob, signal: AbortSignal) {
+  const bytes = new Uint8Array(await file.slice(0, 30).arrayBuffer());
+  signal.throwIfAborted();
+  const text = (start: number, end: number) => String.fromCharCode(...bytes.slice(start, end));
+  const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const png =
+    bytes[0] === 137 &&
+    text(1, 4) === 'PNG' &&
+    bytes[4] === 13 &&
+    bytes[5] === 10 &&
+    bytes[6] === 26 &&
+    bytes[7] === 10;
+  const webp = text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP';
+  if (!jpeg && !png && !webp) throw new Error('Choose a valid JPEG, PNG, or WebP picture.');
+  if (webp && text(12, 16) === 'VP8X' && bytes[20] & 2)
+    throw new Error('Animated WebP pictures are not supported. Choose a static picture.');
+}
+
+async function fallback(
+  job: PictureJob,
+  signal: AbortSignal
+): Promise<Extract<PictureJobResult, { ok: true }>> {
+  await yieldToUi(signal);
+  let image: ImageBitmap | HTMLImageElement;
+  let sourceUrl: string | undefined;
+  if (typeof createImageBitmap !== 'undefined') {
+    image = await createImageBitmap(job.file, {
+      imageOrientation: 'from-image',
+      colorSpaceConversion: 'default',
+    });
+  } else {
+    image = new Image();
+    sourceUrl = URL.createObjectURL(job.file);
+    image.src = sourceUrl;
+    try {
+      await image.decode();
+    } catch (cause) {
+      URL.revokeObjectURL(sourceUrl);
+      throw cause;
+    }
+  }
+  try {
+    signal.throwIfAborted();
+    const sourceWidth = image instanceof HTMLImageElement ? image.naturalWidth : image.width;
+    const sourceHeight = image instanceof HTMLImageElement ? image.naturalHeight : image.height;
+    const scale = Math.min(1, 1024 / Math.max(sourceWidth, sourceHeight));
+    const width =
+      job.action === 'preview'
+        ? Math.max(1, Math.round(sourceWidth * scale))
+        : job.policy.output.width;
+    const height =
+      job.action === 'preview'
+        ? Math.max(1, Math.round(sourceHeight * scale))
+        : job.policy.output.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { alpha: true, colorSpace: 'srgb' });
+    if (!context) throw new Error('Unable to create the picture canvas.');
+    context.imageSmoothingQuality = 'high';
+    const crop =
+      job.action === 'preview'
+        ? { x: 0, y: 0, width: sourceWidth, height: sourceHeight }
+        : { x: job.crop.x, y: job.crop.y, width: job.crop.size, height: job.crop.size };
+    // Bound each synchronous draw and let cancellation and painting run between strips.
+    for (let y = 0; y < height; y += 64) {
+      await yieldToUi(signal);
+      const strip = Math.min(64, height - y);
+      context.drawImage(
+        image,
+        crop.x,
+        crop.y + (crop.height * y) / height,
+        crop.width,
+        (crop.height * strip) / height,
+        0,
+        y,
+        width,
+        strip
+      );
+    }
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (result) =>
+          result ? resolve(result) : reject(new Error('Unable to encode this picture.')),
+        job.action === 'preview' ? 'image/png' : 'image/webp',
+        job.action === 'process' ? job.policy.encoding.staticQuality / 100 : undefined
+      )
+    );
+    signal.throwIfAborted();
+    return { ok: true, blob, width: sourceWidth, height: sourceHeight };
+  } finally {
+    if ('close' in image) image.close();
+    if (sourceUrl) URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+async function runJob(
+  job: PictureJob,
+  signal: AbortSignal
+): Promise<Extract<PictureJobResult, { ok: true }>> {
+  signal.throwIfAborted();
+  if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined')
+    return fallback(job, signal);
+  const result = await new Promise<PictureJobResult>((resolve, reject) => {
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+    } catch {
+      resolve({ ok: false, message: 'Worker unavailable.', unsupported: true });
+      return;
+    }
+    const cleanup = () => {
+      signal.removeEventListener('abort', abort);
+      worker.terminate();
+    };
+    const abort = () => {
+      cleanup();
+      reject(cancelled());
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    worker.onmessage = (event: MessageEvent<PictureJobResult>) => {
+      cleanup();
+      resolve(event.data);
+    };
+    worker.onerror = () => {
+      cleanup();
+      reject(new Error('Picture processing failed. Try again or choose another picture.'));
+    };
+    worker.postMessage(job);
+  });
+  signal.throwIfAborted();
+  if (result.ok) return result;
+  if (result.unsupported) return fallback(job, signal);
+  throw new Error(`Unable to process this picture. ${result.message}`);
+}
+
+/** Public browser adapter: source pixels stay local; only process() returns uploadable bytes. */
+export async function openPictureSource(file: Blob, signal: AbortSignal): Promise<PictureSource> {
+  await validateSource(file, signal);
+  const preview = await runJob({ action: 'preview', file }, signal);
+  let disposed = false;
+  const work = new Set<AbortController>();
+  return {
+    width: preview.width,
+    height: preview.height,
+    preview: preview.blob,
+    async process(crop, policy, signal) {
+      if (disposed) throw cancelled();
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      signal.throwIfAborted();
+      signal.addEventListener('abort', abort, { once: true });
+      work.add(controller);
+      try {
+        const result = await runJob({ action: 'process', file, crop, policy }, controller.signal);
+        if (result.blob.type !== policy.output.mimeType)
+          throw new Error('This browser cannot encode WebP pictures. Try another browser.');
+        if (result.blob.size > policy.maxOutputBytes)
+          throw new Error(
+            `Processed picture exceeds the ${policy.maxOutputBytes.toLocaleString()} byte limit. Choose another picture.`
+          );
+        return result.blob;
+      } finally {
+        signal.removeEventListener('abort', abort);
+        work.delete(controller);
+      }
+    },
+    dispose() {
+      disposed = true;
+      for (const controller of work) controller.abort();
+      work.clear();
+    },
+  };
+}

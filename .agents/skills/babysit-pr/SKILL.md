@@ -17,6 +17,8 @@ Read the PR diff, current head SHA, all CI checks and workflow runs, and all rev
 
 Keep a ledger in session state or outside the repository. Retain the PR URL and head SHA, comment IDs and handling outcomes, delivered fix commits, CI failure evidence, reruns per failure and head, Codex requests and results per head, and flaky-test issue URLs. Resume this ledger on every monitoring wake so counts and retries survive across turns.
 
+Record the remote head on which each fix batch is based. Before publishing, apply [do-work](../do-work/SKILL.md)'s history checks and require that recorded head to be an ancestor of the tested result. Push only the selected head branch using Git's [explicit expected-value lease](https://git-scm.com/docs/git-push#Documentation/git-push.txt---force-with-leaseltrefnamegtltexpectgt): `--force-with-lease=<full-head-ref>:<recorded-head-sha>`. This guards a fast-forward publication against concurrent advances or resets; it does not authorize rewriting history. On rejection, fetch and reassess the new head, integrate applicable fixes, and repeat validation before attempting publication with a newly recorded expectation.
+
 ## 2. Handle review feedback
 
 Invoke [fix-pr-review-comments](../fix-pr-review-comments/SKILL.md) for each batch of unhandled actionable feedback. Its verification, incremental commits, checks, replies, reactions, and resolution rules govern the batch. An outdated comment or an existing reaction alone does not establish completion.

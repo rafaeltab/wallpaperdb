@@ -7,6 +7,8 @@ const publicAdapters = new Set([
   'authentication/adapters/navigation.ts',
   'grid-layout/adapters/muuri.ts',
   'profile-editor/adapters/react.ts',
+  'picture-editor/adapters/browser.ts',
+  'picture-editor/adapters/react.ts',
   'profile-management/adapters/query.ts',
   'public-profile/adapters/routes.ts',
   'request-admission/adapters/graphql.ts',

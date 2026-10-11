@@ -85,8 +85,36 @@ test('clean-checkout web checks have a Web integration task', () => {
 
 test('test tiers preserve sequential container execution', () => {
   for (const tier of ['integration', 'e2e']) {
-    assert.match(output(`test-${tier}`, 'PACKAGE=ingestor-e2e'), /--concurrency=1/);
+    assert.match(output(`test-${tier}`, 'PACKAGE=test-utils'), /--concurrency=1/);
   }
+});
+
+test("E2E task graphs retain only shared container suites and browser journeys", () => {
+	for (const [filter, expected] of [
+		[
+			"",
+			[
+				"@wallpaperdb/test-utils",
+				"@wallpaperdb/testcontainers",
+				"@wallpaperdb/web-e2e",
+			],
+		],
+		[
+			"--filter=!@wallpaperdb/web-e2e",
+			["@wallpaperdb/test-utils", "@wallpaperdb/testcontainers"],
+		],
+	]) {
+		const result = spawnSync(
+			"make",
+			["--no-print-directory", "test-e2e", `TURBO_FLAGS=${filter} --dry=json`],
+			{ encoding: "utf8", env },
+		);
+		assert.equal(result.status, 0, result.stderr);
+		const tasks = JSON.parse(result.stdout).tasks.filter(
+			(task) => task.task === "test:e2e" && task.command !== "<NONEXISTENT>",
+		);
+		assert.deepEqual(tasks.map((task) => task.package).sort(), expected);
+	}
 });
 
 test('browser E2E always executes against the current deployed environment', () => {

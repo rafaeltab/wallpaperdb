@@ -12,6 +12,7 @@ export const configuration = {
     maxWorkers: 5,
     coverage: {
       provider: 'v8',
+      autoAttachSubprocess: true,
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
       reportsDirectory: './coverage/integration',

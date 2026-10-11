@@ -18,7 +18,6 @@ export interface HttpTestServices {
   readonly availability: Availability;
 }
 export const httpConfig: HttpConfig = {
-  port: 3004,
   trustedProxies: [],
   nodeEnv: 'test',
   mediaServiceUrl: 'http://media.example.com',

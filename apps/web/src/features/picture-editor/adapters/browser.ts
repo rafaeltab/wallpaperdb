@@ -1,6 +1,7 @@
 import type { PictureCrop, PictureDimensions, PictureEncodingPolicy } from '../index';
 import type { PictureJob, PictureJobResult } from './protocol';
 import { withoutPictureMetadata } from './webp';
+import { validateSourceDimensions } from './source';
 
 /** UI owns this decoded source and must dispose it when its editing session ends. */
 export interface PictureSource extends PictureDimensions {
@@ -54,12 +55,16 @@ async function validateSource(file: Blob, signal: AbortSignal) {
       if (type === 'acTL')
         throw new Error('Animated PNG pictures are not supported. Choose a static picture.');
       offset += 12 + size;
-      if (type === 'IEND') return;
+      if (type === 'IEND') {
+        await validateSourceDimensions(file, 'png', signal);
+        return;
+      }
     }
     throw new Error('Choose a valid PNG picture.');
   }
   if (webp && text(12, 16) === 'VP8X' && bytes[20] & 2)
     throw new Error('Animated WebP pictures are not supported. Choose a static picture.');
+  await validateSourceDimensions(file, jpeg ? 'jpeg' : 'webp', signal);
 }
 
 async function fallback(

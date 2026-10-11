@@ -37,7 +37,7 @@ The `gh stack` commands require the [GitHub CLI extension](https://github.com/gi
    - uses [tdd](../tdd/SKILL.md) and follows the repository's [development principles](../development-principles/SKILL.md);
    - validates the ticket and reports its commits and results before another implementer starts.
 
-4. Use [code-review](../code-review/SKILL.md) on the ticket's changes against its parent branch. Fix findings in the ticket branch and rerun affected checks. The ticket is implemented for stack readiness only once its acceptance criteria, validation, and review pass.
+4. Use [code-review](../code-review/SKILL.md) on the ticket's changes against its parent branch. Fix findings in the ticket branch and rerun affected checks. Record the reviewed parent and layer commits with the ticket's evidence. The ticket is implemented for stack readiness only once its acceptance criteria, validation, and review pass.
 
 5. Follow [do-work](../do-work/SKILL.md) for validation and publishing checks. Publish the ticket as a draft PR with `gh stack submit --auto --remote <remote>`, which creates or updates the PR targets and registers the native stack once there are at least two PRs. The first publication creates an ordinary PR; report native stack status once the second PR joins it. Write a ticket-specific title and body using [pr](../pr/SKILL.md) and [github-markdown-bodies](../github-markdown-bodies/SKILL.md). Include the ticket's closing reference and link to the spec. Record the PR URL and validated commit in the ticket so later implementers can verify prerequisite readiness.
 
@@ -54,6 +54,8 @@ The `gh stack` commands require the [GitHub CLI extension](https://github.com/gi
 Use `gh stack rebase --remote <remote>` to rebase the stack onto the updated trunk and cascade changes through descendants. Preserve the old parent tips before rewriting history. If rebasing manually, follow Git's [transplanting branches with `--onto` documentation](https://git-scm.com/docs/git-rebase#_transplanting_a_topic_branch_with_onto). Transplant only a layer's own commits with `git rebase --onto <new-parent-tip> <old-parent-tip> <ticket-branch>`, working from the bottom upward. This boundary also prevents replaying landed prerequisite commits after a squash or rebase landing.
 
 Refresh every rewritten layer's recorded commit in its ticket issue, even when its file tree is unchanged. Reuse successful validation for an identical tree and record that comparison; rerun required checks for changed trees. Apply this rule after every history rewrite, including restacks and partial landings.
+
+Compare each layer's diff against its new parent with the diff between its recorded reviewed commits. If that diff changes, invalidate the old layer review and repeat step 4 before treating the ticket as ready or publishing it. If the diff is identical, record the comparison and refresh the reviewed commit pair. A tree comparison alone does not establish that the parent-relative diff is unchanged.
 
 Before publishing, apply the ancestry, merge-commit, and validation checks in [do-work](../do-work/SKILL.md#5-open-a-pr). Push rewritten branches to the selected remote with lease protection and update their PR targets and native stack membership. Check GitHub's native stack status after publishing; PR mergeability alone does not establish stack readiness.
 

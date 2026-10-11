@@ -54,6 +54,13 @@ export function ProfilePictureSettings({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recovery, setRecovery] = useState<'required' | 'review' | null>(null);
+  useEffect(
+    () => () => {
+      session.current++;
+    },
+    []
+  );
   const policyQuery = useQuery({
     queryKey: [...profileQueryKey(profile.id), 'picture-policy'],
     queryFn: ({ signal }) => userApi.picturePolicy({ signal, tokenProvider }),
@@ -88,23 +95,58 @@ export function ProfilePictureSettings({
         editor.clear();
         if (input.current) input.current.value = '';
         setError(null);
+        setRecovery(null);
         setOpen(false);
         toast.success(
           command.action === 'remove' ? 'Generated avatar selected' : 'Profile picture saved'
         );
       },
-      onError: (cause) => {
-        toast.error('Could not save profile picture', { description: cause.message });
-      },
     }
   );
-  const feedback =
-    error ??
-    editor.error ??
-    (mutation.error instanceof UserApiError &&
-    mutation.error.type?.endsWith('/profile-version-conflict')
-      ? 'Your Profile changed elsewhere. Refresh Profile before trying again.'
-      : mutation.error?.message);
+  const feedback = error ?? editor.error;
+  function currentDialog(originatingSession: number, originatingQuery = ownerQuery.current) {
+    return (
+      originatingSession === session.current &&
+      client.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true }) ===
+        originatingQuery
+    );
+  }
+  async function refreshConflict(
+    originatingSession: number,
+    originatingQuery = ownerQuery.current
+  ) {
+    if (!currentDialog(originatingSession, originatingQuery) || availability.isBusy()) return;
+    try {
+      const updated = await refreshProfile();
+      if (!currentDialog(originatingSession, originatingQuery)) return;
+      editor.setExpectedVersion(updated.version);
+      setRecovery('review');
+      setError('Your Profile changed elsewhere. Review the latest saved picture before retrying.');
+    } catch {
+      if (currentDialog(originatingSession, originatingQuery))
+        setError(
+          'Your Profile changed elsewhere. Unable to refresh your saved Profile. Retry the refresh before saving.'
+        );
+    }
+  }
+  async function save(command: PictureCommand) {
+    const originatingQuery = ownerQuery.current;
+    try {
+      await mutation.mutateAsync(command);
+    } catch (cause) {
+      if (!currentDialog(command.session, originatingQuery)) return;
+      if (cause instanceof UserApiError && cause.type?.endsWith('/profile-version-conflict')) {
+        editor.setExpectedVersion(null);
+        setRecovery('required');
+        setError('Your Profile changed elsewhere. Refreshing your saved Profile…');
+        await refreshConflict(command.session, originatingQuery);
+      } else {
+        setError(
+          cause instanceof Error ? cause.message : 'Unable to save this picture. Try again.'
+        );
+      }
+    }
+  }
 
   function selectPicture(picture: File | undefined) {
     if (!open || !policy || !policyReady || availability.isBusy()) return;
@@ -112,7 +154,8 @@ export function ProfilePictureSettings({
     setError(null);
     const result = pictureSelection(picture, policy.acceptedSourceFormats);
     setError(result.error);
-    if (result.selected) void editor.choose(result.selected, profile.version);
+    if (result.selected)
+      void editor.choose(result.selected, recovery === 'required' ? null : profile.version);
     else editor.clear();
   }
 
@@ -131,19 +174,6 @@ export function ProfilePictureSettings({
     return () => document.removeEventListener('paste', pastePicture);
   }, [open]);
 
-  async function refresh() {
-    if (availability.isBusy()) return;
-    mutation.reset();
-    setError(null);
-    editor.clear();
-    if (input.current) input.current.value = '';
-    try {
-      await refreshProfile();
-    } catch {
-      setError('Unable to refresh your Profile. Try again.');
-    }
-  }
-
   return (
     <div className="relative w-fit shrink-0">
       <ProfilePicture profile={profile} />
@@ -161,6 +191,7 @@ export function ProfilePictureSettings({
             editor.clear();
             mutation.reset();
             setError(null);
+            setRecovery(null);
           }
         }}
         title="Profile picture"
@@ -194,14 +225,6 @@ export function ProfilePictureSettings({
           ) : (
             <ProfilePicture profile={profile} />
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={refreshing || writing || editor.processing}
-            onClick={() => void refresh()}
-          >
-            {refreshing ? 'Refreshing Profile…' : 'Refresh Profile'}
-          </Button>
           {importing && (
             <output className="block text-sm text-muted-foreground">
               {profile.pictureImportStatus === 'retrying'
@@ -213,8 +236,17 @@ export function ProfilePictureSettings({
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!policy || !policyReady || availability.isBusy() || editor.processing) return;
+              if (
+                !policy ||
+                !policyReady ||
+                availability.isBusy() ||
+                editor.processing ||
+                recovery === 'required'
+              )
+                return;
               const originatingSession = session.current;
+              setError(null);
+              mutation.reset();
               void editor.apply(policy, (picture, expectedVersion) => {
                 if (
                   originatingSession !== session.current ||
@@ -228,7 +260,7 @@ export function ProfilePictureSettings({
                   throw new Error(
                     'Your Profile is busy. Apply the picture again after the current change finishes.'
                   );
-                mutation.mutate({
+                void save({
                   picture,
                   expectedVersion,
                   action: 'upload',
@@ -293,15 +325,26 @@ export function ProfilePictureSettings({
             <div className="flex flex-wrap gap-2">
               <Button
                 type="submit"
-                disabled={!selected || refreshing || writing || editor.processing || !policyReady}
+                disabled={
+                  !selected ||
+                  refreshing ||
+                  writing ||
+                  editor.processing ||
+                  !policyReady ||
+                  recovery === 'required'
+                }
               >
-                {mutation.isPending ? 'Saving picture…' : selected && feedback ? 'Retry' : 'Apply'}
+                {mutation.isPending
+                  ? 'Saving picture…'
+                  : selected && (feedback || recovery)
+                    ? 'Retry'
+                    : 'Apply'}
               </Button>
               {(profile.pictureAssetId || importing) && (
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={refreshing || writing || editor.processing}
+                  disabled={refreshing || writing || editor.processing || recovery === 'required'}
                   onClick={(event) => {
                     removeOpener.current = event.currentTarget;
                     mutation.reset();
@@ -349,10 +392,10 @@ export function ProfilePictureSettings({
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  disabled={refreshing || writing || editor.processing}
+                  disabled={refreshing || writing || editor.processing || recovery === 'required'}
                   onClick={() => {
-                    if (removeVersion !== null)
-                      mutation.mutate({
+                    if (removeVersion !== null && recovery !== 'required')
+                      void save({
                         action: 'remove',
                         expectedVersion: removeVersion,
                         session: session.current,
@@ -374,9 +417,30 @@ export function ProfilePictureSettings({
               </Button>
             </Alert>
           )}
-          {feedback && (
+          {(feedback || recovery) && (
             <Alert variant="destructive">
-              <AlertDescription>{feedback}</AlertDescription>
+              <AlertDescription>
+                {feedback ??
+                  (recovery === 'required'
+                    ? 'Your Profile changed elsewhere. Refresh your saved Profile before retrying.'
+                    : 'Your Profile changed elsewhere. Review the latest saved picture before retrying.')}
+              </AlertDescription>
+              {recovery === 'required' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={refreshing || writing}
+                  onClick={() => void refreshConflict(session.current)}
+                >
+                  {refreshing ? 'Refreshing saved Profile…' : 'Retry Profile refresh'}
+                </Button>
+              )}
+              {recovery === 'review' && (
+                <fieldset aria-label="Latest saved picture" className="mt-3 space-y-2">
+                  <legend className="text-sm">Latest saved picture</legend>
+                  <ProfilePicture profile={profile} />
+                </fieldset>
+              )}
             </Alert>
           )}
         </div>

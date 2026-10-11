@@ -9,6 +9,7 @@ const repository = fileURLToPath(new URL('../../', import.meta.url));
 test.each([
   { service: 'gateway', fast: 'test/catalogue.test.ts', slow: 'test/opensearch.test.ts' },
   { service: 'media', fast: 'test/delivery.test.ts', slow: 'test/health.test.ts' },
+  { service: 'user', fast: 'test/profile-capability.test.ts', slow: 'test/profile.integration.test.ts' },
 ])('$service CI selections own every test file once and keep infrastructure setup out of fast tests', async ({ service, fast, slow }) => {
   const root = path.join(repository, 'apps', service);
   const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));

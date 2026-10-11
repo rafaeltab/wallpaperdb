@@ -225,6 +225,10 @@ test("Profile picture upload reaches public delivery and removal retires the old
       const publicPage = await publicContext.newPage();
       publicPage.on("pageerror", (error) => pageErrors.push(error.message));
       let uploads = 0;
+      let pictureWorkers = 0;
+      page.on("worker", (worker) => {
+        if (worker.url().includes("/picture-editor/")) pictureWorkers++;
+      });
       page.on("request", (request) => {
         if (
           request.url().endsWith("/user/profile/me/picture") &&
@@ -326,7 +330,9 @@ test("Profile picture upload reaches public delivery and removal retires the old
         expect(
           Math.abs(transparentPixels.samples[1][index] - expected),
         ).toBeLessThan(12);
+      expect(pictureWorkers).toBeGreaterThanOrEqual(4);
       // Exercise the actual yielding browser adapter when worker support is absent.
+      const nativeWorker = await page.evaluateHandle(() => window.Worker);
       await page.evaluate(() => {
         Object.defineProperty(window, "Worker", {
           value: undefined,
@@ -349,6 +355,13 @@ test("Profile picture upload reaches public delivery and removal retires the old
           ).toBeEnabled();
         },
       );
+      await page.evaluate((workerConstructor) => {
+        Object.defineProperty(window, "Worker", {
+          value: workerConstructor,
+          configurable: true,
+        });
+      }, nativeWorker);
+      await nativeWorker.dispose();
       const smallPixels = await pixels(page, last.bytes, [
         [0, 0],
         [511, 511],
@@ -465,11 +478,17 @@ test("Profile picture upload reaches public delivery and removal retires the old
       } catch (cleanupError) {
         journeyErrors.push(cleanupError);
       }
-      try { await publicContext.close(); }
-      catch (cleanupError) { journeyErrors.push(cleanupError); }
-
+      try {
+        await publicContext.close();
+      } catch (cleanupError) {
+        journeyErrors.push(cleanupError);
+      }
     }
     if (journeyErrors.length === 1) throw journeyErrors[0];
-    if (journeyErrors.length > 1) throw new AggregateError(journeyErrors, "Profile picture journey and cleanup failed.");
+    if (journeyErrors.length > 1)
+      throw new AggregateError(
+        journeyErrors,
+        "Profile picture journey and cleanup failed.",
+      );
   });
 });

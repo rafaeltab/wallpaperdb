@@ -220,7 +220,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
     const publicContext = await browser.newContext({
       storageState: { cookies: [], origins: [] },
     });
-    let journeyError: unknown;
+    const journeyErrors: unknown[] = [];
     try {
       const publicPage = await publicContext.newPage();
       publicPage.on("pageerror", (error) => pageErrors.push(error.message));
@@ -450,8 +450,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
         .toBe("DIV");
       expect(pageErrors).toEqual([]);
     } catch (cause) {
-      journeyError = cause;
-      throw cause;
+      journeyErrors.push(cause);
     } finally {
       test.setTimeout(test.info().timeout + 30000);
       try {
@@ -464,15 +463,13 @@ test("Profile picture upload reaches public delivery and removal retires the old
         ).toBeVisible();
         await removePicture(page);
       } catch (cleanupError) {
-        if (journeyError)
-          throw new AggregateError(
-            [journeyError, cleanupError],
-            "Profile picture journey and cleanup failed.",
-          );
-        throw cleanupError;
-      } finally {
-        await publicContext.close();
+        journeyErrors.push(cleanupError);
       }
+      try { await publicContext.close(); }
+      catch (cleanupError) { journeyErrors.push(cleanupError); }
+
     }
+    if (journeyErrors.length === 1) throw journeyErrors[0];
+    if (journeyErrors.length > 1) throw new AggregateError(journeyErrors, "Profile picture journey and cleanup failed.");
   });
 });

@@ -37,7 +37,7 @@ The `gh stack` commands require the [GitHub CLI extension](https://github.com/gi
 
 5. Follow [do-work](../do-work/SKILL.md) for validation and publishing checks. Publish the ticket as a draft PR with `gh stack submit --auto --remote <remote>`, which creates or updates the PR targets and registers the native stack once there are at least two PRs. The first publication creates an ordinary PR; report native stack status once the second PR joins it. Write a ticket-specific title and body using [pr](../pr/SKILL.md) and [github-markdown-bodies](../github-markdown-bodies/SKILL.md). Include the ticket's closing reference and link to the spec. Record the PR URL and validated commit in the ticket so later implementers can verify prerequisite readiness.
 
-6. Repeat steps 3 through 5 for each remaining ticket. When `main` or an earlier layer changes, restack before continuing or publishing. Follow the rebase rules below, revalidate prerequisites whose file trees changed, and refresh their recorded commit and validation evidence.
+6. Repeat steps 3 through 5 for each remaining ticket. When `main` or an earlier layer changes, restack before continuing or publishing. Follow the rebase rules below for every affected layer's recorded commit and validation evidence.
 
 7. Once all tickets are implemented, use [code-review](../code-review/SKILL.md) on the top branch against `main` to review the complete spec. Put each fix in the ticket layer that owns it, then rebase descendants and rerun validation for changed file trees. Validate the combined result on the top branch.
 
@@ -48,6 +48,8 @@ The `gh stack` commands require the [GitHub CLI extension](https://github.com/gi
 ## Rebasing and landing
 
 Use `gh stack rebase --remote <remote>` to rebase the stack onto the updated trunk and cascade changes through descendants. Preserve the old parent tips before rewriting history. If rebasing manually, transplant only a layer's own commits with `git rebase --onto <new-parent-tip> <old-parent-tip> <ticket-branch>`, working from the bottom upward. This boundary also prevents replaying landed prerequisite commits after a squash or rebase landing.
+
+Refresh every rewritten layer's recorded commit in its ticket issue, even when its file tree is unchanged. Reuse successful validation for an identical tree and record that comparison; rerun required checks for changed trees. Apply this rule after every history rewrite, including restacks and partial landings.
 
 Before publishing, apply the ancestry, merge-commit, and validation checks in [do-work](../do-work/SKILL.md#5-open-a-pr). Push rewritten branches to the selected remote with lease protection and update their PR targets and native stack membership. Check GitHub's native stack status after publishing; PR mergeability alone does not establish stack readiness.
 

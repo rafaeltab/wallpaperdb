@@ -20,6 +20,8 @@ Use one implementer subagent at a time in a single worktree for the stack. Each 
 
 ## Prerequisites
 
+Before installing or invoking the extension, check `gh --version` and `git --version` against its [installation requirements](https://github.com/github/gh-stack/tree/v0.2.1#installation). Require GitHub CLI 2.0 or newer and Git 2.36 or newer; compare numeric version components. Stop on an unsupported or unparseable version before changing repository configuration or creating branches.
+
 The `gh stack` commands require the [GitHub CLI extension](https://github.com/github/gh-stack) at [v0.2.1](https://github.com/github/gh-stack/releases/tag/v0.2.1), the release used to verify this workflow's command behavior. If the extension is missing, use the CLI's [pinned installation](https://cli.github.com/manual/gh_extension_install): `gh extension install github/gh-stack --pin v0.2.1`. Check `gh stack --version` for `0.2.1` before executing workflow commands, then check `gh stack --help`. Stop on a different installed version; review its provenance and behavior before changing the pin. Use the release's [command documentation](https://github.com/github/gh-stack/blob/v0.2.1/skills/gh-stack/SKILL.md) and local command help for supported options.
 
 Require generated and adopted ticket branch names to match `^[A-Za-z0-9][A-Za-z0-9/_-]*$` and pass Git's [branch-name validation](https://git-scm.com/docs/git-check-ref-format) with `git check-ref-format --branch "<ticket-branch>"`. Require remote names to match `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Reject incompatible names before command construction. Pass dynamic values as separate process arguments; when using a shell, quote them as literal data rather than pasting ticket text into command source or evaluating it.

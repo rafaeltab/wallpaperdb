@@ -148,7 +148,7 @@ describe('Profile picture settings', () => {
     processPicture.mockImplementationOnce((_crop, _policy, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
     await renderPage();
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['old'], 'old.png', { type: 'image/png' }));
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['old'], 'old.gif', { type: 'image/gif' }));
     fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     const replacement = new File(['new'], `new.${format}`, { type: `image/${format}` });

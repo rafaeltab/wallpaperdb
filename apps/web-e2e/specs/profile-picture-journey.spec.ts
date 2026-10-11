@@ -1,6 +1,8 @@
 import { expect, type Page, test } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
 
+import { fittingPicture } from "../fixtures/profile-fitting";
+
 import { withDisposableOwner } from "../src/disposable-owner";
 
 test.use({ actionTimeout: 15000, storageState: { cookies: [], origins: [] } });
@@ -413,6 +415,11 @@ test("Profile picture upload reaches public delivery and removal retires the old
         )
           uploads++;
       });
+      const policyResponse = page.waitForResponse(
+        (response) =>
+          response.url().endsWith("/user/profile/me/picture-policy") &&
+          response.request().method() === "GET",
+      );
       const oriented = await fixture("profile-oriented.jpg", "image/jpeg");
       const first = await uploadPicture(
         page,
@@ -518,6 +525,9 @@ test("Profile picture upload reaches public delivery and removal retires the old
         },
         "drop",
       );
+      const effectivePolicyResponse = await policyResponse;
+      expect(effectivePolicyResponse.ok()).toBe(true);
+      const effectivePolicy = await effectivePolicyResponse.json();
       const orientedPixels = await pixels(page, first.bytes, [
         [64, 256],
         [448, 256],
@@ -640,13 +650,124 @@ test("Profile picture upload reaches public delivery and removal retires the old
       expect(smallPixels.samples.map((sample) => sample[3])).toEqual([
         255, 255,
       ]);
+      const fitting = await fittingPicture();
+      const originalFitting = await animatedPixels(
+        page,
+        fitting.buffer,
+        fitting.mimeType,
+        [
+          [128, 10],
+          [128, 128],
+        ],
+      );
+      expect(originalFitting.frames).toHaveLength(fitting.frameCount);
+      expect(originalFitting.repetitions).toBe(fitting.repetitions);
+      expect(originalFitting.frames.map((frame) => frame.duration)).toEqual(
+        Array(fitting.frameCount).fill(fitting.duration),
+      );
+      const fittingWorkers = pictureWorkers;
+      const initialBytes = await page.evaluate(
+        async ({ data, policy }) => {
+          const adapterUrl =
+            "/web/src/features/picture-editor/adapters/browser.ts";
+          const featureUrl = "/web/src/features/picture-editor/index.ts";
+          const { openPictureSource } = await import(adapterUrl);
+          const { initialPictureCrop } = await import(featureUrl);
+          const controller = new AbortController();
+          const source = await openPictureSource(
+            new Blob([new Uint8Array(data)], { type: "image/gif" }),
+            controller.signal,
+          );
+          try {
+            const initial = await source.process(
+              initialPictureCrop(source),
+              { ...policy, maxOutputBytes: Number.MAX_SAFE_INTEGER },
+              controller.signal,
+            );
+            return initial.size;
+          } finally {
+            source.dispose();
+          }
+        },
+        { data: Array.from(fitting.buffer), policy: effectivePolicy },
+      );
+      expect(initialBytes).toBeGreaterThan(effectivePolicy.maxOutputBytes);
+      const fitted = await uploadPicture(page, fitting, outgoing);
+      expect(pictureWorkers - fittingWorkers).toBeGreaterThanOrEqual(4);
+      expect(fitted.bytes.length).toBeLessThanOrEqual(
+        effectivePolicy.maxOutputBytes,
+      );
+      const fittedAnimation = await animatedPixels(
+        page,
+        fitted.bytes,
+        "image/webp",
+        [
+          [256, 10],
+          [256, 256],
+        ],
+      );
+      expect(fittedAnimation.repetitions).toBe(fitting.repetitions);
+      expect(fittedAnimation.frames).toHaveLength(fitting.frameCount);
+      expect(
+        fittedAnimation.frames.map((frame) => [
+          frame.timestamp,
+          frame.duration,
+        ]),
+      ).toEqual(
+        Array.from({ length: fitting.frameCount }, (_, index) => [
+          index * fitting.duration,
+          fitting.duration,
+        ]),
+      );
+      for (const frame of fittedAnimation.frames) {
+        expect(frame).toMatchObject({
+          width: 512,
+          height: 512,
+          colorSpace: "srgb",
+        });
+        expect(frame.samples.map((pixel) => pixel[3])).toEqual([0, 255]);
+      }
+      expect(
+        new Set(
+          fittedAnimation.frames.map((frame) => frame.samples[1].join(",")),
+        ).size,
+      ).toBeGreaterThan(1);
+      expect(fitted.profile).toMatchObject({
+        displayName: originalDisplayName,
+        biographyMarkdown: originalBiography,
+      });
+      const fittedUrl = await profilePicture(page).getAttribute("src");
+      if (!fittedUrl)
+        throw new Error("Accepted fitted picture has no public URL");
+      const fittedDelivery = await publicContext.request.get(
+        new URL(fittedUrl, page.url()).toString(),
+      );
+      expect(fittedDelivery.status()).toBe(200);
+      expect(await fittedDelivery.body()).toEqual(fitted.bytes);
+      await writeFile(
+        test.info().outputPath("fitting-bytes.json"),
+        JSON.stringify(
+          {
+            initialBytes,
+            maxOutputBytes: effectivePolicy.maxOutputBytes,
+            fittedBytes: fitted.bytes.length,
+            frameCount: fittedAnimation.frames.length,
+            totalDuration: fittedAnimation.frames.reduce(
+              (sum, frame) => sum + (frame.duration ?? 0),
+              0,
+            ),
+          },
+          null,
+          2,
+        ),
+      );
       const workersBeforeGif = pictureWorkers;
       const last = await uploadPicture(page, gif, outgoing, (dialog) =>
         frameGifCrop(page, dialog),
       );
       expect(pictureWorkers - workersBeforeGif).toBeGreaterThanOrEqual(2);
       await assertAnimation(page, last.bytes);
-      expect(uploads).toBe(5);
+      expect(uploads).toBe(6);
       const saved = last.profile;
       expect(saved).toMatchObject({
         displayName: originalDisplayName,

@@ -71,14 +71,14 @@ it('fits a normal-rate animation by lowering quality while preserving every inte
   const controller = new AbortController();
   const source = await openPictureSource(await fixture("profile-fitting.gif"), controller.signal);
   try {
-    const crop = initialPictureCrop(source);
+    const crop = { x: 32, y: 0, size: 64, zoom: 2 };
     const initial = await source.process(crop, policy, controller.signal);
     const lowQuality = await source.process(crop, { ...policy, encoding: { ...policy.encoding, animationQuality: 20 } }, controller.signal);
     expect(lowQuality.size).toBeLessThan(initial.size);
     const limit = Math.ceil((initial.size + lowQuality.size) / 2);
     const fitted = await source.process(crop, { ...policy, maxOutputBytes: limit }, controller.signal);
     expect(fitted.size).toBeLessThanOrEqual(limit);
-    const result = await decodedAnimation(fitted, [[256, 10], [256, 256]]);
+    const result = await decodedAnimation(fitted, [[256, 200], [256, 300]]);
     expect(result.repetitions).toBe(2);
     expect(result.frames.map((frame) => [frame.timestamp, frame.duration])).toEqual([[0, 100000], [100000, 200000], [300000, 300000], [600000, 400000]]);
     for (const frame of result.frames) expect(frame).toMatchObject({ width: 512, height: 512, colorSpace: 'srgb' });

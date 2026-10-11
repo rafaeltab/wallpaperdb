@@ -106,6 +106,16 @@ export function ProfilePictureSettings({
       ? 'Your Profile changed elsewhere. Refresh Profile before trying again.'
       : mutation.error?.message);
 
+  function selectPicture(picture: File | undefined) {
+    if (!open || !policy || !policyReady || availability.isBusy()) return;
+    mutation.reset();
+    setError(null);
+    const result = pictureSelection(picture, policy.acceptedSourceFormats);
+    setError(result.error);
+    if (result.selected) void editor.choose(result.selected, profile.version);
+    else editor.clear();
+  }
+
   async function refresh() {
     if (availability.isBusy()) return;
     mutation.reset();
@@ -139,8 +149,14 @@ export function ProfilePictureSettings({
           }
         }}
         title="Profile picture"
-        description="Your picture appears on your profile and wallpaper contributions."
+        description="Your picture appears on your profile and wallpaper contributions. Choose or drop an image to begin."
         busy={writing}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          const picture = event.dataTransfer.files[0];
+          if (picture) selectPicture(picture);
+        }}
         trigger={
           <ProfileActionButton
             label="Edit profile picture"
@@ -220,14 +236,8 @@ export function ProfilePictureSettings({
                 accept={policy?.acceptedSourceFormats.join(',')}
                 disabled={refreshing || writing || !policyReady}
                 onChange={(event) => {
-                  mutation.reset();
-                  setError(null);
-                  const picture = event.target.files?.[0];
-                  if (!policy || !policyReady) return;
-                  const result = pictureSelection(picture, policy.acceptedSourceFormats);
-                  setError(result.error);
-                  if (result.selected) void editor.choose(result.selected, profile.version);
-                  else editor.clear();
+                  selectPicture(event.target.files?.[0]);
+                  event.target.value = '';
                 }}
               />
               <div className="flex min-w-0 flex-wrap items-center gap-3">

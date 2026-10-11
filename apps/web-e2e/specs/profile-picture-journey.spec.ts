@@ -1,13 +1,17 @@
 import { expect, type Page, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 import { withDisposableOwner } from "../src/disposable-owner";
-import { uniquePng } from "./journey-helpers";
 
 test.use({ actionTimeout: 15000, storageState: { cookies: [], origins: [] } });
 
 type PictureFile = { name: string; mimeType: string; buffer: Buffer };
 
-async function uploadPicture(page: Page, picture: PictureFile) {
+async function uploadPicture(
+  page: Page,
+  picture: PictureFile,
+  edit?: (dialog: ReturnType<Page["getByRole"]>) => Promise<void>,
+) {
   await page
     .getByRole("button", { name: "Edit profile picture", exact: true })
     .click();
@@ -16,24 +20,84 @@ async function uploadPicture(page: Page, picture: PictureFile) {
     exact: true,
   });
   await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByLabel("Choose picture", { exact: true }),
+  ).toBeEnabled();
   await dialog
     .getByLabel("Choose picture", { exact: true })
     .setInputFiles(picture);
   await expect(
     dialog.getByRole("img", { name: "Selected avatar", exact: true }),
   ).toBeVisible();
+  if (edit) await edit(dialog);
   const saved = page.waitForResponse(
     (response) =>
       response.url().endsWith("/user/profile/me/picture") &&
       response.request().method() === "PUT",
   );
-  await dialog
-    .getByRole("button", { name: /^(Upload|Replace) picture$/ })
-    .click();
+  await dialog.getByRole("button", { name: "Apply", exact: true }).click();
   const response = await saved;
   expect(response.ok()).toBe(true);
   await expect(dialog).not.toBeVisible();
-  return response.json();
+  const request = response.request();
+  const body = request.postDataBuffer();
+  if (!body) throw new Error("Picture command had no body");
+  const start = body.indexOf(Buffer.from("RIFF"));
+  if (start < 0 || body.toString("latin1").includes("PRIVATE_CAMERA"))
+    throw new Error(
+      "Picture command did not contain a private-metadata-free WebP",
+    );
+  const bytes = body.subarray(start, start + body.readUInt32LE(start + 4) + 8);
+  expect(bytes.subarray(8, 12).toString()).toBe("WEBP");
+  const chunks: string[] = [];
+  for (let offset = 12; offset < bytes.length; ) {
+    chunks.push(bytes.subarray(offset, offset + 4).toString());
+    const size = bytes.readUInt32LE(offset + 4);
+    offset += 8 + size + (size % 2);
+  }
+  expect(
+    chunks.every((chunk) => ["VP8X", "ALPH", "VP8 ", "VP8L"].includes(chunk)),
+  ).toBe(true);
+  return { profile: await response.json(), bytes };
+}
+
+async function pixels(
+  page: Page,
+  bytes: Buffer,
+  positions: [number, number][],
+) {
+  return page.evaluate(
+    async ({ data, positions }) => {
+      const bitmap = await createImageBitmap(
+        new Blob([new Uint8Array(data)], { type: "image/webp" }),
+      );
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d", { colorSpace: "srgb" });
+      if (!context) throw new Error("Missing sRGB canvas");
+      context.drawImage(bitmap, 0, 0);
+      const result = {
+        width: bitmap.width,
+        height: bitmap.height,
+        samples: positions.map(([x, y]) =>
+          Array.from(context.getImageData(x, y, 1, 1).data),
+        ),
+        colorSpace: context.getContextAttributes().colorSpace,
+      };
+      bitmap.close();
+      return result;
+    },
+    { data: Array.from(bytes), positions },
+  );
+}
+
+async function fixture(name: string, mimeType: string): Promise<PictureFile> {
+  return {
+    name,
+    mimeType,
+    buffer: await readFile(new URL(`../fixtures/${name}`, import.meta.url)),
+  };
 }
 
 async function removePicture(page: Page) {
@@ -122,8 +186,127 @@ test("Profile picture upload reaches public delivery and removal retires the old
     try {
       const publicPage = await publicContext.newPage();
       publicPage.on("pageerror", (error) => pageErrors.push(error.message));
-      const picture = await uniquePng(page, 128, 128);
-      const saved = await uploadPicture(page, picture);
+      let uploads = 0;
+      page.on("request", (request) => {
+        if (
+          request.url().endsWith("/user/profile/me/picture") &&
+          request.method() === "PUT"
+        )
+          uploads++;
+      });
+      const oriented = await fixture("profile-oriented.jpg", "image/jpeg");
+      const first = await uploadPicture(page, oriented, async (dialog) => {
+        const zoom = dialog.getByRole("slider", { name: "Zoom", exact: true });
+        await zoom.focus();
+        await zoom.press("ArrowRight");
+        expect(Number(await zoom.inputValue())).toBeGreaterThan(1);
+        await dialog
+          .getByRole("button", { name: "Reset", exact: true })
+          .click();
+        await expect(zoom).toHaveValue("1");
+        const crop = dialog.getByRole("group", {
+          name: "Picture crop",
+          exact: true,
+        });
+        const box = await crop.boundingBox();
+        const image = dialog.getByRole("img", { name: "Selected avatar" });
+        const before = await image.boundingBox();
+        if (!box || !before) throw new Error("Crop preview was not measured");
+        expect(before.width / box.width).toBeCloseTo(2, 1);
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width * 1.5, box.y + box.height / 2, {
+          steps: 5,
+        });
+        await page.mouse.up();
+        const after = await image.boundingBox();
+        expect(after?.x).toBeCloseTo(box.x, -1);
+        await dialog
+          .getByRole("button", { name: "Reset", exact: true })
+          .click();
+        // Cancel in the same browser turn before the asynchronous worker can return.
+        await dialog.evaluate(async (element) => {
+          const apply = Array.from(element.querySelectorAll("button")).find(
+            (button) => button.textContent === "Apply",
+          );
+          if (!apply) throw new Error("Apply missing");
+          apply.click();
+          await Promise.resolve();
+          const cancel = element.querySelector<HTMLButtonElement>(
+            'button[aria-label="Cancel picture processing"]',
+          );
+          if (!cancel) throw new Error("Processing cancel button missing");
+          cancel.click();
+        });
+        await expect(
+          dialog.getByRole("button", { name: "Apply", exact: true }),
+        ).toBeEnabled();
+        expect(uploads).toBe(0);
+      });
+      const orientedPixels = await pixels(page, first.bytes, [
+        [64, 256],
+        [448, 256],
+        [0, 0],
+        [511, 511],
+      ]);
+      expect(orientedPixels).toMatchObject({
+        width: 512,
+        height: 512,
+        colorSpace: "srgb",
+      });
+      expect(orientedPixels.samples[0][2]).toBeGreaterThan(240);
+      expect(orientedPixels.samples[0][0]).toBeLessThan(15);
+      expect(orientedPixels.samples[1][0]).toBeGreaterThan(240);
+      expect(orientedPixels.samples[1][2]).toBeLessThan(15);
+      expect(
+        orientedPixels.samples.slice(2).map((sample) => sample[3]),
+      ).toEqual([255, 255]);
+      const transparent = await uploadPicture(
+        page,
+        await fixture("profile-transparent-p3.png", "image/png"),
+      );
+      const transparentPixels = await pixels(page, transparent.bytes, [
+        [256, 10],
+        [256, 256],
+      ]);
+      expect(transparentPixels.samples[0][3]).toBe(0);
+      expect(transparentPixels.samples[1][3]).toBe(128);
+      for (const [index, expected] of [32, 180, 64].entries())
+        expect(
+          Math.abs(transparentPixels.samples[1][index] - expected),
+        ).toBeLessThan(12);
+      // Exercise the actual yielding browser adapter when worker support is absent.
+      await page.evaluate(() => {
+        Object.defineProperty(window, "Worker", {
+          value: undefined,
+          configurable: true,
+        });
+      });
+      const last = await uploadPicture(
+        page,
+        await fixture("profile-small.png", "image/png"),
+        async (dialog) => {
+          await expect(
+            dialog.getByRole("slider", { name: "Zoom" }),
+          ).toBeDisabled();
+          await expect(
+            dialog.getByText(/smaller than 64 pixels/),
+          ).toBeVisible();
+          await expect(
+            dialog.getByRole("button", { name: "Apply", exact: true }),
+          ).toBeEnabled();
+        },
+      );
+      const smallPixels = await pixels(page, last.bytes, [
+        [0, 0],
+        [511, 511],
+      ]);
+      expect(smallPixels).toMatchObject({ width: 512, height: 512 });
+      expect(smallPixels.samples.map((sample) => sample[3])).toEqual([
+        255, 255,
+      ]);
+      expect(uploads).toBe(3);
+      const saved = last.profile;
       expect(saved).toMatchObject({
         displayName: originalDisplayName,
         biographyMarkdown: originalBiography,
@@ -178,6 +361,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
       const publicImage = await publicContext.request.get(absolutePictureUrl);
       expect(publicImage.status()).toBe(200);
       expect(publicImage.headers()["content-type"]).toMatch(/^image\//);
+      expect(await publicImage.body()).toEqual(last.bytes);
 
       await removePicture(page);
       await expect

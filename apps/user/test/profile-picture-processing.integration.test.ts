@@ -39,6 +39,52 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it.each([
+    ['PQ', '0000000463494350091000014d2323fe'],
+    ['HLG', '0000000463494350091200014ea7f790'],
+  ])('rejects %s HDR PNG16 despite the native decoder reporting ordinary RGB16', async (_transfer, chunk) => {
+    const png = await sharp({
+      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+    })
+      .toColourspace('rgb16')
+      .png()
+      .toBuffer();
+    // Valid cICP chunks use the PQ/HLG declarations from the PNG specification.
+    // https://www.w3.org/TR/png-3/#cICP-chunk
+    const input = Buffer.concat([png.subarray(0, 33), Buffer.from(chunk, 'hex'), png.subarray(33)]);
+    expect(await sharp(input).metadata()).toMatchObject({ space: 'rgb16', depth: 'ushort' });
+    expect(await sharp(input).raw().toBuffer()).toHaveLength(3 * 2 * 3);
+    await expect(processProfilePicture(input, limits)).rejects.toThrow(
+      'Picture color interpretation is unsupported'
+    );
+  });
+  it('normalizes ordinary SDR PNG16 without confusing sample depth with HDR', async () => {
+    const input = await sharp({
+      create: {
+        width: 3,
+        height: 2,
+        channels: 4,
+        background: { r: 53, g: 120, b: 170, alpha: 0.25 },
+      },
+    })
+      .toColourspace('rgb16')
+      .png()
+      .toBuffer();
+    expect(await sharp(input).metadata()).toMatchObject({ space: 'rgb16', depth: 'ushort' });
+    const picture = await processProfilePicture(input, limits);
+    expect(await sharp(picture.bytes).metadata()).toMatchObject({
+      width: 512,
+      height: 512,
+      space: 'srgb',
+      depth: 'uchar',
+      hasAlpha: true,
+    });
+    const pixel = await sharp(picture.bytes)
+      .extract({ left: 256, top: 256, width: 1, height: 1 })
+      .raw()
+      .toBuffer();
+    expect(pixel[3]).toBe(64);
+  });
   it('rejects an alpha chunk after the image even when the native decoder accepts the image', async () => {
     const webp = await sharp({
       create: { width: 512, height: 512, channels: 3, background: '#3578aa' },

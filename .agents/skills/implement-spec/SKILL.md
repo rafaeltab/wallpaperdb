@@ -41,7 +41,7 @@ The `gh stack` commands require the [GitHub CLI extension](https://github.com/gi
 
 4. Use [code-review](../code-review/SKILL.md) on the ticket's changes against its parent branch. Fix findings in the ticket branch and rerun affected checks. Record the reviewed parent and layer commits with the ticket's evidence. The ticket is implemented for stack readiness only once its acceptance criteria, validation, and review pass.
 
-5. Follow [do-work](../do-work/SKILL.md) for validation and publishing checks. Publish the ticket as a draft PR with `gh stack submit --auto --remote <remote>`, which creates or updates the PR targets and registers the native stack once there are at least two PRs. The first publication creates an ordinary PR; report native stack status once the second PR joins it. Write a ticket-specific title and body using [pr](../pr/SKILL.md) and [github-markdown-bodies](../github-markdown-bodies/SKILL.md). Include the ticket's closing reference and link to the spec. Record the PR URL and validated commit in the ticket so later implementers can verify prerequisite readiness.
+5. Follow [do-work](../do-work/SKILL.md) for validation and the publishing rules below. Write a ticket-specific title and body using [pr](../pr/SKILL.md) and [github-markdown-bodies](../github-markdown-bodies/SKILL.md), then publish a draft PR. Include the ticket's closing reference and link to the spec. The first publication creates an ordinary PR; register the native stack once the second PR joins it. Record the PR URL and validated commit in the ticket so later implementers can verify prerequisite readiness.
 
 6. Repeat steps 3 through 5 for each remaining ticket. When `main` or an earlier layer changes, restack before continuing or publishing. Follow the rebase rules below for every affected layer's recorded commit and validation evidence.
 
@@ -51,6 +51,14 @@ The `gh stack` commands require the [GitHub CLI extension](https://github.com/gi
 
 9. If a temporary stack worktree was created, clean it up after all commits are published, preserving the stack branches and PRs.
 
+## Publishing
+
+Apply the ancestry, merge-commit, and validation checks in [do-work](../do-work/SKILL.md#5-open-a-pr). Keep each branch's last verified published tip separate from remote-tracking refs; a new branch expects absence. Before every publication, compare all active stack branches' actual remote heads with those recorded expectations. Stop on any difference, including a newly appeared branch. Fetch and preserve external work, then restack, review, and validate it before recording a new expectation.
+
+Push each validated branch using Git's [explicit expected-value lease](https://git-scm.com/docs/git-push#Documentation/git-push.txt---force-with-leaseltrefnamegtltexpectgt): `git push --force-with-lease="refs/heads/<ticket-branch>:<recorded-remote-tip>" "<remote>" "refs/heads/<ticket-branch>:refs/heads/<ticket-branch>"`. Use an empty expected tip for a new branch. On rejection, reassess and validate the new remote state before retrying. Read back the remote head and update the published-tip record only after it matches the tested commit. Publish changed layers from the bottom upward, retaining verified tips after a partial publication failure.
+
+Create the draft PR using [gh pr create](https://cli.github.com/manual/gh_pr_create) with an explicit repository, parent base, head branch, title, and body file. For an existing PR, use [gh pr edit](https://cli.github.com/manual/gh_pr_edit) to update its parent target and body after verifying the PR identity. With at least two PRs, call `gh stack link --base main "<bottom-pr-url>" ... "<top-pr-url>"` in stack order. Pass only verified PR URLs; the extension's [link implementation](https://github.com/github/gh-stack/blob/v0.2.1/cmd/link.go) skips Git pushes for PR URL arguments. Verify native stack membership and readiness after linking. Use this path for restacks too, because the extension's [fetch-then-lease behavior](https://github.com/github/gh-stack/issues/380) makes `gh stack submit` and `push` unsuitable for preserving recorded remote expectations.
+
 ## Rebasing and landing
 
 Use `gh stack rebase --remote <remote>` to rebase the stack onto the updated trunk and cascade changes through descendants. Preserve the old parent tips before rewriting history. If rebasing manually, follow Git's [transplanting branches with `--onto` documentation](https://git-scm.com/docs/git-rebase#_transplanting_a_topic_branch_with_onto). Transplant only a layer's own commits with `git rebase --onto <new-parent-tip> <old-parent-tip> <ticket-branch>`, working from the bottom upward. This boundary also prevents replaying landed prerequisite commits after a squash or rebase landing.
@@ -59,7 +67,7 @@ Refresh every rewritten layer's recorded commit in its ticket issue, even when i
 
 Compare each layer's diff against its new parent with the diff between its recorded reviewed commits. If that diff changes, invalidate the old layer review and repeat step 4 before treating the ticket as ready or publishing it. If the diff is identical, record the comparison and refresh the reviewed commit pair. A tree comparison alone does not establish that the parent-relative diff is unchanged.
 
-Before publishing, apply the ancestry, merge-commit, and validation checks in [do-work](../do-work/SKILL.md#5-open-a-pr). Push rewritten branches to the selected remote with lease protection and update their PR targets and native stack membership. Check GitHub's native stack status after publishing; PR mergeability alone does not establish stack readiness.
+Publish rewritten branches and update their PR targets and native membership using the publishing rules above. PR mergeability alone does not establish native stack readiness.
 
 When landing is explicitly requested, inspect the target branch's effective merge rules first. Without a merge queue, use GitHub's rebase method, or squash when the repository permits it. Invoke stack landing non-interactively with an explicit target and method: `gh stack merge <stack-or-pr-number> --yes --rebase`, or substitute `--squash`. Verify that the target resolves to the requested ready prefix before executing it. Use `gh pr merge <pr-url> --rebase` or `--squash` for an ordinary PR without a native stack. Land prerequisites before their dependents, or use the native atomic stack operation for a ready prefix when no merge queue applies.
 

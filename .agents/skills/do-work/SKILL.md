@@ -11,7 +11,7 @@ description: Structured workflow for implementing tasks. Use when the user asks 
 
 Gather context. Read relevant files, search the codebase, and clarify ambiguities before proceeding.
 
-For work tied to a GitHub issue, follow [issue claiming](../../../docs/agents/issue-tracker.md#claiming-an-issue) before implementation.
+For work tied to a GitHub issue, follow [issue claiming](../../../docs/agents/issue-tracker.md#claiming-an-issue) before planning or implementation.
 
 ### 2. Plan
 

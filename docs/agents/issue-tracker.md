@@ -16,7 +16,9 @@ Infer the repository from `git remote -v`; `gh` does this automatically inside t
 
 ## Claiming an issue
 
-When picking up a GitHub issue, assign it to the authenticated GitHub account used by the agent before implementation. Use [gh issue edit](https://cli.github.com/manual/gh_issue_edit) with `<number-or-url> --add-assignee @me` and preserve existing assignees. Read back the issue with [gh issue view](https://cli.github.com/manual/gh_issue_view) using `<number-or-url> --json assignees` and verify the account is assigned. If assignment or verification fails, report the failure rather than treating the issue as claimed.
+When picking up a GitHub issue, assign it to the authenticated GitHub account used by the agent before planning or implementation. Use [gh issue edit](https://cli.github.com/manual/gh_issue_edit) with `<number-or-url> --add-assignee @me` and preserve existing assignees. Read back the issue with [gh issue view](https://cli.github.com/manual/gh_issue_view) using `<number-or-url> --json assignees` and verify the account is assigned.
+
+If assignment or verification fails, stop work on that issue and report the failure. Resume planning and implementation only after assignment is verified.
 
 ## Pull requests as a triage surface
 

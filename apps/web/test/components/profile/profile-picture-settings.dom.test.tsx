@@ -16,6 +16,7 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
     ...original,
     userApi: {
       ...original.userApi,
+      picturePolicy: vi.fn(),
       ensureProfile: vi.fn(),
       uploadPicture: vi.fn(),
       removePicture: vi.fn(),
@@ -25,6 +26,8 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a href="/profiles/@ada">{children}</a>,
 }));
+
+const picturePolicy = { output: { width: 512, height: 512, mimeType: 'image/webp' as const, colorSpace: 'srgb' as const }, maxOutputBytes: 5242880, acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'], animation: { available: false }, encoding: { staticQuality: 85 } };
 
 const profile: Profile = {
   id: 'user_123',
@@ -57,8 +60,23 @@ async function renderPage(initial = profile, openPicture = true) {
 }
 
 describe('Profile picture settings', () => {
+  it('fetches and presents effective policy when the dialog opens', async () => {
+    vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, maxOutputBytes: 123456 });
+    await renderPage();
+    expect(await screen.findByText(/512 × 512 WebP/)).toHaveTextContent('120.56 KB');
+    expect(userApi.picturePolicy).toHaveBeenCalledWith(expect.objectContaining({ tokenProvider: expect.any(Function) }));
+  });
+  it('blocks upload and offers retry when effective policy cannot be loaded', async () => {
+    vi.mocked(userApi.picturePolicy).mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce(picturePolicy);
+    await renderPage();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load picture rules');
+    expect(screen.getByLabelText('Choose picture')).toBeDisabled();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Retry picture rules' }));
+    await waitFor(() => expect(screen.getByLabelText('Choose picture')).toBeEnabled());
+  });
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(userApi.picturePolicy).mockReset().mockResolvedValue(picturePolicy);
     vi.mocked(useAuth, { partial: true }).mockReturnValue({
       getToken: vi.fn().mockResolvedValue('token'),
       isLoaded: true,
@@ -199,17 +217,15 @@ describe('Profile picture settings', () => {
   });
 
   it('enforces the server byte limit and shows its picture constraints before upload', async () => {
-    await renderPage({
-      ...profile,
-      pictureUploadLimits: { maxBytes: 4, maxPixels: 2000000, maxDecodedBytes: 8000000 },
-    });
+    vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, maxOutputBytes: 4 });
+    await renderPage();
     const user = userEvent.setup();
     await user.upload(
       screen.getByLabelText('Choose picture'),
       new File(['12345'], 'large.png', { type: 'image/png' })
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Picture must be at most 4 bytes.');
-    expect(screen.getByText(/Up to 4 B and 2 megapixels/)).toBeInTheDocument();
+    expect(screen.getByText(/Up to 4 B/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload picture' })).toBeDisabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
   });

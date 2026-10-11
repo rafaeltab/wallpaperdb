@@ -12,6 +12,7 @@ async function uploadPicture(
   picture: PictureFile,
   outgoing: Buffer[],
   edit?: (dialog: ReturnType<Page["getByRole"]>) => Promise<void>,
+  route: "picker" | "drop" | "paste" = "picker",
 ) {
   await page
     .getByRole("button", { name: "Edit profile picture", exact: true })
@@ -24,9 +25,43 @@ async function uploadPicture(
   await expect(
     dialog.getByLabel("Choose picture", { exact: true }),
   ).toBeEnabled();
-  await dialog
-    .getByLabel("Choose picture", { exact: true })
-    .setInputFiles(picture);
+  if (route === "picker") {
+    await dialog
+      .getByLabel("Choose picture", { exact: true })
+      .setInputFiles(picture);
+  } else {
+    await dialog.evaluate(
+      (element, { picture, route }) => {
+        const transfer = new DataTransfer();
+        transfer.items.add(
+          new File([new Uint8Array(picture.data)], picture.name, {
+            type: picture.mimeType,
+          }),
+        );
+        const event =
+          route === "drop"
+            ? new DragEvent("drop", {
+                bubbles: true,
+                cancelable: true,
+                dataTransfer: transfer,
+              })
+            : new ClipboardEvent("paste", {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: transfer,
+              });
+        element.dispatchEvent(event);
+      },
+      {
+        picture: {
+          name: picture.name,
+          mimeType: picture.mimeType,
+          data: Array.from(picture.buffer),
+        },
+        route,
+      },
+    );
+  }
   await expect(
     dialog.getByRole("img", { name: "Selected avatar", exact: true }),
   ).toBeVisible();
@@ -257,6 +292,49 @@ test("Profile picture upload reaches public delivery and removal retires the old
             name: "Picture crop",
             exact: true,
           });
+          await crop.hover();
+          await page.mouse.wheel(0, -10000);
+          await expect(zoom).toHaveValue("2");
+          await page.mouse.wheel(0, 10000);
+          await expect(zoom).toHaveValue("1");
+          const touchBox = await crop.boundingBox();
+          if (!touchBox) throw new Error("Pinch viewport was not measured");
+          const touch = await page.context().newCDPSession(page);
+          await touch.send("Emulation.setTouchEmulationEnabled", {
+            enabled: true,
+            maxTouchPoints: 2,
+          });
+          const center = {
+            x: touchBox.x + touchBox.width / 2,
+            y: touchBox.y + touchBox.height / 2,
+          };
+          await touch.send("Input.dispatchTouchEvent", {
+            type: "touchStart",
+            touchPoints: [
+              { id: 1, x: center.x - 20, y: center.y },
+              { id: 2, x: center.x + 20, y: center.y },
+            ],
+          });
+          await touch.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [
+              { id: 1, x: center.x - 40, y: center.y },
+              { id: 2, x: center.x + 40, y: center.y },
+            ],
+          });
+          await expect(zoom).toHaveValue("2");
+          await touch.send("Input.dispatchTouchEvent", {
+            type: "touchEnd",
+            touchPoints: [],
+          });
+          await touch.send("Emulation.setTouchEmulationEnabled", {
+            enabled: false,
+          });
+          await touch.detach();
+          await dialog
+            .getByRole("button", { name: "Reset", exact: true })
+            .click();
+          await expect(zoom).toHaveValue("1");
           const box = await crop.boundingBox();
           const image = dialog.getByRole("img", { name: "Selected avatar" });
           const before = await image.boundingBox();
@@ -296,6 +374,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
           ).toBeEnabled();
           expect(uploads).toBe(0);
         },
+        "drop",
       );
       const orientedPixels = await pixels(page, first.bytes, [
         [64, 256],
@@ -319,6 +398,8 @@ test("Profile picture upload reaches public delivery and removal retires the old
         page,
         await fixture("profile-transparent-p3.png", "image/png"),
         outgoing,
+        undefined,
+        "paste",
       );
       const transparentPixels = await pixels(page, transparent.bytes, [
         [256, 10],

@@ -15,7 +15,7 @@ Before executing PR-controlled Make targets, dependency installation, or lifecyc
 
 Read the PR diff, current head SHA, all CI checks and workflow runs, and all review feedback. Use [fix-pr-review-comments](../fix-pr-review-comments/SKILL.md) for feedback discovery and handling, including pagination and review summaries outside threads.
 
-Keep a ledger in session state or outside the repository. Retain the PR URL and head SHA, comment IDs and handling outcomes, delivered fix commits, CI failure evidence, reruns per failure and head, Codex requests and results per head, and flaky-test issue URLs. Resume this ledger on every monitoring wake so counts and retries survive across turns.
+Keep a ledger in session state or outside the repository. Retain the PR URL, head SHA, base ref and base SHA, comment IDs and handling outcomes, delivered fix commits, CI failure evidence, reruns per failure and head, Codex requests and results per comparison, and flaky-test issue URLs. Resume this ledger on every monitoring wake so counts and retries survive across turns.
 
 Record the remote head on which each fix batch is based. Before publishing, apply [do-work](../do-work/SKILL.md)'s history checks and require that recorded head to be an ancestor of the tested result. Push only the selected head branch using Git's [explicit expected-value lease](https://git-scm.com/docs/git-push#Documentation/git-push.txt---force-with-leaseltrefnamegtltexpectgt): `--force-with-lease=<full-head-ref>:<recorded-head-sha>`. This guards a fast-forward publication against concurrent advances or resets; it does not authorize rewriting history. On rejection, fetch and reassess the new head, integrate applicable fixes, and repeat validation before attempting publication with a newly recorded expectation.
 
@@ -56,6 +56,8 @@ Approval requires all of the following:
 
 Use the reviewed commit in results or the corresponding review-summary row to match each result to the full current SHA. Verify abbreviated SHAs identify that commit. A newer review round that is pending or reports findings supersedes an older clean result, even on the same head. A summary marked `Completed` can contain findings; it establishes completion, not a clean result. A PR-level reaction has no commit SHA, so it cannot establish current-head approval by itself. After every push, require fresh results covering the new head.
 
+Bind approval to the comparison recorded for that review round: head SHA, base ref, and base SHA. [Changing the PR base changes the reviewed diff](https://docs.github.com/en/pull-requests/how-tos/create-pull-requests/changing-the-base-branch-of-a-pull-request). Refresh that identity on every wake and before requesting or accepting results. A base ref or SHA change invalidates prior approval even if the head is unchanged; obtain fresh code and security results for the new comparison. Use authenticated comparison metadata when exposed; otherwise record the base when the round starts and verify it stayed unchanged through completion. Results whose comparison cannot be established leave approval incomplete.
+
 [PR #322](https://github.com/rafaeltab/wallpaperdb/pull/322) demonstrates clean code and security comments and a PR-level thumbs up after a [manual request](https://github.com/rafaeltab/wallpaperdb/pull/322#issuecomment-5974572590). [PR #335's summary](https://github.com/rafaeltab/wallpaperdb/pull/335#issuecomment-6103790405) demonstrates completed reviews that still reported findings.
 
 Inspect existing requests and review status before posting. New commits can trigger review automatically. After handling feedback, if current-head approval evidence is missing and no corresponding review is running or pending, post `@codex review` with the full current head SHA, using [github-markdown-bodies](../github-markdown-bodies/SKILL.md). Record the request with its head and feedback batch, and avoid duplicate requests for that review round on later wakes. Review fixes may require a manual request for a fresh clean result, including when feedback was handled without changing the head. Escalate an ignored request, stalled review, or unavailable integration with its last known status rather than repeatedly requesting it.
@@ -74,7 +76,7 @@ There is no fixed deadline while runs are progressing. Investigate evidence of s
 
 ## 6. Verify and hand back
 
-Before reporting success, re-fetch the PR head, latest CI results, Codex results and reaction, and feedback state. Both gates must hold for the same current head. If the head changed during verification, repeat the check for the new head.
+Before reporting success, re-fetch the PR head, base ref and SHA, latest CI results, Codex results and reaction, and feedback state. Both gates must hold for the same current comparison. If the head or base identity changed during verification, repeat the gates for the new comparison.
 
 Before every terminal handoff, including success, blockers, pending user questions, and a closed or merged PR, call `unwatch_pull_request` when available so the thread returns to the user's inbox. Perform this cleanup explicitly rather than relying on automatic watcher cleanup. Check `list_thread_pull_requests` and register the selected PR if its link is missing. Report watcher or linking errors accurately.
 

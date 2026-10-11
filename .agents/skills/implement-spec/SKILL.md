@@ -6,7 +6,9 @@ disable-model-invocation: true
 
 You have been provided a spec and its implementation tickets. Read them through the repository's [issue tracker](../../../docs/agents/issue-tracker.md).
 
-The goal is the entire spec implemented as one linear GitHub PR stack, with one branch and PR per ticket. The bottom PR targets `main`; each subsequent PR targets the previous ticket's branch. The top branch contains the complete spec.
+For a spec with multiple tickets, the goal is one linear GitHub PR stack, with one branch and PR per ticket. The bottom PR targets `main`; each subsequent PR targets the previous ticket's branch. The top branch contains the complete spec.
+
+For a single-ticket spec, create an ordinary branch from current `main` and a draft PR targeting `main`. Apply the implementation, review, validation, and issue-closure steps below using [do-work](../do-work/SKILL.md) to publish the PR. Skip extension setup and stack-only initialization, publishing, status, and landing commands. A [native remote stack requires at least two PRs](https://github.com/github/gh-stack/issues/467); the single ticket still implements the complete spec.
 
 Tickets form a dependency graph. Implement them one at a time in an order that puts every prerequisite before its dependents. Independent tickets also become successive stack layers. Apply the issue tracker's readiness rule to every prerequisite, including tickets with multiple blockers.
 
@@ -33,7 +35,7 @@ The `gh stack` commands require the [GitHub CLI extension](https://github.com/gi
 
 4. Use [code-review](../code-review/SKILL.md) on the ticket's changes against its parent branch. Fix findings in the ticket branch and rerun affected checks. The ticket is implemented for stack readiness only once its acceptance criteria, validation, and review pass.
 
-5. Follow [do-work](../do-work/SKILL.md) for validation and publishing checks. Publish the ticket as a draft PR with `gh stack submit --auto`, which creates or updates the native stack and PR targets. Write a ticket-specific title and body using [pr](../pr/SKILL.md) and [github-markdown-bodies](../github-markdown-bodies/SKILL.md). Include the ticket's closing reference and link to the spec. Record the PR URL and validated commit in the ticket so later implementers can verify prerequisite readiness.
+5. Follow [do-work](../do-work/SKILL.md) for validation and publishing checks. Publish the ticket as a draft PR with `gh stack submit --auto`, which creates or updates the PR targets and registers the native stack once there are at least two PRs. The first publication creates an ordinary PR; report native stack status once the second PR joins it. Write a ticket-specific title and body using [pr](../pr/SKILL.md) and [github-markdown-bodies](../github-markdown-bodies/SKILL.md). Include the ticket's closing reference and link to the spec. Record the PR URL and validated commit in the ticket so later implementers can verify prerequisite readiness.
 
 6. Repeat steps 3 through 5 for each remaining ticket. When `main` or an earlier layer changes, restack before continuing or publishing. Follow the rebase rules below, revalidate prerequisites whose file trees changed, and refresh their recorded commit and validation evidence.
 
@@ -49,4 +51,4 @@ Use `gh stack rebase` to rebase the stack onto the updated trunk and cascade cha
 
 Before publishing, apply the ancestry, merge-commit, and validation checks in [do-work](../do-work/SKILL.md#5-open-a-pr). Push rewritten branches with lease protection and update their PR targets and native stack membership. Check GitHub's native stack status after publishing; PR mergeability alone does not establish stack readiness.
 
-When landing is explicitly requested, use GitHub's rebase or squash method, including an explicit `--rebase` or `--squash` when using `gh stack merge`. Land prerequisites before their dependents, or use the native atomic stack operation for a ready prefix. After a partial landing, fetch `main`, rebase the remaining layers onto their new parents, and update the stack. Close each ticket only after its changes reach `main`; close the spec after every ticket has landed and the complete spec is validated.
+When landing is explicitly requested, use GitHub's rebase or squash method, including an explicit `--rebase` or `--squash` when using `gh stack merge`. Use `gh pr merge <pr-url> --rebase` or `--squash` for an ordinary PR without a native stack. Land prerequisites before their dependents, or use the native atomic stack operation for a ready prefix. After a partial landing, fetch `main`, rebase the remaining layers onto their new parents, and update the stack. Close each ticket only after its changes reach `main`; close the spec after every ticket has landed and the complete spec is validated.

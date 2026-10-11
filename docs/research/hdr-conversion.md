@@ -1,7 +1,10 @@
 # HDR conversion research for implementation
 
-Research snapshot, 2026-09-29. Native conversion experiments establish useful
-paths for HDR AVIF, explicit SDR delivery and several gain-map JPEG operations.
+Research completed, 2026-10-11. The October 4 native replay and representative
+physical reviews establish useful paths for HDR AVIF, explicit SDR delivery
+and several gain-map JPEG operations, alongside measured failures and untested
+consumer paths. This completes the empirical investigation in [#284][proof-ticket];
+it does not qualify every HDR capability or originally named device.
 The strongest starting point is a pipeline that identifies the source's actual
 color model, processes geometry at adequate precision, and chooses a separately
 verified output representation. A filename or an encoder's format support list
@@ -39,8 +42,10 @@ gate. This document does not silently revise the accepted product policy.
 
 "Pass" below means the tested files meet their declared structural and
 appearance checks. It does not mean general source coverage or consumer support.
-The [committed report][report] includes retained failed candidates beside passing
-alternatives, so an aggregate cell marked failed can contain a useful recipe.
+The [final replay evidence][native-results] retains failed candidates beside
+passing alternatives, so an aggregate cell marked failed can contain a useful
+recipe. The [compact matrix][matrix] summarizes all classified cells; the full
+archive contains exact selectors and per-case measurements.
 
 | Source and requested result | Best demonstrated approach | Capability and limit |
 | --- | --- | --- |
@@ -59,7 +64,7 @@ Capabilities must preserve that specificity: a passing eight-bit WebP does not
 satisfy `depth=preserve` for a ten-bit source, and binary GIF transparency does
 not preserve fractional alpha. Static extraction selects the first fully
 composed frame. Gain-map JPEG reports the base and map coded depths separately.
-[Selector contract][contract], [exact combinations][matrix].
+[Selector contract][contract], [exact combinations in the native archive][native-results].
 
 Two newer focused results are useful but narrow. Original-size XMP JPEG to
 gain-map AVIF preserves base/map samples and gain metadata, passing at display
@@ -150,7 +155,8 @@ Baseline SOF0 variants avoid that particular rejection but do not fix every
 color or adaptation issue. [Recipe and reader limits][icc], [coding variants][combine].
 
 An output that matches at one display headroom can diverge at another. The
-committed report records zero of its 20 gain-map source/geometry combinations
+[completed replay][replay-audit] records only one of 25 additional headroom
+comparisons passing, and zero of 20 gain-map source/geometry combinations
 passing every same-file headroom comparison. ISO and XMP examples have measured
 adaptation failures; Apple intermediate models are unproven. For example, the
 ISO source reaches approximately 49.26 times SDR white. A regenerated map with
@@ -178,13 +184,64 @@ metadata, independent newer Apple scenes and creator-authored SDR/HDR pairs
 remain important coverage gaps.
 [Provenance and hashes][provenance], [generated fixture locks][fixture-lock].
 
-Browser presentation, native viewing and OS wallpaper behavior remain pending
-on the agreed MacBook Pro, iPad Pro, Windows HDR PC and Galaxy. Automated files
-cannot establish visible HDR luminance, profile handling or wallpaper behavior.
-Use the [inspected file manifest][manual-files] and [device checklist][manual].
-Their failed diagnostic files retain failed labels. The research also supplies
-no production throughput, memory, file-size target or concurrency qualification,
-and no proof of faithful browser-side Profile picture cropping or encoding.
+Consumer results below narrow several of these paths further. Browser success
+does not establish native-viewer or wallpaper compatibility. The research also
+supplies no production throughput, memory, file-size target or concurrency
+qualification, and no proof of faithful browser-side Profile picture cropping
+or encoding.
+
+## Physical review findings
+
+The October 8 to 11 reviews cover representative exact files, not every native
+case. The [consumer observations][consumer-observations], [result rows][consumer-results]
+and [asset hashes][consumer-assets] retain each result's scope. These are user
+observations under recorded settings, without measured display luminance.
+The photographic SDR PNG is an independently prepared authored-base reference;
+its natural appearance does not prove HDR-to-SDR conversion quality.
+
+| Device and recorded environment | Browser findings | Native viewing and wallpaper findings |
+| --- | --- | --- |
+| iPad Pro 12.9-inch, sixth generation; iPadOS 27.0.1; Safari build unrecorded; brightness about halfway, True Tone on | Controlled PQ HDR brightness passed; HLG appearance was positive without a separate above-page-white confirmation. The photograph looked natural with brighter HDR highlights. HDR AVIF animation showed no image, including direct-file viewing. SDR WebP replay and apparent transparency worked. The derived gain-map JPEG had severe green/pink colors; its original control looked natural. | Preview displayed the static photograph naturally with brighter HDR highlights. The tested native flow could not open the HDR animation. SDR JPEG wallpaper looked natural and correctly oriented, with visible blur. The installed neutral HDR diagnostic was much dimmer than Preview and failed perceived HDR-brightness retention. |
+| Galaxy S26 Ultra; Android 16 / One UI 8.5; Chrome 154.0.8037.126; Samsung Gallery 15.8.00.81; halfway brightness, Adaptive brightness and Power saving off | Controlled PQ and separate HLG above-page-white brightness checks passed. The photograph looked natural; animation and apparent translucency worked. The derived gain-map JPEG looked natural with visible HDR. | Gallery rendered the tested HDR AVIF files green/pink. Gain-map JPEGs looked natural; the derived JPEG visibly brightened in Gallery. HDR AVIF animations were reported still; SDR WebP animated. SDR JPEG wallpapers looked natural and correctly oriented on both screens. Tested HDR AVIF Home Screen wallpapers had green/pink colors, and the derived JPEG lost visible HDR on both Home and Lock Screens. |
+| Windows 11, 10.0.26220 Build 26220; Dell AW2725DF, HDR Peak 1000; Chrome 155.0.8059.40, 64-bit; Windows HDR and Auto HDR on; SDR content brightness halfway; user had not run Display Calibration | PQ and HLG chart highlights exceeded page white. Both photographic files looked natural; the SDR base looked brighter overall and HDR outdoor buildings brighter. Both animations played with translucency and a brighter HDR white corner. Original JPEG clouds looked brighter; converted JPEG bright HDR highlights were confirmed, without a separate natural-color judgment. | ImageGlass 8.8.4.4 made the HDR photograph desaturated and not convincingly HDR. Microsoft Photos 2025.11100.9001.0 and Explorer thumbnails rendered tested HDR AVIFs red. Desktop SDR JPEG was natural and correctly oriented; HDR AVIF was red and derived JPEG appeared SDR-like. The Lock Screen picker rejected the tested AVIF; both JPEGs were accepted and looked normal, without visible HDR. |
+
+The supplemental 768-by-512 PQ/HLG charts expose an SDR limitation beyond the
+original small fixture corpus. On the updated iPad, both SDR candidates showed
+bright-red intensity collapse and strongly compressed neutral highlights.
+Native inspection confirmed that the two brightest saturated first-column red
+tiles become identical sRGB red after gamut clipping. The neutral highlight
+ramps still contain distinct codes, so perceived flatness is not evidence of
+complete white clipping. The reported red-orange appearance has no isolated
+cause. These new charts have structural and reproducibility checks, but no
+complete appearance qualification; their SDR fidelity remains unqualified.
+
+Several narrower limits matter when interpreting the table:
+
+- Earlier iPadOS 17.5.1 Safari observations are historical and do not qualify
+  HDR still-image presentation. The positive iPad observations followed the OS
+  update; a precise Safari build was not supplied.
+- The Galaxy's user-reported Developer options > Show HDR/SDR ratio rose from
+  1.00 to 4.99 as the same derived JPEG brightened in Gallery, but was 1.00 as
+  wallpaper on both screens. This supports the observed presentation loss;
+  it is not a luminance measurement or proof that Android rewrote the image.
+- The Windows neutral Allow-HDR high patches were not explicitly compared
+  against the white divider. The separate PQ/HLG above-white chart results are
+  positive. SDR red/green animation regions appeared more translucent than HDR;
+  quantitative alpha fidelity and the cause remain unresolved.
+- ImageGlass and Photos showed natural JPEG colors but uncertain HDR. ImageGlass
+  HDR AVIF animations and Photos HDR AVIF/SDR WebP animations were reported still.
+  Initial playback was not confirmed for these finite three-cycle files, so
+  still-only observations do not establish a complete animation diagnosis.
+- The Mac is unavailable. Mac browser, viewer and wallpaper paths,
+  and Firefox SDR presentation, remain untested. Usable SDR wallpaper on every
+  originally named device is therefore unestablished.
+
+Most of the 1,288 native manual assets remain physically unreviewed. The
+observations do not fix gain-map adaptation failures or qualify other encodings,
+software versions or consumer paths. Missing visible HDR also does not establish
+how an operating system stores an imported wallpaper. Private screenshots
+support the recorded color-corruption observations and are excluded from the
+published evidence.
 
 ## Deployment and evidence boundaries
 
@@ -205,16 +262,30 @@ original-only admission and invalid-selector rejection are proof-side controls;
 production Media still needs those behaviors implemented. [Appearance checks][appearance],
 [contract controls][selectors].
 
-The committed full report at [`41c22b5b`][report-commit] contains 3,229 attempts:
-2,540 qualified, 681 tested and failed, and eight incompatible. Its execution
-source was [`c484862b`][execution]. The 320 endpoint comparisons have passing
-alternatives under named source models, including the superseded old Apple
-convention. They are not 320 production-ready capabilities. Later source
-corrections and focused increments are committed through `fd1c43e7`, but a full
-replay of that latest revision was not completed before work stopped. The older
-aggregate report must not be presented as a complete validation of the latest
-source. Raw results from external or interrupted runs are not this document's
-committed evidence.
+The final replay of `fd1c43e7` completed on 2026-10-04. Its
+[audit][replay-audit] records 690 helper tests with zero failures or errors, and
+3,266 native attempts: 2,576 qualified, 682 tested and failed, and eight
+incompatible with the requested selectors. All 85 ledger cells and five
+additional generic SDR control cells have classifications. All 217 recorded
+proof-source hashes, 146 selector controls and 1,288 manual-file hashes verified;
+suite integrity and evidence validation reported no errors. Existing case
+artifact hashes reproduced unchanged. The replay adds 37 cases to the prior
+aggregate, with 36 qualified and one failed.
+
+The 320 selected endpoint requests have passing alternatives under their named
+source models, including the retained superseded old Apple convention. They are
+not 320 production-ready capabilities. The separate 1/25 headroom and 0/20
+same-file results leave `milestone_qualified=false`. The native replay's historical
+physical-review pending entries remain intact; the smaller consumer record
+above supplements them without retroactively qualifying the whole matrix.
+
+The [raw native results archive][native-results] preserves the final report,
+full matrix, measurements, commands, fixture facts and native versions. The
+[compact matrix][matrix] links its full source hash, and the [replay audit][replay-audit]
+records the hashes of the principal result files. The [publication manifest][publication]
+hashes both archives and the compact evidence files. The [research prerelease][evidence-release]
+is an evidence archive, not a production release. The large proof branch remains
+separate from this documentation change.
 
 To rerun the latest archived suite from a separate checkout, use Docker with
 linux/amd64 support and the repository's normal package tooling:
@@ -235,9 +306,10 @@ before interpreting the result.
 ## Using this evidence in the wayfinder map
 
 Use these findings to choose practical implementation scope in the
-[Media rendition map][map]. [HDR Profile picture source and editing policy][profile-hdr]
-can now compare concrete server-native candidates, but still needs decisions
-about cropping, preview, accepted uploads and source retention. The separate
+[Media rendition map][map]. The accepted [HDR Profile picture resolution][profile-hdr]
+places native processing in Media and stores the processed image as User's
+immutable Asset. Its source admission, crop, preview and retention decisions
+remain in force; this research supplies evidence for their implementation. The separate
 [SDR editor specification][profile-sdr] already chooses a 512-by-512 sRGB SDR
 WebP upload; this research does not change that contract or prove its browser
 implementation.
@@ -245,25 +317,31 @@ implementation.
 [Final specification planning][specs] should select the supported combinations,
 consumer targets, deployment dependencies and representative acceptance tests.
 Generation policy, companion lifecycle and migration remain with their existing
-map investigations. The [conversion proof ticket][proof-ticket] remains open;
-this document neither closes it nor requires every optional experiment to pass
-before those planning discussions proceed.
+map investigations. The [conversion proof ticket][proof-ticket] concludes as
+completed empirical research with demonstrated, failed and explicitly untested
+outcomes. Remaining fidelity and consumer qualifications belong in the selected
+implementation scope and its acceptance tests. Closing the research does not
+change accepted product policy, authorize silent SDR or gamut reduction, or
+require every optional experiment to pass before planning proceeds.
 
 [archive]: https://github.com/rafaeltab/wallpaperdb/commit/fd1c43e78134a5ecc0cd353a3ce099e02ed19392
+[publication]: hdr-conversion-evidence/publication.json
 [map]: https://github.com/rafaeltab/wallpaperdb/issues/253
-[profile-hdr]: https://github.com/rafaeltab/wallpaperdb/issues/270
+[profile-hdr]: https://github.com/rafaeltab/wallpaperdb/issues/270#issuecomment-5902621514
 [profile-sdr]: https://github.com/rafaeltab/wallpaperdb/issues/243
 [specs]: https://github.com/rafaeltab/wallpaperdb/issues/259
 [proof-ticket]: https://github.com/rafaeltab/wallpaperdb/issues/284
 [contract]: https://github.com/rafaeltab/wallpaperdb/issues/250
 [resolution]: https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153
 [ledger]: https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5870519681
-[report-commit]: https://github.com/rafaeltab/wallpaperdb/commit/41c22b5bb02461bb47b5f14bc9366b4ca1c6c335
-[execution]: https://github.com/rafaeltab/wallpaperdb/commit/c484862b1d76559e43c5e7d30724e3608c21914b
-[report]: https://github.com/rafaeltab/wallpaperdb/blob/41c22b5bb02461bb47b5f14bc9366b4ca1c6c335/apps/media/hdr-proof/results/report.md
-[matrix]: https://github.com/rafaeltab/wallpaperdb/blob/41c22b5bb02461bb47b5f14bc9366b4ca1c6c335/apps/media/hdr-proof/results/conversion-matrix.json
-[versions]: https://github.com/rafaeltab/wallpaperdb/blob/41c22b5bb02461bb47b5f14bc9366b4ca1c6c335/apps/media/hdr-proof/results/native-versions.json
-[manual-files]: https://github.com/rafaeltab/wallpaperdb/blob/41c22b5bb02461bb47b5f14bc9366b4ca1c6c335/apps/media/hdr-proof/results/manual/manifest.json
+[matrix]: hdr-conversion-evidence/conversion-matrix.json
+[replay-audit]: hdr-conversion-evidence/replay-audit.json
+[versions]: hdr-conversion-evidence/native-versions.json
+[consumer-observations]: hdr-conversion-evidence/consumer-observations.json
+[consumer-results]: hdr-conversion-evidence/consumer-results.csv
+[consumer-assets]: hdr-conversion-evidence/assets.json
+[evidence-release]: https://github.com/rafaeltab/wallpaperdb/releases/tag/hdr-proof-2026-10-11
+[native-results]: https://github.com/rafaeltab/wallpaperdb/releases/download/hdr-proof-2026-10-11/final-replay-results.tar.gz
 [proof-readme]: https://github.com/rafaeltab/wallpaperdb/blob/fd1c43e78134a5ecc0cd353a3ce099e02ed19392/apps/media/hdr-proof/README.md
 [thresholds]: https://github.com/rafaeltab/wallpaperdb/blob/fd1c43e78134a5ecc0cd353a3ce099e02ed19392/apps/media/hdr-proof/thresholds.json
 [avif]: https://github.com/rafaeltab/wallpaperdb/blob/fd1c43e78134a5ecc0cd353a3ce099e02ed19392/apps/media/hdr-proof/avif.py
@@ -296,6 +374,5 @@ before those planning discussions proceed.
 [bounds]: https://github.com/rafaeltab/wallpaperdb/blob/fd1c43e78134a5ecc0cd353a3ce099e02ed19392/apps/media/hdr-proof/iso_capacity_bound.py
 [provenance]: https://github.com/rafaeltab/wallpaperdb/blob/fd1c43e78134a5ecc0cd353a3ce099e02ed19392/apps/media/hdr-proof/fixtures/gainmap/manifest.json
 [fixture-lock]: https://github.com/rafaeltab/wallpaperdb/blob/fd1c43e78134a5ecc0cd353a3ce099e02ed19392/apps/media/hdr-proof/fixtures/generated-sha256.json
-[manual]: https://github.com/rafaeltab/wallpaperdb/blob/fd1c43e78134a5ecc0cd353a3ce099e02ed19392/apps/media/hdr-proof/MANUAL.md
 [docker]: https://github.com/rafaeltab/wallpaperdb/blob/fd1c43e78134a5ecc0cd353a3ce099e02ed19392/apps/media/hdr-proof/Dockerfile
 [appearance]: https://github.com/rafaeltab/wallpaperdb/blob/fd1c43e78134a5ecc0cd353a3ce099e02ed19392/apps/media/hdr-proof/appearance.py

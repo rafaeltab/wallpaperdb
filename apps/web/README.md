@@ -20,3 +20,5 @@ Profile edits go to the owning User service; public pages read Gateway's project
 ## Frontend feature decisions
 
 Feature policies use plain TypeScript, while React and browser adapters handle rendering and effects. See the [coding guidelines index](../../CODING_STANDARDS.md) for frontend guidance and the [architecture test](test/features/feature-architecture.test.ts) for enforced feature boundaries.
+
+Picture processing contracts use real Chromium because GIF composition, Canvas encoding, workers, and cancellation require browser APIs. The [browser contract configuration](vitest.browser.config.ts) runs separately from the successful service journeys through the workspace's [integration script](package.json), so failure and timing cases do not expand the service journey matrix.

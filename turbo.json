@@ -98,8 +98,7 @@
                 "package-lock.json"
             ],
             "dependsOn": [
-                "^build",
-                "^build:docker"
+                "^build"
             ]
         },
         "test:unit": {
@@ -141,8 +140,7 @@
                 "test-results/**"
             ],
             "dependsOn": [
-                "^build",
-                "^build:docker"
+                "^build"
             ]
         },
         "check-types": {

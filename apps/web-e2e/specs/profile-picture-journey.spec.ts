@@ -23,6 +23,9 @@ async function uploadPicture(
   });
   await expect(dialog).toBeVisible();
   await expect(
+    dialog.getByRole("button", { name: "Refresh Profile", exact: true }),
+  ).toHaveCount(0);
+  await expect(
     dialog.getByLabel("Choose picture", { exact: true }),
   ).toBeEnabled();
   if (route === "picker") {
@@ -159,6 +162,12 @@ async function removePicture(page: Page) {
     name: "Use a generated avatar?",
     exact: true,
   });
+  await confirmation
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(remove).toBeFocused();
+  await expect(dialog).toBeVisible();
+  await remove.click();
   const removed = page.waitForResponse(
     (response) =>
       response.url().endsWith("/user/profile/me/picture") &&

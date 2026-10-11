@@ -1,10 +1,24 @@
 import { Blob as NativeBlob } from 'node:buffer';
-import { afterAll, beforeAll, expect, it, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { openPictureSource } from '@/features/picture-editor/adapters/browser';
 
 // jsdom's Blob lacks arrayBuffer(); use the native Blob API for real header bytes.
-beforeAll(() => vi.stubGlobal('Blob', NativeBlob));
-afterAll(() => vi.unstubAllGlobals());
+beforeEach(() => vi.stubGlobal('Blob', NativeBlob));
+afterEach(() => vi.unstubAllGlobals());
+
+it.each(['worker', 'fallback'])('rejects APNG before the %s decoder can flatten its animation', async (mode) => {
+  // Generated from the existing small PNG with valid acTL/fcTL chunks and CRCs.
+  const fixture = await readFile(new URL('../fixtures/profile-animated.png', import.meta.url));
+  const decode = vi.fn(() => { throw new Error('Source reached the decoder.'); });
+  const worker = vi.fn(function () { throw new Error('Source reached the worker.'); });
+  vi.stubGlobal('createImageBitmap', decode);
+  vi.stubGlobal('Worker', mode === 'worker' ? worker : undefined);
+  vi.stubGlobal('OffscreenCanvas', mode === 'worker' ? vi.fn() : undefined);
+  await expect(openPictureSource(new Blob([fixture], { type: 'image/png' }), new AbortController().signal)).rejects.toThrow('Animated PNG pictures are not supported. Choose a static picture.');
+  expect(decode).not.toHaveBeenCalled();
+  expect(worker).not.toHaveBeenCalled();
+});
 
 it('validates detected source bytes before decoding a misleading declared format', async () => {
   await expect(openPictureSource(new Blob(['<svg/>'], { type: 'image/png' }), new AbortController().signal)).rejects.toThrow('Choose a valid JPEG, PNG, or WebP picture.');

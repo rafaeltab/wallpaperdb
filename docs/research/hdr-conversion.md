@@ -316,8 +316,9 @@ implementation.
 
 [Final specification planning][specs] should select the supported combinations,
 consumer targets, deployment dependencies and representative acceptance tests.
-Generation policy, companion lifecycle and migration remain with their existing
-map investigations. The [conversion proof ticket][proof-ticket] concludes as
+Generation policy and companion lifecycle remain with their existing map
+investigations. The accepted [clean-rebuild decision][clean-rebuild] requires no
+historical migration or backfill. The [conversion proof ticket][proof-ticket] concludes as
 completed empirical research with demonstrated, failed and explicitly untested
 outcomes. Remaining fidelity and consumer qualifications belong in the selected
 implementation scope and its acceptance tests. Closing the research does not
@@ -330,6 +331,7 @@ require every optional experiment to pass before planning proceeds.
 [profile-hdr]: https://github.com/rafaeltab/wallpaperdb/issues/270#issuecomment-5902621514
 [profile-sdr]: https://github.com/rafaeltab/wallpaperdb/issues/243
 [specs]: https://github.com/rafaeltab/wallpaperdb/issues/259
+[clean-rebuild]: https://github.com/rafaeltab/wallpaperdb/issues/257#issuecomment-5940357833
 [proof-ticket]: https://github.com/rafaeltab/wallpaperdb/issues/284
 [contract]: https://github.com/rafaeltab/wallpaperdb/issues/250
 [resolution]: https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153

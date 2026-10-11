@@ -6,18 +6,18 @@ import {
   projectionLayer,
   ProjectionStore,
   ProjectionUnavailable,
-  type ProjectionMutation,
+  type ProjectionChange,
   type ProjectionWrite,
 } from '../src/capabilities/projection/index.js';
 
 class ControlledProjection implements ProjectionStore {
-  readonly changes: ProjectionMutation[] = [];
+  readonly changes: ProjectionChange[] = [];
   constructor(
     private readonly result: ProjectionWrite | ProjectionUnavailable = { _tag: 'Applied' }
   ) {}
   apply = Effect.fn('test.projection.apply')(function* (
     this: ControlledProjection,
-    change: ProjectionMutation
+    change: ProjectionChange
   ) {
     if (this.result._tag === 'ProjectionUnavailable') return yield* this.result;
     this.changes.push(change);
@@ -93,7 +93,7 @@ describe('Catalogue projection', () => {
       )
     );
     expect(outcome).toEqual({ _tag: 'Completed' });
-    expect(store.changes).toEqual([{ ...event, _tag: 'PublishMeasurements' }]);
+    expect(store.changes).toEqual([event]);
   });
   it('publishes quantized named strength while preserving its nonzero quality', async () => {
     const store = new ControlledProjection();
@@ -115,7 +115,7 @@ describe('Catalogue projection', () => {
       )
     );
     expect(outcome).toEqual({ _tag: 'Completed' });
-    expect(store.changes).toEqual([{ ...event, _tag: 'PublishMeasurements' }]);
+    expect(store.changes).toEqual([event]);
   });
   it('preserves occurrence identity and creates a deterministic upload snapshot', async () => {
     const store = new ControlledProjection();
@@ -133,7 +133,7 @@ describe('Catalogue projection', () => {
     expect(outcome).toEqual({ _tag: 'Completed' });
     expect(store.changes).toEqual([
       {
-        _tag: 'PublishWallpaper',
+        _tag: 'WallpaperUploaded',
         occurrence,
         wallpaperId: 'wallpaper',
         profileId: 'profile',
@@ -210,8 +210,8 @@ describe('Catalogue projection', () => {
       }).pipe(Effect.provide(layer(store)))
     );
     expect(store.changes).toEqual([
-      { _tag: 'PublishVariant', occurrence, wallpaperId: 'wallpaper', variant },
-      { _tag: 'PublishProfile', occurrence, profile },
+      { _tag: 'VariantAvailable', occurrence, wallpaperId: 'wallpaper', variant },
+      { _tag: 'ProfilePublished', occurrence, profile },
     ]);
   });
 });

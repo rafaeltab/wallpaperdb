@@ -5,7 +5,7 @@ import {
   COLOR_REFERENCE_COMMIT,
 } from '@wallpaperdb/events';
 import { COLOR_UTILITY_VERSION, encodeColorUtilities } from '../../capabilities/catalogue/index.js';
-import type { ProjectionMutation } from '../../capabilities/projection/index.js';
+import type { ProjectionChange } from '../../capabilities/projection/index.js';
 import { variantDocument, timestamp } from './documents.js';
 
 const colorSnapshot = Schema.Struct({
@@ -83,26 +83,26 @@ function comparableOrder(order: string): string {
 
 export function nextWallpaper(
   current: StoredWallpaper | null,
-  mutation: Exclude<ProjectionMutation, { _tag: 'PublishProfile' }>
+  change: Exclude<ProjectionChange, { _tag: 'ProfilePublished' }>
 ): StoredWallpaper | null {
-  const updatedAt = DateTime.formatIso(DateTime.makeUnsafe(mutation.occurrence.occurredAt));
+  const updatedAt = DateTime.formatIso(DateTime.makeUnsafe(change.occurrence.occurredAt));
   const snapshot: StoredWallpaper = current ?? {
-    wallpaperId: mutation.wallpaperId,
+    wallpaperId: change.wallpaperId,
     variants: [],
     updatedAt,
   };
-  const order = `${mutation.occurrence.occurredAt}/${JSON.stringify([mutation.occurrence.source, mutation.occurrence.id])}`;
+  const order = `${change.occurrence.occurredAt}/${JSON.stringify([change.occurrence.source, change.occurrence.id])}`;
   const advanced = {
     ...snapshot,
     updatedAt: snapshot.updatedAt > updatedAt ? snapshot.updatedAt : updatedAt,
   };
-  switch (mutation._tag) {
-    case 'PublishWallpaper':
+  switch (change._tag) {
+    case 'WallpaperUploaded':
       return snapshot.userId !== undefined
         ? null
-        : { ...advanced, userId: mutation.profileId, uploadedAt: mutation.uploadedAt };
-    case 'PublishVariant': {
-      const variant = mutation.variant;
+        : { ...advanced, userId: change.profileId, uploadedAt: change.uploadedAt };
+    case 'VariantAvailable': {
+      const variant = change.variant;
       const key = JSON.stringify([variant.width, variant.height, variant.format]);
       const previous = snapshot.variantOrder?.[key];
       if (previous !== undefined && comparableOrder(previous) >= comparableOrder(order))
@@ -121,7 +121,7 @@ export function nextWallpaper(
         variantOrder: { ...snapshot.variantOrder, [key]: order },
       };
     }
-    case 'PublishMeasurements':
+    case 'ColorsMeasured':
       return snapshot.colorOrder !== undefined &&
         comparableOrder(snapshot.colorOrder) >= comparableOrder(order)
         ? null
@@ -130,9 +130,9 @@ export function nextWallpaper(
             colorOrder: order,
             colorReady: COLOR_UTILITY_VERSION,
             colorSnapshot: {
-              descriptor: mutation.descriptor,
-              provenance: mutation.provenance,
-              original: mutation.original,
+              descriptor: change.descriptor,
+              provenance: change.provenance,
+              original: change.original,
             },
           };
   }

@@ -9,7 +9,7 @@ import {
   type SearchSelection,
 } from '../../capabilities/catalogue/index.js';
 import {
-  type ProjectionMutation,
+  type ProjectionChange,
   ProjectionStore,
   ProjectionUnavailable,
   type ProjectionWrite,
@@ -290,25 +290,25 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
       })
     )
   );
-  readonly apply = Effect.fn('catalogue.storage.project')((mutation: ProjectionMutation) => {
+  readonly apply = Effect.fn('catalogue.storage.project')((change: ProjectionChange) => {
     const operation = {
-      PublishWallpaper: 'upsert',
-      PublishVariant: 'add_variant',
-      PublishMeasurements: 'add_color_utilities',
-      PublishProfile: 'profile_project',
-    }[mutation._tag];
+      WallpaperUploaded: 'upsert',
+      VariantAvailable: 'add_variant',
+      ColorsMeasured: 'add_color_utilities',
+      ProfilePublished: 'profile_project',
+    }[change._tag];
     return measure(
       operation,
       Effect.gen({ self: this }, function* (): Effect.fn.Return<
         ProjectionWrite,
         SearchRequestError | Schema.SchemaError
       > {
-        if (mutation._tag !== 'PublishProfile') return yield* this.applyWallpaper(mutation);
+        if (change._tag !== 'ProfilePublished') return yield* this.applyWallpaper(change);
         const result = yield* this.request(() =>
           this.client.update({
             index: this.profilesIndex,
-            id: mutation.profile.id,
-            body: profileUpdate(mutation.profile),
+            id: change.profile.id,
+            body: profileUpdate(change.profile),
             refresh: true,
             retry_on_conflict: 5,
           })
@@ -329,21 +329,21 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
   });
   private readonly applyWallpaper = Effect.fnUntraced(function* (
     this: SearchProjection,
-    mutation: Exclude<ProjectionMutation, { _tag: 'PublishProfile' }>
+    change: Exclude<ProjectionChange, { _tag: 'ProfilePublished' }>
   ): Effect.fn.Return<ProjectionWrite, SearchRequestError | Schema.SchemaError> {
     for (let attempt = 0; attempt < 6; attempt++) {
-      const existing = yield* this.get(this.wallpapers, mutation.wallpaperId);
+      const existing = yield* this.get(this.wallpapers, change.wallpaperId);
       const stored = existing === null ? null : yield* storedWallpaperResponse(existing);
       if (
         stored !== null &&
-        (stored._id !== mutation.wallpaperId ||
+        (stored._id !== change.wallpaperId ||
           stored._index !== this.wallpapers ||
-          stored._source.wallpaperId !== mutation.wallpaperId)
+          stored._source.wallpaperId !== change.wallpaperId)
       )
         return yield* new SearchRequestError({
           cause: new Error('Wallpaper source identity differs'),
         });
-      const next = nextWallpaper(stored?._source ?? null, mutation);
+      const next = nextWallpaper(stored?._source ?? null, change);
       if (next === null) return { _tag: 'Unchanged' };
       const body = completeWallpaper(next);
       if (Buffer.byteLength(JSON.stringify(body)) > 5 * 1024 * 1024)
@@ -353,7 +353,7 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
       const written = yield* this.request(() =>
         this.client.index({
           index: this.wallpapers,
-          id: mutation.wallpaperId,
+          id: change.wallpaperId,
           body,
           refresh: true,
           ...(stored === null
@@ -373,7 +373,7 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
       );
       if (written._tag === 'Conflict') continue;
       const acknowledged = yield* indexResponse(written.body);
-      if (acknowledged._id !== mutation.wallpaperId || acknowledged._index !== this.wallpapers)
+      if (acknowledged._id !== change.wallpaperId || acknowledged._index !== this.wallpapers)
         return yield* new SearchRequestError({
           cause: new Error('Wallpaper indexing acknowledgement differs'),
         });

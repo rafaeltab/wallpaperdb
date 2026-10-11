@@ -45,7 +45,9 @@ function hasJpegGainMapDeclaration(marker: number, payload: Buffer): boolean {
 function validateJpegSource(input: Buffer): void {
   if (!input.subarray(0, 2).equals(Buffer.from([0xff, 0xd8]))) return;
   let offset = 2;
-  while ((offset = input.indexOf(0xff, offset)) !== -1) {
+  while (offset < input.length) {
+    offset = input.indexOf(0xff, offset);
+    if (offset === -1) break;
     offset++;
     while (input[offset] === 0xff) offset++;
     const marker = input[offset++];

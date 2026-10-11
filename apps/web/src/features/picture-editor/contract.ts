@@ -18,10 +18,3 @@ export interface PictureEncodingPolicy {
   maxOutputBytes: number;
   encoding: { staticQuality: number };
 }
-
-/** UI owns this decoded source and must dispose it when its editing session ends. */
-export interface PictureSource extends PictureDimensions {
-  preview: Blob;
-  process: (crop: PictureCrop, policy: PictureEncodingPolicy, signal: AbortSignal) => Promise<Blob>;
-  dispose: () => void;
-}

@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  initialPictureCrop,
-  type PictureCrop,
-  type PictureSource,
-  type PictureEncodingPolicy,
-} from '../index';
-import { openPictureSource } from './browser';
+import { initialPictureCrop, type PictureCrop, type PictureEncodingPolicy } from '../index';
+import { openPictureSource, type PictureSource } from './browser';
 
 interface Selection {
   owner: string;

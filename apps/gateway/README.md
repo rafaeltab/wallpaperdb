@@ -17,3 +17,9 @@ OpenSearch supports the catalogue's filtered and ranked searches. Mercurius expo
 Read the [domain context](GLOSSARY.md) for ownership and the [recovery guide](../docs/content/docs/guides/service-upgrades.mdx) before rebuilding projections or replaying messages.
 
 The [admission contract](../docs/content/docs/guides/gateway-admission.mdx) explains quota and overload responses, degraded operation, and required production ingress controls. [Load evidence](docs/admission-load-test.md) records initial limits and the checks required before deployment.
+
+## API documentation
+
+Gateway serves Swagger UI at `/documentation` and its OpenAPI document at `/documentation/json`, registered by the [HTTP adapter](src/http/index.ts) and the [shared OpenAPI plugin](../../packages/core/src/openapi/plugin.ts).
+
+Offline OpenAPI artifact generation is not a supported Gateway workflow. The former `gen:swagger` script pointed to a missing source file and was removed because no in-repository consumer requires a Gateway artifact. The [documentation site's OpenAPI inputs](../docs/src/lib/openapi.ts) consume only Ingestor and Media artifacts.

@@ -7,6 +7,11 @@ const searchTests = [
   'test/{opensearch,color-ranking,profile,profile-search,integration,server}.test.ts',
 ];
 const instrumentationTests = ['test/unit/otel.test.ts'];
+const fastTests = [
+  'test/{catalogue,color-query,color-utilities,cursor.service,event-consumers,event-envelope-conformance,graphql-security,health,http-lifecycle,projection}.test.ts',
+  'test/unit/{admission,availability,availability-adapter,config,runtime,startup-diagnostics}.test.ts',
+  'src/**/*.test.ts',
+];
 
 export default mergeConfig(
   defaults,
@@ -29,9 +34,16 @@ export default mergeConfig(
         {
           extends: true,
           test: {
-            name: 'gateway',
+            name: 'gateway-unit',
+            include: fastTests,
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'gateway-integration',
             include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
-            exclude: [...searchTests, ...instrumentationTests],
+            exclude: [...fastTests, ...searchTests, ...instrumentationTests],
           },
         },
         {

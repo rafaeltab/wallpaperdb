@@ -157,6 +157,80 @@ describe('Profile picture settings', () => {
     await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 1, picture: expect.objectContaining({ type: 'image/webp', size: canonical.size }) })));
   });
 
+  it('pastes actual image data into the open editor and resets an unsaved crop', async () => {
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['old'], 'old.png', { type: 'image/png' }));
+    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
+    const picture = new File(['new'], 'pasted.png', { type: 'image/png' });
+    fireEvent.paste(document, { clipboardData: { items: [{ kind: 'file', type: picture.type, getAsFile: () => picture }] } });
+    expect(await screen.findByText('pasted.png')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('1');
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(disposePicture).toHaveBeenCalled();
+  });
+
+  it.each(['picker', 'drop', 'paste'])('fences processing when %s replaces the source and resets the crop', async (route) => {
+    let finish: ((value: Blob) => void) | undefined;
+    let signal: AbortSignal | undefined;
+    processPicture.mockImplementationOnce((_crop, _policy, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['old'], 'old.png', { type: 'image/png' }));
+    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    const replacement = new File(['new'], 'new.png', { type: 'image/png' });
+    if (route === 'picker') await user.upload(screen.getByLabelText('Choose picture'), replacement);
+    else if (route === 'drop') fireEvent.drop(screen.getByRole('dialog', { name: 'Profile picture' }), { dataTransfer: { files: [replacement] } });
+    else fireEvent.paste(document, { clipboardData: { items: [{ kind: 'file', type: replacement.type, getAsFile: () => replacement }] } });
+    expect(signal?.aborted).toBe(true);
+    expect(await screen.findByRole('slider', { name: 'Zoom' })).toHaveValue('1');
+    await act(async () => finish?.(canonical));
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+    expect(screen.getByText('new.png')).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it.each(['picker', 'drop', 'paste'])('explains unsupported %s sources using the effective policy', async (route) => {
+    vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, acceptedSourceFormats: ['image/jpeg'] });
+    await renderPage();
+    await waitFor(() => expect(screen.getByLabelText('Choose picture')).toBeEnabled());
+    const unsupported = new File(['png'], 'unsupported.png', { type: 'image/png' });
+    if (route === 'picker') await userEvent.setup({ applyAccept: false }).upload(screen.getByLabelText('Choose picture'), unsupported);
+    else if (route === 'drop') fireEvent.drop(screen.getByRole('dialog', { name: 'Profile picture' }), { dataTransfer: { files: [unsupported] } });
+    else fireEvent.paste(document, { clipboardData: { items: [{ kind: 'file', type: unsupported.type, getAsFile: () => unsupported }] } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Choose a JPEG picture.');
+    expect(openPictureSource).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+  });
+
+  it('ignores clipboard markup, text and URLs, and releases image handling on close and unmount', async () => {
+    const { unmount } = await renderPage(profile, false);
+    const picture = new File(['png'], 'clipboard.png', { type: 'image/png' });
+    const imageData = { items: [{ kind: 'file', type: picture.type, getAsFile: () => picture }] };
+    expect(fireEvent.paste(document, { clipboardData: imageData })).toBe(true);
+    expect(openPictureSource).not.toHaveBeenCalled();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
+    for (const type of ['text/html', 'text/plain', 'text/uri-list']) {
+      expect(fireEvent.paste(document, { clipboardData: { items: [{ kind: 'string', type, getAsFile: () => null }], getData: () => '<img src="https://elsewhere.test/image.png">' } })).toBe(true);
+    }
+    fireEvent.drop(screen.getByRole('dialog', { name: 'Profile picture' }), { dataTransfer: { files: [], getData: () => 'https://elsewhere.test/image.png' } });
+    expect(openPictureSource).not.toHaveBeenCalled();
+    expect(screen.getByText('No picture selected')).toBeInTheDocument();
+    fireEvent.paste(document, { clipboardData: imageData });
+    expect(await screen.findByText('clipboard.png')).toBeInTheDocument();
+    expect(screen.getByLabelText('Choose picture')).not.toHaveAttribute('capture');
+    await user.keyboard('{Escape}');
+    vi.mocked(openPictureSource).mockClear();
+    expect(fireEvent.paste(document, { clipboardData: imageData })).toBe(true);
+    expect(openPictureSource).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
+    unmount();
+    expect(fireEvent.paste(document, { clipboardData: imageData })).toBe(true);
+    expect(openPictureSource).not.toHaveBeenCalled();
+  });
+
   it('opens picture controls from the avatar and returns focus when closed', async () => {
     await renderPage(profile, false);
     const user = userEvent.setup();

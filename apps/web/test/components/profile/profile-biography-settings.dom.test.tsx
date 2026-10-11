@@ -18,7 +18,12 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/user')>();
   return {
     ...original,
-    userApi: { ...original.userApi, ensureProfile: vi.fn(), updateProfile: vi.fn() },
+    userApi: {
+      ...original.userApi,
+      ensureProfile: vi.fn(),
+      updateProfile: vi.fn(),
+      picturePolicy: vi.fn(),
+    },
   };
 });
 vi.mock('@tanstack/react-router', () => ({
@@ -64,6 +69,13 @@ describe('Biography settings', () => {
     });
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.updateProfile).mockReset();
+    vi.mocked(userApi.picturePolicy).mockReset().mockResolvedValue({
+      output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+      maxOutputBytes: 5242880,
+      acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
+      animation: { available: false },
+      encoding: { staticQuality: 85 },
+    });
   });
 
   it('refreshes an exhausted same-Markdown wallpaper embed when the owner deliberately refreshes Biography', async () => {

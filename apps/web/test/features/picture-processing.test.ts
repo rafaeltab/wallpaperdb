@@ -86,3 +86,30 @@ it('disposes outstanding processing and refuses further work from an abandoned s
   await expect(processing).rejects.toMatchObject({ name: 'AbortError' });
   await expect(picture.process(crop, policy, new AbortController().signal)).rejects.toMatchObject({ name: 'AbortError' });
 });
+
+it('falls back for preview and processing when the worker module fails after construction', async () => {
+  const terminated = vi.fn();
+  vi.stubGlobal('OffscreenCanvas', class {});
+  vi.stubGlobal('Worker', class {
+    onerror: ((event: Event) => void) | null = null;
+    postMessage() { queueMicrotask(() => this.onerror?.(new Event('error'))); }
+    terminate() { terminated(); }
+  });
+  const picture = await openPictureSource(source, new AbortController().signal);
+  const result = await picture.process(initialPictureCrop(picture), policy, new AbortController().signal);
+  expect(result.type).toBe('image/webp');
+  expect(terminated).toHaveBeenCalledTimes(2);
+  expect(closed).toHaveBeenCalledTimes(2);
+  picture.dispose();
+});
+
+it('retains explicit worker decode failures without retrying unsupported image data', async () => {
+  vi.stubGlobal('OffscreenCanvas', class {});
+  vi.stubGlobal('Worker', class {
+    onmessage: ((event: MessageEvent) => void) | null = null;
+    postMessage() { queueMicrotask(() => this.onmessage?.(new MessageEvent('message', { data: { ok: false, message: 'Invalid image data.' } }))); }
+    terminate() {}
+  });
+  await expect(openPictureSource(source, new AbortController().signal)).rejects.toThrow('Invalid image data.');
+  expect(closed).not.toHaveBeenCalled();
+});

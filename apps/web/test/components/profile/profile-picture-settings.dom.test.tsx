@@ -231,6 +231,22 @@ describe('Profile picture settings', () => {
     expect(openPictureSource).not.toHaveBeenCalled();
   });
 
+  it('uses wheel zoom with the accessible slider, Reset, and the minimum source crop', async () => {
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'wheel.png', { type: 'image/png' }));
+    const zoom = await screen.findByRole('slider', { name: 'Zoom' });
+    const crop = screen.getByRole('group', { name: 'Picture crop' });
+    fireEvent.wheel(crop, { deltaY: -10000, deltaMode: 0 });
+    expect(zoom).toHaveValue('6.25');
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(zoom).toHaveValue('1');
+    fireEvent.wheel(crop, { deltaY: -346.57359028, deltaMode: 0 });
+    expect(Number(zoom.getAttribute('value'))).toBeCloseTo(2);
+    fireEvent.wheel(crop, { deltaY: 10000, deltaMode: 0 });
+    expect(zoom).toHaveValue('1');
+  });
+
   it('opens picture controls from the avatar and returns focus when closed', async () => {
     await renderPage(profile, false);
     const user = userEvent.setup();

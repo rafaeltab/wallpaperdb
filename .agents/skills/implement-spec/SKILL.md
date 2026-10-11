@@ -8,7 +8,7 @@ You have been provided a spec and its implementation tickets. Read them through 
 
 For a spec with multiple tickets, the goal is one linear GitHub PR stack, with one branch and PR per ticket. The bottom PR targets `main`; each subsequent PR targets the previous ticket's branch. The top branch contains the complete spec.
 
-For a single-ticket spec, create an ordinary branch from current `main` and a draft PR targeting `main`. Apply the implementation, review, validation, and issue-closure steps below using [do-work](../do-work/SKILL.md) to publish the PR. Skip extension setup and stack-only initialization, publishing, status, and landing commands. A [native remote stack requires at least two PRs](https://github.com/github/gh-stack/issues/467); the single ticket still implements the complete spec.
+For a single-ticket spec, create an ordinary branch from current `main` and a draft PR targeting `main`. Apply the implementation, review, validation, and issue-closure steps below. Pushing the validated branch and opening its draft PR through [do-work](../do-work/SKILL.md) and the publication rules below remain mandatory. Skip extension setup and all `gh stack` commands; use the ordinary-PR path for explicitly requested landing. A [native remote stack requires at least two PRs](https://github.com/github/gh-stack/issues/467); the single ticket still implements the complete spec.
 
 Tickets form a dependency graph. Implement them one at a time in an order that puts every prerequisite before its dependents. Independent tickets also become successive stack layers. Apply the issue tracker's readiness rule to every prerequisite, including tickets with multiple blockers.
 

@@ -10,9 +10,13 @@ import {
   type EffectivePicturePolicy,
 } from '../src/capabilities/pictures/index.js';
 
-async function processProfilePicture(bytes: Buffer, limits: PictureLimits) {
+async function processProfilePicture(
+  bytes: Buffer,
+  limits: PictureLimits,
+  effectivePolicy = policy
+) {
   const outcome = await Effect.runPromise(
-    Effect.flatMap(PictureCodec, (codec) => codec.process(bytes, policy)).pipe(
+    Effect.flatMap(PictureCodec, (codec) => codec.process(bytes, effectivePolicy)).pipe(
       Effect.provide(pictureCodecLayer(limits))
     )
   );
@@ -35,6 +39,104 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it('rejects a canonical-sized WebP containing duplicate image chunks', async () => {
+    const webp = await sharp({
+      create: { width: 512, height: 512, channels: 3, background: '#3578aa' },
+    })
+      .webp()
+      .toBuffer();
+    const duplicate = Buffer.concat([webp, webp.subarray(12)]);
+    duplicate.writeUInt32LE(duplicate.length - 8, 4);
+    await expect(processProfilePicture(duplicate, limits)).rejects.toThrow(
+      'Picture could not be decoded'
+    );
+  });
+  it('applies source orientation before producing canonical pixels and strips camera metadata', async () => {
+    const pixels = Buffer.alloc(40 * 20 * 3);
+    for (let y = 0; y < 20; y++)
+      for (let x = 0; x < 40; x++) pixels[(y * 40 + x) * 3 + (x < 20 ? 0 : 2)] = 255;
+    const input = await sharp(pixels, { raw: { width: 40, height: 20, channels: 3 } })
+      .withMetadata({ orientation: 6 })
+      .withExifMerge({ IFD0: { Make: 'PRIVATE_CAMERA', Model: 'PRIVATE_MODEL' } })
+      .jpeg({ quality: 100 })
+      .toBuffer();
+    expect(input.includes(Buffer.from('PRIVATE_CAMERA'))).toBe(true);
+    const picture = await processProfilePicture(input, limits);
+    const top = await sharp(picture.bytes)
+      .extract({ left: 256, top: 100, width: 1, height: 1 })
+      .raw()
+      .toBuffer();
+    const bottom = await sharp(picture.bytes)
+      .extract({ left: 256, top: 400, width: 1, height: 1 })
+      .raw()
+      .toBuffer();
+    expect(top[0]).toBeGreaterThan(240);
+    expect(top[2]).toBeLessThan(15);
+    expect(bottom[2]).toBeGreaterThan(240);
+    expect(bottom[0]).toBeLessThan(15);
+    expect(picture.bytes.includes(Buffer.from('PRIVATE_CAMERA'))).toBe(false);
+    expect((await sharp(picture.bytes).metadata()).exif).toBeUndefined();
+  });
+  it('preserves transparency while normalizing PNG and profiled WebP into metadata-free sRGB', async () => {
+    for (const format of ['png', 'webp'] as const) {
+      const input = await sharp({
+        create: {
+          width: 20,
+          height: 10,
+          channels: 4,
+          background: { r: 0, g: 255, b: 0, alpha: 0.25 },
+        },
+      })
+        .withIccProfile('p3')
+        .toFormat(format)
+        .toBuffer();
+      const source = await sharp(input).metadata();
+      expect(source.icc).toBeDefined();
+      const picture = await processProfilePicture(input, limits);
+      const metadata = await sharp(picture.bytes).metadata();
+      expect(metadata).toMatchObject({ width: 512, height: 512, space: 'srgb', hasAlpha: true });
+      expect(metadata.icc).toBeUndefined();
+      expect(metadata.xmp).toBeUndefined();
+      expect(metadata.exif).toBeUndefined();
+      expect(metadata.iptc).toBeUndefined();
+      const pixel = await sharp(picture.bytes)
+        .extract({ left: 200, top: 200, width: 1, height: 1 })
+        .raw()
+        .toBuffer();
+      expect(pixel[0]).toBeLessThan(25);
+      expect(pixel[1]).toBeGreaterThan(240);
+      expect(pixel[2]).toBeLessThan(25);
+      expect(pixel[3]).toBe(64);
+    }
+  });
+  it('enforces final encoded bytes independently of the source upload limit', async () => {
+    const input = await sharp({
+      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+    })
+      .png()
+      .toBuffer();
+    await expect(
+      processProfilePicture(input, limits, { ...policy, maxOutputBytes: 1 })
+    ).rejects.toThrow('processed output byte limit');
+    const canonical = await sharp({
+      create: { width: 512, height: 512, channels: 3, background: '#3578aa' },
+    })
+      .webp()
+      .toBuffer();
+    await expect(
+      processProfilePicture(canonical, limits, { ...policy, maxOutputBytes: 1 })
+    ).rejects.toThrow('processed output byte limit');
+  });
+  it('rejects malformed WebP containers even when their first image can be decoded', async () => {
+    const webp = await sharp({
+      create: { width: 512, height: 512, channels: 3, background: '#3578aa' },
+    })
+      .webp()
+      .toBuffer();
+    await expect(
+      processProfilePicture(Buffer.concat([webp, Buffer.from('hidden trailing bytes')]), limits)
+    ).rejects.toThrow('Picture could not be decoded');
+  });
   it('preserves exact canonical static WebP bytes after fully decoding them', async () => {
     const input = await sharp({
       create: { width: 512, height: 512, channels: 4, background: '#3578aa80' },

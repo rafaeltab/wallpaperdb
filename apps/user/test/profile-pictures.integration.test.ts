@@ -227,8 +227,8 @@ describe('Profile picture commands', () => {
           id: updated.pictureAssetId,
           storageBucket: 'profile-pictures',
           mimeType: 'image/webp',
-          width: 2,
-          height: 3,
+          width: 512,
+          height: 512,
         },
       },
       profile: {
@@ -248,7 +248,7 @@ describe('Profile picture commands', () => {
     const bytes = await object.Body.transformToByteArray();
     expect(bytes.length).toBe(asset.fileSizeBytes);
     const metadata = await sharp(bytes).metadata();
-    expect(metadata).toMatchObject({ format: 'webp', width: 2, height: 3 });
+    expect(metadata).toMatchObject({ format: 'webp', width: 512, height: 512 });
     expect(metadata.exif).toBeUndefined();
     expect(metadata.icc).toBeUndefined();
   });

@@ -10,6 +10,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Comment on an issue**: `gh issue comment <number> --body "..."`.
 - **Apply or remove labels**: `gh issue edit <number> --add-label "..."` or `--remove-label "..."`.
 - **Close an issue**: `gh issue close <number> --comment "..."`.
+- **Reopen an issue**: [gh issue reopen](https://cli.github.com/manual/gh_issue_reopen) accepts an issue number or URL. Explain why the recurrence warrants reopening in an issue comment. After reopening, use [gh issue view](https://cli.github.com/manual/gh_issue_view) with `--json state,url` and verify `state` is `OPEN` before relying on the issue as active tracking. Report a failed mutation or verification instead of treating the issue as open.
 
 Infer the repository from `git remote -v`; `gh` does this automatically inside the clone.
 

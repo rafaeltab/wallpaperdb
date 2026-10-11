@@ -36,3 +36,16 @@ it('honors cancellation before decoded source work can begin', async () => {
   const controller = new AbortController(); controller.abort();
   await expect(openPictureSource(new Blob([new Uint8Array([255, 216, 255])]), controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
 });
+
+it.each(['pq', 'hlg'])('rejects %s PNG16 color declarations before rasterizing the source', async (transfer) => {
+  // Generated RGB16 PNGs with valid CRCs and standard PQ/HLG cICP declarations.
+  const fixture = await readFile(new URL(`../fixtures/profile-${transfer}.png`, import.meta.url));
+  const decode = vi.fn(() => { throw new Error('Source reached the decoder.'); });
+  const worker = vi.fn(function () { throw new Error('Source reached the worker.'); });
+  vi.stubGlobal('createImageBitmap', decode);
+  vi.stubGlobal('Worker', worker);
+  vi.stubGlobal('OffscreenCanvas', class {});
+  await expect(openPictureSource(new Blob([fixture]), new AbortController().signal)).rejects.toThrow('color interpretation is not supported');
+  expect(decode).not.toHaveBeenCalled();
+  expect(worker).not.toHaveBeenCalled();
+});

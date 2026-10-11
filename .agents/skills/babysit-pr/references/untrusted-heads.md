@@ -10,4 +10,10 @@ Keep every read and edit of the untrusted working tree inside a disposable envir
 
 Keep authenticated publication in a clean trusted Git repository whose working tree remains on trusted content. Transfer only verified fix commit objects from isolation, confirm their identity and ancestry against the recorded remote head, and publish under the [existing-PR publication rule](../SKILL.md#1-establish-the-target-and-retain-progress). Publish those objects without checking out the untrusted tree on the host.
 
-Resume the main workflow only after the trusted context and policy snapshot are validated and isolation covers all tree reads, edits, and execution.
+## PR-produced artifacts
+
+Apply the same boundary to files produced by an untrusted PR, including CI archives, reports, traces, and service logs. Route artifact retrieval into the credential-free isolated environment, and perform all extraction, parsing, viewing, and sanitization there. [gh run download](https://cli.github.com/manual/gh_run_download) extracts artifacts into its destination, so it is unsuitable for raw archive transfer in the authenticated publisher.
+
+When artifact retrieval requires authentication, use a trusted broker with the [artifact download API](https://docs.github.com/en/rest/actions/artifacts#download-an-artifact) to stream opaque archive bytes directly into isolation. The broker retains authentication and does not extract, render, or inspect archive contents. Keep archives and extracted files out of the publisher workspace. Return only minimal sanitized plain-text evidence through [github-markdown-bodies](../../github-markdown-bodies/SKILL.md), together with authenticated run and artifact identifiers. Return a blocker if safe retrieval or inspection is unavailable.
+
+Resume the main workflow only after the trusted context and policy snapshot are validated and isolation covers tree reads, edits, execution, and PR-produced artifact handling.

@@ -1,5 +1,6 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { afterEach, describe, expect, it } from 'vitest';
+import { profile } from './http-fixture.js';
 import { Profiles, type ProfileOutcome } from '../src/capabilities/profile/index.js';
 import {
   PictureCodec,
@@ -17,7 +18,11 @@ afterEach(async () => {
   await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
 });
 
-function setup(maxOutputBytes = 5242880, normalize: (bytes: Buffer) => Buffer = (bytes) => bytes) {
+function setup(
+  maxOutputBytes = 5242880,
+  normalize: (bytes: Buffer) => Buffer = (bytes) => bytes,
+  accept = false
+) {
   const policies: unknown[] = [];
   const assets = new Map<string, StoredPicture & { state: 'uploading' | 'staged' | 'deleting' }>();
   const objects = new Map<string, Buffer>();
@@ -44,7 +49,17 @@ function setup(maxOutputBytes = 5242880, normalize: (bytes: Buffer) => Buffer = 
       expectedVersion: number
     ) => {
       adoptions.push({ ...principal, assetId, expectedVersion });
-      return rejected();
+      return accept
+        ? Effect.succeed<ProfileOutcome>({
+            _tag: 'Success',
+            profile: {
+              ...profile,
+              id: principal.profileId,
+              version: expectedVersion + 1,
+              pictureAssetId: assetId,
+            },
+          })
+        : rejected();
     },
     adoptImportedPicture: rejected,
   };
@@ -215,6 +230,37 @@ describe('Picture capability', () => {
       reason: 'unauthorized',
     });
     expect(test.assets.size).toBe(0);
+  });
+
+  it('adopts controlled animated canonical bytes for the authenticated owner and preserves version conflict decisions', async () => {
+    for (const accept of [false, true]) {
+      const canonical = Buffer.from('verified animated WebP');
+      const test = setup(100, () => canonical, accept);
+      const outcome = await test.run((pictures) =>
+        pictures.upload({ profileId: 'owner' }, Buffer.from('untrusted GIF'), 4)
+      );
+      expect([...test.objects.values()]).toEqual([canonical]);
+      expect(test.adoptions).toEqual([
+        { profileId: 'owner', assetId: 'pic_0', expectedVersion: 4 },
+      ]);
+      if (accept)
+        expect(outcome).toMatchObject({
+          _tag: 'Success',
+          profile: {
+            id: 'owner',
+            pictureAssetId: 'pic_0',
+            version: 5,
+            biographyMarkdown: profile.biographyMarkdown,
+          },
+        });
+      else expect(outcome).toMatchObject({ _tag: 'Rejected', reason: 'version-conflict' });
+      expect(test.policies).toMatchObject([
+        {
+          animation: { available: true },
+          acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+        },
+      ]);
+    }
   });
   it('retains a private candidate after a lost PUT reply and never attempts adoption', async () => {
     const test = setup();

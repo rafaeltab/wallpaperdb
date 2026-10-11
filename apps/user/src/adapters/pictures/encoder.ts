@@ -81,9 +81,9 @@ interface WebpStructure {
 /** Strict container admission precedes libvips, including every nested frame. */
 function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | undefined {
   if (input.toString('ascii', 0, 4) !== 'RIFF') return undefined;
-  const invalid = (): never => {
+  function invalid(): never {
     throw new Error('Invalid WebP structure');
-  };
+  }
   if (
     input.length < 12 ||
     input.toString('ascii', 8, 12) !== 'WEBP' ||
@@ -205,6 +205,102 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
   return { animated, canonicalChunks, width, height, durations };
 }
 
+interface GifStructure {
+  animated: boolean;
+  loop: number;
+  durations: number[];
+}
+function inspectGif(input: Buffer, limits: PictureLimits): GifStructure | undefined {
+  if (!['GIF87a', 'GIF89a'].includes(input.toString('ascii', 0, 6))) return undefined;
+  let offset = 6;
+  function invalid(): never {
+    throw new InvalidProfilePictureError('Picture GIF structure is invalid');
+  }
+  const take = (size: number) => {
+    if (offset + size > input.length) invalid();
+    const bytes = input.subarray(offset, offset + size);
+    offset += size;
+    return bytes;
+  };
+  const byte = () => take(1)[0];
+  const word = () => take(2).readUInt16LE();
+  const blocks = () => {
+    const result: Buffer[] = [];
+    for (let size = byte(); size; size = byte()) result.push(take(size));
+    return Buffer.concat(result);
+  };
+  const width = word();
+  const height = word();
+  if (!width || !height || width * height > limits.maxPixels)
+    throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
+  const flags = byte();
+  byte();
+  byte();
+  if (flags & 128) take(3 * (1 << ((flags & 7) + 1)));
+  let repetitions: number | undefined;
+  let delay = 0;
+  const durations: number[] = [];
+  for (;;) {
+    const marker = byte();
+    if (marker === 0x3b) {
+      if (!durations.length || offset !== input.length) invalid();
+      return {
+        animated: durations.length > 1 || repetitions !== undefined,
+        loop: repetitions === undefined ? 1 : repetitions === 0 ? 0 : repetitions + 1,
+        durations,
+      };
+    }
+    if (marker === 0x21) {
+      const label = byte();
+      if (label === 0xf9) {
+        if (byte() !== 4) invalid();
+        const control = byte();
+        if (control & 0xe2 || ((control >>> 2) & 7) > 3)
+          throw new InvalidProfilePictureError('Picture GIF frame controls cannot be preserved');
+        delay = word();
+        byte();
+        if (byte() !== 0) invalid();
+      } else if (label === 0xff) {
+        const application = take(byte()).toString('ascii');
+        const data = blocks();
+        if (['NETSCAPE2.0', 'ANIMEXTS1.0'].includes(application)) {
+          if (data.length !== 3 || data[0] !== 1) invalid();
+          repetitions = data.readUInt16LE(1);
+          if (repetitions === 65535)
+            throw new InvalidProfilePictureError(
+              'Picture GIF loop count cannot be preserved as WebP'
+            );
+        } else if (application === 'ICCRGBG1012')
+          throw new InvalidProfilePictureError('Picture GIF color interpretation is unsupported');
+      } else if (label === 1)
+        throw new InvalidProfilePictureError('Picture GIF text frames cannot be preserved');
+      else blocks();
+    } else if (marker === 0x2c) {
+      const x = word();
+      const y = word();
+      const frameWidth = word();
+      const frameHeight = word();
+      const frameFlags = byte();
+      if (
+        !frameWidth ||
+        !frameHeight ||
+        x + frameWidth > width ||
+        y + frameHeight > height ||
+        frameFlags & 0x18
+      )
+        invalid();
+      if (frameFlags & 128) take(3 * (1 << ((frameFlags & 7) + 1)));
+      const minimum = byte();
+      if (minimum < 2 || minimum > 8) invalid();
+      blocks();
+      durations.push(delay <= 1 ? 100 : delay * 10);
+      delay = 0;
+      if (durations.length * width * height * 4 > limits.maxDecodedBytes)
+        throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');
+    } else invalid();
+  }
+}
+
 function readPngChunk(input: Buffer, offset: number): { type: string; nextOffset: number } {
   const length = input.readUInt32BE(offset);
   if (length > input.length - offset - 12)
@@ -230,7 +326,7 @@ function validateEncodedPicture(input: Buffer, limits: PictureLimits): void {
   if (input.length > limits.maxBytes)
     throw new ProfilePictureTooLargeError('Picture exceeds the upload byte limit');
   if (!hasSupportedSignature(input))
-    throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+    throw new InvalidProfilePictureError('Only JPEG, PNG, WebP, and GIF pictures are accepted');
 
   if (hasPngAnimation(input))
     throw new InvalidProfilePictureError('Animated pictures are not accepted');
@@ -244,15 +340,9 @@ function hasSupportedSignature(input: Buffer): boolean {
   return input.toString('ascii', 0, 4) === 'RIFF' && input.toString('ascii', 8, 12) === 'WEBP';
 }
 
-function hasAnimation(metadata: Metadata): boolean {
-  return (metadata.pages ?? 1) > 1 || metadata.loop !== undefined || metadata.delay !== undefined;
-}
-
-function validateStillFormat(metadata: Metadata, limits: PictureLimits): void {
+function validateSourceFormat(metadata: Metadata): void {
   if (!['jpeg', 'png', 'webp', 'gif'].includes(metadata.format ?? ''))
-    throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
-  if (hasAnimation(metadata) && !limits.policy.animation.available)
-    throw new InvalidProfilePictureError('Animated pictures are not accepted');
+    throw new InvalidProfilePictureError('Only JPEG, PNG, WebP, and GIF pictures are accepted');
 }
 
 function decodedByteCount(metadata: Metadata, pixels: number): number {
@@ -268,7 +358,7 @@ function decodedByteCount(metadata: Metadata, pixels: number): number {
 }
 
 function validatePictureMetadata(metadata: Metadata, limits: PictureLimits): void {
-  validateStillFormat(metadata, limits);
+  validateSourceFormat(metadata);
   if (!limits.policy.acceptedSourceFormats.includes(`image/${metadata.format}`))
     throw new InvalidProfilePictureError('Picture format is unavailable');
   if (
@@ -312,6 +402,7 @@ async function processProfilePicture(
   validateEncodedPicture(input, limits);
   try {
     const structure = inspectWebp(input, limits);
+    const gif = inspectGif(input, limits);
     const decoder = sharp(input, {
       limitInputPixels: limits.maxPixels,
       failOn: 'warning',
@@ -320,14 +411,15 @@ async function processProfilePicture(
     });
     const metadata = await decoder.metadata();
     validatePictureMetadata(metadata, limits);
-    const animated = structure?.animated ?? (metadata.pages ?? 1) > 1;
+    const animated = structure?.animated ?? gif?.animated ?? false;
     if (animated && !limits.policy.animation.available)
       throw new InvalidProfilePictureError('Animated pictures are not accepted');
+    const durations = gif?.durations ?? metadata.delay;
     if (
       animated &&
-      (!metadata.delay ||
-        metadata.delay.length !== metadata.pages ||
-        metadata.delay.some(
+      (!durations ||
+        durations.length !== (metadata.pages ?? 1) ||
+        durations.some(
           (duration) => !Number.isInteger(duration) || duration < 0 || duration > 0xffffff
         ))
     )
@@ -345,8 +437,11 @@ async function processProfilePicture(
     }
     let output: Buffer;
     if (animated) {
+      if (metadata.orientation !== undefined)
+        throw new InvalidProfilePictureError(
+          'Animated picture orientation cannot be normalized. Process the source in the editor.'
+        );
       if (
-        metadata.orientation !== undefined ||
         !Number.isInteger(metadata.loop ?? 1) ||
         (metadata.loop ?? 1) < 0 ||
         (metadata.loop ?? 1) > 65535
@@ -381,8 +476,8 @@ async function processProfilePicture(
       }
       output = animateWebp(
         frames,
-        metadata.delay?.map((duration) => (duration <= 10 ? 100 : duration)) ?? [],
-        metadata.loop ?? 1,
+        durations?.map((duration) => (duration <= 10 ? 100 : duration)) ?? [],
+        gif?.loop ?? metadata.loop ?? 1,
         target.width,
         target.height
       );

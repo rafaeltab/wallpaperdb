@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
@@ -27,12 +28,12 @@ const pictureServices = (
     })
   );
 const config = { nodeEnv: 'test' as const, port: 3009, profilePictureMaxBytes: 8 };
-function multipart(bytes: Buffer, version = '4') {
+function multipart(bytes: Buffer, version = '4', mimeType = 'image/jpeg') {
   return {
     headers: { ...auth, 'content-type': 'multipart/form-data; boundary=picture-test' },
     payload: Buffer.concat([
       Buffer.from(
-        `--picture-test\r\nContent-Disposition: form-data; name="expectedVersion"\r\n\r\n${version}\r\n--picture-test\r\nContent-Disposition: form-data; name="picture"; filename="avatar.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`
+        `--picture-test\r\nContent-Disposition: form-data; name="expectedVersion"\r\n\r\n${version}\r\n--picture-test\r\nContent-Disposition: form-data; name="picture"; filename="avatar.jpg"\r\nContent-Type: ${mimeType}\r\n\r\n`
       ),
       bytes,
       Buffer.from('\r\n--picture-test--\r\n'),
@@ -67,6 +68,40 @@ describe('Picture HTTP translation', () => {
       expect(response.json()).toEqual(policy);
       expect(response.headers['cache-control']).toBe('no-store');
       expect(observed).toEqual([{ profileId: 'user_owner' }]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it.each([
+    'image/gif',
+    'image/webp',
+  ])('passes untrusted %s multipart bytes unchanged and returns the accepted authoritative Profile', async (mimeType) => {
+    const bytes = readFileSync(new URL('./fixtures/profile-compressed.gif', import.meta.url));
+    const uploads: unknown[] = [];
+    const accepted = { ...profile, pictureAssetId: 'animated-picture', version: 5 };
+    const app = await createHttpApp(
+      { ...config, profilePictureMaxBytes: bytes.length },
+      pictureServices((principal, input, version) => {
+        uploads.push({ principal, input, version });
+        return Effect.succeed({ _tag: 'Success', profile: accepted });
+      })
+    );
+    try {
+      const response = await app.inject({
+        method: 'PUT',
+        url: '/profile/me/picture',
+        ...multipart(bytes, '4', mimeType),
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        ...accepted,
+        createdAt: accepted.createdAt.toISOString(),
+        updatedAt: accepted.updatedAt.toISOString(),
+      });
+      expect(uploads).toEqual([
+        { principal: { profileId: 'user_owner' }, input: bytes, version: 4 },
+      ]);
     } finally {
       await app.close();
     }

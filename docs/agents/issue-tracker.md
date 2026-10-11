@@ -29,4 +29,9 @@ When a skill says to fetch a ticket, retrieve its full body, comments, and label
 - Use GitHub sub-issues for parent-child relationships when available.
 - Use GitHub native issue dependencies for blocking edges when available.
 - If either native feature is unavailable, record `Parent: #<number>` and `Blocked by: #<number>` references in the issue body.
-- A ticket is ready to work when every blocking issue is closed.
+- A ticket is ready to work when every blocking issue is closed. During PR stack implementation, an open blocker also satisfies readiness when all of the following hold:
+  - Its changes are present in an ancestor layer of the same stack.
+  - Its acceptance criteria and required validation and review have passed.
+  - Its PR URL and validated commit are recorded in the blocking issue.
+- Every blocker must satisfy the readiness rule. An open PR alone is insufficient, and the stack exception does not make a ticket ready for implementation outside that stack.
+- Keep implementation tickets open until their changes reach the default branch. Verify landing before closing a ticket; close the parent spec only after every ticket has landed and the complete spec is validated.

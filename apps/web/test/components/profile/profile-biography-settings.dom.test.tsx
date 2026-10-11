@@ -23,6 +23,7 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
       ensureProfile: vi.fn(),
       updateProfile: vi.fn(),
       picturePolicy: vi.fn(),
+      removePicture: vi.fn(),
     },
   };
 });
@@ -69,6 +70,7 @@ describe('Biography settings', () => {
     });
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.updateProfile).mockReset();
+    vi.mocked(userApi.removePicture).mockReset();
     vi.mocked(userApi.picturePolicy).mockReset().mockResolvedValue({
       output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
       maxOutputBytes: 5242880,
@@ -114,7 +116,7 @@ describe('Biography settings', () => {
     expect(request).toHaveBeenCalledTimes(5);
   });
 
-  it('blocks owner refresh during a Biography write and keeps the accepted state when refresh fails', async () => {
+  it('coordinates picture recovery with a Biography write and keeps the accepted Biography when recovery refresh fails', async () => {
     let finishSave: ((value: Profile) => void) | undefined;
     vi.mocked(userApi.updateProfile).mockImplementation(
       () =>
@@ -123,7 +125,9 @@ describe('Biography settings', () => {
         })
     );
     vi.mocked(userApi.ensureProfile).mockRejectedValue(new Error('Offline'));
-    const { client } = renderPage();
+    const initial = { ...profile, pictureAssetId: 'saved-picture' };
+    vi.mocked(userApi.removePicture).mockRejectedValue(new UserApiError('Conflict', 409, { type: 'https://wallpaperdb.test/problems/profile-version-conflict' }));
+    const { client } = renderPage(initial);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Edit biography' }));
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
@@ -131,15 +135,19 @@ describe('Biography settings', () => {
     await user.type(editor, 'Saved Biography');
     await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
-    expect(screen.getByRole('button', { name: 'Refresh Profile' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove picture' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Refresh Profile' })).not.toBeInTheDocument();
     expect(editor).toBeDisabled();
     expect(userApi.ensureProfile).not.toHaveBeenCalled();
-    const updated = { ...profile, biographyMarkdown: 'Saved Biography', version: 2 };
+    const updated = { ...initial, biographyMarkdown: 'Saved Biography', version: 2 };
     await act(async () => finishSave?.(updated));
-    await user.click(screen.getByRole('button', { name: 'Refresh Profile' }));
+    await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+    await user.click(screen.getByRole('button', { name: 'Use generated avatar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Unable to refresh your Profile. Try again.'
+      'Unable to refresh your saved Profile.'
     );
+    expect(userApi.removePicture).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 2 }));
+    expect(screen.getByRole('button', { name: 'Retry Profile refresh' })).toBeEnabled();
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
     expect(editor).toHaveValue('Saved Biography');
   });

@@ -9,6 +9,7 @@ export default defineBaseConfig({
     testTimeout: 120000,
     hookTimeout: 60000,
     maxConcurrency: 5,
+    isolate: true,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

@@ -16,8 +16,8 @@ See the [domain context](GLOSSARY.md), [decoding isolation decision](docs/adr/00
 
 ## Test boundaries
 
-The [fast selection](vitest.config.ts) covers controlled extraction and availability capabilities, configuration parsing, and the frozen color anchor definition. It does not load native image adapters or the production telemetry graph.
+The [fast selection](vitest.config.ts) covers controlled extraction and availability capabilities, configuration parsing, and the frozen color anchor definition. It does not load native image adapters or the production telemetry graph. One worker reuses imported modules across these files to avoid repeated startup costs. Tests must own their state and restore changes to globals and environment variables.
 
 The [integration selection](vitest.integration.config.ts) covers real image decoding and reference measurements, byte limits, process and socket cancellation, broker and storage contracts, HTTP, telemetry, and bootstrap artifacts. Event translation tests belong here because the public adapter entry imports the production broker graph. Keep telemetry files isolated because SDK instrumentation patches modules. Cancellation and shutdown tests retain the waits needed to exercise resource ownership.
 
-Use the [workspace scripts](package.json) through the [standard Make commands](../../Makefile). Both selections produce complementary coverage of all source files; CI runs both. Moving a contract to the integration selection preserves its required work. The [combined selection](vitest.all.config.ts) is available for a single coverage run across all scenarios.
+Use the [workspace scripts](package.json) through the [standard Make commands](../../Makefile). Both selections produce complementary coverage of all source files; CI runs both. Moving a contract to the integration selection preserves its required work. The [combined selection](vitest.all.config.ts) is available for a single coverage run across all scenarios. Integration and combined runs retain file isolation.

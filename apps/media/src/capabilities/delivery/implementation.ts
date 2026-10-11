@@ -25,11 +25,7 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
           if (
             options &&
             [options.width, options.height].some(
-              (n, index) =>
-                n !== undefined &&
-                (!Number.isSafeInteger(n) ||
-                  n < 1 ||
-                  n > (index === 0 ? limits.maxResizeWidth : limits.maxResizeHeight))
+              (n) => n !== undefined && (!Number.isSafeInteger(n) || n < 1)
             )
           ) {
             return {
@@ -38,8 +34,22 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             } as const;
           }
           const wallpaper = yield* catalog.findWallpaper(id);
+          const matchesOriginal =
+            wallpaper !== null &&
+            options?.width === wallpaper.width &&
+            options?.height === wallpaper.height;
+          if (
+            !matchesOriginal &&
+            ((options?.width ?? 0) > limits.maxResizeWidth ||
+              (options?.height ?? 0) > limits.maxResizeHeight)
+          ) {
+            return {
+              _tag: 'Rejected',
+              reason: 'Requested dimensions exceed media limits',
+            } as const;
+          }
           if (!wallpaper) return { _tag: 'NotFound' } as const;
-          if (options && (options.width || options.height)) {
+          if (!matchesOriginal && options && (options.width || options.height)) {
             const width =
               options.width ??
               Math.ceil(
@@ -61,7 +71,7 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             ((options?.width ?? wallpaper.width) > wallpaper.width ||
               (options?.height ?? wallpaper.height) > wallpaper.height);
           const variant =
-            options && (options.width || options.height) && !wouldUpscale
+            !matchesOriginal && options && (options.width || options.height) && !wouldUpscale
               ? yield* catalog.findSmallestVariant(
                   id,
                   options.width ?? wallpaper.width,

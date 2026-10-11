@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { initialPictureCrop } from '../../src/features/picture-editor';
 import { openPictureSource } from '../../src/features/picture-editor/adapters/browser';
 
@@ -104,4 +104,36 @@ it('fits excessive frame rates without trimming elapsed time or flattening the a
     expect(result.frames.map((frame) => frame.samples.map((pixel) => pixel[3]))).toEqual([[0, 255], [0, 255]]);
     expect(new Set(result.frames.map((frame) => frame.samples[1].join(','))).size).toBe(2);
   } finally { source.dispose(); }
+});
+
+it.each(['worker', 'fallback'])('reports impossible fitting and keeps the source retryable with the real %s codec', async (mode) => {
+  if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
+  const controller = new AbortController();
+  let source;
+  try {
+    source = await openPictureSource(await fixture('profile-fitting.gif'), controller.signal);
+    const crop = initialPictureCrop(source);
+    await expect(source.process(crop, { ...policy, maxOutputBytes: 1 }, controller.signal)).rejects.toThrow(/animation cannot fit the 1 byte limit/);
+    const recovered = await source.process(crop, policy, controller.signal);
+    const result = await decodedAnimation(recovered);
+    expect(result.frames.map((frame) => frame.duration)).toEqual([100000, 200000, 300000, 400000]);
+    expect(result.repetitions).toBe(2);
+  } finally { source?.dispose(); vi.unstubAllGlobals(); }
+});
+
+it.each(['worker', 'fallback'])('cancels pending fitting while the UI keeps yielding and releases the real %s job', async (mode) => {
+  if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
+  const controller = new AbortController();
+  let source;
+  try {
+    source = await openPictureSource(await fixture('profile-fitting.gif'), controller.signal);
+    const crop = initialPictureCrop(source);
+    const processing = source.process(crop, { ...policy, maxOutputBytes: 1 }, controller.signal);
+    const rejected = expect(processing).rejects.toMatchObject({ name: 'AbortError' });
+    for (let pulse = 0; pulse < 3; pulse++) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    controller.abort();
+    await rejected;
+    const recovered = await source.process(crop, policy, new AbortController().signal);
+    expect((await decodedAnimation(recovered)).frames).toHaveLength(4);
+  } finally { source?.dispose(); vi.unstubAllGlobals(); }
 });

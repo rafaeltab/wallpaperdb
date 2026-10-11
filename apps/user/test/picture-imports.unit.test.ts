@@ -105,7 +105,11 @@ function setup(ids = ['a_failed', 'b_healthy']) {
       }),
   };
   const runtime = ManagedRuntime.make(
-    picturesLayer({ profileEvidenceRetentionDays: 7, profilePictureImportTimeoutMs: 1000 }).pipe(
+    picturesLayer({
+      profileEvidenceRetentionDays: 7,
+      profilePictureImportTimeoutMs: 1000,
+      profilePictureMaxBytes: 5242880,
+    }).pipe(
       Layer.provide(
         Layer.mergeAll(
           Layer.succeed(PictureStore, store),

@@ -67,6 +67,7 @@ export function userLayer(config: Config, options: AppOptions = {}) {
     )
   );
   const pictures = picturesLayer({
+    profilePictureMaxBytes: config.profilePictureMaxBytes,
     profileEvidenceRetentionDays: config.profileEvidenceRetentionDays,
     profilePictureImportTimeoutMs: config.profilePictureImportTimeoutMs,
   }).pipe(

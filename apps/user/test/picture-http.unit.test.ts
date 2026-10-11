@@ -13,6 +13,7 @@ const pictureServices = (
   Layer.merge(
     services(unexpected, unexpected, { adoptPicture }),
     Layer.succeed(Pictures, {
+      policy: unexpected,
       stage: unexpected,
       upload,
       pictureAvailable: unexpected,

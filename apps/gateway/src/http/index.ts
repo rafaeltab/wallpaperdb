@@ -15,7 +15,6 @@ import { inspectOperation } from './security.js';
 import { installAdmissionSchema } from './admission-schema.js';
 
 export interface HttpConfig {
-  readonly port: number;
   readonly trustedProxies: readonly string[];
   readonly nodeEnv: 'development' | 'production' | 'test';
   readonly mediaServiceUrl: string;

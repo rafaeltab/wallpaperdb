@@ -62,13 +62,13 @@ Read workflow configuration at the current head to establish which workflows and
 
 When T3's `watch_pull_request` is available, handle existing feedback and failures first, then call it and end the turn while waiting. T3 wakes the thread for CI and review activity; a wake requires refreshing GitHub state and evaluating both gates again. Use this watcher instead of polling or running a separate watcher. Preserve progress in the ledger before yielding. If it is unavailable, use a resumable monitoring mechanism available in the environment or bounded polling waits of at most 60 seconds with progress updates. Report inability to continue monitoring as a blocker.
 
-There is no fixed deadline while runs are progressing. Investigate evidence of stalled or missing CI and review runs, and return an actionable blocker when progress needs the user. If the PR closes or merges externally, return its actual state and which gates were verified.
+There is no fixed deadline while runs are progressing. Investigate evidence of stalled or missing CI and review runs, and return an actionable blocker when progress needs the user. A closed or merged PR ends babysitting. Perform the handoff cleanup below, then report its actual state and which gates were verified.
 
 ## 6. Verify and hand back
 
 Before reporting success, re-fetch the PR head, latest CI results, Codex results and reaction, and feedback state. Both gates must hold for the same current head. If the head changed during verification, repeat the check for the new head.
 
-On success or when returning a blocker, call `unwatch_pull_request` when available so the thread returns to the user's inbox. Check `list_thread_pull_requests` and register the selected PR if its link is missing. Report watcher or linking errors accurately.
+Before every terminal handoff, including success, blockers, pending user questions, and a closed or merged PR, call `unwatch_pull_request` when available so the thread returns to the user's inbox. Perform this cleanup explicitly rather than relying on automatic watcher cleanup. Check `list_thread_pull_requests` and register the selected PR if its link is missing. Report watcher or linking errors accurately.
 
 Return a concise summary containing:
 

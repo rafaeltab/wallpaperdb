@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Metric } from 'effect';
 import { describe, expect, it } from 'vitest';
 import {
   AssetReader,
@@ -120,6 +120,27 @@ function fixture(
   };
 }
 describe('media delivery', () => {
+  it('counts exact-original delivery as no resize rather than a variant miss', async () => {
+    const f = fixture();
+    const snapshots = await f.run(
+      Effect.gen(function* () {
+        const delivery = yield* MediaDelivery;
+        const outcome = yield* delivery.wallpaper('wall_1', {
+          width: original.width,
+          height: original.height,
+          fit: 'contain',
+        });
+        expect(outcome._tag).toBe('Found');
+        return yield* Metric.snapshot;
+      }).pipe(Effect.provideService(Metric.MetricRegistry, new Map()))
+    );
+    expect(
+      snapshots.filter((metric) => metric.id === 'media.variant_selection.total')
+    ).toMatchObject([
+      { type: 'Counter', attributes: { result: 'no_resize' }, state: { count: 1 } },
+    ]);
+    expect(f.queries).toEqual([]);
+  });
   it.each([
     { width: 3000, height: 6000 },
     { width: 12000, height: 2000 },

@@ -83,7 +83,7 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
               incremental: true,
               attributes: {
                 result:
-                  !options || (!options.width && !options.height)
+                  matchesOriginal || !options || (!options.width && !options.height)
                     ? 'no_resize'
                     : wouldUpscale
                       ? 'upscale_avoided'

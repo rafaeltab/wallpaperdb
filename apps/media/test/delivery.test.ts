@@ -27,6 +27,9 @@ function fixture(
     maxOutputPixels?: number;
     authorityFailure?: boolean;
     readFailure?: boolean;
+    wallpaper?: Wallpaper;
+    maxResizeWidth?: number;
+    maxResizeHeight?: number;
   } = {}
 ) {
   const reads: string[] = [];
@@ -37,7 +40,7 @@ function fixture(
   let missingOriginal = false;
   const dependencies = Layer.mergeAll(
     Layer.succeed(Catalog, {
-      findWallpaper: () => Effect.succeed(original),
+      findWallpaper: () => Effect.succeed(overrides.wallpaper ?? original),
       findSmallestVariant: (_id, w, h) => {
         queries.push([w, h]);
         return Effect.succeed(
@@ -106,8 +109,8 @@ function fixture(
         effect.pipe(
           Effect.provide(
             deliveryLayer({
-              maxResizeWidth: 16384,
-              maxResizeHeight: 16384,
+              maxResizeWidth: overrides.maxResizeWidth ?? 16384,
+              maxResizeHeight: overrides.maxResizeHeight ?? 16384,
               maxOutputPixels: overrides.maxOutputPixels ?? 268435456,
               maxPictureBytes: overrides.maxPictureBytes,
             }).pipe(Layer.provide(dependencies))
@@ -117,6 +120,57 @@ function fixture(
   };
 }
 describe('media delivery', () => {
+  it.each([
+    { width: 3000, height: 6000 },
+    { width: 12000, height: 2000 },
+    { width: 8000, height: 8000 },
+  ])('streams a $width×$height original at its source dimensions above resize limits', async ({
+    width,
+    height,
+  }) => {
+    const f = fixture({
+      wallpaper: { ...original, width, height },
+      maxResizeWidth: 7680,
+      maxResizeHeight: 4320,
+      maxOutputPixels: 33177600,
+    });
+    for (const fit of ['contain', 'cover', 'fill'] as const) {
+      const outcome = await f.run(
+        Effect.flatMap(MediaDelivery, (d) => d.wallpaper('wall_1', { width, height, fit }))
+      );
+      expect(outcome).toMatchObject({ _tag: 'Found', mimeType: 'image/png', fileSizeBytes: 3 });
+      if (outcome._tag !== 'Found') throw new Error('expected original');
+      const chunks = [];
+      for await (const chunk of outcome.body) chunks.push(...chunk);
+      expect(chunks).toEqual([1, 2, 3]);
+    }
+    expect(f.reads).toEqual(['original', 'original', 'original']);
+    expect(f.resizes).toEqual([]);
+    expect(f.queries).toEqual([]);
+  });
+  it.each([
+    { width: 3000, height: 5999 },
+    { width: 3000, height: 6001 },
+    { height: 6000 },
+    { width: 3000 },
+    { width: 0, height: 6000 },
+    { width: 3000.5, height: 6000 },
+    { width: Number.NaN, height: 6000 },
+    { width: Number.MAX_SAFE_INTEGER + 1, height: 6000 },
+  ])('keeps rejecting invalid or oversized transformations of a large original: %j', async (options) => {
+    const f = fixture({
+      wallpaper: { ...original, width: 3000, height: 6000 },
+      maxResizeWidth: 7680,
+      maxResizeHeight: 4320,
+    });
+    expect(
+      await f.run(
+        Effect.flatMap(MediaDelivery, (d) => d.wallpaper('wall_1', { ...options, fit: 'contain' }))
+      )
+    ).toMatchObject({ _tag: 'Rejected' });
+    expect(f.reads).toEqual([]);
+    expect(f.resizes).toEqual([]);
+  });
   it.each([
     'contain',
     'cover',

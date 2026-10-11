@@ -30,7 +30,7 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a href="/profiles/@ada">{children}</a>,
 }));
 
-const picturePolicy = { output: { width: 512, height: 512, mimeType: 'image/webp' as const, colorSpace: 'srgb' as const }, maxOutputBytes: 5242880, acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'], animation: { available: false }, encoding: { staticQuality: 85, animationQuality: 85 } };
+const picturePolicy = { output: { width: 512, height: 512, mimeType: 'image/webp' as const, colorSpace: 'srgb' as const }, maxOutputBytes: 5242880, acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], animation: { available: true }, encoding: { staticQuality: 85, animationQuality: 85 } };
 const canonical = new Blob(['canonical-webp'], { type: 'image/webp' });
 const processPicture = vi.fn();
 const disposePicture = vi.fn();
@@ -142,7 +142,7 @@ describe('Profile picture settings', () => {
     expect(disposePicture).toHaveBeenCalled();
   });
 
-  it.each(['picker', 'drop', 'paste'])('fences processing when %s replaces the source and resets the crop', async (route) => {
+  it.each(['picker', 'drop', 'paste'].flatMap((route) => ['png', 'gif'].map((format) => ({ route, format }))))('fences processing when $route replaces the source with $format and resets the crop', async ({ route, format }) => {
     let finish: ((value: Blob) => void) | undefined;
     let signal: AbortSignal | undefined;
     processPicture.mockImplementationOnce((_crop, _policy, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
@@ -151,7 +151,7 @@ describe('Profile picture settings', () => {
     await user.upload(screen.getByLabelText('Choose picture'), new File(['old'], 'old.png', { type: 'image/png' }));
     fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
     await user.click(screen.getByRole('button', { name: 'Apply' }));
-    const replacement = new File(['new'], 'new.png', { type: 'image/png' });
+    const replacement = new File(['new'], `new.${format}`, { type: `image/${format}` });
     if (route === 'picker') await user.upload(screen.getByLabelText('Choose picture'), replacement);
     else if (route === 'drop') fireEvent.drop(screen.getByRole('dialog', { name: 'Profile picture' }), { dataTransfer: { files: [replacement] } });
     else fireEvent.paste(document, { clipboardData: { items: [{ kind: 'file', type: replacement.type, getAsFile: () => replacement }] } });
@@ -159,7 +159,7 @@ describe('Profile picture settings', () => {
     expect(await screen.findByRole('slider', { name: 'Zoom' })).toHaveValue('1');
     await act(async () => finish?.(canonical));
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
-    expect(screen.getByText('new.png')).toBeInTheDocument();
+    expect(screen.getByText(`new.${format}`)).toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
@@ -375,7 +375,7 @@ describe('Profile picture settings', () => {
     expect(userApi.removePicture).not.toHaveBeenCalled();
   });
 
-  it('keeps the selected picture after failure and closes the dialog after a successful retry', async () => {
+  it.each(['png', 'gif'])('keeps the selected $format picture after failure and closes the dialog after a successful retry', async (format) => {
     const updated = { ...profile, pictureAssetId: 'saved-picture', version: 2 };
     vi.mocked(userApi.uploadPicture)
       .mockRejectedValueOnce(new Error('Upload unavailable'))
@@ -384,13 +384,13 @@ describe('Profile picture settings', () => {
     const user = userEvent.setup();
     await user.upload(
       screen.getByLabelText('Choose picture'),
-      new File(['png'], 'portrait.png', { type: 'image/png' })
+      new File(['png'], `portrait.${format}`, { type: `image/${format}` })
     );
-    expect(screen.getByText('portrait.png')).toBeInTheDocument();
+    expect(screen.getByText(`portrait.${format}`)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Selected avatar' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Upload unavailable');
-    expect(screen.getByText('portrait.png')).toBeInTheDocument();
+    expect(screen.getByText(`portrait.${format}`)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute(
@@ -607,18 +607,18 @@ describe('Profile picture settings', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it('shows effective output constraints and retains a source when processed bytes exceed the limit', async () => {
+  it.each(['png', 'gif'])('shows effective output constraints and retains a %s source when processed bytes exceed the limit', async (format) => {
     vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, maxOutputBytes: 4 });
     await renderPage();
     const user = userEvent.setup();
     await user.upload(
       screen.getByLabelText('Choose picture'),
-      new File(['12345'], 'large.png', { type: 'image/png' })
+      new File(['12345'], `large.${format}`, { type: `image/${format}` })
     );
     processPicture.mockRejectedValue(new Error('Processed picture exceeds the 4 byte limit. Choose another picture.'));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Processed picture exceeds the 4 byte limit.');
-    expect(screen.getByText('large.png')).toBeInTheDocument();
+    expect(screen.getByText(`large.${format}`)).toBeInTheDocument();
     expect(screen.getByText(/Up to 4 B/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
@@ -631,7 +631,7 @@ describe('Profile picture settings', () => {
       screen.getByLabelText('Choose picture'),
       new File(['<svg/>'], 'picture.svg', { type: 'image/svg+xml' })
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose a JPEG, PNG, or WebP picture.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose a JPEG, PNG, WebP, or GIF picture.');
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
   });

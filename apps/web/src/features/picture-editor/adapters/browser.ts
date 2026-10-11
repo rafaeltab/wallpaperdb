@@ -1,5 +1,6 @@
 import type { PictureCrop, PictureDimensions, PictureEncodingPolicy } from '../index';
 import type { PictureJob, PictureJobResult } from './protocol';
+import { gifPictureJob } from './gif';
 import { withoutPictureMetadata } from './webp';
 
 /** UI owns this decoded source and must dispose it when its editing session ends. */
@@ -41,9 +42,47 @@ async function validateSource(file: Blob, signal: AbortSignal) {
     bytes[6] === 26 &&
     bytes[7] === 10;
   const webp = text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP';
-  if (!jpeg && !png && !webp) throw new Error('Choose a valid JPEG, PNG, or WebP picture.');
+  const gif = ['GIF87a', 'GIF89a'].includes(text(0, 6));
+  if (!jpeg && !png && !webp && !gif)
+    throw new Error('Choose a valid JPEG, PNG, WebP, or GIF picture.');
+  if (png) {
+    const data = new Uint8Array(await file.arrayBuffer());
+    signal.throwIfAborted();
+    const view = new DataView(data.buffer);
+    let chunks = 0;
+    for (let offset = 8; offset + 12 <= data.length; ) {
+      if (++chunks % 256 === 0) await yieldToUi(signal);
+      if (String.fromCharCode(...data.subarray(offset + 4, offset + 8)) === 'acTL')
+        throw new Error(
+          'Animated PNG pictures are not supported as an editor source. Choose a GIF to preserve animation.'
+        );
+      const next = offset + 12 + view.getUint32(offset);
+      if (next > data.length) throw new Error('Unable to decode this PNG picture.');
+      offset = next;
+    }
+  }
   if (webp && text(12, 16) === 'VP8X' && bytes[20] & 2)
-    throw new Error('Animated WebP pictures are not supported. Choose a static picture.');
+    throw new Error(
+      'Animated WebP pictures are not supported as an editor source. Choose a GIF to preserve animation.'
+    );
+  if (webp) {
+    const data = new Uint8Array(await file.arrayBuffer());
+    signal.throwIfAborted();
+    const view = new DataView(data.buffer);
+    let chunks = 0;
+    for (let offset = 12; offset + 8 <= data.length; ) {
+      if (++chunks % 256 === 0) await yieldToUi(signal);
+      const chunk = String.fromCharCode(...data.subarray(offset, offset + 4));
+      if (chunk === 'ANIM' || chunk === 'ANMF')
+        throw new Error(
+          'Animated WebP pictures are not supported as an editor source. Choose a GIF to preserve animation.'
+        );
+      const size = view.getUint32(offset + 4, true);
+      const next = offset + 8 + size + (size % 2);
+      if (next > data.length) throw new Error('Unable to decode this WebP picture.');
+      offset = next;
+    }
+  }
 }
 
 async function fallback(
@@ -51,6 +90,8 @@ async function fallback(
   signal: AbortSignal
 ): Promise<Extract<PictureJobResult, { ok: true }>> {
   await yieldToUi(signal);
+  const gif = await gifPictureJob(job, signal, false);
+  if (gif) return gif;
   let image: ImageBitmap | HTMLImageElement;
   let sourceUrl: string | undefined;
   if (typeof createImageBitmap !== 'undefined') {

@@ -20,7 +20,7 @@ describe('Picture animation', () => {
       if (next.value.kind === 'frame') frames.push({ duration: next.value.duration, pixels: Array.from(next.value.pixels) });
       next = decoder.next();
     }
-    expect(next.value).toEqual({ loop: 3, frameCount: 2 });
+    expect(next.value).toEqual({ loop: 3, frameCount: 2, animated: true });
     expect(frames).toEqual([{ duration: 100, pixels: [0, 0, 0, 0] }, { duration: 200, pixels: [255, 255, 255, 255] }]);
   });
   it('composes partial transparent patches with restore-previous and restore-background disposal', () => {
@@ -40,7 +40,7 @@ describe('Picture animation', () => {
   it('packages independently encoded frames with complete duration and finite loop controls', () => {
     const frame = Uint8Array.from(Buffer.from('52494646220000005745425056503820160000003001009d012a0100010001402625a400037000fefb94', 'hex'));
     const result = encodePictureAnimation([{ bytes: frame, duration: 100 }, { bytes: frame, duration: 200 }], { width: 1, height: 1 }, 3);
-    const data = Buffer.from(result);
+    const data = Buffer.concat(result.map((part) => Buffer.from(part)));
     expect(data.toString('ascii', 0, 4)).toBe('RIFF');
     expect(data.readUInt32LE(4)).toBe(data.length - 8);
     expect(data.toString('ascii', 30, 34)).toBe('ANIM');
@@ -48,6 +48,37 @@ describe('Picture animation', () => {
     expect(data.toString('ascii', 44, 48)).toBe('ANMF');
     expect(data.readUIntLE(64, 3)).toBe(100);
     expect(data[67]).toBe(2);
+  });
+
+  it('decodes growing LZW dictionaries and repeated-code entries', () => {
+    const samples: number[][][] = [];
+    for (const step of decodePictureGif(readFileSync('test/fixtures/profile-compressed.gif'))) {
+      if (step.kind === 'frame') samples.push([16, 96].map((x) => Array.from(step.pixels.subarray((32 * step.width + x) * 4, (32 * step.width + x) * 4 + 4))));
+    }
+    expect(samples).toEqual([[[255,0,0,255],[0,0,255,255]], [[0,255,0,255],[255,255,0,255]], [[255,255,255,255],[255,0,255,255]]]);
+  });
+
+  it('uses local palettes and the GIF interlace pass order, keeping untagged one-frame sources static', () => {
+    const steps = decodePictureGif(readFileSync('test/fixtures/profile-interlaced.gif'));
+    let next = steps.next(); let pixels: number[] = [];
+    while (!next.done) { if (next.value.kind === 'frame') pixels = Array.from(next.value.pixels); next = steps.next(); }
+    expect(pixels).toEqual([255,0,0,255,255,0,0,255,0,255,0,255,0,255,0,255,0,0,255,255,0,0,255,255,255,255,255,255,255,255,255,255]);
+    expect(next.value).toEqual({ loop: 1, frameCount: 1, animated: false });
+  });
+  it('preserves explicitly declared looping even for one-frame GIFs', () => {
+    const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030100000021f904000a0000002c00000000010001000002024401003b', 'hex'));
+    const decoder = decodePictureGif(bytes); let step = decoder.next();
+    while (!step.done) step = decoder.next();
+    expect(step.value).toEqual({ loop: 0, frameCount: 1, animated: true });
+  });
+  it.each(['truncated', 'invalid index', 'missing clear', 'out of bounds', 'unsupported control'])('rejects %s GIF work rather than producing partial frames', (malformation) => {
+    const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff21f904000a0000002c00000000010001000002024401003b', 'hex'));
+    if (malformation === 'truncated') bytes[bytes.length - 1] = 0;
+    if (malformation === 'invalid index') bytes[39] = 0x5c;
+    if (malformation === 'missing clear') bytes[39] = 0x40;
+    if (malformation === 'out of bounds') bytes[28] = 1;
+    if (malformation === 'unsupported control') bytes[22] = 2;
+    expect(() => Array.from(decodePictureGif(bytes))).toThrow();
   });
 
 });

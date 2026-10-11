@@ -16,5 +16,6 @@ export interface PictureCrop {
 export interface PictureEncodingPolicy {
   output: PictureDimensions & { mimeType: 'image/webp'; colorSpace: 'srgb' };
   maxOutputBytes: number;
+  animation: { available: boolean };
   encoding: { staticQuality: number; animationQuality: number };
 }

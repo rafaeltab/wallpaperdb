@@ -18,7 +18,13 @@ export function pictureAnimationTiming(delays: readonly number[], repetitions?: 
 export type PictureGifStep =
   | { kind: 'size'; width: number; height: number }
   | { kind: 'progress' }
-  | { kind: 'frame'; pixels: Uint8ClampedArray; width: number; height: number; duration: number };
+  | {
+      kind: 'frame';
+      pixels: Uint8ClampedArray<ArrayBuffer>;
+      width: number;
+      height: number;
+      duration: number;
+    };
 
 function invalid(): never {
   throw new Error('Unable to decode this GIF picture.');
@@ -45,6 +51,7 @@ function* lzw(
   let written = 0;
   let checkpoint = 0;
   let codes = 0;
+  let started = false;
   while (bit + size <= data.length * 8) {
     if (++codes === 8192) {
       codes = 0;
@@ -53,6 +60,8 @@ function* lzw(
     let code = 0;
     for (let i = 0; i < size; i++) code |= ((data[(bit + i) >>> 3] >>> ((bit + i) & 7)) & 1) << i;
     bit += size;
+    if (!started && code !== clear) invalid();
+    started = true;
     if (code === clear) {
       size = minimum + 1;
       next = end + 1;
@@ -97,7 +106,7 @@ function* lzw(
  */
 export function* decodePictureGif(
   bytes: Uint8Array
-): Generator<PictureGifStep, { loop: number; frameCount: number }> {
+): Generator<PictureGifStep, { loop: number; frameCount: number; animated: boolean }> {
   let offset = 0;
   const take = (length: number) => {
     if (offset + length > bytes.length) invalid();
@@ -156,7 +165,11 @@ export function* decodePictureGif(
     const marker = byte();
     if (marker === 0x3b) {
       if (!frameCount || offset !== bytes.length) invalid();
-      return { loop: pictureAnimationTiming([], repetitions).loop, frameCount };
+      return {
+        loop: pictureAnimationTiming([], repetitions).loop,
+        frameCount,
+        animated: frameCount > 1 || repetitions !== undefined,
+      };
     }
     if (marker === 0x21) {
       const label = byte();
@@ -173,6 +186,8 @@ export function* decodePictureGif(
       } else if (label === 0xff) {
         const application = text(byte());
         const data = yield* blocks();
+        if (application === 'ICCRGBG1012')
+          throw new Error('This GIF color profile cannot be normalized. Choose another picture.');
         if (['NETSCAPE2.0', 'ANIMEXTS1.0'].includes(application)) {
           if (data.length !== 3 || data[0] !== 1) invalid();
           repetitions = data[1] | (data[2] << 8);

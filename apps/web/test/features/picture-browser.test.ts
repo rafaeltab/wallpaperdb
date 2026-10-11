@@ -7,7 +7,7 @@ beforeAll(() => vi.stubGlobal('Blob', NativeBlob));
 afterAll(() => vi.unstubAllGlobals());
 
 it('validates detected source bytes before decoding a misleading declared format', async () => {
-  await expect(openPictureSource(new Blob(['<svg/>'], { type: 'image/png' }), new AbortController().signal)).rejects.toThrow('Choose a valid JPEG, PNG, or WebP picture.');
+  await expect(openPictureSource(new Blob(['<svg/>'], { type: 'image/png' }), new AbortController().signal)).rejects.toThrow('Choose a valid JPEG, PNG, WebP, or GIF picture.');
 });
 
 it('rejects animated WebP instead of silently flattening it in the static editor', async () => {
@@ -15,10 +15,18 @@ it('rejects animated WebP instead of silently flattening it in the static editor
   bytes.set(new TextEncoder().encode('RIFF'), 0);
   bytes.set(new TextEncoder().encode('WEBPVP8X'), 8);
   bytes[20] = 2;
-  await expect(openPictureSource(new Blob([bytes], { type: 'image/webp' }), new AbortController().signal)).rejects.toThrow('Animated WebP pictures are not supported.');
+  await expect(openPictureSource(new Blob([bytes], { type: 'image/webp' }), new AbortController().signal)).rejects.toThrow('Animated WebP pictures are not supported as an editor source.');
 });
 
 it('honors cancellation before decoded source work can begin', async () => {
   const controller = new AbortController(); controller.abort();
   await expect(openPictureSource(new Blob([new Uint8Array([255, 216, 255])]), controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+});
+
+
+it('rejects detected animated PNG before a generic bitmap can flatten it', async () => {
+  const bytes = new Uint8Array(20);
+  bytes.set([137,80,78,71,13,10,26,10]);
+  bytes.set(new TextEncoder().encode('acTL'), 12);
+  await expect(openPictureSource(new Blob([bytes], { type: 'image/png' }), new AbortController().signal)).rejects.toThrow('Animated PNG pictures are not supported as an editor source.');
 });

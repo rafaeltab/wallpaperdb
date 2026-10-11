@@ -328,7 +328,7 @@ export function ProfilePictureSettings({
                     {policy.output.width} × {policy.output.height} WebP, sRGB SDR. Static quality{' '}
                     {policy.encoding.staticQuality}.{' '}
                     {policy.animation.available
-                      ? 'Animated images are supported.'
+                      ? `GIF animation is supported at quality ${policy.encoding.animationQuality}.`
                       : 'Animated images are not supported.'}
                   </>
                 ) : (

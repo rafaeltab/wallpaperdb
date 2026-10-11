@@ -123,6 +123,24 @@ test('browser E2E always executes against the current deployed environment', () 
     'source hashes cannot prove that the deployed application, infrastructure, and credentials are unchanged');
 });
 
+test("test task graphs do not build production images", () => {
+	for (const target of ["test", "test-e2e"]) {
+		const result = spawnSync(
+			"make",
+			["--no-print-directory", target, "TURBO_FLAGS=--dry=json"],
+			{ encoding: "utf8", env },
+		);
+		assert.equal(result.status, 0, result.stderr);
+		const tasks = JSON.parse(result.stdout).tasks;
+		assert.deepEqual(
+			tasks
+				.filter((task) => task.task === "build:docker")
+				.map((task) => task.taskId),
+			[],
+		);
+	}
+});
+
 test('typecheck cache inputs include test files compiled by the workspace', () => {
   const task = plannedTask('check-types', 'media', 'check-types');
   const tsconfig = JSON.parse(readFileSync('apps/media/tsconfig.json', 'utf8'));

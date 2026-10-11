@@ -39,7 +39,7 @@ describe('Picture animation', () => {
 
   it('packages independently encoded frames with complete duration and finite loop controls', () => {
     const frame = Uint8Array.from(Buffer.from('52494646220000005745425056503820160000003001009d012a0100010001402625a400037000fefb94', 'hex'));
-    const result = encodePictureAnimation([{ bytes: frame, duration: 100 }, { bytes: frame, duration: 200 }], { width: 1, height: 1 }, 3);
+    const result = encodePictureAnimation([{ bytes: frame, duration: 100 }, { bytes: frame, duration: 200 }], { width: 1, height: 1 }, 3, 5000);
     const data = Buffer.concat(result.map((part) => Buffer.from(part)));
     expect(data.toString('ascii', 0, 4)).toBe('RIFF');
     expect(data.readUInt32LE(4)).toBe(data.length - 8);
@@ -48,6 +48,17 @@ describe('Picture animation', () => {
     expect(data.toString('ascii', 44, 48)).toBe('ANMF');
     expect(data.readUIntLE(64, 3)).toBe(100);
     expect(data[67]).toBe(2);
+  });
+
+  it('enforces the final canonical byte limit after removing real frame metadata', () => {
+    const bytes = Uint8Array.from(readFileSync('test/fixtures/profile-frame-metadata.webp'));
+    const frames = [{ bytes, duration: 100 }, { bytes, duration: 200 }];
+    expect(bytes.byteLength * 2).toBe(2504);
+    const result = Buffer.concat(encodePictureAnimation(frames, { width: 512, height: 512 }, 3, 1172).map((part) => Buffer.from(part)));
+    expect(result.byteLength).toBe(1172);
+    expect(result.includes(Buffer.from('ICCP'))).toBe(false);
+    expect(result.includes(Buffer.from('EXIF'))).toBe(false);
+    expect(() => encodePictureAnimation(frames, { width: 512, height: 512 }, 3, 1171)).toThrow(/byte limit/);
   });
 
   it('decodes growing LZW dictionaries and repeated-code entries', () => {

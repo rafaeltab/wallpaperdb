@@ -9,7 +9,8 @@ export interface PictureEncodedFrame {
 export function encodePictureAnimation(
   frames: readonly PictureEncodedFrame[],
   dimensions: PictureDimensions,
-  loop: number
+  loop: number,
+  maxOutputBytes: number
 ): Uint8Array<ArrayBuffer>[] {
   const { width, height } = dimensions;
   if (
@@ -86,11 +87,12 @@ export function encodePictureAnimation(
   const body = [chunk('VP8X', extended), chunk('ANIM', controls), ...encoded];
   const header = new Uint8Array(12);
   header.set([82, 73, 70, 70], 0);
-  new DataView(header.buffer).setUint32(
-    4,
-    body.reduce((size, bytes) => size + bytes.length, 0) + 4,
-    true
-  );
+  const size = header.byteLength + body.reduce((size, bytes) => size + bytes.length, 0);
+  if (size > maxOutputBytes)
+    throw new Error(
+      `Processed picture exceeds the ${maxOutputBytes.toLocaleString()} byte limit. Choose another picture.`
+    );
+  new DataView(header.buffer).setUint32(4, size - 8, true);
   header.set([87, 69, 66, 80], 8);
   return [header, ...body];
 }

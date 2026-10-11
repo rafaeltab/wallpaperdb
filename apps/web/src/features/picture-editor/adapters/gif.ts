@@ -1,21 +1,7 @@
 import { decodePictureGif, encodePictureAnimation, type PictureEncodedFrame } from '../index';
 import { withoutPictureMetadata } from './webp';
+import { yieldPictureWork } from './yield';
 import type { PictureJob, PictureJobResult } from './protocol';
-
-function yieldWork(signal: AbortSignal): Promise<void> {
-  signal.throwIfAborted();
-  return new Promise((resolve, reject) => {
-    const abort = () => {
-      clearTimeout(timer);
-      reject(new DOMException('Picture processing cancelled.', 'AbortError'));
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', abort);
-      resolve();
-    }, 0);
-    signal.addEventListener('abort', abort, { once: true });
-  });
-}
 
 type PictureCanvas = OffscreenCanvas | HTMLCanvasElement;
 function canvas(width: number, height: number, offscreen: boolean): PictureCanvas {
@@ -58,11 +44,10 @@ export async function gifPictureJob(
   let sourceContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
   let outputContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
   const frames: PictureEncodedFrame[] = [];
-  let encodedBytes = 0;
   try {
     let step = decoder.next();
     while (!step.done) {
-      await yieldWork(signal);
+      await yieldPictureWork(signal);
       const value = step.value;
       if (value.kind === 'size') {
         source = canvas(value.width, value.height, offscreen);
@@ -86,7 +71,7 @@ export async function gifPictureJob(
           throw new Error('Invalid GIF canvas.');
         const rows = Math.max(1, Math.floor(16384 / value.width));
         for (let y = 0; y < value.height; y += rows) {
-          await yieldWork(signal);
+          await yieldPictureWork(signal);
           const height = Math.min(rows, value.height - y);
           const pixels = new Uint8ClampedArray(
             value.pixels.buffer,
@@ -100,7 +85,7 @@ export async function gifPictureJob(
         const width = job.action === 'preview' ? value.width : crop.size;
         const height = job.action === 'preview' ? value.height : crop.size;
         for (let y = 0; y < output.height; y += 64) {
-          await yieldWork(signal);
+          await yieldPictureWork(signal);
           const rows = Math.min(64, output.height - y);
           outputContext.drawImage(
             source,
@@ -124,11 +109,6 @@ export async function gifPictureJob(
           return { ok: true, blob, width: value.width, height: value.height };
         if (blob.type !== 'image/webp')
           throw new Error('This browser cannot encode WebP pictures. Try another browser.');
-        encodedBytes += blob.size;
-        if (encodedBytes > job.policy.maxOutputBytes)
-          throw new Error(
-            `Processed picture exceeds the ${job.policy.maxOutputBytes.toLocaleString()} byte limit. Choose another picture.`
-          );
         frames.push({ bytes: new Uint8Array(await blob.arrayBuffer()), duration: value.duration });
         if (frames.length > 1 && !job.policy.animation.available)
           throw new Error('Animated pictures are unavailable under the current picture rules.');
@@ -138,16 +118,24 @@ export async function gifPictureJob(
     signal.throwIfAborted();
     if (!source || job.action !== 'process' || !frames.length)
       throw new Error('Unable to decode this GIF picture.');
-    await yieldWork(signal);
+    await yieldPictureWork(signal);
     if (step.value.animated && !job.policy.animation.available)
       throw new Error('Animated pictures are unavailable under the current picture rules.');
     const blob = !step.value.animated
       ? await withoutPictureMetadata(
           new Blob([new Uint8Array(frames[0].bytes)], { type: 'image/webp' })
         )
-      : new Blob(encodePictureAnimation(frames, job.policy.output, step.value.loop), {
-          type: 'image/webp',
-        });
+      : new Blob(
+          encodePictureAnimation(
+            frames,
+            job.policy.output,
+            step.value.loop,
+            job.policy.maxOutputBytes
+          ),
+          {
+            type: 'image/webp',
+          }
+        );
     signal.throwIfAborted();
     return { ok: true, blob, width: source.width, height: source.height };
   } finally {

@@ -2,6 +2,7 @@ import type { PictureCrop, PictureDimensions, PictureEncodingPolicy } from '../i
 import type { PictureJob, PictureJobResult } from './protocol';
 import { gifPictureJob } from './gif';
 import { withoutPictureMetadata } from './webp';
+import { yieldPictureWork } from './yield';
 
 /** UI owns this decoded source and must dispose it when its editing session ends. */
 export interface PictureSource extends PictureDimensions {
@@ -12,21 +13,6 @@ export interface PictureSource extends PictureDimensions {
 
 function cancelled() {
   return new DOMException('Picture processing cancelled.', 'AbortError');
-}
-
-function yieldToUi(signal: AbortSignal): Promise<void> {
-  signal.throwIfAborted();
-  return new Promise((resolve, reject) => {
-    const abort = () => {
-      clearTimeout(timer);
-      reject(cancelled());
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', abort);
-      resolve();
-    }, 0);
-    signal.addEventListener('abort', abort, { once: true });
-  });
 }
 
 async function validateSource(file: Blob, signal: AbortSignal) {
@@ -51,7 +37,7 @@ async function validateSource(file: Blob, signal: AbortSignal) {
     const view = new DataView(data.buffer);
     let chunks = 0;
     for (let offset = 8; offset + 12 <= data.length; ) {
-      if (++chunks % 256 === 0) await yieldToUi(signal);
+      if (++chunks % 256 === 0) await yieldPictureWork(signal);
       if (String.fromCharCode(...data.subarray(offset + 4, offset + 8)) === 'acTL')
         throw new Error(
           'Animated PNG pictures are not supported as an editor source. Choose a GIF to preserve animation.'
@@ -71,7 +57,7 @@ async function validateSource(file: Blob, signal: AbortSignal) {
     const view = new DataView(data.buffer);
     let chunks = 0;
     for (let offset = 12; offset + 8 <= data.length; ) {
-      if (++chunks % 256 === 0) await yieldToUi(signal);
+      if (++chunks % 256 === 0) await yieldPictureWork(signal);
       const chunk = String.fromCharCode(...data.subarray(offset, offset + 4));
       if (chunk === 'ANIM' || chunk === 'ANMF')
         throw new Error(
@@ -89,7 +75,7 @@ async function fallback(
   job: PictureJob,
   signal: AbortSignal
 ): Promise<Extract<PictureJobResult, { ok: true }>> {
-  await yieldToUi(signal);
+  await yieldPictureWork(signal);
   const gif = await gifPictureJob(job, signal, false);
   if (gif) return gif;
   let image: ImageBitmap | HTMLImageElement;
@@ -135,7 +121,7 @@ async function fallback(
         : { x: job.crop.x, y: job.crop.y, width: job.crop.size, height: job.crop.size };
     // Bound each synchronous draw and let cancellation and painting run between strips.
     for (let y = 0; y < height; y += 64) {
-      await yieldToUi(signal);
+      await yieldPictureWork(signal);
       const strip = Math.min(64, height - y);
       context.drawImage(
         image,

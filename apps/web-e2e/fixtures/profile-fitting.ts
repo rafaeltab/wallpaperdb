@@ -4,7 +4,7 @@ import sharp from "sharp";
 export async function fittingPicture() {
   const width = 256;
   const height = 256;
-  const frameCount = 48;
+  const frameCount = 56;
   const parts: Buffer[] = [
     Buffer.from("GIF89a", "ascii"),
     Buffer.from([0, 1, 0, 1, 0, 0, 0]),

@@ -4,6 +4,7 @@ import {
   movePictureCrop,
   zoomPictureCrop,
   wheelPictureCrop,
+  pinchPictureCrop,
   type PictureCrop,
   type PictureDimensions,
 } from '@/features/picture-editor';
@@ -22,7 +23,16 @@ export function ProfilePictureCrop({
   disabled: boolean;
   onChange: (crop: PictureCrop) => void;
 }) {
-  const drag = useRef<{ pointer: number; x: number; y: number } | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ crop: PictureCrop; distance: number } | null>(null);
+  function distance() {
+    const [first, second] = pointers.current.values();
+    return first && second ? Math.hypot(second.x - first.x, second.y - first.y) : 0;
+  }
+  function release(pointerId: number) {
+    pointers.current.delete(pointerId);
+    pinch.current = null;
+  }
   const viewport = useRef<HTMLFieldSetElement>(null);
   const wheel = useEffectEvent((event: WheelEvent) => {
     if (disabled) return;
@@ -49,11 +59,18 @@ export function ProfilePictureCrop({
         onPointerDown={(event) => {
           if (disabled || event.button !== 0) return;
           event.currentTarget.setPointerCapture(event.pointerId);
-          drag.current = { pointer: event.pointerId, x: event.clientX, y: event.clientY };
+          pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          if (pointers.current.size === 2) pinch.current = { crop, distance: distance() };
         }}
         onPointerMove={(event) => {
-          const previous = drag.current;
-          if (disabled || !previous || previous.pointer !== event.pointerId) return;
+          const previous = pointers.current.get(event.pointerId);
+          if (disabled || !previous) return;
+          pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          if (pointers.current.size > 1) {
+            const start = pinch.current;
+            if (start) onChange(pinchPictureCrop(start.crop, source, start.distance, distance()));
+            return;
+          }
           const width = event.currentTarget.getBoundingClientRect().width;
           if (!width) return;
           onChange(
@@ -64,17 +81,10 @@ export function ProfilePictureCrop({
               ((event.clientY - previous.y) * crop.size) / width
             )
           );
-          drag.current = { pointer: event.pointerId, x: event.clientX, y: event.clientY };
         }}
-        onPointerUp={() => {
-          drag.current = null;
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
-        }}
-        onLostPointerCapture={() => {
-          drag.current = null;
-        }}
+        onPointerUp={(event) => release(event.pointerId)}
+        onPointerCancel={(event) => release(event.pointerId)}
+        onLostPointerCapture={(event) => release(event.pointerId)}
       >
         <img
           src={previewUrl}

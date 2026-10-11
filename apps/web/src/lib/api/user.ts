@@ -1,5 +1,13 @@
 import { getAuthToken } from '@/lib/auth/token-provider';
 
+export interface PicturePolicy {
+  output: { width: number; height: number; mimeType: 'image/webp'; colorSpace: 'srgb' };
+  maxOutputBytes: number;
+  acceptedSourceFormats: string[];
+  animation: { available: boolean };
+  encoding: { staticQuality: number };
+}
+
 export interface ProfileAlias {
   handle: string;
   claimGeneration: number;
@@ -96,6 +104,19 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
 
   return {
+    async picturePolicy(options: EnsureProfileOptions = {}): Promise<PicturePolicy> {
+      const token = await (options.tokenProvider ?? tokenProvider)();
+      if (!token) throw new UserApiError('Authentication token is not ready', 401);
+      const response = await fetch(`${normalizedBaseUrl}/profile/me/picture-policy`, {
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        signal: options.signal,
+      });
+      if (!response.ok) throw await userApiError(response);
+      const policy: unknown = await response.json();
+      if (!isPicturePolicy(policy))
+        throw new UserApiError('User API returned malformed picture rules', 502);
+      return policy;
+    },
     async uploadPicture(options: UploadPictureOptions): Promise<Profile> {
       const token = await (options.tokenProvider ?? tokenProvider)();
       if (!token) throw new UserApiError('Authentication token is not ready', 401);
@@ -327,6 +348,38 @@ async function userApiError(response: Response): Promise<UserApiError> {
     // Preserve the status-based message for non-JSON responses.
   }
   return new UserApiError(message, response.status, details);
+}
+
+function isPicturePolicy(value: unknown): value is PicturePolicy {
+  if (!value || typeof value !== 'object') return false;
+  const policy = value as Record<string, unknown>;
+  if (
+    !policy.output ||
+    typeof policy.output !== 'object' ||
+    !policy.animation ||
+    typeof policy.animation !== 'object' ||
+    !policy.encoding ||
+    typeof policy.encoding !== 'object'
+  )
+    return false;
+  const output = policy.output as Record<string, unknown>;
+  const encoding = policy.encoding as Record<string, unknown>;
+  const animation = policy.animation as Record<string, unknown>;
+  const positive = (value: unknown) =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+  return (
+    positive(output.width) &&
+    positive(output.height) &&
+    output.mimeType === 'image/webp' &&
+    output.colorSpace === 'srgb' &&
+    positive(policy.maxOutputBytes) &&
+    Array.isArray(policy.acceptedSourceFormats) &&
+    policy.acceptedSourceFormats.length > 0 &&
+    policy.acceptedSourceFormats.every((format) => typeof format === 'string') &&
+    typeof animation.available === 'boolean' &&
+    positive(encoding.staticQuality) &&
+    Number(encoding.staticQuality) <= 100
+  );
 }
 
 function isProfile(value: unknown): value is Profile {

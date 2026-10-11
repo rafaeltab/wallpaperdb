@@ -13,6 +13,20 @@ const profile = {
 };
 
 describe('User API client', () => {
+  it('retrieves effective picture rules with the current token and cancellable authenticated request', async () => {
+    const policy = { output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' }, maxOutputBytes: 123456, acceptedSourceFormats: ['image/png'], animation: { available: false }, encoding: { staticQuality: 85 } };
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(policy))); vi.stubGlobal('fetch', fetch);
+    const tokenProvider = vi.fn().mockResolvedValue('fresh-token');
+    const client = createUserApiClient({ baseUrl: '/user', tokenProvider });
+    const signal = new AbortController().signal;
+    await expect(client.picturePolicy({ signal })).resolves.toEqual(policy);
+    expect(fetch).toHaveBeenCalledWith('/user/profile/me/picture-policy', { headers: { Accept: 'application/json', Authorization: 'Bearer fresh-token' }, signal });
+  });
+  it.each([null, {}, { output: null }, { output: {}, animation: {}, encoding: {}, maxOutputBytes: 0 }])('rejects malformed picture rules instead of inventing defaults: %j', async (value) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(value))));
+    const client = createUserApiClient({ baseUrl: '/user', tokenProvider: async () => 'token' });
+    await expect(client.picturePolicy()).rejects.toMatchObject({ status: 502 });
+  });
   afterEach(() => vi.unstubAllGlobals());
 
   it('posts ensure with a fresh Clerk token and returns the authoritative Profile', async () => {

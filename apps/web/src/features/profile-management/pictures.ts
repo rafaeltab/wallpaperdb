@@ -1,9 +1,13 @@
 export function pictureSelection<T extends { type: string; size: number }>(
   picture: T | undefined,
-  maxBytes: number
+  maxBytes: number,
+  acceptedSourceFormats: readonly string[]
 ): { selected: T | null; error: string | null } {
-  if (picture && !['image/jpeg', 'image/png', 'image/webp'].includes(picture.type))
-    return { selected: null, error: 'Choose a JPEG, PNG, or WebP picture.' };
+  if (picture && !acceptedSourceFormats.includes(picture.type))
+    return {
+      selected: null,
+      error: `Choose a ${new Intl.ListFormat('en', { type: 'disjunction' }).format(acceptedSourceFormats.map((format) => (format === 'image/webp' ? 'WebP' : format.replace('image/', '').toUpperCase())))} picture.`,
+    };
   if (picture && picture.size > maxBytes)
     return { selected: null, error: `Picture must be at most ${maxBytes.toLocaleString()} bytes.` };
   return { selected: picture ?? null, error: null };

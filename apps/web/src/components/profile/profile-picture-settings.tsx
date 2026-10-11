@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { pictureSelection } from '@/features/profile-management';
 import { Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -5,7 +6,10 @@ import { toast } from 'sonner';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
 import { ProfileDialog } from '@/components/profile/profile-dialog';
 import { ProfilePicture } from '@/components/profile/profile-picture';
-import { useOwnerProfileMutation } from '@/features/profile-management/adapters/query';
+import {
+  profileQueryKey,
+  useOwnerProfileMutation,
+} from '@/features/profile-management/adapters/query';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -52,7 +56,14 @@ export function ProfilePictureSettings({
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [selected]);
-  const maxBytes = profile.pictureUploadLimits?.maxBytes ?? 5 * 1024 * 1024;
+  const policyQuery = useQuery({
+    queryKey: [...profileQueryKey(profile.id), 'picture-policy'],
+    queryFn: ({ signal }) => userApi.picturePolicy({ signal, tokenProvider }),
+    enabled: open,
+    retry: false,
+  });
+  const policy = policyQuery.data;
+  const policyReady = Boolean(policy) && !policyQuery.isError && !policyQuery.isFetching;
   const importing =
     profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
   const {
@@ -164,7 +175,7 @@ export function ProfilePictureSettings({
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              if (selected) mutation.mutate({ ...selected, action: 'upload' });
+              if (selected && policyReady) mutation.mutate({ ...selected, action: 'upload' });
             }}
           >
             <Field>
@@ -178,13 +189,18 @@ export function ProfilePictureSettings({
                 className="sr-only"
                 tabIndex={-1}
                 aria-describedby="picture-limits"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={refreshing || writing}
+                accept={policy?.acceptedSourceFormats.join(',')}
+                disabled={refreshing || writing || !policyReady}
                 onChange={(event) => {
                   mutation.reset();
                   setError(null);
                   const picture = event.target.files?.[0];
-                  const result = pictureSelection(picture, maxBytes);
+                  if (!policy || !policyReady) return;
+                  const result = pictureSelection(
+                    picture,
+                    policy.maxOutputBytes,
+                    policy.acceptedSourceFormats
+                  );
                   setError(result.error);
                   setSelected(
                     result.selected
@@ -197,7 +213,7 @@ export function ProfilePictureSettings({
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={refreshing || writing}
+                  disabled={refreshing || writing || !policyReady}
                   onClick={() => input.current?.click()}
                 >
                   Choose picture
@@ -207,15 +223,29 @@ export function ProfilePictureSettings({
                 </span>
               </div>
               <FieldDescription id="picture-limits">
-                JPEG, PNG, or WebP. Up to {formatFileSize(maxBytes)}
-                {profile.pictureUploadLimits
-                  ? ` and ${(profile.pictureUploadLimits.maxPixels / 1000000).toLocaleString(undefined, { maximumFractionDigits: 6 })} megapixels`
-                  : ''}
-                . Animated images are not supported.
+                {policyReady && policy ? (
+                  <>
+                    {policy.acceptedSourceFormats
+                      .map((format) =>
+                        format === 'image/webp'
+                          ? 'WebP'
+                          : format.replace('image/', '').toUpperCase()
+                      )
+                      .join(', ')}
+                    . Up to {formatFileSize(policy.maxOutputBytes)} processed output.{' '}
+                    {policy.output.width} × {policy.output.height} WebP, sRGB SDR. Static quality{' '}
+                    {policy.encoding.staticQuality}.{' '}
+                    {policy.animation.available
+                      ? 'Animated images are supported.'
+                      : 'Animated images are not supported.'}
+                  </>
+                ) : (
+                  'Loading picture rules…'
+                )}
               </FieldDescription>
             </Field>
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={!selected || refreshing || writing}>
+              <Button type="submit" disabled={!selected || refreshing || writing || !policyReady}>
                 {mutation.isPending
                   ? 'Saving picture…'
                   : profile.pictureAssetId
@@ -270,6 +300,16 @@ export function ProfilePictureSettings({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          {policyQuery.isError && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Unable to load picture rules. Try again before uploading.
+              </AlertDescription>
+              <Button type="button" variant="outline" onClick={() => void policyQuery.refetch()}>
+                Retry picture rules
+              </Button>
+            </Alert>
+          )}
           {feedback && (
             <Alert variant="destructive">
               <AlertDescription>{feedback}</AlertDescription>

@@ -15,10 +15,10 @@ it('describes each selected alias action', () => {
   for(const action of ['schedule','keep','reactivate'] as const) expect(aliasChangeDialog({...command,action},'current').description).toContain('@old');
 });
 it('rejects unsupported or oversized pictures and handles deselection', () => {
-  expect(pictureSelection({type:'image/gif',size:1},10).error).toContain('JPEG');
-  expect(pictureSelection({type:'image/png',size:11},10).selected).toBeNull();
-  const file={type:'image/webp',size:10};expect(pictureSelection(file,10)).toEqual({selected:file,error:null});
-  expect(pictureSelection(undefined,10)).toEqual({selected:null,error:null});
+  expect(pictureSelection({type:'image/gif',size:1},10,['image/jpeg','image/png','image/webp']).error).toContain('JPEG');
+  expect(pictureSelection({type:'image/png',size:11},10,['image/jpeg','image/png','image/webp']).selected).toBeNull();
+  const file={type:'image/webp',size:10};expect(pictureSelection(file,10,['image/jpeg','image/png','image/webp'])).toEqual({selected:file,error:null});
+  expect(pictureSelection(undefined,10,['image/jpeg','image/png','image/webp'])).toEqual({selected:null,error:null});
 });
 it('prioritizes expired history and maps unavailable reasons', () => {
   expect(historicalHandleAvailability(5,'claimed',5)).toContain('recent history');

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { initialPictureCrop, movePictureCrop, zoomPictureCrop } from '@/features/picture-editor';
+import { initialPictureCrop, movePictureCrop, zoomPictureCrop, wheelPictureCrop } from '@/features/picture-editor';
 
 it('frames a landscape source centrally and clamps dragging to covered source pixels', () => {
   const crop = initialPictureCrop({ width: 800, height: 400 });
@@ -20,4 +20,14 @@ it('permits small sources with a warning and no additional zoom', () => {
   const crop = initialPictureCrop(source);
   expect(crop).toMatchObject({ x: 0, y: 34, size: 32, zoom: 1, maxZoom: 1, lowResolution: true });
   expect(zoomPictureCrop(crop, source, 10)).toEqual(crop);
+});
+
+it('zooms wheel input in either direction with the same source-region and low-resolution limits', () => {
+  const source = { width: 800, height: 400 };
+  const crop = initialPictureCrop(source);
+  expect(wheelPictureCrop(crop, source, -346.57359028).zoom).toBeCloseTo(2);
+  expect(wheelPictureCrop(crop, source, -10000)).toMatchObject({ size: 64, zoom: 6.25 });
+  expect(wheelPictureCrop(wheelPictureCrop(crop, source, -10000), source, 10000)).toEqual(crop);
+  const small = { width: 32, height: 48 };
+  expect(wheelPictureCrop(initialPictureCrop(small), small, -10000)).toEqual(initialPictureCrop(small));
 });

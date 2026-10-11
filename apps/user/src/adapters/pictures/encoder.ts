@@ -13,7 +13,7 @@ interface PictureLimits {
     maxOutputBytes: number;
     acceptedSourceFormats: readonly string[];
     animation: { available: boolean };
-    encoding: { staticQuality: number };
+    encoding: { staticQuality: number; animationQuality: number };
   };
 }
 
@@ -224,7 +224,10 @@ const limitsSchema = z.object({
     maxOutputBytes: z.number().int().positive(),
     acceptedSourceFormats: z.array(z.string()),
     animation: z.object({ available: z.boolean() }),
-    encoding: z.object({ staticQuality: z.number().int().min(1).max(100) }),
+    encoding: z.object({
+      staticQuality: z.number().int().min(1).max(100),
+      animationQuality: z.number().int().min(1).max(100),
+    }),
   }),
 });
 try {

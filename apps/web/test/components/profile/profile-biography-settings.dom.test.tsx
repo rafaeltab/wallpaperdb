@@ -76,7 +76,7 @@ describe('Biography settings', () => {
       maxOutputBytes: 5242880,
       acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
       animation: { available: false },
-      encoding: { staticQuality: 85 },
+      encoding: { staticQuality: 85, animationQuality: 85 },
     });
   });
 

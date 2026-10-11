@@ -14,7 +14,7 @@ const profile = {
 
 describe('User API client', () => {
   it('retrieves effective picture rules with the current token and cancellable authenticated request', async () => {
-    const policy = { output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' }, maxOutputBytes: 123456, acceptedSourceFormats: ['image/png'], animation: { available: false }, encoding: { staticQuality: 85 } };
+    const policy = { output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' }, maxOutputBytes: 123456, acceptedSourceFormats: ['image/png'], animation: { available: false }, encoding: { staticQuality: 85, animationQuality: 85 } };
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(policy))); vi.stubGlobal('fetch', fetch);
     const tokenProvider = vi.fn().mockResolvedValue('fresh-token');
     const client = createUserApiClient({ baseUrl: '/user', tokenProvider });

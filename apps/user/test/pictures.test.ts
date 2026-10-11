@@ -178,9 +178,9 @@ describe('Picture capability', () => {
       {
         output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
         maxOutputBytes: 4,
-        acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
-        animation: { available: false },
-        encoding: { staticQuality: 85 },
+        acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+        animation: { available: true },
+        encoding: { staticQuality: 85, animationQuality: 85 },
       },
     ]);
   });
@@ -198,16 +198,16 @@ describe('Picture capability', () => {
       ]);
     }
   });
-  it('resolves effective static policy for the authenticated User with configurable output bytes', async () => {
+  it('resolves effective static and animated policy for the authenticated User with configurable output bytes', async () => {
     const test = setup(123456);
     expect(await test.run((pictures) => pictures.policy({ profileId: 'owner' }))).toEqual({
       _tag: 'Policy',
       policy: {
         output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
         maxOutputBytes: 123456,
-        acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
-        animation: { available: false },
-        encoding: { staticQuality: 85 },
+        acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+        animation: { available: true },
+        encoding: { staticQuality: 85, animationQuality: 85 },
       },
     });
     expect(await test.run((pictures) => pictures.policy({ profileId: '' }))).toMatchObject({

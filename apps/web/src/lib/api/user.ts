@@ -5,7 +5,7 @@ export interface PicturePolicy {
   maxOutputBytes: number;
   acceptedSourceFormats: string[];
   animation: { available: boolean };
-  encoding: { staticQuality: number };
+  encoding: { staticQuality: number; animationQuality: number };
 }
 
 export interface ProfileAlias {
@@ -378,7 +378,9 @@ function isPicturePolicy(value: unknown): value is PicturePolicy {
     policy.acceptedSourceFormats.every((format) => typeof format === 'string') &&
     typeof animation.available === 'boolean' &&
     positive(encoding.staticQuality) &&
-    Number(encoding.staticQuality) <= 100
+    Number(encoding.staticQuality) <= 100 &&
+    positive(encoding.animationQuality) &&
+    Number(encoding.animationQuality) <= 100
   );
 }
 

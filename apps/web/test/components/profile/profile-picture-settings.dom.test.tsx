@@ -30,7 +30,7 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a href="/profiles/@ada">{children}</a>,
 }));
 
-const picturePolicy = { output: { width: 512, height: 512, mimeType: 'image/webp' as const, colorSpace: 'srgb' as const }, maxOutputBytes: 5242880, acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'], animation: { available: false }, encoding: { staticQuality: 85 } };
+const picturePolicy = { output: { width: 512, height: 512, mimeType: 'image/webp' as const, colorSpace: 'srgb' as const }, maxOutputBytes: 5242880, acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'], animation: { available: false }, encoding: { staticQuality: 85, animationQuality: 85 } };
 const canonical = new Blob(['canonical-webp'], { type: 'image/webp' });
 const processPicture = vi.fn();
 const disposePicture = vi.fn();

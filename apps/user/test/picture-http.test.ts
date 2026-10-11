@@ -48,7 +48,7 @@ describe('Picture HTTP translation', () => {
       maxOutputBytes: 1234,
       acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
       animation: { available: false },
-      encoding: { staticQuality: 85 },
+      encoding: { staticQuality: 85, animationQuality: 85 },
     };
     const app = await createHttpApp(
       config,

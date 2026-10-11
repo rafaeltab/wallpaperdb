@@ -354,7 +354,7 @@ describe('Profile picture settings', () => {
     await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Unable to decode');
     expect(screen.getByText('portrait.png')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
   });
 
@@ -367,10 +367,15 @@ describe('Profile picture settings', () => {
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Encoder unavailable');
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
+    vi.mocked(userApi.uploadPicture).mockRejectedValue(new Error('Offline'));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
+    expect(processPicture.mock.calls[1][0]).toMatchObject({ x: 300, y: 100, size: 200, zoom: 2 });
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Offline'));
     await user.keyboard('{Escape}');
     expect(disposePicture).toHaveBeenCalled();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
-    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
   });
 
   it('fences late processing after closing and reopening the dialog', async () => {
@@ -443,7 +448,7 @@ describe('Profile picture settings', () => {
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Upload unavailable');
     expect(screen.getByText('portrait.png')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute(
       'src',
@@ -542,7 +547,7 @@ describe('Profile picture settings', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Processed picture exceeds the 4 byte limit.');
     expect(screen.getByText('large.png')).toBeInTheDocument();
     expect(screen.getByText(/Up to 4 B/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
   });
 

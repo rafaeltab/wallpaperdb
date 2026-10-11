@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -157,6 +157,115 @@ describe('Profile picture settings', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(edit).toHaveFocus();
+  });
+
+  it('retains its edit and reports that a competing Profile command blocked submission after processing', async () => {
+    let finishProcessing: ((value: Blob) => void) | undefined;
+    processPicture.mockImplementation(() => new Promise((resolve) => { finishProcessing = resolve; }));
+    const { client } = await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    let finishOtherCommand: (() => void) | undefined;
+    const otherCommand = client.getMutationCache().build(client, { mutationKey: profileQueryKey(profile.id), mutationFn: () => new Promise<void>((resolve) => { finishOtherCommand = resolve; }) });
+    let pending: Promise<void>;
+    act(() => { pending = otherCommand.execute(undefined); });
+    await act(async () => finishProcessing?.(canonical));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your Profile is busy');
+    expect(screen.getByText('portrait.png')).toBeInTheDocument();
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+    await act(async () => { finishOtherCommand?.(); await pending; });
+  });
+
+  it('cancels processing in the same dialog, ignores a late result, and permits the retained crop to be applied again', async () => {
+    let finish: ((value: Blob) => void) | undefined;
+    let signal: AbortSignal | undefined;
+    processPicture.mockImplementationOnce((_crop, _policy, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
+    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'saved' });
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Cancel picture processing' }));
+    expect(signal?.aborted).toBe(true);
+    await act(async () => finish?.(canonical));
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
+    expect(processPicture.mock.calls[1][0]).toMatchObject({ x: 300, y: 100, size: 200 });
+  });
+
+  it('immediately replaces a source and ignores its late decode without opening a confirmation', async () => {
+    let finish: ((value: Awaited<ReturnType<typeof openPictureSource>>) => void) | undefined;
+    let signal: AbortSignal | undefined;
+    vi.mocked(openPictureSource).mockImplementationOnce((_file, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'old.png', { type: 'image/png' }));
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'new.png', { type: 'image/png' }));
+    expect(signal?.aborted).toBe(true);
+    expect(await screen.findByRole('slider', { name: 'Zoom' })).toHaveValue('1');
+    const abandonedDispose = vi.fn();
+    await act(async () => finish?.({ width: 10, height: 10, preview: new Blob(), process: processPicture, dispose: abandonedDispose }));
+    expect(abandonedDispose).toHaveBeenCalled();
+    expect(screen.getByText('new.png')).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.queryByText(/smaller than 64/)).not.toBeInTheDocument();
+  });
+
+  it('retains the file after a decode failure and retries its decode when Apply is chosen', async () => {
+    vi.mocked(openPictureSource).mockRejectedValueOnce(new Error('Unable to decode this picture.'));
+    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'saved' });
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to decode');
+    expect(screen.getByText('portrait.png')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
+  });
+
+  it('retains the crop after a processing failure and releases its preview when the edit is abandoned', async () => {
+    processPicture.mockRejectedValueOnce(new Error('Encoder unavailable'));
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Encoder unavailable');
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
+    await user.keyboard('{Escape}');
+    expect(disposePicture).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+  });
+
+  it('fences late processing after closing and reopening the dialog', async () => {
+    let finish: ((value: Blob) => void) | undefined;
+    processPicture.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'old.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'new.png', { type: 'image/png' }));
+    await act(async () => finish?.(canonical));
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+    expect(screen.getByText('new.png')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Profile picture' })).toBeVisible();
+  });
+
+  it('warns about a small source, disables zoom, and still permits Apply', async () => {
+    vi.mocked(openPictureSource).mockResolvedValue({ width: 32, height: 48, preview: new Blob(), process: processPicture, dispose: disposePicture });
+    await renderPage();
+    await userEvent.setup().upload(screen.getByLabelText('Choose picture'), new File(['png'], 'small.png', { type: 'image/png' }));
+    expect(await screen.findByRole('slider', { name: 'Zoom' })).toBeDisabled();
+    expect(screen.getByText(/smaller than 64/)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
   });
 
   it.each(['cancel', 'escape'])('returns focus to Remove picture after dismissing its confirmation with %s', async (dismissal) => {

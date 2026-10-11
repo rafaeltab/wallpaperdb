@@ -54,6 +54,10 @@ async function validateSource(file: Blob, signal: AbortSignal) {
       if (offset + 12 + size > file.size) break;
       if (type === 'acTL')
         throw new Error('Animated PNG pictures are not supported. Choose a static picture.');
+      if (type === 'cICP')
+        throw new Error(
+          "This picture's color interpretation is not supported. Choose another picture."
+        );
       offset += 12 + size;
       if (type === 'IEND') {
         await validateSourceDimensions(file, 'png', signal);

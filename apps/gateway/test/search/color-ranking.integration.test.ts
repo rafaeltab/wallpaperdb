@@ -6,10 +6,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   COLOR_UTILITY_VERSION,
   type SearchSelection,
-} from '../src/capabilities/catalogue/index.js';
-import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
-import utilitiesReference from './fixtures/prototype/utilities.json';
-import { rankingCases as references } from './helpers/color-ranking.js';
+} from '../../src/capabilities/catalogue/index.js';
+import { acquireSearchFixture, createSearchFixture } from '../search-fixture.js';
+import utilitiesReference from '../fixtures/prototype/utilities.json';
+import { rankingCases as references } from '../helpers/color-ranking.js';
 
 const referenceQuery = Schema.decodeUnknownSync(
   Schema.Struct({

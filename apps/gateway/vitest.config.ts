@@ -3,15 +3,8 @@ import { defaults } from '@wallpaperdb/vitest-config/defaults';
 import { defineConfig, mergeConfig } from 'vitest/config';
 
 const require = createRequire(import.meta.url);
-const searchTests = [
-  'test/{opensearch,color-ranking,profile,profile-search,integration,server}.test.ts',
-];
-const instrumentationTests = ['test/unit/otel.test.ts'];
-const fastTests = [
-  'test/{catalogue,color-query,color-utilities,cursor.service,event-consumers,event-envelope-conformance,graphql-security,health,http-lifecycle,projection}.test.ts',
-  'test/unit/{admission,availability,availability-adapter,config,runtime,startup-diagnostics}.test.ts',
-  'src/adapters/opensearch/documents.test.ts',
-];
+const searchTests = ['test/search/**/*.integration.test.ts'];
+const instrumentationTests = ['test/instrumentation/**/*.integration.test.ts'];
 
 export default mergeConfig(
   defaults,
@@ -35,15 +28,15 @@ export default mergeConfig(
           extends: true,
           test: {
             name: 'gateway-unit',
-            include: fastTests,
+            include: ['test/**/*.unit.test.ts', 'src/**/*.unit.test.ts'],
           },
         },
         {
           extends: true,
           test: {
             name: 'gateway-integration',
-            include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
-            exclude: [...fastTests, ...searchTests, ...instrumentationTests],
+            include: ['test/**/*.integration.test.ts', 'src/**/*.integration.test.ts'],
+            exclude: [...searchTests, ...instrumentationTests],
           },
         },
         {

@@ -481,57 +481,84 @@ describe('Profile picture settings', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it('keeps owner refreshes from racing a picture write and reports a failed refresh', async () => {
+  it('blocks duplicate picture writes and removes the normal Profile refresh action', async () => {
     let finishUpload: ((value: Profile) => void) | undefined;
-    vi.mocked(userApi.uploadPicture).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          finishUpload = resolve;
-        })
-    );
-    vi.mocked(userApi.ensureProfile).mockRejectedValue(new Error('Offline'));
+    vi.mocked(userApi.uploadPicture).mockImplementation(() => new Promise((resolve) => { finishUpload = resolve; }));
     const { client } = await renderPage();
     const user = userEvent.setup();
-    await user.upload(
-      screen.getByLabelText('Choose picture'),
-      new File(['png'], 'portrait.png', { type: 'image/png' })
-    );
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(screen.getByRole('button', { name: 'Refresh Profile' })).toBeDisabled();
+    const form = screen.getByRole('button', { name: 'Saving picture…' }).closest('form');
+    if (!form) throw new Error('Picture form missing');
+    fireEvent.submit(form);
+    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Refresh Profile' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Choose picture')).toBeDisabled();
     expect(userApi.ensureProfile).not.toHaveBeenCalled();
     const updated = { ...profile, pictureAssetId: 'picture_new', version: 2 };
     await act(async () => finishUpload?.(updated));
-    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
-    await user.click(screen.getByRole('button', { name: 'Refresh Profile' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Unable to refresh your Profile. Try again.'
-    );
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('explains stale picture commands and refreshes the owner before selecting another upload', async () => {
-    vi.mocked(userApi.uploadPicture).mockRejectedValue(
-      new UserApiError('Conflict', 409, {
-        type: 'https://wallpaperdb.test/problems/profile-version-conflict',
-      })
-    );
-    const updated = { ...profile, version: 2, pictureAssetId: 'remote_picture' };
-    vi.mocked(userApi.ensureProfile).mockResolvedValue(updated);
+  it('refreshes a conflict without losing the edit and waits for Retry with the authoritative version', async () => {
+    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new UserApiError('Conflict', 409, { type: 'https://wallpaperdb.test/problems/profile-version-conflict' }));
+    const refreshed = { ...profile, version: 7, pictureAssetId: 'remote_picture' };
+    const accepted = { ...refreshed, version: 8, pictureAssetId: 'accepted_picture' };
+    vi.mocked(userApi.ensureProfile).mockResolvedValue(refreshed);
+    vi.mocked(userApi.uploadPicture).mockResolvedValueOnce(accepted);
     const { client } = await renderPage();
     const user = userEvent.setup();
-    await user.upload(
-      screen.getByLabelText('Choose picture'),
-      new File(['png'], 'portrait.png', { type: 'image/png' })
-    );
+    const source = new File(['png'], 'portrait.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Choose picture'), source);
+    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
     await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Your Profile changed elsewhere. Refresh Profile before trying again.'
-    );
-    await user.click(screen.getByRole('button', { name: 'Refresh Profile' }));
-    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(refreshed));
+    expect(screen.getByRole('alert')).toHaveTextContent('Your Profile changed elsewhere');
+    const latest = screen.getByRole('group', { name: 'Latest saved picture' });
+    expect(within(latest).getByRole('img')).toHaveAttribute('src', '/media/profile-pictures/remote_picture');
+    expect(screen.getByText('portrait.png')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
+    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
+    expect(userApi.uploadPicture).toHaveBeenNthCalledWith(1, expect.objectContaining({ expectedVersion: 1 }));
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(accepted));
+    expect(userApi.uploadPicture).toHaveBeenNthCalledWith(2, expect.objectContaining({ expectedVersion: 7 }));
+    expect(processPicture.mock.calls.map(([crop]) => crop)).toEqual([expect.objectContaining({ x: 300, y: 100, size: 200, zoom: 2 }), expect.objectContaining({ x: 300, y: 100, size: 200, zoom: 2 })]);
+    expect(openPictureSource).toHaveBeenCalledWith(source, expect.any(AbortSignal));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('retains the edit after a failed conflict refresh and blocks stale writes until refresh recovery succeeds', async () => {
+    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new UserApiError('Conflict', 409, { type: 'https://wallpaperdb.test/problems/profile-version-conflict' }));
+    const refreshed = { ...profile, version: 9, pictureAssetId: 'latest_picture' };
+    vi.mocked(userApi.ensureProfile).mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce(refreshed);
+    vi.mocked(userApi.uploadPicture).mockResolvedValueOnce({ ...refreshed, version: 10, pictureAssetId: 'accepted' });
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['old'], 'retained.png', { type: 'image/png' }));
+    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to refresh your saved Profile');
+    expect(screen.getByText('retained.png')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled();
+    const replacement = new File(['new'], 'replacement.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Choose picture'), replacement);
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    expect(retry).toBeDisabled();
+    const form = retry.closest('form');
+    if (!form) throw new Error('Picture form missing');
+    fireEvent.submit(form);
+    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Retry Profile refresh' }));
+    expect(await screen.findByRole('group', { name: 'Latest saved picture' })).toBeVisible();
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('1');
+    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(userApi.uploadPicture).toHaveBeenNthCalledWith(2, expect.objectContaining({ expectedVersion: 9 }));
+    expect(processPicture.mock.calls[1][0]).toMatchObject({ size: 400, zoom: 1 });
   });
 
   it('shows effective output constraints and retains a source when processed bytes exceed the limit', async () => {

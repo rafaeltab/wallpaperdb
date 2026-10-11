@@ -5,7 +5,7 @@ import { openPictureSource, type PictureSource } from './browser';
 interface Selection {
   owner: string;
   file: File;
-  expectedVersion: number;
+  expectedVersion: number | null;
   source: PictureSource | null;
   crop: PictureCrop | null;
   previewUrl: string | null;
@@ -63,7 +63,7 @@ export function usePictureEditor(owner: string) {
     publish(decoded);
     return decoded;
   }
-  async function choose(file: File, expectedVersion: number) {
+  async function choose(file: File, expectedVersion: number | null) {
     clear();
     const selected: Selection = {
       owner,
@@ -95,7 +95,7 @@ export function usePictureEditor(owner: string) {
     policy: PictureEncodingPolicy,
     accept: (file: File, expectedVersion: number) => void
   ) {
-    if (!current.current || operation.current) return;
+    if (!current.current || current.current.expectedVersion === null || operation.current) return;
     let selected = current.current;
     const controller = new AbortController();
     operation.current = controller;
@@ -107,7 +107,7 @@ export function usePictureEditor(owner: string) {
         if (!decoded) return;
         selected = decoded;
       }
-      if (!selected.source || !selected.crop) return;
+      if (!selected.source || !selected.crop || selected.expectedVersion === null) return;
       const blob = await selected.source.process(selected.crop, policy, controller.signal);
       if (controller.signal.aborted || current.current !== selected) return;
       accept(
@@ -134,6 +134,9 @@ export function usePictureEditor(owner: string) {
     apply,
     clear,
     cancel,
+    setExpectedVersion(expectedVersion: number | null) {
+      if (current.current) publish({ ...current.current, expectedVersion });
+    },
     setCrop(crop: PictureCrop) {
       if (current.current) publish({ ...current.current, crop });
     },

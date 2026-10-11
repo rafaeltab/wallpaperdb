@@ -40,6 +40,7 @@ export function services(
   return Layer.mergeAll(
     availability,
     Layer.succeed(Pictures, {
+      policy: unexpected,
       stage: unexpected,
       upload: unexpected,
       pictureAvailable: () => Effect.succeed(false),

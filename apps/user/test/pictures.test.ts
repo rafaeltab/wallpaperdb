@@ -17,7 +17,7 @@ afterEach(async () => {
   await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
 });
 
-function setup() {
+function setup(maxOutputBytes = 5242880) {
   const assets = new Map<string, StoredPicture & { state: 'uploading' | 'staged' | 'deleting' }>();
   const objects = new Map<string, Buffer>();
   const adoptions: Array<{ profileId: string; assetId: string | null; expectedVersion: number }> =
@@ -109,7 +109,11 @@ function setup() {
       }),
   };
   const runtime = ManagedRuntime.make(
-    picturesLayer({ profileEvidenceRetentionDays: 7, profilePictureImportTimeoutMs: 1000 }).pipe(
+    picturesLayer({
+      profileEvidenceRetentionDays: 7,
+      profilePictureImportTimeoutMs: 1000,
+      profilePictureMaxBytes: maxOutputBytes,
+    }).pipe(
       Layer.provide(
         Layer.mergeAll(
           Layer.succeed(Profiles, profiles),
@@ -152,6 +156,24 @@ function setup() {
 }
 
 describe('Picture capability', () => {
+  it('resolves effective static policy for the authenticated User with configurable output bytes', async () => {
+    const test = setup(123456);
+    expect(await test.run((pictures) => pictures.policy({ profileId: 'owner' }))).toEqual({
+      _tag: 'Policy',
+      policy: {
+        output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+        maxOutputBytes: 123456,
+        acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
+        animation: { available: false },
+        encoding: { staticQuality: 85 },
+      },
+    });
+    expect(await test.run((pictures) => pictures.policy({ profileId: '' }))).toMatchObject({
+      _tag: 'Rejected',
+      reason: 'unauthorized',
+    });
+    expect(test.assets.size).toBe(0);
+  });
   it('retains a private candidate after a lost PUT reply and never attempts adoption', async () => {
     const test = setup();
     test.failStorage();

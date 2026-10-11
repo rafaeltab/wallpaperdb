@@ -88,6 +88,21 @@ export const picturesLayer = (policy: PicturesPolicy) =>
           return yield* store.finishDeletion(asset.id);
         });
       return Pictures.of({
+        policy: (principal) =>
+          Effect.succeed(
+            principal.profileId
+              ? {
+                  _tag: 'Policy',
+                  policy: {
+                    output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+                    maxOutputBytes: policy.profilePictureMaxBytes,
+                    acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
+                    animation: { available: false },
+                    encoding: { staticQuality: 85 },
+                  },
+                }
+              : { _tag: 'Rejected', reason: 'unauthorized', message: 'Authentication is required' }
+          ),
         stage,
         upload: Effect.fn('pictures.upload')(function* (principal, bytes, expectedVersion) {
           const candidate = yield* stage(principal, bytes);

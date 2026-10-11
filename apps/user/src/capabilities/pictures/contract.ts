@@ -136,7 +136,25 @@ export const PictureObjects = Context.Service<PictureObjects>(
 export interface PicturesPolicy {
   readonly profileEvidenceRetentionDays: number;
   readonly profilePictureImportTimeoutMs: number;
+  readonly profilePictureMaxBytes: number;
 }
+
+export interface EffectivePicturePolicy {
+  readonly output: {
+    readonly width: number;
+    readonly height: number;
+    readonly mimeType: 'image/webp';
+    readonly colorSpace: 'srgb';
+  };
+  readonly maxOutputBytes: number;
+  readonly acceptedSourceFormats: readonly ('image/jpeg' | 'image/png' | 'image/webp')[];
+  readonly animation: { readonly available: boolean };
+  readonly encoding: { readonly staticQuality: number };
+}
+
+export type PicturePolicyOutcome =
+  | { readonly _tag: 'Policy'; readonly policy: EffectivePicturePolicy }
+  | ProfileRejection;
 
 export type StageOutcome =
   | { readonly _tag: 'Staged'; readonly assetId: string }
@@ -144,6 +162,7 @@ export type StageOutcome =
   | ProfileRejection;
 
 export interface Pictures {
+  policy(principal: ProfilePrincipal): Effect.Effect<PicturePolicyOutcome>;
   stage(
     principal: ProfilePrincipal,
     bytes: Buffer

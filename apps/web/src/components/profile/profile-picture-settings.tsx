@@ -1,7 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { pictureSelection } from '@/features/profile-management';
-import { Pencil } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { LoaderCircle, Pencil, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { usePictureEditor } from '@/features/picture-editor/adapters/react';
+import { ProfilePictureCrop } from '@/components/profile/profile-picture-crop';
 import { toast } from 'sonner';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
 import { ProfileDialog } from '@/components/profile/profile-dialog';
@@ -28,8 +30,8 @@ import { type Profile, UserApiError, userApi } from '@/lib/api/user';
 import { formatFileSize } from '@/lib/utils/wallpaper';
 
 type PictureCommand =
-  | { action: 'upload'; picture: File; expectedVersion: number }
-  | { action: 'remove'; expectedVersion: number };
+  | { action: 'upload'; picture: File; expectedVersion: number; session: number }
+  | { action: 'remove'; expectedVersion: number; session: number };
 
 export function ProfilePictureSettings({
   profile,
@@ -41,21 +43,17 @@ export function ProfilePictureSettings({
   const input = useRef<HTMLInputElement>(null);
   const dialogContent = useRef<HTMLDivElement>(null);
   const removeOpener = useRef<HTMLButtonElement>(null);
-  const [selected, setSelected] = useState<{ picture: File; expectedVersion: number } | null>(null);
+  const editor = usePictureEditor(profile.id);
+  const selected = editor.selection;
+  const session = useRef(0);
+  const client = useQueryClient();
+  const ownerQuery = useRef(
+    client.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true })
+  );
   const [removeVersion, setRemoveVersion] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!selected) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(selected.picture);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [selected]);
   const policyQuery = useQuery({
     queryKey: [...profileQueryKey(profile.id), 'picture-policy'],
     queryFn: ({ signal }) => userApi.picturePolicy({ signal, tokenProvider }),
@@ -86,7 +84,8 @@ export function ProfilePictureSettings({
     },
     {
       onSuccess: (_updated: Profile, command: PictureCommand) => {
-        setSelected(null);
+        if (command.session !== session.current) return;
+        editor.clear();
         if (input.current) input.current.value = '';
         setError(null);
         setOpen(false);
@@ -101,6 +100,7 @@ export function ProfilePictureSettings({
   );
   const feedback =
     error ??
+    editor.error ??
     (mutation.error instanceof UserApiError &&
     mutation.error.type?.endsWith('/profile-version-conflict')
       ? 'Your Profile changed elsewhere. Refresh Profile before trying again.'
@@ -110,7 +110,7 @@ export function ProfilePictureSettings({
     if (availability.isBusy()) return;
     mutation.reset();
     setError(null);
-    setSelected(null);
+    editor.clear();
     if (input.current) input.current.value = '';
     try {
       await refreshProfile();
@@ -127,8 +127,13 @@ export function ProfilePictureSettings({
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
+          session.current++;
+          if (next)
+            ownerQuery.current = client
+              .getQueryCache()
+              .find({ queryKey: profileQueryKey(profile.id), exact: true });
           if (!next) {
-            setSelected(null);
+            editor.clear();
             mutation.reset();
             setError(null);
           }
@@ -147,11 +152,13 @@ export function ProfilePictureSettings({
         }
       >
         <div className="space-y-5">
-          {previewUrl ? (
-            <img
-              src={previewUrl}
-              alt="Selected avatar"
-              className="size-28 rounded-xl object-cover"
+          {selected?.source && selected.crop && selected.previewUrl ? (
+            <ProfilePictureCrop
+              source={selected.source}
+              crop={selected.crop}
+              previewUrl={selected.previewUrl}
+              disabled={editor.processing || writing}
+              onChange={editor.setCrop}
             />
           ) : (
             <ProfilePicture profile={profile} />
@@ -159,7 +166,7 @@ export function ProfilePictureSettings({
           <Button
             variant="outline"
             size="sm"
-            disabled={refreshing || writing}
+            disabled={refreshing || writing || editor.processing}
             onClick={() => void refresh()}
           >
             {refreshing ? 'Refreshing Profile…' : 'Refresh Profile'}
@@ -175,7 +182,24 @@ export function ProfilePictureSettings({
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              if (selected && policyReady) mutation.mutate({ ...selected, action: 'upload' });
+              if (!policy || !policyReady || availability.isBusy() || editor.processing) return;
+              const originatingSession = session.current;
+              void editor.apply(policy, (picture, expectedVersion) => {
+                if (
+                  originatingSession !== session.current ||
+                  client
+                    .getQueryCache()
+                    .find({ queryKey: profileQueryKey(profile.id), exact: true }) !==
+                    ownerQuery.current
+                )
+                  return;
+                mutation.mutate({
+                  picture,
+                  expectedVersion,
+                  action: 'upload',
+                  session: originatingSession,
+                });
+              });
             }}
           >
             <Field>
@@ -196,17 +220,10 @@ export function ProfilePictureSettings({
                   setError(null);
                   const picture = event.target.files?.[0];
                   if (!policy || !policyReady) return;
-                  const result = pictureSelection(
-                    picture,
-                    policy.maxOutputBytes,
-                    policy.acceptedSourceFormats
-                  );
+                  const result = pictureSelection(picture, policy.acceptedSourceFormats);
                   setError(result.error);
-                  setSelected(
-                    result.selected
-                      ? { picture: result.selected, expectedVersion: profile.version }
-                      : null
-                  );
+                  if (result.selected) void editor.choose(result.selected, profile.version);
+                  else editor.clear();
                 }}
               />
               <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -219,7 +236,7 @@ export function ProfilePictureSettings({
                   Choose picture
                 </Button>
                 <span className="min-w-0 break-all text-sm text-muted-foreground">
-                  {selected?.picture.name ?? 'No picture selected'}
+                  {selected?.file.name ?? 'No picture selected'}
                 </span>
               </div>
               <FieldDescription id="picture-limits">
@@ -245,18 +262,17 @@ export function ProfilePictureSettings({
               </FieldDescription>
             </Field>
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={!selected || refreshing || writing || !policyReady}>
-                {mutation.isPending
-                  ? 'Saving picture…'
-                  : profile.pictureAssetId
-                    ? 'Replace picture'
-                    : 'Upload picture'}
+              <Button
+                type="submit"
+                disabled={!selected || refreshing || writing || editor.processing || !policyReady}
+              >
+                {mutation.isPending ? 'Saving picture…' : 'Apply'}
               </Button>
               {(profile.pictureAssetId || importing) && (
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={refreshing || writing}
+                  disabled={refreshing || writing || editor.processing}
                   onClick={(event) => {
                     removeOpener.current = event.currentTarget;
                     mutation.reset();
@@ -269,6 +285,21 @@ export function ProfilePictureSettings({
               )}
             </div>
           </form>
+          {editor.processing && (
+            <output className="flex items-center gap-2 text-sm">
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+              Processing picture…
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Cancel picture processing"
+                onClick={editor.cancel}
+              >
+                <X className="size-4" />
+              </Button>
+            </output>
+          )}
           <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <AlertDialogContent
               onCloseAutoFocus={(event) => {
@@ -289,10 +320,14 @@ export function ProfilePictureSettings({
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  disabled={refreshing || writing}
+                  disabled={refreshing || writing || editor.processing}
                   onClick={() => {
                     if (removeVersion !== null)
-                      mutation.mutate({ action: 'remove', expectedVersion: removeVersion });
+                      mutation.mutate({
+                        action: 'remove',
+                        expectedVersion: removeVersion,
+                        session: session.current,
+                      });
                   }}
                 >
                   Use generated avatar

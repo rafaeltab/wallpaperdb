@@ -5,6 +5,7 @@ import type {
   PictureImport,
   PictureImportCursor,
   EffectivePicturePolicy,
+  PicturePolicyOutcome,
   PicturesPolicy,
   StoredPicture,
 } from './contract.js';
@@ -104,7 +105,7 @@ export const picturesLayer = (policy: PicturesPolicy) =>
         });
       return Pictures.of({
         policy: (principal) =>
-          Effect.succeed(
+          Effect.succeed<PicturePolicyOutcome>(
             principal.profileId
               ? {
                   _tag: 'Policy',

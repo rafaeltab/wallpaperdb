@@ -11,6 +11,8 @@ An invocation authorizes tested fixes and pushes to the selected PR, review repl
 
 Identify the repository and PR from the request or current branch. Ask when ambiguous. Fetch its actual head branch and preserve unrelated local changes. Register the PR with the current thread using `link_pull_request` when available.
 
+Before executing PR-controlled Make targets, dependency installation, or lifecycle scripts, establish head trust from authenticated author and repository metadata and the user's scope. Use the trusted workspace for heads from known trusted maintainers. Run fork or otherwise untrusted heads only in a disposable environment without credentials, host-file access, or access to private host services; keep authenticated publication in the trusted workspace. If that isolation is unavailable, return a blocker before executing the head.
+
 Read the PR diff, current head SHA, all CI checks and workflow runs, and all review feedback. Use [fix-pr-review-comments](../fix-pr-review-comments/SKILL.md) for feedback discovery and handling, including pagination and review summaries outside threads.
 
 Keep a ledger in session state or outside the repository. Retain the PR URL and head SHA, comment IDs and handling outcomes, delivered fix commits, CI failure evidence, reruns per failure and head, Codex requests and results per head, and flaky-test issue URLs. Resume this ledger on every monitoring wake so counts and retries survive across turns.

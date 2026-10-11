@@ -1,8 +1,9 @@
-import { useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 import {
   initialPictureCrop,
   movePictureCrop,
   zoomPictureCrop,
+  wheelPictureCrop,
   type PictureCrop,
   type PictureDimensions,
 } from '@/features/picture-editor';
@@ -22,9 +23,27 @@ export function ProfilePictureCrop({
   onChange: (crop: PictureCrop) => void;
 }) {
   const drag = useRef<{ pointer: number; x: number; y: number } | null>(null);
+  const viewport = useRef<HTMLFieldSetElement>(null);
+  const wheel = useEffectEvent((event: WheelEvent) => {
+    if (disabled) return;
+    event.preventDefault();
+    const unit =
+      event.deltaMode === 1
+        ? 16
+        : event.deltaMode === 2
+          ? (viewport.current?.clientHeight ?? 0)
+          : 1;
+    onChange(wheelPictureCrop(crop, source, event.deltaY * unit));
+  });
+  useEffect(() => {
+    const element = viewport.current;
+    element?.addEventListener('wheel', wheel, { passive: false });
+    return () => element?.removeEventListener('wheel', wheel);
+  }, []);
   return (
     <div className="space-y-3">
       <fieldset
+        ref={viewport}
         aria-label="Picture crop"
         className="relative mx-auto aspect-square w-full max-w-64 touch-none overflow-hidden rounded-full border bg-muted cursor-grab"
         onPointerDown={(event) => {

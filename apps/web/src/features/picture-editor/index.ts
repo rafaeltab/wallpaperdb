@@ -3,4 +3,4 @@ export type {
   PictureDimensions,
   PictureEncodingPolicy,
 } from './contract';
-export { initialPictureCrop, movePictureCrop, zoomPictureCrop } from './crop';
+export { initialPictureCrop, movePictureCrop, zoomPictureCrop, wheelPictureCrop } from './crop';

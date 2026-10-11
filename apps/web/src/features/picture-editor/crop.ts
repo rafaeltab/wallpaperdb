@@ -43,3 +43,12 @@ export function zoomPictureCrop(
     y: clamp(crop.y + (crop.size - size) / 2, source.height - size),
   };
 }
+
+/** Wheel distances are CSS pixels; 500 pixels change zoom by a factor of e. */
+export function wheelPictureCrop(
+  crop: PictureCrop,
+  source: PictureDimensions,
+  deltaPixels: number
+): PictureCrop {
+  return zoomPictureCrop(crop, source, crop.zoom * Math.exp(-deltaPixels / 500));
+}

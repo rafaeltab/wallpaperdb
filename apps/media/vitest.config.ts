@@ -1,9 +1,5 @@
 import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
-const fastTests = [
-  'test/{availability,delivery,event-envelope-conformance,events-translation,http,http-operations}.test.ts',
-];
-
 export default defineBaseConfig({
   test: {
     name: 'media',
@@ -12,14 +8,13 @@ export default defineBaseConfig({
     projects: [
       {
         extends: true,
-        test: { name: 'media-unit', include: fastTests },
+        test: { name: 'media-unit', include: ['test/**/*.unit.test.ts'] },
       },
       {
         extends: true,
         test: {
           name: 'media-integration',
-          include: ['test/**/*.test.ts'],
-          exclude: fastTests,
+          include: ['test/**/*.integration.test.ts'],
         },
       },
     ],

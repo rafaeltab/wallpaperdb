@@ -35,7 +35,7 @@ describe('Initial Profile picture download', () => {
       'https://img.clerk.com/captured-picture',
       expect.objectContaining({
         redirect: 'manual',
-        headers: { Accept: 'image/jpeg, image/png, image/webp' },
+        headers: { Accept: 'image/jpeg, image/png, image/webp, image/gif' },
         signal: expect.any(AbortSignal),
       })
     );

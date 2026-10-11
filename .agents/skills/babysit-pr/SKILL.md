@@ -39,7 +39,7 @@ Permission failures and infrastructure failures require a concrete blocker repor
 
 In this repository, Codex findings can appear as inline comments and reviews with state `COMMENTED`. Clean outcomes use conversation comments and a thumbs-up reaction on the PR itself from `chatgpt-codex-connector[bot]`. Some GraphQL and `gh pr view` results expose the login as `chatgpt-codex-connector`.
 
-Read conversation comments, reviews, threads, and PR-level reactions. PR reactions are available through `GET /repos/{owner}/{repo}/issues/{number}/reactions`; paginate and match both the bot identity and `+1` content. Reactions on individual comments are separate from approval of the PR.
+Read conversation comments, reviews, threads, and PR-level reactions. Use GitHub's [list reactions for an issue API](https://docs.github.com/en/rest/reactions/reactions#list-reactions-for-an-issue) for PR-level reactions; follow its pagination and match both the bot identity and `+1` content. Reactions on individual comments are separate from approval of the PR.
 
 Approval requires all of the following:
 

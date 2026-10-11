@@ -16,9 +16,3 @@ Ingestor accepts authenticated wallpaper uploads, validates their contents, and 
 File-type identifies formats from the uploaded bytes. Sharp reads image metadata with decompression limits before Ingestor accepts an image.
 
 See the [domain context](GLOSSARY.md) for acceptance rules and the [durable publication decision](docs/adr/0001-effect-ingestion-and-durable-publication.md) for recovery guarantees.
-
-## Testing
-
-The [unit selection](vitest.config.ts) runs Ingestion with controlled storage, inspection, and event adapters, admission with an in-memory quota, availability, recovery workers, configuration, and HTTP contracts with controlled ports. The integration selection retains production adapters, native inspection, application composition, and telemetry. SDK instrumentation still runs in a separate isolated process.
-
-The [workspace scripts](package.json) expose both selections with coverage and retain `test` for the complete suite. Run them through the [Make workspace selectors](../../Makefile). The [root coverage script](../../package.json) combines `coverage/unit` and `coverage/integration` for CI.

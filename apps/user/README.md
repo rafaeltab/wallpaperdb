@@ -16,9 +16,3 @@ User owns contributor Profiles and the rules for changing public identity, inclu
 Clerk supplies authenticated identities. PostgreSQL owns Profile state and exclusive Handle claims. Sharp decodes Profile pictures into metadata-free images in an isolated process so expensive native work can be stopped.
 
 See the [domain context](GLOSSARY.md) for terminology and invariants, the [profile editing guide](../docs/content/docs/guides/profile-editing.mdx) for user behavior, and the [upgrade procedures](../docs/content/docs/guides/service-upgrades.mdx) for existing installations.
-
-## Testing
-
-The [unit selection](vitest.config.ts) runs Profile, Picture, maintenance, availability, and worker behavior with controlled adapters, plus HTTP contracts with controlled ports. The integration selection retains production adapter contracts, PostgreSQL/S3/NATS workflows, native picture processing, artifact builds, and telemetry.
-
-The [workspace scripts](package.json) expose both selections with coverage and retain `test` for the complete suite. Run them through the [Make workspace selectors](../../Makefile). The [root coverage script](../../package.json) combines `coverage/unit` and `coverage/integration` for CI.

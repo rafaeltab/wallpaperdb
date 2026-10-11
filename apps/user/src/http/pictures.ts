@@ -79,6 +79,24 @@ export async function registerPictureRoutes(
       fieldSize: 32,
     },
   });
+  app.get('/profile/me/picture-policy', (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const principal = request.profilePrincipal;
+    if (!principal)
+      return reply
+        .code(401)
+        .type('application/problem+json')
+        .send(problem(401, 'unauthorized', 'Unauthorized'));
+    return execution.run(
+      Pictures.use((pictures) => pictures.policy(principal)).pipe(
+        Effect.map((outcome) =>
+          outcome._tag === 'Policy' ? reply.send(outcome.policy) : sendProfile(reply, outcome)
+        )
+      ),
+      request,
+      reply
+    );
+  });
   app.get(
     '/internal/profile-pictures/:pictureId/availability',
     { config: { skipAuth: true } },

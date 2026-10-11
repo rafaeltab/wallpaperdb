@@ -2,6 +2,7 @@ import type { PictureCrop, PictureDimensions, PictureEncodingPolicy } from '../i
 import type { PictureJob, PictureJobResult } from './protocol';
 import { withoutPictureMetadata } from './webp';
 import { validateSourceDimensions } from './source';
+import { validateJpegColor } from './jpeg';
 
 /** UI owns this decoded source and must dispose it when its editing session ends. */
 export interface PictureSource extends PictureDimensions {
@@ -69,6 +70,7 @@ async function validateSource(file: Blob, signal: AbortSignal) {
   if (webp && text(12, 16) === 'VP8X' && bytes[20] & 2)
     throw new Error('Animated WebP pictures are not supported. Choose a static picture.');
   await validateSourceDimensions(file, jpeg ? 'jpeg' : 'webp', signal);
+  if (jpeg) await validateJpegColor(file, signal);
 }
 
 async function fallback(

@@ -11,6 +11,8 @@ description: Structured workflow for implementing tasks. Use when the user asks 
 
 Gather context. Read relevant files, search the codebase, and clarify ambiguities before proceeding.
 
+When picking up a GitHub issue, assign it to the authenticated GitHub account used by the agent before implementation with `gh issue edit <number-or-url> --add-assignee @me`. Preserve existing assignees. Read back the issue with `gh issue view <number-or-url> --json assignees` and verify the account is assigned. If assignment or verification fails, report the failure rather than treating the issue as claimed.
+
 ### 2. Plan
 
 Create a todo list of the implementation steps.

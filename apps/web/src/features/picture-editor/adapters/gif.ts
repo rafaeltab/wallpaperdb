@@ -27,17 +27,18 @@ async function encode(canvas: PictureCanvas, type: string, quality?: number) {
   );
 }
 
-/** Both the worker and cooperative UI fallback own a whole decode/compose/encode job. */
-export async function gifPictureJob(
+interface GifAttempt {
+  result: Extract<PictureJobResult, { ok: true }>;
+  animated: boolean;
+}
+
+async function gifPictureAttempt(
   job: PictureJob,
   signal: AbortSignal,
-  offscreen: boolean
-): Promise<Extract<PictureJobResult, { ok: true }> | undefined> {
-  const header = new Uint8Array(await job.file.slice(0, 6).arrayBuffer());
-  signal.throwIfAborted();
-  if (!['GIF87a', 'GIF89a'].includes(String.fromCharCode(...header))) return undefined;
-  const bytes = new Uint8Array(await job.file.arrayBuffer());
-  signal.throwIfAborted();
+  offscreen: boolean,
+  bytes: Uint8Array,
+  quality?: number
+): Promise<GifAttempt> {
   const decoder = decodePictureGif(bytes);
   let source: PictureCanvas | undefined;
   let output: PictureCanvas | undefined;
@@ -102,11 +103,14 @@ export async function gifPictureJob(
         const blob = await encode(
           output,
           job.action === 'preview' ? 'image/png' : 'image/webp',
-          job.action === 'process' ? job.policy.encoding.animationQuality / 100 : undefined
+          quality === undefined ? undefined : quality / 100
         );
         signal.throwIfAborted();
         if (job.action === 'preview')
-          return { ok: true, blob, width: value.width, height: value.height };
+          return {
+            result: { ok: true, blob, width: value.width, height: value.height },
+            animated: false,
+          };
         if (blob.type !== 'image/webp')
           throw new Error('This browser cannot encode WebP pictures. Try another browser.');
         frames.push({ bytes: new Uint8Array(await blob.arrayBuffer()), duration: value.duration });
@@ -130,14 +134,17 @@ export async function gifPictureJob(
             frames,
             job.policy.output,
             step.value.loop,
-            job.policy.maxOutputBytes
+            Number.MAX_SAFE_INTEGER
           ),
           {
             type: 'image/webp',
           }
         );
     signal.throwIfAborted();
-    return { ok: true, blob, width: source.width, height: source.height };
+    return {
+      result: { ok: true, blob, width: source.width, height: source.height },
+      animated: step.value.animated,
+    };
   } finally {
     decoder.return({ loop: 1, frameCount: 0, animated: false });
     if (source) {
@@ -149,4 +156,32 @@ export async function gifPictureJob(
       output.height = 0;
     }
   }
+}
+
+/** Both the worker and cooperative UI fallback own all fitting attempts for one source. */
+export async function gifPictureJob(
+  job: PictureJob,
+  signal: AbortSignal,
+  offscreen: boolean
+): Promise<Extract<PictureJobResult, { ok: true }> | undefined> {
+  const header = new Uint8Array(await job.file.slice(0, 6).arrayBuffer());
+  signal.throwIfAborted();
+  if (!['GIF87a', 'GIF89a'].includes(String.fromCharCode(...header))) return undefined;
+  const bytes = new Uint8Array(await job.file.arrayBuffer());
+  signal.throwIfAborted();
+  if (job.action === 'preview')
+    return (await gifPictureAttempt(job, signal, offscreen, bytes)).result;
+  let quality = job.policy.encoding.animationQuality;
+  const minimumQuality = Math.min(20, quality);
+  while (true) {
+    await yieldPictureWork(signal);
+    const attempt = await gifPictureAttempt(job, signal, offscreen, bytes, quality);
+    if (!attempt.animated || attempt.result.blob.size <= job.policy.maxOutputBytes)
+      return attempt.result;
+    if (quality === minimumQuality) break;
+    quality = Math.max(minimumQuality, quality - 20);
+  }
+  throw new Error(
+    `Processed animation cannot fit the ${job.policy.maxOutputBytes.toLocaleString()} byte limit. Choose another picture.`
+  );
 }

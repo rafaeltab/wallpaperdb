@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
 import { withDisposableOwner } from "../src/disposable-owner";
 
@@ -10,6 +10,7 @@ type PictureFile = { name: string; mimeType: string; buffer: Buffer };
 async function uploadPicture(
   page: Page,
   picture: PictureFile,
+  outgoing: Buffer[],
   edit?: (dialog: ReturnType<Page["getByRole"]>) => Promise<void>,
 ) {
   await page
@@ -39,15 +40,16 @@ async function uploadPicture(
   const response = await saved;
   expect(response.ok()).toBe(true);
   await expect(dialog).not.toBeVisible();
-  const request = response.request();
-  const body = request.postDataBuffer();
-  if (!body) throw new Error("Picture command had no body");
-  const start = body.indexOf(Buffer.from("RIFF"));
-  if (start < 0 || body.toString("latin1").includes("PRIVATE_CAMERA"))
+  const bytes = outgoing.at(-1);
+  if (!bytes) throw new Error("Picture command had no observed File bytes");
+  if (
+    bytes.subarray(0, 4).toString() !== "RIFF" ||
+    bytes.includes(Buffer.from("PRIVATE_CAMERA"))
+  )
     throw new Error(
       "Picture command did not contain a private-metadata-free WebP",
     );
-  const bytes = body.subarray(start, start + body.readUInt32LE(start + 4) + 8);
+  expect(bytes.length).toBe(bytes.readUInt32LE(4) + 8);
   expect(bytes.subarray(8, 12).toString()).toBe("WEBP");
   const chunks: string[] = [];
   for (let offset = 12; offset < bytes.length; ) {
@@ -56,8 +58,8 @@ async function uploadPicture(
     offset += 8 + size + (size % 2);
   }
   expect(
-    chunks.every((chunk) => ["VP8X", "ALPH", "VP8 ", "VP8L"].includes(chunk)),
-  ).toBe(true);
+    chunks.filter((chunk) => !["VP8X", "ALPH", "VP8 ", "VP8L"].includes(chunk)),
+  ).toEqual([]);
   return { profile: await response.json(), bytes };
 }
 
@@ -150,6 +152,41 @@ test("Profile picture upload reaches public delivery and removal retires the old
 }) => {
   test.setTimeout(120000);
   await withDisposableOwner(process.env, async ({ email, password }) => {
+    const outgoing: Buffer[] = [];
+    await page.exposeFunction(
+      "observePictureUpload",
+      async (bytes: number[]) => {
+        const picture = Buffer.from(bytes);
+        outgoing.push(picture);
+        await writeFile(
+          test.info().outputPath(`processed-picture-${outgoing.length}.webp`),
+          picture,
+        );
+      },
+    );
+    await page.addInitScript(() => {
+      const send = window.fetch.bind(window);
+      window.fetch = async (input, options) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (
+          url.endsWith("/user/profile/me/picture") &&
+          options?.method === "PUT" &&
+          options.body instanceof FormData
+        ) {
+          const picture = options.body.get("picture");
+          if (picture instanceof Blob) {
+            const observe: (bytes: number[]) => Promise<void> = Reflect.get(
+              window,
+              "observePictureUpload",
+            );
+            await observe(
+              Array.from(new Uint8Array(await picture.arrayBuffer())),
+            );
+          }
+        }
+        return send(input, options);
+      };
+    });
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.goto("/web/sign-in");
@@ -183,6 +220,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
     const publicContext = await browser.newContext({
       storageState: { cookies: [], origins: [] },
     });
+    let journeyError: unknown;
     try {
       const publicPage = await publicContext.newPage();
       publicPage.on("pageerror", (error) => pageErrors.push(error.message));
@@ -195,54 +233,66 @@ test("Profile picture upload reaches public delivery and removal retires the old
           uploads++;
       });
       const oriented = await fixture("profile-oriented.jpg", "image/jpeg");
-      const first = await uploadPicture(page, oriented, async (dialog) => {
-        const zoom = dialog.getByRole("slider", { name: "Zoom", exact: true });
-        await zoom.focus();
-        await zoom.press("ArrowRight");
-        expect(Number(await zoom.inputValue())).toBeGreaterThan(1);
-        await dialog
-          .getByRole("button", { name: "Reset", exact: true })
-          .click();
-        await expect(zoom).toHaveValue("1");
-        const crop = dialog.getByRole("group", {
-          name: "Picture crop",
-          exact: true,
-        });
-        const box = await crop.boundingBox();
-        const image = dialog.getByRole("img", { name: "Selected avatar" });
-        const before = await image.boundingBox();
-        if (!box || !before) throw new Error("Crop preview was not measured");
-        expect(before.width / box.width).toBeCloseTo(2, 1);
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-        await page.mouse.down();
-        await page.mouse.move(box.x + box.width * 1.5, box.y + box.height / 2, {
-          steps: 5,
-        });
-        await page.mouse.up();
-        const after = await image.boundingBox();
-        expect(after?.x).toBeCloseTo(box.x, -1);
-        await dialog
-          .getByRole("button", { name: "Reset", exact: true })
-          .click();
-        // Cancel in the same browser turn before the asynchronous worker can return.
-        await dialog.evaluate(async (element) => {
-          const apply = Array.from(element.querySelectorAll("button")).find(
-            (button) => button.textContent === "Apply",
+      const first = await uploadPicture(
+        page,
+        oriented,
+        outgoing,
+        async (dialog) => {
+          const zoom = dialog.getByRole("slider", {
+            name: "Zoom",
+            exact: true,
+          });
+          await zoom.focus();
+          await zoom.press("ArrowRight");
+          expect(Number(await zoom.inputValue())).toBeGreaterThan(1);
+          await dialog
+            .getByRole("button", { name: "Reset", exact: true })
+            .click();
+          await expect(zoom).toHaveValue("1");
+          const crop = dialog.getByRole("group", {
+            name: "Picture crop",
+            exact: true,
+          });
+          const box = await crop.boundingBox();
+          const image = dialog.getByRole("img", { name: "Selected avatar" });
+          const before = await image.boundingBox();
+          if (!box || !before) throw new Error("Crop preview was not measured");
+          expect(before.width / box.width).toBeCloseTo(2, 1);
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(
+            box.x + box.width * 1.5,
+            box.y + box.height / 2,
+            {
+              steps: 5,
+            },
           );
-          if (!apply) throw new Error("Apply missing");
-          apply.click();
-          await Promise.resolve();
-          const cancel = element.querySelector<HTMLButtonElement>(
-            'button[aria-label="Cancel picture processing"]',
-          );
-          if (!cancel) throw new Error("Processing cancel button missing");
-          cancel.click();
-        });
-        await expect(
-          dialog.getByRole("button", { name: "Apply", exact: true }),
-        ).toBeEnabled();
-        expect(uploads).toBe(0);
-      });
+          await page.mouse.up();
+          const after = await image.boundingBox();
+          expect(after?.x).toBeCloseTo(box.x, -1);
+          await dialog
+            .getByRole("button", { name: "Reset", exact: true })
+            .click();
+          // Cancel in the same browser turn before the asynchronous worker can return.
+          await dialog.evaluate(async (element) => {
+            const apply = Array.from(element.querySelectorAll("button")).find(
+              (button) => button.textContent === "Apply",
+            );
+            if (!apply) throw new Error("Apply missing");
+            apply.click();
+            await Promise.resolve();
+            const cancel = element.querySelector<HTMLButtonElement>(
+              'button[aria-label="Cancel picture processing"]',
+            );
+            if (!cancel) throw new Error("Processing cancel button missing");
+            cancel.click();
+          });
+          await expect(
+            dialog.getByRole("button", { name: "Apply", exact: true }),
+          ).toBeEnabled();
+          expect(uploads).toBe(0);
+        },
+      );
       const orientedPixels = await pixels(page, first.bytes, [
         [64, 256],
         [448, 256],
@@ -264,6 +314,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
       const transparent = await uploadPicture(
         page,
         await fixture("profile-transparent-p3.png", "image/png"),
+        outgoing,
       );
       const transparentPixels = await pixels(page, transparent.bytes, [
         [256, 10],
@@ -285,6 +336,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
       const last = await uploadPicture(
         page,
         await fixture("profile-small.png", "image/png"),
+        outgoing,
         async (dialog) => {
           await expect(
             dialog.getByRole("slider", { name: "Zoom" }),
@@ -397,6 +449,9 @@ test("Profile picture upload reaches public delivery and removal retires the old
         )
         .toBe("DIV");
       expect(pageErrors).toEqual([]);
+    } catch (cause) {
+      journeyError = cause;
+      throw cause;
     } finally {
       test.setTimeout(test.info().timeout + 30000);
       try {
@@ -408,6 +463,13 @@ test("Profile picture upload reaches public delivery and removal retires the old
           }),
         ).toBeVisible();
         await removePicture(page);
+      } catch (cleanupError) {
+        if (journeyError)
+          throw new AggregateError(
+            [journeyError, cleanupError],
+            "Profile picture journey and cleanup failed.",
+          );
+        throw cleanupError;
       } finally {
         await publicContext.close();
       }

@@ -16,6 +16,10 @@ Communication with subagents should use context pointers to the spec, tickets, r
 
 Use one implementer subagent at a time in a single worktree for the stack. Each ticket gets its own branch in that worktree. Review and validate its work before starting the next ticket; its PR can remain open while later tickets are implemented.
 
+## Prerequisites
+
+The `gh stack` commands require the [GitHub CLI extension](https://github.com/github/gh-stack). Follow its setup requirements and check `gh stack --help` before initializing a stack. If the extension is missing, install it with `gh extension install github/gh-stack`, then repeat the check. Use the extension's [command documentation](https://github.com/github/gh-stack/blob/main/skills/gh-stack/SKILL.md) and local command help for supported options.
+
 ## Steps
 
 1. Read the spec, full tickets, comments, and blocking relationships. Choose an order that respects the dependency graph. Resolve missing prerequisites or cycles before starting affected tickets.

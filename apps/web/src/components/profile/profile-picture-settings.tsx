@@ -295,7 +295,7 @@ export function ProfilePictureSettings({
                 type="submit"
                 disabled={!selected || refreshing || writing || editor.processing || !policyReady}
               >
-                {mutation.isPending ? 'Saving picture…' : 'Apply'}
+                {mutation.isPending ? 'Saving picture…' : selected && feedback ? 'Retry' : 'Apply'}
               </Button>
               {(profile.pictureAssetId || importing) && (
                 <Button

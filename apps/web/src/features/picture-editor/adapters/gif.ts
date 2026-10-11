@@ -56,7 +56,7 @@ async function gifPictureAttempt(
   try {
     let step = decoder.next();
     while (!step.done) {
-      await yieldPictureWork(signal);
+      await yieldPictureWork(signal, offscreen);
       const value = step.value;
       if (value.kind === 'size') {
         source = canvas(value.width, value.height, offscreen);
@@ -87,7 +87,7 @@ async function gifPictureAttempt(
           throw new Error('Invalid GIF canvas.');
         const rows = Math.max(1, Math.floor(16384 / value.width));
         for (let y = 0; y < value.height; y += rows) {
-          await yieldPictureWork(signal);
+          await yieldPictureWork(signal, offscreen);
           const height = Math.min(rows, value.height - y);
           const pixels = new Uint8ClampedArray(
             value.pixels.buffer,
@@ -101,7 +101,7 @@ async function gifPictureAttempt(
         const width = job.action === 'preview' ? value.width : crop.size;
         const height = job.action === 'preview' ? value.height : crop.size;
         for (let y = 0; y < output.height; y += 64) {
-          await yieldPictureWork(signal);
+          await yieldPictureWork(signal, offscreen);
           const rows = Math.min(64, output.height - y);
           outputContext.drawImage(
             source,
@@ -138,7 +138,7 @@ async function gifPictureAttempt(
     signal.throwIfAborted();
     if (!source || job.action !== 'process' || !frames.length)
       throw new Error('Unable to decode this GIF picture.');
-    await yieldPictureWork(signal);
+    await yieldPictureWork(signal, offscreen);
     if (step.value.animated && !job.policy.animation.available)
       throw new Error('Animated pictures are unavailable under the current picture rules.');
     const blob = !step.value.animated
@@ -192,7 +192,7 @@ export async function gifPictureJob(
   const minimumQuality = Math.min(20, quality);
   let durations: number[] = [];
   while (true) {
-    await yieldPictureWork(signal);
+    await yieldPictureWork(signal, offscreen);
     const attempt = await gifPictureAttempt(job, signal, offscreen, bytes, quality);
     durations = attempt.durations;
     if (!attempt.animated || attempt.result.blob.size <= job.policy.maxOutputBytes)
@@ -212,7 +212,7 @@ export async function gifPictureJob(
     )
       continue;
     previous = plan;
-    await yieldPictureWork(signal);
+    await yieldPictureWork(signal, offscreen);
     const attempt = await gifPictureAttempt(
       job,
       signal,

@@ -20,7 +20,7 @@ Use one implementer subagent at a time in a single worktree for the stack. Each 
 
 ## Prerequisites
 
-Before installing or invoking the extension, check `gh --version` and `git --version` against its [installation requirements](https://github.com/github/gh-stack/tree/v0.2.1#installation). Require GitHub CLI 2.0 or newer and Git 2.36 or newer; compare numeric version components. Stop on an unsupported or unparseable version before changing repository configuration or creating branches.
+Before installing or invoking the extension, check `gh --version` and `git --version`. Require GitHub CLI 2.7 or newer for [pinned extension installation introduced in 2.7](https://github.com/cli/cli/releases/tag/v2.7.0), and Git 2.36 or newer per the extension's [installation requirements](https://github.com/github/gh-stack/tree/v0.2.1#installation). Compare numeric version components. Stop on an unsupported or unparseable version before changing repository configuration or creating branches.
 
 The `gh stack` commands require the [GitHub CLI extension](https://github.com/github/gh-stack) at [v0.2.1](https://github.com/github/gh-stack/releases/tag/v0.2.1), the release used to verify this workflow's command behavior. If the extension is missing, use the CLI's [pinned installation](https://cli.github.com/manual/gh_extension_install): `gh extension install github/gh-stack --pin v0.2.1`. Check `gh stack --version` for `0.2.1` before executing workflow commands, then check `gh stack --help`. Stop on a different installed version; review its provenance and behavior before changing the pin. Use the release's [command documentation](https://github.com/github/gh-stack/blob/v0.2.1/skills/gh-stack/SKILL.md) and local command help for supported options.
 

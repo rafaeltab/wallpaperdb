@@ -27,7 +27,7 @@ Mixed or uncertain verdicts require the user's answer under that skill. Finish i
 
 ## 3. Diagnose and handle CI failures
 
-Inspect failed-job logs and artifacts before retrying. Use [diagnosing-bugs](../diagnosing-bugs/SKILL.md), [development-principles](../development-principles/SKILL.md), and [testing](../testing/SKILL.md) for diagnosis, changes, and focused Make checks. Publish tested fixes to the PR's actual head branch using [do-work](../do-work/SKILL.md)'s publishing and history checks.
+Inspect failed-job logs and artifacts before retrying. Use [diagnosing-bugs](../diagnosing-bugs/SKILL.md) for reproducible defects that need a code fix, and [development-principles](../development-principles/SKILL.md) and [testing](../testing/SKILL.md) for changes and focused Make checks. For CI-only intermittent failures, logs, artifacts, and matching historical CI runs may establish the flake classification below. Document why a local reproduction is unavailable; it is not a prerequisite for the issue-and-retry path. Publish tested fixes to the PR's actual head branch using [do-work](../do-work/SKILL.md)'s publishing and history checks.
 
 Fix failures caused by this PR, including failures in tests that existed before it. Classify a failure as a pre-existing flaky test only with evidence of intermittent behavior and evidence that the PR did not cause it. Compare the diff and use base-branch reproduction or matching historical failures where practical. An unchanged test, a single successful rerun, or inability to reproduce does not establish that classification. Escalate uncertain causes with the evidence gathered.
 

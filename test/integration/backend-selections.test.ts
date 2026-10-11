@@ -23,7 +23,11 @@ test.each([
     unit: 'test/profile-capability.unit.test.ts',
     integration: 'test/profile.integration.test.ts',
   },
-  { service: 'ingestor', unit: 'test/ingestion.test.ts', integration: 'test/composition.test.ts' },
+  {
+    service: 'ingestor',
+    unit: 'test/ingestion.unit.test.ts',
+    integration: 'test/composition.integration.test.ts',
+  },
 ])('$service CI selections own every test file once and keep infrastructure setup out of unit tests', async ({
   service,
   unit,
@@ -46,16 +50,14 @@ test.each([
       if (selection === 'unit') {
         expect(files).toContain(unit);
         expect(files).not.toContain(integration);
-        if (service !== 'ingestor')
-          expect(files.every((file) => file.endsWith('.unit.test.ts'))).toBe(true);
+        expect(files.every((file) => file.endsWith('.unit.test.ts'))).toBe(true);
         for (const project of runner.projects) expect(project.config.globalSetup).toEqual([]);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(
           path.join(root, 'coverage/unit')
         );
       } else {
         expect(files).toContain(integration);
-        if (service !== 'ingestor')
-          expect(files.every((file) => file.endsWith('.integration.test.ts'))).toBe(true);
+        expect(files.every((file) => file.endsWith('.integration.test.ts'))).toBe(true);
         expect(path.resolve(root, runner.config.coverage.reportsDirectory)).toBe(
           path.join(root, 'coverage/integration')
         );
@@ -104,6 +106,7 @@ test.each([
   'gateway',
   'media',
   'user',
+  'ingestor',
 ])('%s selects new tests by type without a config edit', async (service) => {
   const root = await mkdtemp(path.join(tmpdir(), 'wallpaperdb-test-selection-'));
   try {

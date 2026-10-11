@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
-import { type ReactNode, type Ref, useRef } from 'react';
+import { type DragEventHandler, type ReactNode, type Ref, useRef } from 'react';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,8 @@ export function ProfileDialog({
   children,
   busy = false,
   className,
+  onDrop,
+  onDragOver,
 }: {
   ref?: Ref<HTMLDivElement>;
   open: boolean;
@@ -24,6 +26,8 @@ export function ProfileDialog({
   children: ReactNode;
   busy?: boolean;
   className?: string;
+  onDrop?: DragEventHandler<HTMLDivElement>;
+  onDragOver?: DragEventHandler<HTMLDivElement>;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   return (
@@ -39,6 +43,8 @@ export function ProfileDialog({
         <Dialog.Content
           ref={ref}
           tabIndex={-1}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
           className={cn(
             'fixed top-1/2 left-1/2 z-50 max-h-[85dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-background p-5 shadow-2xl outline-none sm:p-6',
             className

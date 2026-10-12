@@ -145,8 +145,9 @@ export function ProfilePictureCrop({
           size="sm"
           disabled={disabled}
           onClick={() => onChange(initialPictureCrop(source))}
+          aria-label="Reset crop"
         >
-          Reset
+          Reset crop
         </Button>
       </div>
       {crop.lowResolution && (

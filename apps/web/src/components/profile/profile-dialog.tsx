@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
-import { type DragEventHandler, type ReactNode, type Ref, useRef } from 'react';
+import { type DragEventHandler, type ReactNode, type Ref, useId, useRef } from 'react';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
 import { cn } from '@/lib/utils';
 
@@ -22,7 +22,7 @@ export function ProfileDialog({
   onOpenChange: (open: boolean) => void;
   trigger: ReactNode;
   title: string;
-  description: string;
+  description?: string;
   children: ReactNode;
   busy?: boolean;
   className?: string;
@@ -30,6 +30,7 @@ export function ProfileDialog({
   onDragOver?: DragEventHandler<HTMLDivElement>;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const descriptionId = useId();
   return (
     <Dialog.Root
       open={open}
@@ -43,6 +44,7 @@ export function ProfileDialog({
         <Dialog.Content
           ref={ref}
           tabIndex={-1}
+          aria-describedby={description ? descriptionId : undefined}
           onDrop={onDrop}
           onDragOver={onDragOver}
           className={cn(
@@ -62,9 +64,11 @@ export function ProfileDialog({
             >
               {title}
             </Dialog.Title>
-            <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-              {description}
-            </Dialog.Description>
+            {description && (
+              <Dialog.Description id={descriptionId} className="mt-1 text-sm text-muted-foreground">
+                {description}
+              </Dialog.Description>
+            )}
           </div>
           <Dialog.Close asChild>
             <ProfileActionButton label="Close" className="absolute top-4 right-4" disabled={busy}>

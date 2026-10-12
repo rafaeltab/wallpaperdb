@@ -66,6 +66,29 @@ async function renderPage(initial = profile, openPicture = true) {
 }
 
 describe('Profile picture settings', () => {
+  it('simplifies a selected picture and lets Cancel discard it without changing the saved Profile', async () => {
+    const saved = { ...profile, pictureAssetId: 'saved-picture' };
+    const { client } = await renderPage(saved);
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], 'picture.png', { type: 'image/png' }));
+    const dialog = screen.getByRole('dialog', { name: 'Profile picture' });
+    await within(dialog).findByRole('slider', { name: 'Zoom' });
+    expect(within(dialog).queryByRole('button', { name: 'Choose picture' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Choose, drop, or paste/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/512 × 512 WebP/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Your picture appears/)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Reset' })).toHaveAttribute('data-variant', 'destructive');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Profile picture' })).not.toBeInTheDocument();
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(saved);
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+    expect(userApi.removePicture).not.toHaveBeenCalled();
+    expect(disposePicture).toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
+    expect(screen.queryByRole('slider', { name: 'Zoom' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose picture' })).toBeVisible();
+  });
+
   it('fetches and presents effective policy when the dialog opens', async () => {
     vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, maxOutputBytes: 123456 });
     await renderPage();
@@ -92,7 +115,7 @@ describe('Profile picture settings', () => {
     try {
       expect(screen.getByText('Loading picture rules…')).toBeInTheDocument();
       expect(screen.getByLabelText('Choose picture')).toBeDisabled();
-      const remove = screen.getByRole('button', { name: 'Remove picture' });
+      const remove = screen.getByRole('button', { name: 'Reset' });
       expect(remove).toBeEnabled();
       const user = userEvent.setup();
       await user.click(remove);
@@ -241,7 +264,7 @@ describe('Profile picture settings', () => {
     fireEvent(crop, event);
     expect(event.defaultPrevented).toBe(true);
     expect(zoom).toHaveValue('6.25');
-    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await user.click(screen.getByRole('button', { name: 'Reset crop' }));
     expect(zoom).toHaveValue('1');
     fireEvent.wheel(crop, { deltaY: -346.57359028 / unit, deltaMode });
     expect(Number(zoom.getAttribute('value'))).toBeCloseTo(2);
@@ -419,10 +442,10 @@ describe('Profile picture settings', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it.each(['cancel', 'escape'])('returns focus to Remove picture after dismissing its confirmation with %s', async (dismissal) => {
+  it.each(['cancel', 'escape'])('returns focus to Reset after dismissing its confirmation with %s', async (dismissal) => {
     await renderPage({ ...profile, pictureAssetId: 'original-picture' });
     const user = userEvent.setup();
-    const remove = screen.getByRole('button', { name: 'Remove picture' });
+    const remove = screen.getByRole('button', { name: 'Reset' });
     await user.click(remove);
     const confirmation = screen.getByRole('alertdialog');
     if (dismissal === 'cancel') await user.click(within(confirmation).getByRole('button', { name: 'Cancel' }));
@@ -664,9 +687,10 @@ describe('Profile picture settings', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it.each(['png', 'gif'])('shows effective output constraints and retains a %s source when processed bytes exceed the limit', async (format) => {
+  it.each(['png', 'gif'])('presents rules before selection and retains a %s source when processed bytes exceed the limit', async (format) => {
     vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, maxOutputBytes: 4 });
     await renderPage();
+    expect(await screen.findByText(/Up to 4 B/)).toBeInTheDocument();
     const user = userEvent.setup();
     await user.upload(
       screen.getByLabelText('Choose picture'),
@@ -676,7 +700,7 @@ describe('Profile picture settings', () => {
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Processed picture exceeds the 4 byte limit.');
     expect(screen.getByText(`large.${format}`)).toBeInTheDocument();
-    expect(screen.getByText(/Up to 4 B/)).toBeInTheDocument();
+    expect(screen.queryByText(/Up to 4 B/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
   });
@@ -724,7 +748,7 @@ describe('Profile picture settings', () => {
     const { client } = await renderPage({ ...profile, pictureImportStatus: 'pending' });
     const user = userEvent.setup();
     expect(screen.getByText(/importing your account picture/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Cancel picture import' }));
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
     await user.click(
       within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Use generated avatar' })
     );
@@ -734,7 +758,7 @@ describe('Profile picture settings', () => {
       expectedProfileId: profile.id,
       tokenProvider: expect.any(Function),
     });
-    expect(screen.queryByRole('button', { name: 'Cancel picture import' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
   });
 
   it('confirms picture removal with the version seen when the dialog opened and keeps cancellation local', async () => {
@@ -743,13 +767,13 @@ describe('Profile picture settings', () => {
     vi.mocked(userApi.removePicture).mockResolvedValue(updated);
     const { client } = await renderPage(initial);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
     let dialog = screen.getByRole('alertdialog');
     expect(dialog).toHaveTextContent(/generated avatar/i);
     expect(dialog).toHaveTextContent(/pending picture import/i);
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(userApi.removePicture).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
     dialog = screen.getByRole('alertdialog');
     act(() =>
       client.setQueryData(profileQueryKey(profile.id), {

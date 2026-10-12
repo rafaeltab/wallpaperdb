@@ -227,7 +227,7 @@ export function ProfilePictureSettings({
         trigger={
           <ProfileActionButton
             label="Edit profile picture"
-            className="absolute -right-2 -bottom-2"
+            className="absolute right-1 bottom-1"
             buttonClassName="rounded-full border-4 border-card bg-background shadow-sm hover:bg-background dark:hover:bg-background"
           >
             <Pencil className="size-3.5" />

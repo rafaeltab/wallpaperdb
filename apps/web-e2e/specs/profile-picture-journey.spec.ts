@@ -369,6 +369,21 @@ async function expectCircularAvatar(
     .toBe(true);
 }
 
+async function expectAvatarEditOverlay(page: Page) {
+  const avatar = await profilePicture(page).boundingBox();
+  const edit = await page
+    .getByRole("button", { name: "Edit profile picture", exact: true })
+    .boundingBox();
+  if (!avatar || !edit)
+    throw new Error("Avatar edit placement was not measured");
+  const distance = Math.hypot(
+    edit.x + edit.width / 2 - avatar.x - avatar.width / 2,
+    edit.y + edit.height / 2 - avatar.y - avatar.height / 2,
+  );
+  expect(distance).toBeGreaterThan(avatar.width * 0.4);
+  expect(distance).toBeLessThanOrEqual(avatar.width / 2 + 2);
+}
+
 test("Profile picture upload reaches public delivery and removal retires the old URL", async ({
   page,
   browser,
@@ -420,6 +435,12 @@ test("Profile picture upload reaches public delivery and removal retires the old
 
     await page.goto("/web/settings/profile");
     await expectCircularAvatar(profilePicture(page));
+    await expectAvatarEditOverlay(page);
+    const desktopViewport = page.viewportSize();
+    if (!desktopViewport) throw new Error("Browser viewport missing");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expectAvatarEditOverlay(page);
+    await page.setViewportSize(desktopViewport);
     await expect(
       page.getByRole("button", { name: "Edit profile picture", exact: true }),
     ).toBeVisible();

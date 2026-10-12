@@ -24,7 +24,7 @@ export function useOwnerProfileMutation<Command>(
 ) {
   const client = useQueryClient();
   const key = profileQueryKey(profileId);
-  const refreshing = useIsFetching({ queryKey: key }) > 0;
+  const refreshing = useIsFetching({ queryKey: key, exact: true }) > 0;
   const writing = useIsMutating({ mutationKey: key }) > 0;
   const lifecycle = useMemo(() => ({ client, profileId, generation: 0 }), [client, profileId]);
   useEffect(() => {
@@ -36,7 +36,7 @@ export function useOwnerProfileMutation<Command>(
   const availability = useMemo<ProfileCommandAvailability>(() => {
     const key = profileQueryKey(profileId);
     const isBusy = () =>
-      client.isFetching({ queryKey: key }) > 0 || client.isMutating({ mutationKey: key }) > 0;
+      client.isFetching({ queryKey: key, exact: true }) > 0 || client.isMutating({ mutationKey: key }) > 0;
     return {
       isBusy,
       subscribe(listener) {

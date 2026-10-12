@@ -231,19 +231,21 @@ describe('Profile picture settings', () => {
     expect(openPictureSource).not.toHaveBeenCalled();
   });
 
-  it('uses wheel zoom with the accessible slider, Reset, and the minimum source crop', async () => {
+  it.each([{ deltaMode: 0, unit: 1 }, { deltaMode: 1, unit: 16 }])('uses $deltaMode wheel units with the accessible slider, Reset, and the minimum source crop', async ({ deltaMode, unit }) => {
     await renderPage();
     const user = userEvent.setup();
     await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'wheel.png', { type: 'image/png' }));
     const zoom = await screen.findByRole('slider', { name: 'Zoom' });
     const crop = screen.getByRole('group', { name: 'Picture crop' });
-    fireEvent.wheel(crop, { deltaY: -10000, deltaMode: 0 });
+    const event = new WheelEvent('wheel', { deltaY: -10000 / unit, deltaMode, cancelable: true });
+    fireEvent(crop, event);
+    expect(event.defaultPrevented).toBe(true);
     expect(zoom).toHaveValue('6.25');
     await user.click(screen.getByRole('button', { name: 'Reset' }));
     expect(zoom).toHaveValue('1');
-    fireEvent.wheel(crop, { deltaY: -346.57359028, deltaMode: 0 });
+    fireEvent.wheel(crop, { deltaY: -346.57359028 / unit, deltaMode });
     expect(Number(zoom.getAttribute('value'))).toBeCloseTo(2);
-    fireEvent.wheel(crop, { deltaY: 10000, deltaMode: 0 });
+    fireEvent.wheel(crop, { deltaY: 10000 / unit, deltaMode });
     expect(zoom).toHaveValue('1');
   });
 
@@ -273,6 +275,18 @@ describe('Profile picture settings', () => {
       picturePolicy,
       expect.any(AbortSignal)
     );
+  });
+
+  it.each(['minimum', 'maximum', 'low resolution'])('leaves clamped wheel input available for scrolling at %s zoom', async (boundary) => {
+    if (boundary === 'low resolution')
+      vi.mocked(openPictureSource).mockResolvedValue({ width: 32, height: 48, preview: new Blob(), process: processPicture, dispose: disposePicture });
+    await renderPage();
+    await userEvent.setup().upload(screen.getByLabelText('Choose picture'), new File(['source'], 'picture.png', { type: 'image/png' }));
+    const crop = await screen.findByRole('group', { name: 'Picture crop' });
+    if (boundary === 'maximum') fireEvent.wheel(crop, { deltaY: -10000 });
+    const event = new WheelEvent('wheel', { deltaY: boundary === 'minimum' ? 10000 : -10000, cancelable: true });
+    fireEvent(crop, event);
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it('retains its edit and reports that a competing Profile command blocked submission after processing', async () => {

@@ -36,14 +36,16 @@ export function ProfilePictureCrop({
   const viewport = useRef<HTMLFieldSetElement>(null);
   const wheel = useEffectEvent((event: WheelEvent) => {
     if (disabled) return;
-    event.preventDefault();
     const unit =
       event.deltaMode === 1
         ? 16
         : event.deltaMode === 2
           ? (viewport.current?.clientHeight ?? 0)
           : 1;
-    onChange(wheelPictureCrop(crop, source, event.deltaY * unit));
+    const next = wheelPictureCrop(crop, source, event.deltaY * unit);
+    if (next.zoom === crop.zoom) return;
+    event.preventDefault();
+    onChange(next);
   });
   useEffect(() => {
     const element = viewport.current;

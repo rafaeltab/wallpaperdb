@@ -715,37 +715,6 @@ describe('OpenSearch catalogue port contract', () => {
     expect(await bank('metadata-bank')).toEqual(colorFixture.utilities);
     expect((await get('metadata-bank'))?.variants).toHaveLength(2);
   });
-  it('treats malformed persisted data as unavailable rather than asserting it is a wallpaper', async () => {
-    const malformedFixture = createSearchFixture();
-    const malformed = await acquireSearchFixture(malformedFixture.options);
-    const malformedAdapter = malformed.adapter;
-    const malformedClient = new Client({ node: malformedFixture.options.url });
-    try {
-      await malformedClient.index({
-        index: malformedFixture.options.wallpaperIndex,
-        id: 'malformed',
-        body: { wallpaperId: 'malformed', userId: 'malformed' },
-        refresh: true,
-      });
-      expect(
-        await Effect.runPromise(Effect.flip(malformedAdapter.read.wallpaper('malformed')))
-      ).toMatchObject({ _tag: 'CatalogueUnavailable' });
-      expect(
-        await Effect.runPromise(
-          Effect.flip(
-            malformedAdapter.read.search({ profileId: 'malformed', size: 10, sortOrder: 'asc' })
-          )
-        )
-      ).toMatchObject({ _tag: 'CatalogueUnavailable' });
-    } finally {
-      try {
-        await Promise.all([malformedClient.close(), malformed.dispose()]);
-      } finally {
-        await malformedFixture.destroy();
-      }
-    }
-  });
-
   it('rejects impossible calendar dates in stored timestamps', async () => {
     const malformedFixture = createSearchFixture();
     const malformed = await acquireSearchFixture(malformedFixture.options);

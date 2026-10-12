@@ -3,10 +3,8 @@ import { defaults } from '@wallpaperdb/vitest-config/defaults';
 import { defineConfig, mergeConfig } from 'vitest/config';
 
 const require = createRequire(import.meta.url);
-const searchTests = [
-  'test/{opensearch,color-ranking,profile,profile-search,integration,server}.test.ts',
-];
-const instrumentationTests = ['test/unit/otel.test.ts'];
+const searchTests = ['test/search/**/*.integration.test.ts'];
+const instrumentationTests = ['test/instrumentation/**/*.integration.test.ts'];
 
 export default mergeConfig(
   defaults,
@@ -29,8 +27,15 @@ export default mergeConfig(
         {
           extends: true,
           test: {
-            name: 'gateway',
-            include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
+            name: 'gateway-unit',
+            include: ['test/**/*.unit.test.ts', 'src/**/*.unit.test.ts'],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'gateway-integration',
+            include: ['test/**/*.integration.test.ts', 'src/**/*.integration.test.ts'],
             exclude: [...searchTests, ...instrumentationTests],
           },
         },

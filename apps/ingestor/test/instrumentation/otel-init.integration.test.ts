@@ -5,11 +5,11 @@ import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { initializeOtel } from '../src/otel-init.js';
-import { ingestorTracingLayer } from '../src/runtime.js';
-import { Ingestion, IngestionUnavailable } from '../src/capabilities/ingestion/index.js';
-import { fixture, uploadInput } from './helpers/ingestion.js';
-import { Quota } from '../src/capabilities/admission/index.js';
+import { initializeOtel } from '../../src/otel-init.js';
+import { ingestorTracingLayer } from '../../src/runtime.js';
+import { Ingestion, IngestionUnavailable } from '../../src/capabilities/ingestion/index.js';
+import { fixture, uploadInput } from '../helpers/ingestion.js';
+import { Quota } from '../../src/capabilities/admission/index.js';
 import { GenericContainer } from 'testcontainers';
 
 afterEach(() => {
@@ -114,7 +114,7 @@ describe('ingestor telemetry ownership', () => {
           // Load the real client through that hook only after SDK startup.
           createRequire(import.meta.url)('ioredis');
           const { redisQuotaLayer } = yield* Effect.promise(
-            () => import('../src/adapters/quota/index.js')
+            () => import('../../src/adapters/quota/index.js')
           );
           const quota = yield* Effect.acquireRelease(
             Effect.sync(() =>

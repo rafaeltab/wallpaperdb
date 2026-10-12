@@ -5,19 +5,14 @@ export default defineBaseConfig({
     name: 'variant-generator',
     globals: true,
     environment: 'node',
-    include: ['test/**/*.test.ts'],
-    exclude: [
-      'test/**/*.integration.test.ts',
-      'test/integration/**/*.test.ts',
-      'test/health.test.ts',
-    ],
+    include: ['test/**/*.unit.test.ts'],
     testTimeout: 120000,
     hookTimeout: 60000,
     maxConcurrency: 1,
-    // Two workers overlap socket/telemetry waits while bounding memory use (#351).
+    // Keep the two-worker setting validated in #351 for the fast selection (#359).
     maxWorkers: 2,
     fileParallelism: true,
-    // Environment stubs and telemetry SDK globals must remain isolated per file.
+    // Environment stubs must remain isolated per file.
     isolate: true,
     coverage: {
       provider: 'v8',

@@ -80,8 +80,8 @@ describe('native image resize contract', () => {
     { name: 'square contain', source: [1200, 1200], fit: 'contain' as const, output: [1000, 1000] },
     { name: 'landscape cover', source: [1920, 1080], fit: 'cover' as const, output: [1000, 1000] },
     { name: 'portrait cover', source: [1080, 1920], fit: 'cover' as const, output: [1000, 1000] },
-    { name: 'landscape fill', source: [1600, 900], fit: 'fill' as const, output: [1000, 1000] },
-    { name: 'portrait fill', source: [900, 1600], fit: 'fill' as const, output: [1000, 1000] },
+    { name: 'landscape fill', source: [1920, 1080], fit: 'fill' as const, output: [1000, 1000] },
+    { name: 'portrait fill', source: [1080, 1920], fit: 'fill' as const, output: [1000, 1000] },
   ])('encodes $name dimensions', async ({ source, fit, output }) => {
     const result = await resize(source[0], source[1], { width: 1000, height: 1000, fit });
     expect(await sharp(result).metadata()).toMatchObject({

@@ -3,6 +3,40 @@ import { describe, expect, it } from 'vitest';
 import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from '../../src/features/picture-editor';
 
 describe('Picture animation', () => {
+  it('rejects excessive loop-control data before scanning its untrusted bulk payload', () => {
+    const payload = Buffer.alloc(4 * 1024 * 1024);
+    for (let i = 0; i < payload.length; i += 2) {
+      payload[i] = 1;
+      payload[i + 1] = 65;
+    }
+    const input = Buffer.concat([
+      Buffer.from('47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30', 'hex'),
+      payload,
+      Buffer.from('002c00000000010001000002024401003b', 'hex'),
+    ]);
+    let checkpoints = 0;
+    expect(() => {
+      for (const step of decodePictureGif(input)) {
+        if (step.kind === 'progress' && ++checkpoints > 4)
+          throw new Error('Scanned beyond fixed-size loop control.');
+      }
+    }).toThrow('Unable to decode this GIF picture.');
+  });
+
+  it('preserves fragmented loop controls and image data', () => {
+    const input = Buffer.from(
+      '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30' +
+      '010101020100002c0000000001000100000201440101003b', 'hex');
+    const decoder = decodePictureGif(input);
+    let step = decoder.next();
+    let pixels: number[] = [];
+    while (!step.done) {
+      if (step.value.kind === 'frame') pixels = Array.from(step.value.pixels);
+      step = decoder.next();
+    }
+    expect(step.value).toEqual({ loop: 3, frameCount: 1, animated: true });
+    expect(pixels).toEqual([0, 0, 0, 255]);
+  });
   it.each([0, 49, 1, 113, 255])('handles the declared GIF pixel aspect ratio %s', (aspect) => {
     const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex'));
     bytes[12] = aspect;

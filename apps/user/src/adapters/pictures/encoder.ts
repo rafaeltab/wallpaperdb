@@ -233,12 +233,24 @@ function inspectGif(input: Buffer, limits: PictureLimits): GifStructure | undefi
     offset += size;
     return bytes;
   };
-  const byte = () => take(1)[0];
+  const byte = () => {
+    if (offset >= input.length) invalid();
+    return input[offset++];
+  };
   const word = () => take(2).readUInt16LE();
-  const blocks = () => {
-    const result: Buffer[] = [];
-    for (let size = byte(); size; size = byte()) result.push(take(size));
-    return Buffer.concat(result);
+  const blocks = (captureLimit = 0) => {
+    const result = Buffer.alloc(captureLimit);
+    let length = 0;
+    for (let size = byte(); size; size = byte()) {
+      if (offset + size > input.length) invalid();
+      if (captureLimit) {
+        if (length + size > captureLimit) invalid();
+        input.copy(result, length, offset, offset + size);
+        length += size;
+      }
+      offset += size;
+    }
+    return result.subarray(0, length);
   };
   const width = word();
   const height = word();
@@ -275,7 +287,7 @@ function inspectGif(input: Buffer, limits: PictureLimits): GifStructure | undefi
         if (byte() !== 0) invalid();
       } else if (label === 0xff) {
         const application = take(byte()).toString('ascii');
-        const data = blocks();
+        const data = blocks(['NETSCAPE2.0', 'ANIMEXTS1.0'].includes(application) ? 3 : 0);
         if (['NETSCAPE2.0', 'ANIMEXTS1.0'].includes(application)) {
           if (data.length !== 3 || data[0] !== 1) invalid();
           repetitions = data.readUInt16LE(1);

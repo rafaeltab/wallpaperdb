@@ -117,19 +117,26 @@ export function* decodePictureGif(
     offset += length;
     return result;
   };
-  const byte = () => take(1)[0];
+  const byte = () => {
+    if (offset >= bytes.length) invalid();
+    return bytes[offset++];
+  };
   const word = () => {
     const value = take(2);
     return value[0] | (value[1] << 8);
   };
   const text = (length: number) => String.fromCharCode(...take(length));
-  function* blocks(): Generator<PictureGifStep, Uint8Array> {
-    const parts: Uint8Array[] = [];
+  function* blocks(captureLimit?: number): Generator<PictureGifStep, Uint8Array> {
+    const start = offset;
     let length = 0;
     let checkpoint = offset;
     for (let size = byte(); size; size = byte()) {
-      parts.push(take(size));
-      length += size;
+      if (offset + size > bytes.length) invalid();
+      if (captureLimit !== 0) {
+        length += size;
+        if (captureLimit !== undefined && length > captureLimit) invalid();
+      }
+      offset += size;
       if (offset - checkpoint >= 16384) {
         checkpoint = offset;
         yield { kind: 'progress' };
@@ -138,9 +145,9 @@ export function* decodePictureGif(
     const data = new Uint8Array(length);
     let position = 0;
     checkpoint = 0;
-    for (const part of parts) {
-      data.set(part, position);
-      position += part.length;
+    for (let cursor = start; captureLimit !== 0 && bytes[cursor]; ) {
+      const size = bytes[cursor++];
+      for (let i = 0; i < size; i++) data[position++] = bytes[cursor++];
       if (position - checkpoint >= 16384) {
         checkpoint = position;
         yield { kind: 'progress' };
@@ -216,7 +223,7 @@ export function* decodePictureGif(
         if (byte() !== 0) invalid();
       } else if (label === 0xff) {
         const application = text(byte());
-        const data = yield* blocks();
+        const data = yield* blocks(['NETSCAPE2.0', 'ANIMEXTS1.0'].includes(application) ? 3 : 0);
         if (application === 'ICCRGBG1012')
           throw new Error('This GIF color profile cannot be normalized. Choose another picture.');
         if (['NETSCAPE2.0', 'ANIMEXTS1.0'].includes(application)) {
@@ -226,7 +233,7 @@ export function* decodePictureGif(
         }
       } else if (label === 0x01)
         throw new Error('GIF text frames cannot be preserved. Choose another picture.');
-      else yield* blocks();
+      else yield* blocks(0);
       continue;
     }
     if (marker !== 0x2c) invalid();

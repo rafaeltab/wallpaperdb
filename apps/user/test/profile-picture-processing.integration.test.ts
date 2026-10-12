@@ -41,6 +41,54 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it('preserves fragmented GIF loop controls and image data during direct normalization', async () => {
+    const input = Buffer.from(
+      '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30' +
+        '010101020100002c0000000001000100000201440101003b',
+      'hex'
+    );
+    const picture = await processProfilePicture(input, limits, {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+      animation: { available: true },
+    });
+    expect(picture.bytes.includes(Buffer.from('ANIM'))).toBe(true);
+    expect(await sharp(picture.bytes, { animated: true }).metadata()).toMatchObject({ loop: 3 });
+  });
+  it.each([
+    'comment',
+    'application',
+  ])('processes fragmented GIF %s metadata within a constrained child heap', async (extension) => {
+    const payload = Buffer.alloc(4 * 1024 * 1024);
+    for (let i = 0; i < payload.length; i += 2) {
+      payload[i] = 1;
+      payload[i + 1] = 65;
+    }
+    const input = Buffer.concat([
+      Buffer.from('47494638396101000100800000000000ffffff', 'hex'),
+      extension === 'comment'
+        ? Buffer.from([0x21, 0xfe])
+        : Buffer.concat([Buffer.from([0x21, 0xff, 11]), Buffer.from('PRIVATEAPP1')]),
+      payload,
+      Buffer.from('002c00000000010001000002024401003b', 'hex'),
+    ]);
+    expect(input.length).toBeLessThan(limits.maxBytes);
+    vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=96');
+    try {
+      const result = await processProfilePicture(input, limits, {
+        ...policy,
+        acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+        animation: { available: true },
+      });
+      expect(await sharp(result.bytes).metadata()).toMatchObject({
+        format: 'webp',
+        width: 512,
+        height: 512,
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it.each([
     0, 49, 1, 113, 255,
   ])('handles the declared pixel aspect ratio %s in direct GIF normalization', async (aspect) => {

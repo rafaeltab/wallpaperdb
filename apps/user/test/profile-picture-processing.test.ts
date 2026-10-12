@@ -41,6 +41,28 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it('accepts 132 full-screen animation frames within a 512 MiB decoded budget', async () => {
+    const input = Buffer.concat([
+      Buffer.from('47494638396100020002800000000000ffffff', 'hex'),
+      ...Array.from({ length: 132 }, () => Buffer.from('2c0000000001000100000202440100', 'hex')),
+      Buffer.from([0x3b]),
+    ]);
+    const picture = await processProfilePicture(
+      input,
+      { ...limits, maxDecodedBytes: 512 * 1024 * 1024 },
+      {
+        ...policy,
+        acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+        animation: { available: true },
+      }
+    );
+    expect(await sharp(picture.bytes, { animated: true }).metadata()).toMatchObject({
+      width: 512,
+      pageHeight: 512,
+      pages: 132,
+    });
+  });
+
   it('normalizes valid unknown chunks inside animated WebP frames', async () => {
     const input = readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url));
     const animatedPolicy = {

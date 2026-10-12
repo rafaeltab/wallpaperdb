@@ -875,6 +875,9 @@ test("Profile picture upload reaches public delivery and removal retires the old
       ]);
       const fitting = await fittingPicture();
       const fitted = await uploadPicture(page, fitting, outgoing);
+      expect((await animatedPixels(page, fitted.bytes)).frames).toHaveLength(
+        132,
+      );
       expect(fitted.bytes.length).toBeLessThanOrEqual(
         effectivePolicy.maxOutputBytes,
       );
@@ -911,12 +914,10 @@ test("Profile picture upload reaches public delivery and removal retires the old
       expect(saved.pictureAssetId).toEqual(expect.any(String));
       const image = profilePicture(page);
       await expectAvatarEditOverlay(page);
-      await image
-        .locator("..")
-        .screenshot({
-          path: test.info().outputPath("avatar-edit-overlay.png"),
-          animations: "allow",
-        });
+      await image.locator("..").screenshot({
+        path: test.info().outputPath("avatar-edit-overlay.png"),
+        animations: "allow",
+      });
       await expect
         .poll(
           () =>

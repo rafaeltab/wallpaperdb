@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from '../../src/features/picture-editor';
 
 describe('Picture animation', () => {
+  it.each([4, 5])('charges decoded GIF indices against a %s-byte budget', (maxDecodedBytes) => {
+    const bytes = Uint8Array.from(Buffer.from(
+      '47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex'));
+    const decode = () => Array.from(decodePictureGif(bytes, { maxPixels: 1, maxDecodedBytes }));
+    if (maxDecodedBytes === 4) expect(decode).toThrow('decoded byte limit');
+    else expect(decode().filter((step) => step.kind === 'frame')).toMatchObject([
+      { width: 1, height: 1, pixels: new Uint8ClampedArray([0, 0, 0, 255]) },
+    ]);
+  });
   it('rejects excessive loop-control data before scanning its untrusted bulk payload', () => {
     const payload = Buffer.alloc(4 * 1024 * 1024);
     for (let i = 0; i < payload.length; i += 2) {
@@ -44,10 +53,10 @@ describe('Picture animation', () => {
     if (aspect === 0 || aspect === 49) expect(decode().filter((step) => step.kind === 'frame')).toHaveLength(1);
     else expect(decode).toThrow('pixel aspect ratio');
   });
-  it.each([7, 8])('charges restore-previous snapshot bytes against a %s-byte budget', (maxDecodedBytes) => {
+  it.each([8, 9])('charges restore-previous snapshot bytes against a %s-byte budget', (maxDecodedBytes) => {
     const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff21f9040c0a0000002c00000000010001000002024401003b', 'hex'));
     const decode = () => Array.from(decodePictureGif(bytes, { maxPixels: 1, maxDecodedBytes }));
-    if (maxDecodedBytes === 7) expect(decode).toThrow('decoded byte limit');
+    if (maxDecodedBytes === 8) expect(decode).toThrow('decoded byte limit');
     else expect(decode().filter((step) => step.kind === 'frame')).toHaveLength(1);
   });
 
@@ -56,7 +65,7 @@ describe('Picture animation', () => {
       '47494638396102000100800100ff000000ff00' +
       '21f9040c010000002c00000000010001000002024401003b', 'hex'));
     const frames: number[][] = [];
-    for (const step of decodePictureGif(bytes, { maxPixels: 2, maxDecodedBytes: 12 })) {
+    for (const step of decodePictureGif(bytes, { maxPixels: 2, maxDecodedBytes: 13 })) {
       if (step.kind === 'frame') frames.push(Array.from(step.pixels));
     }
     expect(frames).toEqual([
@@ -75,7 +84,7 @@ describe('Picture animation', () => {
     const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401002c00000000010001000002024401003b', 'hex'));
     const frames: number[][] = [];
     expect(() => {
-      for (const step of decodePictureGif(bytes, { maxPixels: 1, maxDecodedBytes: 4 })) {
+      for (const step of decodePictureGif(bytes, { maxPixels: 1, maxDecodedBytes: 5 })) {
         if (step.kind === 'frame') frames.push(Array.from(step.pixels));
       }
     }).toThrow('decoded byte limit');

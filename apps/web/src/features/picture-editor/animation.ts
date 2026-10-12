@@ -254,14 +254,16 @@ export function* decodePictureGif(
     if (!palette) invalid();
     if ((frameCount + 1) * width * height * 4 > limits.maxDecodedBytes)
       throw new Error('This GIF exceeds the decoded byte limit.');
-    const snapshotBytes = disposal === 3 ? frameWidth * frameHeight * 4 : 0;
-    if (canvas.byteLength + snapshotBytes > limits.maxDecodedBytes)
+    const framePixels = frameWidth * frameHeight;
+    const snapshotBytes = disposal === 3 ? framePixels * 4 : 0;
+    // LZW retains one index byte per frame pixel alongside the live RGBA buffers.
+    if (canvas.byteLength + snapshotBytes + framePixels > limits.maxDecodedBytes)
       throw new Error('This GIF exceeds the decoded byte limit.');
     if (!frameCount && transparent === undefined && background)
       yield* restoreBackground(0, 0, width, height, true);
     const minimum = byte();
     const compressed = yield* blocks();
-    const indices = yield* lzw(compressed, minimum, frameWidth * frameHeight);
+    const indices = yield* lzw(compressed, minimum, framePixels);
     let saved: Uint8ClampedArray | undefined;
     if (disposal === 3) {
       saved = new Uint8ClampedArray(snapshotBytes);

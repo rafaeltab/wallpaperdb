@@ -3,6 +3,27 @@ import { describe, expect, it } from 'vitest';
 import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from '../../src/features/picture-editor';
 
 describe('Picture animation', () => {
+  it('preserves opaque logical-screen background through partial frames and disposal', () => {
+    const bytes = Uint8Array.from(Buffer.from(
+      '47494638396102000100800100ff000000ff00' +
+      '21f90408010000002c0000000001000100000202440100' +
+      '2c01000000010001000002024401003b', 'hex'));
+    const frames: number[][] = [];
+    for (const step of decodePictureGif(bytes)) {
+      if (step.kind === 'frame') frames.push(Array.from(step.pixels));
+    }
+    expect(frames).toEqual([
+      [255, 0, 0, 255, 0, 255, 0, 255],
+      [0, 255, 0, 255, 255, 0, 0, 255],
+    ]);
+  });
+
+  it('rejects a background index outside the declared global palette', () => {
+    const bytes = Uint8Array.from(Buffer.from(
+      '47494638396101000100800200ff000000ff002c00000000010001000002024401003b', 'hex'));
+    expect(() => decodePictureGif(bytes).next()).toThrow('Unable to decode this GIF picture.');
+  });
+
   it.each([
     [undefined, 1], [0, 0], [1, 2], [20, 21], [65534, 65535],
   ])('preserves GIF repetitions %s as WebP cycles %s', (repetitions, loop) => {

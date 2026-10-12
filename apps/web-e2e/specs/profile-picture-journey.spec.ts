@@ -317,6 +317,43 @@ test("Profile picture upload reaches public delivery and removal retires the old
           await expect(zoom).toHaveValue("2");
           await page.mouse.wheel(0, 10000);
           await expect(zoom).toHaveValue("1");
+          const originalViewport = page.viewportSize();
+          if (!originalViewport)
+            throw new Error("Browser viewport was not configured");
+          await page.setViewportSize({
+            width: originalViewport.width,
+            height: 480,
+          });
+          expect(
+            await dialog.evaluate((element) => element.scrollHeight),
+          ).toBeGreaterThan(
+            await dialog.evaluate((element) => element.clientHeight),
+          );
+          await crop.hover();
+          const initialScroll = await dialog.evaluate(
+            (element) => element.scrollTop,
+          );
+          await page.mouse.wheel(0, 80);
+          await expect
+            .poll(() => dialog.evaluate((element) => element.scrollTop))
+            .toBeGreaterThan(initialScroll);
+          await expect(zoom).toHaveValue("1");
+          await crop.hover();
+          await page.mouse.wheel(0, -10000);
+          await expect(zoom).toHaveValue("2");
+          const lowerScroll = await dialog.evaluate(
+            (element) => element.scrollTop,
+          );
+          await page.mouse.wheel(0, -80);
+          await expect
+            .poll(() => dialog.evaluate((element) => element.scrollTop))
+            .toBeLessThan(lowerScroll);
+          await expect(zoom).toHaveValue("2");
+          await page.setViewportSize(originalViewport);
+          await dialog
+            .getByRole("button", { name: "Reset", exact: true })
+            .click();
+          await expect(zoom).toHaveValue("1");
           const touchBox = await crop.boundingBox();
           if (!touchBox) throw new Error("Pinch viewport was not measured");
           const touch = await page.context().newCDPSession(page);

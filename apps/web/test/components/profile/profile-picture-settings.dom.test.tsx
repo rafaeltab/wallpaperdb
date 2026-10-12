@@ -525,7 +525,7 @@ describe('Profile picture settings', () => {
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(accepted));
     expect(userApi.uploadPicture).toHaveBeenNthCalledWith(2, expect.objectContaining({ expectedVersion: 7 }));
     expect(processPicture.mock.calls.map(([crop]) => crop)).toEqual([expect.objectContaining({ x: 300, y: 100, size: 200, zoom: 2 }), expect.objectContaining({ x: 300, y: 100, size: 200, zoom: 2 })]);
-    expect(openPictureSource).toHaveBeenCalledWith(source, expect.any(AbortSignal));
+    expect(openPictureSource).toHaveBeenCalledWith(source, expect.any(AbortSignal), profile.pictureUploadLimits);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

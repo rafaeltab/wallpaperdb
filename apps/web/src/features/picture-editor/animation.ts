@@ -1,3 +1,5 @@
+import { defaultPictureDecodedLimits, type PictureDecodedLimits } from './contract';
+
 /** GIF delays follow browser playback: unspecified or <=10ms displays for 100ms. */
 export function pictureAnimationTiming(delays: readonly number[], repetitions?: number) {
   if (
@@ -105,7 +107,8 @@ function* lzw(
  * Consumers yield at each step and close the iterator on cancellation to release frame memory.
  */
 export function* decodePictureGif(
-  bytes: Uint8Array
+  bytes: Uint8Array,
+  limits: PictureDecodedLimits = defaultPictureDecodedLimits
 ): Generator<PictureGifStep, { loop: number; frameCount: number; animated: boolean }> {
   let offset = 0;
   const take = (length: number) => {
@@ -149,6 +152,9 @@ export function* decodePictureGif(
   const width = word();
   const height = word();
   if (!width || !height) invalid();
+  if (width * height > limits.maxPixels) throw new Error('This GIF exceeds the pixel limit.');
+  if (width * height * 4 > limits.maxDecodedBytes)
+    throw new Error('This GIF exceeds the decoded byte limit.');
   const flags = byte();
   const backgroundIndex = byte();
   byte();
@@ -237,6 +243,8 @@ export function* decodePictureGif(
       invalid();
     const palette = frameFlags & 128 ? take(3 * (1 << ((frameFlags & 7) + 1))) : global;
     if (!palette) invalid();
+    if ((frameCount + 1) * width * height * 4 > limits.maxDecodedBytes)
+      throw new Error('This GIF exceeds the decoded byte limit.');
     if (!frameCount && transparent === undefined && background)
       yield* restoreBackground(0, 0, width, height, true);
     const minimum = byte();

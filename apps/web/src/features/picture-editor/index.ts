@@ -1,6 +1,7 @@
 export type {
   PictureCrop,
   PictureDimensions,
+  PictureDecodedLimits,
   PictureEncodingPolicy,
 } from './contract';
 export {

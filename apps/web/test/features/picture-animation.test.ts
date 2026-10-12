@@ -3,6 +3,25 @@ import { describe, expect, it } from 'vitest';
 import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from '../../src/features/picture-editor';
 
 describe('Picture animation', () => {
+  it.each([
+    { maxPixels: 3, maxDecodedBytes: 100, expected: 'pixel limit' },
+    { maxPixels: 100, maxDecodedBytes: 15, expected: 'decoded byte limit' },
+  ])('checks $expected before yielding a logical-screen allocation', (limits) => {
+    const bytes = Uint8Array.from(Buffer.from('47494638396102000200800000000000ffffff2c00000000010001000002024401003b', 'hex'));
+    expect(() => decodePictureGif(bytes, limits).next()).toThrow(limits.expected);
+  });
+
+  it('checks aggregate decoded frame bytes before composing another frame', () => {
+    const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401002c00000000010001000002024401003b', 'hex'));
+    const frames: number[][] = [];
+    expect(() => {
+      for (const step of decodePictureGif(bytes, { maxPixels: 1, maxDecodedBytes: 4 })) {
+        if (step.kind === 'frame') frames.push(Array.from(step.pixels));
+      }
+    }).toThrow('decoded byte limit');
+    expect(frames).toHaveLength(1);
+  });
+
   it('preserves opaque logical-screen background through partial frames and disposal', () => {
     const bytes = Uint8Array.from(Buffer.from(
       '47494638396102000100800100ff000000ff00' +

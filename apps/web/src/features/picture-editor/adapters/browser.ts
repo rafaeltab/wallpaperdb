@@ -1,4 +1,10 @@
-import type { PictureCrop, PictureDimensions, PictureEncodingPolicy } from '../index';
+import type {
+  PictureCrop,
+  PictureDecodedLimits,
+  PictureDimensions,
+  PictureEncodingPolicy,
+} from '../index';
+import { defaultPictureDecodedLimits } from '../contract';
 import type { PictureJob, PictureJobResult } from './protocol';
 import { gifPictureJob } from './gif';
 import { withoutPictureMetadata } from './webp';
@@ -205,9 +211,13 @@ async function runJob(
 }
 
 /** Public browser adapter: source pixels stay local; only process() returns uploadable bytes. */
-export async function openPictureSource(file: Blob, signal: AbortSignal): Promise<PictureSource> {
+export async function openPictureSource(
+  file: Blob,
+  signal: AbortSignal,
+  limits: PictureDecodedLimits = defaultPictureDecodedLimits
+): Promise<PictureSource> {
   await validateSource(file, signal);
-  const preview = await runJob({ action: 'preview', file }, signal);
+  const preview = await runJob({ action: 'preview', file, limits }, signal);
   let disposed = false;
   const work = new Set<AbortController>();
   return {
@@ -222,7 +232,10 @@ export async function openPictureSource(file: Blob, signal: AbortSignal): Promis
       signal.addEventListener('abort', abort, { once: true });
       work.add(controller);
       try {
-        const result = await runJob({ action: 'process', file, crop, policy }, controller.signal);
+        const result = await runJob(
+          { action: 'process', file, crop, policy, limits },
+          controller.signal
+        );
         if (result.blob.type !== policy.output.mimeType)
           throw new Error('This browser cannot encode WebP pictures. Try another browser.');
         if (result.blob.size > policy.maxOutputBytes)

@@ -227,4 +227,72 @@ describe('OpenSearch controlled HTTP contracts', () => {
       }
     );
   });
+  it('preserves the response error as the cause of typed read and projection failures', async () => {
+    await withControlledSearch(
+      (_request, response) => json(response, { error: { type: 'unavailable' }, status: 503 }, 503),
+      async (adapter) => {
+        const underlying = {
+          _tag: 'SearchRequestError',
+          cause: {
+            name: 'ResponseError',
+            meta: { statusCode: 503, body: { error: { type: 'unavailable' } } },
+          },
+        };
+        expect(await Effect.runPromise(Effect.flip(adapter.read.wallpaper('retry')))).toMatchObject(
+          { _tag: 'CatalogueUnavailable', cause: underlying }
+        );
+        expect(
+          await Effect.runPromise(
+            Effect.flip(
+              adapter.projectionStore.apply({
+                _tag: 'WallpaperUploaded',
+                wallpaperId: 'retry',
+                profileId: 'profile',
+                uploadedAt: '2026-01-01T00:00:00.000Z',
+                occurrence: {
+                  source: 'wallpaperdb/test',
+                  id: 'retry',
+                  occurredAt: '2026-01-01T00:00:00.000Z',
+                },
+              })
+            )
+          )
+        ).toMatchObject({ _tag: 'ProjectionUnavailable', cause: underlying });
+      }
+    );
+  });
+
+  it('distinguishes a supplied unavailable-index error from an absent catalogue record', async () => {
+    let missingIndex = false;
+    await withControlledSearch(
+      (_request, response) =>
+        json(
+          response,
+          missingIndex
+            ? { error: { type: 'index_not_found_exception' }, status: 404 }
+            : { found: false },
+          404
+        ),
+      async (adapter) => {
+        expect(await Effect.runPromise(adapter.read.wallpaper('missing'))).toBeNull();
+        expect(await Effect.runPromise(adapter.read.profile('missing'))).toBeNull();
+        missingIndex = true;
+        const failures = await Promise.all([
+          Effect.runPromise(Effect.flip(adapter.read.wallpaper('missing'))),
+          Effect.runPromise(Effect.flip(adapter.read.profile('missing'))),
+        ]);
+        for (const failure of failures) {
+          expect(failure).toMatchObject({
+            _tag: 'CatalogueUnavailable',
+            cause: {
+              _tag: 'SearchRequestError',
+              cause: {
+                meta: { statusCode: 404, body: { error: { type: 'index_not_found_exception' } } },
+              },
+            },
+          });
+        }
+      }
+    );
+  });
 });

@@ -117,15 +117,17 @@ describe('OpenSearch controlled HTTP contracts', () => {
     );
   });
   it('treats malformed persisted data as unavailable rather than asserting it is a wallpaper', async () => {
-    const source = { wallpaperId: 'malformed', userId: 'malformed' };
+    let source: Record<string, unknown> = { wallpaperId: 'malformed', userId: 'malformed' };
     await withControlledSearch(
       (request, response) =>
         json(
           response,
           request.url?.includes('/_search')
             ? {
+                timed_out: false,
+                _shards: { total: 1, successful: 1, failed: 0 },
                 hits: {
-                  total: { value: 1 },
+                  total: { value: 1, relation: 'eq' },
                   hits: [
                     {
                       _id: 'malformed',
@@ -148,6 +150,25 @@ describe('OpenSearch controlled HTTP contracts', () => {
             Effect.flip(adapter.read.search({ profileId: 'malformed', size: 10, sortOrder: 'asc' }))
           )
         ).toMatchObject({ _tag: 'CatalogueUnavailable', cause: { _tag: 'SchemaError' } });
+        source = {
+          ...source,
+          variants: [],
+          uploadedAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        };
+        expect(
+          await Effect.runPromise(
+            adapter.read.search({ profileId: 'malformed', size: 10, sortOrder: 'asc' })
+          )
+        ).toMatchObject({
+          total: 1,
+          entries: [
+            {
+              wallpaper: { wallpaperId: 'malformed', profileId: 'malformed', variants: [] },
+              cursor: ['malformed'],
+            },
+          ],
+        });
       }
     );
   });

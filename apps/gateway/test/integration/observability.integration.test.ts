@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { Admission } from '../../src/capabilities/admission/index.js';
 import { Availability } from '../../src/capabilities/availability/index.js';
 import { HttpExecution, httpExecutionLayer } from '../../src/runtime.js';
-import { httpTestLayer } from './http-fixture.js';
+import { httpTestLayer } from '../unit/http-fixture.js';
 
 describe('Effect OpenTelemetry bridge', () => {
   it('parents application spans to the active transport span', async () => {

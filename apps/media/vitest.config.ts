@@ -1,6 +1,6 @@
 import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
-export default defineBaseConfig({
+export const configuration = {
   test: {
     name: 'media',
     globals: true,
@@ -18,4 +18,6 @@ export default defineBaseConfig({
       reportsDirectory: './coverage/integration',
     },
   },
-});
+} satisfies Parameters<typeof defineBaseConfig>[0];
+
+export default defineBaseConfig(configuration);

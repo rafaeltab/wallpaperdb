@@ -14,3 +14,9 @@ Variant Generator creates lower-resolution renditions of uploaded wallpapers so 
 Sharp resizes and encodes images in an isolated process so deadlines and shutdown can stop native work. Object storage holds the originals and variants; NATS JetStream retains generation requests and variant announcements.
 
 See the [domain context](GLOSSARY.md), [replay decision](docs/adr/0001-replay-safe-variant-generation.md), [upgrade and replay procedures](../docs/content/docs/guides/service-upgrades.mdx), and [contributor setup](../../CONTRIBUTING.md).
+
+## Test boundaries
+
+The [unit selection](vitest.config.ts) keeps capability decisions behind controlled driven ports, configuration parsing, and protocol translation without starting production image or telemetry resources. The [integration selection](vitest.integration.config.ts) owns real image encoding, socket cancellation and process reaping, telemetry SDK lifecycle, deployed artifact builds, and container contracts. Keep new scenarios in exactly one selection using `.unit.test.ts` or `.integration.test.ts` filenames.
+
+Both selections retain per-file isolation. SDK patches and telemetry globals must not reuse modules across files. The cancellation fixture's deliberate 1,200 ms response delay and the telemetry collector stall exercise real resource cleanup; virtual application deadlines do not replace those stimuli or native kill/reap assertions. See the [package scripts](package.json) for coverage-producing selections and the [complete selection](vitest.all.config.ts) for a single serial run. Unit and integration coverage include the same production sources and write complementary reports for the repository's [coverage merge](../../package.json).

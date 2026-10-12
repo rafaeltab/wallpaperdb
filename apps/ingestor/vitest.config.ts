@@ -1,7 +1,7 @@
 import { defaults } from '@wallpaperdb/vitest-config/defaults';
 import { defineConfig, mergeConfig } from 'vitest/config';
 
-const instrumentationTests = ['test/otel-init.test.ts'];
+const instrumentationTests = ['test/instrumentation/**/*.integration.test.ts'];
 
 export default mergeConfig(
   defaults,
@@ -16,9 +16,13 @@ export default mergeConfig(
       projects: [
         {
           extends: true,
+          test: { name: 'ingestor-unit', include: ['test/**/*.unit.test.ts'] },
+        },
+        {
+          extends: true,
           test: {
-            name: 'ingestor',
-            include: ['test/**/*.test.ts'],
+            name: 'ingestor-integration',
+            include: ['test/**/*.integration.test.ts'],
             exclude: instrumentationTests,
           },
         },

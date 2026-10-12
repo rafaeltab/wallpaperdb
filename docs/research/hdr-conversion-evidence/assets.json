@@ -1,0 +1,2475 @@
+{
+  "schema_version": 1,
+  "scope": "Exact offered review bytes. Codec status is distinct from consumer qualification. The gain-map JPEG retains its recorded headroom and reader limits. Source metadata in synthetic fixtures is deliberately injected test data.",
+  "source_commit": "fd1c43e78134a5ecc0cd353a3ce099e02ed19392",
+  "review_archive_url": "https://github.com/rafaeltab/wallpaperdb/releases/download/hdr-proof-2026-10-11/manual-review-files.zip",
+  "files": [
+    {
+      "file": "files/pq-original.avif",
+      "sha256": "43a7c7cafbb2b596e819a04eac3bd87ab8e6e2cd2102c39c66f0252f3d2505d8",
+      "bytes": 2406,
+      "group": "pq",
+      "label": "Original PQ / Rec.2020 / 10-bit",
+      "dimensions": {
+        "width": 96,
+        "height": 64
+      },
+      "role": "Inspected source fixture",
+      "case_id": null,
+      "fixture_id": null,
+      "selectors": null,
+      "selector_note": "Source or reference image; no conversion selectors are asserted.",
+      "geometry": null,
+      "codec_status": "source reference, not a conversion qualification",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "source-avif-pq-rec2020-10-opaque.avif",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-10-opaque/avif-pq-rec2020-10-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "avif-pq-rec2020-10-opaque.avif",
+          "FileSize": 2406,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "GPSLatitude": 51,
+          "Make": "HDR-PROOF-PRIVATE-CAMERA",
+          "ImageWidth": 96,
+          "ImageHeight": 64,
+          "ImageSpatialExtent": "96 64",
+          "ImagePixelDepth": "10 10 10",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 9,
+          "TransferCharacteristics": 16,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 2047,
+          "MediaDataOffset": 359,
+          "ImageSize": "96 64",
+          "Megapixels": 0.006144,
+          "GPSLatitudeRef": "N"
+        },
+        "width": 96,
+        "height": 64,
+        "depth": 10,
+        "primaries": 9,
+        "transfer": 16,
+        "matrix": 0,
+        "alpha": "Absent",
+        "sha256": "43a7c7cafbb2b596e819a04eac3bd87ab8e6e2cd2102c39c66f0252f3d2505d8"
+      }
+    },
+    {
+      "file": "files/pq-hdr.avif",
+      "sha256": "1db8a9cf098a0199dd1b7e93df68fad26500460b334240ba4b13bc93e4793ec0",
+      "bytes": 1780,
+      "group": "pq",
+      "label": "HDR derivative / PQ / 10-bit",
+      "dimensions": {
+        "width": 57,
+        "height": 38
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "avif-pq-rec2020-10-opaque:hdr:avif:preserve:preserve:contain",
+      "fixture_id": "avif-pq-rec2020-10-opaque",
+      "selectors": {
+        "format": "avif",
+        "range": "hdr",
+        "gamut": "preserve",
+        "depth": "preserve",
+        "motion": "preserve",
+        "transparency": "preserve",
+        "w": 58,
+        "h": 38,
+        "fit": "contain"
+      },
+      "selector_note": null,
+      "geometry": "contain",
+      "codec_status": "qualified",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "avif-pq-rec2020-10-opaque-hdr-avif-preserve-preserve-contain.avif",
+          "case_id": "avif-pq-rec2020-10-opaque:hdr:avif:preserve:preserve:contain",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-10-opaque/hdr-avif-preserve-contain/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 1780,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "10 10 10",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 9,
+          "TransferCharacteristics": 16,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 1505,
+          "MediaDataOffset": 275,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 10,
+        "primaries": 9,
+        "transfer": 16,
+        "matrix": 0,
+        "alpha": "Absent",
+        "sha256": "1db8a9cf098a0199dd1b7e93df68fad26500460b334240ba4b13bc93e4793ec0"
+      }
+    },
+    {
+      "file": "files/pq-sdr.avif",
+      "sha256": "9a4846edc6c1b0a8deab3f051a86158dfdd059a31b2bbad9de64cfe01d03ef7c",
+      "bytes": 2345,
+      "group": "pq",
+      "label": "Explicit SDR / sRGB / 12-bit",
+      "dimensions": {
+        "width": 57,
+        "height": 38
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "avif-pq-rec2020-10-opaque:sdr:avif:srgb:preserve:contain:depth-12",
+      "fixture_id": "avif-pq-rec2020-10-opaque",
+      "selectors": {
+        "format": "avif",
+        "range": "sdr",
+        "gamut": "srgb",
+        "depth": "12",
+        "motion": "preserve",
+        "transparency": "preserve",
+        "w": 58,
+        "h": 38,
+        "fit": "contain"
+      },
+      "selector_note": null,
+      "geometry": "contain",
+      "codec_status": "qualified",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "avif-pq-rec2020-10-opaque-sdr-avif-srgb-preserve-contain-depth-12.avif",
+          "case_id": "avif-pq-rec2020-10-opaque:sdr:avif:srgb:preserve:contain:depth-12",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-10-opaque/sdr-avif-preserve-contain-depth-12/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 2345,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "12 12 12",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 2074,
+          "MediaDataOffset": 271,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 12,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 0,
+        "alpha": "Absent",
+        "sha256": "9a4846edc6c1b0a8deab3f051a86158dfdd059a31b2bbad9de64cfe01d03ef7c"
+      }
+    },
+    {
+      "file": "files/hlg-original.avif",
+      "sha256": "149712244d61fd1499e8f16bb9f0380a359573684032892238166a55201d85ba",
+      "bytes": 2660,
+      "group": "hlg",
+      "label": "Original HLG / P3 / 10-bit",
+      "dimensions": {
+        "width": 96,
+        "height": 64
+      },
+      "role": "Inspected source fixture",
+      "case_id": null,
+      "fixture_id": null,
+      "selectors": null,
+      "selector_note": "Source or reference image; no conversion selectors are asserted.",
+      "geometry": null,
+      "codec_status": "source reference, not a conversion qualification",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "source-avif-hlg-p3-10-opaque.avif",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-p3-10-opaque/avif-hlg-p3-10-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "avif-hlg-p3-10-opaque.avif",
+          "FileSize": 2660,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "GPSLatitude": 51,
+          "Make": "HDR-PROOF-PRIVATE-CAMERA",
+          "ImageWidth": 96,
+          "ImageHeight": 64,
+          "ImageSpatialExtent": "96 64",
+          "ImagePixelDepth": "10 10 10",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 12,
+          "TransferCharacteristics": 18,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 2301,
+          "MediaDataOffset": 359,
+          "ImageSize": "96 64",
+          "Megapixels": 0.006144,
+          "GPSLatitudeRef": "N"
+        },
+        "width": 96,
+        "height": 64,
+        "depth": 10,
+        "primaries": 12,
+        "transfer": 18,
+        "matrix": 0,
+        "alpha": "Absent",
+        "sha256": "149712244d61fd1499e8f16bb9f0380a359573684032892238166a55201d85ba"
+      }
+    },
+    {
+      "file": "files/hlg-hdr.avif",
+      "sha256": "8ea4a0340bb05cde29eda5e6eded64c215373ff3bc462d062a7146a514a447c3",
+      "bytes": 1921,
+      "group": "hlg",
+      "label": "HDR derivative / HLG / 10-bit",
+      "dimensions": {
+        "width": 57,
+        "height": 38
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "avif-hlg-p3-10-opaque:hdr:avif:preserve:preserve:contain",
+      "fixture_id": "avif-hlg-p3-10-opaque",
+      "selectors": {
+        "format": "avif",
+        "range": "hdr",
+        "gamut": "preserve",
+        "depth": "preserve",
+        "motion": "preserve",
+        "transparency": "preserve",
+        "w": 58,
+        "h": 38,
+        "fit": "contain"
+      },
+      "selector_note": null,
+      "geometry": "contain",
+      "codec_status": "qualified",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "avif-hlg-p3-10-opaque-hdr-avif-preserve-preserve-contain.avif",
+          "case_id": "avif-hlg-p3-10-opaque:hdr:avif:preserve:preserve:contain",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-p3-10-opaque/hdr-avif-preserve-contain/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 1921,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "10 10 10",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 12,
+          "TransferCharacteristics": 18,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 1646,
+          "MediaDataOffset": 275,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 10,
+        "primaries": 12,
+        "transfer": 18,
+        "matrix": 0,
+        "alpha": "Absent",
+        "sha256": "8ea4a0340bb05cde29eda5e6eded64c215373ff3bc462d062a7146a514a447c3"
+      }
+    },
+    {
+      "file": "files/hlg-sdr.avif",
+      "sha256": "f5e44c2f9e2e784c48900fad02be687a4622a6b7fa4ca60d9858f09a2a77fcc7",
+      "bytes": 2439,
+      "group": "hlg",
+      "label": "Explicit SDR / sRGB / 12-bit",
+      "dimensions": {
+        "width": 57,
+        "height": 38
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "avif-hlg-p3-10-opaque:sdr:avif:srgb:preserve:contain:depth-12",
+      "fixture_id": "avif-hlg-p3-10-opaque",
+      "selectors": {
+        "format": "avif",
+        "range": "sdr",
+        "gamut": "srgb",
+        "depth": "12",
+        "motion": "preserve",
+        "transparency": "preserve",
+        "w": 58,
+        "h": 38,
+        "fit": "contain"
+      },
+      "selector_note": null,
+      "geometry": "contain",
+      "codec_status": "qualified",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "avif-hlg-p3-10-opaque-sdr-avif-srgb-preserve-contain-depth-12.avif",
+          "case_id": "avif-hlg-p3-10-opaque:sdr:avif:srgb:preserve:contain:depth-12",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-p3-10-opaque/sdr-avif-preserve-contain-depth-12/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 2439,
+          "FilePermissions": 100644,
+          "FileType": "AVIF",
+          "FileTypeExtension": "AVIF",
+          "MIMEType": "image/avif",
+          "MajorBrand": "avif",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "mif1",
+            "miaf"
+          ],
+          "HandlerType": "pict",
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "12 12 12",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 1,
+          "TransferCharacteristics": 13,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "MediaDataSize": 2168,
+          "MediaDataOffset": 271,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 12,
+        "primaries": 1,
+        "transfer": 13,
+        "matrix": 0,
+        "alpha": "Absent",
+        "sha256": "f5e44c2f9e2e784c48900fad02be687a4622a6b7fa4ca60d9858f09a2a77fcc7"
+      }
+    },
+    {
+      "file": "files/animation-original.avif",
+      "sha256": "9bfff5fddc798e21359b944d4bbed1e6ccfc092436db633bae2cc744be872b6d",
+      "bytes": 4858,
+      "group": "animation",
+      "label": "Original animated PQ / alpha",
+      "dimensions": {
+        "width": 96,
+        "height": 64
+      },
+      "role": "Inspected source fixture",
+      "case_id": null,
+      "fixture_id": null,
+      "selectors": null,
+      "selector_note": "Source or reference image; no conversion selectors are asserted.",
+      "geometry": null,
+      "codec_status": "source reference, not a conversion qualification",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "source-animated-pq-alpha.avif",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/animated-pq-alpha/animated-pq-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * Repeat Count   : 2\n * 10 timescales per second, 1.00 seconds (10 timescales), 2 frames\n * Image Sequence Frames: (2 expected frames)\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 0.30 (3 timescales)] [96x64]\n   * Decoded frame [1] [pts 0.30 (3 timescales)] [duration 0.70 (7 timescales)] [96x64]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "animated-pq-alpha.avif",
+          "FileSize": 4858,
+          "FilePermissions": 100644,
+          "FileType": "MP4",
+          "FileTypeExtension": "MP4",
+          "MIMEType": "video/mp4",
+          "MajorBrand": "avis",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "avis",
+            "msf1",
+            "iso8",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "PrimaryItemReference": 1,
+          "GPSLatitude": 51,
+          "Make": "HDR-PROOF-PRIVATE-CAMERA",
+          "ImageWidth": 96,
+          "ImageHeight": 64,
+          "ImageSpatialExtent": "96 64",
+          "ImagePixelDepth": "10 10 10",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 9,
+          "TransferCharacteristics": 16,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+          "MovieHeaderVersion": 1,
+          "CreateDate": "1970:01:01 00:00:01",
+          "ModifyDate": "1970:01:01 00:00:01",
+          "TimeScale": 10,
+          "Duration": 3,
+          "PreferredRate": 1,
+          "PreferredVolume": 1,
+          "PreviewTime": 0,
+          "PreviewDuration": 0,
+          "PosterTime": 0,
+          "SelectionTime": 0,
+          "SelectionDuration": 0,
+          "CurrentTime": 0,
+          "NextTrackID": 3,
+          "TrackHeaderVersion": 1,
+          "TrackCreateDate": "1970:01:01 00:00:01",
+          "TrackModifyDate": "1970:01:01 00:00:01",
+          "TrackID": 1,
+          "TrackDuration": 3,
+          "TrackLayer": 0,
+          "TrackVolume": 0,
+          "MatrixStructure": "1 0 0 0 1 0 0 0 1",
+          "MediaHeaderVersion": 16777216,
+          "MediaCreateDate": "1970:01:01 00:00:01",
+          "MediaModifyDate": "1970:01:01 00:00:01",
+          "MediaTimeScale": 10,
+          "MediaDuration": 1,
+          "MediaLanguageCode": "und",
+          "HandlerType": "auxv",
+          "GraphicsMode": 0,
+          "OpColor": "0 0 0",
+          "OtherFormat": "av01",
+          "MediaDataSize": 2846,
+          "MediaDataOffset": 2012,
+          "ImageSize": "96 64",
+          "Megapixels": 0.006144,
+          "AvgBitrate": 7589,
+          "GPSLatitudeRef": "N"
+        },
+        "width": 96,
+        "height": 64,
+        "depth": 10,
+        "primaries": 9,
+        "transfer": 16,
+        "matrix": 0,
+        "alpha": "Not",
+        "sha256": "9bfff5fddc798e21359b944d4bbed1e6ccfc092436db633bae2cc744be872b6d"
+      }
+    },
+    {
+      "file": "files/animation-hdr.avif",
+      "sha256": "6c75f39ceca0b03633198022220313399a793fe03feea0eef934affbdd1e992b",
+      "bytes": 5791,
+      "group": "animation",
+      "label": "HDR animation / PQ / alpha",
+      "dimensions": {
+        "width": 57,
+        "height": 38
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "animated-pq-alpha:hdr:avif:preserve:preserve:contain",
+      "fixture_id": "animated-pq-alpha",
+      "selectors": {
+        "format": "avif",
+        "range": "hdr",
+        "gamut": "preserve",
+        "depth": "preserve",
+        "motion": "preserve",
+        "transparency": "preserve",
+        "w": 58,
+        "h": 38,
+        "fit": "contain"
+      },
+      "selector_note": null,
+      "geometry": "contain",
+      "codec_status": "qualified",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "animated-pq-alpha-hdr-avif-preserve-preserve-contain.avif",
+          "case_id": "animated-pq-alpha:hdr:avif:preserve:preserve:contain",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/animated-pq-alpha/hdr-avif-preserve-contain/output.avif\n * Resolution     : 57x38\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * Repeat Count   : 2\n * 10 timescales per second, 1.00 seconds (10 timescales), 2 frames\n * Image Sequence Frames: (2 expected frames)\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 0.30 (3 timescales)] [57x38]\n   * Decoded frame [1] [pts 0.30 (3 timescales)] [duration 0.70 (7 timescales)] [57x38]\n",
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.avif",
+          "FileSize": 5791,
+          "FilePermissions": 100644,
+          "FileType": "MP4",
+          "FileTypeExtension": "MP4",
+          "MIMEType": "video/mp4",
+          "MajorBrand": "avis",
+          "MinorVersion": "0.0.0",
+          "CompatibleBrands": [
+            "avif",
+            "avis",
+            "msf1",
+            "iso8",
+            "mif1",
+            "miaf",
+            "MA1A"
+          ],
+          "PrimaryItemReference": 1,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ImageSpatialExtent": "57 38",
+          "ImagePixelDepth": "10 10 10",
+          "AV1ConfigurationVersion": 1,
+          "ChromaFormat": 0,
+          "ChromaSamplePosition": 0,
+          "ColorProfiles": "nclx",
+          "ColorPrimaries": 9,
+          "TransferCharacteristics": 16,
+          "MatrixCoefficients": 0,
+          "VideoFullRangeFlag": 1,
+          "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+          "MovieHeaderVersion": 1,
+          "CreateDate": "1970:01:01 00:00:01",
+          "ModifyDate": "1970:01:01 00:00:01",
+          "TimeScale": 10,
+          "Duration": 3,
+          "PreferredRate": 1,
+          "PreferredVolume": 1,
+          "PreviewTime": 0,
+          "PreviewDuration": 0,
+          "PosterTime": 0,
+          "SelectionTime": 0,
+          "SelectionDuration": 0,
+          "CurrentTime": 0,
+          "NextTrackID": 2,
+          "TrackHeaderVersion": 1,
+          "TrackCreateDate": "1970:01:01 00:00:01",
+          "TrackModifyDate": "1970:01:01 00:00:01",
+          "TrackID": 1,
+          "TrackDuration": 3,
+          "TrackLayer": 0,
+          "TrackVolume": 0,
+          "MatrixStructure": "1 0 0 0 1 0 0 0 1",
+          "MediaHeaderVersion": 16777216,
+          "MediaCreateDate": "1970:01:01 00:00:01",
+          "MediaModifyDate": "1970:01:01 00:00:01",
+          "MediaTimeScale": 10,
+          "MediaDuration": 1,
+          "MediaLanguageCode": "und",
+          "HandlerType": "auxv",
+          "GraphicsMode": 0,
+          "OpColor": "0 0 0",
+          "OtherFormat": "av01",
+          "MediaDataSize": 3984,
+          "MediaDataOffset": 1807,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166,
+          "AvgBitrate": 10624
+        },
+        "width": 57,
+        "height": 38,
+        "depth": 10,
+        "primaries": 9,
+        "transfer": 16,
+        "matrix": 0,
+        "alpha": "Not",
+        "sha256": "6c75f39ceca0b03633198022220313399a793fe03feea0eef934affbdd1e992b"
+      }
+    },
+    {
+      "file": "files/animation-sdr.webp",
+      "sha256": "eaf9233d05461e8474de94d008b038a89dbc48b782ba7c2035af8a79a9ae716f",
+      "bytes": 1560,
+      "group": "animation",
+      "label": "Explicit SDR animation / gamma-2.2 ICC",
+      "dimensions": {
+        "width": 57,
+        "height": 38
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "animated-pq-alpha:sdr:webp:srgb:preserve:contain:transfer-gamma22",
+      "fixture_id": "animated-pq-alpha",
+      "selectors": {
+        "format": "webp",
+        "range": "sdr",
+        "gamut": "srgb",
+        "depth": "8",
+        "motion": "preserve",
+        "transparency": "preserve",
+        "w": 58,
+        "h": 38,
+        "fit": "contain"
+      },
+      "selector_note": null,
+      "geometry": "contain",
+      "codec_status": "qualified",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "animated-pq-alpha-sdr-webp-srgb-preserve-contain-transfer-gamma22.webp",
+          "case_id": "animated-pq-alpha:sdr:webp:srgb:preserve:contain:transfer-gamma22",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "width": 57,
+        "height": 38,
+        "depth": 8,
+        "format": "WEBP",
+        "loop": 3,
+        "durations_ms": [
+          300,
+          700
+        ],
+        "icc": {
+          "sha256": "d7b8387fdd626cc24b118014a6b7fb03396fe2486b262661e61f5658f92a8e45",
+          "gammas": [
+            2.1999969482421875,
+            2.1999969482421875,
+            2.1999969482421875
+          ],
+          "rgb_to_xyz_d50": [
+            [
+              0.43603515625,
+              0.3851165771484375,
+              0.1430511474609375
+            ],
+            [
+              0.2224884033203125,
+              0.7169036865234375,
+              0.06060791015625
+            ],
+            [
+              0.013916015625,
+              0.0970611572265625,
+              0.7139129638671875
+            ]
+          ],
+          "chromatic_adaptation": [
+            [
+              1.047882080078125,
+              0.022918701171875,
+              -0.0502166748046875
+            ],
+            [
+              0.0295867919921875,
+              0.990478515625,
+              -0.0170745849609375
+            ],
+            [
+              -0.009246826171875,
+              0.01507568359375,
+              0.751678466796875
+            ]
+          ],
+          "rgb_to_xyz_d65": [
+            [
+              0.41238604256997247,
+              0.35758865382107435,
+              0.18048716215572805
+            ],
+            [
+              0.21264179542406994,
+              0.715168220828018,
+              0.0721851050810435
+            ],
+            [
+              0.01932150233280058,
+              0.11918136742392695,
+              0.950530963753934
+            ]
+          ],
+          "gamma22_srgb_primaries": true,
+          "gamut": "srgb",
+          "creation_date": [
+            2020,
+            1,
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.webp",
+          "FileSize": 1560,
+          "FilePermissions": 100644,
+          "FileType": "Extended WEBP",
+          "FileTypeExtension": "WEBP",
+          "MIMEType": "image/webp",
+          "WebP_Flags": 50,
+          "ImageWidth": 57,
+          "ImageHeight": 38,
+          "ProfileCMMType": "lcms",
+          "ProfileVersion": 1088,
+          "ProfileClass": "mntr",
+          "ColorSpaceData": "RGB ",
+          "ProfileConnectionSpace": "XYZ ",
+          "ProfileDateTime": "2020:01:01 00:00:00",
+          "ProfileFileSignature": "acsp",
+          "PrimaryPlatform": "APPL",
+          "CMMFlags": 0,
+          "DeviceManufacturer": "",
+          "DeviceModel": "",
+          "DeviceAttributes": "0 0",
+          "RenderingIntent": 0,
+          "ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ProfileCreator": "lcms",
+          "ProfileID": "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+          "ProfileDescription": "RGB built-in",
+          "ProfileCopyright": "No copyright, use freely",
+          "MediaWhitePoint": "0.9642 1 0.82491",
+          "ChromaticAdaptation": "1.04788 0.02292 -0.05022 0.02959 0.99048 -0.01707 -0.00925 0.01508 0.75168",
+          "RedMatrixColumn": "0.43604 0.22249 0.01392",
+          "BlueMatrixColumn": "0.14305 0.06061 0.71391",
+          "GreenMatrixColumn": "0.38512 0.7169 0.09706",
+          "RedTRC": "(Binary data 16 bytes, use -b option to extract)",
+          "GreenTRC": "(Binary data 16 bytes, use -b option to extract)",
+          "BlueTRC": "(Binary data 16 bytes, use -b option to extract)",
+          "ChromaticityChannels": 3,
+          "ChromaticityColorant": 0,
+          "ChromaticityChannel1": "0.64 0.33",
+          "ChromaticityChannel2": "0.3 0.60001",
+          "ChromaticityChannel3": "0.14999 0.06",
+          "BackgroundColor": "255 255 255 255",
+          "AnimationLoopCount": 3,
+          "Duration": 1,
+          "ImageSize": "57 38",
+          "Megapixels": 0.002166
+        },
+        "privacy": true,
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 0.00784313725490196,
+          "frame_maximum_absolute_errors": [
+            0.005774854678733621,
+            0.0056160073654324405
+          ],
+          "maximum_absolute_error": 0.005774854678733621
+        },
+        "sha256": "eaf9233d05461e8474de94d008b038a89dbc48b782ba7c2035af8a79a9ae716f"
+      }
+    },
+    {
+      "file": "files/gainmap-original.jpg",
+      "sha256": "d22fd05e210df1067ebd6a1f63d0e5d94c5fa9042fe2ebd7067a10a301402271",
+      "bytes": 47579,
+      "group": "gainmap",
+      "label": "Original Android XMP gain-map JPEG",
+      "dimensions": {
+        "width": 403,
+        "height": 302
+      },
+      "role": "Provenance-documented gain-map source; exact original",
+      "case_id": null,
+      "fixture_id": null,
+      "selectors": null,
+      "selector_note": "Source or reference image; no conversion selectors are asserted.",
+      "geometry": null,
+      "codec_status": "source reference, not a conversion qualification",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "source-gainmap-android-xmp.jpg",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": null
+    },
+    {
+      "file": "files/gainmap-hdr.jpg",
+      "sha256": "50fcfb8f31c9da4fca968f608e3cb0e41cd672247b3d3f8fa9fc83de7e702517",
+      "bytes": 81678,
+      "group": "gainmap",
+      "label": "HDR JPEG / passes boost 16, fails boost 2",
+      "dimensions": {
+        "width": 173,
+        "height": 130
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1:independent-xmp-render-boost16",
+      "fixture_id": "gainmap-android-xmp",
+      "selectors": {
+        "format": "jpg",
+        "range": "hdr",
+        "gamut": "preserve",
+        "depth": "preserve",
+        "motion": "preserve",
+        "transparency": "preserve",
+        "w": 173,
+        "fit": "contain"
+      },
+      "selector_note": null,
+      "geometry": "contain",
+      "codec_status": "qualified",
+      "coding_scope": null,
+      "qualification_scope": "One exact SOF0 RGB8 output at display boost 16, against independent legacy EXIF-sRGB XMP source rendering before containment; this point does not qualify other headrooms or physical consumers.",
+      "rendering_scope": {
+        "display_boost": 16,
+        "headroom_log2": 4,
+        "sdr_white_nits": 203,
+        "source_reference_revision": "gainmap-xmp-independent-boost16-v1",
+        "converter_reference_display_boost": 16,
+        "headroom_is_product_selector": false,
+        "source_capacity_headroom_log2": 3.5,
+        "output_capacity_headroom_log2": 2.7728538513183594,
+        "source_gain_map_weight": 1.0,
+        "output_gain_map_weight": 1.0,
+        "native_weight_derived_from_verified_inputs": 1.0,
+        "native_weight_scope": "Derived from actual probe capacities and recorded boost invocation; not a returned native field"
+      },
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1-independent-xmp-render-boost2.jpg",
+          "case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1:independent-xmp-render-boost2",
+          "codec_status": "tested and failed",
+          "qualification_scope": "One exact SOF0 RGB8 output at display boost 2, against independent legacy EXIF-sRGB XMP source rendering before containment; this point does not qualify other headrooms or physical consumers.",
+          "rendering_scope": {
+            "display_boost": 2,
+            "headroom_log2": 1,
+            "sdr_white_nits": 203,
+            "source_reference_revision": "gainmap-xmp-intermediate-boost2-v1",
+            "converter_reference_display_boost": 16,
+            "headroom_is_product_selector": false,
+            "source_capacity_headroom_log2": 3.5,
+            "output_capacity_headroom_log2": 2.7728538513183594,
+            "source_gain_map_weight": 0.2857142857142857,
+            "output_gain_map_weight": 0.3606392740549769,
+            "native_weight_derived_from_verified_inputs": 0.3606392702423693,
+            "native_weight_scope": "Derived from actual probe capacities and recorded boost invocation; not a returned native field"
+          },
+          "warning": "A failed candidate is a diagnostic comparison, not an approved download or SDR fallback."
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1-independent-xmp-render-boost16.jpg",
+          "case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1:independent-xmp-render-boost16",
+          "codec_status": "qualified",
+          "qualification_scope": "One exact SOF0 RGB8 output at display boost 16, against independent legacy EXIF-sRGB XMP source rendering before containment; this point does not qualify other headrooms or physical consumers.",
+          "rendering_scope": {
+            "display_boost": 16,
+            "headroom_log2": 4,
+            "sdr_white_nits": 203,
+            "source_reference_revision": "gainmap-xmp-independent-boost16-v1",
+            "converter_reference_display_boost": 16,
+            "headroom_is_product_selector": false,
+            "source_capacity_headroom_log2": 3.5,
+            "output_capacity_headroom_log2": 2.7728538513183594,
+            "source_gain_map_weight": 1.0,
+            "output_gain_map_weight": 1.0,
+            "native_weight_derived_from_verified_inputs": 1.0,
+            "native_weight_scope": "Derived from actual probe capacities and recorded boost invocation; not a returned native field"
+          },
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1.jpg",
+          "case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "sha256": "50fcfb8f31c9da4fca968f608e3cb0e41cd672247b3d3f8fa9fc83de7e702517",
+        "metadata": {
+          "ExifTool:ExifToolVersion": 13.55,
+          "File:FileType": "JPEG",
+          "File:FileTypeExtension": "JPG",
+          "File:MIMEType": "image/jpeg",
+          "File:ImageWidth": 173,
+          "File:ImageHeight": 130,
+          "File:EncodingProcess": 0,
+          "File:BitsPerSample": 8,
+          "File:ColorComponents": 3,
+          "File:YCbCrSubSampling": "1 1",
+          "XMP-x:XMPToolkit": "Adobe XMP Core 5.1.2",
+          "XMP-hdrgm:Version": 1.0,
+          "XMP-GContainer:DirectoryItemSemantic": [
+            "Primary",
+            "GainMap"
+          ],
+          "XMP-GContainer:DirectoryItemMime": [
+            "image/jpeg",
+            "image/jpeg"
+          ],
+          "XMP-GContainer:DirectoryItemLength": 29545,
+          "ICC-header:ProfileCMMType": "lcms",
+          "ICC-header:ProfileVersion": 1088,
+          "ICC-header:ProfileClass": "mntr",
+          "ICC-header:ColorSpaceData": "RGB ",
+          "ICC-header:ProfileConnectionSpace": "XYZ ",
+          "ICC-header:ProfileDateTime": "2020:01:01 00:00:00",
+          "ICC-header:ProfileFileSignature": "acsp",
+          "ICC-header:PrimaryPlatform": "APPL",
+          "ICC-header:CMMFlags": 0,
+          "ICC-header:DeviceManufacturer": "",
+          "ICC-header:DeviceModel": "",
+          "ICC-header:DeviceAttributes": "0 0",
+          "ICC-header:RenderingIntent": 0,
+          "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ICC-header:ProfileCreator": "lcms",
+          "ICC-header:ProfileID": "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+          "ICC_Profile:ProfileDescription": "sRGB built-in",
+          "ICC_Profile:ProfileCopyright": "No copyright, use freely",
+          "ICC_Profile:MediaWhitePoint": "0.9642 1 0.82491",
+          "ICC_Profile:ChromaticAdaptation": "1.04788 0.02292 -0.05022 0.02959 0.99048 -0.01707 -0.00925 0.01508 0.75168",
+          "ICC_Profile:RedMatrixColumn": "0.43604 0.22249 0.01392",
+          "ICC_Profile:BlueMatrixColumn": "0.14305 0.06061 0.71391",
+          "ICC_Profile:GreenMatrixColumn": "0.38512 0.7169 0.09706",
+          "ICC_Profile:RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "ICC_Profile:GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "ICC_Profile:BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "ICC-chrm:ChromaticityChannels": 3,
+          "ICC-chrm:ChromaticityColorant": 0,
+          "ICC-chrm:ChromaticityChannel1": "0.64 0.33",
+          "ICC-chrm:ChromaticityChannel2": "0.3 0.60001",
+          "ICC-chrm:ChromaticityChannel3": "0.14999 0.06",
+          "APP2:UniformResourceName": "urn:iso:std:iso:ts:21496:-1",
+          "MPF0:MPFVersion": "0100",
+          "MPF0:NumberOfImages": 2,
+          "MPImage1:MPImageFlags": 0,
+          "MPImage1:MPImageFormat": 0,
+          "MPImage1:MPImageType": 196608,
+          "MPImage1:MPImageLength": 52133,
+          "MPImage1:MPImageStart": 0,
+          "MPImage1:DependentImage1EntryNumber": 0,
+          "MPImage1:DependentImage2EntryNumber": 0,
+          "MPImage2:MPImageFlags": 0,
+          "MPImage2:MPImageFormat": 0,
+          "MPImage2:MPImageType": 0,
+          "MPImage2:MPImageLength": 29545,
+          "MPImage2:MPImageStart": 52133,
+          "MPImage2:DependentImage1EntryNumber": 0,
+          "MPImage2:DependentImage2EntryNumber": 0,
+          "MPImage2:MPImage2": "(Binary data 29545 bytes, use -b option to extract)",
+          "Google:GainMapImage": "(Binary data 29545 bytes, use -b option to extract)",
+          "Composite:ImageSize": "173 130",
+          "Composite:Megapixels": 0.02249
+        },
+        "frame_count": 1,
+        "opaque": true,
+        "coded_depth": 8,
+        "private_tags": [],
+        "base": {
+          "depth": 8,
+          "width": 173,
+          "height": 130,
+          "components": 3,
+          "sof": 0
+        },
+        "gain_map_present": true,
+        "map": {
+          "depth": 8,
+          "width": 173,
+          "height": 130,
+          "components": 3,
+          "sof": 0
+        },
+        "iso_identifier": true,
+        "map_private_tags": [],
+        "android_xmp_properties": {
+          "XMP-hdrgm:Version": 1.0,
+          "XMP-hdrgm:HDRCapacityMin": 0,
+          "XMP-hdrgm:HDRCapacityMax": 2.77285,
+          "XMP-hdrgm:BaseRenditionIsHDR": false,
+          "XMP-hdrgm:GainMapMin": [
+            -6.05589,
+            -6.45814,
+            -6.19513
+          ],
+          "XMP-hdrgm:GainMapMax": [
+            2.79279,
+            2.87395,
+            2.9652
+          ],
+          "XMP-hdrgm:Gamma": [
+            1,
+            1,
+            1
+          ],
+          "XMP-hdrgm:OffsetSDR": [
+            0.000244141,
+            0.000244141,
+            0.000244141
+          ],
+          "XMP-hdrgm:OffsetHDR": [
+            0.000244141,
+            0.000244141,
+            0.000244141
+          ]
+        },
+        "iso_metadata": {
+          "minimum_version": 0,
+          "writer_version": 0,
+          "use_base_colour_space": true,
+          "backward": false,
+          "base_headroom": 0.0,
+          "alternate_headroom": 2.7728538513183594,
+          "channels": [
+            {
+              "minimum": -6.055893421173096,
+              "maximum": 2.792786121368408,
+              "gamma": 1.0,
+              "base_offset": 0.000244140625,
+              "alternate_offset": 0.000244140625
+            },
+            {
+              "minimum": -6.458144187927246,
+              "maximum": 2.873950481414795,
+              "gamma": 1.0,
+              "base_offset": 0.000244140625,
+              "alternate_offset": 0.000244140625
+            },
+            {
+              "minimum": -6.195134162902832,
+              "maximum": 2.9651987552642822,
+              "gamma": 1.0,
+              "base_offset": 0.000244140625,
+              "alternate_offset": 0.000244140625
+            }
+          ]
+        }
+      }
+    },
+    {
+      "file": "files/gainmap-sdr-reference.png",
+      "sha256": "b58ac4171554daab4ab1736bc37eb041681927999a46369b8b7117e4c0683731",
+      "bytes": 40066,
+      "group": "gainmap",
+      "label": "Matched authored SDR reference",
+      "dimensions": {
+        "width": 173,
+        "height": 130
+      },
+      "role": "Independent matched-geometry authored SDR reference",
+      "case_id": null,
+      "fixture_id": null,
+      "selectors": null,
+      "selector_note": "Source or reference image; no conversion selectors are asserted.",
+      "geometry": null,
+      "codec_status": "source reference, not a conversion qualification",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "avif-gainmap-from-android-xmp-sdr-avif-preserve-preserve-contain-authored-rgb8-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-sdr-png-preserve-preserve-contain-authored-rgb8-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1-independent-xmp-render-boost2-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1-independent-xmp-render-boost16-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-avif-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-png-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-webp-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-gif-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-regenerate-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-regenerate-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-regenerate-avif-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-jpg-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-jpg-srgb-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-avif-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-avif-srgb-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-png-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-png-srgb-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-webp-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-webp-srgb-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-gif-preserve-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-gif-srgb-preserve-contain-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-jpg-preserve-preserve-contain-rgb-jpeg-srgb-transfer-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-jpg-preserve-preserve-contain-rgb-jpeg-gamma3-2-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-avif-preserve-preserve-contain-lossless-avif-srgb-transfer-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-png-preserve-preserve-contain-lossless-png-srgb-transfer-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-webp-preserve-preserve-contain-lossless-webp-srgb-transfer-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-jpg-srgb-preserve-contain-rgb-jpeg-srgb-transfer-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-jpg-srgb-preserve-contain-rgb-jpeg-gamma3-2-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-avif-srgb-preserve-contain-lossless-avif-srgb-transfer-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-png-srgb-preserve-contain-lossless-png-srgb-transfer-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-webp-srgb-preserve-contain-lossless-webp-srgb-transfer-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-identity-lossless-rgb-gainmap-hdr-target-gamut-v1-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-lossless-rgb-gainmap-hdr-target-gamut-v1-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-dct-rgb-gainmap-hdr-target-gamut-v1-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-dct-float-rgb-gainmap-hdr-target-gamut-v1-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-hdr-jpg-preserve-preserve-contain-native-combine-moderateoffset-jpegli-base-dct-float-map-gainmap-hdr-target-gamut-v1-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-sdr-webp-preserve-preserve-contain-authored-rgb8-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-hdr-avif-preserve-preserve-contain-stock-auto-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-hdr-avif-preserve-preserve-contain-stock-depth8-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-hdr-avif-preserve-preserve-contain-moderateoffset-auto-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-hdr-avif-preserve-preserve-contain-moderateoffset-depth8-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-sdr-jpg-preserve-preserve-contain-authored-srgb-rgb8-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-hdr-jpg-preserve-preserve-contain-icc-midpoint-gamma15-float-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-hdr-jpg-preserve-preserve-contain-icc-midpoint-gamma15-float-render-boost2-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-hdr-jpg-preserve-preserve-contain-separate-original-map-render-boost2-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-hdr-jpg-preserve-preserve-contain-separate-original-map-render-source-full-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-hdr-jpg-preserve-preserve-contain-separate-original-map-render-boost16-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-sdr-gif-preserve-preserve-contain-authored-srgb256-sierra24-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-sdr-gif-preserve-preserve-contain-authored-srgb256-libimagequant-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-sdr-gif-preserve-preserve-contain-authored-gamma32-256-libimagequant-reference-sdr.png",
+          "case_id": null,
+          "codec_status": "source reference, not a conversion qualification",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "reference_sha256": "b58ac4171554daab4ab1736bc37eb041681927999a46369b8b7117e4c0683731",
+        "case_id": "gainmap-android-xmp:hdr:jpg:preserve:preserve:contain:native-combine-moderateoffset-dct-float-rgb:gainmap-hdr-target-gamut-v1:independent-xmp-render-boost16"
+      }
+    },
+    {
+      "file": "files/wallpaper-sdr.jpg",
+      "sha256": "fe78297586abb65828565ab94185a57898a9ec5926f6d8b30a8a2db555d5be5e",
+      "bytes": 51422,
+      "group": "gainmap",
+      "label": "Qualified SDR JPEG / wallpaper trial",
+      "dimensions": {
+        "width": 173,
+        "height": 130
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "gainmap-android-xmp:sdr:jpg:srgb:preserve:contain:rgb-jpeg-srgb-transfer",
+      "fixture_id": "gainmap-android-xmp",
+      "selectors": {
+        "format": "jpg",
+        "range": "sdr",
+        "gamut": "srgb",
+        "depth": "preserve",
+        "motion": "preserve",
+        "transparency": "preserve",
+        "w": 173,
+        "fit": "contain"
+      },
+      "selector_note": null,
+      "geometry": "contain",
+      "codec_status": "qualified",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null,
+      "same_bytes_evidence": [
+        {
+          "original_file": "gainmap-android-xmp-sdr-jpg-preserve-preserve-contain-rgb-jpeg-srgb-transfer.jpg",
+          "case_id": "gainmap-android-xmp:sdr:jpg:preserve:preserve:contain:rgb-jpeg-srgb-transfer",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "gainmap-android-xmp-sdr-jpg-srgb-preserve-contain-rgb-jpeg-srgb-transfer.jpg",
+          "case_id": "gainmap-android-xmp:sdr:jpg:srgb:preserve:contain:rgb-jpeg-srgb-transfer",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        },
+        {
+          "original_file": "avif-gainmap-from-android-xmp-sdr-jpg-preserve-preserve-contain-authored-srgb-rgb8.jpg",
+          "case_id": "avif-gainmap-from-android-xmp:sdr:jpg:preserve:preserve:contain:authored-srgb-rgb8",
+          "codec_status": "qualified",
+          "qualification_scope": null,
+          "rendering_scope": null,
+          "warning": null
+        }
+      ],
+      "inspected_facts": {
+        "depth": 8,
+        "width": 173,
+        "height": 130,
+        "components": 3,
+        "sof": 0,
+        "color": {
+          "gamut": "srgb",
+          "transfer": "srgb",
+          "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
+          "icc_version_major": 4,
+          "rgb_to_xyz_d50": [
+            [
+              0.43603515625,
+              0.3851165771484375,
+              0.1430511474609375
+            ],
+            [
+              0.2224884033203125,
+              0.7169036865234375,
+              0.06060791015625
+            ],
+            [
+              0.013916015625,
+              0.0970611572265625,
+              0.7139129638671875
+            ]
+          ],
+          "channel_transfer_parameters": [
+            [
+              2.399993896484375,
+              0.9478607177734375,
+              0.0521392822265625,
+              0.077392578125,
+              0.0404510498046875,
+              0,
+              0
+            ],
+            [
+              2.399993896484375,
+              0.9478607177734375,
+              0.0521392822265625,
+              0.077392578125,
+              0.0404510498046875,
+              0,
+              0
+            ],
+            [
+              2.399993896484375,
+              0.9478607177734375,
+              0.0521392822265625,
+              0.077392578125,
+              0.0404510498046875,
+              0,
+              0
+            ]
+          ],
+          "media_white_xyz": [
+            0.964202880859375,
+            1.0,
+            0.8249053955078125
+          ],
+          "header_flags": 0,
+          "pcs_illuminant_xyz": [
+            0.964202880859375,
+            1.0,
+            0.8249053955078125
+          ],
+          "gamut_basis": "ICC colorants and explicit chromatic adaptation match D65 primaries"
+        },
+        "decoder": "FFmpeg native MJPEG decoder",
+        "icc_sha256": "e7ba6537533fa4252a2b5a7b8ed2c49125cd0a1423b530e4fffae5392dcbf182",
+        "jpeg_color_transform": 0,
+        "jpeg_color_model": "Adobe ColorTransform 0 with verified RGB ICC",
+        "gamut": "srgb",
+        "transfer": "srgb",
+        "privacy": true,
+        "metadata": {
+          "ExifTool:ExifToolVersion": 13.55,
+          "File:FileType": "JPEG",
+          "File:FileTypeExtension": "JPG",
+          "File:MIMEType": "image/jpeg",
+          "File:ImageWidth": 173,
+          "File:ImageHeight": 130,
+          "File:EncodingProcess": 0,
+          "File:BitsPerSample": 8,
+          "File:ColorComponents": 3,
+          "File:YCbCrSubSampling": "1 1",
+          "Adobe:DCTEncodeVersion": 100,
+          "Adobe:APP14Flags0": 0,
+          "Adobe:APP14Flags1": 0,
+          "Adobe:ColorTransform": 0,
+          "ICC-header:ProfileCMMType": "lcms",
+          "ICC-header:ProfileVersion": 1088,
+          "ICC-header:ProfileClass": "mntr",
+          "ICC-header:ColorSpaceData": "RGB ",
+          "ICC-header:ProfileConnectionSpace": "XYZ ",
+          "ICC-header:ProfileDateTime": "2020:01:01 00:00:00",
+          "ICC-header:ProfileFileSignature": "acsp",
+          "ICC-header:PrimaryPlatform": "APPL",
+          "ICC-header:CMMFlags": 0,
+          "ICC-header:DeviceManufacturer": "",
+          "ICC-header:DeviceModel": "",
+          "ICC-header:DeviceAttributes": "0 0",
+          "ICC-header:RenderingIntent": 0,
+          "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+          "ICC-header:ProfileCreator": "lcms",
+          "ICC-header:ProfileID": "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+          "ICC_Profile:ProfileDescription": "sRGB built-in",
+          "ICC_Profile:ProfileCopyright": "No copyright, use freely",
+          "ICC_Profile:MediaWhitePoint": "0.9642 1 0.82491",
+          "ICC_Profile:ChromaticAdaptation": "1.04788 0.02292 -0.05022 0.02959 0.99048 -0.01707 -0.00925 0.01508 0.75168",
+          "ICC_Profile:RedMatrixColumn": "0.43604 0.22249 0.01392",
+          "ICC_Profile:BlueMatrixColumn": "0.14305 0.06061 0.71391",
+          "ICC_Profile:GreenMatrixColumn": "0.38512 0.7169 0.09706",
+          "ICC_Profile:RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "ICC_Profile:GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "ICC_Profile:BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
+          "ICC-chrm:ChromaticityChannels": 3,
+          "ICC-chrm:ChromaticityColorant": 0,
+          "ICC-chrm:ChromaticityChannel1": "0.64 0.33",
+          "ICC-chrm:ChromaticityChannel2": "0.3 0.60001",
+          "ICC-chrm:ChromaticityChannel3": "0.14999 0.06",
+          "Composite:ImageSize": "173 130",
+          "Composite:Megapixels": 0.02249
+        }
+      }
+    },
+    {
+      "file": "files/color-chart-pq-rec2020-hdr.avif",
+      "sha256": "73656e2551845e31a602d67ce03144ac6fbb3833456c7669ce0d15d5d1eb5acb",
+      "bytes": 30262,
+      "label": "color chart pq / hdr",
+      "dimensions": {
+        "width": 768,
+        "height": 512
+      },
+      "role": "Supplemental manual display control",
+      "case_id": null,
+      "codec_status": "structurally inspected display control; not qualified in conversion matrix",
+      "inspected_facts": {
+        "file": "color-chart-pq-rec2020-hdr.avif",
+        "sha256": "73656e2551845e31a602d67ce03144ac6fbb3833456c7669ce0d15d5d1eb5acb",
+        "width": 768,
+        "height": 512,
+        "transfer": "pq",
+        "primaries": "rec2020",
+        "depth": 12,
+        "opaque": true,
+        "pair_id": "color-chart-pq",
+        "role": "hdr",
+        "inspection": "AOM encode; independent dav1d decode; ExifTool metadata; independent libpng decoded-sample recovery",
+        "facts": {
+          "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /aid/color-chart-pq-rec2020-hdr.avif\n * Resolution     : 768x512\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [768x512]\n",
+          "exiftool": {
+            "ExifToolVersion": 13.55,
+            "FileName": "color-chart-pq-rec2020-hdr.avif",
+            "FileSize": 30262,
+            "FilePermissions": 100644,
+            "FileType": "AVIF",
+            "FileTypeExtension": "AVIF",
+            "MIMEType": "image/avif",
+            "MajorBrand": "avif",
+            "MinorVersion": "0.0.0",
+            "CompatibleBrands": [
+              "avif",
+              "mif1",
+              "miaf"
+            ],
+            "HandlerType": "pict",
+            "PrimaryItemReference": 1,
+            "ImageWidth": 768,
+            "ImageHeight": 512,
+            "ImageSpatialExtent": "768 512",
+            "ImagePixelDepth": "12 12 12",
+            "AV1ConfigurationVersion": 1,
+            "ChromaFormat": 0,
+            "ChromaSamplePosition": 0,
+            "ColorProfiles": "nclx",
+            "ColorPrimaries": 9,
+            "TransferCharacteristics": 16,
+            "MatrixCoefficients": 0,
+            "VideoFullRangeFlag": 1,
+            "MediaDataSize": 29991,
+            "MediaDataOffset": 271,
+            "ImageSize": "768 512",
+            "Megapixels": 0.393216
+          },
+          "width": 768,
+          "height": 512,
+          "depth": 12,
+          "primaries": 9,
+          "transfer": 16,
+          "matrix": 0,
+          "alpha": "Absent",
+          "sha256": "73656e2551845e31a602d67ce03144ac6fbb3833456c7669ce0d15d5d1eb5acb"
+        },
+        "diagnostics": {
+          "maximum_coded_signal_error_from_authored_chart": 0.00012965346265469968,
+          "decoded_neutral_203_patch_nits": [
+            203.04606428424486,
+            203.04606428424486,
+            203.04606428424486
+          ]
+        }
+      }
+    },
+    {
+      "file": "files/color-chart-pq-srgb-sdr.png",
+      "sha256": "33934b1603d67722e1dffab67a556f55aa1403ee77d6617b3e08ffbb73c73e08",
+      "bytes": 9209,
+      "label": "color chart pq / sdr",
+      "dimensions": {
+        "width": 768,
+        "height": 512
+      },
+      "role": "Supplemental manual display control",
+      "case_id": null,
+      "codec_status": "structurally inspected display control; not qualified in conversion matrix",
+      "inspected_facts": {
+        "file": "color-chart-pq-srgb-sdr.png",
+        "sha256": "33934b1603d67722e1dffab67a556f55aa1403ee77d6617b3e08ffbb73c73e08",
+        "width": 768,
+        "height": 512,
+        "transfer": "srgb",
+        "primaries": "srgb",
+        "depth": 16,
+        "opaque": true,
+        "pair_id": "color-chart-pq",
+        "role": "sdr",
+        "inspection": "Native FFmpeg PNG encode; independent libpng sample recovery and ExifTool sRGB signaling",
+        "facts": {
+          "ExifToolVersion": 13.55,
+          "FileName": "color-chart-pq-srgb-sdr.png",
+          "FileSize": 9209,
+          "FilePermissions": 100644,
+          "FileType": "PNG",
+          "FileTypeExtension": "PNG",
+          "MIMEType": "image/png",
+          "ImageWidth": 768,
+          "ImageHeight": 512,
+          "BitDepth": 16,
+          "ColorType": 2,
+          "Compression": 0,
+          "Filter": 0,
+          "Interlace": 0,
+          "PixelsPerUnitX": 0,
+          "PixelsPerUnitY": 1,
+          "PixelUnits": 0,
+          "SRGBRendering": 1,
+          "WhitePointX": 0.3127,
+          "WhitePointY": 0.329,
+          "RedX": 0.64,
+          "RedY": 0.33,
+          "GreenX": 0.3,
+          "GreenY": 0.6,
+          "BlueX": 0.15,
+          "BlueY": 0.06,
+          "Gamma": 2.2,
+          "ImageSize": "768 512",
+          "Megapixels": 0.393216
+        },
+        "diagnostics": {
+          "ordinary_white_sdr_signal": [
+            0.8858777752346074,
+            0.8858777752346074,
+            0.8858777752346074
+          ]
+        }
+      }
+    },
+    {
+      "file": "files/color-chart-pq-srgb-sdr.avif",
+      "sha256": "93a13eb7646a8065c482b0561deee4b549c7874fd3e5a5e333e205577ba17ff4",
+      "bytes": 36660,
+      "label": "color chart pq / sdr-alternative",
+      "dimensions": {
+        "width": 768,
+        "height": 512
+      },
+      "role": "Supplemental manual display control",
+      "case_id": null,
+      "codec_status": "structurally inspected display control; not qualified in conversion matrix",
+      "inspected_facts": {
+        "file": "color-chart-pq-srgb-sdr.avif",
+        "sha256": "93a13eb7646a8065c482b0561deee4b549c7874fd3e5a5e333e205577ba17ff4",
+        "width": 768,
+        "height": 512,
+        "transfer": "srgb",
+        "primaries": "srgb",
+        "depth": 12,
+        "opaque": true,
+        "pair_id": "color-chart-pq",
+        "role": "sdr-alternative",
+        "inspection": "AOM encode; independent dav1d decode; ExifTool metadata; independent libpng decoded-sample recovery",
+        "facts": {
+          "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /aid/color-chart-pq-srgb-sdr.avif\n * Resolution     : 768x512\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [768x512]\n",
+          "exiftool": {
+            "ExifToolVersion": 13.55,
+            "FileName": "color-chart-pq-srgb-sdr.avif",
+            "FileSize": 36660,
+            "FilePermissions": 100644,
+            "FileType": "AVIF",
+            "FileTypeExtension": "AVIF",
+            "MIMEType": "image/avif",
+            "MajorBrand": "avif",
+            "MinorVersion": "0.0.0",
+            "CompatibleBrands": [
+              "avif",
+              "mif1",
+              "miaf"
+            ],
+            "HandlerType": "pict",
+            "PrimaryItemReference": 1,
+            "ImageWidth": 768,
+            "ImageHeight": 512,
+            "ImageSpatialExtent": "768 512",
+            "ImagePixelDepth": "12 12 12",
+            "AV1ConfigurationVersion": 1,
+            "ChromaFormat": 0,
+            "ChromaSamplePosition": 0,
+            "ColorProfiles": "nclx",
+            "ColorPrimaries": 1,
+            "TransferCharacteristics": 13,
+            "MatrixCoefficients": 0,
+            "VideoFullRangeFlag": 1,
+            "MediaDataSize": 36389,
+            "MediaDataOffset": 271,
+            "ImageSize": "768 512",
+            "Megapixels": 0.393216
+          },
+          "width": 768,
+          "height": 512,
+          "depth": 12,
+          "primaries": 1,
+          "transfer": 13,
+          "matrix": 0,
+          "alpha": "Absent",
+          "sha256": "93a13eb7646a8065c482b0561deee4b549c7874fd3e5a5e333e205577ba17ff4"
+        }
+      }
+    },
+    {
+      "file": "files/color-chart-hlg-rec2020-hdr.avif",
+      "sha256": "871480d6d38af3831d322b979f5cf686bcdc02e5359e21b8e3e7e4d253813c18",
+      "bytes": 36213,
+      "label": "color chart hlg / hdr",
+      "dimensions": {
+        "width": 768,
+        "height": 512
+      },
+      "role": "Supplemental manual display control",
+      "case_id": null,
+      "codec_status": "structurally inspected display control; not qualified in conversion matrix",
+      "inspected_facts": {
+        "file": "color-chart-hlg-rec2020-hdr.avif",
+        "sha256": "871480d6d38af3831d322b979f5cf686bcdc02e5359e21b8e3e7e4d253813c18",
+        "width": 768,
+        "height": 512,
+        "transfer": "hlg",
+        "primaries": "rec2020",
+        "depth": 12,
+        "opaque": true,
+        "pair_id": "color-chart-hlg",
+        "role": "hdr",
+        "inspection": "AOM encode; independent dav1d decode; ExifTool metadata; independent libpng decoded-sample recovery",
+        "facts": {
+          "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /aid/color-chart-hlg-rec2020-hdr.avif\n * Resolution     : 768x512\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [768x512]\n",
+          "exiftool": {
+            "ExifToolVersion": 13.55,
+            "FileName": "color-chart-hlg-rec2020-hdr.avif",
+            "FileSize": 36213,
+            "FilePermissions": 100644,
+            "FileType": "AVIF",
+            "FileTypeExtension": "AVIF",
+            "MIMEType": "image/avif",
+            "MajorBrand": "avif",
+            "MinorVersion": "0.0.0",
+            "CompatibleBrands": [
+              "avif",
+              "mif1",
+              "miaf"
+            ],
+            "HandlerType": "pict",
+            "PrimaryItemReference": 1,
+            "ImageWidth": 768,
+            "ImageHeight": 512,
+            "ImageSpatialExtent": "768 512",
+            "ImagePixelDepth": "12 12 12",
+            "AV1ConfigurationVersion": 1,
+            "ChromaFormat": 0,
+            "ChromaSamplePosition": 0,
+            "ColorProfiles": "nclx",
+            "ColorPrimaries": 9,
+            "TransferCharacteristics": 18,
+            "MatrixCoefficients": 0,
+            "VideoFullRangeFlag": 1,
+            "MediaDataSize": 35942,
+            "MediaDataOffset": 271,
+            "ImageSize": "768 512",
+            "Megapixels": 0.393216
+          },
+          "width": 768,
+          "height": 512,
+          "depth": 12,
+          "primaries": 9,
+          "transfer": 18,
+          "matrix": 0,
+          "alpha": "Absent",
+          "sha256": "871480d6d38af3831d322b979f5cf686bcdc02e5359e21b8e3e7e4d253813c18"
+        },
+        "diagnostics": {
+          "maximum_coded_signal_error_from_authored_chart": 0.00012965385904117888,
+          "decoded_neutral_203_patch_nits": [
+            203.07167365294902,
+            203.07167365294902,
+            203.07167365294902
+          ]
+        }
+      }
+    },
+    {
+      "file": "files/color-chart-hlg-srgb-sdr.png",
+      "sha256": "34652b2f86c0b355623b32a8c1758ccf058b9190efc78cbd1d77238091a14d23",
+      "bytes": 11723,
+      "label": "color chart hlg / sdr",
+      "dimensions": {
+        "width": 768,
+        "height": 512
+      },
+      "role": "Supplemental manual display control",
+      "case_id": null,
+      "codec_status": "structurally inspected display control; not qualified in conversion matrix",
+      "inspected_facts": {
+        "file": "color-chart-hlg-srgb-sdr.png",
+        "sha256": "34652b2f86c0b355623b32a8c1758ccf058b9190efc78cbd1d77238091a14d23",
+        "width": 768,
+        "height": 512,
+        "transfer": "srgb",
+        "primaries": "srgb",
+        "depth": 16,
+        "opaque": true,
+        "pair_id": "color-chart-hlg",
+        "role": "sdr",
+        "inspection": "Native FFmpeg PNG encode; independent libpng sample recovery and ExifTool sRGB signaling",
+        "facts": {
+          "ExifToolVersion": 13.55,
+          "FileName": "color-chart-hlg-srgb-sdr.png",
+          "FileSize": 11723,
+          "FilePermissions": 100644,
+          "FileType": "PNG",
+          "FileTypeExtension": "PNG",
+          "MIMEType": "image/png",
+          "ImageWidth": 768,
+          "ImageHeight": 512,
+          "BitDepth": 16,
+          "ColorType": 2,
+          "Compression": 0,
+          "Filter": 0,
+          "Interlace": 0,
+          "PixelsPerUnitX": 0,
+          "PixelsPerUnitY": 1,
+          "PixelUnits": 0,
+          "SRGBRendering": 1,
+          "WhitePointX": 0.3127,
+          "WhitePointY": 0.329,
+          "RedX": 0.64,
+          "RedY": 0.33,
+          "GreenX": 0.3,
+          "GreenY": 0.6,
+          "BlueX": 0.15,
+          "BlueY": 0.06,
+          "Gamma": 2.2,
+          "ImageSize": "768 512",
+          "Megapixels": 0.393216
+        },
+        "diagnostics": {
+          "ordinary_white_sdr_signal": [
+            0.8856336308842603,
+            0.8858777752346074,
+            0.8856336308842603
+          ]
+        }
+      }
+    },
+    {
+      "file": "files/color-chart-hlg-srgb-sdr.avif",
+      "sha256": "93ad9ee13dc81112ce3994d1fbaf8781e68f3d6fe42acbc7879493f9e7ad15db",
+      "bytes": 36663,
+      "label": "color chart hlg / sdr-alternative",
+      "dimensions": {
+        "width": 768,
+        "height": 512
+      },
+      "role": "Supplemental manual display control",
+      "case_id": null,
+      "codec_status": "structurally inspected display control; not qualified in conversion matrix",
+      "inspected_facts": {
+        "file": "color-chart-hlg-srgb-sdr.avif",
+        "sha256": "93ad9ee13dc81112ce3994d1fbaf8781e68f3d6fe42acbc7879493f9e7ad15db",
+        "width": 768,
+        "height": 512,
+        "transfer": "srgb",
+        "primaries": "srgb",
+        "depth": 12,
+        "opaque": true,
+        "pair_id": "color-chart-hlg",
+        "role": "sdr-alternative",
+        "inspection": "AOM encode; independent dav1d decode; ExifTool metadata; independent libpng decoded-sample recovery",
+        "facts": {
+          "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /aid/color-chart-hlg-srgb-sdr.avif\n * Resolution     : 768x512\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Absent\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [768x512]\n",
+          "exiftool": {
+            "ExifToolVersion": 13.55,
+            "FileName": "color-chart-hlg-srgb-sdr.avif",
+            "FileSize": 36663,
+            "FilePermissions": 100644,
+            "FileType": "AVIF",
+            "FileTypeExtension": "AVIF",
+            "MIMEType": "image/avif",
+            "MajorBrand": "avif",
+            "MinorVersion": "0.0.0",
+            "CompatibleBrands": [
+              "avif",
+              "mif1",
+              "miaf"
+            ],
+            "HandlerType": "pict",
+            "PrimaryItemReference": 1,
+            "ImageWidth": 768,
+            "ImageHeight": 512,
+            "ImageSpatialExtent": "768 512",
+            "ImagePixelDepth": "12 12 12",
+            "AV1ConfigurationVersion": 1,
+            "ChromaFormat": 0,
+            "ChromaSamplePosition": 0,
+            "ColorProfiles": "nclx",
+            "ColorPrimaries": 1,
+            "TransferCharacteristics": 13,
+            "MatrixCoefficients": 0,
+            "VideoFullRangeFlag": 1,
+            "MediaDataSize": 36392,
+            "MediaDataOffset": 271,
+            "ImageSize": "768 512",
+            "Megapixels": 0.393216
+          },
+          "width": 768,
+          "height": 512,
+          "depth": 12,
+          "primaries": 1,
+          "transfer": 13,
+          "matrix": 0,
+          "alpha": "Absent",
+          "sha256": "93ad9ee13dc81112ce3994d1fbaf8781e68f3d6fe42acbc7879493f9e7ad15db"
+        }
+      }
+    },
+    {
+      "file": "files/pq-sdr-native-size.png",
+      "sha256": "1e8defdb6bbe25f4aac73dc14bb4a227d54783cc7750e84a1560f3677ae5e151",
+      "bytes": 924,
+      "label": "Explicit SDR PQ source / sRGB PNG16 / original size",
+      "dimensions": {
+        "width": 96,
+        "height": 64
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "avif-pq-rec2020-10-opaque:sdr:png:srgb:preserve:identity",
+      "fixture_id": "avif-pq-rec2020-10-opaque",
+      "selectors": {
+        "format": "png",
+        "range": "sdr",
+        "gamut": "srgb",
+        "depth": "16",
+        "motion": "preserve",
+        "transparency": "preserve"
+      },
+      "geometry": "identity",
+      "codec_status": "qualified",
+      "inspected_facts": {
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.png",
+          "FileSize": 924,
+          "FilePermissions": 100644,
+          "FileType": "PNG",
+          "FileTypeExtension": "PNG",
+          "MIMEType": "image/png",
+          "ImageWidth": 96,
+          "ImageHeight": 64,
+          "BitDepth": 16,
+          "ColorType": 6,
+          "Compression": 0,
+          "Filter": 0,
+          "Interlace": 0,
+          "PixelsPerUnitX": 0,
+          "PixelsPerUnitY": 1,
+          "PixelUnits": 0,
+          "SRGBRendering": 1,
+          "WhitePointX": 0.3127,
+          "WhitePointY": 0.329,
+          "RedX": 0.64,
+          "RedY": 0.33,
+          "GreenX": 0.3,
+          "GreenY": 0.6,
+          "BlueX": 0.15,
+          "BlueY": 0.06,
+          "Gamma": 2.2,
+          "ImageSize": "96 64",
+          "Megapixels": 0.006144
+        },
+        "sha256": "1e8defdb6bbe25f4aac73dc14bb4a227d54783cc7750e84a1560f3677ae5e151",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 3.0518043793392844e-05,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "file": "files/hlg-sdr-native-size.png",
+      "sha256": "9ab19f7b958a17db152c11ac8a5a9de935828edc7fd82bcc4e43a120fd449a3e",
+      "bytes": 1130,
+      "label": "Explicit SDR HLG source / sRGB PNG16 / original size",
+      "dimensions": {
+        "width": 96,
+        "height": 64
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "avif-hlg-p3-10-opaque:sdr:png:srgb:preserve:identity",
+      "fixture_id": "avif-hlg-p3-10-opaque",
+      "selectors": {
+        "format": "png",
+        "range": "sdr",
+        "gamut": "srgb",
+        "depth": "16",
+        "motion": "preserve",
+        "transparency": "preserve"
+      },
+      "geometry": "identity",
+      "codec_status": "qualified",
+      "inspected_facts": {
+        "exiftool": {
+          "ExifToolVersion": 13.55,
+          "FileName": "output.png",
+          "FileSize": 1130,
+          "FilePermissions": 100644,
+          "FileType": "PNG",
+          "FileTypeExtension": "PNG",
+          "MIMEType": "image/png",
+          "ImageWidth": 96,
+          "ImageHeight": 64,
+          "BitDepth": 16,
+          "ColorType": 6,
+          "Compression": 0,
+          "Filter": 0,
+          "Interlace": 0,
+          "PixelsPerUnitX": 0,
+          "PixelsPerUnitY": 1,
+          "PixelUnits": 0,
+          "SRGBRendering": 1,
+          "WhitePointX": 0.3127,
+          "WhitePointY": 0.329,
+          "RedX": 0.64,
+          "RedY": 0.33,
+          "GreenX": 0.3,
+          "GreenY": 0.6,
+          "BlueX": 0.15,
+          "BlueY": 0.06,
+          "Gamma": 2.2,
+          "ImageSize": "96 64",
+          "Megapixels": 0.006144
+        },
+        "sha256": "9ab19f7b958a17db152c11ac8a5a9de935828edc7fd82bcc4e43a120fd449a3e",
+        "alpha_measurement": {
+          "comparison": "preserved fractional alpha",
+          "absolute_error_limit": 3.0518043793392844e-05,
+          "maximum_absolute_error": 0.0,
+          "frame_maximum_absolute_errors": [
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "file": "files/photo-hdr.avif",
+      "sha256": "7f1fdd0b26e62f5318344a812a0589c8004d312ef0b15d6a89616c6076559e79",
+      "bytes": 1330801,
+      "label": "Old Apple photo / corrected full HDR / PQ AVIF12",
+      "dimensions": {
+        "width": 769,
+        "height": 1025
+      },
+      "role": "Inspected native conversion candidate",
+      "case_id": "gainmap-apple-old:hdr:avif:preserve:12:upscale:documented-full-native:precision-opaque-planar16",
+      "codec_status": "qualified",
+      "coding_scope": null,
+      "qualification_scope": "One explicit P3 AVIF12 upscale from inspected precise native PQ16 intent. Documented full effect only; other selectors and physical consumers require separate evidence.",
+      "rendering_scope": {
+        "source_full_headroom": 8,
+        "source_reference_revision": "apple-old-documented-full-rec709-linear-bilinear8-v1",
+        "output": "Fixed absolute PQ luminance, not an adaptive gain map",
+        "intermediate_adaptation_qualified": false
+      },
+      "warning": null
+    },
+    {
+      "file": "files/photo-sdr-reference.png",
+      "sha256": "bcdc345a2c7f846954f5897d5d824d1ceabb2cbaff89f16232b1b3e0b6c7482c",
+      "bytes": 402356,
+      "label": "Old Apple photo / authored SDR reference",
+      "dimensions": {
+        "width": 769,
+        "height": 1025
+      },
+      "role": "Independent matched-geometry authored SDR reference",
+      "case_id": null,
+      "codec_status": "source reference, not a conversion qualification",
+      "coding_scope": null,
+      "qualification_scope": null,
+      "rendering_scope": null,
+      "warning": null
+    },
+    {
+      "file": "files/wallpaper-brightness-hdr.avif",
+      "sha256": "0a7d9aac836388a1dd6658796e38b7b6f5f71acfdfecfa902d8bc30465a70a92",
+      "bytes": 90983,
+      "label": "Authored static opaque HDR display diagnostic",
+      "dimensions": {
+        "width": 1536,
+        "height": 2048
+      },
+      "role": "Authored static opaque HDR display diagnostic",
+      "case_id": null,
+      "codec_status": "authored display diagnostic; independently verified structure and test levels; not a conversion qualification"
+    },
+    {
+      "file": "files/wallpaper-brightness-sdr.png",
+      "sha256": "fa150ac80cb4f8fd36731e6704b4ce922e54a1ff52b39f8c6986ecc4945bfd40",
+      "bytes": 27947,
+      "label": "Authored SDR control, deliberately clipped at HDR reference white",
+      "dimensions": {
+        "width": 1536,
+        "height": 2048
+      },
+      "role": "Authored SDR control, deliberately clipped at HDR reference white",
+      "case_id": null,
+      "codec_status": "authored display diagnostic; independently verified structure and test levels; not a conversion qualification"
+    }
+  ]
+}

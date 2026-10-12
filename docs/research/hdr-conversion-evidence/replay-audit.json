@@ -1,0 +1,77 @@
+{
+  "native_run_completed": true,
+  "unit_tests": {
+    "run": 690,
+    "failures": 0,
+    "errors": 0
+  },
+  "suite_integrity_errors": [],
+  "evidence_errors": [],
+  "selector_control_failures": [],
+  "ledger_cell_count": 85,
+  "generic_sdr_control_count": 5,
+  "required_case_count": 320,
+  "milestone_qualified": false,
+  "native_cases": 3266,
+  "case_statuses": {
+    "qualified": 2576,
+    "tested and failed": 682,
+    "incompatible with the requested selectors": 8
+  },
+  "cell_statuses": {
+    "tested and failed": 32,
+    "incompatible with the requested selectors": 17,
+    "qualified": 15,
+    "untested": 17,
+    "deliberately deferred": 9
+  },
+  "product_coverage": {
+    "required_count": 320,
+    "qualified_count": 320,
+    "untested_count": 0
+  },
+  "rendering_coverage": {
+    "required_count": 25,
+    "qualified_count": 1,
+    "same_file_required_count": 20,
+    "same_file_qualified_count": 0
+  },
+  "source_hash_count": 217,
+  "source_hash_errors": [],
+  "manual_file_count": 1288,
+  "manual_hash_errors": [],
+  "manual_consumer_statuses": {
+    "pending manual review": 1288
+  },
+  "manual_manifest_sha256": "3a45da8ae354d943deea359a5198c32686fe3fd1972c2746565fceec1154dd98",
+  "tracked_nonresult_changes": [],
+  "case_id_counts": {
+    "old": 3229,
+    "new": 3266,
+    "added": 37,
+    "removed": 0
+  },
+  "status_changes": [],
+  "added_statuses": {
+    "qualified": 36,
+    "tested and failed": 1
+  },
+  "removed_case_ids": [],
+  "output_hashes": {
+    "conversion-matrix.json": "3d812bf1431423bab9b704a6533ddeb2c9701303a5066856dcea421f23232ad7",
+    "measurements.json": "9e05c95605bd1075d4ce196ee31bb173e23e66bac16e87dd5d7075aad90b5ad6",
+    "native-versions.json": "4be7f588bbe3f917383aa77bbfed0c467d8af16e8bb172a40f64722566a43f07",
+    "fixtures.json": "b7b6d36390bfd1315766e2c74a4a0a1186f8dc2171baf9918266355353e6c1b6",
+    "commands.json": "4b2c3cae202fe991012726d0c9869a88ed59fdd85d54431bf2260a4b48ddfc11",
+    "report.md": "b2a9dd86513ab1b090760309b5b1eae0ef5208c252cf0c7cfa57ec1a5f36d1ee"
+  },
+  "native_environment_unchanged_from_baseline": true,
+  "fixture_facts_unchanged_from_baseline": true,
+  "manual_shared_byte_changes": 0,
+  "manual_added_files": 101,
+  "manual_removed_files": 0,
+  "manual_total_bytes": 163483734,
+  "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+  "existing_case_artifact_hash_changes": [],
+  "selector_controls": 146
+}

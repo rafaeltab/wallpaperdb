@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "source_commit": "fd1c43e78134a5ecc0cd353a3ce099e02ed19392",
+  "release_url": "https://github.com/rafaeltab/wallpaperdb/releases/tag/hdr-proof-2026-10-11",
+  "artifacts": [
+    {
+      "file": "final-replay-results.tar.gz",
+      "sha256": "f155a4783c089f6c1fde6a2992a39128aa5cc39f7dde8b5bdb755f9e5c03fdfd",
+      "bytes": 178991851,
+      "url": "https://github.com/rafaeltab/wallpaperdb/releases/download/hdr-proof-2026-10-11/final-replay-results.tar.gz"
+    },
+    {
+      "file": "manual-review-files.zip",
+      "sha256": "d7da0b33cffc9ce99c8dec1eeef0fae0f4e952d0435abcc05078d1b3f8c52ed3",
+      "bytes": 2337910,
+      "url": "https://github.com/rafaeltab/wallpaperdb/releases/download/hdr-proof-2026-10-11/manual-review-files.zip"
+    }
+  ],
+  "repository_evidence_sha256": {
+    "assets.json": "6908d4d194146da1e698160448de7281d43475f7cbde7f66e0b8d1ac6737371d",
+    "consumer-observations.json": "59421fdc90a8d81a1b77a374dc411d6c188dbf6c01e620f5317be81e32a56f58",
+    "consumer-results.csv": "fd84aa39f854f8257872644b56f884e9b6adb0c6593b863dcdee79bb45ca816f",
+    "conversion-matrix.json": "59675006fd40bdea8bf7ec2fd484b1f2f4c8caa9809c56a427a2dfce22cc760f",
+    "native-versions.json": "4be7f588bbe3f917383aa77bbfed0c467d8af16e8bb172a40f64722566a43f07",
+    "replay-audit.json": "990f8815cb969a3e0422d117ea74aa41e86178177503bc4397fe8f1921c5921b"
+  },
+  "scope": "Research evidence only. No production implementation or all-consumer qualification."
+}

@@ -47,7 +47,7 @@ Redis was stopped for the outage run and restarted before the recovery run. This
 
 Run the gateway package's `load:admission` script through the shared Make `run` target. Its positional arguments are the GraphQL endpoint URL, the number of requests per row, and a phase label. The package script and [Makefile](../../../Makefile) are the command sources. For this run, those arguments were `http://localhost:8470/gateway/graphql 128 healthy`, then the same endpoint/count with `redis-outage` and `recovery`. Use an isolated development stack for the outage phase and restore its Redis container afterward. Allow the shared bucket to refill between larger runs so quota exhaustion does not obscure active-work measurements.
 
-The [HTTP lifecycle tests](../test/http-lifecycle.test.ts) separately exercise blocked backend work, a shortened configurable deadline, delayed cancellation finalizers, client disconnect, replica independence, and shutdown grace. They verify that timed-out work is interrupted, charged cost is retained, capacity remains occupied until cleanup settles, later nested resolvers do not execute after cancellation, and capacity recovers. Socket-based tests are the demonstration for this backend-only behavior; a browser video cannot establish cancellation or outstanding backend work.
+The [HTTP lifecycle tests](../test/http-lifecycle.unit.test.ts) separately exercise blocked backend work, a shortened configurable deadline, delayed cancellation finalizers, client disconnect, replica independence, and shutdown grace. They verify that timed-out work is interrupted, charged cost is retained, capacity remains occupied until cleanup settles, later nested resolvers do not execute after cancellation, and capacity recovers. Socket-based tests are the demonstration for this backend-only behavior; a browser video cannot establish cancellation or outstanding backend work.
 
 ## Completed admission and ingress measurements
 
@@ -123,11 +123,11 @@ The focused tests cover policy and infrastructure guarantees that a small load f
 
 | Guarantee | Evidence boundary |
 | --- | --- |
-| Weighted admission, fixed inspection penalty, local exhaustion/refill/recovery, bounded retained budgets | [Admission capability tests](../test/unit/admission.test.ts) through controlled quota adapters |
-| Selected operation and variables, cache repetition, query limits, spoofed identity, GET/POST, response codes/headers, OpenAPI contract | [GraphQL HTTP contract](../test/graphql-security.test.ts) |
-| Atomic shared reservations across replicas, denial without debit, real outage/reconnect, command saturation and deadlines, shared usage counts | [Redis adapter and composition tests](../test/redis.test.ts) against real Redis |
-| Separate per-replica active bounds, deadline/disconnect cancellation, retained charge and slots until cleanup, shutdown | [HTTP lifecycle tests](../test/http-lifecycle.test.ts) |
-| Production trust and enforcement configuration | [Configuration tests](../test/unit/config.test.ts) |
+| Weighted admission, fixed inspection penalty, local exhaustion/refill/recovery, bounded retained budgets | [Admission capability tests](../test/unit/admission.unit.test.ts) through controlled quota adapters |
+| Selected operation and variables, cache repetition, query limits, spoofed identity, GET/POST, response codes/headers, OpenAPI contract | [GraphQL HTTP contract](../test/graphql-security.unit.test.ts) |
+| Atomic shared reservations across replicas, denial without debit, real outage/reconnect, command saturation and deadlines, shared usage counts | [Redis adapter and composition tests](../test/redis.integration.test.ts) against real Redis |
+| Separate per-replica active bounds, deadline/disconnect cancellation, retained charge and slots until cleanup, shutdown | [HTTP lifecycle tests](../test/http-lifecycle.unit.test.ts) |
+| Production trust and enforcement configuration | [Configuration tests](../test/unit/config.unit.test.ts) |
 | One delayed 429 retry, manual 503 retry, cached content and paused pagination | [Web client and component tests](../../web/test) and the preceding web PR's recorded browser journey |
 | Cheap/expensive shared-IP bursts, local quota exhaustion, active-work overload, healthy recovery, paced rates and body ceiling | Measurements above |
 

@@ -1,0 +1,846 @@
+{
+  "schema_version": 1,
+  "scope": "Curated final structured results from user physical review. Superseded prompts, private screenshots, hardware model numbers and local paths omitted. Basis IDs map to locally retained source observations; current results are authoritative over historical pending text.",
+  "source_observations_sha256": "ddc39c6ded5fd66e1ef0a9a68bfe5ee7b1c39ce60a0900e05211af611ada0a14",
+  "consumer_row_key": [
+    "manual_session_id",
+    "file",
+    "consumer_path",
+    "application_version"
+  ],
+  "measurement_limit": "No absolute display luminance was measured. User-reported HDR/SDR overlay ratios are not measured nits or proof of encoded gain.",
+  "unqualified_consumers": [
+    "Mac/Safari/native viewer/wallpaper unavailable and untested",
+    "Firefox SDR presentation untested"
+  ],
+  "sessions": [
+    {
+      "id": "mac-safari-2026-10-04",
+      "device": "MacBook Pro, 16-inch, 2023",
+      "chip": "Apple M2 Max",
+      "os": "macOS Sonoma 14.5",
+      "os_build": null,
+      "browser": "Safari",
+      "browser_version": "17.5 (19618.2.12.11.6)",
+      "display_name": "Built-in Display",
+      "preset": "Apple XDR Display (P3-1600 nits)",
+      "brightness_user_description": "half",
+      "automatic_brightness": false,
+      "true_tone": true,
+      "night_shift": null,
+      "power_mode": null,
+      "ambient_light": null,
+      "manual_check_results": {},
+      "basis_observation_ids": [],
+      "scope": "Exact files, settings, application and consumer path only; subjective physical observations, not measured luminance or universal support.",
+      "availability": "Unavailable; not tested"
+    },
+    {
+      "id": "ipad-safari-2026-10-08",
+      "device": "iPad Pro 12.9-inch, 6th generation",
+      "os": "iPadOS 17.5.1",
+      "browser": "Safari",
+      "browser_version": null,
+      "brightness_user_description": "about half",
+      "true_tone": true,
+      "manual_check_results": {},
+      "basis_observation_ids": [
+        "ipad-safari-pq-full-size-first-observation",
+        "ipad-safari-pq-adjacent-white-first-observation"
+      ],
+      "scope": "Exact files, settings, application and consumer path only; subjective physical observations, not measured luminance or universal support.",
+      "status": "Historical iPadOS17.5.1 session superseded by the explicitly separate post-update session"
+    },
+    {
+      "id": "ipad-safari-after-update-2026-10-10",
+      "device": "iPad Pro 12.9-inch, 6th generation",
+      "os": "iPadOS 27.0.1",
+      "browser": "Safari",
+      "browser_version": null,
+      "brightness_user_description": "about half",
+      "true_tone": true,
+      "manual_check_results": {
+        "pq_supplemental_visible_hdr": {
+          "status": "passed",
+          "basis_observation_id": "pq-same-file-display-control-and-red-hue-first-observation",
+          "scope": "Only files/color-chart-pq-rec2020-hdr.avif in this iPad Safari session",
+          "not_established": [
+            "numerical luminance accuracy",
+            "full color fidelity",
+            "qualification of native SDR conversion",
+            "qualification of all PQ AVIF variants",
+            "native-viewer behavior",
+            "wallpaper behavior"
+          ]
+        },
+        "pq_supplemental_sdr_color": {
+          "status": "unqualified; confirmed clipping limitation",
+          "concern": "Fourth color row shows strongest hue difference versus browser-limited HDR; broad patch differences reported. User sees rows3 and4 matching in SDR. Native measurements confirm exact collapse of first-column bright-red intensities.",
+          "scope": "Supplemental PQ sRGB PNG only; existing qualified cases in archived matrix are not changed."
+        },
+        "hlg_supplemental_hdr_appearance": {
+          "status": "positive user report; HDR displays correctly",
+          "scope": "Supplemental HLG chart in this iPad Safari session",
+          "controlled_hdr_vs_sdr_limit": "not tested; only PQ has the control in revision5",
+          "numeric_luminance": "not measured"
+        },
+        "hlg_supplemental_sdr_color": {
+          "status": "unqualified; red appearance concern and bright-red intensity collapse confirmed"
+        },
+        "pq_hlg_supplemental_sdr_highlight_ramp": {
+          "status": "nearly flat appearance reported; numerical ramps retain compressed variation without full-white clipping; perceptual quality unqualified",
+          "band": "third grayscale strip, y64..95; authored neutral203..1000nits"
+        },
+        "photograph_natural_appearance": {
+          "status": "passed subjective visual check",
+          "basis_observation_id": "photograph-natural-appearance-and-highlight-detail",
+          "scope": "Only the exact photographic HDR AVIF and authored SDR PNG reference in this iPad Safari session",
+          "hdr_highlights": "Brighter and natural, especially outside buildings",
+          "sdr_detail": "User thinks details remain distinguishable; more washed out than HDR but believable",
+          "not_established": [
+            "qualification of native HDR-to-SDR conversion",
+            "numerical luminance accuracy",
+            "adaptive gain-map rendering",
+            "native-viewer behavior",
+            "wallpaper behavior",
+            "other devices"
+          ]
+        },
+        "animated_hdr_avif_browser": {
+          "status": "failed both comparison-page and direct-file presentation; unqualified",
+          "basis_observation_id": "animation-hdr-direct-file-white-page",
+          "scope": "Only this exact animation HDR AVIF in the current iPad Safari session",
+          "root_cause": "Not isolated; comparison-page layout and controls are not required for failure",
+          "direct_file_check": "failed: white page and no visible image",
+          "sdr_animation_result": "SDR plays after replay; full fidelity pending",
+          "original_animation_check": "pending"
+        },
+        "animated_sdr_webp_browser": {
+          "status": "passed basic visible playback, transparency visibility and no-outline visual check as reported; exact timing, loop and full appearance pending",
+          "basis_observation_id": "animation-replay-sdr-plays-hdr-checkerboard-only",
+          "scope": "Exact SDR WebP in this iPad Safari session",
+          "earlier_no_motion_observation": "Resolved for basic playback by user-confirmed replay",
+          "not_established": [
+            "exact frame durations",
+            "exact loop count",
+            "fractional alpha fidelity",
+            "color fidelity",
+            "native-viewer behavior",
+            "wallpaper behavior"
+          ],
+          "transparency_observation_id": "animation-sdr-checkerboard-visible",
+          "transparency": "Checkerboard visible; red more transparent than green, then blue; authored ordering independently checked",
+          "edge_observation_id": "animation-sdr-no-outlines-opacity-order",
+          "edge_quality": "No outlines reported; blurred transitions; transparency ordering agrees with authored alpha",
+          "per_background_settings": "Question requested both backgrounds; reply reports no outlines without logging each setting separately"
+        },
+        "animated_hdr_avif_quick_look": {
+          "status": "failed to open according to user; unqualified",
+          "basis_observation_id": "animation-hdr-quick-look-unrecognized-other-app-preview",
+          "scope": "Downloaded animation-hdr.avif offered in this session; Files Quick Look on iPadOS27.0.1",
+          "exact_error": "not supplied",
+          "other_viewers": "Preview subsequently tested: AVIF greyed out; Photos untested; playground attachment representation not qualified"
+        },
+        "animated_hdr_avif_preview": {
+          "status": "failed file-opening path: extracted AVIF greyed out and not selectable; unqualified",
+          "basis_observation_id": "animation-hdr-preview-file-greyed-out",
+          "scope": "Apple Preview on this iPad and this exact offered AVIF",
+          "decode": "Not reached through tested UI",
+          "other_native_viewers": "Photos untested; unspecified playground attachment representation unqualified"
+        },
+        "gainmap_jpeg_browser": {
+          "status": "failed: severe false colors; unqualified",
+          "basis_observation_id": "gainmap-jpeg-severe-false-colors",
+          "scope": "Exact gainmap-hdr.jpg on this iPad Safari session",
+          "visible_hdr_brightness": "not established",
+          "root_cause": "Not isolated; do not equate with prior boost2 or stock-reader failures",
+          "original_source_control": "Completed: original looks natural and clouds reportedly exceed page white; derived remains a severe-color failure",
+          "other_consumers": "Native viewers and wallpaper untested for this JPEG"
+        },
+        "gainmap_original_jpeg_browser": {
+          "status": "positive: settled appearance natural; clouds reported above white background",
+          "basis_observation_id": "gainmap-original-natural-colors-gradual-brightening",
+          "scope": "Exact original JPEG directly viewed in this iPad Safari session",
+          "brightness_transition": "Gradual increase reported; cause and repeatability untested",
+          "not_established": [
+            "numerical luminance accuracy",
+            "specific display-headroom gain-map model",
+            "all-source or all-viewer support",
+            "qualification of the converted JPEG",
+            "native-viewer or wallpaper behavior"
+          ]
+        },
+        "photograph_hdr_preview": {
+          "status": "passed subjective natural appearance with reported brighter HDR highlights than authored SDR reference",
+          "basis_observation_id": "photograph-hdr-preview-natural-appearance",
+          "scope": "Exact photo-hdr.avif in Apple Preview on this iPad",
+          "not_established": [
+            "numerical luminance/color accuracy",
+            "wallpaper behavior",
+            "other AVIF variants"
+          ],
+          "authored_sdr_reference": "Both files natural; user confirms brighter HDR outdoor-building highlights",
+          "brightness_observation_id": "photograph-preview-brighter-hdr-highlights"
+        },
+        "photograph_pair_preview": {
+          "status": "passed subjective natural appearance with reported brighter HDR highlights than authored SDR reference",
+          "basis_observation_id": "photograph-preview-both-believable",
+          "scope": "Exact HDR AVIF and authored SDR PNG in Apple Preview on this iPad",
+          "not_established": [
+            "numerical color/luminance accuracy",
+            "qualification of native HDR-to-SDR conversion",
+            "wallpaper behavior"
+          ],
+          "brightness_observation_id": "photograph-preview-brighter-hdr-highlights"
+        },
+        "sdr_jpeg_wallpaper": {
+          "status": "passed scoped compatibility, natural appearance and orientation/rotation",
+          "basis_observation_id": "sdr-jpeg-wallpaper-natural-colors-rotation",
+          "scope": "This exact offered explicit SDR JPEG through the iPad wallpaper flow in this session",
+          "sharpness": "Blurred;173x130 compatibility fixture only",
+          "not_established": [
+            "production-resolution wallpaper quality",
+            "exact OS crop/zoom mode",
+            "byte preservation after Photos import/system processing",
+            "numeric color fidelity",
+            "separate Home Screen result",
+            "HDR wallpaper behavior",
+            "other devices"
+          ]
+        },
+        "photograph_hdr_wallpaper": {
+          "status": "accepted as wallpaper; visible HDR inconclusive",
+          "basis_observation_id": "photograph-hdr-wallpaper-accepted-brightness-uncertain",
+          "scope": "Offered photo-hdr.avif on this iPad",
+          "not_established": [
+            "retained HDR in installed wallpaper",
+            "physical luminance or headroom",
+            "exact wallpaper crop or system pixel conversion",
+            "other devices"
+          ],
+          "subsequent_diagnostic": "Neutral diagnostic subsequently shows clear loss of Preview brightness; no HDR wallpaper qualification"
+        },
+        "neutral_hdr_wallpaper": {
+          "status": "failed subjective visible-HDR preservation compared with Preview",
+          "basis_observation_id": "neutral-hdr-wallpaper-loses-preview-brightness",
+          "scope": "Exact neutral PQ12 P3 AVIF through this iPad wallpaper flow",
+          "sdr_control": "untested by user choice",
+          "root_cause": "Unestablished; visible brightness loss alone does not prove an internal SDR conversion"
+        }
+      },
+      "basis_observation_ids": [
+        "after-update-general-appearance",
+        "pq-same-file-display-control-and-red-hue-first-observation",
+        "hlg-display-reds-and-pq-hlg-highlight-flatness",
+        "photograph-natural-appearance-and-highlight-detail",
+        "animation-hdr-no-visible-image",
+        "animation-sdr-no-motion-observed",
+        "animation-replay-sdr-plays-hdr-checkerboard-only",
+        "animation-hdr-direct-file-white-page",
+        "animation-hdr-quick-look-unrecognized-other-app-preview",
+        "animation-hdr-preview-file-greyed-out",
+        "animation-sdr-checkerboard-visible",
+        "animation-sdr-no-outlines-opacity-order",
+        "gainmap-jpeg-severe-false-colors",
+        "gainmap-original-natural-colors-gradual-brightening",
+        "photograph-hdr-preview-natural-appearance",
+        "photograph-preview-both-believable",
+        "photograph-preview-brighter-hdr-highlights",
+        "sdr-jpeg-wallpaper-natural-colors-rotation",
+        "photograph-hdr-wallpaper-accepted-brightness-uncertain",
+        "neutral-hdr-wallpaper-loses-preview-brightness"
+      ],
+      "scope": "Exact files, settings, application and consumer path only; subjective physical observations, not measured luminance or universal support.",
+      "status": "Representative review recorded; failures and detailed limits remain unqualified",
+      "supplemental_sdr_color_investigation": {
+        "artifact": "[local path omitted]",
+        "sha256": "4eb47bda99f763a26319a951ced698d718409739fe1152aad5b054e92233b4d1",
+        "confirmed": "Native SDR output clips out-of-gamut colors; the two brightest saturated first-column red tiles become identical sRGB red.",
+        "unknown": "Exact user patch and cause of perceived orange shift; encoded first-column saturated reds contain no green or blue.",
+        "status": "Confirmed clipping and bright-red intensity collapse in the SDR candidate; subjective red-orange appearance cause not isolated. SDR fidelity remains unqualified.",
+        "confirmed_user_color_row_one_based": 4,
+        "remaining_user_coordinates": "Exact red column not explicitly confirmed; fourth color row is strongest. User confirms row3/row4 similarity is within the SDR PNG.",
+        "manual_numerical_agreement": "User reports rows3 and4 visually matching. Native measurements establish exact equality of the first-column saturated red patches in those rows despite different source intensities. Equality of all pixels across both rows is not claimed."
+      }
+    },
+    {
+      "id": "galaxy-chrome-2026-10-11",
+      "device": "Samsung Galaxy S26 Ultra",
+      "os": "Android16",
+      "browser": "Chrome",
+      "browser_version": "154.0.8037.126",
+      "brightness_user_description": "halfway, confirmed by user",
+      "adaptive_brightness": {
+        "usual": true,
+        "requested_for_test": false,
+        "confirmed_for_test": false
+      },
+      "power_saving": false,
+      "other_display_settings": "Unknown; no changes requested",
+      "gallery_version": "15.8.00.81",
+      "manual_check_results": {
+        "neutral_pq_browser": {
+          "status": "passed scoped controlled visible-HDR check",
+          "basis_observation_ids": [
+            "galaxy-neutral-hdr-strong-brightness-first-report",
+            "galaxy-neutral-pq-above-css-white-confirmed"
+          ],
+          "scope": "Exact wallpaper-brightness-hdr.avif in this Galaxy Chrome154.0.8037.126 session",
+          "not_established": [
+            "measured screen luminance or actual display peak",
+            "full color fidelity",
+            "other HDR file encodings",
+            "native Gallery or wallpaper behavior"
+          ],
+          "settings_note": "Brightness halfway and Adaptive brightness off, confirmed by user; Power saving off reported earlier"
+        },
+        "photograph_pair_browser": {
+          "status": "passed subjective natural appearance and brighter HDR outdoor buildings",
+          "basis_observation_id": "galaxy-photograph-natural-hdr-highlight-advantage",
+          "scope": "Exact photographic PQ12 P3 AVIF and authored SDR PNG in this Galaxy Chrome session",
+          "not_established": [
+            "cloud-highlight comparison",
+            "fine-detail retention",
+            "numeric color/luminance fidelity",
+            "HDR-to-SDR conversion quality",
+            "Gallery or wallpaper behavior"
+          ]
+        },
+        "hlg_chart_browser": {
+          "status": "passed subjective above-CSS-white HDR brightness check",
+          "basis_observation_id": "galaxy-hlg-highlight-above-css-white",
+          "scope": "Exact HLG12 Rec2020 chart in this Galaxy Chrome session",
+          "not_established": [
+            "same-file SDR-limit control",
+            "numeric luminance",
+            "full color or SDR conversion fidelity",
+            "native Gallery or wallpaper"
+          ]
+        },
+        "browser_chart_colors": {
+          "status": "No obvious hue shift reported; subtle comparison inconclusive",
+          "basis_observation_id": "galaxy-seven-check-batch-results",
+          "scope": "Supplemental PQ/HLG chart review",
+          "clarification": "Compare SDR against HDR within each chart separately. PQ-versus-HLG is not the requested hue comparison.",
+          "not_established": [
+            "formal color fidelity",
+            "separate PQ and HLG comparison results",
+            "dark detail,banding and halos"
+          ],
+          "existing_native_failures": "Unchanged: supplemental SDR chart clipping/bright-red collapse remain unqualified"
+        },
+        "browser_animation": {
+          "status": "Both HDR AVIF and SDR WebP animate with good apparent translucency; HDR white corner reported brighter than SDR",
+          "scope": "Exact offered animation pair in Galaxy Chrome",
+          "not_established": [
+            "controlled above-CSS-white comparison",
+            "exact timing and repeats",
+            "stop/replay behavior",
+            "brightness stability",
+            "original animation browser result",
+            "numeric alpha accuracy and detailed edge assessment"
+          ],
+          "basis_observation_ids": [
+            "galaxy-seven-check-batch-results",
+            "galaxy-browser-alpha-and-jpeg-wallpaper-hdr-loss"
+          ],
+          "alpha": "Passed subjective translucency check for both files; no numeric alpha measurement"
+        },
+        "browser_gainmap_jpeg": {
+          "status": "Converted HDR JPEG looks natural and believable; user perceives HDR",
+          "basis_observation_id": "galaxy-seven-check-batch-results",
+          "scope": "Exact gainmap-hdr.jpg in Galaxy Chrome",
+          "original_control": "Both reported believable, but original JPEG versus shown SDR reference not unambiguously separated",
+          "not_established": [
+            "numeric gain-map fidelity",
+            "headroom adaptation",
+            "full native qualification"
+          ],
+          "existing_native_failures": "Prior boost2 and stock-reader failures remain unchanged"
+        },
+        "gallery_still_files": {
+          "status": "Mixed: photographic HDR AVIF fails appearance; SDR photo and both gain-map JPEGs look normal",
+          "basis_observation_id": "galaxy-seven-check-batch-results",
+          "mapping": "Answers interpreted in requested filename order",
+          "files": {
+            "photo-hdr.avif": "green/pink appearance failure",
+            "photo-sdr-reference.png": "normal appearance",
+            "gainmap-original.jpg": "normal appearance; HDR brightness not separately stated",
+            "gainmap-hdr.jpg": "Normal appearance and visible HDR; same-file control subsequently brightens gradually with overlay rise from 1.00 to 4.99"
+          },
+          "app": "Samsung Gallery15.8.00.81",
+          "not_established": [
+            "orientation for individual stills",
+            "numeric color/luminance accuracy",
+            "neutral HDR chart full-view baseline; screenshot shows thumbnail corruption"
+          ],
+          "gainmap_overlay_observation_id": "galaxy-jpeg-gallery-ratio-control-and-both-wallpaper-screens"
+        },
+        "gallery_animation": {
+          "status": "HDR source and derivative fail color appearance and are reported still; SDR WebP normal and animated",
+          "basis_observation_id": "galaxy-seven-check-batch-results",
+          "files": {
+            "animation-hdr.avif": "green/pink; reported still",
+            "animation-original.avif": "green/pink; reported still",
+            "animation-sdr.webp": "normal; animation shows"
+          },
+          "motion_limit": "Both AVIF sequences stop after three one-second plays. Still observation is insufficient to establish lack of playback without observing initial/repeated opening.",
+          "not_established": [
+            "exact loop/timing",
+            "alpha fidelity",
+            "initial HDR playback"
+          ],
+          "app": "Samsung Gallery15.8.00.81"
+        },
+        "sdr_jpeg_wallpaper": {
+          "status": "Passed scoped acceptance,natural appearance and orientation on Home Screen and Lock Screen",
+          "basis_observation_id": "galaxy-seven-check-batch-results",
+          "file": "files/wallpaper-sdr.jpg",
+          "crop": "Landscape image cropped to portrait phone display; horizon remains aligned with real-world horizon",
+          "not_established": [
+            "exact crop/zoom settings",
+            "production-resolution sharpness",
+            "numeric color fidelity",
+            "byte preservation after import"
+          ]
+        },
+        "hdr_avif_wallpaper": {
+          "status": "Failed color appearance on Home Screen for both photographic and neutral HDR AVIF",
+          "basis_observation_id": "galaxy-seven-check-batch-results",
+          "files": [
+            "files/photo-hdr.avif",
+            "files/wallpaper-brightness-hdr.avif"
+          ],
+          "color": "Green/pink or green appearance",
+          "hdr_retention": "Not qualified because appearance fails; user declines SDR comparison",
+          "sdr_control": "Explicitly not tested",
+          "other_screen": "HDR Lock Screen result not separately reported",
+          "cause": "Not isolated; no claim of an identified Samsung decoder bug or universal AVIF non-support"
+        },
+        "gainmap_jpeg_wallpaper": {
+          "status": "Wallpaper acceptance passed; visible HDR retention failed on both Home Screen and Lock Screen",
+          "scope": "Exact offered gainmap-hdr.jpg on both wallpaper screens of this Galaxy under the recorded settings",
+          "file": "files/gainmap-hdr.jpg",
+          "sha256": "50fcfb8f31c9da4fca968f608e3cb0e41cd672247b3d3f8fa9fc83de7e702517",
+          "visible_hdr_retention": "Failed on both screens: user sees loss of HDR and reports overlay 1.00; same JPEG visibly brightens in Gallery as overlay rises from 1.00 to 4.99",
+          "overlay_reading": {
+            "exact_setting_name": "Developer options > Show HDR/SDR ratio",
+            "source": "User reports of physical device overlay; not agent telemetry or measured luminance",
+            "gallery_positive_control": {
+              "file": "files/gainmap-hdr.jpg",
+              "application": "Samsung Gallery 15.8.00.81",
+              "start_value_as_reported": "1.00",
+              "end_value_as_reported": "4.99",
+              "transition": "Climbs gradually while the image visibly becomes brighter",
+              "elapsed_time": "Not measured"
+            },
+            "wallpaper_value_as_reported": "1.00",
+            "wallpaper_screens": [
+              "Home Screen",
+              "Lock Screen"
+            ]
+          },
+          "not_established": [
+            "wallpaper color fidelity and crop/orientation",
+            "internal conversion or stored file representation",
+            "measured luminance"
+          ],
+          "native_qualification": "Unchanged; previous gain-map headroom adaptation failures remain",
+          "basis_observation_ids": [
+            "galaxy-browser-alpha-and-jpeg-wallpaper-hdr-loss",
+            "galaxy-jpeg-gallery-ratio-control-and-both-wallpaper-screens"
+          ]
+        },
+        "gallery_gainmap_hdr_ratio": {
+          "status": "Positive same-file visible-HDR control: gradual brightening accompanies reported overlay rise from 1.00 to 4.99",
+          "basis_observation_id": "galaxy-jpeg-gallery-ratio-control-and-both-wallpaper-screens",
+          "file": "files/gainmap-hdr.jpg",
+          "sha256": "50fcfb8f31c9da4fca968f608e3cb0e41cd672247b3d3f8fa9fc83de7e702517",
+          "overlay_reading": {
+            "exact_setting_name": "Developer options > Show HDR/SDR ratio",
+            "source": "User reports of physical device overlay; not agent telemetry or measured luminance",
+            "gallery_positive_control": {
+              "file": "files/gainmap-hdr.jpg",
+              "application": "Samsung Gallery 15.8.00.81",
+              "start_value_as_reported": "1.00",
+              "end_value_as_reported": "4.99",
+              "transition": "Climbs gradually while the image visibly becomes brighter",
+              "elapsed_time": "Not measured"
+            },
+            "wallpaper_value_as_reported": "1.00",
+            "wallpaper_screens": [
+              "Home Screen",
+              "Lock Screen"
+            ]
+          },
+          "scope": "Samsung Gallery 15.8.00.81 on this Galaxy under the recorded settings",
+          "not_established": [
+            "absolute luminance",
+            "exact ramp duration",
+            "quantitative gain-map fidelity or headroom adaptation qualification"
+          ]
+        }
+      },
+      "basis_observation_ids": [
+        "galaxy-preflight-settings",
+        "galaxy-neutral-hdr-strong-brightness-first-report",
+        "galaxy-neutral-pq-above-css-white-confirmed",
+        "galaxy-photograph-natural-hdr-highlight-advantage",
+        "galaxy-hlg-highlight-above-css-white",
+        "galaxy-seven-check-batch-results",
+        "galaxy-gallery-version-and-display-settings-confirmed",
+        "galaxy-browser-alpha-and-jpeg-wallpaper-hdr-loss",
+        "galaxy-jpeg-gallery-ratio-control-and-both-wallpaper-screens"
+      ],
+      "scope": "Exact files, settings, application and consumer path only; subjective physical observations, not measured luminance or universal support.",
+      "status": "Representative review recorded; failures and detailed limits remain unqualified",
+      "user_reported_overlay": {
+        "exact_setting_name": "Developer options > Show HDR/SDR ratio",
+        "source": "User reports of physical device overlay; not agent telemetry or measured luminance",
+        "gallery_positive_control": {
+          "file": "files/gainmap-hdr.jpg",
+          "application": "Samsung Gallery 15.8.00.81",
+          "start_value_as_reported": "1.00",
+          "end_value_as_reported": "4.99",
+          "transition": "Climbs gradually while the image visibly becomes brighter",
+          "elapsed_time": "Not measured"
+        },
+        "wallpaper_value_as_reported": "1.00",
+        "wallpaper_screens": [
+          "Home Screen",
+          "Lock Screen"
+        ]
+      }
+    },
+    {
+      "id": "windows-chrome-2026-10-11",
+      "device": "Windows PC with Dell AW2725DF display",
+      "os": "Windows 11",
+      "os_version_as_reported": "10.0.26220 Build 26220",
+      "browser": "Chrome",
+      "browser_version": "155.0.8059.40",
+      "browser_build_description": "64-bit official build",
+      "display_model_as_reported": "Dell AW2725DF",
+      "display_profile_as_reported": "HDR Peak 1000",
+      "windows_hdr_enabled": true,
+      "auto_hdr_enabled": true,
+      "display_calibration_user_report": "Has not run the Display Calibration tool; no claim about pre-existing factory/driver profiles",
+      "sdr_content_brightness": {
+        "description": "exactly halfway",
+        "numeric_value": "not separately supplied"
+      },
+      "monitor_brightness": "Not separately reported; SDR content brightness is a Windows setting",
+      "native_viewers": [
+        {
+          "application": "ImageGlass",
+          "version": "8.8.4.4"
+        },
+        {
+          "application": "Microsoft Photos",
+          "version": "2025.11100.9001.0"
+        }
+      ],
+      "actual_display_luminance": "not measured",
+      "manual_check_results": {
+        "neutral_pq_browser": {
+          "status": "Partial control recorded; Allow HDR high patches versus divider not explicitly reported",
+          "basis_observation_id": "windows-six-check-batch-results",
+          "file": "files/wallpaper-brightness-hdr.avif",
+          "allow_hdr": {
+            "1000_vs_4000": "No visible difference; user notes non-adjacency could hide slight difference",
+            "divider_vs_203": "Divider brighter",
+            "1000_4000_vs_divider": "Not explicitly reported"
+          },
+          "limit_sdr": {
+            "1000_vs_4000": "No visible difference; same non-adjacency caveat",
+            "divider_vs_1000_4000": "Same color"
+          },
+          "not_established": [
+            "controlled disappearance of above-divider brightness",
+            "numeric luminance",
+            "maximum display peak"
+          ]
+        },
+        "photograph_pair_browser": {
+          "status": "Both natural; SDR base brighter, HDR outdoor buildings brighter",
+          "basis_observation_id": "windows-six-check-batch-results",
+          "hdr": "files/photo-hdr.avif",
+          "sdr": "files/photo-sdr-reference.png",
+          "scope": "Subjective appearance of exact pair",
+          "not_established": [
+            "HDR-to-SDR conversion fidelity; SDR is an authored reference",
+            "quantitative color/luminance accuracy",
+            "individual shadow/highlight detail checks"
+          ]
+        },
+        "pq_chart_browser": {
+          "status": "Passed scoped subjective above-CSS-white HDR brightness check",
+          "basis_observation_id": "windows-six-check-batch-results",
+          "file": "files/color-chart-pq-rec2020-hdr.avif",
+          "observation": "Third gray strip significantly brighter than adjacent white block",
+          "color": "Looks about the same as remembered from other devices; detailed hue/shadow/banding observations not separately supplied",
+          "not_established": [
+            "same-file range-limit control on this chart",
+            "full color fidelity",
+            "native viewer or wallpaper qualification"
+          ]
+        },
+        "hlg_chart_browser": {
+          "status": "Passed scoped subjective above-CSS-white HDR brightness check",
+          "basis_observation_id": "windows-six-check-batch-results",
+          "file": "files/color-chart-hlg-rec2020-hdr.avif",
+          "observation": "Third gray strip significantly brighter than adjacent white block",
+          "color": "Looks about the same as remembered from other devices; detailed hue/shadow/banding observations not separately supplied",
+          "not_established": [
+            "full color fidelity",
+            "same-file SDR-limit control",
+            "native viewer or wallpaper qualification"
+          ]
+        },
+        "browser_animation": {
+          "status": "Both animate with apparent translucency; HDR white corner brighter; perceived red/green alpha appearance differs",
+          "basis_observation_id": "windows-six-check-batch-results",
+          "files": [
+            "files/animation-hdr.avif",
+            "files/animation-sdr.webp"
+          ],
+          "alpha": "SDR red and green appear more translucent; user suggests stronger HDR colors may affect the impression",
+          "not_established": [
+            "quantitative alpha accuracy",
+            "cause of perceived translucency difference",
+            "exact timing/repeats and replay",
+            "detailed edge/flicker assessment",
+            "original HDR animation browser result"
+          ]
+        },
+        "browser_gainmap_jpeg": {
+          "status": "Original JPEG good with brighter clouds; converted JPEG bright HDR highlights confirmed; converted natural-color judgment not separately supplied",
+          "basis_observation_id": "windows-six-check-batch-results",
+          "original": "files/gainmap-original.jpg",
+          "converted": "files/gainmap-hdr.jpg",
+          "converted_status": "Positive subjective bright-HDR-highlight report",
+          "not_established": [
+            "separate converted JPEG natural-color judgment",
+            "gain-map headroom adaptation",
+            "quantitative fidelity"
+          ],
+          "converted_observation_id": "windows-viewer-versions-and-converted-jpeg-highlights"
+        },
+        "explorer_thumbnails": {
+          "status": "Failed red-dominated appearance for the four tested HDR AVIF thumbnails",
+          "basis_observation_id": "windows-six-check-batch-results",
+          "files": [
+            "files/photo-hdr.avif",
+            "files/animation-hdr.avif",
+            "files/animation-original.avif",
+            "files/wallpaper-brightness-hdr.avif"
+          ],
+          "not_established": [
+            "luminance",
+            "animation playback",
+            "full-view appearance",
+            "decoder root cause"
+          ]
+        },
+        "native_viewers": {
+          "status": "Viewer-specific findings recorded for ImageGlass 8.8.4.4 and Microsoft Photos 2025.11100.9001.0",
+          "basis_observation_id": "windows-six-check-batch-results",
+          "applications": {
+            "ImageGlass": {
+              "version": "8.8.4.4",
+              "files": {
+                "photo-hdr.avif": {
+                  "appearance": "Desaturated, not convincing",
+                  "visible_hdr": "No visible HDR reported",
+                  "result": "Failed convincing HDR photo appearance and visible-HDR presentation"
+                },
+                "photo-sdr-reference.png": {
+                  "appearance": "Convincing SDR",
+                  "result": "Passed subjective SDR appearance"
+                },
+                "gainmap-original.jpg": {
+                  "appearance": "Convincing",
+                  "visible_hdr": "Probably HDR but hard to tell; inconclusive",
+                  "result": "Passed subjective natural colors; HDR unqualified"
+                },
+                "gainmap-hdr.jpg": {
+                  "appearance": "Convincing",
+                  "visible_hdr": "Probably HDR but hard to tell; inconclusive",
+                  "result": "Passed subjective natural colors; HDR unqualified"
+                },
+                "gainmap-sdr-reference.png": {
+                  "appearance": "Convincing",
+                  "result": "Passed subjective SDR appearance"
+                },
+                "animation-hdr.avif": {
+                  "appearance": "Less bright than SDR",
+                  "visible_hdr": "Not qualified",
+                  "animation": "Reported still",
+                  "result": "Visible HDR and animation unqualified"
+                },
+                "animation-sdr.webp": {
+                  "appearance": "Normal",
+                  "animation": "Animated",
+                  "alpha": "Not separately assessed",
+                  "result": "Passed subjective appearance and basic playback"
+                },
+                "animation-original.avif": {
+                  "appearance": "Less bright than SDR",
+                  "visible_hdr": "Not qualified",
+                  "animation": "Reported still",
+                  "result": "Visible HDR and animation unqualified"
+                },
+                "wallpaper-sdr.jpg": {
+                  "appearance": "Convincing",
+                  "result": "Passed subjective SDR appearance"
+                },
+                "wallpaper-brightness-hdr.avif": {
+                  "appearance": "4000 brighter than 1000 brighter than 203",
+                  "visible_hdr": "User reports no HDR brightness despite retained patch differences",
+                  "result": "Failed reported visible-HDR presentation; patch contrast retained"
+                },
+                "wallpaper-brightness-sdr.png": {
+                  "appearance": "203,1000,4000 equal",
+                  "result": "Expected equal-white SDR control appearance"
+                }
+              }
+            },
+            "Microsoft Photos": {
+              "version": "2025.11100.9001.0",
+              "files": {
+                "photo-hdr.avif": {
+                  "appearance": "Weird bright red",
+                  "visible_hdr": "Not qualified because appearance fails",
+                  "result": "Failed color appearance"
+                },
+                "photo-sdr-reference.png": {
+                  "appearance": "Normal",
+                  "result": "Passed subjective SDR appearance"
+                },
+                "gainmap-original.jpg": {
+                  "appearance": "Normal",
+                  "visible_hdr": "Does not look HDR; user unsure",
+                  "result": "Passed subjective natural colors; HDR unqualified"
+                },
+                "gainmap-hdr.jpg": {
+                  "appearance": "Normal",
+                  "visible_hdr": "Does not look HDR; user unsure",
+                  "result": "Passed subjective natural colors; HDR unqualified"
+                },
+                "gainmap-sdr-reference.png": {
+                  "appearance": "Normal",
+                  "result": "Passed subjective SDR appearance"
+                },
+                "animation-hdr.avif": {
+                  "appearance": "Bright red",
+                  "visible_hdr": "Not qualified because appearance fails",
+                  "animation": "Reported not animated",
+                  "result": "Failed color appearance; animation unqualified"
+                },
+                "animation-sdr.webp": {
+                  "appearance": "Normal",
+                  "animation": "Reported not animated",
+                  "alpha": "User cannot tell whether opacity works",
+                  "result": "Passed subjective colors; playback and alpha unqualified"
+                },
+                "animation-original.avif": {
+                  "appearance": "Bright red",
+                  "visible_hdr": "Not qualified because appearance fails",
+                  "animation": "Reported not animated",
+                  "result": "Failed color appearance; animation unqualified"
+                },
+                "wallpaper-sdr.jpg": {
+                  "appearance": "Normal",
+                  "result": "Passed subjective SDR appearance"
+                },
+                "wallpaper-brightness-hdr.avif": {
+                  "appearance": "Red:4000 brightest and almost orange,1000 strong red,203 dark red",
+                  "visible_hdr": "Unqualified; patch brightness differences and red appearance do not prove HDR",
+                  "result": "Failed neutral color appearance"
+                },
+                "wallpaper-brightness-sdr.png": {
+                  "appearance": "203,1000,4000 equal",
+                  "result": "Expected equal-white SDR control appearance"
+                }
+              }
+            }
+          },
+          "animation_limit": "Still/not animated is the reported observation, not independently proven lack of decoder support. These sequences finish after three short cycles; observation immediately after reopening was not explicitly confirmed.",
+          "version_observation_id": "windows-viewer-versions-and-converted-jpeg-highlights"
+        },
+        "desktop_wallpaper": {
+          "status": "SDR JPEG natural and correctly oriented; HDR AVIF red failure; gain-map JPEG appears SDR-like",
+          "basis_observation_id": "windows-six-check-batch-results",
+          "method": "File Explorer right click > set as desktop background",
+          "screen": "Desktop",
+          "files": {
+            "wallpaper-sdr.jpg": {
+              "acceptance": "Passed",
+              "appearance": "Normal SDR",
+              "orientation": "Correct",
+              "crop": "Not reported",
+              "status": "Passed scoped SDR compatibility and orientation"
+            },
+            "photo-hdr.avif": {
+              "acceptance": "Installed",
+              "appearance": "Very red",
+              "hdr_retention": "Unqualified because appearance fails",
+              "status": "Failed color appearance"
+            },
+            "gainmap-hdr.jpg": {
+              "acceptance": "Installed",
+              "appearance": "Looks exactly the same as SDR version",
+              "hdr_retention": "User does not think HDR is showing; perceived failure, with no confirmed native JPEG HDR baseline",
+              "status": "Visible HDR not demonstrated; reported SDR-like desktop appearance"
+            }
+          },
+          "not_established": [
+            "exact fit/crop",
+            "stored file representation or internal conversion",
+            "numeric luminance"
+          ],
+          "other_screen_result": "See separate lock_screen_wallpaper result; desktop and lock-screen outcomes differ"
+        },
+        "lock_screen_wallpaper": {
+          "status": "Lock Screen rejects selection of tested AVIF; both JPEGs look normal, with no visible HDR for gain-map JPEG",
+          "basis_observation_id": "windows-lock-screen-avif-unselectable-jpegs-sdr-like",
+          "method": "Windows Settings lock-screen picture picker, following supplied guidance",
+          "screen": "Lock Screen",
+          "files": {
+            "photo-hdr.avif": {
+              "acceptance": "Cannot select in picker",
+              "appearance": "Not assessed as lock-screen image",
+              "status": "Tested AVIF route unavailable"
+            },
+            "gainmap-hdr.jpg": {
+              "acceptance": "Passed",
+              "appearance": "Normal",
+              "visible_hdr": "Not visible per user",
+              "status": "Passed natural appearance; failed visible-HDR presentation"
+            },
+            "wallpaper-sdr.jpg": {
+              "acceptance": "Passed",
+              "appearance": "Normal SDR",
+              "visible_hdr": "Not applicable: explicit SDR",
+              "status": "Passed scoped SDR lock-screen compatibility and appearance"
+            }
+          },
+          "not_established": [
+            "crop and orientation for Lock Screen",
+            "numeric luminance",
+            "stored file representation or internal conversion",
+            "other AVIF encodings or alternative wallpaper software"
+          ]
+        }
+      },
+      "basis_observation_ids": [
+        "windows-preflight-and-general-browser-hdr",
+        "windows-six-check-batch-results",
+        "windows-viewer-versions-and-converted-jpeg-highlights",
+        "windows-lock-screen-avif-unselectable-jpegs-sdr-like"
+      ],
+      "scope": "Exact files, settings, application and consumer path only; subjective physical observations, not measured luminance or universal support.",
+      "status": "Representative review recorded; failures and detailed limits remain unqualified"
+    }
+  ]
+}

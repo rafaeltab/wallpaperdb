@@ -3,6 +3,25 @@ import { describe, expect, it } from 'vitest';
 import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from '../../src/features/picture-editor';
 
 describe('Picture animation', () => {
+  it.each([7, 8])('charges restore-previous snapshot bytes against a %s-byte budget', (maxDecodedBytes) => {
+    const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff21f9040c0a0000002c00000000010001000002024401003b', 'hex'));
+    const decode = () => Array.from(decodePictureGif(bytes, { maxPixels: 1, maxDecodedBytes }));
+    if (maxDecodedBytes === 7) expect(decode).toThrow('decoded byte limit');
+    else expect(decode().filter((step) => step.kind === 'frame')).toHaveLength(1);
+  });
+
+  it('stores only the restored rectangle of a partial frame within the decoded budget', () => {
+    const bytes = Uint8Array.from(Buffer.from(
+      '47494638396102000100800100ff000000ff00' +
+      '21f9040c010000002c00000000010001000002024401003b', 'hex'));
+    const frames: number[][] = [];
+    for (const step of decodePictureGif(bytes, { maxPixels: 2, maxDecodedBytes: 12 })) {
+      if (step.kind === 'frame') frames.push(Array.from(step.pixels));
+    }
+    expect(frames).toEqual([
+      [255, 0, 0, 255, 0, 255, 0, 255],
+    ]);
+  });
   it.each([
     { maxPixels: 3, maxDecodedBytes: 100, expected: 'pixel limit' },
     { maxPixels: 100, maxDecodedBytes: 15, expected: 'decoded byte limit' },

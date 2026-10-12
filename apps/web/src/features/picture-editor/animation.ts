@@ -245,6 +245,9 @@ export function* decodePictureGif(
     if (!palette) invalid();
     if ((frameCount + 1) * width * height * 4 > limits.maxDecodedBytes)
       throw new Error('This GIF exceeds the decoded byte limit.');
+    const snapshotBytes = disposal === 3 ? frameWidth * frameHeight * 4 : 0;
+    if (canvas.byteLength + snapshotBytes > limits.maxDecodedBytes)
+      throw new Error('This GIF exceeds the decoded byte limit.');
     if (!frameCount && transparent === undefined && background)
       yield* restoreBackground(0, 0, width, height, true);
     const minimum = byte();
@@ -252,11 +255,14 @@ export function* decodePictureGif(
     const indices = yield* lzw(compressed, minimum, frameWidth * frameHeight);
     let saved: Uint8ClampedArray | undefined;
     if (disposal === 3) {
-      saved = new Uint8ClampedArray(canvas.length);
-      for (let start = 0; start < canvas.length; start += 65536) {
-        saved.set(canvas.subarray(start, start + 65536), start);
-        yield { kind: 'progress' };
-      }
+      saved = new Uint8ClampedArray(snapshotBytes);
+      for (let y = 0; y < frameHeight; y++)
+        for (let x = 0; x < frameWidth; x += 16384) {
+          const start = ((top + y) * width + left + x) * 4;
+          const length = Math.min(16384, frameWidth - x) * 4;
+          saved.set(canvas.subarray(start, start + length), (y * frameWidth + x) * 4);
+          yield { kind: 'progress' };
+        }
     }
     const rows: number[] = [];
     if (frameFlags & 64) {
@@ -298,10 +304,13 @@ export function* decodePictureGif(
     if (disposal === 2) {
       yield* restoreBackground(left, top, frameWidth, frameHeight, transparent === undefined);
     } else if (saved) {
-      for (let start = 0; start < canvas.length; start += 65536) {
-        canvas.set(saved.subarray(start, start + 65536), start);
-        yield { kind: 'progress' };
-      }
+      for (let y = 0; y < frameHeight; y++)
+        for (let x = 0; x < frameWidth; x += 16384) {
+          const start = (y * frameWidth + x) * 4;
+          const length = Math.min(16384, frameWidth - x) * 4;
+          canvas.set(saved.subarray(start, start + length), ((top + y) * width + left + x) * 4);
+          yield { kind: 'progress' };
+        }
     }
     delay = 0;
     disposal = 0;

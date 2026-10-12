@@ -75,7 +75,7 @@ async function validateSource(file: Blob, signal: AbortSignal) {
       const header = new Uint8Array(await file.slice(offset, offset + 8).arrayBuffer());
       signal.throwIfAborted();
       const type = String.fromCharCode(...header.slice(0, 4));
-      if (type === 'ANIM' || type === 'ANMF')
+      if (type === 'ANMF')
         throw new Error(
           'Animated WebP pictures are not supported as an editor source. Choose a GIF to preserve animation.'
         );

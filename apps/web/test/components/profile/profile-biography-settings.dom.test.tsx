@@ -135,13 +135,13 @@ describe('Biography settings', () => {
     await user.type(editor, 'Saved Biography');
     await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
-    expect(screen.getByRole('button', { name: 'Remove picture' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Refresh Profile' })).not.toBeInTheDocument();
     expect(editor).toBeDisabled();
     expect(userApi.ensureProfile).not.toHaveBeenCalled();
     const updated = { ...initial, biographyMarkdown: 'Saved Biography', version: 2 };
     await act(async () => finishSave?.(updated));
-    await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
     await user.click(screen.getByRole('button', { name: 'Use generated avatar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Unable to refresh your saved Profile.'

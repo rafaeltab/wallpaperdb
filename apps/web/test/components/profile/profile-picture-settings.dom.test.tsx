@@ -285,21 +285,27 @@ describe('Profile picture settings', () => {
     expect(edit).toHaveFocus();
   });
 
-  it('applies keyboard repositioning through the picture command', async () => {
+  it.each([
+    { key: 'ArrowLeft', x: 320, y: 100 },
+    { key: 'ArrowRight', x: 280, y: 100 },
+    { key: 'ArrowUp', x: 300, y: 120 },
+    { key: 'ArrowDown', x: 300, y: 80 },
+    { key: 'Home', x: 300, y: 100 },
+  ])('applies $key through the focused crop without directional buttons', async ({ key, x, y }) => {
     vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2 });
     await renderPage();
     const user = userEvent.setup();
     await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], 'picture.png', { type: 'image/png' }));
-    const crop = await screen.findByRole('group', { name: 'Picture crop' });
+    const zoom = await screen.findByRole('slider', { name: 'Zoom' });
+    fireEvent.change(zoom, { target: { value: '2' } });
+    const crop = screen.getByRole('group', { name: 'Picture crop' });
     expect(screen.queryByRole('button', { name: /Move picture (left|right|up|down)/ })).not.toBeInTheDocument();
     crop.focus();
-    await user.keyboard('{ArrowLeft}');
+    await user.keyboard(`{${key}}`);
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
     expect(processPicture).toHaveBeenCalledWith(
-      expect.objectContaining({ x: 240, y: 0, size: 400 }),
-      picturePolicy,
-      expect.any(AbortSignal)
+      expect.objectContaining({ x, y, size: 200 }), picturePolicy, expect.any(AbortSignal)
     );
   });
 

@@ -151,4 +151,30 @@ describe('OpenSearch controlled HTTP contracts', () => {
       }
     );
   });
+  it('rejects impossible calendar dates in stored timestamps', async () => {
+    let uploadedAt = '';
+    await withControlledSearch(
+      (_request, response) =>
+        json(response, {
+          _source: {
+            wallpaperId: 'invalid-calendar',
+            userId: 'owner',
+            variants: [],
+            uploadedAt,
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        }),
+      async (adapter) => {
+        for (uploadedAt of [
+          '2026-02-30T00:00:00.000Z',
+          '1900-02-29T00:00:00Z',
+          '2026-04-31T00:00:00Z',
+        ]) {
+          expect(
+            await Effect.runPromise(Effect.flip(adapter.read.wallpaper('invalid-calendar')))
+          ).toMatchObject({ _tag: 'CatalogueUnavailable', cause: { _tag: 'SchemaError' } });
+        }
+      }
+    );
+  });
 });

@@ -715,40 +715,6 @@ describe('OpenSearch catalogue port contract', () => {
     expect(await bank('metadata-bank')).toEqual(colorFixture.utilities);
     expect((await get('metadata-bank'))?.variants).toHaveLength(2);
   });
-  it('rejects impossible calendar dates in stored timestamps', async () => {
-    const malformedFixture = createSearchFixture();
-    const malformed = await acquireSearchFixture(malformedFixture.options);
-    try {
-      await client.indices.putMapping({
-        index: malformedFixture.options.wallpaperIndex,
-        body: { properties: { uploadedAt: { type: 'date', ignore_malformed: true } } },
-      });
-      for (const uploadedAt of [
-        '2026-02-30T00:00:00.000Z',
-        '1900-02-29T00:00:00Z',
-        '2026-04-31T00:00:00Z',
-      ]) {
-        await client.index({
-          index: malformedFixture.options.wallpaperIndex,
-          id: 'invalid-calendar',
-          body: {
-            wallpaperId: 'invalid-calendar',
-            userId: 'owner',
-            variants: [],
-            uploadedAt,
-            updatedAt: timestamp,
-          },
-        });
-        expect(
-          await Effect.runPromise(Effect.flip(malformed.adapter.read.wallpaper('invalid-calendar')))
-        ).toMatchObject({ _tag: 'CatalogueUnavailable' });
-      }
-    } finally {
-      await malformed.dispose();
-      await malformedFixture.destroy();
-    }
-  });
-
   it('preserves valid stored timestamp representations and fractional precision', async () => {
     for (const uploadedAt of [
       '2024-02-29T12:34:56.123456Z',

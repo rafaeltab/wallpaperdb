@@ -2,7 +2,12 @@ import { it as effectIt } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { openSearchLayer } from '../src/adapters/opensearch/index.js';
-import { json, wallpaperMapping, withSearchEndpoint } from './helpers/controlled-search.js';
+import {
+  json,
+  wallpaperMapping,
+  withSearchEndpoint,
+  withControlledSearch,
+} from './helpers/controlled-search.js';
 
 describe('OpenSearch controlled HTTP contracts', () => {
   effectIt.live('reports invalid connection configuration as a startup failure', () =>
@@ -109,6 +114,41 @@ describe('OpenSearch controlled HTTP contracts', () => {
         }
       },
       supplied
+    );
+  });
+  it('treats malformed persisted data as unavailable rather than asserting it is a wallpaper', async () => {
+    const source = { wallpaperId: 'malformed', userId: 'malformed' };
+    await withControlledSearch(
+      (request, response) =>
+        json(
+          response,
+          request.url?.includes('/_search')
+            ? {
+                hits: {
+                  total: { value: 1 },
+                  hits: [
+                    {
+                      _id: 'malformed',
+                      _index: 'wallpapers',
+                      _source: source,
+                      _score: null,
+                      sort: ['malformed'],
+                    },
+                  ],
+                },
+              }
+            : { _source: source }
+        ),
+      async (adapter) => {
+        expect(
+          await Effect.runPromise(Effect.flip(adapter.read.wallpaper('malformed')))
+        ).toMatchObject({ _tag: 'CatalogueUnavailable', cause: { _tag: 'SchemaError' } });
+        expect(
+          await Effect.runPromise(
+            Effect.flip(adapter.read.search({ profileId: 'malformed', size: 10, sortOrder: 'asc' }))
+          )
+        ).toMatchObject({ _tag: 'CatalogueUnavailable', cause: { _tag: 'SchemaError' } });
+      }
     );
   });
 });

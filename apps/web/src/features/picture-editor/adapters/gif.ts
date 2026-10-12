@@ -134,7 +134,7 @@ export async function gifPictureJob(
       step = decoder.next();
     }
     signal.throwIfAborted();
-    if (!source || job.action !== 'process' || !frames.length)
+    if (!source || !output || job.action !== 'process' || !frames.length)
       throw new Error('Unable to decode this GIF picture.');
     await yieldPictureWork(signal);
     if (step.value.animated && !job.policy.animation.available)
@@ -145,21 +145,29 @@ export async function gifPictureJob(
         limits.maxDecodedBytes
     )
       throw new Error('This GIF exceeds the decoded byte limit.');
-    const blob = !step.value.animated
-      ? await withoutPictureMetadata(
-          new Blob([new Uint8Array(frames[0].bytes)], { type: 'image/webp' })
-        )
-      : new Blob(
-          encodePictureAnimation(
-            frames,
-            job.policy.output,
-            step.value.loop,
-            job.policy.maxOutputBytes
-          ),
-          {
-            type: 'image/webp',
-          }
-        );
+    let blob: Blob;
+    if (!step.value.animated) {
+      const staticFrame =
+        job.policy.encoding.staticQuality === job.policy.encoding.animationQuality
+          ? new Blob([new Uint8Array(frames[0].bytes)], { type: 'image/webp' })
+          : await encode(output, 'image/webp', job.policy.encoding.staticQuality / 100);
+      signal.throwIfAborted();
+      if (staticFrame.type !== 'image/webp')
+        throw new Error('This browser cannot encode WebP pictures. Try another browser.');
+      blob = await withoutPictureMetadata(staticFrame);
+    } else {
+      blob = new Blob(
+        encodePictureAnimation(
+          frames,
+          job.policy.output,
+          step.value.loop,
+          job.policy.maxOutputBytes
+        ),
+        {
+          type: 'image/webp',
+        }
+      );
+    }
     signal.throwIfAborted();
     return { ok: true, blob, width: source.width, height: source.height };
   } finally {

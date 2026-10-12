@@ -7,6 +7,36 @@ import { openPictureSource } from '@/features/picture-editor/adapters/browser';
 beforeEach(() => vi.stubGlobal('Blob', NativeBlob));
 afterEach(() => vi.unstubAllGlobals());
 
+it.each([false, true])('uses the quality of the final GIF classification, looping=%s', async (looping) => {
+  const encoded = new Blob([await readFile(new URL('../fixtures/profile-canonical.webp', import.meta.url))], { type: 'image/webp' });
+  const qualities: number[] = [];
+  vi.stubGlobal('Worker', undefined);
+  vi.stubGlobal('ImageData', class {});
+  vi.stubGlobal('document', { createElement: () => ({
+    width: 0, height: 0,
+    getContext: () => ({ putImageData() {}, clearRect() {}, drawImage() {}, imageSmoothingQuality: 'low' }),
+    toBlob(callback: (value: Blob) => void, type: string, quality: number) {
+      if (type === 'image/webp') qualities.push(quality);
+      callback(type === 'image/png' ? new Blob(['preview'], { type }) : encoded);
+    },
+  }) });
+  const bytes = Buffer.concat([
+    Buffer.from('47494638396101000100800000000000ffffff', 'hex'),
+    ...(looping ? [Buffer.from('21ff0b4e45545343415045322e300301000000', 'hex')] : []),
+    Buffer.from('2c00000000010001000002024401003b', 'hex'),
+  ]);
+  const picture = await openPictureSource(new Blob([bytes]), new AbortController().signal);
+  const policy: PictureEncodingPolicy = {
+    output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
+    maxOutputBytes: 5242880, animation: { available: true },
+    encoding: { staticQuality: 91, animationQuality: 63 },
+  };
+  const result = await picture.process(initialPictureCrop(picture), policy, new AbortController().signal);
+  expect(qualities.at(-1)).toBe(looping ? 0.63 : 0.91);
+  expect(Buffer.from(await result.arrayBuffer()).includes(Buffer.from('ANIM'))).toBe(looping);
+  picture.dispose();
+});
+
 it('rejects excessive GIF logical dimensions before the fallback creates a canvas', async () => {
   const allocate = vi.fn(() => { throw new Error('Reached canvas allocation.'); });
   vi.stubGlobal('Worker', undefined);

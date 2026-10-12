@@ -694,7 +694,7 @@ describe('Profile picture settings', () => {
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(profile);
-    expect(openPictureSource).toHaveBeenCalledWith(file, expect.any(AbortSignal));
+    expect(openPictureSource).toHaveBeenCalledWith(file, expect.any(AbortSignal), profile.pictureUploadLimits);
     const accepted = { ...profile, version: 2, pictureAssetId: 'fitted_picture' };
     vi.mocked(userApi.uploadPicture).mockResolvedValue(accepted);
     await user.click(screen.getByRole('button', { name: 'Retry' }));

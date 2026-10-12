@@ -90,21 +90,19 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
     input.readUInt32LE(4) + 8 !== input.length
   )
     invalid();
-  function chunks(start: number, end: number) {
-    const result: Array<{ type: string; data: Buffer }> = [];
+  function* chunks(start: number, end: number) {
     let offset = start;
     while (offset + 8 <= end) {
       const size = input.readUInt32LE(offset + 4);
       const next = offset + 8 + size + (size % 2);
       if (next > end || (size % 2 && input[next - 1] !== 0)) invalid();
-      result.push({
+      yield {
         type: input.toString('ascii', offset, offset + 4),
         data: input.subarray(offset + 8, offset + 8 + size),
-      });
+      };
       offset = next;
     }
     if (offset !== end) invalid();
-    return result;
   }
   function imageDimensions(data: Buffer, type: string) {
     if (type === 'VP8L') {
@@ -135,7 +133,8 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
     return imageDimensions(part.data, part.type);
   }
   const top = chunks(12, input.length);
-  const header = top[0]?.type === 'VP8X' ? top[0].data : undefined;
+  const first = top.next();
+  const header = !first.done && first.value.type === 'VP8X' ? first.value.data : undefined;
   if (
     header &&
     (header.length !== 10 || header[0] & 0xc1 || header.subarray(1, 4).some((byte) => byte !== 0))
@@ -151,17 +150,16 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
   const seen = new Set<string>();
   const still: Array<{ type: string; data: Buffer }> = [];
   const durations: number[] = [];
-  for (const { type, data } of top) {
+  for (let chunk = first; !chunk.done; chunk = top.next()) {
+    const { type, data } = chunk.value;
     if (type === 'ANIM' && !animated) {
       canonicalChunks = false;
       continue;
     }
-    if (
-      ['VP8X', 'ANIM', 'ICCP', 'EXIF', 'XMP ', 'ALPH', 'VP8 ', 'VP8L'].includes(type) &&
-      seen.has(type)
-    )
-      invalid();
-    seen.add(type);
+    if (['VP8X', 'ANIM', 'ICCP', 'EXIF', 'XMP ', 'ALPH', 'VP8 ', 'VP8L'].includes(type)) {
+      if (seen.has(type)) invalid();
+      seen.add(type);
+    }
     if (type === 'VP8X') {
       if (data !== header) invalid();
       continue;
@@ -181,13 +179,16 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
       if (frameWidth * frameHeight > limits.maxPixels)
         throw new Error('Picture exceeds the pixel limit');
       const start = data.byteOffset - input.byteOffset + 16;
-      const frameParts = chunks(start, start + data.length - 16);
-      const imageParts = frameParts.filter((part) => {
-        if (['ALPH', 'VP8 ', 'VP8L'].includes(part.type)) return true;
-        if (['VP8X', 'ICCP', 'ANIM', 'ANMF', 'EXIF', 'XMP '].includes(part.type)) invalid();
-        canonicalChunks = false;
-        return false;
-      });
+      const imageParts: Array<{ type: string; data: Buffer }> = [];
+      for (const part of chunks(start, start + data.length - 16)) {
+        if (['ALPH', 'VP8 ', 'VP8L'].includes(part.type)) {
+          if (imageParts.length === 2) invalid();
+          imageParts.push(part);
+        } else {
+          if (['VP8X', 'ICCP', 'ANIM', 'ANMF', 'EXIF', 'XMP '].includes(part.type)) invalid();
+          canonicalChunks = false;
+        }
+      }
       const decoded = image(imageParts);
       if (decoded.width !== frameWidth || decoded.height !== frameHeight) invalid();
       hasAlpha ||= decoded.alpha;

@@ -127,6 +127,7 @@ describe('native image resize contract', () => {
 
   it.each([
     { name: '8K', source: [7680, 4320], output: [1920, 1080] },
+    { name: 'materialized rendition downscale', source: [1920, 1080], output: [1600, 900] },
     { name: 'above all materialized renditions', source: [3840, 2160], output: [2560, 1440] },
     { name: 'small', source: [320, 180], output: [160, 90] },
     { name: 'ultrawide', source: [3440, 1440], output: [1720, 720] },

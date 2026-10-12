@@ -295,4 +295,34 @@ describe('OpenSearch controlled HTTP contracts', () => {
       }
     );
   });
+  it.each([
+    'mapper_parsing_exception',
+    'strict_dynamic_mapping_exception',
+  ])('translates supplied %s responses into permanent projection rejection', async (type) => {
+    await withControlledSearch(
+      (request, response) =>
+        json(
+          response,
+          request.method === 'GET' ? { found: false } : { error: { type }, status: 400 },
+          request.method === 'GET' ? 404 : 400
+        ),
+      async (adapter) => {
+        expect(
+          await Effect.runPromise(
+            adapter.projectionStore.apply({
+              _tag: 'WallpaperUploaded',
+              wallpaperId: 'rejected',
+              profileId: 'profile',
+              uploadedAt: '2026-01-01T00:00:00.000Z',
+              occurrence: {
+                source: 'wallpaperdb/test',
+                id: 'rejected',
+                occurredAt: '2026-01-01T00:00:00.000Z',
+              },
+            })
+          )
+        ).toEqual({ _tag: 'Rejected' });
+      }
+    );
+  });
 });

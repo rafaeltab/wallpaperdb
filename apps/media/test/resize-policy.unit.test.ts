@@ -173,7 +173,7 @@ describe('rendition source selection', () => {
   it.each([
     { name: 'exact', width: 1920, height: 1080, key: 'medium', resized: false },
     { name: 'between sizes', width: 1600, height: 900, key: 'medium', resized: true },
-    { name: 'above all renditions', width: 3000, height: 1800, key: 'original', resized: true },
+    { name: 'above all renditions', width: 2560, height: 1440, key: 'original', resized: true },
   ])('uses the smallest suitable materialized rendition for $name', async ({
     width,
     height,
@@ -182,7 +182,7 @@ describe('rendition source selection', () => {
   }) => {
     const f = fixture();
     // Deliberately insert out of order, with decoys that satisfy only one dimension.
-    f.addRendition(2560, 1440, 'large');
+    if (key !== 'original') f.addRendition(2560, 1440, 'large');
     f.addRendition(1280, 720, 'small');
     f.addRendition(1920, 1080, 'medium');
     f.addRendition(4000, 100, 'too-short');

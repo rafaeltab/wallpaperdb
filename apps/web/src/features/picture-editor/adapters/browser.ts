@@ -1,6 +1,8 @@
 import type { PictureCrop, PictureDimensions, PictureEncodingPolicy } from '../index';
 import type { PictureJob, PictureJobResult } from './protocol';
 import { withoutPictureMetadata } from './webp';
+import { validateSourceDimensions } from './source';
+import { validateJpegColor } from './jpeg';
 
 /** UI owns this decoded source and must dispose it when its editing session ends. */
 export interface PictureSource extends PictureDimensions {
@@ -42,8 +44,33 @@ async function validateSource(file: Blob, signal: AbortSignal) {
     bytes[7] === 10;
   const webp = text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP';
   if (!jpeg && !png && !webp) throw new Error('Choose a valid JPEG, PNG, or WebP picture.');
+  if (png) {
+    // Read chunk headers only; large compressed image data stays in the original Blob.
+    let offset = 8;
+    while (offset + 12 <= file.size) {
+      const header = new Uint8Array(await file.slice(offset, offset + 8).arrayBuffer());
+      signal.throwIfAborted();
+      const size = new DataView(header.buffer).getUint32(0);
+      const type = String.fromCharCode(...header.slice(4, 8));
+      if (offset + 12 + size > file.size) break;
+      if (type === 'acTL')
+        throw new Error('Animated PNG pictures are not supported. Choose a static picture.');
+      if (type === 'cICP')
+        throw new Error(
+          "This picture's color interpretation is not supported. Choose another picture."
+        );
+      offset += 12 + size;
+      if (type === 'IEND') {
+        await validateSourceDimensions(file, 'png', signal);
+        return;
+      }
+    }
+    throw new Error('Choose a valid PNG picture.');
+  }
   if (webp && text(12, 16) === 'VP8X' && bytes[20] & 2)
     throw new Error('Animated WebP pictures are not supported. Choose a static picture.');
+  await validateSourceDimensions(file, jpeg ? 'jpeg' : 'webp', signal);
+  if (jpeg) await validateJpegColor(file, signal);
 }
 
 async function fallback(
@@ -155,7 +182,7 @@ async function runJob(
     };
     worker.onerror = () => {
       cleanup();
-      reject(new Error('Picture processing failed. Try again or choose another picture.'));
+      resolve({ ok: false, message: 'Worker unavailable.', unsupported: true });
     };
     worker.postMessage(job);
   });

@@ -62,7 +62,7 @@ export function ProfilePictureCrop({
         aria-describedby="picture-crop-help"
         aria-disabled={disabled}
         tabIndex={disabled ? -1 : 0}
-        className="relative mx-auto aspect-square w-full max-w-[55dvh] touch-none overflow-hidden rounded-xl border bg-muted cursor-grab outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="relative mx-auto aspect-square w-full max-w-[55dvh] touch-none select-none overflow-hidden rounded-xl border bg-muted cursor-grab outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onKeyDown={(event) => {
           if (disabled || event.altKey || event.ctrlKey || event.metaKey) return;
           const directions: Record<string, { x: number; y: number }> = {
@@ -71,7 +71,9 @@ export function ProfilePictureCrop({
             ArrowUp: { x: 0, y: -1 },
             ArrowDown: { x: 0, y: 1 },
           };
-          const direction = Object.hasOwn(directions, event.key) ? directions[event.key] : undefined;
+          const direction = Object.hasOwn(directions, event.key)
+            ? directions[event.key]
+            : undefined;
           if (!direction) return;
           event.preventDefault();
           onChange(
@@ -85,6 +87,8 @@ export function ProfilePictureCrop({
         }}
         onPointerDown={(event) => {
           if (disabled || event.button !== 0) return;
+          event.preventDefault();
+          event.currentTarget.focus({ preventScroll: true });
           event.currentTarget.setPointerCapture(event.pointerId);
           pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
           if (pointers.current.size === 2) pinch.current = { crop, distance: distance() };

@@ -497,6 +497,11 @@ test("Profile picture upload reaches public delivery and removal retires the old
               name: /Move picture (left|right|up|down)/,
             }),
           ).toHaveCount(0);
+          expect(
+            await crop.evaluate(
+              (element) => getComputedStyle(element).userSelect,
+            ),
+          ).toBe("none");
           const boundary = dialog.getByTestId("picture-crop-boundary");
           const viewportBox = await crop.boundingBox();
           const boundaryBox = await boundary.boundingBox();
@@ -618,6 +623,24 @@ test("Profile picture upload reaches public delivery and removal retires the old
             .boundingBox();
           if (!cropBoundary) throw new Error("Crop boundary was not measured");
           expect(before.width / cropBoundary.width).toBeCloseTo(2, 1);
+          const titleBox = await dialog
+            .getByRole("heading", { name: "Profile picture", exact: true })
+            .boundingBox();
+          if (!titleBox) throw new Error("Picture title was not measured");
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(
+            titleBox.x + titleBox.width / 2,
+            titleBox.y + titleBox.height / 2,
+            { steps: 8 },
+          );
+          await page.mouse.up();
+          expect(
+            await page.evaluate(() => window.getSelection()?.toString()),
+          ).toBe("");
+          await dialog
+            .getByRole("button", { name: "Reset crop", exact: true })
+            .click();
           await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
           await page.mouse.down();
           await page.mouse.move(
@@ -628,6 +651,9 @@ test("Profile picture upload reaches public delivery and removal retires the old
             },
           );
           await page.mouse.up();
+          expect(
+            await page.evaluate(() => window.getSelection()?.toString()),
+          ).toBe("");
           const after = await image.boundingBox();
           expect(after?.x).toBeCloseTo(box.x + box.width * 0.125, -1);
           await dialog

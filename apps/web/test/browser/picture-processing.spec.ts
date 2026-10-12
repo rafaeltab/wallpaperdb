@@ -1,6 +1,8 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { initialPictureCrop, movePictureCrop, zoomPictureCrop } from '../../src/features/picture-editor';
 import { openPictureSource } from '../../src/features/picture-editor/adapters/browser';
+
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const policy = {
   output: { width: 512, height: 512, mimeType: 'image/webp' as const, colorSpace: 'srgb' as const },
@@ -67,7 +69,8 @@ async function decodedAnimation(blob: Blob, positions: [number, number][] = [[32
   } finally { decoder.close(); }
 }
 
-it('fits a normal-rate animation by lowering quality while preserving every interval and alpha', async () => {
+it.each(['worker', 'fallback'])('fits a normal-rate animation while preserving every interval and alpha with the real %s codec', async (mode) => {
+  if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
   const controller = new AbortController();
   const source = await openPictureSource(await fixture("profile-fitting.gif"), controller.signal);
   try {
@@ -87,7 +90,8 @@ it('fits a normal-rate animation by lowering quality while preserving every inte
   } finally { source.dispose(); }
 });
 
-it('fits excessive frame rates without trimming elapsed time or flattening the animation', async () => {
+it.each(['worker', 'fallback'])('fits excessive frame rates without trimming elapsed time with the real %s codec', async (mode) => {
+  if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
   const controller = new AbortController();
   const source = await openPictureSource(await fixture('profile-fast-fitting.gif'), controller.signal);
   try {

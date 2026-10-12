@@ -8,6 +8,7 @@ import {
   type PictureCrop,
   type PictureDimensions,
 } from '@/features/picture-editor';
+import { RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function ProfilePictureCrop({
@@ -23,6 +24,7 @@ export function ProfilePictureCrop({
   disabled: boolean;
   onChange: (crop: PictureCrop) => void;
 }) {
+  const apertureFraction = 0.75;
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ crop: PictureCrop; distance: number } | null>(null);
   function distance() {
@@ -57,7 +59,30 @@ export function ProfilePictureCrop({
       <fieldset
         ref={viewport}
         aria-label="Picture crop"
-        className="relative mx-auto aspect-square w-full max-w-64 touch-none overflow-hidden rounded-full border bg-muted cursor-grab"
+        aria-describedby="picture-crop-help"
+        aria-disabled={disabled}
+        tabIndex={disabled ? -1 : 0}
+        className="relative mx-auto aspect-square w-full max-w-[55dvh] touch-none overflow-hidden rounded-xl border bg-muted cursor-grab outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onKeyDown={(event) => {
+          if (disabled || event.altKey || event.ctrlKey || event.metaKey) return;
+          const directions: Record<string, { x: number; y: number }> = {
+            ArrowLeft: { x: -1, y: 0 },
+            ArrowRight: { x: 1, y: 0 },
+            ArrowUp: { x: 0, y: -1 },
+            ArrowDown: { x: 0, y: 1 },
+          };
+          const direction = Object.hasOwn(directions, event.key) ? directions[event.key] : undefined;
+          if (!direction) return;
+          event.preventDefault();
+          onChange(
+            movePictureCrop(
+              crop,
+              source,
+              (direction.x * crop.size) / 10,
+              (direction.y * crop.size) / 10
+            )
+          );
+        }}
         onPointerDown={(event) => {
           if (disabled || event.button !== 0) return;
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -73,7 +98,7 @@ export function ProfilePictureCrop({
             if (start) onChange(pinchPictureCrop(start.crop, source, start.distance, distance()));
             return;
           }
-          const width = event.currentTarget.getBoundingClientRect().width;
+          const width = event.currentTarget.getBoundingClientRect().width * apertureFraction;
           if (!width) return;
           onChange(
             movePictureCrop(
@@ -94,35 +119,23 @@ export function ProfilePictureCrop({
           draggable={false}
           className="pointer-events-none absolute max-w-none select-none"
           style={{
-            width: `${(source.width / crop.size) * 100}%`,
-            height: `${(source.height / crop.size) * 100}%`,
-            left: `${(-crop.x / crop.size) * 100}%`,
-            top: `${(-crop.y / crop.size) * 100}%`,
+            width: `${(source.width / crop.size) * apertureFraction * 100}%`,
+            height: `${(source.height / crop.size) * apertureFraction * 100}%`,
+            left: `${((1 - apertureFraction) / 2 - (crop.x / crop.size) * apertureFraction) * 100}%`,
+            top: `${((1 - apertureFraction) / 2 - (crop.y / crop.size) * apertureFraction) * 100}%`,
           }}
         />
+        <div
+          aria-hidden="true"
+          data-testid="picture-crop-boundary"
+          className="pointer-events-none absolute rounded-full border-2 border-white shadow-[0_0_0_999px_rgb(0_0_0_/0.55)]"
+          style={{ inset: `${(1 - apertureFraction) * 50}%` }}
+        />
       </fieldset>
-      <fieldset aria-label="Move picture" className="flex flex-wrap justify-center gap-2">
-        {[
-          { label: 'Left', x: -1, y: 0 },
-          { label: 'Right', x: 1, y: 0 },
-          { label: 'Up', x: 0, y: -1 },
-          { label: 'Down', x: 0, y: 1 },
-        ].map(({ label, x, y }) => (
-          <Button
-            key={label}
-            type="button"
-            variant="outline"
-            size="sm"
-            aria-label={`Move picture ${label.toLowerCase()}`}
-            disabled={disabled}
-            onClick={() =>
-              onChange(movePictureCrop(crop, source, (x * crop.size) / 10, (y * crop.size) / 10))
-            }
-          >
-            {label}
-          </Button>
-        ))}
-      </fieldset>
+      <p id="picture-crop-help" className="sr-only">
+        Drag the picture or use the arrow keys to move it. Use the Zoom slider, mouse wheel, or
+        pinch to resize it.
+      </p>
       <div className="flex items-center gap-3">
         <label htmlFor="picture-zoom" className="text-sm">
           Zoom
@@ -141,13 +154,13 @@ export function ProfilePictureCrop({
         />
         <Button
           type="button"
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon"
           disabled={disabled}
           onClick={() => onChange(initialPictureCrop(source))}
           aria-label="Reset crop"
         >
-          Reset crop
+          <RotateCcw className="size-4" />
         </Button>
       </div>
       {crop.lowResolution && (

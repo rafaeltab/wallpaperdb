@@ -290,7 +290,10 @@ describe('Profile picture settings', () => {
     await renderPage();
     const user = userEvent.setup();
     await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], 'picture.png', { type: 'image/png' }));
-    await user.click(await screen.findByRole('button', { name: 'Move picture left' }));
+    const crop = await screen.findByRole('group', { name: 'Picture crop' });
+    expect(screen.queryByRole('button', { name: /Move picture (left|right|up|down)/ })).not.toBeInTheDocument();
+    crop.focus();
+    await user.keyboard('{ArrowLeft}');
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
     expect(processPicture).toHaveBeenCalledWith(

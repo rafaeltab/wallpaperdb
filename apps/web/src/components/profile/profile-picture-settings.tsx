@@ -293,6 +293,7 @@ export function ProfilePictureSettings({
                 type="file"
                 className="sr-only"
                 tabIndex={-1}
+                aria-hidden={selected ? true : undefined}
                 aria-describedby={selected ? undefined : 'picture-limits'}
                 accept={policy?.acceptedSourceFormats.join(',')}
                 disabled={refreshing || writing || !policyReady}

@@ -4,6 +4,7 @@ import {
   projectionRetryDelay,
   resolveProfilePicture,
 } from '@/features/public-profile';
+import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useOwnerProfile } from '@/hooks/use-owner-profile';
 import type { Profile as OwnerProfile } from '@/lib/api/user';
@@ -36,11 +37,12 @@ export function ProfilePicture({ profile, className }: ProfilePictureProps) {
 
 export function ProfilePictureImage({
   profile,
-  className = 'flex size-24 shrink-0 items-center justify-center rounded-2xl border-4 border-card object-cover text-2xl font-bold text-white shadow-sm sm:size-28 sm:text-3xl',
+  className = 'flex size-24 shrink-0 items-center justify-center border-4 border-card object-cover text-2xl font-bold text-white shadow-sm sm:size-28 sm:text-3xl',
 }: {
   profile: Pick<Profile, 'id' | 'displayName' | 'picture'>;
   className?: string;
 }) {
+  const pictureClassName = cn(className, 'rounded-full');
   const [failed, setFailed] = useState(false);
   const [retries, setRetries] = useState(0);
   const accessibleName = `${profile.displayName}'s profile picture`;
@@ -77,7 +79,7 @@ export function ProfilePictureImage({
   if (profile.picture && !failed) {
     return (
       <img
-        className={className}
+        className={pictureClassName}
         src={profile.picture.url}
         alt={accessibleName}
         onError={() => setFailed(true)}
@@ -89,7 +91,7 @@ export function ProfilePictureImage({
     <div
       role="img"
       aria-label={accessibleName}
-      className={className}
+      className={pictureClassName}
       style={{ backgroundColor: profileFallbackColor(profile.id) }}
     >
       {profileInitials(profile.displayName)}

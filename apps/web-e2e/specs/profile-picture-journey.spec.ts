@@ -288,7 +288,7 @@ async function frameGifCrop(page: Page, dialog: ReturnType<Page["getByRole"]>) {
             .boundingBox()
         )?.x,
     )
-    .toBeCloseTo(box.x, -1);
+    .toBeCloseTo(box.x + box.width * 0.125, -1);
 }
 
 async function fixture(name: string, mimeType: string): Promise<PictureFile> {
@@ -309,7 +309,7 @@ async function removePicture(page: Page) {
   });
   await expect(dialog).toBeVisible();
   const remove = dialog.getByRole("button", {
-    name: "Remove picture",
+    name: "Reset",
     exact: true,
   });
   if (!(await remove.count())) {
@@ -347,6 +347,26 @@ function profilePicture(page: Page) {
     .last()
     .getByRole("img", { name: /'s profile picture$/ })
     .first();
+}
+
+async function expectCircularAvatar(
+  picture: ReturnType<typeof profilePicture>,
+) {
+  await expect
+    .poll(() =>
+      picture.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const radius = Number.parseFloat(
+          getComputedStyle(element).borderTopLeftRadius,
+        );
+        return (
+          bounds.width > 0 &&
+          Math.abs(bounds.width - bounds.height) < 1 &&
+          radius >= bounds.width / 2
+        );
+      }),
+    )
+    .toBe(true);
 }
 
 test("Profile picture upload reaches public delivery and removal retires the old URL", async ({
@@ -399,6 +419,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
 
     await page.goto("/web/settings/profile");
+    await expectCircularAvatar(profilePicture(page));
     await expect(
       page.getByRole("button", { name: "Edit profile picture", exact: true }),
     ).toBeVisible();
@@ -458,33 +479,56 @@ test("Profile picture upload reaches public delivery and removal retires the old
           await zoom.press("ArrowRight");
           expect(Number(await zoom.inputValue())).toBeGreaterThan(1);
           await dialog
-            .getByRole("button", { name: "Reset", exact: true })
+            .getByRole("button", { name: "Reset crop", exact: true })
             .click();
           await expect(zoom).toHaveValue("1");
           const selectedImage = dialog.getByRole("img", {
             name: "Selected avatar",
           });
           const centered = await selectedImage.boundingBox();
-          const moveLeft = dialog.getByRole("button", {
-            name: "Move picture left",
-            exact: true,
-          });
-          await moveLeft.focus();
-          await expect(moveLeft).toBeFocused();
-          await moveLeft.press("Enter");
-          const repositioned = await selectedImage.boundingBox();
-          if (!centered || !repositioned)
+          if (!centered)
             throw new Error("Keyboard crop preview was not measured");
-          expect(repositioned.x).toBeLessThan(centered.x);
-          await dialog
-            .getByRole("button", { name: "Move picture right", exact: true })
-            .press("Space");
-          const restored = await selectedImage.boundingBox();
-          expect(restored?.x).toBeCloseTo(centered.x, 1);
           const crop = dialog.getByRole("group", {
             name: "Picture crop",
             exact: true,
           });
+          await expect(
+            dialog.getByRole("button", {
+              name: /Move picture (left|right|up|down)/,
+            }),
+          ).toHaveCount(0);
+          const boundary = dialog.getByTestId("picture-crop-boundary");
+          const viewportBox = await crop.boundingBox();
+          const boundaryBox = await boundary.boundingBox();
+          if (!viewportBox || !boundaryBox)
+            throw new Error("Crop context was not measured");
+          expect(boundaryBox.width).toBeLessThan(viewportBox.width * 0.8);
+          expect(boundaryBox.x).toBeGreaterThan(viewportBox.x);
+          await dialog.screenshot({
+            path: test.info().outputPath("picture-editor-desktop.png"),
+          });
+          const desktopViewport = page.viewportSize();
+          if (!desktopViewport) throw new Error("Browser viewport missing");
+          await page.setViewportSize({ width: 390, height: 844 });
+          await expect(dialog).toBeInViewport();
+          expect(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth <= innerWidth,
+            ),
+          ).toBe(true);
+          await dialog.screenshot({
+            path: test.info().outputPath("picture-editor-mobile.png"),
+          });
+          await page.setViewportSize(desktopViewport);
+          await crop.focus();
+          await crop.press("ArrowLeft");
+          await expect
+            .poll(async () => (await selectedImage.boundingBox())?.x)
+            .toBeLessThan(centered.x);
+          await crop.press("ArrowRight");
+          await expect
+            .poll(async () => (await selectedImage.boundingBox())?.x)
+            .toBeCloseTo(centered.x, -1);
           await crop.hover();
           await page.mouse.wheel(0, -10000);
           await expect(zoom).toHaveValue("2");
@@ -524,7 +568,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
           await expect(zoom).toHaveValue("2");
           await page.setViewportSize(originalViewport);
           await dialog
-            .getByRole("button", { name: "Reset", exact: true })
+            .getByRole("button", { name: "Reset crop", exact: true })
             .click();
           await expect(zoom).toHaveValue("1");
           const touchBox = await crop.boundingBox();
@@ -562,14 +606,18 @@ test("Profile picture upload reaches public delivery and removal retires the old
           });
           await touch.detach();
           await dialog
-            .getByRole("button", { name: "Reset", exact: true })
+            .getByRole("button", { name: "Reset crop", exact: true })
             .click();
           await expect(zoom).toHaveValue("1");
           const box = await crop.boundingBox();
           const image = dialog.getByRole("img", { name: "Selected avatar" });
           const before = await image.boundingBox();
           if (!box || !before) throw new Error("Crop preview was not measured");
-          expect(before.width / box.width).toBeCloseTo(2, 1);
+          const cropBoundary = await dialog
+            .getByTestId("picture-crop-boundary")
+            .boundingBox();
+          if (!cropBoundary) throw new Error("Crop boundary was not measured");
+          expect(before.width / cropBoundary.width).toBeCloseTo(2, 1);
           await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
           await page.mouse.down();
           await page.mouse.move(
@@ -581,9 +629,9 @@ test("Profile picture upload reaches public delivery and removal retires the old
           );
           await page.mouse.up();
           const after = await image.boundingBox();
-          expect(after?.x).toBeCloseTo(box.x, -1);
+          expect(after?.x).toBeCloseTo(box.x + box.width * 0.125, -1);
           await dialog
-            .getByRole("button", { name: "Reset", exact: true })
+            .getByRole("button", { name: "Reset crop", exact: true })
             .click();
           // Cancel in the same browser turn before the asynchronous worker can return.
           await dialog.evaluate(async (element) => {
@@ -631,7 +679,20 @@ test("Profile picture upload reaches public delivery and removal retires the old
         page,
         await fixture("profile-transparent-p3.png", "image/png"),
         outgoing,
-        undefined,
+        async (dialog) => {
+          await expect(
+            dialog.getByRole("button", { name: "Choose picture", exact: true }),
+          ).toHaveCount(0);
+          await expect(
+            dialog.getByRole("button", { name: "Reset", exact: true }),
+          ).toHaveAttribute("data-variant", "destructive");
+          await expect(
+            dialog.getByRole("button", { name: "Cancel", exact: true }),
+          ).toBeVisible();
+          await dialog.screenshot({
+            path: test.info().outputPath("picture-editor-actions.png"),
+          });
+        },
         "paste",
       );
       const transparentPixels = await pixels(page, transparent.bytes, [
@@ -808,6 +869,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
         )
         .toBeGreaterThan(0);
 
+      await expectCircularAvatar(profilePicture(publicPage));
       const publicImage = await publicContext.request.get(absolutePictureUrl);
       expect(publicImage.status()).toBe(200);
       expect(publicImage.headers()["content-type"]).toMatch(/^image\//);

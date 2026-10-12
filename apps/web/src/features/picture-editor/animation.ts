@@ -157,7 +157,9 @@ export function* decodePictureGif(
     throw new Error('This GIF exceeds the decoded byte limit.');
   const flags = byte();
   const backgroundIndex = byte();
-  byte();
+  const aspect = byte();
+  if (aspect !== 0 && aspect !== 49)
+    throw new Error('This GIF pixel aspect ratio cannot be preserved. Choose another picture.');
   const global = flags & 128 ? take(3 * (1 << ((flags & 7) + 1))) : undefined;
   if (global && backgroundIndex * 3 + 2 >= global.length) invalid();
   const background = global?.subarray(backgroundIndex * 3, backgroundIndex * 3 + 3);

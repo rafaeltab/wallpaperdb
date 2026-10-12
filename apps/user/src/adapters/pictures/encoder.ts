@@ -246,7 +246,9 @@ function inspectGif(input: Buffer, limits: PictureLimits): GifStructure | undefi
     throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
   const flags = byte();
   byte();
-  byte();
+  const aspect = byte();
+  if (aspect !== 0 && aspect !== 49)
+    throw new InvalidProfilePictureError('Picture GIF pixel aspect ratio cannot be preserved');
   if (flags & 128) take(3 * (1 << ((flags & 7) + 1)));
   let repetitions: number | undefined;
   let delay = 0;

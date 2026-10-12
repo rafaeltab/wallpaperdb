@@ -3,6 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from '../../src/features/picture-editor';
 
 describe('Picture animation', () => {
+  it.each([0, 49, 1, 113, 255])('handles the declared GIF pixel aspect ratio %s', (aspect) => {
+    const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex'));
+    bytes[12] = aspect;
+    const decode = () => Array.from(decodePictureGif(bytes));
+    if (aspect === 0 || aspect === 49) expect(decode().filter((step) => step.kind === 'frame')).toHaveLength(1);
+    else expect(decode).toThrow('pixel aspect ratio');
+  });
   it.each([7, 8])('charges restore-previous snapshot bytes against a %s-byte budget', (maxDecodedBytes) => {
     const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff21f9040c0a0000002c00000000010001000002024401003b', 'hex'));
     const decode = () => Array.from(decodePictureGif(bytes, { maxPixels: 1, maxDecodedBytes }));

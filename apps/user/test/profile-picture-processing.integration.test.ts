@@ -41,6 +41,23 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it.each([
+    0, 49, 1, 113, 255,
+  ])('handles the declared pixel aspect ratio %s in direct GIF normalization', async (aspect) => {
+    const bytes = Buffer.from(
+      '47494638396101000100800000000000ffffff2c00000000010001000002024401003b',
+      'hex'
+    );
+    bytes[12] = aspect;
+    const animatedPolicy = {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+      animation: { available: true },
+    };
+    const process = processProfilePicture(bytes, limits, animatedPolicy);
+    if (aspect === 0 || aspect === 49) expect((await process).mimeType).toBe('image/webp');
+    else await expect(process).rejects.toThrow('pixel aspect ratio');
+  });
   it('normalizes repeated unknown top-level chunks in static and animated WebP', async () => {
     const animatedPolicy = {
       ...policy,

@@ -7,6 +7,38 @@ import { openPictureSource } from '@/features/picture-editor/adapters/browser';
 beforeEach(() => vi.stubGlobal('Blob', NativeBlob));
 afterEach(() => vi.unstubAllGlobals());
 
+it('rejects GIF sources above 50 MiB before copying their compressed bytes', async () => {
+  vi.stubGlobal('Worker', undefined);
+  const allocate = vi.fn();
+  vi.stubGlobal('document', { createElement: allocate });
+  const copy = vi.fn(async () => { throw new Error('Copied oversized GIF.'); });
+  class OversizedGif extends Blob {
+    get size() { return 50 * 1024 * 1024 + 1; }
+    arrayBuffer() { return copy(); }
+  }
+  const file = new OversizedGif(['GIF89a']);
+  await expect(openPictureSource(file, new AbortController().signal))
+    .rejects.toThrow('50 MiB');
+  expect(copy).not.toHaveBeenCalled();
+  expect(allocate).not.toHaveBeenCalled();
+});
+
+it('accepts a GIF source at 50 MiB before processing instead of applying the 5 MiB upload bound', async () => {
+  vi.stubGlobal('Worker', undefined);
+  const allocate = vi.fn(() => { throw new Error('Admitted source to canvas.'); });
+  vi.stubGlobal('document', { createElement: allocate });
+  const bytes = Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex');
+  const copy = vi.fn(async () => Uint8Array.from(bytes).buffer);
+  class LargeGif extends Blob {
+    get size() { return 50 * 1024 * 1024; }
+    arrayBuffer() { return copy(); }
+  }
+  await expect(openPictureSource(new LargeGif([bytes]), new AbortController().signal))
+    .rejects.toThrow('Admitted source to canvas.');
+  expect(copy).toHaveBeenCalledOnce();
+  expect(allocate).toHaveBeenCalledOnce();
+});
+
 it.each([false, true])('uses the quality of the final GIF classification, looping=%s', async (looping) => {
   const encoded = new Blob([await readFile(new URL('../fixtures/profile-canonical.webp', import.meta.url))], { type: 'image/webp' });
   const qualities: number[] = [];

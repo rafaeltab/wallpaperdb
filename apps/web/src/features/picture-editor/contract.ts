@@ -14,6 +14,9 @@ export const defaultPictureDecodedLimits: PictureDecodedLimits = {
   maxDecodedBytes: 64 * 1024 * 1024,
 };
 
+// Match Ingestor's image source limit, independently of User's processed upload limit.
+export const pictureGifSourceByteLimit = 50 * 1024 * 1024;
+
 /** Coordinates are in the oriented source, independent of preview/display size. */
 export interface PictureCrop {
   x: number;

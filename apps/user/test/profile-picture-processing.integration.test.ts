@@ -41,6 +41,42 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it.each([1, 2])('normalizes a still WebP with %s ignored ANIM chunks', async (count) => {
+    const source = await sharp({
+      create: {
+        width: 512,
+        height: 512,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 0.5 },
+      },
+    })
+      .webp({ lossless: true })
+      .toBuffer();
+    const images: Buffer[] = [];
+    for (let offset = 12; offset < source.length; ) {
+      const size = source.readUInt32LE(offset + 4);
+      const end = offset + 8 + size + (size % 2);
+      if (['VP8 ', 'VP8L', 'ALPH'].includes(source.toString('ascii', offset, offset + 4)))
+        images.push(source.subarray(offset, end));
+      offset = end;
+    }
+    const header = Buffer.alloc(30);
+    header.write('RIFF');
+    header.write('WEBP', 8);
+    header.write('VP8X', 12);
+    header.writeUInt32LE(10, 16);
+    header[20] = 0x10;
+    header.writeUIntLE(511, 24, 3);
+    header.writeUIntLE(511, 27, 3);
+    const controls = Buffer.from('414e494d06000000000000000000', 'hex');
+    const tagged = Buffer.concat([header, ...images, controls, ...(count === 2 ? [controls] : [])]);
+    tagged.writeUInt32LE(tagged.length - 8, 4);
+    expect((await sharp(tagged).metadata()).hasAlpha).toBe(true);
+    const picture = await processProfilePicture(tagged, limits);
+    expect(picture.bytes.includes(Buffer.from('ANIM'))).toBe(false);
+    const raw = await sharp(picture.bytes).ensureAlpha().raw().toBuffer();
+    expect([...raw.subarray(0, 4)]).toEqual([255, 255, 255, 128]);
+  });
   it('preserves fragmented GIF loop controls and image data during direct normalization', async () => {
     const input = Buffer.from(
       '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30' +

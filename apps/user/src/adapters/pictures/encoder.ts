@@ -152,6 +152,10 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
   const still: Array<{ type: string; data: Buffer }> = [];
   const durations: number[] = [];
   for (const { type, data } of top) {
+    if (type === 'ANIM' && !animated) {
+      canonicalChunks = false;
+      continue;
+    }
     if (
       ['VP8X', 'ANIM', 'ICCP', 'EXIF', 'XMP ', 'ALPH', 'VP8 ', 'VP8L'].includes(type) &&
       seen.has(type)

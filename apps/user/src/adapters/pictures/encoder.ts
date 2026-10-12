@@ -173,7 +173,14 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
       if (frameWidth * frameHeight > limits.maxPixels)
         throw new Error('Picture exceeds the pixel limit');
       const start = data.byteOffset - input.byteOffset + 16;
-      const decoded = image(chunks(start, start + data.length - 16));
+      const frameParts = chunks(start, start + data.length - 16);
+      const imageParts = frameParts.filter((part) => {
+        if (['ALPH', 'VP8 ', 'VP8L'].includes(part.type)) return true;
+        if (['VP8X', 'ICCP', 'ANIM', 'ANMF', 'EXIF', 'XMP '].includes(part.type)) invalid();
+        canonicalChunks = false;
+        return false;
+      });
+      const decoded = image(imageParts);
       if (decoded.width !== frameWidth || decoded.height !== frameHeight) invalid();
       hasAlpha ||= decoded.alpha;
       durations.push(data.readUIntLE(12, 3));

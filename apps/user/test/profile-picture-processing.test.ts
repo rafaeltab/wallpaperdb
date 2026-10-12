@@ -41,6 +41,43 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it('normalizes valid unknown chunks inside animated WebP frames', async () => {
+    const input = readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url));
+    const animatedPolicy = {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+      animation: { available: true },
+    };
+    const canonical = (await processProfilePicture(input, limits, animatedPolicy)).bytes;
+    let offset = 12;
+    while (canonical.toString('ascii', offset, offset + 4) !== 'ANMF') {
+      const size = canonical.readUInt32LE(offset + 4);
+      offset += 8 + size + (size % 2);
+    }
+    const frameSize = canonical.readUInt32LE(offset + 4);
+    const payload = Buffer.from('PRIVATE-FRAME-META');
+    const extension = Buffer.alloc(8 + payload.length + (payload.length % 2));
+    extension.write('TEST');
+    extension.writeUInt32LE(payload.length, 4);
+    payload.copy(extension, 8);
+    const end = offset + 8 + frameSize;
+    const tagged = Buffer.concat([canonical.subarray(0, end), extension, canonical.subarray(end)]);
+    tagged.writeUInt32LE(frameSize + extension.length, offset + 4);
+    tagged.writeUInt32LE(tagged.length - 8, 4);
+    await sharp(tagged, { animated: true }).raw().toBuffer();
+    const expected = await sharp(canonical, { animated: true }).metadata();
+    const picture = await processProfilePicture(tagged, limits, animatedPolicy);
+    expect(picture.bytes.includes(payload)).toBe(false);
+    expect(await sharp(picture.bytes, { animated: true }).metadata()).toMatchObject({
+      width: expected.width,
+      height: expected.height,
+      pages: expected.pages,
+      pageHeight: expected.pageHeight,
+      delay: expected.delay,
+      loop: expected.loop,
+      hasAlpha: expected.hasAlpha,
+    });
+  });
   it('rejects a tiny GIF with excessive output-frame work before it can reach per-frame encoding', async () => {
     const input = Buffer.concat([
       Buffer.from('47494638396101000100800000000000ffffff', 'hex'),

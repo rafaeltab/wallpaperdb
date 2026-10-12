@@ -181,3 +181,35 @@ it.each(['worker', 'fallback'])('cancels an observed pending fitting job and rel
     expect((await decodedAnimation(recovered)).frames).toHaveLength(4);
   } finally { releaseEncode(); source?.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); }
 });
+
+
+it.each(['worker', 'fallback'])('normalizes small and transparent static sources with the real %s codec', async (mode) => {
+  if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
+  for (const name of ['profile-small.png', 'profile-transparent-p3.png']) {
+    const response = await fetch(new URL(`../../../web-e2e/fixtures/${name}`, import.meta.url));
+    expect(response.ok).toBe(true);
+    const controller = new AbortController();
+    const source = await openPictureSource(await response.blob(), controller.signal);
+    try {
+      const result = await source.process(initialPictureCrop(source), policy, controller.signal);
+      const bitmap = await createImageBitmap(result);
+      try {
+        expect([bitmap.width, bitmap.height]).toEqual([512, 512]);
+        const canvas = new OffscreenCanvas(512, 512);
+        const context = canvas.getContext('2d', { colorSpace: 'srgb' });
+        if (!context) throw new Error('Missing static-source canvas');
+        context.drawImage(bitmap, 0, 0);
+        if (name === 'profile-small.png') {
+          expect(context.getImageData(0, 0, 1, 1).data[3]).toBe(255);
+          expect(context.getImageData(511, 511, 1, 1).data[3]).toBe(255);
+        } else {
+          expect(context.getImageData(256, 10, 1, 1).data[3]).toBe(0);
+          const sample = context.getImageData(256, 256, 1, 1).data;
+          expect(sample[3]).toBe(128);
+          for (const [index, expected] of [32, 180, 64].entries())
+            expect(Math.abs(sample[index] - expected)).toBeLessThan(12);
+        }
+      } finally { bitmap.close(); }
+    } finally { source.dispose(); }
+  }
+});

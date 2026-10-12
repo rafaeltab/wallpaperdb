@@ -43,7 +43,7 @@ export function ProfilePictureSettings({
   const input = useRef<HTMLInputElement>(null);
   const dialogContent = useRef<HTMLDivElement>(null);
   const removeOpener = useRef<HTMLButtonElement>(null);
-  const editor = usePictureEditor(profile.id);
+  const editor = usePictureEditor(profile.id, profile.pictureUploadLimits);
   const selected = editor.selection;
   const session = useRef(0);
   const client = useQueryClient();

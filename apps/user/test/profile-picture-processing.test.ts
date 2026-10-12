@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { readFileSync } from 'node:fs';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { pictureCodecLayer } from '../src/adapters/pictures/index.js';
@@ -40,6 +41,63 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it('normalizes valid unknown chunks inside animated WebP frames', async () => {
+    const input = readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url));
+    const animatedPolicy = {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+      animation: { available: true },
+    };
+    const canonical = (await processProfilePicture(input, limits, animatedPolicy)).bytes;
+    let offset = 12;
+    while (canonical.toString('ascii', offset, offset + 4) !== 'ANMF') {
+      const size = canonical.readUInt32LE(offset + 4);
+      offset += 8 + size + (size % 2);
+    }
+    const frameSize = canonical.readUInt32LE(offset + 4);
+    const payload = Buffer.from('PRIVATE-FRAME-META');
+    const extension = Buffer.alloc(8 + payload.length + (payload.length % 2));
+    extension.write('TEST');
+    extension.writeUInt32LE(payload.length, 4);
+    payload.copy(extension, 8);
+    const end = offset + 8 + frameSize;
+    const tagged = Buffer.concat([canonical.subarray(0, end), extension, canonical.subarray(end)]);
+    tagged.writeUInt32LE(frameSize + extension.length, offset + 4);
+    tagged.writeUInt32LE(tagged.length - 8, 4);
+    await sharp(tagged, { animated: true }).raw().toBuffer();
+    const expected = await sharp(canonical, { animated: true }).metadata();
+    const picture = await processProfilePicture(tagged, limits, animatedPolicy);
+    expect(picture.bytes.includes(payload)).toBe(false);
+    expect(await sharp(picture.bytes, { animated: true }).metadata()).toMatchObject({
+      width: expected.width,
+      height: expected.height,
+      pages: expected.pages,
+      pageHeight: expected.pageHeight,
+      delay: expected.delay,
+      loop: expected.loop,
+      hasAlpha: expected.hasAlpha,
+    });
+  });
+  it('rejects a tiny GIF with excessive output-frame work before it can reach per-frame encoding', async () => {
+    const input = Buffer.concat([
+      Buffer.from('47494638396101000100800000000000ffffff', 'hex'),
+      ...Array.from({ length: 1024 }, () => Buffer.from('2c0000000001000100000202440100', 'hex')),
+      Buffer.from([0x3b]),
+    ]);
+    expect(input.length).toBeLessThan(limits.maxBytes);
+    expect(await sharp(input, { animated: true }).metadata()).toMatchObject({
+      width: 1,
+      pageHeight: 1,
+      pages: 1024,
+    });
+    await expect(
+      processProfilePicture(input, limits, {
+        ...policy,
+        acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+        animation: { available: true },
+      })
+    ).rejects.toThrow('Picture exceeds the decoded byte limit');
+  });
   it('normalizes direct GIF and WebP without losing frames, alpha, timing or looping', async () => {
     const gif = Buffer.from(
       '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030102000021f904010a0000002c000000000100010000020244010021f90401140000002c00000000010001000002024c01003b',
@@ -288,6 +346,160 @@ describe('Profile picture processing', () => {
       /orientation/
     );
   });
+  it.each([
+    'old',
+    'new',
+  ])('rejects the real Apple %s gain-map JPEG instead of storing only its SDR base', async (generation) => {
+    const input = await readFile(
+      new URL(`./fixtures/profile-picture-hdr/apple_gainmap_${generation}.jpg`, import.meta.url)
+    );
+    expect(await sharp(input).metadata()).toMatchObject({
+      format: 'jpeg',
+      space: 'srgb',
+      depth: 'uchar',
+    });
+    await sharp(input, { failOn: 'warning' }).raw().toBuffer();
+    await expect(processProfilePicture(input, limits)).rejects.toThrow(
+      'Picture color interpretation is unsupported'
+    );
+  });
+  it.each([
+    [
+      'Ultra HDR',
+      0xe1,
+      Buffer.from(
+        'http://ns.adobe.com/xap/1.0/\0<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/" hdrgm:Version="1.0"/></rdf:RDF></x:xmpmeta>'
+      ),
+    ],
+    [
+      'ISO gain-map',
+      0xe2,
+      Buffer.concat([Buffer.from('urn:iso:std:iso:ts:21496:-1\0'), Buffer.alloc(4)]),
+    ],
+  ] as const)('rejects JPEGs declaring %s before the SDR decoder discards that declaration', async (_format, marker, payload) => {
+    const jpeg = await sharp({
+      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+    })
+      .jpeg()
+      .toBuffer();
+    const header = Buffer.from([0xff, marker, 0, 0]);
+    header.writeUInt16BE(payload.length + 2, 2);
+    const input = Buffer.concat([jpeg.subarray(0, 2), header, payload, jpeg.subarray(2)]);
+    expect(await sharp(input).metadata()).toMatchObject({
+      format: 'jpeg',
+      space: 'srgb',
+      depth: 'uchar',
+    });
+    await sharp(input, { failOn: 'warning' }).raw().toBuffer();
+    await expect(processProfilePicture(input, limits)).rejects.toThrow(
+      'Picture color interpretation is unsupported'
+    );
+  });
+  it.each([
+    'EXIF',
+    'XMP',
+  ])('normalizes SDR JPEG %s containing gain-map text without a gain-map declaration', async (metadataType) => {
+    const source = sharp({
+      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+    });
+    const namespace = 'http://ns.adobe.com/hdr-gain-map/1.0/';
+    let input: Buffer;
+    if (metadataType === 'EXIF') {
+      input = await source
+        .withExifMerge({ IFD0: { Model: namespace } })
+        .jpeg()
+        .toBuffer();
+    } else {
+      const jpeg = await source.jpeg({ progressive: true }).toBuffer();
+      const payload = Buffer.from(
+        `http://ns.adobe.com/xap/1.0/\0<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:description>${namespace}</dc:description></rdf:Description></rdf:RDF></x:xmpmeta>`
+      );
+      const header = Buffer.from([0xff, 0xe1, 0, 0]);
+      header.writeUInt16BE(payload.length + 2, 2);
+      input = Buffer.concat([jpeg.subarray(0, 2), header, payload, jpeg.subarray(2)]);
+    }
+    expect(input.includes(Buffer.from(namespace))).toBe(true);
+    const picture = await processProfilePicture(input, limits);
+    expect(await sharp(picture.bytes).metadata()).toMatchObject({
+      format: 'webp',
+      width: 512,
+      height: 512,
+      space: 'srgb',
+      depth: 'uchar',
+    });
+    expect((await sharp(picture.bytes).metadata()).xmp).toBeUndefined();
+    expect((await sharp(picture.bytes).metadata()).exif).toBeUndefined();
+    expect(picture.bytes.includes(Buffer.from(namespace))).toBe(false);
+  });
+  it.each([
+    ['PQ', '0000000463494350091000014d2323fe'],
+    ['HLG', '0000000463494350091200014ea7f790'],
+  ])('rejects %s HDR PNG16 despite the native decoder reporting ordinary RGB16', async (_transfer, chunk) => {
+    const png = await sharp({
+      create: { width: 3, height: 2, channels: 3, background: '#3578aa' },
+    })
+      .toColourspace('rgb16')
+      .png()
+      .toBuffer();
+    // Valid cICP chunks use the PQ/HLG declarations from the PNG specification.
+    // https://www.w3.org/TR/png-3/#cICP-chunk
+    const input = Buffer.concat([png.subarray(0, 33), Buffer.from(chunk, 'hex'), png.subarray(33)]);
+    expect(await sharp(input).metadata()).toMatchObject({ space: 'rgb16', depth: 'ushort' });
+    expect(await sharp(input).raw().toBuffer()).toHaveLength(3 * 2 * 3);
+    await expect(processProfilePicture(input, limits)).rejects.toThrow(
+      'Picture color interpretation is unsupported'
+    );
+  });
+  it('normalizes ordinary SDR PNG16 without confusing sample depth with HDR', async () => {
+    const input = await sharp({
+      create: {
+        width: 3,
+        height: 2,
+        channels: 4,
+        background: { r: 53, g: 120, b: 170, alpha: 0.25 },
+      },
+    })
+      .toColourspace('rgb16')
+      .png()
+      .toBuffer();
+    expect(await sharp(input).metadata()).toMatchObject({ space: 'rgb16', depth: 'ushort' });
+    const picture = await processProfilePicture(input, limits);
+    expect(await sharp(picture.bytes).metadata()).toMatchObject({
+      width: 512,
+      height: 512,
+      space: 'srgb',
+      depth: 'uchar',
+      hasAlpha: true,
+    });
+    const pixel = await sharp(picture.bytes)
+      .extract({ left: 256, top: 256, width: 1, height: 1 })
+      .raw()
+      .toBuffer();
+    expect(pixel[3]).toBe(64);
+  });
+  it('rejects an alpha chunk after the image even when the native decoder accepts the image', async () => {
+    const webp = await sharp({
+      create: { width: 512, height: 512, channels: 3, background: '#3578aa' },
+    })
+      .webp()
+      .toBuffer();
+    const extension = Buffer.alloc(18);
+    extension.write('VP8X');
+    extension.writeUInt32LE(10, 4);
+    extension.writeUIntLE(511, 12, 3);
+    extension.writeUIntLE(511, 15, 3);
+    const malformed = Buffer.concat([
+      webp.subarray(0, 12),
+      extension,
+      webp.subarray(12),
+      Buffer.from('414c5048010000000000', 'hex'),
+    ]);
+    malformed.writeUInt32LE(malformed.length - 8, 4);
+    expect(await sharp(malformed).raw().toBuffer()).toHaveLength(512 * 512 * 3);
+    await expect(processProfilePicture(malformed, limits)).rejects.toThrow(
+      'Picture could not be decoded'
+    );
+  });
   it('rejects a canonical-sized WebP containing duplicate image chunks', async () => {
     const webp = await sharp({
       create: { width: 512, height: 512, channels: 3, background: '#3578aa' },
@@ -297,6 +509,24 @@ describe('Profile picture processing', () => {
     const duplicate = Buffer.concat([webp, webp.subarray(12)]);
     duplicate.writeUInt32LE(duplicate.length - 8, 4);
     await expect(processProfilePicture(duplicate, limits)).rejects.toThrow(
+      'Picture could not be decoded'
+    );
+  });
+  it('rejects an extended header that omits alpha present in the lossless image', async () => {
+    const webp = await sharp({
+      create: { width: 512, height: 512, channels: 4, background: '#3578aa80' },
+    })
+      .webp({ lossless: true })
+      .toBuffer();
+    expect(webp.toString('ascii', 12, 16)).toBe('VP8L');
+    const extension = Buffer.alloc(18);
+    extension.write('VP8X');
+    extension.writeUInt32LE(10, 4);
+    extension.writeUIntLE(511, 12, 3);
+    extension.writeUIntLE(511, 15, 3);
+    const malformed = Buffer.concat([webp.subarray(0, 12), extension, webp.subarray(12)]);
+    malformed.writeUInt32LE(malformed.length - 8, 4);
+    await expect(processProfilePicture(malformed, limits)).rejects.toThrow(
       'Picture could not be decoded'
     );
   });
@@ -376,6 +606,24 @@ describe('Profile picture processing', () => {
       processProfilePicture(canonical, limits, { ...policy, maxOutputBytes: 1 })
     ).rejects.toThrow('processed output byte limit');
   });
+  it('allows canonical output larger than the source decoded-byte budget when it fits output policy', async () => {
+    const pixels = Buffer.alloc(16 * 16 * 3);
+    let seed = 123456;
+    for (let index = 0; index < pixels.length; index++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      pixels[index] = seed >>> 24;
+    }
+    const input = await sharp(pixels, { raw: { width: 16, height: 16, channels: 3 } })
+      .png()
+      .toBuffer();
+    const picture = await processProfilePicture(input, {
+      ...limits,
+      maxDecodedBytes: pixels.length,
+    });
+    expect(picture.bytes.length).toBeGreaterThan(pixels.length * 2 + 4096);
+    expect(picture.bytes.length).toBeLessThan(policy.maxOutputBytes);
+    expect(await sharp(picture.bytes).metadata()).toMatchObject({ width: 512, height: 512 });
+  });
   it('rejects malformed WebP containers even when their first image can be decoded', async () => {
     const webp = await sharp({
       create: { width: 512, height: 512, channels: 3, background: '#3578aa' },
@@ -386,11 +634,14 @@ describe('Profile picture processing', () => {
       processProfilePicture(Buffer.concat([webp, Buffer.from('hidden trailing bytes')]), limits)
     ).rejects.toThrow('Picture could not be decoded');
   });
-  it('preserves exact canonical static WebP bytes after fully decoding them', async () => {
+  it.each([
+    false,
+    true,
+  ])('preserves exact canonical static WebP bytes after fully decoding them with lossless=%s', async (lossless) => {
     const input = await sharp({
       create: { width: 512, height: 512, channels: 4, background: '#3578aa80' },
     })
-      .webp({ quality: 73 })
+      .webp({ quality: 73, lossless })
       .toBuffer();
     const picture = await processProfilePicture(input, limits);
     expect(picture.bytes).toEqual(input);

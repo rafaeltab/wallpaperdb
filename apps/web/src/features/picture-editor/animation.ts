@@ -1,3 +1,5 @@
+import { defaultPictureDecodedLimits, type PictureDecodedLimits } from './contract';
+
 /** GIF delays follow browser playback: unspecified or <=10ms displays for 100ms. */
 export function pictureAnimationTiming(delays: readonly number[], repetitions?: number) {
   if (
@@ -105,7 +107,8 @@ function* lzw(
  * Consumers yield at each step and close the iterator on cancellation to release frame memory.
  */
 export function* decodePictureGif(
-  bytes: Uint8Array
+  bytes: Uint8Array,
+  limits: PictureDecodedLimits = defaultPictureDecodedLimits
 ): Generator<PictureGifStep, { loop: number; frameCount: number; animated: boolean }> {
   let offset = 0;
   const take = (length: number) => {
@@ -149,12 +152,38 @@ export function* decodePictureGif(
   const width = word();
   const height = word();
   if (!width || !height) invalid();
+  if (width * height > limits.maxPixels) throw new Error('This GIF exceeds the pixel limit.');
+  if (width * height * 4 > limits.maxDecodedBytes)
+    throw new Error('This GIF exceeds the decoded byte limit.');
   const flags = byte();
-  byte();
+  const backgroundIndex = byte();
   byte();
   const global = flags & 128 ? take(3 * (1 << ((flags & 7) + 1))) : undefined;
+  if (global && backgroundIndex * 3 + 2 >= global.length) invalid();
+  const background = global?.subarray(backgroundIndex * 3, backgroundIndex * 3 + 3);
   yield { kind: 'size', width, height };
   const canvas = new Uint8ClampedArray(width * height * 4);
+  function* restoreBackground(
+    left: number,
+    top: number,
+    columns: number,
+    rows: number,
+    opaque: boolean
+  ): Generator<PictureGifStep> {
+    const color =
+      opaque && background ? [background[0], background[1], background[2], 255] : [0, 0, 0, 0];
+    let work = 0;
+    for (let y = top; y < top + rows; y++) {
+      for (let x = left; x < left + columns; x++) {
+        const target = (y * width + x) * 4;
+        canvas.set(color, target);
+        if (++work === 16384) {
+          work = 0;
+          yield { kind: 'progress' };
+        }
+      }
+    }
+  }
   let repetitions: number | undefined;
   let frameCount = 0;
   let delay = 0;
@@ -214,6 +243,10 @@ export function* decodePictureGif(
       invalid();
     const palette = frameFlags & 128 ? take(3 * (1 << ((frameFlags & 7) + 1))) : global;
     if (!palette) invalid();
+    if ((frameCount + 1) * width * height * 4 > limits.maxDecodedBytes)
+      throw new Error('This GIF exceeds the decoded byte limit.');
+    if (!frameCount && transparent === undefined && background)
+      yield* restoreBackground(0, 0, width, height, true);
     const minimum = byte();
     const compressed = yield* blocks();
     const indices = yield* lzw(compressed, minimum, frameWidth * frameHeight);
@@ -262,15 +295,8 @@ export function* decodePictureGif(
       height,
       duration: pictureAnimationTiming([delay]).durations[0],
     };
-    // Match browser GIF rendering: restore-background clears the disposed rectangle to alpha.
     if (disposal === 2) {
-      for (let y = top; y < top + frameHeight; y++) {
-        canvas.fill(0, (y * width + left) * 4, (y * width + left + frameWidth) * 4);
-        if (++work * frameWidth >= 16384) {
-          work = 0;
-          yield { kind: 'progress' };
-        }
-      }
+      yield* restoreBackground(left, top, frameWidth, frameHeight, transparent === undefined);
     } else if (saved) {
       for (let start = 0; start < canvas.length; start += 65536) {
         canvas.set(saved.subarray(start, start + 65536), start);

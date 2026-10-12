@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { initialPictureCrop, type PictureCrop, type PictureEncodingPolicy } from '../index';
+import {
+  initialPictureCrop,
+  type PictureCrop,
+  type PictureDecodedLimits,
+  type PictureEncodingPolicy,
+} from '../index';
+import { defaultPictureDecodedLimits } from '../contract';
 import { openPictureSource, type PictureSource } from './browser';
 
 interface Selection {
@@ -12,7 +18,10 @@ interface Selection {
 }
 
 /** Owns local source work. The caller owns command acceptance and saved Profile state. */
-export function usePictureEditor(owner: string) {
+export function usePictureEditor(
+  owner: string,
+  limits: PictureDecodedLimits = defaultPictureDecodedLimits
+) {
   const current = useRef<Selection | null>(null);
   const operation = useRef<AbortController | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -49,7 +58,7 @@ export function usePictureEditor(owner: string) {
     return dispose;
   }, [owner, dispose]);
   async function decode(selected: Selection, controller: AbortController) {
-    const source = await openPictureSource(selected.file, controller.signal);
+    const source = await openPictureSource(selected.file, controller.signal, limits);
     if (controller.signal.aborted || current.current !== selected) {
       source.dispose();
       return null;

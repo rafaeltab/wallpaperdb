@@ -17,6 +17,10 @@ React and TanStack Router provide the application and its navigation. TanStack Q
 
 Profile edits go to the owning User service; public pages read Gateway's projection, which can take a moment to catch up. See the [profile editing guide](../docs/content/docs/guides/profile-editing.mdx) for saving, aliases, cooldowns, and picture changes.
 
+Local static Profile picture sources follow [Ingestor's dimension admission limits](../ingestor/src/capabilities/ingestion/implementation.ts) to bound decoding before canonical reduction. The [browser source inspector](src/features/picture-editor/adapters/source.ts) checks headers before starting either decoder. The effective User picture policy remains authoritative for the processed upload.
+
+The SDR editor rejects JPEG gain-map declarations and PNG `cICP` color declarations before rasterization. Unqualified HDR sources must not silently become SDR uploads; [ADR 0009](../../docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md) assigns HDR processing to Media, and the [confirmed source policy](https://github.com/rafaeltab/wallpaperdb/issues/270#issuecomment-5902621514) requires classification before SDR normalization.
+
 ## Frontend feature decisions
 
 Feature policies use plain TypeScript, while React and browser adapters handle rendering and effects. See the [coding guidelines index](../../CODING_STANDARDS.md) for frontend guidance and the [architecture test](test/features/feature-architecture.test.ts) for enforced feature boundaries.

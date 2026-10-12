@@ -36,14 +36,16 @@ export function ProfilePictureCrop({
   const viewport = useRef<HTMLFieldSetElement>(null);
   const wheel = useEffectEvent((event: WheelEvent) => {
     if (disabled) return;
-    event.preventDefault();
     const unit =
       event.deltaMode === 1
         ? 16
         : event.deltaMode === 2
           ? (viewport.current?.clientHeight ?? 0)
           : 1;
-    onChange(wheelPictureCrop(crop, source, event.deltaY * unit));
+    const next = wheelPictureCrop(crop, source, event.deltaY * unit);
+    if (next.zoom === crop.zoom) return;
+    event.preventDefault();
+    onChange(next);
   });
   useEffect(() => {
     const element = viewport.current;
@@ -98,6 +100,28 @@ export function ProfilePictureCrop({
             top: `${(-crop.y / crop.size) * 100}%`,
           }}
         />
+      </fieldset>
+      <fieldset aria-label="Move picture" className="flex flex-wrap justify-center gap-2">
+        {[
+          { label: 'Left', x: -1, y: 0 },
+          { label: 'Right', x: 1, y: 0 },
+          { label: 'Up', x: 0, y: -1 },
+          { label: 'Down', x: 0, y: 1 },
+        ].map(({ label, x, y }) => (
+          <Button
+            key={label}
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={`Move picture ${label.toLowerCase()}`}
+            disabled={disabled}
+            onClick={() =>
+              onChange(movePictureCrop(crop, source, (x * crop.size) / 10, (y * crop.size) / 10))
+            }
+          >
+            {label}
+          </Button>
+        ))}
       </fieldset>
       <div className="flex items-center gap-3">
         <label htmlFor="picture-zoom" className="text-sm">

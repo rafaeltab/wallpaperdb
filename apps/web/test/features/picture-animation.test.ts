@@ -4,6 +4,46 @@ import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from
 
 describe('Picture animation', () => {
   it.each([
+    { maxPixels: 3, maxDecodedBytes: 100, expected: 'pixel limit' },
+    { maxPixels: 100, maxDecodedBytes: 15, expected: 'decoded byte limit' },
+  ])('checks $expected before yielding a logical-screen allocation', (limits) => {
+    const bytes = Uint8Array.from(Buffer.from('47494638396102000200800000000000ffffff2c00000000010001000002024401003b', 'hex'));
+    expect(() => decodePictureGif(bytes, limits).next()).toThrow(limits.expected);
+  });
+
+  it('checks aggregate decoded frame bytes before composing another frame', () => {
+    const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401002c00000000010001000002024401003b', 'hex'));
+    const frames: number[][] = [];
+    expect(() => {
+      for (const step of decodePictureGif(bytes, { maxPixels: 1, maxDecodedBytes: 4 })) {
+        if (step.kind === 'frame') frames.push(Array.from(step.pixels));
+      }
+    }).toThrow('decoded byte limit');
+    expect(frames).toHaveLength(1);
+  });
+
+  it('preserves opaque logical-screen background through partial frames and disposal', () => {
+    const bytes = Uint8Array.from(Buffer.from(
+      '47494638396102000100800100ff000000ff00' +
+      '21f90408010000002c0000000001000100000202440100' +
+      '2c01000000010001000002024401003b', 'hex'));
+    const frames: number[][] = [];
+    for (const step of decodePictureGif(bytes)) {
+      if (step.kind === 'frame') frames.push(Array.from(step.pixels));
+    }
+    expect(frames).toEqual([
+      [255, 0, 0, 255, 0, 255, 0, 255],
+      [0, 255, 0, 255, 255, 0, 0, 255],
+    ]);
+  });
+
+  it('rejects a background index outside the declared global palette', () => {
+    const bytes = Uint8Array.from(Buffer.from(
+      '47494638396101000100800200ff000000ff002c00000000010001000002024401003b', 'hex'));
+    expect(() => decodePictureGif(bytes).next()).toThrow('Unable to decode this GIF picture.');
+  });
+
+  it.each([
     [undefined, 1], [0, 0], [1, 2], [20, 21], [65534, 65535],
   ])('preserves GIF repetitions %s as WebP cycles %s', (repetitions, loop) => {
     expect(pictureAnimationTiming([0, 1, 2, 10, 65535], repetitions)).toEqual({ durations: [100, 100, 20, 100, 655350], loop });

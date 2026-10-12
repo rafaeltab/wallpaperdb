@@ -41,6 +41,26 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it('rejects a tiny GIF with excessive output-frame work before it can reach per-frame encoding', async () => {
+    const input = Buffer.concat([
+      Buffer.from('47494638396101000100800000000000ffffff', 'hex'),
+      ...Array.from({ length: 1024 }, () => Buffer.from('2c0000000001000100000202440100', 'hex')),
+      Buffer.from([0x3b]),
+    ]);
+    expect(input.length).toBeLessThan(limits.maxBytes);
+    expect(await sharp(input, { animated: true }).metadata()).toMatchObject({
+      width: 1,
+      pageHeight: 1,
+      pages: 1024,
+    });
+    await expect(
+      processProfilePicture(input, limits, {
+        ...policy,
+        acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+        animation: { available: true },
+      })
+    ).rejects.toThrow('Picture exceeds the decoded byte limit');
+  });
   it('normalizes direct GIF and WebP without losing frames, alpha, timing or looping', async () => {
     const gif = Buffer.from(
       '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030102000021f904010a0000002c000000000100010000020244010021f90401140000002c00000000010001000002024c01003b',

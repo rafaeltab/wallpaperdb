@@ -113,6 +113,8 @@ describe('resize HTTP validation', () => {
     ['h=1080', { height: 1080, fit: 'contain' }],
     ['fit=cover', undefined],
     ['w=1920&h=1080', { width: 1920, height: 1080, fit: 'contain' }],
+    ['w=800&h=600&fit=cover', { width: 800, height: 600, fit: 'cover' }],
+    ['w=1200&h=800&fit=fill', { width: 1200, height: 800, fit: 'fill' }],
   ] as const)('accepts %s and defaults omitted fit', async (query, options) => {
     const f = fixture();
     const app = await f.app();

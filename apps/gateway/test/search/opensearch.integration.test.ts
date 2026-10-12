@@ -5,18 +5,24 @@ import { Client } from '@opensearch-project/opensearch';
 import { metrics } from '@opentelemetry/api';
 import { Effect, Layer } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { type OpenSearchGateway, openSearchLayer } from '../src/adapters/opensearch/index.js';
+import { type OpenSearchGateway, openSearchLayer } from '../../src/adapters/opensearch/index.js';
 import type {
   ColorDescriptor,
   SearchBatch,
   SearchSelection,
   Variant,
   Wallpaper,
-} from '../src/capabilities/catalogue/index.js';
-import type { ProjectCatalogue, ProjectionChange } from '../src/capabilities/projection/index.js';
-import { colorUtilityFields, COLOR_UTILITY_VERSION } from '../src/capabilities/catalogue/index.js';
-import { measuredColors, colorFixture } from './helpers/colors.js';
-import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
+} from '../../src/capabilities/catalogue/index.js';
+import type {
+  ProjectCatalogue,
+  ProjectionChange,
+} from '../../src/capabilities/projection/index.js';
+import {
+  colorUtilityFields,
+  COLOR_UTILITY_VERSION,
+} from '../../src/capabilities/catalogue/index.js';
+import { measuredColors, colorFixture } from '../helpers/colors.js';
+import { acquireSearchFixture, createSearchFixture } from '../search-fixture.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
 const variant: Variant = {

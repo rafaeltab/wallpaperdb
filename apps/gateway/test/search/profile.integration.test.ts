@@ -3,10 +3,10 @@ import { it as effectIt } from '@effect/vitest';
 import { DateTime, Effect } from 'effect';
 import { TestClock } from 'effect/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
-import type { Profile } from '../src/capabilities/catalogue/index.js';
-import type { ProjectCatalogue } from '../src/capabilities/projection/index.js';
-import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
+import type { OpenSearchGateway } from '../../src/adapters/opensearch/index.js';
+import type { Profile } from '../../src/capabilities/catalogue/index.js';
+import type { ProjectCatalogue } from '../../src/capabilities/projection/index.js';
+import { acquireSearchFixture, createSearchFixture } from '../search-fixture.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
 function profile(id: string, overrides: Partial<Profile> = {}): Profile {

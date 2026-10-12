@@ -2,11 +2,11 @@ import { Client } from '@opensearch-project/opensearch';
 import type { ProfileUpdatedEvent, WallpaperUploadedEvent } from '@wallpaperdb/events';
 import { Effect } from 'effect';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
-import { createGatewayTester } from './setup.js';
-import { createApp } from '../src/app.js';
-import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
-import { measuredColors } from './helpers/colors.js';
+import type { OpenSearchGateway } from '../../src/adapters/opensearch/index.js';
+import { createGatewayTester } from '../setup.js';
+import { createApp } from '../../src/app.js';
+import { acquireSearchFixture, createSearchFixture } from '../search-fixture.js';
+import { measuredColors } from '../helpers/colors.js';
 
 const timestamp = '2026-09-15T12:00:00.000Z';
 

@@ -152,7 +152,11 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
   const still: Array<{ type: string; data: Buffer }> = [];
   const durations: number[] = [];
   for (const { type, data } of top) {
-    if (type !== 'ANMF' && seen.has(type)) invalid();
+    if (
+      ['VP8X', 'ANIM', 'ICCP', 'EXIF', 'XMP ', 'ALPH', 'VP8 ', 'VP8L'].includes(type) &&
+      seen.has(type)
+    )
+      invalid();
     seen.add(type);
     if (type === 'VP8X') {
       if (data !== header) invalid();

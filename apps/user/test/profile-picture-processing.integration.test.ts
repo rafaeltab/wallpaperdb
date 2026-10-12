@@ -41,6 +41,37 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it('normalizes repeated unknown top-level chunks in static and animated WebP', async () => {
+    const animatedPolicy = {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+      animation: { available: true },
+    };
+    const gif = readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url));
+    const inputs = [
+      await sharp({ create: { width: 512, height: 512, channels: 3, background: '#7799aa' } })
+        .webp()
+        .toBuffer(),
+      (await processProfilePicture(gif, limits, animatedPolicy)).bytes,
+    ];
+    const privateChunk = Buffer.from('50524956080000005052495641544521', 'hex');
+    for (const canonical of inputs) {
+      const tagged = Buffer.concat([canonical, privateChunk, privateChunk]);
+      tagged.writeUInt32LE(tagged.length - 8, 4);
+      await sharp(tagged, { animated: true }).raw().toBuffer();
+      const expected = await sharp(canonical, { animated: true }).metadata();
+      const result = await processProfilePicture(tagged, limits, animatedPolicy);
+      expect(result.bytes.includes(Buffer.from('PRIVATE!'))).toBe(false);
+      const actual = await sharp(result.bytes, { animated: true }).metadata();
+      expect(actual).toMatchObject({
+        width: expected.width,
+        height: expected.height,
+      });
+      expect(actual.pages).toBe(expected.pages);
+      expect(actual.delay).toEqual(expected.delay);
+      expect(actual.loop).toBe(expected.loop);
+    }
+  });
   it('normalizes valid unknown chunks inside animated WebP frames', async () => {
     const input = readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url));
     const animatedPolicy = {

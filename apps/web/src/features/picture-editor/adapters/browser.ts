@@ -3,6 +3,8 @@ import type { PictureJob, PictureJobResult } from './protocol';
 import { gifPictureJob } from './gif';
 import { withoutPictureMetadata } from './webp';
 import { yieldPictureWork } from './yield';
+import { validateSourceDimensions } from './source';
+import { validateJpegColor } from './jpeg';
 
 /** UI owns this decoded source and must dispose it when its editing session ends. */
 export interface PictureSource extends PictureDimensions {
@@ -31,44 +33,54 @@ async function validateSource(file: Blob, signal: AbortSignal) {
   const gif = ['GIF87a', 'GIF89a'].includes(text(0, 6));
   if (!jpeg && !png && !webp && !gif)
     throw new Error('Choose a valid JPEG, PNG, WebP, or GIF picture.');
+  if (gif) return;
   if (png) {
-    const data = new Uint8Array(await file.arrayBuffer());
-    signal.throwIfAborted();
-    const view = new DataView(data.buffer);
-    let chunks = 0;
-    for (let offset = 8; offset + 12 <= data.length; ) {
-      if (++chunks % 256 === 0) await yieldPictureWork(signal);
-      if (String.fromCharCode(...data.subarray(offset + 4, offset + 8)) === 'acTL')
+    let offset = 8;
+    while (offset + 12 <= file.size) {
+      const header = new Uint8Array(await file.slice(offset, offset + 8).arrayBuffer());
+      signal.throwIfAborted();
+      const size = new DataView(header.buffer).getUint32(0);
+      const type = String.fromCharCode(...header.slice(4, 8));
+      if (offset + 12 + size > file.size) break;
+      if (type === 'acTL')
         throw new Error(
           'Animated PNG pictures are not supported as an editor source. Choose a GIF to preserve animation.'
         );
-      const next = offset + 12 + view.getUint32(offset);
-      if (next > data.length) throw new Error('Unable to decode this PNG picture.');
-      offset = next;
+      if (type === 'cICP')
+        throw new Error(
+          "This picture's color interpretation is not supported. Choose another picture."
+        );
+      offset += 12 + size;
+      if (type === 'IEND') {
+        await validateSourceDimensions(file, 'png', signal);
+        return;
+      }
     }
+    throw new Error('Choose a valid PNG picture.');
   }
-  if (webp && text(12, 16) === 'VP8X' && bytes[20] & 2)
-    throw new Error(
-      'Animated WebP pictures are not supported as an editor source. Choose a GIF to preserve animation.'
-    );
   if (webp) {
-    const data = new Uint8Array(await file.arrayBuffer());
-    signal.throwIfAborted();
-    const view = new DataView(data.buffer);
     let chunks = 0;
-    for (let offset = 12; offset + 8 <= data.length; ) {
+    if (text(12, 16) === 'VP8X' && bytes[20] & 2)
+      throw new Error(
+        'Animated WebP pictures are not supported as an editor source. Choose a GIF to preserve animation.'
+      );
+    for (let offset = 12; offset + 8 <= file.size; ) {
       if (++chunks % 256 === 0) await yieldPictureWork(signal);
-      const chunk = String.fromCharCode(...data.subarray(offset, offset + 4));
-      if (chunk === 'ANIM' || chunk === 'ANMF')
+      const header = new Uint8Array(await file.slice(offset, offset + 8).arrayBuffer());
+      signal.throwIfAborted();
+      const type = String.fromCharCode(...header.slice(0, 4));
+      if (type === 'ANIM' || type === 'ANMF')
         throw new Error(
           'Animated WebP pictures are not supported as an editor source. Choose a GIF to preserve animation.'
         );
-      const size = view.getUint32(offset + 4, true);
+      const size = new DataView(header.buffer).getUint32(4, true);
       const next = offset + 8 + size + (size % 2);
-      if (next > data.length) throw new Error('Unable to decode this WebP picture.');
+      if (next > file.size) throw new Error('Unable to decode this WebP picture.');
       offset = next;
     }
   }
+  await validateSourceDimensions(file, jpeg ? 'jpeg' : 'webp', signal);
+  if (jpeg) await validateJpegColor(file, signal);
 }
 
 async function fallback(
@@ -182,7 +194,7 @@ async function runJob(
     };
     worker.onerror = () => {
       cleanup();
-      reject(new Error('Picture processing failed. Try again or choose another picture.'));
+      resolve({ ok: false, message: 'Worker unavailable.', unsupported: true });
     };
     worker.postMessage(job);
   });

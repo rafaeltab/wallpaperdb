@@ -301,6 +301,52 @@ function inspectGif(input: Buffer, limits: PictureLimits): GifStructure | undefi
   }
 }
 
+function hasJpegGainMapDeclaration(marker: number, payload: Buffer): boolean {
+  if (marker === 0xe2) {
+    const isoHeader = Buffer.from('urn:iso:std:iso:ts:21496:-1\0');
+    return (
+      payload.subarray(0, 4).equals(Buffer.from('MPF\0')) ||
+      payload.subarray(0, isoHeader.length).equals(isoHeader)
+    );
+  }
+  if (marker !== 0xe1) return false;
+  const xmp = ['http://ns.adobe.com/xap/1.0/\0', 'http://ns.adobe.com/xmp/extension/\0'].some(
+    (header) => payload.subarray(0, header.length).equals(Buffer.from(header))
+  );
+  if (!xmp) return false;
+  return /xmlns(?::[\w.-]+)?\s*=\s*(['"])(?:http:\/\/ns\.adobe\.com\/hdr-gain-map\/1\.0\/|urn:com:apple:photo:2020:aux:hdrgainmap)\1/.test(
+    payload.toString('utf8')
+  );
+}
+
+function validateJpegSource(input: Buffer): void {
+  if (!input.subarray(0, 2).equals(Buffer.from([0xff, 0xd8]))) return;
+  let offset = 2;
+  while (offset < input.length) {
+    offset = input.indexOf(0xff, offset);
+    if (offset === -1) break;
+    offset++;
+    while (input[offset] === 0xff) offset++;
+    const marker = input[offset++];
+    if (marker === 0xd9) {
+      if (offset !== input.length)
+        throw new InvalidProfilePictureError('Picture could not be decoded');
+      return;
+    }
+    if (marker === 0 || marker === 1 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (marker === 0xd8 || offset + 2 > input.length)
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    const length = input.readUInt16BE(offset);
+    if (length < 2 || length > input.length - offset)
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    // MPF and gain-map APP metadata can advertise HDR despite an SDR primary image.
+    if (hasJpegGainMapDeclaration(marker, input.subarray(offset + 2, offset + length)))
+      throw new InvalidProfilePictureError('Picture color interpretation is unsupported');
+    offset += length;
+  }
+  throw new InvalidProfilePictureError('Picture could not be decoded');
+}
+
 function readPngChunk(input: Buffer, offset: number): { type: string; nextOffset: number } {
   const length = input.readUInt32BE(offset);
   if (length > input.length - offset - 12)
@@ -311,15 +357,19 @@ function readPngChunk(input: Buffer, offset: number): { type: string; nextOffset
   };
 }
 
-function hasPngAnimation(input: Buffer): boolean {
-  if (!input.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return false;
+function validatePngSource(input: Buffer): void {
+  if (!input.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return;
   for (let offset = 8; offset + 12 <= input.length; ) {
     const chunk = readPngChunk(input, offset);
-    if (chunk.type === 'acTL') return true;
+    if (chunk.type === 'acTL')
+      throw new InvalidProfilePictureError('Animated pictures are not accepted');
+    // The native decoder does not expose cICP interpretation, including PQ/HLG.
+    // Reject these sources rather than infer SDR from RGB16 sample metadata.
+    if (chunk.type === 'cICP')
+      throw new InvalidProfilePictureError('Picture color interpretation is unsupported');
     if (chunk.type === 'IEND') break;
     offset = chunk.nextOffset;
   }
-  return false;
 }
 
 function validateEncodedPicture(input: Buffer, limits: PictureLimits): void {
@@ -328,8 +378,8 @@ function validateEncodedPicture(input: Buffer, limits: PictureLimits): void {
   if (!hasSupportedSignature(input))
     throw new InvalidProfilePictureError('Only JPEG, PNG, WebP, and GIF pictures are accepted');
 
-  if (hasPngAnimation(input))
-    throw new InvalidProfilePictureError('Animated pictures are not accepted');
+  validateJpegSource(input);
+  validatePngSource(input);
 }
 
 function hasSupportedSignature(input: Buffer): boolean {
@@ -370,7 +420,9 @@ function validatePictureMetadata(metadata: Metadata, limits: PictureLimits): voi
   const totalPixels = pixels * (metadata.pages ?? 1);
   if (!(pixels > 0) || pixels > limits.maxPixels)
     throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
-  if (Math.max(decodedByteCount(metadata, totalPixels), totalPixels * 4) > limits.maxDecodedBytes)
+  const composedBytes =
+    metadata.format === 'gif' || (metadata.pages ?? 1) > 1 ? totalPixels * 4 : 0;
+  if (Math.max(decodedByteCount(metadata, totalPixels), composedBytes) > limits.maxDecodedBytes)
     throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');
 }
 

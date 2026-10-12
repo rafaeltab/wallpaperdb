@@ -291,6 +291,39 @@ async function frameGifCrop(page: Page, dialog: ReturnType<Page["getByRole"]>) {
     .toBeCloseTo(box.x + box.width * 0.125, -1);
 }
 
+async function expectGifPreviewPlayback(
+  page: Page,
+  dialog: ReturnType<Page["getByRole"]>,
+) {
+  const crop = dialog.getByRole("group", { name: "Picture crop", exact: true });
+  const box = await crop.boundingBox();
+  if (!box) throw new Error("Animated crop preview was not measured");
+  const displayedColors = new Set<string>();
+  await expect
+    .poll(
+      async () => {
+        const screenshot = await crop.screenshot({ animations: "allow" });
+        const sampled = await pixels(page, screenshot, [
+          [Math.floor(box.width / 4), Math.floor(box.height / 2)],
+        ]);
+        const [red, green, blue] = sampled.samples[0];
+        if (red > 220 && green < 40 && blue < 40) displayedColors.add("red");
+        if (green > 220 && red < 40 && blue < 40) displayedColors.add("green");
+        if (red > 220 && green > 220 && blue > 220)
+          displayedColors.add("white");
+        if (red > 220 && green > 220 && blue < 40)
+          displayedColors.add("yellow");
+        return displayedColors.size;
+      },
+      {
+        timeout: 8000,
+        message:
+          "the dragged and zoomed GIF preview displays distinct animation frames",
+      },
+    )
+    .toBeGreaterThanOrEqual(2);
+}
+
 async function fixture(name: string, mimeType: string): Promise<PictureFile> {
   return {
     name,
@@ -800,6 +833,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
         outgoing,
         async (dialog) => {
           await frameGifCrop(page, dialog);
+          await expectGifPreviewPlayback(page, dialog);
           const before = uploads;
           await dialog
             .getByRole("button", { name: "Apply", exact: true })
@@ -858,9 +892,14 @@ test("Profile picture upload reaches public delivery and removal retires the old
       expect(fittedDelivery.status()).toBe(200);
       expect(await fittedDelivery.body()).toEqual(fitted.bytes);
       const workersBeforeGif = pictureWorkers;
-      const last = await uploadPicture(page, gif, outgoing, (dialog) =>
-        frameGifCrop(page, dialog),
-      );
+      const last = await uploadPicture(page, gif, outgoing, async (dialog) => {
+        await frameGifCrop(page, dialog);
+        await expectGifPreviewPlayback(page, dialog);
+        await dialog.screenshot({
+          path: test.info().outputPath("animated-gif-crop.png"),
+          animations: "allow",
+        });
+      });
       expect(pictureWorkers - workersBeforeGif).toBeGreaterThanOrEqual(2);
       await assertAnimation(page, last.bytes);
       expect(uploads).toBe(6);
@@ -871,6 +910,13 @@ test("Profile picture upload reaches public delivery and removal retires the old
       });
       expect(saved.pictureAssetId).toEqual(expect.any(String));
       const image = profilePicture(page);
+      await expectAvatarEditOverlay(page);
+      await image
+        .locator("..")
+        .screenshot({
+          path: test.info().outputPath("avatar-edit-overlay.png"),
+          animations: "allow",
+        });
       await expect
         .poll(
           () =>

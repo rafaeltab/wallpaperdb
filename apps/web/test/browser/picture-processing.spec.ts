@@ -43,7 +43,7 @@ it('keeps an already fitting animation equivalent at the exact canonical byte li
 });
 
 async function decodedAnimation(blob: Blob, positions: [number, number][] = [[32, 256], [448, 256]]) {
-  const decoder = new ImageDecoder({ data: new Uint8Array(await blob.arrayBuffer()), type: 'image/webp' });
+  const decoder = new ImageDecoder({ data: new Uint8Array(await blob.arrayBuffer()), type: blob.type });
   try {
     await decoder.tracks.ready;
     const track = decoder.tracks.selectedTrack;
@@ -68,6 +68,20 @@ async function decodedAnimation(blob: Blob, positions: [number, number][] = [[32
     return { repetitions: track.repetitionCount, frames };
   } finally { decoder.close(); }
 }
+
+it.each(['worker', 'fallback'])('previews every GIF interval within the decoded bounds with the real %s codec', async (mode) => {
+  if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
+  const file = await fixture();
+  const source = await openPictureSource(file, new AbortController().signal);
+  try {
+    const preview = await decodedAnimation(source.preview, [[16, 64], [48, 64]]);
+    expect(preview.frames.map((frame) => frame.duration)).toEqual([100000, 200000, 300000, 400000]);
+    expect(preview.repetitions).toBe(2);
+    for (const frame of preview.frames) expect(frame).toMatchObject({ width: 224, height: 128 });
+    expect(preview.frames.map((frame) => frame.samples[1][3])).toEqual([255, 255, 255, 0]);
+    await expect(openPictureSource(file, new AbortController().signal, { maxPixels: 28672, maxDecodedBytes: 344064 })).rejects.toThrow('decoded byte limit');
+  } finally { source.dispose(); }
+});
 
 it.each(['worker', 'fallback'])('fits a normal-rate animation while preserving every interval and alpha with the real %s codec', async (mode) => {
   if (mode === 'fallback') vi.stubGlobal('Worker', undefined);

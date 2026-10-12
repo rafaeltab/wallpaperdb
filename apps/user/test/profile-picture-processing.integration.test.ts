@@ -42,6 +42,76 @@ const limits = {
 
 describe('Profile picture processing', () => {
   it.each([
+    { chunk: 'VP8X', offset: 0, bit: 1 },
+    { chunk: 'VP8X', offset: 0, bit: 64 },
+    { chunk: 'VP8X', offset: 0, bit: 128 },
+    { chunk: 'VP8X', offset: 1, bit: 255 },
+    { chunk: 'VP8X', offset: 2, bit: 255 },
+    { chunk: 'VP8X', offset: 3, bit: 255 },
+    { chunk: 'ALPH', offset: 0, bit: 64 },
+    { chunk: 'ALPH', offset: 0, bit: 128 },
+    { chunk: 'ANMF', offset: 15, bit: 4 },
+    { chunk: 'ANMF', offset: 15, bit: 128 },
+  ])('normalizes reader-ignored $chunk fields at $offset with bit $bit', async ({
+    chunk,
+    offset,
+    bit,
+  }) => {
+    const animatedPolicy = {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+      animation: { available: true },
+    };
+    const source =
+      chunk === 'ANMF'
+        ? (
+            await processProfilePicture(
+              readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url)),
+              limits,
+              animatedPolicy
+            )
+          ).bytes
+        : await sharp({
+            create: {
+              width: 512,
+              height: 512,
+              channels: 4,
+              background: { r: 255, g: 255, b: 255, alpha: 0.5 },
+            },
+          })
+            .webp()
+            .toBuffer();
+    const expected = await sharp(source, { animated: true }).metadata();
+    const input = Buffer.from(source);
+    let position = 12;
+    while (input.toString('ascii', position, position + 4) !== chunk) {
+      const size = input.readUInt32LE(position + 4);
+      position += 8 + size + (size % 2);
+      expect(position).toBeLessThan(input.length);
+    }
+    input[position + 8 + offset] |= bit;
+    const result = await processProfilePicture(input, limits, animatedPolicy);
+    const metadata = await sharp(result.bytes, { animated: true }).metadata();
+    expect(metadata.width).toEqual(expected.width);
+    expect(metadata.height).toEqual(expected.height);
+    expect(metadata.hasAlpha).toEqual(expected.hasAlpha);
+    expect(metadata.pages).toEqual(expected.pages);
+    expect(metadata.delay).toEqual(expected.delay);
+    expect(metadata.loop).toEqual(expected.loop);
+    expect(result.bytes.equals(input)).toBe(false);
+    for (let pos = 12; pos < result.bytes.length; ) {
+      const type = result.bytes.toString('ascii', pos, pos + 4);
+      if (type === 'VP8X') {
+        expect(result.bytes[pos + 8] & 0xc1).toBe(0);
+        expect([...result.bytes.subarray(pos + 9, pos + 12)]).toEqual([0, 0, 0]);
+      }
+      if (type === 'ALPH') expect(result.bytes[pos + 8] & 0xc0).toBe(0);
+      if (type === 'ANMF') expect(result.bytes[pos + 23] & 0xfc).toBe(0);
+      const size = result.bytes.readUInt32LE(pos + 4);
+      pos += 8 + size + (size % 2);
+    }
+  });
+  it.each([
     'repeated top-level',
     'distinct top-level',
     'distinct frame',
@@ -348,13 +418,7 @@ describe('Profile picture processing', () => {
     expect(offsets).toHaveLength(4);
     for (const mutate of [
       (bytes: Buffer) => {
-        bytes[20] |= 0x80;
-      },
-      (bytes: Buffer) => {
         bytes.writeUIntLE(256, offsets[1] + 8, 3);
-      },
-      (bytes: Buffer) => {
-        bytes[offsets[1] + 23] |= 0x80;
       },
       (bytes: Buffer) => {
         bytes.writeUInt32LE(0xffffffff, offsets[1] + 28);

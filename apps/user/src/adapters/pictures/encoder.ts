@@ -76,6 +76,7 @@ interface WebpStructure {
   width?: number;
   height?: number;
   durations: number[];
+  decoderInput?: Buffer;
 }
 
 /** Strict container admission precedes libvips, including every nested frame. */
@@ -90,6 +91,14 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
     input.readUInt32LE(4) + 8 !== input.length
   )
     invalid();
+  let canonicalChunks = true;
+  let decoderInput: Buffer | undefined;
+  function ignoreReserved(data: Buffer, index: number, mask: number) {
+    if (!(data[index] & mask)) return;
+    canonicalChunks = false;
+    decoderInput ??= Buffer.from(input);
+    decoderInput[data.byteOffset - input.byteOffset + index] &= ~mask;
+  }
   function* chunks(start: number, end: number) {
     let offset = start;
     while (offset + 8 <= end) {
@@ -124,8 +133,8 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
   function image(parts: Array<{ type: string; data: Buffer }>) {
     if (parts.length === 2 && parts[0]?.type === 'ALPH' && parts[1]?.type === 'VP8 ') {
       const alpha = parts[0].data;
-      if (alpha.length === 0 || alpha[0] & 0xc0 || (alpha[0] & 3) > 1 || ((alpha[0] >>> 4) & 3) > 1)
-        invalid();
+      if (alpha.length === 0 || (alpha[0] & 3) > 1 || ((alpha[0] >>> 4) & 3) > 1) invalid();
+      ignoreReserved(alpha, 0, 0xc0);
       return { ...imageDimensions(parts[1].data, 'VP8 '), alpha: true };
     }
     const part = parts[0];
@@ -135,15 +144,14 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
   const top = chunks(12, input.length);
   const first = top.next();
   const header = !first.done && first.value.type === 'VP8X' ? first.value.data : undefined;
-  if (
-    header &&
-    (header.length !== 10 || header[0] & 0xc1 || header.subarray(1, 4).some((byte) => byte !== 0))
-  )
-    invalid();
+  if (header) {
+    if (header.length !== 10) invalid();
+    ignoreReserved(header, 0, 0xc1);
+    for (let index = 1; index < 4; index++) ignoreReserved(header, index, 0xff);
+  }
   const width = header ? header.readUIntLE(4, 3) + 1 : undefined;
   const height = header ? header.readUIntLE(7, 3) + 1 : undefined;
   const animated = Boolean(header && header[0] & 2);
-  let canonicalChunks = true;
   let seenAnimation = false;
   let seenFrame = false;
   let hasAlpha = false;
@@ -168,8 +176,8 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
       if (!animated || seenFrame || data.length !== 6) invalid();
       seenAnimation = true;
     } else if (type === 'ANMF') {
-      if (!animated || !seenAnimation || data.length < 24 || data[15] & ~3 || !width || !height)
-        invalid();
+      if (!animated || !seenAnimation || data.length < 24 || !width || !height) invalid();
+      ignoreReserved(data, 15, 0xfc);
       seenFrame = true;
       const frameWidth = data.readUIntLE(6, 3) + 1;
       const frameHeight = data.readUIntLE(9, 3) + 1;
@@ -218,7 +226,7 @@ function inspectWebp(input: Buffer, limits: PictureLimits): WebpStructure | unde
       Boolean(header[0] & 4) !== seen.has('XMP '))
   )
     invalid();
-  return { animated, canonicalChunks, width, height, durations };
+  return { animated, canonicalChunks, width, height, durations, decoderInput };
 }
 
 interface GifStructure {
@@ -456,7 +464,11 @@ function validatePictureMetadata(metadata: Metadata, limits: PictureLimits): voi
     throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');
 }
 
-function isCanonical(input: Buffer, metadata: Metadata, limits: PictureLimits): boolean {
+function isCanonical(
+  metadata: Metadata,
+  limits: PictureLimits,
+  structure: WebpStructure | undefined
+): boolean {
   const output = limits.policy.output;
   if (
     metadata.format !== 'webp' ||
@@ -471,7 +483,6 @@ function isCanonical(input: Buffer, metadata: Metadata, limits: PictureLimits): 
     metadata.iptc
   )
     return false;
-  const structure = inspectWebp(input, limits);
   return Boolean(
     structure?.canonicalChunks && structure.durations.every((duration) => duration > 10)
   );
@@ -485,7 +496,7 @@ async function processProfilePicture(
   try {
     const structure = inspectWebp(input, limits);
     const gif = inspectGif(input, limits);
-    const decoder = sharp(input, {
+    const decoder = sharp(structure?.decoderInput ?? input, {
       limitInputPixels: limits.maxPixels,
       failOn: 'warning',
       sequentialRead: true,
@@ -506,7 +517,7 @@ async function processProfilePicture(
         ))
     )
       throw new InvalidProfilePictureError('Picture frame timing is invalid');
-    if (isCanonical(input, metadata, limits)) {
+    if (isCanonical(metadata, limits, structure)) {
       await decoder.clone().raw().timeout({ seconds: 10 }).toBuffer();
       if (input.length > limits.policy.maxOutputBytes)
         throw new ProfilePictureTooLargeError('Picture exceeds the processed output byte limit');

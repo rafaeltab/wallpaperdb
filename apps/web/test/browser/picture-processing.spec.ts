@@ -121,19 +121,45 @@ it.each(['worker', 'fallback'])('reports impossible fitting and keeps the source
   } finally { source?.dispose(); vi.unstubAllGlobals(); }
 });
 
-it.each(['worker', 'fallback'])('cancels pending fitting while the UI keeps yielding and releases the real %s job', async (mode) => {
+it.each(['worker', 'fallback'])('cancels an observed pending fitting job and releases the real %s codec', async (mode) => {
   if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
   const controller = new AbortController();
+  let notifyStarted = () => {};
+  let releaseEncode = () => {};
+  const started = new Promise<void>((resolve) => { notifyStarted = resolve; });
+  const release = new Promise<void>((resolve) => { releaseEncode = resolve; });
   let source;
   try {
     source = await openPictureSource(await fixture('profile-fitting.gif'), controller.signal);
+    if (mode === 'worker') {
+      const RealWorker = Worker;
+      vi.stubGlobal('Worker', class extends RealWorker {
+        override postMessage(message: unknown, options?: Transferable[] | StructuredSerializeOptions) {
+          if (Array.isArray(options)) super.postMessage(message, options);
+          else super.postMessage(message, options);
+          notifyStarted();
+        }
+      });
+    } else {
+      const realEncode = HTMLCanvasElement.prototype.toBlob;
+      vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (this: HTMLCanvasElement, callback, type, quality) {
+        realEncode.call(this, (blob) => {
+          notifyStarted();
+          void release.then(() => callback(blob));
+        }, type, quality);
+      });
+    }
     const crop = initialPictureCrop(source);
     const processing = source.process(crop, { ...policy, maxOutputBytes: 1 }, controller.signal);
     const rejected = expect(processing).rejects.toMatchObject({ name: 'AbortError' });
-    for (let pulse = 0; pulse < 3; pulse++) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await started;
     controller.abort();
+    releaseEncode();
     await rejected;
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
     const recovered = await source.process(crop, policy, new AbortController().signal);
     expect((await decodedAnimation(recovered)).frames).toHaveLength(4);
-  } finally { source?.dispose(); vi.unstubAllGlobals(); }
+  } finally { releaseEncode(); source?.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); }
 });

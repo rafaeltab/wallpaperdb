@@ -161,6 +161,9 @@ describe('resize HTTP validation', () => {
       expect(resized.headers['content-type']).toBe(mimeType);
       expect(resized.headers['cache-control']).toBe('public, max-age=31536000, immutable');
       expect(resized.headers['content-length']).toBeUndefined();
+      expect(f.resizes).toMatchObject([
+        { width: 960, fit: 'contain', mimeType, input: 'original' },
+      ]);
       const original = await app.inject('/wallpapers/wallpaper');
       expect(original.statusCode).toBe(200);
       expect(original.body).toBe('original');

@@ -177,4 +177,54 @@ describe('OpenSearch controlled HTTP contracts', () => {
       }
     );
   });
+  it('aborts interrupted requests and closes in-flight transport work with the layer scope', async () => {
+    let stalledRequests = 0;
+    let activeRequests = 0;
+    let unavailable = false;
+    await withControlledSearch(
+      (incoming, outgoing) => {
+        if (unavailable) {
+          outgoing.writeHead(503);
+          outgoing.end();
+        } else if (incoming.url?.includes('/_doc/stalled')) {
+          stalledRequests++;
+          activeRequests++;
+          outgoing.once('close', () => {
+            activeRequests--;
+          });
+        } else {
+          outgoing.writeHead(200);
+          outgoing.end();
+        }
+      },
+      async (adapter, dispose) => {
+        expect(await Effect.runPromise(adapter.check())).toBe(true);
+        unavailable = true;
+        expect(await Effect.runPromise(adapter.check())).toBe(false);
+        unavailable = false;
+        expect(await Effect.runPromise(adapter.check())).toBe(true);
+        const aborted = Effect.runPromise(
+          adapter.read
+            .wallpaper('stalled-timeout')
+            .pipe(Effect.timeout('200 millis'), Effect.result)
+        );
+        await expect.poll(() => stalledRequests).toBe(1);
+        expect((await aborted)._tag).toBe('Failure');
+        await expect.poll(() => activeRequests).toBe(0);
+        const closing = Effect.runPromise(
+          adapter.read.wallpaper('stalled-shutdown').pipe(Effect.result)
+        );
+        await expect.poll(() => stalledRequests).toBe(2);
+        await Effect.runPromise(Effect.tryPromise(dispose).pipe(Effect.timeout('2 seconds')));
+        const result = await closing;
+        expect(result._tag).toBe('Failure');
+        if (result._tag === 'Failure')
+          expect(result.failure).toMatchObject({
+            _tag: 'CatalogueUnavailable',
+            cause: { _tag: 'SearchRequestError', cause: { name: 'RequestAbortedError' } },
+          });
+        await expect.poll(() => activeRequests).toBe(0);
+      }
+    );
+  });
 });

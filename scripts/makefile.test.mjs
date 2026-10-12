@@ -145,7 +145,7 @@ test('typecheck cache inputs include test files compiled by the workspace', () =
   const task = plannedTask('check-types', 'media', 'check-types');
   const tsconfig = JSON.parse(readFileSync('apps/media/tsconfig.json', 'utf8'));
   assert.ok(tsconfig.include.includes('test/**/*'));
-  assert.ok(Object.hasOwn(task.inputs, 'test/catalog-postgres.test.ts'),
+  assert.ok(Object.hasOwn(task.inputs, 'test/catalog-postgres.integration.test.ts'),
     'test-only TypeScript errors must invalidate a cached successful typecheck');
 });
 
@@ -167,7 +167,7 @@ test('focused tests select one workspace and serialize dependency builds and tes
   assert.notEqual(make('test-focused').status, 0);
   for (const [workspace, file] of [
     ['web', 'test/components/profile/public-profile-page.dom.test.tsx'],
-    ['gateway', 'test/catalogue.test.ts'],
+    ['gateway', 'test/catalogue.unit.test.ts'],
   ]) {
     const focused = output('test-focused', `PACKAGE=${workspace}`, `ARGS=${file}`);
     assert.ok(focused.includes(`run build --filter="@wallpaperdb/${workspace}^..." --concurrency=1`));

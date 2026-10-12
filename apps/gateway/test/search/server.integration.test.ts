@@ -10,11 +10,11 @@ import { fileURLToPath } from 'node:url';
 import { headers } from 'nats';
 import { Cause, ConfigProvider, Effect, Exit, Fiber, Layer, Scope } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from '@effect/vitest';
-import { openSearchLayer } from '../src/adapters/opensearch/index.js';
-import { loadConfig } from '../src/config.js';
-import { startGateway } from '../src/server.js';
-import { gatewayProgram } from '../src/bootstrap.js';
-import { createGatewayTester } from './setup.js';
+import { openSearchLayer } from '../../src/adapters/opensearch/index.js';
+import { loadConfig } from '../../src/config.js';
+import { startGateway } from '../../src/server.js';
+import { gatewayProgram } from '../../src/bootstrap.js';
+import { createGatewayTester } from '../setup.js';
 
 const execute = promisify(execFile);
 
@@ -37,7 +37,7 @@ describe('Gateway bootstrap and deployed artifact', () => {
   beforeAll(async () => {
     await tester.setup();
     await execute('make', ['build', 'PACKAGE=gateway'], {
-      cwd: fileURLToPath(new URL('../../../', import.meta.url)),
+      cwd: fileURLToPath(new URL('../../../../', import.meta.url)),
     });
   });
   afterAll(async () => {
@@ -65,7 +65,7 @@ describe('Gateway bootstrap and deployed artifact', () => {
     const directory = await mkdtemp(join(tmpdir(), 'gateway-startup-failure-'));
     const child = spawn(
       process.execPath,
-      [fileURLToPath(new URL('../dist/index.mjs', import.meta.url))],
+      [fileURLToPath(new URL('../../dist/index.mjs', import.meta.url))],
       { cwd: directory, env: { ...environment(), ...overrides }, stdio: ['ignore', 'pipe', 'pipe'] }
     );
     let output = '';
@@ -521,7 +521,7 @@ describe('Gateway bootstrap and deployed artifact', () => {
     }
     const child = spawn(
       process.execPath,
-      [fileURLToPath(new URL('../dist/index.mjs', import.meta.url))],
+      [fileURLToPath(new URL('../../dist/index.mjs', import.meta.url))],
       {
         cwd: directory,
         env: source === 'dotenv' ? {} : config,

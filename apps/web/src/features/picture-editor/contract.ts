@@ -11,7 +11,7 @@ export interface PictureDecodedLimits {
 
 export const defaultPictureDecodedLimits: PictureDecodedLimits = {
   maxPixels: 16_000_000,
-  maxDecodedBytes: 64 * 1024 * 1024,
+  maxDecodedBytes: 512 * 1024 * 1024,
 };
 
 /** Coordinates are in the oriented source, independent of preview/display size. */

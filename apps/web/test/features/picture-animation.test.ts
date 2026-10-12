@@ -3,6 +3,22 @@ import { describe, expect, it } from 'vitest';
 import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from '../../src/features/picture-editor';
 
 describe('Picture animation', () => {
+  it('accepts 132 full-screen GIF frames under the default decoded limit while honoring a lower override', () => {
+    const bytes = Buffer.concat([
+      Buffer.from('47494638396100020002800000000000ffffff', 'hex'),
+      ...Array.from({ length: 132 }, () => Buffer.from('2c0000000001000100000202440100', 'hex')),
+      Buffer.from([0x3b]),
+    ]);
+    let frames = 0;
+    for (const step of decodePictureGif(bytes)) if (step.kind === 'frame') frames++;
+    expect(frames).toBe(132);
+    expect(() => {
+      for (const _step of decodePictureGif(bytes, { maxPixels: 16_000_000, maxDecodedBytes: 64 * 1024 * 1024 })) {
+        // Validate the entire animation without retaining its composed frame buffers.
+      }
+    }).toThrow('decoded byte limit');
+  });
+
   it.each([
     { maxPixels: 3, maxDecodedBytes: 100, expected: 'pixel limit' },
     { maxPixels: 100, maxDecodedBytes: 15, expected: 'decoded byte limit' },

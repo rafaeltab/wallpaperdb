@@ -7,12 +7,26 @@ const profile = {
   displayName: 'Wallpaper Fan',
   biographyMarkdown: '',
   pictureAssetId: null,
+  pictureUploadLimits: { maxBytes: 123456, maxPixels: 98765, maxDecodedBytes: 654321 },
   version: 1,
   createdAt: '2026-07-12T12:00:00.000Z',
   updatedAt: '2026-07-12T12:00:00.000Z',
 };
 
 describe('User API client', () => {
+  it.each([
+    undefined, null, {},
+    { maxBytes: 1, maxPixels: 1 },
+    { maxBytes: 0, maxPixels: 1, maxDecodedBytes: 1 },
+    { maxBytes: 1, maxPixels: -1, maxDecodedBytes: 1 },
+    { maxBytes: 1, maxPixels: 1, maxDecodedBytes: 0.5 },
+    { maxBytes: 1, maxPixels: 1, maxDecodedBytes: Infinity },
+    { maxBytes: 1, maxPixels: '1', maxDecodedBytes: 1 },
+  ])('rejects owner Profiles without valid resolved picture limits: %j', async (pictureUploadLimits) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ ...profile, pictureUploadLimits }))));
+    const client = createUserApiClient({ baseUrl: '/user', tokenProvider: async () => 'token' });
+    await expect(client.ensureProfile()).rejects.toMatchObject({ status: 502 });
+  });
   it('retrieves effective picture rules with the current token and cancellable authenticated request', async () => {
     const policy = { output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' }, maxOutputBytes: 123456, acceptedSourceFormats: ['image/png'], animation: { available: false }, encoding: { staticQuality: 85, animationQuality: 85 } };
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(policy))); vi.stubGlobal('fetch', fetch);

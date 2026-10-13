@@ -8,6 +8,7 @@ import {
 } from '@/features/profile-management/adapters/query';
 import type { Profile } from '@/lib/api/user';
 const initial: Profile = {
+  pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
   id: 'owner',
   displayName: 'Ada',
   handle: 'ada',

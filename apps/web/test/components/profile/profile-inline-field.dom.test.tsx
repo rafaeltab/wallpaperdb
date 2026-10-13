@@ -12,6 +12,7 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
   return { ...original, userApi: { ...original.userApi, updateProfile: vi.fn(), updateHandle: vi.fn(), ensureProfile: vi.fn() } };
 });
 const profile: Profile = {
+  pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
   id: 'user_inline', handle: 'ada', displayName: 'Ada Lovelace', biographyMarkdown: 'Original biography', pictureAssetId: null,
   version: 1, createdAt: '2026-07-12T12:00:00.000Z', updatedAt: '2026-07-12T12:00:00.000Z',
 };

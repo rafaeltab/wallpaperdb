@@ -4,7 +4,6 @@ import type {
   PictureDimensions,
   PictureEncodingPolicy,
 } from '../index';
-import { defaultPictureDecodedLimits } from '../contract';
 import type { PictureJob, PictureJobResult } from './protocol';
 import { gifPictureJob } from './gif';
 import { withoutPictureMetadata } from './webp';
@@ -75,7 +74,7 @@ async function validateSource(file: Blob, signal: AbortSignal) {
       const header = new Uint8Array(await file.slice(offset, offset + 8).arrayBuffer());
       signal.throwIfAborted();
       const type = String.fromCharCode(...header.slice(0, 4));
-      if (type === 'ANIM' || type === 'ANMF')
+      if (type === 'ANMF')
         throw new Error(
           'Animated WebP pictures are not supported as an editor source. Choose a GIF to preserve animation.'
         );
@@ -89,7 +88,39 @@ async function validateSource(file: Blob, signal: AbortSignal) {
   if (jpeg) await validateJpegColor(file, signal);
 }
 
-async function fallback(
+let fallbackReservation: Promise<void> | undefined;
+
+function waitForFallback(reservation: Promise<void>, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      signal.removeEventListener('abort', abort);
+      reject(cancelled());
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    reservation.then(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    });
+  });
+}
+
+async function fallback(job: PictureJob, signal: AbortSignal) {
+  while (fallbackReservation) await waitForFallback(fallbackReservation, signal);
+  signal.throwIfAborted();
+  let release = () => {};
+  fallbackReservation = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    return await fallbackWork(job, signal);
+  } finally {
+    fallbackReservation = undefined;
+    release();
+  }
+}
+
+async function fallbackWork(
   job: PictureJob,
   signal: AbortSignal
 ): Promise<Extract<PictureJobResult, { ok: true }>> {
@@ -214,7 +245,7 @@ async function runJob(
 export async function openPictureSource(
   file: Blob,
   signal: AbortSignal,
-  limits: PictureDecodedLimits = defaultPictureDecodedLimits
+  limits?: PictureDecodedLimits
 ): Promise<PictureSource> {
   await validateSource(file, signal);
   const preview = await runJob({ action: 'preview', file, limits }, signal);

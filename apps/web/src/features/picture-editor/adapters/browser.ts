@@ -88,7 +88,39 @@ async function validateSource(file: Blob, signal: AbortSignal) {
   if (jpeg) await validateJpegColor(file, signal);
 }
 
-async function fallback(
+let fallbackReservation: Promise<void> | undefined;
+
+function waitForFallback(reservation: Promise<void>, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      signal.removeEventListener('abort', abort);
+      reject(cancelled());
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    reservation.then(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    });
+  });
+}
+
+async function fallback(job: PictureJob, signal: AbortSignal) {
+  while (fallbackReservation) await waitForFallback(fallbackReservation, signal);
+  signal.throwIfAborted();
+  let release = () => {};
+  fallbackReservation = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    return await fallbackWork(job, signal);
+  } finally {
+    fallbackReservation = undefined;
+    release();
+  }
+}
+
+async function fallbackWork(
   job: PictureJob,
   signal: AbortSignal
 ): Promise<Extract<PictureJobResult, { ok: true }>> {

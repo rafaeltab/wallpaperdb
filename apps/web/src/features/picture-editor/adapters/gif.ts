@@ -45,7 +45,8 @@ async function gifFrameDurations(
   bytes: Uint8Array,
   limits: PictureDecodedLimits,
   signal: AbortSignal,
-  offscreen: boolean
+  offscreen: boolean,
+  maximumFrames: number
 ) {
   const decoder = decodePictureGif(bytes, limits);
   const durations: number[] = [];
@@ -53,7 +54,11 @@ async function gifFrameDurations(
     let step = decoder.next();
     while (!step.done) {
       await yieldPictureWork(signal, offscreen);
-      if (step.value.kind === 'frame') durations.push(step.value.duration);
+      if (step.value.kind === 'frame') {
+        if (durations.length === maximumFrames)
+          throw new OutputFrameLimitError('This GIF exceeds the decoded byte limit.');
+        durations.push(step.value.duration);
+      }
       step = decoder.next();
     }
     return durations;
@@ -266,7 +271,18 @@ export async function gifPictureJob(
     } catch (cause) {
       if (!(cause instanceof OutputFrameLimitError)) throw cause;
       frameLimitError = cause;
-      durations = await gifFrameDurations(bytes, limits, signal, offscreen);
+      const maximumOutputFrames = Math.floor(
+        limits.maxDecodedBytes / (job.policy.output.width * job.policy.output.height * 4)
+      );
+      // GIF intervals are at least 20 ms. The 50 ms plan groups at most three
+      // source frames, plus at most two trailing frames merged into the last group.
+      durations = await gifFrameDurations(
+        bytes,
+        limits,
+        signal,
+        offscreen,
+        maximumOutputFrames * 3 + 2
+      );
       break;
     }
     durations = attempt.durations;

@@ -70,9 +70,9 @@ async function decodedAnimation(blob: Blob, positions: [number, number][] = [[32
   } finally { decoder.close(); }
 }
 
-function manyFrameGif(delay: number) {
+function manyFrameGif(delay: number, count = 80) {
   const header = '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e300301020000';
-  const frames = Array.from({ length: 80 }, (_, index) =>
+  const frames = Array.from({ length: count }, (_, index) =>
     `21f90400${delay.toString(16).padStart(2, '0')}0000002c0000000001000100000202${(index >> 1) % 2 ? '4c' : '44'}0100`).join('');
   return new Blob([Uint8Array.from((header + frames + '3b').match(/../g)!, (byte) => parseInt(byte, 16))], { type: 'image/gif' });
 }
@@ -116,6 +116,32 @@ it('reports an impossible byte limit after coalescing and keeps the source retry
     await expect(source.process(crop, { ...policy, maxOutputBytes: 1 }, controller.signal)).rejects.toThrow('animation cannot fit the 1 byte limit');
     const recovered = await source.process(crop, policy, controller.signal);
     expect((await decodedAnimation(recovered)).frames).toHaveLength(40);
+  } finally { source.dispose(); }
+});
+
+it('accepts the largest short-frame run fitting the 50 ms plan, including its merged tail', async () => {
+  const controller = new AbortController();
+  const source = await openPictureSource(manyFrameGif(2, 194), controller.signal,
+    { maxPixels: 16_000_000, maxDecodedBytes: 64 * 1024 * 1024 });
+  try {
+    const fitted = await source.process(initialPictureCrop(source), policy, controller.signal);
+    const result = await decodedAnimation(fitted, [[256, 256]]);
+    expect(result.frames).toHaveLength(64);
+    expect(result.frames.at(-1)!.timestamp! + result.frames.at(-1)!.duration!).toBe(3880000);
+  } finally { source.dispose(); }
+});
+
+it('rejects an unencodable frame count before scanning a large unrelated source tail', async () => {
+  const initial = new Uint8Array(await manyFrameGif(2, 195).arrayBuffer());
+  const tail = new Uint8Array(4 * 1024 * 1024);
+  for (let index = 0; index < tail.length; index += 2) { tail[index] = 1; tail[index + 1] = 65; }
+  const file = new Blob([initial.subarray(0, -1), new Uint8Array([0x21, 0xfe]), tail,
+    new Uint8Array([0, 0x21, 1, 0x3b])], { type: 'image/gif' });
+  const controller = new AbortController();
+  const source = await openPictureSource(file, controller.signal,
+    { maxPixels: 16_000_000, maxDecodedBytes: 64 * 1024 * 1024 });
+  try {
+    await expect(source.process(initialPictureCrop(source), policy, controller.signal)).rejects.toThrow('decoded byte limit');
   } finally { source.dispose(); }
 });
 

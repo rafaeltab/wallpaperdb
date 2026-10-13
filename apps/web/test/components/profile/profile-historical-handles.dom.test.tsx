@@ -10,6 +10,7 @@ describe('Configured Handle history', () => {
     render(
       <ProfileHistoricalHandles
         profile={{
+          pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
           id: 'user_history',
           handle: 'current',
           displayName: 'Current Profile',

@@ -4,7 +4,6 @@ import type {
   PictureDimensions,
   PictureEncodingPolicy,
 } from '../index';
-import { defaultPictureDecodedLimits } from '../contract';
 import type { PictureJob, PictureJobResult } from './protocol';
 import { gifPictureJob } from './gif';
 import { withoutPictureMetadata } from './webp';
@@ -214,7 +213,7 @@ async function runJob(
 export async function openPictureSource(
   file: Blob,
   signal: AbortSignal,
-  limits: PictureDecodedLimits = defaultPictureDecodedLimits
+  limits?: PictureDecodedLimits
 ): Promise<PictureSource> {
   await validateSource(file, signal);
   const preview = await runJob({ action: 'preview', file, limits }, signal);

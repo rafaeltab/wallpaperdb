@@ -2,7 +2,7 @@ import { decodePictureGif, encodePictureAnimation, type PictureEncodedFrame } fr
 import { withoutPictureMetadata } from './webp';
 import { yieldPictureWork } from './yield';
 import type { PictureJob, PictureJobResult } from './protocol';
-import { defaultPictureDecodedLimits, pictureGifSourceByteLimit } from '../contract';
+import { pictureGifSourceByteLimit } from '../contract';
 
 type PictureCanvas = OffscreenCanvas | HTMLCanvasElement;
 function canvas(width: number, height: number, offscreen: boolean): PictureCanvas {
@@ -37,11 +37,18 @@ export async function gifPictureJob(
   const header = new Uint8Array(await job.file.slice(0, 6).arrayBuffer());
   signal.throwIfAborted();
   if (!['GIF87a', 'GIF89a'].includes(String.fromCharCode(...header))) return undefined;
+  const limits = job.limits;
+  if (
+    !limits ||
+    ![limits.maxPixels, limits.maxDecodedBytes].every(
+      (value) => Number.isSafeInteger(value) && value > 0
+    )
+  )
+    throw new Error('Picture resource limits are unavailable. Refresh your Profile and try again.');
   if (job.file.size > pictureGifSourceByteLimit)
     throw new Error('This GIF exceeds the 50 MiB source file limit.');
   const bytes = new Uint8Array(await job.file.arrayBuffer());
   signal.throwIfAborted();
-  const limits = job.limits ?? defaultPictureDecodedLimits;
   const decoder = decodePictureGif(bytes, limits);
   let source: PictureCanvas | undefined;
   let output: PictureCanvas | undefined;

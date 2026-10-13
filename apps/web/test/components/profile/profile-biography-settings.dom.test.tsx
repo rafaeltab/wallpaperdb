@@ -31,6 +31,7 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a href="/profiles/@ada">{children}</a>,
 }));
 const profile: Profile = {
+  pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
   id: 'user_123',
   handle: 'ada',
   displayName: 'Ada Lovelace',

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from '../../src/features/picture-editor';
 
+const resolvedLimits = { maxPixels: 20_000_000, maxDecodedBytes: 80_000_000 };
+
 describe('Picture animation', () => {
   it.each([4, 5])('charges decoded GIF indices against a %s-byte budget', (maxDecodedBytes) => {
     const bytes = Uint8Array.from(Buffer.from(
@@ -25,7 +27,7 @@ describe('Picture animation', () => {
     ]);
     let checkpoints = 0;
     expect(() => {
-      for (const step of decodePictureGif(input)) {
+      for (const step of decodePictureGif(input, resolvedLimits)) {
         if (step.kind === 'progress' && ++checkpoints > 4)
           throw new Error('Scanned beyond fixed-size loop control.');
       }
@@ -36,7 +38,7 @@ describe('Picture animation', () => {
     const input = Buffer.from(
       '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30' +
       '010101020100002c0000000001000100000201440101003b', 'hex');
-    const decoder = decodePictureGif(input);
+    const decoder = decodePictureGif(input, resolvedLimits);
     let step = decoder.next();
     let pixels: number[] = [];
     while (!step.done) {
@@ -49,7 +51,7 @@ describe('Picture animation', () => {
   it.each([0, 49, 1, 113, 255])('handles the declared GIF pixel aspect ratio %s', (aspect) => {
     const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex'));
     bytes[12] = aspect;
-    const decode = () => Array.from(decodePictureGif(bytes));
+    const decode = () => Array.from(decodePictureGif(bytes, resolvedLimits));
     if (aspect === 0 || aspect === 49) expect(decode().filter((step) => step.kind === 'frame')).toHaveLength(1);
     else expect(decode).toThrow('pixel aspect ratio');
   });
@@ -97,7 +99,7 @@ describe('Picture animation', () => {
       '21f90408010000002c0000000001000100000202440100' +
       '2c01000000010001000002024401003b', 'hex'));
     const frames: number[][] = [];
-    for (const step of decodePictureGif(bytes)) {
+    for (const step of decodePictureGif(bytes, resolvedLimits)) {
       if (step.kind === 'frame') frames.push(Array.from(step.pixels));
     }
     expect(frames).toEqual([
@@ -109,7 +111,7 @@ describe('Picture animation', () => {
   it('rejects a background index outside the declared global palette', () => {
     const bytes = Uint8Array.from(Buffer.from(
       '47494638396101000100800200ff000000ff002c00000000010001000002024401003b', 'hex'));
-    expect(() => decodePictureGif(bytes).next()).toThrow('Unable to decode this GIF picture.');
+    expect(() => decodePictureGif(bytes, resolvedLimits).next()).toThrow('Unable to decode this GIF picture.');
   });
 
   it.each([
@@ -122,7 +124,7 @@ describe('Picture animation', () => {
   });
   it('decodes transparent GIF frames without flattening and exposes bounded work checkpoints', () => {
     const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030102000021f904010a0000002c000000000100010000020244010021f90401140000002c00000000010001000002024c01003b', 'hex'));
-    const decoder = decodePictureGif(bytes);
+    const decoder = decodePictureGif(bytes, resolvedLimits);
     const frames: Array<{ duration: number; pixels: number[] }> = [];
     let next = decoder.next();
     while (!next.done) {
@@ -135,7 +137,7 @@ describe('Picture animation', () => {
   it('composes partial transparent patches with restore-previous and restore-background disposal', () => {
     const bytes = readFileSync('test/fixtures/profile-disposal.gif');
     const samples: number[][][] = [];
-    for (const step of decodePictureGif(bytes)) {
+    for (const step of decodePictureGif(bytes, resolvedLimits)) {
       if (step.kind === 'frame') samples.push([16, 48, 96, 192].map((x) => Array.from(step.pixels.subarray((64 * step.width + x) * 4, (64 * step.width + x) * 4 + 4))));
     }
     expect(samples).toEqual([
@@ -172,14 +174,14 @@ describe('Picture animation', () => {
 
   it('decodes growing LZW dictionaries and repeated-code entries', () => {
     const samples: number[][][] = [];
-    for (const step of decodePictureGif(readFileSync('test/fixtures/profile-compressed.gif'))) {
+    for (const step of decodePictureGif(readFileSync('test/fixtures/profile-compressed.gif'), resolvedLimits)) {
       if (step.kind === 'frame') samples.push([16, 96].map((x) => Array.from(step.pixels.subarray((32 * step.width + x) * 4, (32 * step.width + x) * 4 + 4))));
     }
     expect(samples).toEqual([[[255,0,0,255],[0,0,255,255]], [[0,255,0,255],[255,255,0,255]], [[255,255,255,255],[255,0,255,255]]]);
   });
 
   it('uses local palettes and the GIF interlace pass order, keeping untagged one-frame sources static', () => {
-    const steps = decodePictureGif(readFileSync('test/fixtures/profile-interlaced.gif'));
+    const steps = decodePictureGif(readFileSync('test/fixtures/profile-interlaced.gif'), resolvedLimits);
     let next = steps.next(); let pixels: number[] = [];
     while (!next.done) { if (next.value.kind === 'frame') pixels = Array.from(next.value.pixels); next = steps.next(); }
     expect(pixels).toEqual([255,0,0,255,255,0,0,255,0,255,0,255,0,255,0,255,0,0,255,255,0,0,255,255,255,255,255,255,255,255,255,255]);
@@ -187,7 +189,7 @@ describe('Picture animation', () => {
   });
   it('preserves explicitly declared looping even for one-frame GIFs', () => {
     const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030100000021f904000a0000002c00000000010001000002024401003b', 'hex'));
-    const decoder = decodePictureGif(bytes); let step = decoder.next();
+    const decoder = decodePictureGif(bytes, resolvedLimits); let step = decoder.next();
     while (!step.done) step = decoder.next();
     expect(step.value).toEqual({ loop: 0, frameCount: 1, animated: true });
   });
@@ -198,7 +200,7 @@ describe('Picture animation', () => {
     if (malformation === 'missing clear') bytes[39] = 0x40;
     if (malformation === 'out of bounds') bytes[28] = 1;
     if (malformation === 'unsupported control') bytes[22] = 2;
-    expect(() => Array.from(decodePictureGif(bytes))).toThrow();
+    expect(() => Array.from(decodePictureGif(bytes, resolvedLimits))).toThrow();
   });
 
 });

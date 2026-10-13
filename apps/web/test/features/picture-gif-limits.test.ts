@@ -4,8 +4,24 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { initialPictureCrop, type PictureEncodingPolicy } from '@/features/picture-editor';
 import { openPictureSource } from '@/features/picture-editor/adapters/browser';
 
+const resolvedLimits = { maxPixels: 20_000_000, maxDecodedBytes: 80_000_000 };
+
 beforeEach(() => vi.stubGlobal('Blob', NativeBlob));
 afterEach(() => vi.unstubAllGlobals());
+
+it('requires resolved GIF limits before copying source bytes or allocating a canvas', async () => {
+  vi.stubGlobal('Worker', undefined);
+  const allocate = vi.fn(() => { throw new Error('Allocated a GIF canvas.'); });
+  vi.stubGlobal('document', { createElement: allocate });
+  const copy = vi.fn();
+  class Source extends Blob {
+    arrayBuffer() { copy(); return super.arrayBuffer(); }
+  }
+  const bytes = Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex');
+  await expect(openPictureSource(new Source([bytes]), new AbortController().signal)).rejects.toThrow('resource limits');
+  expect(copy).not.toHaveBeenCalled();
+  expect(allocate).not.toHaveBeenCalled();
+});
 
 it('rejects GIF sources above 50 MiB before copying their compressed bytes', async () => {
   vi.stubGlobal('Worker', undefined);
@@ -17,7 +33,7 @@ it('rejects GIF sources above 50 MiB before copying their compressed bytes', asy
     arrayBuffer() { return copy(); }
   }
   const file = new OversizedGif(['GIF89a']);
-  await expect(openPictureSource(file, new AbortController().signal))
+  await expect(openPictureSource(file, new AbortController().signal, resolvedLimits))
     .rejects.toThrow('50 MiB');
   expect(copy).not.toHaveBeenCalled();
   expect(allocate).not.toHaveBeenCalled();
@@ -33,7 +49,7 @@ it('accepts a GIF source at 50 MiB before processing instead of applying the 5 M
     get size() { return 50 * 1024 * 1024; }
     arrayBuffer() { return copy(); }
   }
-  await expect(openPictureSource(new LargeGif([bytes]), new AbortController().signal))
+  await expect(openPictureSource(new LargeGif([bytes]), new AbortController().signal, resolvedLimits))
     .rejects.toThrow('Admitted source to canvas.');
   expect(copy).toHaveBeenCalledOnce();
   expect(allocate).toHaveBeenCalledOnce();
@@ -57,7 +73,7 @@ it.each([false, true])('uses the quality of the final GIF classification, loopin
     ...(looping ? [Buffer.from('21ff0b4e45545343415045322e300301000000', 'hex')] : []),
     Buffer.from('2c00000000010001000002024401003b', 'hex'),
   ]);
-  const picture = await openPictureSource(new Blob([bytes]), new AbortController().signal);
+  const picture = await openPictureSource(new Blob([bytes]), new AbortController().signal, resolvedLimits);
   const policy: PictureEncodingPolicy = {
     output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
     maxOutputBytes: 5242880, animation: { available: true },

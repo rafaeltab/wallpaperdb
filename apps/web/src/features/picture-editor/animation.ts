@@ -1,4 +1,4 @@
-import { defaultPictureDecodedLimits, type PictureDecodedLimits } from './contract';
+import type { PictureDecodedLimits } from './contract';
 
 /** GIF delays follow browser playback: unspecified or <=10ms displays for 100ms. */
 export function pictureAnimationTiming(delays: readonly number[], repetitions?: number) {
@@ -108,7 +108,7 @@ function* lzw(
  */
 export function* decodePictureGif(
   bytes: Uint8Array,
-  limits: PictureDecodedLimits = defaultPictureDecodedLimits
+  limits: PictureDecodedLimits
 ): Generator<PictureGifStep, { loop: number; frameCount: number; animated: boolean }> {
   let offset = 0;
   const take = (length: number) => {

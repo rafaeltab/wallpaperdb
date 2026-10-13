@@ -45,6 +45,7 @@ export function ProfilePictureSettings({
   const removeOpener = useRef<HTMLButtonElement>(null);
   const editor = usePictureEditor(profile.id, profile.pictureUploadLimits);
   const selected = editor.selection;
+  const showPicker = !selected || (!selected.source && !editor.processing);
   const session = useRef(0);
   const client = useQueryClient();
   const ownerQuery = useRef(
@@ -216,7 +217,7 @@ export function ProfilePictureSettings({
             .find({ queryKey: profileQueryKey(profile.id), exact: true });
         }}
         title="Profile picture"
-        description={selected ? undefined : 'Choose, drop, or paste an image to begin.'}
+        description={showPicker ? 'Choose, drop, or paste an image to begin.' : undefined}
         busy={writing}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
@@ -293,8 +294,8 @@ export function ProfilePictureSettings({
                 type="file"
                 className="sr-only"
                 tabIndex={-1}
-                aria-hidden={selected ? true : undefined}
-                aria-describedby={selected ? undefined : 'picture-limits'}
+                aria-hidden={showPicker ? undefined : true}
+                aria-describedby={showPicker ? 'picture-limits' : undefined}
                 accept={policy?.acceptedSourceFormats.join(',')}
                 disabled={refreshing || writing || !policyReady}
                 onChange={(event) => {
@@ -302,7 +303,7 @@ export function ProfilePictureSettings({
                   event.target.value = '';
                 }}
               />
-              {!selected && (
+              {showPicker && (
                 <>
                   <div className="flex min-w-0 flex-wrap items-center gap-3">
                     <Button
@@ -314,7 +315,7 @@ export function ProfilePictureSettings({
                       Choose picture
                     </Button>
                     <span className="min-w-0 break-all text-sm text-muted-foreground">
-                      No picture selected
+                      {selected ? selected.file.name : 'No picture selected'}
                     </span>
                   </div>
                   <FieldDescription id="picture-limits">
@@ -340,7 +341,7 @@ export function ProfilePictureSettings({
                   </FieldDescription>
                 </>
               )}
-              {selected && (
+              {selected && !showPicker && (
                 <p className="truncate text-sm text-muted-foreground">{selected.file.name}</p>
               )}
             </Field>

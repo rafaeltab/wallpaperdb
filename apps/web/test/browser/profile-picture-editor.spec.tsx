@@ -30,11 +30,11 @@ afterEach(async () => {
   await page.viewport(1280, 800);
 });
 
-function mount() {
+function mount(initial = profile) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   clients.push(client);
-  client.setQueryData(profileQueryKey(profile.id), profile);
-  render(<QueryClientProvider client={client}><ProfilePictureSettings profile={profile} tokenProvider={async () => null} /></QueryClientProvider>);
+  client.setQueryData(profileQueryKey(initial.id), initial);
+  render(<QueryClientProvider client={client}><ProfilePictureSettings profile={initial} tokenProvider={async () => null} /></QueryClientProvider>);
 }
 async function png(width = 800, height = 400) {
   const canvas = document.createElement('canvas');
@@ -58,6 +58,34 @@ async function choose(file: File) {
 function crop() { return screen.getByRole('group', { name: 'Picture crop' }); }
 function image() { return screen.getByRole<HTMLImageElement>('img', { name: 'Selected avatar' }); }
 function zoom() { return screen.getByRole<HTMLInputElement>('slider', { name: 'Zoom' }); }
+
+it.each(['corrupt', 'over-budget'])('replaces a %s source through the picker without reopening the dialog', async (failure) => {
+  const owner = { ...profile, pictureUploadLimits: { ...profile.pictureUploadLimits, maxDecodedBytes: 4 * 1024 * 1024 } };
+  const upload = vi.spyOn(userApi, 'uploadPicture').mockResolvedValue({ ...owner, version: 2, pictureAssetId: 'replacement' });
+  const bytes = failure === 'corrupt'
+    ? new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
+    : Uint8Array.from(('47494638396100020002800000000000ffffff' +
+      '2c0000000001000100000202440100'.repeat(5) + '3b').match(/../g)!, (byte) => parseInt(byte, 16));
+  mount(owner);
+  await userEvent.click(page.getByRole('button', { name: 'Edit profile picture', exact: true }));
+  const picker = page.getByLabelText('Choose picture', { exact: true });
+  await expect.element(picker).toBeEnabled();
+  await userEvent.upload(picker, new File([bytes], 'invalid.' + (failure === 'corrupt' ? 'png' : 'gif'), { type: failure === 'corrupt' ? 'image/png' : 'image/gif' }));
+  await expect.element(page.getByRole('alert')).toBeVisible();
+  if (failure === 'over-budget') expect(screen.getByRole('alert').textContent).toContain('decoded byte limit');
+  expect(upload).not.toHaveBeenCalled();
+  const chooseButton = screen.getByText('Choose picture', { selector: 'button' });
+  await expect.element(chooseButton).toBeVisible();
+  await userEvent.click(chooseButton);
+  await userEvent.upload(picker, await png());
+  await expect.element(page.getByRole('img', { name: 'Selected avatar' })).toBeVisible();
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Choose picture' })).toBeNull();
+  await userEvent.click(page.getByRole('button', { name: 'Apply', exact: true }));
+  await expect.poll(() => upload.mock.calls.length).toBe(1);
+  expect(upload.mock.calls[0][0]).toMatchObject({ picture: expect.objectContaining({ type: 'image/webp' }), expectedVersion: 1 });
+  await expect.element(page.getByRole('dialog', { name: 'Profile picture', exact: true })).not.toBeInTheDocument();
+});
 
 it.each([{ width: 1280, height: 800 }, { width: 390, height: 844 }])('keeps circular avatars and the edit control on their edge at $width pixels', async ({ width, height }) => {
   await page.viewport(width, height);

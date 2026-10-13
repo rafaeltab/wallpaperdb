@@ -30,7 +30,7 @@ function withCleanWebWorkspace(run) {
     for (const file of [
       'src', 'test', 'public', 'scripts', 'index.html', 'package.json',
       'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json', 'vite.config.ts',
-      'tsr.config.json',
+      'tsr.config.json', 'vitest.browser.config.ts',
     ]) {
       const source = join('apps/web', file);
       if (!existsSync(source)) continue;
@@ -76,16 +76,16 @@ function withCleanWebWorkspace(run) {
 }
 
 for (const script of ['check-types', 'build']) {
-  test(`web ${script} generates routes from a clean checkout and rejects application, test, and Vite errors`, () => {
+  test(`web ${script} generates routes from a clean checkout and rejects application, test, and browser configuration errors`, () => {
     withCleanWebWorkspace(({ workspace, web }) => {
-      const fixtures = ['src/typecheck-probe.ts', 'test/typecheck-probe.ts', 'vite.config.ts'];
-      const originalViteConfig = readFileSync(join(web, 'vite.config.ts'), 'utf8');
+      const fixtures = ['src/typecheck-probe.ts', 'test/typecheck-probe.ts', 'vite.config.ts', 'vitest.browser.config.ts'];
+      const originalConfigs = new Map(['vite.config.ts', 'vitest.browser.config.ts'].map((file) => [file, readFileSync(join(web, file), 'utf8')]));
       const check = () => spawnSync('make', [
         '--no-print-directory', 'run', 'PACKAGE=web', `SCRIPT=${script}`,
       ], { encoding: 'utf8', env, cwd: workspace, timeout: 120_000 });
       const writeFixtures = (value) => {
         for (const fixture of fixtures) {
-          const prefix = fixture === 'vite.config.ts' ? originalViteConfig : '';
+          const prefix = originalConfigs.get(fixture) ?? '';
           writeFileSync(join(web, fixture),
             `${prefix}\nexport const typecheckProbe: number = ${value};\n`);
         }

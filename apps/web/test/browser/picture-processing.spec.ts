@@ -70,6 +70,55 @@ async function decodedAnimation(blob: Blob, positions: [number, number][] = [[32
   } finally { decoder.close(); }
 }
 
+function manyFrameGif(delay: number) {
+  const header = '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e300301020000';
+  const frames = Array.from({ length: 80 }, (_, index) =>
+    `21f90400${delay.toString(16).padStart(2, '0')}0000002c0000000001000100000202${(index >> 1) % 2 ? '4c' : '44'}0100`).join('');
+  return new Blob([Uint8Array.from((header + frames + '3b').match(/../g)!, (byte) => parseInt(byte, 16))], { type: 'image/gif' });
+}
+
+it.each(['worker', 'fallback'])('coalesces source-admitted short frames before exceeding the output budget with the real %s codec', async (mode) => {
+  if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
+  const controller = new AbortController();
+  const source = await openPictureSource(manyFrameGif(2), controller.signal,
+    { maxPixels: 16_000_000, maxDecodedBytes: 64 * 1024 * 1024 });
+  try {
+    const fitted = await source.process(initialPictureCrop(source), policy, controller.signal);
+    expect(fitted.size).toBeLessThanOrEqual(policy.maxOutputBytes);
+    const result = await decodedAnimation(fitted, [[256, 256]]);
+    expect(result.repetitions).toBe(2);
+    expect(result.frames).toHaveLength(40);
+    expect(result.frames.map((frame) => frame.duration)).toEqual(Array(40).fill(40000));
+    expect(result.frames.at(-1)!.timestamp! + result.frames.at(-1)!.duration!).toBe(1600000);
+    result.frames.forEach((frame, index) => {
+      expect(frame).toMatchObject({ width: 512, height: 512 });
+      expect(frame.samples[0][3]).toBe(255);
+      expect(frame.samples[0][0] > 128).toBe(index % 2 === 1);
+    });
+  } finally { source.dispose(); }
+});
+
+it('keeps normal-rate source frames subject to the output budget', async () => {
+  const controller = new AbortController();
+  const source = await openPictureSource(manyFrameGif(10), controller.signal,
+    { maxPixels: 16_000_000, maxDecodedBytes: 64 * 1024 * 1024 });
+  try {
+    await expect(source.process(initialPictureCrop(source), policy, controller.signal)).rejects.toThrow('decoded byte limit');
+  } finally { source.dispose(); }
+});
+
+it('reports an impossible byte limit after coalescing and keeps the source retryable', async () => {
+  const controller = new AbortController();
+  const source = await openPictureSource(manyFrameGif(2), controller.signal,
+    { maxPixels: 16_000_000, maxDecodedBytes: 64 * 1024 * 1024 });
+  try {
+    const crop = initialPictureCrop(source);
+    await expect(source.process(crop, { ...policy, maxOutputBytes: 1 }, controller.signal)).rejects.toThrow('animation cannot fit the 1 byte limit');
+    const recovered = await source.process(crop, policy, controller.signal);
+    expect((await decodedAnimation(recovered)).frames).toHaveLength(40);
+  } finally { source.dispose(); }
+});
+
 it.each(['worker', 'fallback'])('fits a normal-rate animation while preserving every interval and alpha with the real %s codec', async (mode) => {
   if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
   const controller = new AbortController();

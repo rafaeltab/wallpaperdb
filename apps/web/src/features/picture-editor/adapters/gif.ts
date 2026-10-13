@@ -39,6 +39,29 @@ interface GifAttempt {
   durations: number[];
 }
 
+class OutputFrameLimitError extends Error {}
+
+async function gifFrameDurations(
+  bytes: Uint8Array,
+  limits: PictureDecodedLimits,
+  signal: AbortSignal,
+  offscreen: boolean
+) {
+  const decoder = decodePictureGif(bytes, limits);
+  const durations: number[] = [];
+  try {
+    let step = decoder.next();
+    while (!step.done) {
+      await yieldPictureWork(signal, offscreen);
+      if (step.value.kind === 'frame') durations.push(step.value.duration);
+      step = decoder.next();
+    }
+    return durations;
+  } finally {
+    decoder.return({ loop: 1, frameCount: 0, animated: false });
+  }
+}
+
 async function gifPictureAttempt(
   job: PictureJob,
   signal: AbortSignal,
@@ -98,7 +121,7 @@ async function gifPictureAttempt(
           (frames.length + 1) * job.policy.output.width * job.policy.output.height * 4 >
             limits.maxDecodedBytes
         )
-          throw new Error('This GIF exceeds the decoded byte limit.');
+          throw new OutputFrameLimitError('This GIF exceeds the decoded byte limit.');
         if (!source || !output || !sourceContext || !outputContext)
           throw new Error('Invalid GIF canvas.');
         const rows = Math.max(1, Math.floor(16384 / value.width));
@@ -170,7 +193,7 @@ async function gifPictureAttempt(
       frames.length * job.policy.output.width * job.policy.output.height * 4 >
         limits.maxDecodedBytes
     )
-      throw new Error('This GIF exceeds the decoded byte limit.');
+      throw new OutputFrameLimitError('This GIF exceeds the decoded byte limit.');
     let blob: Blob;
     if (!step.value.animated) {
       const staticFrame =
@@ -234,9 +257,18 @@ export async function gifPictureJob(
   let quality = job.policy.encoding.animationQuality;
   const minimumQuality = Math.min(20, quality);
   let durations: number[] = [];
+  let frameLimitError: OutputFrameLimitError | undefined;
   while (true) {
     await yieldPictureWork(signal, offscreen);
-    const attempt = await gifPictureAttempt(job, signal, offscreen, bytes, limits, quality);
+    let attempt: GifAttempt;
+    try {
+      attempt = await gifPictureAttempt(job, signal, offscreen, bytes, limits, quality);
+    } catch (cause) {
+      if (!(cause instanceof OutputFrameLimitError)) throw cause;
+      frameLimitError = cause;
+      durations = await gifFrameDurations(bytes, limits, signal, offscreen);
+      break;
+    }
     durations = attempt.durations;
     if (!attempt.animated || attempt.result.blob.size <= job.policy.maxOutputBytes)
       return attempt.result;
@@ -244,6 +276,7 @@ export async function gifPictureJob(
     quality = Math.max(minimumQuality, quality - 20);
   }
   let previous = pictureAnimationFramePlan(durations, 0);
+  let usablePlan = false;
   for (const interval of [40, 50]) {
     const plan = pictureAnimationFramePlan(durations, interval);
     if (
@@ -255,6 +288,12 @@ export async function gifPictureJob(
     )
       continue;
     previous = plan;
+    if (
+      plan.length * job.policy.output.width * job.policy.output.height * 4 >
+      limits.maxDecodedBytes
+    )
+      continue;
+    usablePlan = true;
     await yieldPictureWork(signal, offscreen);
     const attempt = await gifPictureAttempt(
       job,
@@ -267,6 +306,7 @@ export async function gifPictureJob(
     );
     if (attempt.result.blob.size <= job.policy.maxOutputBytes) return attempt.result;
   }
+  if (frameLimitError && !usablePlan) throw frameLimitError;
   throw new Error(
     `Processed animation cannot fit the ${job.policy.maxOutputBytes.toLocaleString()} byte limit. Choose another picture.`
   );

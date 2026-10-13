@@ -122,8 +122,16 @@ export function pictureCodecLayer(limits: PictureLimits): Layer.Layer<PictureCod
     PictureCodec,
     Effect.gen(function* () {
       const nativeWork = yield* Semaphore.make(2);
+      // Reserve the configured ceiling, not compressed upload bytes, before spawning.
+      // Keep the previous two-128-MiB allowance, or admit one larger source at a time.
+      const decodedWork = yield* Semaphore.make(
+        Math.max(256 * 1024 * 1024, limits.maxDecodedBytes)
+      );
       return PictureCodec.of({
-        process: (bytes, policy) => nativeWork.withPermit(encode(bytes, limits, policy)),
+        process: (bytes, policy) =>
+          nativeWork.withPermit(
+            decodedWork.withPermits(limits.maxDecodedBytes)(encode(bytes, limits, policy))
+          ),
       });
     })
   );

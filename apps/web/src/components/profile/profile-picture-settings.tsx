@@ -45,6 +45,7 @@ export function ProfilePictureSettings({
   const removeOpener = useRef<HTMLButtonElement>(null);
   const editor = usePictureEditor(profile.id, profile.pictureUploadLimits);
   const selected = editor.selection;
+  const showPicker = !selected || (!selected.source && !editor.processing);
   const session = useRef(0);
   const client = useQueryClient();
   const ownerQuery = useRef(
@@ -216,7 +217,7 @@ export function ProfilePictureSettings({
             .find({ queryKey: profileQueryKey(profile.id), exact: true });
         }}
         title="Profile picture"
-        description="Your picture appears on your profile and wallpaper contributions. Choose, drop, or paste an image to begin."
+        description={showPicker ? 'Choose, drop, or paste an image to begin.' : undefined}
         busy={writing}
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
@@ -227,7 +228,7 @@ export function ProfilePictureSettings({
         trigger={
           <ProfileActionButton
             label="Edit profile picture"
-            className="absolute -right-2 -bottom-2"
+            className="absolute right-1 bottom-1"
             buttonClassName="rounded-full border-4 border-card bg-background shadow-sm hover:bg-background dark:hover:bg-background"
           >
             <Pencil className="size-3.5" />
@@ -293,7 +294,8 @@ export function ProfilePictureSettings({
                 type="file"
                 className="sr-only"
                 tabIndex={-1}
-                aria-describedby="picture-limits"
+                aria-hidden={showPicker ? undefined : true}
+                aria-describedby={showPicker ? 'picture-limits' : undefined}
                 accept={policy?.acceptedSourceFormats.join(',')}
                 disabled={refreshing || writing || !policyReady}
                 onChange={(event) => {
@@ -301,63 +303,53 @@ export function ProfilePictureSettings({
                   event.target.value = '';
                 }}
               />
-              <div className="flex min-w-0 flex-wrap items-center gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={refreshing || writing || !policyReady}
-                  onClick={() => input.current?.click()}
-                >
-                  Choose picture
-                </Button>
-                <span className="min-w-0 break-all text-sm text-muted-foreground">
-                  {selected?.file.name ?? 'No picture selected'}
-                </span>
-              </div>
-              <FieldDescription id="picture-limits">
-                {policyReady && policy ? (
-                  <>
-                    {policy.acceptedSourceFormats
-                      .map((format) =>
-                        format === 'image/webp'
-                          ? 'WebP'
-                          : format.replace('image/', '').toUpperCase()
-                      )
-                      .join(', ')}
-                    . Up to {formatFileSize(policy.maxOutputBytes)} processed output.{' '}
-                    {policy.output.width} × {policy.output.height} WebP, sRGB SDR. Static quality{' '}
-                    {policy.encoding.staticQuality}.{' '}
-                    {policy.animation.available
-                      ? `GIF animation is supported at quality ${policy.encoding.animationQuality}.`
-                      : 'Animated images are not supported.'}
-                  </>
-                ) : (
-                  'Loading picture rules…'
-                )}
-              </FieldDescription>
+              {showPicker && (
+                <>
+                  <div className="flex min-w-0 flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={refreshing || writing || !policyReady}
+                      onClick={() => input.current?.click()}
+                    >
+                      Choose picture
+                    </Button>
+                    <span className="min-w-0 break-all text-sm text-muted-foreground">
+                      {selected ? selected.file.name : 'No picture selected'}
+                    </span>
+                  </div>
+                  <FieldDescription id="picture-limits">
+                    {policyReady && policy ? (
+                      <>
+                        {policy.acceptedSourceFormats
+                          .map((format) =>
+                            format === 'image/webp'
+                              ? 'WebP'
+                              : format.replace('image/', '').toUpperCase()
+                          )
+                          .join(', ')}
+                        . Up to {formatFileSize(policy.maxOutputBytes)} processed output.{' '}
+                        {policy.output.width} × {policy.output.height} WebP, sRGB SDR. Static
+                        quality {policy.encoding.staticQuality}.{' '}
+                        {policy.animation.available
+                          ? `GIF animation is supported at quality ${policy.encoding.animationQuality}.`
+                          : 'Animated images are not supported.'}
+                      </>
+                    ) : (
+                      'Loading picture rules…'
+                    )}
+                  </FieldDescription>
+                </>
+              )}
+              {selected && !showPicker && (
+                <p className="truncate text-sm text-muted-foreground">{selected.file.name}</p>
+              )}
             </Field>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="submit"
-                disabled={
-                  !selected ||
-                  refreshing ||
-                  writing ||
-                  editor.processing ||
-                  !policyReady ||
-                  recovery === 'required'
-                }
-              >
-                {mutation.isPending
-                  ? 'Saving picture…'
-                  : selected && (feedback || recovery)
-                    ? 'Retry'
-                    : 'Apply'}
-              </Button>
+            <div className="flex flex-wrap items-center gap-2">
               {(profile.pictureAssetId || importing) && (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="destructive"
                   disabled={refreshing || writing || editor.processing || recovery === 'required'}
                   onClick={(event) => {
                     removeOpener.current = event.currentTarget;
@@ -366,9 +358,31 @@ export function ProfilePictureSettings({
                     setDialogOpen(true);
                   }}
                 >
-                  {profile.pictureAssetId ? 'Remove picture' : 'Cancel picture import'}
+                  Reset
                 </Button>
               )}
+              <div className="ml-auto flex gap-2">
+                <Button type="button" variant="outline" disabled={writing} onClick={abandonDialog}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    !selected ||
+                    refreshing ||
+                    writing ||
+                    editor.processing ||
+                    !policyReady ||
+                    recovery === 'required'
+                  }
+                >
+                  {mutation.isPending
+                    ? 'Saving picture…'
+                    : selected && (feedback || recovery)
+                      ? 'Retry'
+                      : 'Apply'}
+                </Button>
+              </div>
             </div>
           </form>
           {editor.processing && (

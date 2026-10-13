@@ -497,7 +497,8 @@ async function processProfilePicture(
     const structure = inspectWebp(input, limits);
     const gif = inspectGif(input, limits);
     const decoder = sharp(structure?.decoderInput ?? input, {
-      limitInputPixels: limits.maxPixels,
+      // Sharp counts the frame stack; metadata validation bounds each frame separately.
+      limitInputPixels: Math.max(limits.maxPixels, Math.floor(limits.maxDecodedBytes / 4)),
       failOn: 'warning',
       sequentialRead: true,
       animated: true,

@@ -44,7 +44,7 @@ it('keeps an already fitting animation equivalent at the exact canonical byte li
 });
 
 async function decodedAnimation(blob: Blob, positions: [number, number][] = [[32, 256], [448, 256]]) {
-  const decoder = new ImageDecoder({ data: new Uint8Array(await blob.arrayBuffer()), type: 'image/webp' });
+  const decoder = new ImageDecoder({ data: new Uint8Array(await blob.arrayBuffer()), type: blob.type });
   try {
     await decoder.tracks.ready;
     const track = decoder.tracks.selectedTrack;
@@ -69,6 +69,20 @@ async function decodedAnimation(blob: Blob, positions: [number, number][] = [[32
     return { repetitions: track.repetitionCount, frames };
   } finally { decoder.close(); }
 }
+
+it.each(['worker', 'fallback'])('previews every GIF interval within the decoded bounds with the real %s codec', async (mode) => {
+  if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
+  const file = await fixture();
+  const source = await openPictureSource(file, new AbortController().signal, resolvedLimits);
+  try {
+    const preview = await decodedAnimation(source.preview, [[16, 64], [48, 64]]);
+    expect(preview.frames.map((frame) => frame.duration)).toEqual([100000, 200000, 300000, 400000]);
+    expect(preview.repetitions).toBe(2);
+    for (const frame of preview.frames) expect(frame).toMatchObject({ width: 224, height: 128 });
+    expect(preview.frames.map((frame) => frame.samples[1][3])).toEqual([255, 255, 255, 0]);
+    await expect(openPictureSource(file, new AbortController().signal, { maxPixels: 28672, maxDecodedBytes: 344064 })).rejects.toThrow('decoded byte limit');
+  } finally { source.dispose(); }
+});
 
 function manyFrameGif(delay: number, count = 80) {
   const header = '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e300301020000';
@@ -131,12 +145,12 @@ it('accepts the largest short-frame run fitting the 50 ms plan, including its me
   } finally { source.dispose(); }
 });
 
-it('rejects an unencodable frame count before scanning a large unrelated source tail', async () => {
+it('rejects an unencodable frame count with a large valid source tail', async () => {
   const initial = new Uint8Array(await manyFrameGif(2, 195).arrayBuffer());
   const tail = new Uint8Array(4 * 1024 * 1024);
   for (let index = 0; index < tail.length; index += 2) { tail[index] = 1; tail[index + 1] = 65; }
   const file = new Blob([initial.subarray(0, -1), new Uint8Array([0x21, 0xfe]), tail,
-    new Uint8Array([0, 0x21, 1, 0x3b])], { type: 'image/gif' });
+    new Uint8Array([0, 0x3b])], { type: 'image/gif' });
   const controller = new AbortController();
   const source = await openPictureSource(file, controller.signal,
     { maxPixels: 16_000_000, maxDecodedBytes: 64 * 1024 * 1024 });
@@ -242,4 +256,36 @@ it.each(['worker', 'fallback'])('cancels an observed pending fitting job and rel
     const recovered = await source.process(crop, policy, new AbortController().signal);
     expect((await decodedAnimation(recovered)).frames).toHaveLength(4);
   } finally { releaseEncode(); source?.dispose(); vi.restoreAllMocks(); vi.unstubAllGlobals(); }
+});
+
+
+it.each(['worker', 'fallback'])('normalizes small and transparent static sources with the real %s codec', async (mode) => {
+  if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
+  for (const name of ['profile-small.png', 'profile-transparent-p3.png']) {
+    const response = await fetch(new URL(`../../../web-e2e/fixtures/${name}`, import.meta.url));
+    expect(response.ok).toBe(true);
+    const controller = new AbortController();
+    const source = await openPictureSource(await response.blob(), controller.signal);
+    try {
+      const result = await source.process(initialPictureCrop(source), policy, controller.signal);
+      const bitmap = await createImageBitmap(result);
+      try {
+        expect([bitmap.width, bitmap.height]).toEqual([512, 512]);
+        const canvas = new OffscreenCanvas(512, 512);
+        const context = canvas.getContext('2d', { colorSpace: 'srgb' });
+        if (!context) throw new Error('Missing static-source canvas');
+        context.drawImage(bitmap, 0, 0);
+        if (name === 'profile-small.png') {
+          expect(context.getImageData(0, 0, 1, 1).data[3]).toBe(255);
+          expect(context.getImageData(511, 511, 1, 1).data[3]).toBe(255);
+        } else {
+          expect(context.getImageData(256, 10, 1, 1).data[3]).toBe(0);
+          const sample = context.getImageData(256, 256, 1, 1).data;
+          expect(sample[3]).toBe(128);
+          for (const [index, expected] of [32, 180, 64].entries())
+            expect(Math.abs(sample[index] - expected)).toBeLessThan(12);
+        }
+      } finally { bitmap.close(); }
+    } finally { source.dispose(); }
+  }
 });

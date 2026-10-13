@@ -3,6 +3,7 @@ import {
   encodePictureAnimation,
   pictureAnimationFramePlan,
   type PictureEncodedFrame,
+  type PictureDimensions,
 } from '../index';
 import { withoutPictureMetadata } from './webp';
 import { yieldPictureWork } from './yield';
@@ -68,7 +69,7 @@ async function gifFrameDurations(
 }
 
 async function gifPictureAttempt(
-  job: PictureJob,
+  job: Extract<PictureJob, { action: 'process' }>,
   signal: AbortSignal,
   offscreen: boolean,
   bytes: Uint8Array,
@@ -76,21 +77,11 @@ async function gifPictureAttempt(
   quality?: number,
   plan?: ReadonlyMap<number, number>
 ): Promise<GifAttempt> {
-  function outputDimensions(width: number, height: number) {
-    const scale = Math.min(1, 1024 / Math.max(width, height));
-    return {
-      width:
-        job.action === 'preview' ? Math.max(1, Math.round(width * scale)) : job.policy.output.width,
-      height:
-        job.action === 'preview'
-          ? Math.max(1, Math.round(height * scale))
-          : job.policy.output.height,
-    };
-  }
-  const decoder = decodePictureGif(bytes, limits, (width, height) => {
-    const output = outputDimensions(width, height);
-    return (width * height + output.width * output.height) * 4;
-  });
+  const decoder = decodePictureGif(
+    bytes,
+    limits,
+    (width, height) => (width * height + job.policy.output.width * job.policy.output.height) * 4
+  );
   let source: PictureCanvas | undefined;
   let output: PictureCanvas | undefined;
   let sourceContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
@@ -105,8 +96,7 @@ async function gifPictureAttempt(
       const value = step.value;
       if (value.kind === 'size') {
         source = canvas(value.width, value.height, offscreen);
-        const dimensions = outputDimensions(value.width, value.height);
-        output = canvas(dimensions.width, dimensions.height, offscreen);
+        output = canvas(job.policy.output.width, job.policy.output.height, offscreen);
         sourceContext = context(source);
         outputContext = context(output);
         if (!sourceContext || !outputContext)
@@ -121,7 +111,6 @@ async function gifPictureAttempt(
           continue;
         }
         if (
-          job.action === 'process' &&
           frames.length > 0 &&
           (frames.length + 1) * job.policy.output.width * job.policy.output.height * 4 >
             limits.maxDecodedBytes
@@ -141,18 +130,16 @@ async function gifPictureAttempt(
           sourceContext.putImageData(new ImageData(pixels, value.width, height), 0, y);
         }
         outputContext.clearRect(0, 0, output.width, output.height);
-        const crop = job.action === 'preview' ? { x: 0, y: 0, size: 0 } : job.crop;
-        const width = job.action === 'preview' ? value.width : crop.size;
-        const height = job.action === 'preview' ? value.height : crop.size;
+        const crop = job.crop;
         for (let y = 0; y < output.height; y += 64) {
           await yieldPictureWork(signal, offscreen);
           const rows = Math.min(64, output.height - y);
           outputContext.drawImage(
             source,
             crop.x,
-            crop.y + (height * y) / output.height,
-            width,
-            (height * rows) / output.height,
+            crop.y + (crop.size * y) / output.height,
+            crop.size,
+            (crop.size * rows) / output.height,
             0,
             y,
             output.width,
@@ -161,16 +148,10 @@ async function gifPictureAttempt(
         }
         const blob = await encode(
           output,
-          job.action === 'preview' ? 'image/png' : 'image/webp',
+          'image/webp',
           quality === undefined ? undefined : quality / 100
         );
         signal.throwIfAborted();
-        if (job.action === 'preview')
-          return {
-            result: { ok: true, blob, width: value.width, height: value.height },
-            animated: false,
-            durations,
-          };
         if (blob.type !== 'image/webp')
           throw new Error('This browser cannot encode WebP pictures. Try another browser.');
         const retainedLimit = Math.max(
@@ -188,8 +169,7 @@ async function gifPictureAttempt(
       step = decoder.next();
     }
     signal.throwIfAborted();
-    if (!source || !output || job.action !== 'process' || !frames.length)
-      throw new Error('Unable to decode this GIF picture.');
+    if (!source || !output || !frames.length) throw new Error('Unable to decode this GIF picture.');
     await yieldPictureWork(signal, offscreen);
     if (step.value.animated && !job.policy.animation.available)
       throw new Error('Animated pictures are unavailable under the current picture rules.');
@@ -257,8 +237,17 @@ export async function gifPictureJob(
     throw new Error('This GIF exceeds the 50 MiB source file limit.');
   const bytes = new Uint8Array(await job.file.arrayBuffer());
   signal.throwIfAborted();
-  if (job.action === 'preview')
-    return (await gifPictureAttempt(job, signal, offscreen, bytes, limits)).result;
+  if (job.action === 'preview') {
+    let dimensions: PictureDimensions | undefined;
+    // Validate every frame before letting the browser animate the local source.
+    for (const step of decodePictureGif(bytes, limits)) {
+      await yieldPictureWork(signal, offscreen);
+      if (step.kind === 'size') dimensions = { width: step.width, height: step.height };
+    }
+    signal.throwIfAborted();
+    if (!dimensions) throw new Error('Unable to decode this GIF picture.');
+    return { ok: true, blob: job.file.slice(0, job.file.size, 'image/gif'), ...dimensions };
+  }
   let quality = job.policy.encoding.animationQuality;
   const minimumQuality = Math.min(20, quality);
   let durations: number[] = [];

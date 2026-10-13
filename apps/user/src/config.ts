@@ -83,7 +83,7 @@ export function loadConfig(): Config {
     profilePictureMaxPixels: parseIntEnv(process.env.PROFILE_PICTURE_MAX_PIXELS, 16_000_000),
     profilePictureMaxDecodedBytes: parseIntEnv(
       process.env.PROFILE_PICTURE_MAX_DECODED_BYTES,
-      64 * 1024 * 1024
+      512 * 1024 * 1024
     ),
     profilePictureImportTimeoutMs: parseIntEnv(
       process.env.PROFILE_PICTURE_IMPORT_TIMEOUT_MS,

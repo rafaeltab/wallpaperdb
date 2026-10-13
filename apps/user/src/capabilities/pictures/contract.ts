@@ -151,9 +151,14 @@ export interface EffectivePicturePolicy {
     readonly colorSpace: 'srgb';
   };
   readonly maxOutputBytes: number;
-  readonly acceptedSourceFormats: readonly ('image/jpeg' | 'image/png' | 'image/webp')[];
+  readonly acceptedSourceFormats: readonly (
+    | 'image/jpeg'
+    | 'image/png'
+    | 'image/webp'
+    | 'image/gif'
+  )[];
   readonly animation: { readonly available: boolean };
-  readonly encoding: { readonly staticQuality: number };
+  readonly encoding: { readonly staticQuality: number; readonly animationQuality: number };
 }
 
 export type PicturePolicyOutcome =

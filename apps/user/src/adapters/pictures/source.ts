@@ -73,7 +73,7 @@ async function readSource(
     signal.throwIfAborted();
     const response = await fetcher(source.href, {
       redirect: 'manual',
-      headers: { Accept: 'image/jpeg, image/png, image/webp' },
+      headers: { Accept: 'image/jpeg, image/png, image/webp, image/gif' },
       signal,
     });
     if (signal.aborted) {

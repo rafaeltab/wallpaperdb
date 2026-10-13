@@ -31,6 +31,7 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a href="/profiles/@ada">{children}</a>,
 }));
 const profile: Profile = {
+  pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
   id: 'user_123',
   handle: 'ada',
   displayName: 'Ada Lovelace',
@@ -76,7 +77,7 @@ describe('Biography settings', () => {
       maxOutputBytes: 5242880,
       acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
       animation: { available: false },
-      encoding: { staticQuality: 85 },
+      encoding: { staticQuality: 85, animationQuality: 85 },
     });
   });
 

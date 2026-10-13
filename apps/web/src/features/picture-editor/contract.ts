@@ -3,6 +3,15 @@ export interface PictureDimensions {
   height: number;
 }
 
+/** GIF composition uses User's advertised decoded resource bounds. */
+export interface PictureDecodedLimits {
+  readonly maxPixels: number;
+  readonly maxDecodedBytes: number;
+}
+
+// Match Ingestor's image source limit, independently of User's processed upload limit.
+export const pictureGifSourceByteLimit = 50 * 1024 * 1024;
+
 /** Coordinates are in the oriented source, independent of preview/display size. */
 export interface PictureCrop {
   x: number;
@@ -16,5 +25,6 @@ export interface PictureCrop {
 export interface PictureEncodingPolicy {
   output: PictureDimensions & { mimeType: 'image/webp'; colorSpace: 'srgb' };
   maxOutputBytes: number;
-  encoding: { staticQuality: number };
+  animation: { available: boolean };
+  encoding: { staticQuality: number; animationQuality: number };
 }

@@ -478,9 +478,13 @@ describe('Private Profile picture retention', () => {
       (error: unknown) => error
     );
     try {
-      await vi.waitFor(async () => {
-        expect(await sql`select id from profile_picture_assets`).toHaveLength(1);
-      });
+      // Codec cold start is part of its 15-second processing deadline.
+      await vi.waitFor(
+        async () => {
+          expect(await sql`select id from profile_picture_assets`).toHaveLength(1);
+        },
+        { timeout: 15_000 }
+      );
       const [asset] = await sql`select id, expires_at from profile_picture_assets`;
       vi.setSystemTime(asset.expires_at);
       release();

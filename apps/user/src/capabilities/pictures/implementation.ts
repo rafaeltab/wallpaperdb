@@ -26,9 +26,9 @@ export const picturesLayer = (policy: PicturesPolicy) =>
       const effectivePolicy = (_principal: ProfilePrincipal): EffectivePicturePolicy => ({
         output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
         maxOutputBytes: policy.profilePictureMaxBytes,
-        acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
-        animation: { available: false },
-        encoding: { staticQuality: 85 },
+        acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+        animation: { available: true },
+        encoding: { staticQuality: 85, animationQuality: 85 },
       });
       const stage = Effect.fn('pictures.stage')(function* (
         principal: ProfilePrincipal,

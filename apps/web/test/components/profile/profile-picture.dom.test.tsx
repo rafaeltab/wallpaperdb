@@ -40,6 +40,7 @@ describe('ProfilePicture', () => {
     vi.stubEnv('VITE_MEDIA_URL', '/media');
     const client = new QueryClient();
     const owner: Profile = {
+      pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
       ...profile,
       handle: 'ada',
       biographyMarkdown: '',
@@ -87,6 +88,7 @@ describe('ProfilePicture', () => {
     vi.stubEnv('VITE_MEDIA_URL', '/media');
     const client = new QueryClient();
     const owner: Profile = {
+      pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
       ...profile,
       handle: 'ada',
       biographyMarkdown: '',

@@ -78,7 +78,7 @@ it('keeps production HTTP and storage clients behind the post-SDK dynamic import
             maxOutputBytes: 10000,
             acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp'],
             animation: { available: false },
-            encoding: { staticQuality: 85 },
+            encoding: { staticQuality: 85, animationQuality: 85 },
           },
         }),
       ],

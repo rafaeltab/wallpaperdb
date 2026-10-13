@@ -13,6 +13,7 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
 });
 
 const profile: Profile = {
+  pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
   id: 'user_123',
   handle: 'wallpaper-fan',
   displayName: 'Wallpaper Fan',

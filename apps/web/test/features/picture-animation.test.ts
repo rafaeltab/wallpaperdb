@@ -5,6 +5,10 @@ import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from
 const resolvedLimits = { maxPixels: 20_000_000, maxDecodedBytes: 80_000_000 };
 
 describe('Picture animation', () => {
+  it.each([-1, Infinity])('rejects an invalid retained-pixel reservation of %s bytes', (retainedBytes) => {
+    const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex'));
+    expect(() => decodePictureGif(bytes, resolvedLimits, () => retainedBytes).next()).toThrow('Unable to decode this GIF picture.');
+  });
   it.each([4, 5])('charges decoded GIF indices against a %s-byte budget', (maxDecodedBytes) => {
     const bytes = Uint8Array.from(Buffer.from(
       '47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex'));

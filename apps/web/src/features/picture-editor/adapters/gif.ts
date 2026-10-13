@@ -49,7 +49,21 @@ export async function gifPictureJob(
     throw new Error('This GIF exceeds the 50 MiB source file limit.');
   const bytes = new Uint8Array(await job.file.arrayBuffer());
   signal.throwIfAborted();
-  const decoder = decodePictureGif(bytes, limits);
+  function outputDimensions(width: number, height: number) {
+    const scale = Math.min(1, 1024 / Math.max(width, height));
+    return {
+      width:
+        job.action === 'preview' ? Math.max(1, Math.round(width * scale)) : job.policy.output.width,
+      height:
+        job.action === 'preview'
+          ? Math.max(1, Math.round(height * scale))
+          : job.policy.output.height,
+    };
+  }
+  const decoder = decodePictureGif(bytes, limits, (width, height) => {
+    const output = outputDimensions(width, height);
+    return (width * height + output.width * output.height) * 4;
+  });
   let source: PictureCanvas | undefined;
   let output: PictureCanvas | undefined;
   let sourceContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
@@ -63,16 +77,8 @@ export async function gifPictureJob(
       const value = step.value;
       if (value.kind === 'size') {
         source = canvas(value.width, value.height, offscreen);
-        const scale = Math.min(1, 1024 / Math.max(value.width, value.height));
-        output = canvas(
-          job.action === 'preview'
-            ? Math.max(1, Math.round(value.width * scale))
-            : job.policy.output.width,
-          job.action === 'preview'
-            ? Math.max(1, Math.round(value.height * scale))
-            : job.policy.output.height,
-          offscreen
-        );
+        const dimensions = outputDimensions(value.width, value.height);
+        output = canvas(dimensions.width, dimensions.height, offscreen);
         sourceContext = context(source);
         outputContext = context(output);
         if (!sourceContext || !outputContext)

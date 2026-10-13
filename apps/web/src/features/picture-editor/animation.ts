@@ -108,7 +108,8 @@ function* lzw(
  */
 export function* decodePictureGif(
   bytes: Uint8Array,
-  limits: PictureDecodedLimits
+  limits: PictureDecodedLimits,
+  retainedPixelBytes: (width: number, height: number) => number = () => 0
 ): Generator<PictureGifStep, { loop: number; frameCount: number; animated: boolean }> {
   let offset = 0;
   const take = (length: number) => {
@@ -160,7 +161,9 @@ export function* decodePictureGif(
   const height = word();
   if (!width || !height) invalid();
   if (width * height > limits.maxPixels) throw new Error('This GIF exceeds the pixel limit.');
-  if (width * height * 4 > limits.maxDecodedBytes)
+  const retainedBytes = retainedPixelBytes(width, height);
+  if (!Number.isSafeInteger(retainedBytes) || retainedBytes < 0) invalid();
+  if (width * height * 4 + retainedBytes > limits.maxDecodedBytes)
     throw new Error('This GIF exceeds the decoded byte limit.');
   const flags = byte();
   const backgroundIndex = byte();
@@ -257,7 +260,7 @@ export function* decodePictureGif(
     const framePixels = frameWidth * frameHeight;
     const snapshotBytes = disposal === 3 ? framePixels * 4 : 0;
     // LZW retains one index byte per frame pixel alongside the live RGBA buffers.
-    if (canvas.byteLength + snapshotBytes + framePixels > limits.maxDecodedBytes)
+    if (canvas.byteLength + snapshotBytes + framePixels + retainedBytes > limits.maxDecodedBytes)
       throw new Error('This GIF exceeds the decoded byte limit.');
     if (!frameCount && transparent === undefined && background)
       yield* restoreBackground(0, 0, width, height, true);

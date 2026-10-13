@@ -6,6 +6,37 @@ import { openPictureSource } from '@/features/picture-editor/adapters/browser';
 
 const resolvedLimits = { maxPixels: 20_000_000, maxDecodedBytes: 80_000_000 };
 
+it.each([
+  { name: 'canvas and indices', hex: '47494638396101000100800000000000ffffff2c00000000010001000002024401003b', budget: 12, accepted: false },
+  { name: 'canvas and indices', hex: '47494638396101000100800000000000ffffff2c00000000010001000002024401003b', budget: 13, accepted: true },
+  { name: 'restore previous', hex: '47494638396101000100800000000000ffffff21f9040c0a0000002c00000000010001000002024401003b', budget: 16, accepted: false },
+  { name: 'restore previous', hex: '47494638396101000100800000000000ffffff21f9040c0a0000002c00000000010001000002024401003b', budget: 17, accepted: true },
+  { name: 'partial restore', hex: '47494638396102000100800100ff000000ff0021f9040c010000002c00000000010001000002024401003b', budget: 28, accepted: false },
+  { name: 'partial restore', hex: '47494638396102000100800100ff000000ff0021f9040c010000002c00000000010001000002024401003b', budget: 29, accepted: true },
+])('accounts for decoder, source and output buffers for $name at $budget bytes', async ({ hex, budget, accepted }) => {
+  vi.stubGlobal('Worker', undefined);
+  vi.stubGlobal('ImageData', class {});
+  vi.stubGlobal('document', { createElement: () => ({
+    width: 0, height: 0,
+    getContext: () => ({ putImageData() {}, clearRect() {}, drawImage() {} }),
+    toBlob: (callback: (blob: Blob) => void) => callback(new Blob(['preview'], { type: 'image/png' })),
+  }) });
+  const source = openPictureSource(new Blob([Buffer.from(hex, 'hex')]), new AbortController().signal,
+    { maxPixels: 2, maxDecodedBytes: budget });
+  if (accepted) (await source).dispose();
+  else await expect(source).rejects.toThrow('decoded byte limit');
+});
+
+it('rejects combined canvas backing stores before allocating native canvases', async () => {
+  vi.stubGlobal('Worker', undefined);
+  const allocate = vi.fn(() => { throw new Error('Allocated a native canvas.'); });
+  vi.stubGlobal('document', { createElement: allocate });
+  const bytes = Buffer.from('47494638396102000100800000000000ffffff2c00000000010001000002024401003b', 'hex');
+  await expect(openPictureSource(new Blob([bytes]), new AbortController().signal,
+    { maxPixels: 2, maxDecodedBytes: 16 })).rejects.toThrow('decoded byte limit');
+  expect(allocate).not.toHaveBeenCalled();
+});
+
 beforeEach(() => vi.stubGlobal('Blob', NativeBlob));
 afterEach(() => vi.unstubAllGlobals());
 
@@ -110,7 +141,7 @@ it('bounds output-frame work before the fallback encodes another frame', async (
   }) });
   const bytes = Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401002c00000000010001000002024401003b', 'hex');
   const picture = await openPictureSource(new Blob([bytes]), new AbortController().signal,
-    { maxPixels: 1, maxDecodedBytes: 8 });
+    { maxPixels: 1, maxDecodedBytes: 512 * 512 * 4 + 9 });
   const policy: PictureEncodingPolicy = {
     output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
     maxOutputBytes: 4096, animation: { available: true },

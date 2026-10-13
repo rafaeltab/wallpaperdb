@@ -7,7 +7,7 @@ import {
 import { withoutPictureMetadata } from './webp';
 import { yieldPictureWork } from './yield';
 import type { PictureJob, PictureJobResult } from './protocol';
-import { defaultPictureDecodedLimits } from '../contract';
+import { pictureGifSourceByteLimit, type PictureDecodedLimits } from '../contract';
 
 type PictureCanvas = OffscreenCanvas | HTMLCanvasElement;
 function canvas(width: number, height: number, offscreen: boolean): PictureCanvas {
@@ -44,11 +44,25 @@ async function gifPictureAttempt(
   signal: AbortSignal,
   offscreen: boolean,
   bytes: Uint8Array,
+  limits: PictureDecodedLimits,
   quality?: number,
   plan?: ReadonlyMap<number, number>
 ): Promise<GifAttempt> {
-  const limits = job.limits ?? defaultPictureDecodedLimits;
-  const decoder = decodePictureGif(bytes, limits);
+  function outputDimensions(width: number, height: number) {
+    const scale = Math.min(1, 1024 / Math.max(width, height));
+    return {
+      width:
+        job.action === 'preview' ? Math.max(1, Math.round(width * scale)) : job.policy.output.width,
+      height:
+        job.action === 'preview'
+          ? Math.max(1, Math.round(height * scale))
+          : job.policy.output.height,
+    };
+  }
+  const decoder = decodePictureGif(bytes, limits, (width, height) => {
+    const output = outputDimensions(width, height);
+    return (width * height + output.width * output.height) * 4;
+  });
   let source: PictureCanvas | undefined;
   let output: PictureCanvas | undefined;
   let sourceContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null = null;
@@ -63,16 +77,8 @@ async function gifPictureAttempt(
       const value = step.value;
       if (value.kind === 'size') {
         source = canvas(value.width, value.height, offscreen);
-        const scale = Math.min(1, 1024 / Math.max(value.width, value.height));
-        output = canvas(
-          job.action === 'preview'
-            ? Math.max(1, Math.round(value.width * scale))
-            : job.policy.output.width,
-          job.action === 'preview'
-            ? Math.max(1, Math.round(value.height * scale))
-            : job.policy.output.height,
-          offscreen
-        );
+        const dimensions = outputDimensions(value.width, value.height);
+        output = canvas(dimensions.width, dimensions.height, offscreen);
         sourceContext = context(source);
         outputContext = context(output);
         if (!sourceContext || !outputContext)
@@ -154,7 +160,7 @@ async function gifPictureAttempt(
       step = decoder.next();
     }
     signal.throwIfAborted();
-    if (!source || job.action !== 'process' || !frames.length)
+    if (!source || !output || job.action !== 'process' || !frames.length)
       throw new Error('Unable to decode this GIF picture.');
     await yieldPictureWork(signal, offscreen);
     if (step.value.animated && !job.policy.animation.available)
@@ -165,21 +171,24 @@ async function gifPictureAttempt(
         limits.maxDecodedBytes
     )
       throw new Error('This GIF exceeds the decoded byte limit.');
-    const blob = !step.value.animated
-      ? await withoutPictureMetadata(
-          new Blob([new Uint8Array(frames[0].bytes)], { type: 'image/webp' })
-        )
-      : new Blob(
-          encodePictureAnimation(
-            frames,
-            job.policy.output,
-            step.value.loop,
-            Number.MAX_SAFE_INTEGER
-          ),
-          {
-            type: 'image/webp',
-          }
-        );
+    let blob: Blob;
+    if (!step.value.animated) {
+      const staticFrame =
+        quality === job.policy.encoding.staticQuality
+          ? new Blob([new Uint8Array(frames[0].bytes)], { type: 'image/webp' })
+          : await encode(output, 'image/webp', job.policy.encoding.staticQuality / 100);
+      signal.throwIfAborted();
+      if (staticFrame.type !== 'image/webp')
+        throw new Error('This browser cannot encode WebP pictures. Try another browser.');
+      blob = await withoutPictureMetadata(staticFrame);
+    } else {
+      blob = new Blob(
+        encodePictureAnimation(frames, job.policy.output, step.value.loop, Number.MAX_SAFE_INTEGER),
+        {
+          type: 'image/webp',
+        }
+      );
+    }
     signal.throwIfAborted();
     return {
       result: { ok: true, blob, width: source.width, height: source.height },
@@ -208,16 +217,26 @@ export async function gifPictureJob(
   const header = new Uint8Array(await job.file.slice(0, 6).arrayBuffer());
   signal.throwIfAborted();
   if (!['GIF87a', 'GIF89a'].includes(String.fromCharCode(...header))) return undefined;
+  const limits = job.limits;
+  if (
+    !limits ||
+    ![limits.maxPixels, limits.maxDecodedBytes].every(
+      (value) => Number.isSafeInteger(value) && value > 0
+    )
+  )
+    throw new Error('Picture resource limits are unavailable. Refresh your Profile and try again.');
+  if (job.file.size > pictureGifSourceByteLimit)
+    throw new Error('This GIF exceeds the 50 MiB source file limit.');
   const bytes = new Uint8Array(await job.file.arrayBuffer());
   signal.throwIfAborted();
   if (job.action === 'preview')
-    return (await gifPictureAttempt(job, signal, offscreen, bytes)).result;
+    return (await gifPictureAttempt(job, signal, offscreen, bytes, limits)).result;
   let quality = job.policy.encoding.animationQuality;
   const minimumQuality = Math.min(20, quality);
   let durations: number[] = [];
   while (true) {
     await yieldPictureWork(signal, offscreen);
-    const attempt = await gifPictureAttempt(job, signal, offscreen, bytes, quality);
+    const attempt = await gifPictureAttempt(job, signal, offscreen, bytes, limits, quality);
     durations = attempt.durations;
     if (!attempt.animated || attempt.result.blob.size <= job.policy.maxOutputBytes)
       return attempt.result;
@@ -242,6 +261,7 @@ export async function gifPictureJob(
       signal,
       offscreen,
       bytes,
+      limits,
       minimumQuality,
       new Map(plan.map(({ index, duration }) => [index, duration]))
     );

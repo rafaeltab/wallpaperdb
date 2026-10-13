@@ -29,7 +29,7 @@ export interface Profile {
   biographyMaxLength?: number;
   pictureAssetId: string | null;
   pictureImportStatus?: 'pending' | 'retrying' | 'complete';
-  pictureUploadLimits?: { maxBytes: number; maxPixels: number; maxDecodedBytes: number };
+  pictureUploadLimits: { maxBytes: number; maxPixels: number; maxDecodedBytes: number };
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -387,6 +387,16 @@ function isPicturePolicy(value: unknown): value is PicturePolicy {
 function isProfile(value: unknown): value is Profile {
   if (!value || typeof value !== 'object') return false;
   const profile = value as Record<string, unknown>;
+  const limits = profile.pictureUploadLimits;
+  if (!limits || typeof limits !== 'object') return false;
+  const bounds = limits as Record<string, unknown>;
+  if (
+    !['maxBytes', 'maxPixels', 'maxDecodedBytes'].every(
+      (key) =>
+        typeof bounds[key] === 'number' && Number.isSafeInteger(bounds[key]) && bounds[key] > 0
+    )
+  )
+    return false;
   return (
     typeof profile.id === 'string' &&
     typeof profile.handle === 'string' &&

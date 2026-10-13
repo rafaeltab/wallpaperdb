@@ -41,6 +41,57 @@ beforeEach(async () => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it.each(['png', 'gif'])('serializes %s fallback jobs until a canceled native encode settles', async (format) => {
+  const file = format === 'gif'
+    ? new Blob([Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex')])
+    : source;
+  const limits = { maxPixels: 20_000_000, maxDecodedBytes: 80_000_000 };
+  const callbacks: Array<(blob: Blob) => void> = [];
+  vi.stubGlobal('ImageData', class {});
+  vi.stubGlobal('document', { createElement: () => ({
+    width: 0, height: 0,
+    getContext: () => ({ putImageData() {}, clearRect() {}, drawImage() {} }),
+    toBlob(callback: (blob: Blob) => void, type: string) {
+      if (type === 'image/png') callback(new Blob(['preview'], { type }));
+      else callbacks.push(callback);
+    },
+  }) });
+  const firstSource = await openPictureSource(file, new AbortController().signal, limits);
+  const secondSource = await openPictureSource(file, new AbortController().signal, limits);
+  const requests: Promise<Blob>[] = [];
+  vi.useFakeTimers();
+  try {
+    const controller = new AbortController();
+    const first = firstSource.process(initialPictureCrop(firstSource), policy, controller.signal);
+    first.catch(() => {}); requests.push(first);
+    await vi.runAllTimersAsync();
+    expect(callbacks).toHaveLength(1);
+    controller.abort();
+    const queuedController = new AbortController();
+    const queued = secondSource.process(initialPictureCrop(secondSource), policy, queuedController.signal);
+    queued.catch(() => {}); requests.push(queued);
+    queuedController.abort();
+    await expect(queued).rejects.toMatchObject({ name: 'AbortError' });
+    const second = secondSource.process(initialPictureCrop(secondSource), policy, new AbortController().signal);
+    second.catch(() => {}); requests.push(second);
+    await vi.runAllTimersAsync();
+    expect(callbacks).toHaveLength(1);
+    callbacks.shift()?.(encoded);
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.runAllTimersAsync();
+    expect(callbacks).toHaveLength(1);
+    callbacks.shift()?.(encoded);
+    await vi.runAllTimersAsync();
+    await expect(second).resolves.toMatchObject({ type: 'image/webp' });
+  } finally {
+    firstSource.dispose(); secondSource.dispose();
+    for (const callback of callbacks.splice(0)) callback(encoded);
+    await vi.runAllTimersAsync();
+    await Promise.allSettled(requests);
+    vi.useRealTimers();
+  }
+});
+
 it('returns metadata-free WebP through the yielding fallback and releases decoded bitmaps', async () => {
   const picture = await openPictureSource(source, new AbortController().signal);
   expect(picture).toMatchObject({ width: 32, height: 48 });

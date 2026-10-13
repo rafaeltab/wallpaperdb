@@ -10,6 +10,7 @@ const policy = {
   animation: { available: true },
   encoding: { staticQuality: 85, animationQuality: 85 },
 };
+const resolvedLimits = { maxPixels: 20_000_000, maxDecodedBytes: 80_000_000 };
 
 async function fixture(name = "profile-disposal.gif") {
   const response = await fetch(new URL(`../fixtures/${name}`, import.meta.url));
@@ -19,7 +20,7 @@ async function fixture(name = "profile-disposal.gif") {
 
 it('keeps an already fitting animation equivalent at the exact canonical byte limit', async () => {
   const controller = new AbortController();
-  const source = await openPictureSource(await fixture(), controller.signal);
+  const source = await openPictureSource(await fixture(), controller.signal, resolvedLimits);
   try {
     const crop = initialPictureCrop(source);
     const original = await source.process(crop, policy, controller.signal);
@@ -72,7 +73,7 @@ async function decodedAnimation(blob: Blob, positions: [number, number][] = [[32
 it.each(['worker', 'fallback'])('fits a normal-rate animation while preserving every interval and alpha with the real %s codec', async (mode) => {
   if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
   const controller = new AbortController();
-  const source = await openPictureSource(await fixture("profile-fitting.gif"), controller.signal);
+  const source = await openPictureSource(await fixture("profile-fitting.gif"), controller.signal, resolvedLimits);
   try {
     const crop = movePictureCrop(zoomPictureCrop(initialPictureCrop(source), source, 2), source, 0, 32);
     const initial = await source.process(crop, policy, controller.signal);
@@ -93,7 +94,7 @@ it.each(['worker', 'fallback'])('fits a normal-rate animation while preserving e
 it.each(['worker', 'fallback'])('fits excessive frame rates without trimming elapsed time with the real %s codec', async (mode) => {
   if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
   const controller = new AbortController();
-  const source = await openPictureSource(await fixture('profile-fast-fitting.gif'), controller.signal);
+  const source = await openPictureSource(await fixture('profile-fast-fitting.gif'), controller.signal, resolvedLimits);
   try {
     const crop = initialPictureCrop(source);
     const lowQualityPolicy = { ...policy, encoding: { ...policy.encoding, animationQuality: 20 } };
@@ -115,7 +116,7 @@ it.each(['worker', 'fallback'])('reports impossible fitting and keeps the source
   const controller = new AbortController();
   let source;
   try {
-    source = await openPictureSource(await fixture('profile-fitting.gif'), controller.signal);
+    source = await openPictureSource(await fixture('profile-fitting.gif'), controller.signal, resolvedLimits);
     const crop = initialPictureCrop(source);
     await expect(source.process(crop, { ...policy, maxOutputBytes: 1 }, controller.signal)).rejects.toThrow(/animation cannot fit the 1 byte limit/);
     const recovered = await source.process(crop, policy, controller.signal);
@@ -134,7 +135,7 @@ it.each(['worker', 'fallback'])('cancels an observed pending fitting job and rel
   const release = new Promise<void>((resolve) => { releaseEncode = resolve; });
   let source;
   try {
-    source = await openPictureSource(await fixture('profile-fitting.gif'), controller.signal);
+    source = await openPictureSource(await fixture('profile-fitting.gif'), controller.signal, resolvedLimits);
     if (mode === 'worker') {
       const RealWorker = Worker;
       vi.stubGlobal('Worker', class extends RealWorker {

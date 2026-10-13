@@ -41,6 +41,268 @@ const limits = {
 };
 
 describe('Profile picture processing', () => {
+  it.each([
+    { chunk: 'VP8X', offset: 0, bit: 1 },
+    { chunk: 'VP8X', offset: 0, bit: 64 },
+    { chunk: 'VP8X', offset: 0, bit: 128 },
+    { chunk: 'VP8X', offset: 1, bit: 255 },
+    { chunk: 'VP8X', offset: 2, bit: 255 },
+    { chunk: 'VP8X', offset: 3, bit: 255 },
+    { chunk: 'ALPH', offset: 0, bit: 64 },
+    { chunk: 'ALPH', offset: 0, bit: 128 },
+    { chunk: 'ANMF', offset: 15, bit: 4 },
+    { chunk: 'ANMF', offset: 15, bit: 128 },
+  ])('normalizes reader-ignored $chunk fields at $offset with bit $bit', async ({
+    chunk,
+    offset,
+    bit,
+  }) => {
+    const animatedPolicy = {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+      animation: { available: true },
+    };
+    const source =
+      chunk === 'ANMF'
+        ? (
+            await processProfilePicture(
+              readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url)),
+              limits,
+              animatedPolicy
+            )
+          ).bytes
+        : await sharp({
+            create: {
+              width: 512,
+              height: 512,
+              channels: 4,
+              background: { r: 255, g: 255, b: 255, alpha: 0.5 },
+            },
+          })
+            .webp()
+            .toBuffer();
+    const expected = await sharp(source, { animated: true }).metadata();
+    const input = Buffer.from(source);
+    let position = 12;
+    while (input.toString('ascii', position, position + 4) !== chunk) {
+      const size = input.readUInt32LE(position + 4);
+      position += 8 + size + (size % 2);
+      expect(position).toBeLessThan(input.length);
+    }
+    input[position + 8 + offset] |= bit;
+    const result = await processProfilePicture(input, limits, animatedPolicy);
+    const metadata = await sharp(result.bytes, { animated: true }).metadata();
+    expect(metadata.width).toEqual(expected.width);
+    expect(metadata.height).toEqual(expected.height);
+    expect(metadata.hasAlpha).toEqual(expected.hasAlpha);
+    expect(metadata.pages).toEqual(expected.pages);
+    expect(metadata.delay).toEqual(expected.delay);
+    expect(metadata.loop).toEqual(expected.loop);
+    expect(result.bytes.equals(input)).toBe(false);
+    for (let pos = 12; pos < result.bytes.length; ) {
+      const type = result.bytes.toString('ascii', pos, pos + 4);
+      if (type === 'VP8X') {
+        expect(result.bytes[pos + 8] & 0xc1).toBe(0);
+        expect([...result.bytes.subarray(pos + 9, pos + 12)]).toEqual([0, 0, 0]);
+      }
+      if (type === 'ALPH') expect(result.bytes[pos + 8] & 0xc0).toBe(0);
+      if (type === 'ANMF') expect(result.bytes[pos + 23] & 0xfc).toBe(0);
+      const size = result.bytes.readUInt32LE(pos + 4);
+      pos += 8 + size + (size % 2);
+    }
+  });
+  it.each([
+    'repeated top-level',
+    'distinct top-level',
+    'distinct frame',
+  ])('normalizes %s WebP chunks within a constrained child heap', async (placement) => {
+    const animatedPolicy = {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+      animation: { available: true },
+    };
+    const canonical =
+      placement === 'distinct frame'
+        ? (
+            await processProfilePicture(
+              readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url)),
+              limits,
+              animatedPolicy
+            )
+          ).bytes
+        : await sharp({ create: { width: 512, height: 512, channels: 3, background: '#ffffff' } })
+            .webp()
+            .toBuffer();
+    const expected = await sharp(canonical, { animated: true }).metadata();
+    const privateChunks = Buffer.alloc(600_000 * 8);
+    for (let i = 0; i < 600_000; i++) {
+      privateChunks[i * 8] = 122;
+      for (let digit = 0; digit < 3; digit++)
+        privateChunks[i * 8 + 1 + digit] =
+          placement === 'repeated top-level' ? 65 : 33 + (Math.floor(i / 90 ** digit) % 90);
+    }
+    let input: Buffer;
+    if (placement === 'distinct frame') {
+      let offset = 12;
+      while (canonical.toString('ascii', offset, offset + 4) !== 'ANMF') {
+        const size = canonical.readUInt32LE(offset + 4);
+        offset += 8 + size + (size % 2);
+      }
+      const size = canonical.readUInt32LE(offset + 4);
+      const end = offset + 8 + size;
+      input = Buffer.concat([canonical.subarray(0, end), privateChunks, canonical.subarray(end)]);
+      input.writeUInt32LE(size + privateChunks.length, offset + 4);
+    } else input = Buffer.concat([canonical, privateChunks]);
+    input.writeUInt32LE(input.length - 8, 4);
+    expect(input.length).toBeLessThan(limits.maxBytes);
+    vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=96');
+    try {
+      const result = await processProfilePicture(input, limits, animatedPolicy);
+      const metadata = await sharp(result.bytes, { animated: true }).metadata();
+      expect(metadata).toMatchObject({
+        width: expected.width,
+        height: expected.height,
+      });
+      expect(metadata.pages).toEqual(expected.pages);
+      expect(metadata.delay).toEqual(expected.delay);
+      expect(metadata.loop).toEqual(expected.loop);
+      expect(result.bytes.length).toBeLessThan(privateChunks.length);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+  it.each([1, 2])('normalizes a still WebP with %s ignored ANIM chunks', async (count) => {
+    const source = await sharp({
+      create: {
+        width: 512,
+        height: 512,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 0.5 },
+      },
+    })
+      .webp({ lossless: true })
+      .toBuffer();
+    const images: Buffer[] = [];
+    for (let offset = 12; offset < source.length; ) {
+      const size = source.readUInt32LE(offset + 4);
+      const end = offset + 8 + size + (size % 2);
+      if (['VP8 ', 'VP8L', 'ALPH'].includes(source.toString('ascii', offset, offset + 4)))
+        images.push(source.subarray(offset, end));
+      offset = end;
+    }
+    const header = Buffer.alloc(30);
+    header.write('RIFF');
+    header.write('WEBP', 8);
+    header.write('VP8X', 12);
+    header.writeUInt32LE(10, 16);
+    header[20] = 0x10;
+    header.writeUIntLE(511, 24, 3);
+    header.writeUIntLE(511, 27, 3);
+    const controls = Buffer.from('414e494d06000000000000000000', 'hex');
+    const tagged = Buffer.concat([header, ...images, controls, ...(count === 2 ? [controls] : [])]);
+    tagged.writeUInt32LE(tagged.length - 8, 4);
+    expect((await sharp(tagged).metadata()).hasAlpha).toBe(true);
+    const picture = await processProfilePicture(tagged, limits);
+    expect(picture.bytes.includes(Buffer.from('ANIM'))).toBe(false);
+    const raw = await sharp(picture.bytes).ensureAlpha().raw().toBuffer();
+    expect([...raw.subarray(0, 4)]).toEqual([255, 255, 255, 128]);
+  });
+  it('preserves fragmented GIF loop controls and image data during direct normalization', async () => {
+    const input = Buffer.from(
+      '47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30' +
+        '010101020100002c0000000001000100000201440101003b',
+      'hex'
+    );
+    const picture = await processProfilePicture(input, limits, {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+      animation: { available: true },
+    });
+    expect(picture.bytes.includes(Buffer.from('ANIM'))).toBe(true);
+    expect(await sharp(picture.bytes, { animated: true }).metadata()).toMatchObject({ loop: 3 });
+  });
+  it.each([
+    'comment',
+    'application',
+  ])('processes fragmented GIF %s metadata within a constrained child heap', async (extension) => {
+    const payload = Buffer.alloc(4 * 1024 * 1024);
+    for (let i = 0; i < payload.length; i += 2) {
+      payload[i] = 1;
+      payload[i + 1] = 65;
+    }
+    const input = Buffer.concat([
+      Buffer.from('47494638396101000100800000000000ffffff', 'hex'),
+      extension === 'comment'
+        ? Buffer.from([0x21, 0xfe])
+        : Buffer.concat([Buffer.from([0x21, 0xff, 11]), Buffer.from('PRIVATEAPP1')]),
+      payload,
+      Buffer.from('002c00000000010001000002024401003b', 'hex'),
+    ]);
+    expect(input.length).toBeLessThan(limits.maxBytes);
+    vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=96');
+    try {
+      const result = await processProfilePicture(input, limits, {
+        ...policy,
+        acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif'],
+        animation: { available: true },
+      });
+      expect(await sharp(result.bytes).metadata()).toMatchObject({
+        format: 'webp',
+        width: 512,
+        height: 512,
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+  it.each([
+    0, 49, 1, 113, 255,
+  ])('handles the declared pixel aspect ratio %s in direct GIF normalization', async (aspect) => {
+    const bytes = Buffer.from(
+      '47494638396101000100800000000000ffffff2c00000000010001000002024401003b',
+      'hex'
+    );
+    bytes[12] = aspect;
+    const animatedPolicy = {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+      animation: { available: true },
+    };
+    const process = processProfilePicture(bytes, limits, animatedPolicy);
+    if (aspect === 0 || aspect === 49) expect((await process).mimeType).toBe('image/webp');
+    else await expect(process).rejects.toThrow('pixel aspect ratio');
+  });
+  it('normalizes repeated unknown top-level chunks in static and animated WebP', async () => {
+    const animatedPolicy = {
+      ...policy,
+      acceptedSourceFormats: [...policy.acceptedSourceFormats, 'image/gif' as const],
+      animation: { available: true },
+    };
+    const gif = readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url));
+    const inputs = [
+      await sharp({ create: { width: 512, height: 512, channels: 3, background: '#7799aa' } })
+        .webp()
+        .toBuffer(),
+      (await processProfilePicture(gif, limits, animatedPolicy)).bytes,
+    ];
+    const privateChunk = Buffer.from('50524956080000005052495641544521', 'hex');
+    for (const canonical of inputs) {
+      const tagged = Buffer.concat([canonical, privateChunk, privateChunk]);
+      tagged.writeUInt32LE(tagged.length - 8, 4);
+      await sharp(tagged, { animated: true }).raw().toBuffer();
+      const expected = await sharp(canonical, { animated: true }).metadata();
+      const result = await processProfilePicture(tagged, limits, animatedPolicy);
+      expect(result.bytes.includes(Buffer.from('PRIVATE!'))).toBe(false);
+      const actual = await sharp(result.bytes, { animated: true }).metadata();
+      expect(actual).toMatchObject({
+        width: expected.width,
+        height: expected.height,
+      });
+      expect(actual.pages).toBe(expected.pages);
+      expect(actual.delay).toEqual(expected.delay);
+      expect(actual.loop).toBe(expected.loop);
+    }
+  });
   it('normalizes valid unknown chunks inside animated WebP frames', async () => {
     const input = readFileSync(new URL('./fixtures/profile-disposal.gif', import.meta.url));
     const animatedPolicy = {
@@ -156,13 +418,7 @@ describe('Profile picture processing', () => {
     expect(offsets).toHaveLength(4);
     for (const mutate of [
       (bytes: Buffer) => {
-        bytes[20] |= 0x80;
-      },
-      (bytes: Buffer) => {
         bytes.writeUIntLE(256, offsets[1] + 8, 3);
-      },
-      (bytes: Buffer) => {
-        bytes[offsets[1] + 23] |= 0x80;
       },
       (bytes: Buffer) => {
         bytes.writeUInt32LE(0xffffffff, offsets[1] + 28);

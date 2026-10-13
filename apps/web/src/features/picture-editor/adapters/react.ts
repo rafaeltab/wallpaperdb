@@ -5,7 +5,6 @@ import {
   type PictureDecodedLimits,
   type PictureEncodingPolicy,
 } from '../index';
-import { defaultPictureDecodedLimits } from '../contract';
 import { openPictureSource, type PictureSource } from './browser';
 
 interface Selection {
@@ -18,10 +17,7 @@ interface Selection {
 }
 
 /** Owns local source work. The caller owns command acceptance and saved Profile state. */
-export function usePictureEditor(
-  owner: string,
-  limits: PictureDecodedLimits = defaultPictureDecodedLimits
-) {
+export function usePictureEditor(owner: string, limits: PictureDecodedLimits) {
   const current = useRef<Selection | null>(null);
   const operation = useRef<AbortController | null>(null);
   const [selection, setSelection] = useState<Selection | null>(null);

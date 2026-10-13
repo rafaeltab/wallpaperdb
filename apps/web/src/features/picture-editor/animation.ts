@@ -33,7 +33,7 @@ function invalid(): never {
 }
 
 function* lzw(
-  data: Uint8Array,
+  readByte: () => number | undefined,
   minimum: number,
   count: number
 ): Generator<PictureGifStep, Uint8Array> {
@@ -49,19 +49,26 @@ function* lzw(
   let next = end + 1;
   let previous = -1;
   let first = 0;
-  let bit = 0;
+  let bits = 0;
+  let buffered = 0;
   let written = 0;
   let checkpoint = 0;
   let codes = 0;
   let started = false;
-  while (bit + size <= data.length * 8) {
+  for (;;) {
+    while (buffered < size) {
+      const value = readByte();
+      if (value === undefined) invalid();
+      bits |= value << buffered;
+      buffered += 8;
+    }
     if (++codes === 8192) {
       codes = 0;
       yield { kind: 'progress' };
     }
-    let code = 0;
-    for (let i = 0; i < size; i++) code |= ((data[(bit + i) >>> 3] >>> ((bit + i) & 7)) & 1) << i;
-    bit += size;
+    let code = bits & ((1 << size) - 1);
+    bits >>>= size;
+    buffered -= size;
     if (!started && code !== clear) invalid();
     started = true;
     if (code === clear) {
@@ -100,7 +107,6 @@ function* lzw(
       yield { kind: 'progress' };
     }
   }
-  return invalid();
 }
 
 /** Borrowed full-canvas pixels are valid until next(). Progress steps bound synchronous work.
@@ -127,7 +133,7 @@ export function* decodePictureGif(
     return value[0] | (value[1] << 8);
   };
   const text = (length: number) => String.fromCharCode(...take(length));
-  function* blocks(captureLimit?: number): Generator<PictureGifStep, Uint8Array> {
+  function* blocks(captureLimit: number): Generator<PictureGifStep, Uint8Array> {
     const start = offset;
     let length = 0;
     let checkpoint = offset;
@@ -135,7 +141,7 @@ export function* decodePictureGif(
       if (offset + size > bytes.length) invalid();
       if (captureLimit !== 0) {
         length += size;
-        if (captureLimit !== undefined && length > captureLimit) invalid();
+        if (length > captureLimit) invalid();
       }
       offset += size;
       if (offset - checkpoint >= 16384) {
@@ -265,8 +271,22 @@ export function* decodePictureGif(
     if (!frameCount && transparent === undefined && background)
       yield* restoreBackground(0, 0, width, height, true);
     const minimum = byte();
-    const compressed = yield* blocks();
-    const indices = yield* lzw(compressed, minimum, framePixels);
+    let cursor = offset;
+    let remaining = 0;
+    // Validate and advance past every sub-block without retaining its contents.
+    yield* blocks(0);
+    const indices = yield* lzw(
+      () => {
+        if (!remaining) {
+          remaining = bytes[cursor++];
+          if (!remaining) return undefined;
+        }
+        remaining--;
+        return bytes[cursor++];
+      },
+      minimum,
+      framePixels
+    );
     let saved: Uint8ClampedArray | undefined;
     if (disposal === 3) {
       saved = new Uint8ClampedArray(snapshotBytes);

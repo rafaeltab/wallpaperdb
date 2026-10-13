@@ -1,10 +1,70 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { decodePictureGif, pictureAnimationTiming, encodePictureAnimation } from '../../src/features/picture-editor';
 
 const resolvedLimits = { maxPixels: 20_000_000, maxDecodedBytes: 80_000_000 };
 
 describe('Picture animation', () => {
+  it.each([1, 2, 255])('preserves growing LZW codes across %s-byte sub-blocks', (blockSize) => {
+    const header = Buffer.from('47494638396107000100800000000000ffffff2c00000000070001000002', 'hex');
+    // Clear, 0, 1, dictionary entry 6, repeated-code entry 8, end. Width grows to four bits.
+    const compressed = Buffer.from('448c05', 'hex');
+    const parts = [header];
+    for (let offset = 0; offset < compressed.length; offset += blockSize) {
+      const block = compressed.subarray(offset, offset + blockSize);
+      parts.push(Buffer.from([block.length]), block);
+    }
+    const frames = Array.from(decodePictureGif(Buffer.concat([...parts, Buffer.from([0, 0x3b])]), resolvedLimits))
+      .filter((step) => step.kind === 'frame');
+    expect(frames).toMatchObject([{ width: 7, height: 1, duration: 100 }]);
+    expect(Array.from(frames[0].pixels)).toEqual([0, 255, 0, 255, 0, 255, 0].flatMap((color) => [color, color, color, 255]));
+  });
+  it('decodes a large clear-code image stream without allocating another source-sized buffer', () => {
+    const header = Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002', 'hex');
+    const clearBytes = 3 * Math.ceil(4 * 1024 * 1024 / 3);
+    const imageBytes = clearBytes + 2;
+    const input = Buffer.alloc(header.length + imageBytes + Math.ceil(imageBytes / 255) + 2);
+    input.set(header);
+    const clearCodes = [0x24, 0x49, 0x92];
+    const finalCodes = [0x44, 0x01];
+    let offset = header.length;
+    let position = 0;
+    while (position < imageBytes) {
+      const size = Math.min(255, imageBytes - position);
+      input[offset++] = size;
+      for (let i = 0; i < size; i++, position++)
+        input[offset++] = position < clearBytes ? clearCodes[position % 3] : finalCodes[position - clearBytes];
+    }
+    input[offset++] = 0;
+    input[offset] = 0x3b;
+    const allocations: number[] = [];
+    vi.stubGlobal('Uint8Array', new Proxy(Uint8Array, {
+      construct(target, args) {
+        if (typeof args[0] === 'number') {
+          allocations.push(args[0]);
+          if (args[0] > 4096) throw new Error('Allocated an image-stream-sized buffer.');
+        }
+        return Reflect.construct(target, args);
+      },
+    }));
+    try {
+      const decoder = decodePictureGif(input, { maxPixels: 1, maxDecodedBytes: 5 });
+      let step = decoder.next();
+      let pixels: number[] = [];
+      let progress = 0;
+      while (!step.done) {
+        if (step.value.kind === 'frame') pixels = Array.from(step.value.pixels);
+        if (step.value.kind === 'progress') progress++;
+        step = decoder.next();
+      }
+      expect(step.value).toEqual({ loop: 1, frameCount: 1, animated: false });
+      expect(pixels).toEqual([0, 0, 0, 255]);
+      expect(progress).toBeGreaterThan(1000);
+      expect(Math.max(...allocations)).toBeLessThanOrEqual(4096);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it.each([-1, Infinity])('rejects an invalid retained-pixel reservation of %s bytes', (retainedBytes) => {
     const bytes = Uint8Array.from(Buffer.from('47494638396101000100800000000000ffffff2c00000000010001000002024401003b', 'hex'));
     expect(() => decodePictureGif(bytes, resolvedLimits, () => retainedBytes).next()).toThrow('Unable to decode this GIF picture.');

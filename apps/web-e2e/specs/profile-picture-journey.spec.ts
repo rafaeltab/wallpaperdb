@@ -96,7 +96,16 @@ async function uploadPicture(
     offset += 8 + size + (size % 2);
   }
   expect(
-    chunks.filter((chunk) => !["VP8X", "ALPH", "VP8 ", "VP8L"].includes(chunk)),
+    chunks.filter(
+      (chunk) =>
+        ![
+          "VP8X",
+          "ALPH",
+          "VP8 ",
+          "VP8L",
+          ...(picture.mimeType === "image/gif" ? ["ANIM", "ANMF"] : []),
+        ].includes(chunk),
+    ),
   ).toEqual([]);
   return { profile: await response.json(), bytes };
 }
@@ -130,6 +139,130 @@ async function pixels(
     },
     { data: Array.from(bytes), positions },
   );
+}
+
+async function animatedPixels(
+  page: Page,
+  bytes: Buffer,
+  mimeType = "image/webp",
+  positions: [number, number][] = [
+    [128, 256],
+    [384, 256],
+  ],
+) {
+  return page.evaluate(
+    async ({ data, mimeType, positions }) => {
+      const Decoder = window.ImageDecoder;
+      if (typeof Decoder !== "function")
+        throw new Error("Native animation decoder unavailable");
+      const decoder = new Decoder({
+        data: new Uint8Array(data),
+        type: mimeType,
+        preferAnimation: true,
+      });
+      try {
+        await decoder.tracks.ready;
+        const track = decoder.tracks.selectedTrack;
+        if (!track) throw new Error("Missing animated track");
+        const frames = [];
+        for (let frameIndex = 0; frameIndex < track.frameCount; frameIndex++) {
+          const { image } = await decoder.decode({
+            frameIndex,
+            completeFramesOnly: true,
+          });
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = image.displayWidth;
+            canvas.height = image.displayHeight;
+            const context = canvas.getContext("2d", { colorSpace: "srgb" });
+            if (!context) throw new Error("Missing sRGB canvas");
+            context.drawImage(image, 0, 0);
+            frames.push({
+              width: image.displayWidth,
+              height: image.displayHeight,
+              timestamp: image.timestamp,
+              duration: image.duration,
+              samples: positions.map(([x, y]) =>
+                Array.from(context.getImageData(x, y, 1, 1).data),
+              ),
+              colorSpace: context.getContextAttributes().colorSpace,
+            });
+            canvas.width = 0;
+            canvas.height = 0;
+          } finally {
+            image.close();
+          }
+        }
+        return {
+          animated: track.animated,
+          repetitions: track.repetitionCount,
+          frames,
+        };
+      } finally {
+        decoder.close();
+      }
+    },
+    { data: Array.from(bytes), mimeType, positions },
+  );
+}
+
+async function assertAnimation(page: Page, bytes: Buffer) {
+  const decoded = await animatedPixels(page, bytes);
+  expect(decoded).toMatchObject({ animated: true, repetitions: 2 });
+  expect(
+    decoded.frames.map((frame) => [frame.timestamp, frame.duration]),
+  ).toEqual([
+    [0, 100000],
+    [100000, 200000],
+    [300000, 300000],
+    [600000, 400000],
+  ]);
+  for (const frame of decoded.frames)
+    expect(frame).toMatchObject({
+      width: 512,
+      height: 512,
+      colorSpace: "srgb",
+    });
+  const colors = [
+    [255, 0, 0],
+    [0, 255, 0],
+    [255, 255, 255],
+    [255, 255, 0],
+  ];
+  for (const [index, color] of colors.entries()) {
+    for (let channel = 0; channel < 3; channel++)
+      expect(
+        Math.abs(decoded.frames[index].samples[0][channel] - color[channel]),
+      ).toBeLessThan(15);
+    expect(decoded.frames[index].samples[0][3]).toBe(255);
+  }
+  expect(decoded.frames[3].samples[1][3]).toBe(0);
+}
+
+async function frameGifCrop(page: Page, dialog: ReturnType<Page["getByRole"]>) {
+  const zoom = dialog.getByRole("slider", { name: "Zoom", exact: true });
+  await zoom.focus();
+  await zoom.press("End");
+  await expect(zoom).toHaveValue("2");
+  const crop = dialog.getByRole("group", { name: "Picture crop", exact: true });
+  const box = await crop.boundingBox();
+  if (!box) throw new Error("GIF crop was not measured");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 2.5, box.y + box.height / 2, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect
+    .poll(
+      async () =>
+        (
+          await dialog
+            .getByRole("img", { name: "Selected avatar", exact: true })
+            .boundingBox()
+        )?.x,
+    )
+    .toBeCloseTo(box.x, -1);
 }
 
 async function fixture(name: string, mimeType: string): Promise<PictureFile> {
@@ -486,7 +619,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
           configurable: true,
         });
       });
-      const last = await uploadPicture(
+      const small = await uploadPicture(
         page,
         await fixture("profile-small.png", "image/png"),
         outgoing,
@@ -502,6 +635,53 @@ test("Profile picture upload reaches public delivery and removal retires the old
           ).toBeEnabled();
         },
       );
+      const gif = await fixture("profile-disposal.gif", "image/gif");
+      const originalAnimation = await animatedPixels(
+        page,
+        gif.buffer,
+        gif.mimeType,
+        [
+          [16, 64],
+          [48, 64],
+        ],
+      );
+      expect(originalAnimation.repetitions).toBe(2);
+      expect(originalAnimation.frames.map((frame) => frame.duration)).toEqual([
+        100000, 200000, 300000, 400000,
+      ]);
+      expect(
+        originalAnimation.frames.map((frame) => frame.samples[1][3]),
+      ).toEqual([255, 255, 255, 0]);
+      const fallbackAnimation = await uploadPicture(
+        page,
+        gif,
+        outgoing,
+        async (dialog) => {
+          await frameGifCrop(page, dialog);
+          const before = uploads;
+          await dialog
+            .getByRole("button", { name: "Apply", exact: true })
+            .click();
+          const cancel = dialog.getByRole("button", {
+            name: "Cancel picture processing",
+            exact: true,
+          });
+          await expect(cancel).toBeVisible();
+          await cancel.click();
+          await expect(
+            dialog.getByRole("button", { name: "Apply", exact: true }),
+          ).toBeEnabled();
+          await expect(
+            dialog.getByRole("slider", { name: "Zoom", exact: true }),
+          ).toHaveValue("2");
+          await expect(
+            dialog.getByText("profile-disposal.gif", { exact: true }),
+          ).toBeVisible();
+          expect(uploads).toBe(before);
+        },
+        "paste",
+      );
+      await assertAnimation(page, fallbackAnimation.bytes);
       await page.evaluate((workerConstructor) => {
         Object.defineProperty(window, "Worker", {
           value: workerConstructor,
@@ -509,7 +689,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
         });
       }, nativeWorker);
       await nativeWorker.dispose();
-      const smallPixels = await pixels(page, last.bytes, [
+      const smallPixels = await pixels(page, small.bytes, [
         [0, 0],
         [511, 511],
       ]);
@@ -517,7 +697,13 @@ test("Profile picture upload reaches public delivery and removal retires the old
       expect(smallPixels.samples.map((sample) => sample[3])).toEqual([
         255, 255,
       ]);
-      expect(uploads).toBe(3);
+      const workersBeforeGif = pictureWorkers;
+      const last = await uploadPicture(page, gif, outgoing, (dialog) =>
+        frameGifCrop(page, dialog),
+      );
+      expect(pictureWorkers - workersBeforeGif).toBeGreaterThanOrEqual(2);
+      await assertAnimation(page, last.bytes);
+      expect(uploads).toBe(5);
       const saved = last.profile;
       expect(saved).toMatchObject({
         displayName: originalDisplayName,
@@ -574,6 +760,39 @@ test("Profile picture upload reaches public delivery and removal retires the old
       expect(publicImage.status()).toBe(200);
       expect(publicImage.headers()["content-type"]).toMatch(/^image\//);
       expect(await publicImage.body()).toEqual(last.bytes);
+
+      await assertAnimation(publicPage, await publicImage.body());
+      const displayedColors = new Set<string>();
+      await expect
+        .poll(
+          async () => {
+            const displayed = profilePicture(publicPage);
+            const box = await displayed.boundingBox();
+            if (!box) return displayedColors.size;
+            const screenshot = await displayed.screenshot({
+              animations: "allow",
+            });
+            const sampled = await pixels(publicPage, screenshot, [
+              [Math.floor(box.width / 4), Math.floor(box.height / 2)],
+            ]);
+            const [red, green, blue] = sampled.samples[0];
+            if (red > 220 && green < 40 && blue < 40)
+              displayedColors.add("red");
+            if (green > 220 && red < 40 && blue < 40)
+              displayedColors.add("green");
+            if (red > 220 && green > 220 && blue > 220)
+              displayedColors.add("white");
+            if (red > 220 && green > 220 && blue < 40)
+              displayedColors.add("yellow");
+            return displayedColors.size;
+          },
+          {
+            timeout: 8000,
+            message:
+              "the delivered Profile picture displays distinct animation frames",
+          },
+        )
+        .toBeGreaterThanOrEqual(2);
 
       await removePicture(page);
       await expect

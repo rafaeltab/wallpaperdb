@@ -1,4 +1,5 @@
 import type { PictureJob, PictureJobResult } from './protocol';
+import { gifPictureJob } from './gif';
 import { withoutPictureMetadata } from './webp';
 
 // Each worker owns one job. Termination cancels native decode/encode and frees its bitmap.
@@ -14,6 +15,11 @@ self.addEventListener('message', async (event: MessageEvent<PictureJob>) => {
   let bitmap: ImageBitmap | undefined;
   try {
     const job = event.data;
+    const gif = await gifPictureJob(job, new AbortController().signal, true);
+    if (gif) {
+      self.postMessage(gif);
+      return;
+    }
     bitmap = await createImageBitmap(job.file, {
       imageOrientation: 'from-image',
       colorSpaceConversion: 'default',

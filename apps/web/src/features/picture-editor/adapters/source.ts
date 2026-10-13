@@ -61,11 +61,13 @@ export async function validateSourceDimensions(
     const length = new DataView(chunk.buffer).getUint32(4, true);
     const next = offset + 8 + length + (length % 2);
     if (next > file.size) throw invalid();
-    if (type === 'ANIM' || type === 'ANMF')
+    if (type === 'ANMF')
       throw new Error('Animated WebP pictures are not supported. Choose a static picture.');
     if (type === 'VP8X') {
       if (length !== 10) throw invalid();
       const bytes = await read(offset + 8, 10);
+      if (bytes[0] & 2)
+        throw new Error('Animated WebP pictures are not supported. Choose a static picture.');
       const uint24 = (start: number) =>
         bytes[start] + bytes[start + 1] * 256 + bytes[start + 2] * 65536;
       checkDimensions({ width: uint24(4) + 1, height: uint24(7) + 1 });

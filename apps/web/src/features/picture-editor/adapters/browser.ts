@@ -1,6 +1,13 @@
-import type { PictureCrop, PictureDimensions, PictureEncodingPolicy } from '../index';
+import type {
+  PictureCrop,
+  PictureDecodedLimits,
+  PictureDimensions,
+  PictureEncodingPolicy,
+} from '../index';
 import type { PictureJob, PictureJobResult } from './protocol';
+import { gifPictureJob } from './gif';
 import { withoutPictureMetadata } from './webp';
+import { yieldPictureWork } from './yield';
 import { validateSourceDimensions } from './source';
 import { validateJpegColor } from './jpeg';
 
@@ -13,21 +20,6 @@ export interface PictureSource extends PictureDimensions {
 
 function cancelled() {
   return new DOMException('Picture processing cancelled.', 'AbortError');
-}
-
-function yieldToUi(signal: AbortSignal): Promise<void> {
-  signal.throwIfAborted();
-  return new Promise((resolve, reject) => {
-    const abort = () => {
-      clearTimeout(timer);
-      reject(cancelled());
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', abort);
-      resolve();
-    }, 0);
-    signal.addEventListener('abort', abort, { once: true });
-  });
 }
 
 async function validateSource(file: Blob, signal: AbortSignal) {
@@ -43,9 +35,11 @@ async function validateSource(file: Blob, signal: AbortSignal) {
     bytes[6] === 26 &&
     bytes[7] === 10;
   const webp = text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP';
-  if (!jpeg && !png && !webp) throw new Error('Choose a valid JPEG, PNG, or WebP picture.');
+  const gif = ['GIF87a', 'GIF89a'].includes(text(0, 6));
+  if (!jpeg && !png && !webp && !gif)
+    throw new Error('Choose a valid JPEG, PNG, WebP, or GIF picture.');
+  if (gif) return;
   if (png) {
-    // Read chunk headers only; large compressed image data stays in the original Blob.
     let offset = 8;
     while (offset + 12 <= file.size) {
       const header = new Uint8Array(await file.slice(offset, offset + 8).arrayBuffer());
@@ -54,7 +48,9 @@ async function validateSource(file: Blob, signal: AbortSignal) {
       const type = String.fromCharCode(...header.slice(4, 8));
       if (offset + 12 + size > file.size) break;
       if (type === 'acTL')
-        throw new Error('Animated PNG pictures are not supported. Choose a static picture.');
+        throw new Error(
+          'Animated PNG pictures are not supported as an editor source. Choose a GIF to preserve animation.'
+        );
       if (type === 'cICP')
         throw new Error(
           "This picture's color interpretation is not supported. Choose another picture."
@@ -67,17 +63,70 @@ async function validateSource(file: Blob, signal: AbortSignal) {
     }
     throw new Error('Choose a valid PNG picture.');
   }
-  if (webp && text(12, 16) === 'VP8X' && bytes[20] & 2)
-    throw new Error('Animated WebP pictures are not supported. Choose a static picture.');
+  if (webp) {
+    let chunks = 0;
+    if (text(12, 16) === 'VP8X' && bytes[20] & 2)
+      throw new Error(
+        'Animated WebP pictures are not supported as an editor source. Choose a GIF to preserve animation.'
+      );
+    for (let offset = 12; offset + 8 <= file.size; ) {
+      if (++chunks % 256 === 0) await yieldPictureWork(signal);
+      const header = new Uint8Array(await file.slice(offset, offset + 8).arrayBuffer());
+      signal.throwIfAborted();
+      const type = String.fromCharCode(...header.slice(0, 4));
+      if (type === 'ANMF')
+        throw new Error(
+          'Animated WebP pictures are not supported as an editor source. Choose a GIF to preserve animation.'
+        );
+      const size = new DataView(header.buffer).getUint32(4, true);
+      const next = offset + 8 + size + (size % 2);
+      if (next > file.size) throw new Error('Unable to decode this WebP picture.');
+      offset = next;
+    }
+  }
   await validateSourceDimensions(file, jpeg ? 'jpeg' : 'webp', signal);
   if (jpeg) await validateJpegColor(file, signal);
 }
 
-async function fallback(
+let fallbackReservation: Promise<void> | undefined;
+
+function waitForFallback(reservation: Promise<void>, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      signal.removeEventListener('abort', abort);
+      reject(cancelled());
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    reservation.then(() => {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    });
+  });
+}
+
+async function fallback(job: PictureJob, signal: AbortSignal) {
+  while (fallbackReservation) await waitForFallback(fallbackReservation, signal);
+  signal.throwIfAborted();
+  let release = () => {};
+  fallbackReservation = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    return await fallbackWork(job, signal);
+  } finally {
+    fallbackReservation = undefined;
+    release();
+  }
+}
+
+async function fallbackWork(
   job: PictureJob,
   signal: AbortSignal
 ): Promise<Extract<PictureJobResult, { ok: true }>> {
-  await yieldToUi(signal);
+  await yieldPictureWork(signal);
+  const gif = await gifPictureJob(job, signal, false);
+  if (gif) return gif;
   let image: ImageBitmap | HTMLImageElement;
   let sourceUrl: string | undefined;
   if (typeof createImageBitmap !== 'undefined') {
@@ -121,7 +170,7 @@ async function fallback(
         : { x: job.crop.x, y: job.crop.y, width: job.crop.size, height: job.crop.size };
     // Bound each synchronous draw and let cancellation and painting run between strips.
     for (let y = 0; y < height; y += 64) {
-      await yieldToUi(signal);
+      await yieldPictureWork(signal);
       const strip = Math.min(64, height - y);
       context.drawImage(
         image,
@@ -193,9 +242,13 @@ async function runJob(
 }
 
 /** Public browser adapter: source pixels stay local; only process() returns uploadable bytes. */
-export async function openPictureSource(file: Blob, signal: AbortSignal): Promise<PictureSource> {
+export async function openPictureSource(
+  file: Blob,
+  signal: AbortSignal,
+  limits?: PictureDecodedLimits
+): Promise<PictureSource> {
   await validateSource(file, signal);
-  const preview = await runJob({ action: 'preview', file }, signal);
+  const preview = await runJob({ action: 'preview', file, limits }, signal);
   let disposed = false;
   const work = new Set<AbortController>();
   return {
@@ -210,7 +263,10 @@ export async function openPictureSource(file: Blob, signal: AbortSignal): Promis
       signal.addEventListener('abort', abort, { once: true });
       work.add(controller);
       try {
-        const result = await runJob({ action: 'process', file, crop, policy }, controller.signal);
+        const result = await runJob(
+          { action: 'process', file, crop, policy, limits },
+          controller.signal
+        );
         if (result.blob.type !== policy.output.mimeType)
           throw new Error('This browser cannot encode WebP pictures. Try another browser.');
         if (result.blob.size > policy.maxOutputBytes)

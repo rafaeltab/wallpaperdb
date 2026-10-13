@@ -43,7 +43,7 @@ export function ProfilePictureSettings({
   const input = useRef<HTMLInputElement>(null);
   const dialogContent = useRef<HTMLDivElement>(null);
   const removeOpener = useRef<HTMLButtonElement>(null);
-  const editor = usePictureEditor(profile.id);
+  const editor = usePictureEditor(profile.id, profile.pictureUploadLimits);
   const selected = editor.selection;
   const session = useRef(0);
   const client = useQueryClient();
@@ -328,7 +328,7 @@ export function ProfilePictureSettings({
                     {policy.output.width} × {policy.output.height} WebP, sRGB SDR. Static quality{' '}
                     {policy.encoding.staticQuality}.{' '}
                     {policy.animation.available
-                      ? 'Animated images are supported.'
+                      ? `GIF animation is supported at quality ${policy.encoding.animationQuality}.`
                       : 'Animated images are not supported.'}
                   </>
                 ) : (

@@ -13,8 +13,10 @@
     "check-types": "node scripts/generate-routes.mjs && tsc -b",
     "test": "vitest run",
     "test:unit": "vitest run --coverage",
-    "test:integration": "node --test test/clean-checkout.test.mjs",
-    "test:watch": "vitest"
+    "test:integration": "node --test test/clean-checkout.test.mjs && vitest run --config vitest.browser.config.ts",
+    "test:watch": "vitest",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:browser:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
@@ -65,6 +67,8 @@
     "shadcn": "^3.6.1",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "@vitest/browser-playwright": "5.0.2",
+    "playwright": "1.59.1"
   }
 }

@@ -19,6 +19,7 @@
     "@types/node": "^24.10.1",
     "dotenv": "^16.4.7",
     "typescript": "~5.9.3",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "sharp": "0.33.5"
   }
 }

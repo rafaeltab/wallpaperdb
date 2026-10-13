@@ -244,7 +244,7 @@
                 "$TURBO_ROOT$/packages/profile-markdown/src/**",
                 "$TURBO_ROOT$/packages/profile-markdown/package.json"
             ],
-            "outputs": []
+            "outputs": ["coverage/integration/**"]
         },
         "@wallpaperdb/infra-local#test:unit": {
             "inputs": ["$TURBO_DEFAULT$"],

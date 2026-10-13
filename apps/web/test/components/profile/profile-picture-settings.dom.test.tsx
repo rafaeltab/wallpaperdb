@@ -176,7 +176,7 @@ describe('Profile picture settings', () => {
     processPicture.mockImplementationOnce((_crop, _policy, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
     await renderPage();
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['old'], 'old.png', { type: 'image/png' }));
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['old'], 'old.gif', { type: 'image/gif' }));
     fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     const replacement = new File(['new'], `new.${format}`, { type: `image/${format}` });
@@ -307,14 +307,14 @@ describe('Profile picture settings', () => {
     await act(async () => { finishOtherCommand?.(); await pending; });
   });
 
-  it('cancels processing in the same dialog, ignores a late result, and permits the retained crop to be applied again', async () => {
+  it.each(['png', 'gif'])('cancels %s processing in the same dialog, ignores a late result, and permits the retained crop to be applied again', async (format) => {
     let finish: ((value: Blob) => void) | undefined;
     let signal: AbortSignal | undefined;
     processPicture.mockImplementationOnce((_crop, _policy, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
     vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'saved' });
     await renderPage();
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], `portrait.${format}`, { type: `image/${format}` }));
     fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
@@ -679,6 +679,31 @@ describe('Profile picture settings', () => {
     expect(screen.getByText(/Up to 4 B/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
+  });
+
+  it('keeps an impossible animation edit and saved Profile intact until an explicit Retry succeeds', async () => {
+    processPicture.mockRejectedValueOnce(new Error('Processed animation cannot fit the 4 byte limit. Choose another picture.'));
+    const { client } = await renderPage();
+    const user = userEvent.setup();
+    const file = new File(['gif'], 'animation.gif', { type: 'image/gif' });
+    await user.upload(screen.getByLabelText('Choose picture'), file);
+    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('animation cannot fit');
+    expect(screen.getByText('animation.gif')).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(profile);
+    expect(openPictureSource).toHaveBeenCalledWith(file, expect.any(AbortSignal), profile.pictureUploadLimits);
+    const accepted = { ...profile, version: 2, pictureAssetId: 'fitted_picture' };
+    vi.mocked(userApi.uploadPicture).mockResolvedValue(accepted);
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(accepted));
+    expect(processPicture.mock.calls[1][0]).toEqual(processPicture.mock.calls[0][0]);
+    expect(processPicture.mock.calls[1][0]).toMatchObject({ x: 300, y: 100, size: 200, zoom: 2 });
+    expect(processPicture.mock.calls[1][1]).toEqual(processPicture.mock.calls[0][1]);
+    expect(openPictureSource).toHaveBeenCalledTimes(1);
+    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
   });
 
   it('rejects unsupported picture files before sending an upload', async () => {

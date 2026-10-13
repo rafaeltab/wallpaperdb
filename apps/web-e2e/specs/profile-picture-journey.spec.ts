@@ -1,5 +1,13 @@
-import { expect, type Page, test } from "@playwright/test";
+import {
+  expect,
+  type Page,
+  type Request,
+  type Response,
+  test,
+} from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
+
+import { fittingPicture } from "../fixtures/profile-fitting";
 
 import { withDisposableOwner } from "../src/disposable-owner";
 
@@ -69,45 +77,63 @@ async function uploadPicture(
     dialog.getByRole("img", { name: "Selected avatar", exact: true }),
   ).toBeVisible();
   if (edit) await edit(dialog);
-  const saved = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/user/profile/me/picture") &&
-      response.request().method() === "PUT",
-  );
-  await dialog.getByRole("button", { name: "Apply", exact: true }).click();
-  const response = await saved;
-  expect(response.ok()).toBe(true);
-  await expect(dialog).not.toBeVisible();
-  const bytes = outgoing.at(-1);
-  if (!bytes) throw new Error("Picture command had no observed File bytes");
-  if (
-    bytes.subarray(0, 4).toString() !== "RIFF" ||
-    bytes.includes(Buffer.from("PRIVATE_CAMERA"))
-  )
-    throw new Error(
-      "Picture command did not contain a private-metadata-free WebP",
-    );
-  expect(bytes.length).toBe(bytes.readUInt32LE(4) + 8);
-  expect(bytes.subarray(8, 12).toString()).toBe("WEBP");
-  const chunks: string[] = [];
-  for (let offset = 12; offset < bytes.length; ) {
-    chunks.push(bytes.subarray(offset, offset + 4).toString());
-    const size = bytes.readUInt32LE(offset + 4);
-    offset += 8 + size + (size % 2);
+  let stopWatching = () => {};
+  const saved = new Promise<Response>((resolve, reject) => {
+    const onRequest = (request: Request) => {
+      if (
+        !request.url().endsWith("/user/profile/me/picture") ||
+        request.method() !== "PUT"
+      )
+        return;
+      stopWatching();
+      // The HTTP deadline starts after local fitting dispatches the upload.
+      void page
+        .waitForResponse((response) => response.request() === request)
+        .then(resolve, reject);
+    };
+    stopWatching = () => {
+      page.off("request", onRequest);
+    };
+    page.on("request", onRequest);
+  });
+  try {
+    await dialog.getByRole("button", { name: "Apply", exact: true }).click();
+    const response = await saved;
+    expect(response.ok()).toBe(true);
+    await expect(dialog).not.toBeVisible();
+    const bytes = outgoing.at(-1);
+    if (!bytes) throw new Error("Picture command had no observed File bytes");
+    if (
+      bytes.subarray(0, 4).toString() !== "RIFF" ||
+      bytes.includes(Buffer.from("PRIVATE_CAMERA"))
+    )
+      throw new Error(
+        "Picture command did not contain a private-metadata-free WebP",
+      );
+    expect(bytes.length).toBe(bytes.readUInt32LE(4) + 8);
+    expect(bytes.subarray(8, 12).toString()).toBe("WEBP");
+    const chunks: string[] = [];
+    for (let offset = 12; offset < bytes.length; ) {
+      chunks.push(bytes.subarray(offset, offset + 4).toString());
+      const size = bytes.readUInt32LE(offset + 4);
+      offset += 8 + size + (size % 2);
+    }
+    expect(
+      chunks.filter(
+        (chunk) =>
+          ![
+            "VP8X",
+            "ALPH",
+            "VP8 ",
+            "VP8L",
+            ...(picture.mimeType === "image/gif" ? ["ANIM", "ANMF"] : []),
+          ].includes(chunk),
+      ),
+    ).toEqual([]);
+    return { profile: await response.json(), bytes };
+  } finally {
+    stopWatching();
   }
-  expect(
-    chunks.filter(
-      (chunk) =>
-        ![
-          "VP8X",
-          "ALPH",
-          "VP8 ",
-          "VP8L",
-          ...(picture.mimeType === "image/gif" ? ["ANIM", "ANMF"] : []),
-        ].includes(chunk),
-    ),
-  ).toEqual([]);
-  return { profile: await response.json(), bytes };
 }
 
 async function pixels(
@@ -413,6 +439,11 @@ test("Profile picture upload reaches public delivery and removal retires the old
         )
           uploads++;
       });
+      const policyResponse = page.waitForResponse(
+        (response) =>
+          response.url().endsWith("/user/profile/me/picture-policy") &&
+          response.request().method() === "GET",
+      );
       const oriented = await fixture("profile-oriented.jpg", "image/jpeg");
       const first = await uploadPicture(
         page,
@@ -575,6 +606,9 @@ test("Profile picture upload reaches public delivery and removal retires the old
         },
         "drop",
       );
+      const effectivePolicyResponse = await policyResponse;
+      expect(effectivePolicyResponse.ok()).toBe(true);
+      const effectivePolicy = await effectivePolicyResponse.json();
       const orientedPixels = await pixels(page, first.bytes, [
         [64, 256],
         [448, 256],
@@ -697,13 +731,31 @@ test("Profile picture upload reaches public delivery and removal retires the old
       expect(smallPixels.samples.map((sample) => sample[3])).toEqual([
         255, 255,
       ]);
+      const fitting = await fittingPicture();
+      const fitted = await uploadPicture(page, fitting, outgoing);
+      expect(fitted.bytes.length).toBeLessThanOrEqual(
+        effectivePolicy.maxOutputBytes,
+      );
+      expect(fitted.profile).toMatchObject({
+        displayName: originalDisplayName,
+        biographyMarkdown: originalBiography,
+      });
+      await expect(profilePicture(page)).toHaveAttribute("src", /.+/);
+      const fittedUrl = await profilePicture(page).getAttribute("src");
+      if (!fittedUrl)
+        throw new Error("Accepted fitted picture has no public URL");
+      const fittedDelivery = await publicContext.request.get(
+        new URL(fittedUrl, page.url()).toString(),
+      );
+      expect(fittedDelivery.status()).toBe(200);
+      expect(await fittedDelivery.body()).toEqual(fitted.bytes);
       const workersBeforeGif = pictureWorkers;
       const last = await uploadPicture(page, gif, outgoing, (dialog) =>
         frameGifCrop(page, dialog),
       );
       expect(pictureWorkers - workersBeforeGif).toBeGreaterThanOrEqual(2);
       await assertAnimation(page, last.bytes);
-      expect(uploads).toBe(5);
+      expect(uploads).toBe(6);
       const saved = last.profile;
       expect(saved).toMatchObject({
         displayName: originalDisplayName,

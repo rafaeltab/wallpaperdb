@@ -18,13 +18,9 @@
  */
 
 import { execSync } from "node:child_process";
-import {
-	existsSync,
-	readFileSync,
-	statSync,
-	unlinkSync,
-} from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import { basename, join, resolve } from "node:path";
+import { getProjectName } from "./lib/worktree-project.mjs";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,34 +47,6 @@ function parseKeyValue(content) {
 		}
 	}
 	return result;
-}
-
-/**
- * Derive a Docker-safe project name suffix from a branch name.
- * Must match the logic in setup-worktree.mjs exactly.
- */
-function branchToSlug(branch) {
-	const maxTotal = 63;
-	const prefix = "wallpaperdb-";
-	const maxSlugLen = maxTotal - prefix.length;
-
-	let slug = branch
-		.replace(/\//g, "-")
-		.replace(/[^a-zA-Z0-9-]/g, "")
-		.toLowerCase()
-		.replace(/^-+|-+$/g, "")
-		.replace(/-+/g, "-");
-
-	if (!slug) {
-		slug = "worktree";
-	}
-
-	return slug.slice(0, maxSlugLen);
-}
-
-function getProjectName(branch) {
-	const slug = branchToSlug(branch);
-	return `wallpaperdb-${slug}`;
 }
 
 /**
@@ -110,7 +78,9 @@ function runComposeDown(projectName, composeFile, removeVolumes) {
 	} catch (err) {
 		// Exit code 1 from docker compose down is common when there's nothing
 		// running. Treat it as a soft warning, not a hard failure.
-		console.warn(`  Warning: docker compose down exited with error (this may be normal if no containers were running).`);
+		console.warn(
+			`  Warning: docker compose down exited with error (this may be normal if no containers were running).`,
+		);
 	}
 }
 
@@ -139,16 +109,16 @@ function runNormalTeardown(repoRoot) {
 		process.exit(1);
 	}
 	if (Number.isNaN(slot)) {
-		console.error("Error: WORKTREE_SLOT not found or invalid in .worktree file.");
+		console.error(
+			"Error: WORKTREE_SLOT not found or invalid in .worktree file.",
+		);
 		process.exit(1);
 	}
 
 	const isMainWorktree = slot === 0;
 	const removeVolumes = !isMainWorktree;
 
-	console.log(
-		`\nTearing down worktree: ${projectName} (slot ${slot})`,
-	);
+	console.log(`\nTearing down worktree: ${projectName} (slot ${slot})`);
 	if (isMainWorktree) {
 		console.log(
 			"  Note: This is the main worktree (slot 0). Volumes will be preserved.",
@@ -202,7 +172,9 @@ function releaseSlotFromWorktreeRoot(repoRoot) {
 		const content = readFileSafe(dotGitPath);
 		const match = content?.match(/^gitdir:\s*(.+)$/);
 		if (!match) {
-			console.warn("  Warning: Unexpected .git file format — slot file not released.");
+			console.warn(
+				"  Warning: Unexpected .git file format — slot file not released.",
+			);
 			return;
 		}
 		const gitDir = resolve(repoRoot, match[1]);
@@ -225,28 +197,12 @@ function runStaleCleanup(slotFilePath) {
 	// The worktree meta dir is its parent.
 	const worktreeMetaDir = resolve(resolvedSlotFile, "..");
 
-	// Read the branch from the HEAD file in the meta dir to derive project name.
-	const headFile = join(worktreeMetaDir, "HEAD");
-	const headContent = readFileSafe(headFile);
-	if (!headContent) {
-		console.error(`Error: Could not read HEAD from ${headFile}`);
-		process.exit(1);
-	}
-
-	let branch;
-	const refMatch = headContent.match(/^ref: refs\/heads\/(.+)$/);
-	if (refMatch) {
-		branch = refMatch[1];
-	} else {
-		// Detached HEAD — use short hash
-		branch = headContent.slice(0, 8);
-	}
-
-	const projectName = getProjectName(branch);
+	const worktreeName = basename(worktreeMetaDir);
+	const projectName = getProjectName(worktreeName);
 	const slot = readFileSafe(resolvedSlotFile);
 
 	console.log(
-		`\nStale cleanup for project: ${projectName} (slot ${slot}, branch: ${branch})`,
+		`\nStale cleanup for project: ${projectName} (slot ${slot}, worktree: ${worktreeName})`,
 	);
 	console.log(
 		"  Note: This worktree no longer exists on disk. Volumes will be removed.",
@@ -283,7 +239,9 @@ function releaseSlotFile(slotFilePath) {
 		unlinkSync(slotFilePath);
 		console.log(`  Slot file released: ${slotFilePath}`);
 	} catch (err) {
-		console.warn(`  Warning: Could not delete slot file ${slotFilePath}: ${err.message}`);
+		console.warn(
+			`  Warning: Could not delete slot file ${slotFilePath}: ${err.message}`,
+		);
 	}
 }
 

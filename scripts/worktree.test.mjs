@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
 	copyFileSync,
+	existsSync,
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
@@ -231,3 +232,78 @@ test("collision diagnostics use administrative identities even when HEAD is miss
 	assert.match(output, /administrative worktree name/);
 	assert.doesNotMatch(output, /Rename one branch/);
 });
+
+function assertComposeDown(dockerLog, projectName, removeVolumes) {
+	const commands = readFileSync(dockerLog, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line))
+		.filter((args) => args.includes("down"));
+	assert.equal(commands.length, 2);
+	for (const [index, args] of commands.entries()) {
+		assert.equal(args[args.indexOf("-p") + 1], projectName);
+		assert.equal(
+			basename(args[args.indexOf("-f") + 1]),
+			index === 0 ? "docker-compose.apps.yml" : "docker-compose.yml",
+		);
+		assert.equal(args.includes("--volumes"), removeVolumes);
+		assert.ok(args.includes("--remove-orphans"));
+	}
+}
+
+test("normal teardown uses the saved project name and releases the linked-worktree slot", (t) => {
+	const { addWorktree, git, prepare, run, dockerLog } = fixture(t);
+	const cwd = addWorktree("normal-worktree", "original-branch");
+	prepare(cwd);
+	run("setup-worktree.mjs", cwd);
+	assertGenerated(cwd, "wallpaperdb-normal-worktree", 1);
+	const gitDir = resolve(cwd, git(cwd, "rev-parse", "--git-dir"));
+	git(cwd, "switch", "-c", "changed-branch");
+	// The generated name is authoritative, including for an older setup.
+	const path = join(cwd, ".worktree");
+	writeFileSync(
+		path,
+		readFileSync(path, "utf8").replace(
+			"wallpaperdb-normal-worktree",
+			"wallpaperdb-saved-project",
+		),
+	);
+	run("teardown-worktree.mjs", cwd);
+	assertComposeDown(dockerLog, "wallpaperdb-saved-project", true);
+	assert.equal(existsSync(join(gitDir, "worktree-slot")), false);
+});
+
+test("normal teardown preserves main-checkout volumes", (t) => {
+	const { main, prepare, run, dockerLog } = fixture(t);
+	prepare(main);
+	run("setup-worktree.mjs", main);
+	assertGenerated(main, "wallpaperdb", 0);
+	run("teardown-worktree.mjs", main);
+	assertComposeDown(dockerLog, "wallpaperdb", false);
+});
+
+for (const [headState, name] of [
+	["branch", "--MiXeD__Worktree!!--"],
+	["detached", "L".repeat(80)],
+	["missing", "___"],
+]) {
+	test(`stale teardown selects setup's project with ${headState} HEAD`, (t) => {
+		const { main, addWorktree, git, prepare, run, dockerLog } = fixture(t);
+		const cwd = addWorktree(name, "original-branch");
+		prepare(main);
+		prepare(cwd);
+		run("setup-worktree.mjs", cwd);
+		const projectName = readValues(join(cwd, ".worktree")).COMPOSE_PROJECT_NAME;
+		const gitDir = resolve(cwd, git(cwd, "rev-parse", "--git-dir"));
+		if (headState === "branch") git(cwd, "branch", "-m", "renamed-branch");
+		if (headState === "detached") git(cwd, "switch", "--detach", "HEAD");
+		if (headState === "missing") rmSync(join(gitDir, "HEAD"));
+		rmSync(cwd, { recursive: true });
+		const slotFile = join(gitDir, "worktree-slot");
+		const output = run("teardown-worktree.mjs", main, "--slot-file", slotFile);
+		assertComposeDown(dockerLog, projectName, true);
+		assert.equal(existsSync(slotFile), false);
+		assert.ok(output.includes(`worktree: ${basename(gitDir)}`));
+		assert.doesNotMatch(output, /branch:/);
+	});
+}

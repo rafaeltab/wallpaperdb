@@ -45,7 +45,13 @@ For other scripts use `make run PACKAGE=<workspace> SCRIPT=<script>`. `PACKAGE` 
 
 For another checkout, run `git worktree add -b <branch> <path>` and `make install` in that directory. Each worktree gets separate ports, containers, and volumes.
 
+Linked-worktree Compose project names come from Git's administrative worktree directory name. For example, `.git` pointing to `.git/worktrees/t3-3e761aad` produces `wallpaperdb-t3-3e761aad`. Branch switches, branch renames, and detached HEAD checkouts keep the same project name and persistent slot when installation reruns. The main checkout uses `wallpaperdb`, slot 0. See [setup](scripts/setup-worktree.mjs) and the [shared naming rule](scripts/lib/worktree-project.mjs) for normalization and the length limit.
+
+Existing linked worktrees adopt this naming rule on their next installation. Stop any running stack under its previous project name before regenerating configuration. Setup does not migrate or delete previous containers or volumes.
+
 Before removing a checkout, run `make worktree-remove` there. It releases the slot and deletes non-main worktree containers and volumes. Then use `git worktree remove <path>` from another checkout. If a directory was already removed, follow the stale-slot cleanup instructions printed by the next installation.
+
+Normal [teardown](scripts/teardown-worktree.mjs) uses the project name saved in `.worktree` and preserves main-checkout volumes. Stale cleanup derives the project name from the administrative directory containing the supplied `worktree-slot` file, so it also works when that directory's HEAD file is missing.
 
 ## Change the documentation
 

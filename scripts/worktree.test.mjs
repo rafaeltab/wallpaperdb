@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
 	copyFileSync,
 	mkdtempSync,
@@ -60,7 +60,12 @@ function fixture(t) {
 	for (const key of ["COMPOSE_PROJECT_NAME", ...portKeys]) delete env[key];
 
 	function git(cwd, ...args) {
-		return execFileSync("git", args, { cwd, env, encoding: "utf8" }).trim();
+		return execFileSync("git", args, {
+			cwd,
+			env,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe"],
+		}).trim();
 	}
 	git(main, "init", "--initial-branch=main");
 	git(
@@ -93,7 +98,7 @@ function fixture(t) {
 	}
 
 	function run(script, cwd, ...args) {
-		return execFileSync(
+		const result = spawnSync(
 			process.execPath,
 			[join(repoRoot, "scripts", script), ...args],
 			{
@@ -103,6 +108,8 @@ function fixture(t) {
 				stdio: ["ignore", "pipe", "pipe"],
 			},
 		);
+		assert.equal(result.status, 0, result.stderr);
+		return result.stdout + result.stderr;
 	}
 
 	return { main, addWorktree, git, prepare, run, dockerLog };
@@ -157,4 +164,70 @@ test("setup keeps the administrative worktree identity and ports across HEAD cha
 			generated,
 		);
 	}
+});
+
+test("setup allocates distinct projects and slots to detached worktrees at the same commit", (t) => {
+	const { main, addWorktree, git, prepare, run } = fixture(t);
+	const first = addWorktree("first/shared", "first-branch");
+	const second = addWorktree("second/shared", "second-branch");
+	for (const [index, cwd] of [first, second].entries()) {
+		prepare(cwd);
+		git(cwd, "switch", "--detach", git(main, "rev-parse", "HEAD"));
+		const output = run("setup-worktree.mjs", cwd);
+		assert.doesNotMatch(output, /Slug collision/);
+		assertGenerated(
+			cwd,
+			index === 0 ? "wallpaperdb-shared" : "wallpaperdb-shared1",
+			index + 1,
+		);
+	}
+	const output = run("setup-worktree.mjs", first);
+	assert.doesNotMatch(output, /Slug collision/);
+	assertGenerated(first, "wallpaperdb-shared", 1);
+});
+
+test("setup preserves the main checkout project, slot zero, and ports across branch changes", (t) => {
+	const { main, git, prepare, run } = fixture(t);
+	prepare(main);
+	run("setup-worktree.mjs", main);
+	const generated = assertGenerated(main, "wallpaperdb", 0);
+	git(main, "switch", "-c", "other-branch");
+	run("setup-worktree.mjs", main);
+	assert.equal(assertGenerated(main, "wallpaperdb", 0), generated);
+});
+
+test("setup preserves Docker-safe normalization, fallback, and the 63-character limit", (t) => {
+	const { addWorktree, prepare, run } = fixture(t);
+	const cases = [
+		["--MiXeD__Worktree!!--", "wallpaperdb-mixedworktree"],
+		["___", "wallpaperdb-worktree"],
+		["L".repeat(80), `wallpaperdb-${"l".repeat(51)}`],
+	];
+	for (const [index, [name, expected]] of cases.entries()) {
+		const cwd = addWorktree(name, `branch-${index}`);
+		prepare(cwd);
+		run("setup-worktree.mjs", cwd);
+		assertGenerated(cwd, expected, index + 1);
+		assert.match(expected, /^[a-z0-9][a-z0-9-]*$/);
+		assert.ok(expected.length <= 63);
+	}
+});
+
+test("collision diagnostics use administrative identities even when HEAD is missing", (t) => {
+	const { addWorktree, git, prepare, run } = fixture(t);
+	const first = addWorktree("Feature_ID", "unrelated-first-branch");
+	const second = addWorktree("FeatureID", "unrelated-second-branch");
+	prepare(first);
+	prepare(second);
+	run("setup-worktree.mjs", first);
+	const gitDir = resolve(first, git(first, "rev-parse", "--git-dir"));
+	rmSync(join(gitDir, "HEAD"));
+	const output = run("setup-worktree.mjs", second);
+	assertGenerated(second, "wallpaperdb-featureid", 2);
+	assert.match(output, /Slug collision detected/);
+	assert.match(output, /Project name: wallpaperdb-featureid/);
+	assert.ok(output.includes(first));
+	assert.ok(output.includes(second));
+	assert.match(output, /administrative worktree name/);
+	assert.doesNotMatch(output, /Rename one branch/);
 });

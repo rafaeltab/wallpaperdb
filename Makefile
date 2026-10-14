@@ -47,7 +47,7 @@ TURBO_PACKAGE = $(if $(filter root,$(PACKAGE)),//,@wallpaperdb/$(PACKAGE))
 FILTER = $(if $(PACKAGE),--filter=$(TURBO_PACKAGE))
 TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 
-.PHONY: help install dev stop build test test-unit test-integration test-e2e test-focused \
+.PHONY: help install dev stop build test test-unit test-integration test-e2e test-focused test-mutation \
         format lint lint-fix check-types check run \
         infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
@@ -90,6 +90,9 @@ test-focused: ## Build dependencies and run selected tests serially (requires PA
 
 test-unit: ## Run unit tests (no containers; optional PACKAGE)
 	@$(TURBO) run test:unit $(TURBO_FLAGS)
+
+test-mutation: ## Run the mutation-testing POC (optional PACKAGE=profile-markdown; optional ARGS)
+	@$(TURBO) run test:mutation $(TURBO_FLAGS) --concurrency=1 -- $(ARGS)
 
 test-integration: ## Run integration tests (Docker required) (optional PACKAGE)
 	@$(TURBO) run test:integration $(TURBO_FLAGS) --concurrency=1

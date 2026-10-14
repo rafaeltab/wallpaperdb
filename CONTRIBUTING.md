@@ -59,6 +59,20 @@ The runner prints the failing phase and original status, reports cleanup failure
 
 For other scripts use `make run PACKAGE=<workspace> SCRIPT=<script>`. `PACKAGE` selects a workspace, `SERVICE` selects an application container, and `DB` selects a database. Read `make help` instead of maintaining a second command list here.
 
+### Mutation-testing proof of concept
+
+The opt-in Stryker POC checks whether the existing Profile Markdown tests detect deliberate changes to the shared policy. Run it with Node.js 22.18+ on the 22.x line, 24.11+ on the 24.x line, or 26+. Stryker 10's Babel dependencies require this newer runtime.
+
+```sh
+make test-mutation PACKAGE=profile-markdown
+```
+
+Open `packages/profile-markdown/reports/mutation/mutation.html` to inspect each mutation and its outcome. The same directory contains the JSON report. See the [Stryker configuration](packages/profile-markdown/stryker.config.json) for scope and reporter settings. Generated reports and sandboxes are ignored by Git.
+
+The POC uses Stryker's command runner because its Vitest plugin currently [selects zero tests for covered mutants on Vitest 5](https://github.com/stryker-mutator/stryker-js/issues/6210). Each mutation runs the complete workspace test suite, so this approach costs more than per-test selection and does not distinguish uncovered mutations. No TypeScript checker filters mutations before execution. Review survivors for missing assertions or equivalent behavior before setting a score threshold.
+
+Mutation testing runs separately from `make ci`, bypasses Turbo caching, and has no failing score threshold. Ordinary test failures in the initial run still fail the command. To narrow an investigation, pass a source range relative to the workspace, for example `ARGS='--mutate src/index.ts:59-61'`.
+
 ## Stop or remove a worktree
 
 `make apps-stop` and `make infra-stop` stop this worktree's containers and preserve its data. `make infra-reset` deletes infrastructure data after confirmation.

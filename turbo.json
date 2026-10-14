@@ -113,6 +113,11 @@
                 "^build"
             ]
         },
+        "test:mutation": {
+            "cache": false,
+            "dependsOn": ["^build"],
+            "outputs": ["reports/mutation/**"]
+        },
         "test:integration": {
             "cache": true,
             "inputs": [

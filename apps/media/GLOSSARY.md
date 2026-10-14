@@ -51,7 +51,7 @@ A Source acceptance rule requiring additions or replacements to preserve the Ass
 A representation Media produces by processing source media. A Generated rendition may be produced on request or stored as a Materialized rendition.
 
 **Materialized rendition**:
-A stored Rendition that Media can reuse to satisfy Rendition requests.
+A stored Generated rendition that Media can reuse to satisfy Rendition requests.
 _Avoid_: Cached file, pre-generated version
 
 **Source facts**:

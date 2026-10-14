@@ -12,7 +12,7 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - [Wallpaper variant generation (legacy)](./apps/variant-generator/GLOSSARY.md) - currently produces lower-resolution wallpaper variants; the [accepted delivery plan](https://github.com/rafaeltab/wallpaperdb/issues/250) moves generation ownership to Media
 
-- [Media](./apps/media/GLOSSARY.md) - currently owns on-request rendition processing, the delivery catalog, and delivery of immutable Assets. The [accepted target model](https://github.com/rafaeltab/wallpaperdb/issues/250) assigns Asset inspection and all rendition generation to Media, including migration of legacy variant generation. [ADR 0009](./docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md) adds temporary HDR Profile picture conversion to that target ownership.
+- [Media](./apps/media/GLOSSARY.md) - currently owns on-request rendition processing, the delivery catalog, and delivery of immutable source Assets. The [accepted Source rendition model](https://github.com/rafaeltab/wallpaperdb/issues/269#issuecomment-6152919559) assigns the full lifecycle of stable Assets and their immutable Source renditions to reusable Media. [Architecture reconciliation](https://github.com/rafaeltab/wallpaperdb/issues/391) replaces the earlier ownership model in [the delivery baseline](https://github.com/rafaeltab/wallpaperdb/issues/250) and [ADR 0009](./docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md), while preserving their product requirements.
 
 - [Tagging](./apps/tags/GLOSSARY.md) - reserved for wallpaper classification; domain language remains undefined
 
@@ -24,10 +24,16 @@ Additional contexts are documented lazily as their domain language is resolved.
 - **Ingestor -> User**: Wallpaper ownership records use the Profile ID, which is the authenticated Clerk user ID. User consumes published wallpaper events into a minimal ownership projection to validate Biography embeds.
 - **User -> Web**: User accepts authenticated Profile commands; Web presents and edits Profiles.
 - **User <-> Web**: A [shared Markdown policy](./docs/adr/0005-share-the-profile-markdown-policy.md) keeps Biography acceptance and React rendering aligned.
-- **Web <-> Media**: The planned HDR editing flow sends temporary sources and crop settings from Web to Media, which returns processed images for Web to upload to User. The [processing ownership decision](./docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md) records why Media owns this stateless conversion while User owns the accepted Asset.
+- **Web <-> Media**: The earlier planned HDR editing flow sends temporary sources and crop settings from Web to Media, which returns processed images for Web to upload to User. The [processing ownership decision](./docs/adr/0009-process-temporary-hdr-profile-picture-sources-in-media.md) records that rationale. [Architecture reconciliation](https://github.com/rafaeltab/wallpaperdb/issues/391) replaces the ownership/transfer flow under the accepted full Media lifecycle direction while preserving the [Profile picture product policy](https://github.com/rafaeltab/wallpaperdb/issues/270#issuecomment-5902621514).
 
 - **Ingestor -> Color Extractor**: Uploaded wallpaper events identify immutable originals for color extraction.
 - **Color Extractor -> Gateway**: Published matching-area and quality measurements provide the source for color-ranked discovery.
 
 - **Ingestor -> Variant Generator**: Uploaded wallpaper events identify originals for variant generation.
 - **Variant Generator -> Media**: Stored variant announcements supply renditions for delivery.
+
+## Accepted target relationships
+
+- **Domain applications -> Media**: Trusted Asset creation requests establish type and an opaque Owner reference. Caller mapping and ownership enforcement remain project agnostic.
+- **Creators -> Media**: Asset owners upload, add, replace, and withdraw immutable Source renditions under the configured Source acceptance policy.
+- **Media -> Gateway**: Faithful Delivery capabilities establish rendition availability; per-source Source facts support discovery filters. The [Source rendition resolution](https://github.com/rafaeltab/wallpaperdb/issues/269#issuecomment-6152919559) records the non-empty-capabilities gate, and [architecture reconciliation](https://github.com/rafaeltab/wallpaperdb/issues/391) owns the replacement event contracts.

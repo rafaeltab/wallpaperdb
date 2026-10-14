@@ -2,6 +2,8 @@
 
 The Gateway Catalogue lets visitors discover wallpapers and their public contributors. It interprets published wallpaper, Media delivery, color, and Profile facts.
 
+The Wallpaper Asset and discovery terms below follow the [accepted Source rendition model](https://github.com/rafaeltab/wallpaperdb/issues/269#issuecomment-6152919559). [Architecture reconciliation](https://github.com/rafaeltab/wallpaperdb/issues/391) tracks its replacement of the earlier single-source model.
+
 ## Language
 
 **Catalogue**:
@@ -13,14 +15,14 @@ A published image available for discovery, associated with its contributor's Pro
 _Avoid_: Upload command, asset file
 
 **Wallpaper Asset**:
-The immutable source image identified by the Wallpaper ID, with Media's published delivery availability, inspection readiness, and known Source facts.
+The stable Media Asset associated with a Wallpaper, containing its Source renditions and Media-established delivery capabilities and Source facts.
 _Avoid_: Variant, stored rendition inventory
 
 **Source facts**:
-Media-established characteristics of a wallpaper's source image used for discovery. Unknown characteristics remain unknown; conversion capabilities are not Source facts.
+Media-established characteristics of individual Source renditions used for discovery. Unknown characteristics remain unknown; conversion capabilities are not Source facts.
 
 **Discovery eligibility**:
-The catalogue's knowledge that a wallpaper has been published and Media has confirmed unchanged-source delivery. Inspection readiness is separate, and temporary delivery outages do not withdraw that confirmation.
+The catalogue's knowledge that a Wallpaper has been published and its Asset has a non-empty announced set of faithful Delivery capabilities, including unchanged-source delivery. Deliberate withdrawal of the last source removes eligibility; temporary delivery outages do not.
 
 **Contributor Profile**:
 The catalogue's public view of the Profile that contributed a wallpaper. The User context owns its identity and presentation.

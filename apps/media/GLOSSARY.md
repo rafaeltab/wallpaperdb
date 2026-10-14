@@ -31,6 +31,9 @@ _Avoid_: Version, variant
 The delivery characteristics requested for an Asset. Media either satisfies the complete request or rejects an unsupported combination.
 _Avoid_: Transformation options
 
+**Faithful rendition**:
+A Rendition that satisfies every requested characteristic through exact source-byte delivery or a source/request combination qualified under the [accepted delivery policy](https://github.com/rafaeltab/wallpaperdb/issues/250) and applicable [HDR qualification policy](https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153). Requested crops, explicit SDR conversion, and re-encoding can be faithful when their processing path qualifies; preservation requests retain the characteristics they promise.
+
 **Source rendition**:
 A creator-supplied immutable representation of an Asset. Different Source renditions can carry separately authored SDR/HDR appearances or encode the Asset at different resolutions or in different formats.
 
@@ -64,7 +67,7 @@ Media's examination of a Source rendition to establish its Source facts. Inspect
 Media's confirmation that a Source rendition has entered its delivery catalog for unchanged delivery, subject to the Asset's lifecycle rules. This is independent of Inspection readiness and is not a continuous service-health guarantee.
 
 **Delivery capabilities**:
-The Rendition combinations Media can deliver for an Asset from its eligible sources under its current processing support and limits. They do not describe the inventory of Materialized renditions.
+The combinations of Faithful renditions Media can deliver for an Asset from its eligible sources under its current processing support and limits. They do not describe the inventory of Materialized renditions.
 
 **Available renditions announcement**:
 Media's published snapshot of an Asset's faithful Delivery capabilities. It describes supported combinations without enumerating every possible output resolution.

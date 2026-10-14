@@ -21,8 +21,11 @@ _Avoid_: Variant, stored rendition inventory
 **Source facts**:
 Media-established characteristics of individual Source renditions used for discovery. Unknown characteristics remain unknown; conversion capabilities are not Source facts.
 
+**Delivery capabilities**:
+Media's announced combinations of Faithful renditions for a Wallpaper Asset. Faithfulness follows [Media's definition](../media/GLOSSARY.md); the catalogue does not classify transformations independently.
+
 **Discovery eligibility**:
-The catalogue's knowledge that a Wallpaper has been published and its Asset has a non-empty announced set of faithful Delivery capabilities, including unchanged-source delivery. Deliberate withdrawal of the last source removes eligibility; temporary delivery outages do not.
+The catalogue's knowledge that a Wallpaper has been published and its Asset has a non-empty announced set of Delivery capabilities, including unchanged-source delivery. Deliberate withdrawal of the last source removes eligibility; temporary delivery outages do not.
 
 **Contributor Profile**:
 The catalogue's public view of the Profile that contributed a wallpaper. The User context owns its identity and presentation.

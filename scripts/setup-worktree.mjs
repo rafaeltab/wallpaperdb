@@ -251,13 +251,13 @@ function checkStaleSlots(worktreeGitRoot) {
  * Scans all linked worktrees and warns if two worktrees would produce the same
  * project name (slug collision).
  */
-function checkSlugCollisions(worktreeGitRoot, thisProjectName) {
+function checkSlugCollisions(worktreeGitRoot) {
 	const worktreesDir = join(worktreeGitRoot, "worktrees");
 	if (!existsSync(worktreesDir)) {
 		return;
 	}
 
-	const seen = new Map(); // projectName → worktreePath
+	const seen = new Map(); // projectName → administrative name and worktree path
 
 	const entries = readdirSync(worktreesDir);
 	for (const entry of entries) {
@@ -273,32 +273,19 @@ function checkSlugCollisions(worktreeGitRoot, thisProjectName) {
 			continue; // Stale — already warned above
 		}
 
-		// Read HEAD to get the branch
-		const headFile = join(worktreeMetaDir, "HEAD");
-		const headContent = readFileSafe(headFile);
-		if (!headContent) {
-			continue;
-		}
-		let branch;
-		const refMatch = headContent.match(/^ref: refs\/heads\/(.+)$/);
-		if (refMatch) {
-			branch = refMatch[1];
-		} else {
-			branch = headContent.slice(0, 8); // detached HEAD — use short hash
-		}
-
-		const projectName = getProjectName(branch);
+		const projectName = getProjectName(entry);
+		const identity = `${entry} (${worktreePath})`;
 		if (seen.has(projectName)) {
 			console.warn(
 				`\n⚠️  Slug collision detected:\n` +
 					`   Project name: ${projectName}\n` +
 					`   Worktree 1: ${seen.get(projectName)}\n` +
-					`   Worktree 2: ${worktreePath}\n` +
+					`   Worktree 2: ${identity}\n` +
 					`   Both worktrees would use the same Docker project name!\n` +
-					`   Rename one branch to resolve this conflict.`,
+					`   Create a replacement worktree whose administrative worktree name produces a different project name.`,
 			);
 		} else {
-			seen.set(projectName, worktreePath);
+			seen.set(projectName, identity);
 		}
 	}
 }
@@ -680,7 +667,7 @@ function main() {
 	// 2. Stale slot + collision detection (informational only)
 	checkStaleSlots(context.worktreeGitRoot);
 	if (context.isWorktree) {
-		checkSlugCollisions(context.worktreeGitRoot, null);
+		checkSlugCollisions(context.worktreeGitRoot);
 	}
 
 	// 3. Resolve slot
@@ -689,18 +676,13 @@ function main() {
 	// 4. Derive project name
 	const projectName = getProjectName(context.worktreeName);
 
-	// 5. Detect slug collisions now that we know our project name
-	if (context.isWorktree) {
-		// Already called above for all worktrees; this is just informational
-	}
-
-	// 6. Compute ports
+	// 5. Compute ports
 	const ports = computePorts(slot);
 
-	// 7. Build file content
+	// 6. Build file content
 	const newContent = buildWorktreeFileContent(slot, projectName, ports);
 
-	// 8. Idempotency check — only write if content changed
+	// 7. Idempotency check — only write if content changed
 	const existingContent = readFileSafe(worktreeFilePath);
 	const worktreeUnchanged = existingContent === newContent.trim();
 
@@ -715,10 +697,10 @@ function main() {
 		return;
 	}
 
-	// 9. Write .worktree file
+	// 8. Write .worktree file
 	writeFileSync(worktreeFilePath, newContent, "utf8");
 
-	// 9b. Generate .env files and Bruno environment
+	// 9. Generate .env files and Bruno environment
 	generateAllEnvFiles(repoRoot, projectName, ports);
 	generateBrunoEnv(repoRoot, ports);
 

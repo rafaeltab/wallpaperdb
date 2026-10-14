@@ -24,7 +24,8 @@ import {
 	appendFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve, relative } from "node:path";
+import { basename, join, resolve, relative } from "node:path";
+import { getProjectName } from "./lib/worktree-project.mjs";
 import {
 	parseEnvValues,
 	applyOverrides,
@@ -95,7 +96,7 @@ function detectWorktreeContext(repoRoot) {
 		// worktreeGitRoot is /path/to/main/.git
 		const worktreesDir = join(gitDir, "..");
 		const worktreeGitRoot = resolve(worktreesDir, "..");
-		const worktreeName = gitDir.split("/").pop();
+		const worktreeName = basename(gitDir);
 
 		return {
 			isWorktree: true,
@@ -106,61 +107,6 @@ function detectWorktreeContext(repoRoot) {
 	}
 
 	throw new Error(`.git at ${dotGitPath} is neither a file nor a directory`);
-}
-
-// ─── Branch Name ─────────────────────────────────────────────────────────────
-
-/** Get the current branch name (or HEAD commit hash if detached). */
-function getCurrentBranch(repoRoot) {
-	try {
-		const result = execSync("git rev-parse --abbrev-ref HEAD", {
-			cwd: repoRoot,
-			encoding: "utf8",
-			stdio: ["pipe", "pipe", "pipe"],
-		}).trim();
-		return result === "HEAD" ? "detached" : result;
-	} catch {
-		return "unknown";
-	}
-}
-
-// ─── Slug Derivation ─────────────────────────────────────────────────────────
-
-/**
- * Derive a Docker-safe project name suffix from a branch name.
- * Rules:
- *   - Replace `/` with `-`
- *   - Strip non-alphanumeric characters (except `-`)
- *   - Convert to lowercase
- *   - Truncate so "wallpaperdb-<slug>" is ≤ 63 characters
- *   - Final slug must not be empty
- */
-function branchToSlug(branch) {
-	const maxTotal = 63;
-	const prefix = "wallpaperdb-";
-	const maxSlugLen = maxTotal - prefix.length;
-
-	let slug = branch
-		.replace(/\//g, "-")
-		.replace(/[^a-zA-Z0-9-]/g, "")
-		.toLowerCase()
-		.replace(/^-+|-+$/g, "") // trim leading/trailing hyphens
-		.replace(/-+/g, "-"); // collapse multiple hyphens
-
-	if (!slug) {
-		slug = "worktree";
-	}
-
-	return slug.slice(0, maxSlugLen);
-}
-
-/** Derive the Docker Compose project name. Main checkout uses "wallpaperdb". */
-function getProjectName(isWorktree, branch) {
-	if (!isWorktree) {
-		return "wallpaperdb";
-	}
-	const slug = branchToSlug(branch);
-	return `wallpaperdb-${slug}`;
 }
 
 // ─── Port Computation ────────────────────────────────────────────────────────
@@ -341,7 +287,7 @@ function checkSlugCollisions(worktreeGitRoot, thisProjectName) {
 			branch = headContent.slice(0, 8); // detached HEAD — use short hash
 		}
 
-		const projectName = getProjectName(true, branch);
+		const projectName = getProjectName(branch);
 		if (seen.has(projectName)) {
 			console.warn(
 				`\n⚠️  Slug collision detected:\n` +
@@ -409,8 +355,7 @@ function checkDockerComposeVersion() {
 		}
 
 		const [major, minor] = version;
-		const meetsRequirement =
-			major > 2 || (major === 2 && minor >= 22);
+		const meetsRequirement = major > 2 || (major === 2 && minor >= 22);
 		if (!meetsRequirement) {
 			console.warn(
 				`\n⚠️  docker compose version ${output} is below the required ≥ 2.22.\n` +
@@ -519,8 +464,7 @@ function buildServiceOverrides() {
 // ─── User Secrets ───────────────────────────────────────────────────────────
 
 function getSecretEnvPaths() {
-	const configDir =
-		process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+	const configDir = process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
 	const wallpaperdbConfigDir = join(configDir, "wallpaperdb");
 	return {
 		primary: join(wallpaperdbConfigDir, "secrets.env"),
@@ -663,7 +607,12 @@ function generateAllEnvFiles(repoRoot, projectName, ports) {
  * Idempotent: only writes the file when the content has changed.
  */
 function generateBrunoEnv(repoRoot, ports) {
-	const examplePath = join(repoRoot, "api", "environments", "local.bru.example");
+	const examplePath = join(
+		repoRoot,
+		"api",
+		"environments",
+		"local.bru.example",
+	);
 	const envPath = join(repoRoot, "api", "environments", "local.bru");
 
 	const example = readFileSafe(examplePath);
@@ -738,8 +687,7 @@ function main() {
 	const slot = resolveSlot(context);
 
 	// 4. Derive project name
-	const branch = getCurrentBranch(repoRoot);
-	const projectName = getProjectName(context.isWorktree, branch);
+	const projectName = getProjectName(context.worktreeName);
 
 	// 5. Detect slug collisions now that we know our project name
 	if (context.isWorktree) {

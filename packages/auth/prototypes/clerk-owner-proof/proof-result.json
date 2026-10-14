@@ -1,0 +1,201 @@
+{
+  "startedAt": "2026-10-14T19:41:32.040Z",
+  "sdk": "@clerk/backend 3.4.1 via @clerk/fastify 3.1.19",
+  "issuer": "https://legible-peacock-59.clerk.accounts.dev",
+  "namespace": "wallpaperdb-development",
+  "realClerkAccounts": [
+    {
+      "persona": "owner",
+      "userId": "user_3KhPar5qSjzIM0n8bbBJ2tkTMkz",
+      "sessionId": "sess_3KhPanl6HFUg7fKQRcplOiWrVa2",
+      "sessionStatus": "active",
+      "tokenFacts": {
+        "issuer": "https://legible-peacock-59.clerk.accounts.dev",
+        "subject": "user_3KhPar5qSjzIM0n8bbBJ2tkTMkz",
+        "sessionId": "sess_3KhPanl6HFUg7fKQRcplOiWrVa2",
+        "audience": null,
+        "authorizedParty": null,
+        "issuedAt": 1792006892,
+        "expiresAt": 1792006952
+      }
+    },
+    {
+      "persona": "other",
+      "userId": "user_3KhPaymxLzSWgfXkiL4qfr3pLld",
+      "sessionId": "sess_3KhPayO6DRjxPz9N8YLtVnR3Yt9",
+      "sessionStatus": "active",
+      "tokenFacts": {
+        "issuer": "https://legible-peacock-59.clerk.accounts.dev",
+        "subject": "user_3KhPaymxLzSWgfXkiL4qfr3pLld",
+        "sessionId": "sess_3KhPayO6DRjxPz9N8YLtVnR3Yt9",
+        "audience": null,
+        "authorizedParty": null,
+        "issuedAt": 1792006893,
+        "expiresAt": 1792006953
+      }
+    }
+  ],
+  "processes": [
+    {
+      "ready": true,
+      "role": "media",
+      "url": "http://127.0.0.1:33273",
+      "pid": 3683606,
+      "hasClerkSecretKey": false
+    },
+    {
+      "ready": true,
+      "role": "application",
+      "url": "http://127.0.0.1:35921",
+      "pid": 3683686,
+      "hasClerkSecretKey": false
+    }
+  ],
+  "checks": [
+    {
+      "name": "Authenticated application creates Asset for real Clerk owner",
+      "expectedStatus": 201,
+      "status": 201,
+      "passed": true
+    },
+    {
+      "name": "Owner reads Asset",
+      "expectedStatus": 200,
+      "status": 200,
+      "passed": true
+    },
+    {
+      "name": "Other real Clerk user cannot read Asset",
+      "expectedStatus": 403,
+      "status": 403,
+      "passed": true
+    },
+    {
+      "name": "Anonymous caller cannot read Asset",
+      "expectedStatus": 401,
+      "status": 401,
+      "passed": true
+    },
+    {
+      "name": "Application credential cannot authenticate as a user",
+      "expectedStatus": 401,
+      "status": 401,
+      "passed": true
+    },
+    {
+      "name": "Owner adds immutable Source",
+      "expectedStatus": 201,
+      "status": 201,
+      "passed": true
+    },
+    {
+      "name": "Owner reads exact Source bytes",
+      "expectedStatus": 200,
+      "status": 200,
+      "passed": true
+    },
+    {
+      "name": "Other user cannot read Source bytes",
+      "expectedStatus": 403,
+      "status": 403,
+      "passed": true
+    },
+    {
+      "name": "Other user cannot add a Source",
+      "expectedStatus": 403,
+      "status": 403,
+      "passed": true
+    },
+    {
+      "name": "Other user cannot withdraw a Source",
+      "expectedStatus": 403,
+      "status": 403,
+      "passed": true
+    },
+    {
+      "name": "Other user cannot spoof Owner with request fields",
+      "expectedStatus": 403,
+      "status": 403,
+      "passed": true
+    },
+    {
+      "name": "Owner also cannot override ownership fields",
+      "expectedStatus": 400,
+      "status": 400,
+      "passed": true
+    },
+    {
+      "name": "Changing JWT subject without Clerk signature fails",
+      "expectedStatus": 401,
+      "status": 401,
+      "passed": true
+    },
+    {
+      "name": "Owner JWT cannot exercise service creation authority",
+      "expectedStatus": 401,
+      "status": 401,
+      "passed": true
+    },
+    {
+      "name": "Application cannot accept client-supplied ownership",
+      "expectedStatus": 400,
+      "status": 400,
+      "passed": true
+    },
+    {
+      "name": "Rejected operations leave original Source bytes unchanged",
+      "expectedStatus": 200,
+      "status": 200,
+      "passed": true
+    },
+    {
+      "name": "Rejected operations leave source membership unchanged",
+      "expectedStatus": 200,
+      "status": 200,
+      "passed": true
+    },
+    {
+      "name": "Owner withdraws the Source",
+      "expectedStatus": 200,
+      "status": 200,
+      "passed": true
+    },
+    {
+      "name": "Stable empty Asset remains owned by same user",
+      "expectedStatus": 200,
+      "status": 200,
+      "passed": true
+    },
+    {
+      "name": "Other user remains forbidden after last withdrawal",
+      "expectedStatus": 403,
+      "status": 403,
+      "passed": true
+    }
+  ],
+  "cleanup": [
+    {
+      "userId": "user_3KhPaymxLzSWgfXkiL4qfr3pLld",
+      "deleted": true
+    },
+    {
+      "userId": "user_3KhPar5qSjzIM0n8bbBJ2tkTMkz",
+      "deleted": true
+    }
+  ],
+  "limits": [
+    "Real Clerk development accounts and Clerk-issued session JWTs; no locally signed or mocked user credentials.",
+    "Sessions are created through Clerk development testing APIs, not a browser password sign-in.",
+    "The actual session JWTs omit audience and authorized-party claims; their absence is reported, not replaced with invented claims.",
+    "Only the configured issuer and its public keys are exercised. Cross-provider collisions, production frontend origins, live revocation and rotation recovery remain unproved.",
+    "In-memory Assets and sample byte strings only. No image processing, durable command transport, database, production service, or public rendition delivery."
+  ],
+  "asset": {
+    "type": "wallpaper",
+    "id": "ast_b8e4507b-af2b-4db5-b6f0-427bfe850563",
+    "reference": "wlpr_391_real_clerk_proof",
+    "ownerReference": "user_3KhPar5qSjzIM0n8bbBJ2tkTMkz"
+  },
+  "passed": true,
+  "completedAt": "2026-10-14T19:41:34.692Z"
+}

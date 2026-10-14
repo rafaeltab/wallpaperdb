@@ -1,0 +1,13 @@
+# Real Clerk Owner authorization prototype
+
+Throwaway proof for [#391](https://github.com/rafaeltab/wallpaperdb/issues/391). It asks whether an authenticated application can create an Asset for a real Clerk user and Media can independently verify that user's Clerk token and reject another real user.
+
+From this directory, run `make prove` for the real HTTP proof and immediate account cleanup, or `make demo` for an interactive local runner. `CONFIG_REPO=/path/to/configured/worktree` selects the existing `apps/user/.env`. Install the repository dependencies first. The prototype uses the declared `@clerk/fastify` dependency of the containing auth workspace, which re-exports Clerk's backend SDK. No application stack or database is needed.
+
+The runner creates two disposable development accounts and actual Clerk sessions. Two child processes receive public Clerk keys and a private application credential. Neither child receives the Clerk administrative key. The application validates its user's token, derives the Owner subject, and calls Media with a service-authenticated creation request. Media maps the trusted application's Owner subject and the verified user-token subject into the same configured namespace. User request fields cannot assign ownership.
+
+The UI deliberately holds test sessions in the local runner. Account selection obtains a fresh real Clerk token for that fixture. It is not a password sign-in proof and is not a product login flow. All servers bind to loopback. Tokens, generated passwords, and administrative/service credentials are never written to the report or sent to the browser. Stopping the runner deletes only its own disposable accounts. The demo also shuts down and cleans up after 30 minutes.
+
+The generated `proof-result.json` records real account IDs, sanitized token facts, process separation, HTTP outcomes and cleanup. Failed cleanup fails the run. It contains no reusable credentials. JWTs in this development-session profile can omit `aud` and `azp`; the proof reports their actual presence rather than claiming those checks passed. Public keys are fixed for one run. Production origin/audience profiles, key rotation, live revocation, cross-provider identities, durable command transport, persistence and processing remain outside this experiment.
+
+Assets and small sample Source bytes are held in memory. These are protected author operations; no public rendition-delivery or private-Asset entitlement policy is introduced. This code stays on the throwaway prototype branch. It does not implement the planned Media lifecycle in a production module.

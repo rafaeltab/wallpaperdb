@@ -2,24 +2,30 @@ import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { ManagedRuntime } from 'effect';
-import { Pool } from 'pg';
+import { Client } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CatalogPostgresLayer } from '../src/adapters/catalog/index.js';
-import { CatalogHealth, CatalogOutbox, CatalogProjection } from '../src/capabilities/catalog/index.js';
+import {
+  CatalogHealth,
+  CatalogOutbox,
+  CatalogProjection,
+} from '../src/capabilities/catalog/index.js';
 import { Catalog } from '../src/capabilities/delivery/index.js';
 
 const timestamp = '2026-09-24T10:00:00.000Z';
 describe('Catalog logical asset locations', () => {
   let postgres: Awaited<ReturnType<PostgreSqlContainer['start']>>;
-  let pool: Pool;
+  let database: Client;
   let runtime: ManagedRuntime.ManagedRuntime<
     Catalog | CatalogProjection | CatalogOutbox | CatalogHealth,
     unknown
   >;
   beforeAll(async () => {
     postgres = await new PostgreSqlContainer('postgres:16-alpine').start();
-    pool = new Pool({ connectionString: postgres.getConnectionUri() });
-    await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+    // Await the fixture socket closing before stopping PostgreSQL in teardown.
+    database = new Client({ connectionString: postgres.getConnectionUri() });
+    await database.connect();
+    await migrate(drizzle(database), { migrationsFolder: './drizzle' });
     runtime = ManagedRuntime.make(
       CatalogPostgresLayer({
         databaseUrl: postgres.getConnectionUri(),
@@ -28,13 +34,13 @@ describe('Catalog logical asset locations', () => {
     );
   });
   beforeEach(async () => {
-    await pool.query(
+    await database.query(
       'TRUNCATE catalog_targets, catalog_processed, catalog_outbox, variants, wallpapers, profile_picture_assets, profile_picture_heads'
     );
   });
   afterAll(async () => {
     await runtime?.dispose();
-    await pool?.end();
+    await database?.end();
     await postgres?.stop();
   });
 

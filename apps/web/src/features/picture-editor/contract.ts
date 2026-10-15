@@ -50,6 +50,9 @@ export interface PictureEditorProfile {
 }
 
 export interface PictureEditorDependencies {
+  availability: ProfileCommandAvailability;
+  save: (command: PictureCommand) => Promise<PictureSaveResult>;
+  notify: (message: string) => void;
   openSource: (
     file: File,
     signal: AbortSignal,
@@ -58,9 +61,18 @@ export interface PictureEditorDependencies {
   previews: { create: (preview: Blob) => string; release: (url: string) => void };
 }
 
+export type PictureCommand =
+  | { action: 'upload'; picture: File; expectedVersion: number }
+  | { action: 'remove'; expectedVersion: number };
+
+export type PictureSaveResult =
+  | { success: true }
+  | { success: false; error: { message: string; versionConflict?: boolean } };
+
 export interface PictureEditorSnapshot {
   open: boolean;
   selection: PictureSelection | null;
   processing: boolean;
   error: string | null;
 }
+import type { ProfileCommandAvailability } from '@/features/profile-management';

@@ -99,6 +99,19 @@ describe('Profile picture settings', () => {
     await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
   });
 
+  it('keeps the small-source zoom explanation without announcing pixelation when output needs no enlargement', async () => {
+    vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, output: { ...picturePolicy.output, width: 32, height: 32 } });
+    vi.mocked(openPictureSource).mockResolvedValue({ width: 32, height: 48, preview: new Blob(['preview']), process: processPicture, dispose: disposePicture });
+    await renderPage();
+    await userEvent.setup().upload(screen.getByLabelText('Choose picture'), new File(['source'], 'small.png', { type: 'image/png' }));
+    const zoom = await screen.findByRole('slider', { name: 'Zoom' });
+    expect(zoom).toBeDisabled();
+    expect(zoom).toHaveAccessibleDescription('This picture is smaller than 64 pixels. Further zoom is disabled, but you can still apply it.');
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    expect(screen.queryByText(/may look pixelated/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
+  });
+
   it('uses refreshed output dimensions and replacement source pixels for quality feedback', async () => {
     const { client } = await renderPage();
     const user = userEvent.setup();

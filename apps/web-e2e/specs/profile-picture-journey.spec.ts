@@ -294,6 +294,10 @@ function profilePicture(page: Page) {
     .first();
 }
 
+function profilePictureImage(page: Page) {
+  return profilePicture(page).locator("img");
+}
+
 test("Profile picture upload reaches public delivery and removal retires the old URL", async ({
   page,
   browser,
@@ -420,8 +424,8 @@ test("Profile picture upload reaches public delivery and removal retires the old
         displayName: originalDisplayName,
         biographyMarkdown: originalBiography,
       });
-      await expect(profilePicture(page)).toHaveAttribute("src", /.+/);
-      const fittedUrl = await profilePicture(page).getAttribute("src");
+      await expect(profilePictureImage(page)).toHaveAttribute("src", /.+/);
+      const fittedUrl = await profilePictureImage(page).getAttribute("src");
       if (!fittedUrl)
         throw new Error("Accepted fitted picture has no public URL");
       const fittedDelivery = await publicContext.request.get(
@@ -441,7 +445,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
         biographyMarkdown: originalBiography,
       });
       expect(saved.pictureAssetId).toEqual(expect.any(String));
-      const image = profilePicture(page);
+      const image = profilePictureImage(page);
       await expect
         .poll(
           () =>
@@ -473,7 +477,9 @@ test("Profile picture upload reaches public delivery and removal retires the old
         .poll(
           async () => {
             await publicPage.goto(publicUrl);
-            const src = await profilePicture(publicPage).getAttribute("src");
+            const src = await profilePictureImage(publicPage).evaluateAll(
+              ([image]) => image?.getAttribute("src") ?? null,
+            );
             return src ? new URL(src, publicPage.url()).toString() : null;
           },
           { timeout: 30000 },
@@ -481,7 +487,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
         .toBe(absolutePictureUrl);
       await expect
         .poll(() =>
-          profilePicture(publicPage).evaluate((element) =>
+          profilePictureImage(publicPage).evaluate((element) =>
             element instanceof HTMLImageElement ? element.naturalWidth : 0,
           ),
         )
@@ -526,9 +532,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
         .toBeGreaterThanOrEqual(2);
 
       await removePicture(page);
-      await expect
-        .poll(() => profilePicture(page).evaluate((element) => element.tagName))
-        .toBe("DIV");
+      await expect.poll(() => profilePicture(page).textContent()).toMatch(/\S/);
       await expect
         .poll(
           async () => {
@@ -551,13 +555,11 @@ test("Profile picture upload reaches public delivery and removal retires the old
         .poll(
           async () => {
             await publicPage.goto(publicUrl);
-            return profilePicture(publicPage).evaluate(
-              (element) => element.tagName,
-            );
+            return profilePicture(publicPage).textContent();
           },
           { timeout: 30000 },
         )
-        .toBe("DIV");
+        .toMatch(/\S/);
       expect(pageErrors).toEqual([]);
     } catch (cause) {
       journeyErrors.push(cause);

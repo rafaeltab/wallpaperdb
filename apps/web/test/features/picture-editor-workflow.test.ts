@@ -284,6 +284,73 @@ describe('picture workflow recovery and lifetimes', () => {
 });
 
 describe('picture editing session', () => {
+  it('returns to selection without closing or writing and releases the discarded draft', async () => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    const applying = context.editor.apply(policy);
+    decoded.encodes[0].result.reject(new Error('Encoding failed'));
+    await applying;
+    context.editor.returnToSelection();
+    expect(context.editor.getSnapshot()).toMatchObject({ open: true, selection: null, error: null });
+    expect(decoded.isDisposed()).toBe(true);
+    expect(context.previews.size).toBe(0);
+    expect(context.requests).toEqual([]);
+    expect(context.notices).toEqual([]);
+    await selectReady(context);
+    expect(context.editor.getSnapshot().selection?.expectedVersion).toBe(1);
+  });
+
+  it.each(['decoding', 'processing', 'writing', 'owner replacement', 'deactivation'])('rejects Back during %s even before UI controls update', async (restriction) => {
+    const context = setup();
+    let pending: Promise<void> | undefined;
+    let decoded: ReturnType<typeof source> | undefined;
+    if (restriction === 'decoding') {
+      pending = context.editor.select(new File(['source'], 'portrait.png', { type: 'image/png' }), policy);
+    } else {
+      decoded = await selectReady(context);
+      if (restriction === 'processing') pending = context.editor.apply(policy);
+      if (restriction === 'writing') context.setBusy(true, false);
+      if (restriction === 'owner replacement') context.replaceOwner(false);
+      if (restriction === 'deactivation') context.deactivate();
+    }
+    const before = context.editor.getSnapshot();
+    expect(context.editor.returnToSelection()).toBe(false);
+    expect(context.editor.getSnapshot()).toBe(before);
+    expect(context.requests).toEqual([]);
+    if (pending) {
+      context.editor.cancel();
+      if (decoded) decoded.encodes[0].result.resolve(canonical);
+      else context.decodes[0].result.resolve(source().picture);
+      await pending;
+    }
+    context.deactivate();
+  });
+
+  it.each(['required', 'review'])('preserves %s conflict recovery when returning to selection', async (recovery) => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    const applying = context.editor.apply(policy);
+    decoded.encodes[0].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    context.requests[0].result.resolve({ success: false, error: { message: 'Conflict', versionConflict: true } });
+    await expect.poll(() => context.refreshes.length).toBe(1);
+    if (recovery === 'required') context.refreshes[0].reject(new Error('Offline'));
+    else context.refreshes[0].resolve({ version: 7 });
+    await applying;
+    expect(context.editor.returnToSelection()).toBe(true);
+    expect(context.editor.getSnapshot()).toMatchObject({ open: true, selection: null, error: null, recovery });
+    expect(decoded.isDisposed()).toBe(true);
+    const replacement = await selectReady(context);
+    if (recovery === 'required') {
+      expect(context.editor.getSnapshot().selection?.expectedVersion).toBeNull();
+      await context.editor.apply(policy);
+      context.editor.requestRemoval();
+      expect(replacement.encodes).toEqual([]);
+      expect(context.editor.getSnapshot().removeVersion).toBeNull();
+    }
+    expect(context.requests).toHaveLength(1);
+  });
+
   it('captures the removal confirmation version independently of upload policy and keeps cancellation local', async () => {
     const { editor, requests, notices } = setup();
     editor.requestRemoval();

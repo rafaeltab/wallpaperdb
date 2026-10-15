@@ -11,6 +11,7 @@ import {
 } from '@/features/picture-editor';
 import { RotateCcw, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export function ProfilePictureCrop({
   source,
@@ -27,7 +28,7 @@ export function ProfilePictureCrop({
   disabled: boolean;
   onChange: (crop: PictureCrop) => void;
 }) {
-  const enlarged = output && pictureCropNeedsEnlargement(crop, output);
+  const enlarged = Boolean(output && pictureCropNeedsEnlargement(crop, output));
   const qualityFeedback = [
     enlarged ? 'This crop will be enlarged and may look pixelated.' : '',
     crop.lowResolution
@@ -38,10 +39,8 @@ export function ProfilePictureCrop({
     .join(' ');
   const [announcement, setAnnouncement] = useState('');
   useEffect(() => {
-    setAnnouncement(
-      qualityFeedback ? 'Picture quality warning. This crop may look pixelated.' : ''
-    );
-  }, [qualityFeedback]);
+    setAnnouncement(enlarged ? 'Picture quality warning. This crop may look pixelated.' : '');
+  }, [enlarged]);
   const apertureFraction = 0.75;
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ crop: PictureCrop; distance: number } | null>(null);
@@ -191,9 +190,12 @@ export function ProfilePictureCrop({
       {qualityFeedback && (
         <p
           id="picture-quality"
-          className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300"
+          className={cn(
+            'flex items-start gap-2 text-sm',
+            enlarged ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'
+          )}
         >
-          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {enlarged && <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />}
           <span>{qualityFeedback}</span>
         </p>
       )}

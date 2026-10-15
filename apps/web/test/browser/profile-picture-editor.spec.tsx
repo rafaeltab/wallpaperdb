@@ -308,7 +308,7 @@ it.each([{ width: 1280, height: 800 }, { width: 390, height: 844 }])('places qua
   expect(screen.queryByText(warning)).toBeNull();
   await userEvent.hover(crop());
   await userEvent.wheel(crop(), { delta: { y: -550 } });
-  await expect.element(screen.getByText(warning)).toBeVisible();
+  await expect.element(page.getByText(warning, { exact: true })).toBeVisible();
   const feedback = screen.getByText(warning).closest('p');
   if (!feedback) throw new Error('Missing quality feedback');
   expect(feedback.getBoundingClientRect().top).toBeGreaterThanOrEqual(zoom().getBoundingClientRect().bottom);
@@ -370,7 +370,7 @@ it('resizes the crop with a real two-finger pinch', async () => {
     await expect.poll(() => zoom().value).toBe('2');
     expect(screen.queryByText(warning)).toBeNull();
     await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, x: x - 60, y }, { id: 2, x: x + 60, y }] });
-    await expect.element(screen.getByText(warning)).toBeVisible();
+    await expect.element(page.getByText(warning, { exact: true })).toBeVisible();
     await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   } finally {
     await session.send('Emulation.setTouchEmulationEnabled', { enabled: false });

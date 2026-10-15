@@ -2,6 +2,7 @@ import { fork } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { connect } from 'node:net';
+import { createInterface } from 'node:readline';
 import { GenericContainer, getContainerRuntimeClient, Wait } from 'testcontainers';
 import { expect, it, vi } from 'vitest';
 import { createDockerProxy } from './fixtures/docker-proxy.js';
@@ -25,9 +26,17 @@ it('starts a container when a selected Ryuk exits and preserves automatic cleanu
   let proxy: Awaited<ReturnType<typeof createDockerProxy>> | undefined;
   try {
     await once(keeper, 'connect');
-    keeper.write(`label=org.testcontainers.session-id=${session}\r\n`);
-    const [ack] = await once(keeper, 'data');
-    expect(ack.toString()).toBe('ACK\n');
+    const acknowledgements = createInterface({ input: keeper });
+    try {
+      const acknowledgement = once(acknowledgements, 'line', {
+        signal: AbortSignal.timeout(5000),
+      });
+      keeper.write(`label=org.testcontainers.session-id=${session}\r\n`);
+      const [ack] = await acknowledgement;
+      expect(ack).toBe('ACK');
+    } finally {
+      acknowledgements.close();
+    }
 
     proxy = await createDockerProxy(
       client.info.containerRuntime.remoteSocketPath,

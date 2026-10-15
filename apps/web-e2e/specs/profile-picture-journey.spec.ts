@@ -477,6 +477,7 @@ test("Profile picture upload reaches public delivery and removal retires the old
         .poll(
           async () => {
             await publicPage.goto(publicUrl);
+            await expect(profilePicture(publicPage)).toBeVisible();
             const src = await profilePictureImage(publicPage).evaluateAll(
               ([image]) => image?.getAttribute("src") ?? null,
             );

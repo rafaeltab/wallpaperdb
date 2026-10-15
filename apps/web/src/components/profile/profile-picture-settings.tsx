@@ -17,7 +17,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import type { Profile } from '@/lib/api/user';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +39,7 @@ export function ProfilePictureSettings({
   const { selection: selected, open, error: feedback, recovery, processing, removeVersion } = state;
   const hasCrop = Boolean(selected?.source && selected.crop && selected.previewUrl);
   const showPicker = !hasCrop;
+  const initialRetry = Boolean(selected && !hasCrop && !processing && !saving);
   const stage = saving || (hasCrop && processing) ? 3 : hasCrop ? 2 : 1;
   function clearDrag() {
     dragDepth.current = 0;
@@ -142,24 +142,8 @@ export function ProfilePictureSettings({
               </li>
             ))}
           </ol>
-          {selected?.source && selected.crop && selected.previewUrl ? (
-            <ProfilePictureCrop
-              source={selected.source}
-              crop={selected.crop}
-              previewUrl={selected.previewUrl}
-              disabled={processing || writing}
-              onChange={editor.setCrop}
-            />
-          ) : null}
-          {importing && (
-            <output className="block text-sm text-muted-foreground">
-              {profile.pictureImportStatus === 'retrying'
-                ? 'Your account picture import is retrying. You can upload a picture or choose your generated avatar now.'
-                : 'Importing your account picture. You can keep editing your Profile while it loads.'}
-            </output>
-          )}
           <form
-            className="space-y-4"
+            className="flex flex-col gap-4"
             onSubmit={(event) => {
               event.preventDefault();
               void editor.apply(policyReady ? policy : undefined);
@@ -168,7 +152,7 @@ export function ProfilePictureSettings({
             <label className="sr-only" htmlFor="profile-picture">
               Choose picture
             </label>
-            <Input
+            <input
               ref={input}
               id="profile-picture"
               type="file"
@@ -182,6 +166,15 @@ export function ProfilePictureSettings({
                 event.target.value = '';
               }}
             />
+            {selected?.source && selected.crop && selected.previewUrl ? (
+              <ProfilePictureCrop
+                source={selected.source}
+                crop={selected.crop}
+                previewUrl={selected.previewUrl}
+                disabled={processing || writing}
+                onChange={editor.setCrop}
+              />
+            ) : null}
             {showPicker && (
               <fieldset
                 aria-label="Picture source"
@@ -216,11 +209,116 @@ export function ProfilePictureSettings({
                             : format.replace('image/', '').toUpperCase()
                         )
                       )
-                    : 'Loading picture rules…'}
+                    : policyQuery.isError
+                      ? 'Picture rules unavailable'
+                      : 'Loading picture rules…'}
                 </p>
               </fieldset>
             )}
-            <div className="flex flex-wrap items-center gap-2">
+            {(importing ||
+              processing ||
+              saving ||
+              policyQuery.isError ||
+              feedback ||
+              recovery ||
+              initialRetry) && (
+              <div role="group" aria-label="Picture feedback" className="min-w-0 space-y-3">
+                {importing && (
+                  <p className="text-sm text-muted-foreground">
+                    {profile.pictureImportStatus === 'retrying'
+                      ? 'Your account picture import is retrying. You can upload a picture or choose your generated avatar now.'
+                      : 'Importing your account picture. You can keep editing your Profile while it loads.'}
+                  </p>
+                )}
+                {(processing || saving) && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <LoaderCircle
+                      className="size-4 shrink-0 animate-spin motion-reduce:animate-none"
+                      aria-hidden="true"
+                    />
+                    <output className="min-w-0 flex-1">
+                      {processing ? 'Processing picture…' : 'Saving picture…'}
+                    </output>
+                    {processing && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Cancel picture processing"
+                        onClick={editor.cancel}
+                      >
+                        <X className="size-4" aria-hidden="true" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {policyQuery.isError && (
+                  <Alert variant="destructive" className="min-w-0">
+                    <AlertDescription>
+                      Unable to load picture rules. Try again before uploading.
+                    </AlertDescription>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="mt-2 w-fit max-w-full whitespace-normal"
+                      disabled={refreshing || writing || policyQuery.isFetching}
+                      onClick={() => void policyQuery.refetch()}
+                    >
+                      Retry picture rules
+                    </Button>
+                  </Alert>
+                )}
+                {(feedback || recovery || initialRetry) && (
+                  <Alert variant="destructive" className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <AlertDescription className="min-w-0 flex-1 break-words text-destructive/90">
+                        {feedback ??
+                          (recovery === 'required'
+                            ? 'Your Profile changed elsewhere. Refresh your saved Profile before retrying.'
+                            : recovery === 'review'
+                              ? 'Your Profile changed elsewhere. Review the latest saved picture before retrying.'
+                              : 'Picture processing cancelled. Choose a picture or retry.')}
+                      </AlertDescription>
+                      {initialRetry && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="shrink-0"
+                          disabled={
+                            refreshing || writing || !policyReady || recovery === 'required'
+                          }
+                          onClick={() => void editor.apply(policyReady ? policy : undefined)}
+                        >
+                          Retry
+                        </Button>
+                      )}
+                    </div>
+                    {recovery === 'required' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="mt-2 w-fit max-w-full whitespace-normal"
+                        disabled={refreshing || writing || processing}
+                        onClick={() => void editor.refresh()}
+                      >
+                        {refreshing ? 'Refreshing saved Profile…' : 'Retry Profile refresh'}
+                      </Button>
+                    )}
+                    {recovery === 'review' && (
+                      <fieldset aria-label="Latest saved picture" className="mt-3 space-y-2">
+                        <legend className="text-sm">Latest saved picture</legend>
+                        <ProfilePicture profile={profile} />
+                      </fieldset>
+                    )}
+                  </Alert>
+                )}
+              </div>
+            )}
+            <div
+              role="group"
+              aria-label="Picture actions"
+              className="flex flex-wrap items-center gap-2"
+            >
               {(profile.pictureAssetId || importing) && (
                 <Button
                   type="button"
@@ -254,6 +352,7 @@ export function ProfilePictureSettings({
                 )}
                 <Button
                   type="submit"
+                  aria-label={saving ? 'Apply' : undefined}
                   disabled={
                     !hasCrop ||
                     refreshing ||
@@ -265,28 +364,13 @@ export function ProfilePictureSettings({
                 >
                   {saving
                     ? 'Saving picture…'
-                    : selected && (feedback || recovery)
+                    : hasCrop && (feedback || recovery)
                       ? 'Retry'
                       : 'Apply'}
                 </Button>
               </div>
             </div>
           </form>
-          {processing && (
-            <output className="flex items-center gap-2 text-sm">
-              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-              Processing picture…
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Cancel picture processing"
-                onClick={editor.cancel}
-              >
-                <X className="size-4" />
-              </Button>
-            </output>
-          )}
           <AlertDialog
             open={removeVersion !== null}
             onOpenChange={(next) => {
@@ -320,42 +404,6 @@ export function ProfilePictureSettings({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          {policyQuery.isError && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                Unable to load picture rules. Try again before uploading.
-              </AlertDescription>
-              <Button type="button" variant="outline" onClick={() => void policyQuery.refetch()}>
-                Retry picture rules
-              </Button>
-            </Alert>
-          )}
-          {(feedback || recovery) && (
-            <Alert variant="destructive">
-              <AlertDescription>
-                {feedback ??
-                  (recovery === 'required'
-                    ? 'Your Profile changed elsewhere. Refresh your saved Profile before retrying.'
-                    : 'Your Profile changed elsewhere. Review the latest saved picture before retrying.')}
-              </AlertDescription>
-              {recovery === 'required' && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={refreshing || writing}
-                  onClick={() => void editor.refresh()}
-                >
-                  {refreshing ? 'Refreshing saved Profile…' : 'Retry Profile refresh'}
-                </Button>
-              )}
-              {recovery === 'review' && (
-                <fieldset aria-label="Latest saved picture" className="mt-3 space-y-2">
-                  <legend className="text-sm">Latest saved picture</legend>
-                  <ProfilePicture profile={profile} />
-                </fieldset>
-              )}
-            </Alert>
-          )}
         </div>
       </ProfileDialog>
     </div>

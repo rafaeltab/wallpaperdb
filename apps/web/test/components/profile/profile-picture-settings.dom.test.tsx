@@ -102,6 +102,62 @@ describe('Profile picture settings', () => {
     expect(screen.queryByText(/512 × 512 WebP/)).not.toBeInTheDocument();
     expect(userApi.picturePolicy).toHaveBeenCalledWith(expect.objectContaining({ tokenProvider: expect.any(Function) }));
   });
+  it('shows compact processing and saving feedback before the actions and returns to Frame on upload failure', async () => {
+    let finishProcessing!: (picture: Blob) => void;
+    let failUpload!: (cause: Error) => void;
+    processPicture.mockImplementationOnce(() => new Promise((resolve) => { finishProcessing = resolve; }));
+    vi.mocked(userApi.uploadPicture).mockImplementationOnce(() => new Promise((_resolve, reject) => { failUpload = reject; }));
+    await renderPage();
+    const user = userEvent.setup();
+    expect(screen.queryByRole('group', { name: 'Picture feedback' })).not.toBeInTheDocument();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    const progress = screen.getByRole('list', { name: 'Picture editing progress' });
+    expect(progress.querySelector('[aria-current=step]')).toHaveTextContent('3Save');
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Processing picture…');
+    expect(status).not.toHaveTextContent('Cancel');
+    const actions = screen.getByRole('group', { name: 'Picture actions' });
+    expect(screen.getByRole('group', { name: 'Picture feedback' }).compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel picture processing' })).toBeEnabled();
+    await act(async () => finishProcessing(canonical));
+    expect(screen.getByRole('status')).toHaveTextContent('Saving picture…');
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Cancel picture processing' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
+    await act(async () => failUpload(new Error('Upload unavailable')));
+    expect(screen.getByRole('alert')).toHaveTextContent('Upload unavailable');
+    expect(progress.querySelector('[aria-current=step]')).toHaveTextContent('2Frame');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('keeps initial decode Retry in the alert and allows selecting the same file after failure', async () => {
+    vi.mocked(openPictureSource).mockRejectedValueOnce(new Error('Unable to decode this picture. Retry the selection.'));
+    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2 });
+    await renderPage();
+    const user = userEvent.setup();
+    const file = new File(['png'], 'portrait.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Choose picture'), file);
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByRole('button', { name: 'Retry' })).toBeEnabled();
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+    expect(screen.getByRole('group', { name: 'Picture source' })).toBeVisible();
+    await user.upload(screen.getByLabelText('Choose picture'), file);
+    expect(await screen.findByRole('group', { name: 'Picture crop' })).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(openPictureSource).toHaveBeenCalledTimes(2);
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    vi.mocked(openPictureSource).mockRejectedValueOnce(new Error('Decode failed'));
+    await user.upload(screen.getByLabelText('Choose picture'), file);
+    await user.click(within(await screen.findByRole('alert')).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
+    expect(openPictureSource).toHaveBeenCalledTimes(4);
+  });
+
   it('blocks upload and offers retry when effective policy cannot be loaded', async () => {
     vi.mocked(userApi.picturePolicy).mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce(picturePolicy);
     await renderPage();
@@ -415,7 +471,7 @@ describe('Profile picture settings', () => {
     const user = userEvent.setup();
     await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
-    const form = screen.getByRole('button', { name: 'Saving picture…' }).closest('form');
+    const form = screen.getByRole('button', { name: 'Apply' }).closest('form');
     if (!form) throw new Error('Picture form missing');
     fireEvent.submit(form);
     expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);

@@ -5,7 +5,7 @@ import { cdp, page, userEvent } from 'vitest/browser';
 import type {} from '@vitest/browser-playwright';
 import { ProfilePictureSettings } from '../../src/components/profile/profile-picture-settings';
 import { profileQueryKey } from '../../src/features/profile-management/adapters/query';
-import { userApi, type Profile } from '../../src/lib/api/user';
+import { userApi, UserApiError, type Profile } from '../../src/lib/api/user';
 import { openPictureSource } from '../../src/features/picture-editor/adapters/browser';
 import '../../src/index.css';
 
@@ -40,6 +40,7 @@ afterEach(async () => {
 function mount(initial = profile) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   clients.push(client);
+  client.setQueryDefaults(profileQueryKey(initial.id), { queryFn: () => userApi.ensureProfile({ tokenProvider: async () => null }) });
   client.setQueryData(profileQueryKey(initial.id), initial);
   render(<QueryClientProvider client={client}><ProfilePictureSettings profile={initial} tokenProvider={async () => null} /></QueryClientProvider>);
 }
@@ -209,7 +210,8 @@ it.each([{ width: 1280, height: 800 }, { width: 360, height: 640 }])('places wra
   expect(screen.getByRole('dialog').getBoundingClientRect().height).toBe(idleHeight);
 });
 
-it('keeps status spacing, stops the spinner under reduced motion, and shrinks after cancellation', async () => {
+it.each([1280, 360])('keeps status spacing, reduced motion, and recovery readable at %s pixels', async (width) => {
+  await page.viewport(width, 800);
   let finishProcessing!: (picture: Blob) => void;
   let failUpload!: (cause: Error) => void;
   const file = await png();
@@ -219,7 +221,10 @@ it('keeps status spacing, stops the spinner under reduced motion, and shrinks af
     process: () => new Promise((resolve) => { finishProcessing = resolve; }),
     dispose: () => URL.revokeObjectURL(url),
   });
-  const upload = vi.spyOn(userApi, 'uploadPicture').mockImplementationOnce(() => new Promise((_resolve, reject) => { failUpload = reject; }));
+  const upload = vi.spyOn(userApi, 'uploadPicture')
+    .mockImplementationOnce(() => new Promise((_resolve, reject) => { failUpload = reject; }))
+    .mockRejectedValueOnce(new UserApiError('Conflict', 409, { type: 'https://wallpaperdb.test/problems/profile-version-conflict' }));
+  vi.spyOn(userApi, 'ensureProfile').mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce({ ...profile, version: 7, pictureAssetId: 'latest' });
   mount({ ...profile, pictureImportStatus: 'complete' });
   await userEvent.click(page.getByRole('button', { name: 'Edit profile picture', exact: true }));
   const picker = page.getByLabelText('Choose picture', { exact: true });
@@ -257,6 +262,22 @@ it('keeps status spacing, stops the spinner under reduced motion, and shrinks af
     await expect.element(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();
     const errorFeedback = screen.getByRole('group', { name: 'Picture feedback' });
     expect(actions.getBoundingClientRect().top - errorFeedback.getBoundingClientRect().bottom).toBe(16);
+    await userEvent.click(page.getByRole('button', { name: 'Retry', exact: true }));
+    finishProcessing(new Blob(['retry']));
+    await expect.element(page.getByRole('button', { name: 'Retry Profile refresh', exact: true })).toBeEnabled();
+    expect(screen.getByRole('alert').textContent).toContain('Unable to refresh');
+    await userEvent.click(page.getByRole('button', { name: 'Retry Profile refresh', exact: true }));
+    await expect.element(page.getByRole('group', { name: 'Latest saved picture', exact: true })).toBeVisible();
+    expect(upload).toHaveBeenCalledTimes(2);
+    const review = screen.getByRole('group', { name: 'Picture feedback' });
+    expect(actions.getBoundingClientRect().top - review.getBoundingClientRect().bottom).toBe(16);
+    expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth);
+    actions.scrollIntoView();
+    expect(actions.getBoundingClientRect().bottom).toBeLessThanOrEqual(dialog.getBoundingClientRect().bottom);
+    await userEvent.click(page.getByRole('button', { name: 'Back', exact: true }));
+    await expect.element(page.getByRole('group', { name: 'Picture source', exact: true })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Latest saved picture' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
   } finally {
     await session.send('Emulation.setEmulatedMedia', { features: [] });
   }

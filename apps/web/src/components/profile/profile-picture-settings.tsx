@@ -1,5 +1,5 @@
 import { ArrowLeft, LoaderCircle, Pencil, Upload, X } from 'lucide-react';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { usePictureEditor } from '@/features/picture-editor/adapters/react';
 import { ProfilePictureCrop } from '@/components/profile/profile-picture-crop';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
@@ -41,17 +41,17 @@ export function ProfilePictureSettings({
   const showPicker = !hasCrop;
   const initialRetry = Boolean(selected && !hasCrop && !processing && !saving);
   const stage = saving || (hasCrop && processing) ? 3 : hasCrop ? 2 : 1;
-  function clearDrag() {
+  const clearDrag = useCallback(() => {
     dragDepth.current = 0;
     setDragging(false);
-  }
+  }, []);
   useEffect(() => {
     if (!open) clearDrag();
     if (showPicker && focusPicker.current) {
       picker.current?.focus();
       focusPicker.current = false;
     }
-  }, [open, showPicker]);
+  }, [open, showPicker, clearDrag]);
   const importing =
     profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
   function selectPicture(picture: File | undefined) {
@@ -222,7 +222,7 @@ export function ProfilePictureSettings({
               feedback ||
               recovery ||
               initialRetry) && (
-              <div role="group" aria-label="Picture feedback" className="min-w-0 space-y-3">
+              <fieldset aria-label="Picture feedback" className="min-w-0 space-y-3">
                 {importing && (
                   <p className="text-sm text-muted-foreground">
                     {profile.pictureImportStatus === 'retrying'
@@ -312,12 +312,11 @@ export function ProfilePictureSettings({
                     )}
                   </Alert>
                 )}
-              </div>
+              </fieldset>
             )}
-            <div
-              role="group"
+            <fieldset
               aria-label="Picture actions"
-              className="flex flex-wrap items-center gap-2"
+              className="flex min-w-0 flex-wrap items-center gap-2"
             >
               {(profile.pictureAssetId || importing) && (
                 <Button
@@ -369,7 +368,7 @@ export function ProfilePictureSettings({
                       : 'Apply'}
                 </Button>
               </div>
-            </div>
+            </fieldset>
           </form>
           <AlertDialog
             open={removeVersion !== null}

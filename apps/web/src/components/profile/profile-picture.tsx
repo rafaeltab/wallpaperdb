@@ -133,7 +133,7 @@ function ProfilePictureLoad({
         <div
           role="img"
           aria-label={accessibleName}
-          className={cn(pictureClassName, 'relative bg-muted')}
+          className={cn(pictureClassName, 'relative', !ready && 'bg-muted')}
         >
           {(status === 'loading' || ready) && image}
           {!ready && (

@@ -52,6 +52,7 @@ export interface PictureEditorProfile {
 export interface PictureEditorDependencies {
   availability: ProfileCommandAvailability;
   save: (command: PictureCommand) => Promise<PictureSaveResult>;
+  refresh: () => Promise<{ version: number }>;
   notify: (message: string) => void;
   openSource: (
     file: File,
@@ -74,5 +75,6 @@ export interface PictureEditorSnapshot {
   selection: PictureSelection | null;
   processing: boolean;
   error: string | null;
+  recovery: 'required' | 'review' | null;
 }
 import type { ProfileCommandAvailability } from '@/features/profile-management';

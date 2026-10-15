@@ -675,9 +675,18 @@ it.each([
     ).toBe(1);
     // Stop in-flight retries before purging, or a retry can verify a chunk that the purge then deletes.
     await runtime.dispose();
-    expect(
-      (await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).ack_floor.stream_seq
-    ).toBeLessThan(input.seq);
+    const stopped = await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership');
+    expect(stopped.ack_floor.stream_seq).toBeLessThan(input.seq);
+    // Force a fetched, unacknowledged delivery independently of the old worker's shutdown timing.
+    await manager.consumers.delete('WALLPAPER', 'user-wallpaper-ownership');
+    await manager.consumers.add('WALLPAPER', stopped.config);
+    const stoppedConsumer = await connection
+      .jetstream()
+      .consumers.get('WALLPAPER', 'user-wallpaper-ownership');
+    const strandedRetry = await stoppedConsumer.next({ expires: 5000 });
+    expect(strandedRetry?.info.streamSequence).toBe(input.seq);
+    // Recreate the stopped durable so a fetched retry cannot hold recovery until its ACK deadline.
+    await manager.consumers.delete('WALLPAPER', 'user-wallpaper-ownership');
     // Purge leaves deduplication IDs alive. A repeated PubAck must be verified against actual evidence.
     await manager.streams.purge('USER_QUARANTINE');
     await manager.streams.update('USER_QUARANTINE', { max_msgs: -1 });

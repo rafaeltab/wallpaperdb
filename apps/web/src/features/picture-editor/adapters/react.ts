@@ -12,26 +12,30 @@ import { openPictureSource } from './browser';
 /** Public React adapter for the Profile picture editing workflow and browser resources. */
 export function usePictureEditor(profile: Profile, tokenProvider: () => Promise<string | null>) {
   const { mutation, refresh, availability, ownership, refreshing, writing } =
-    useOwnerProfileMutation(profile.id, (command: PictureCommand) => {
+    useOwnerProfileMutation(profile.id, (command: PictureCommand<Blob>) => {
       const options = {
         expectedVersion: command.expectedVersion,
         expectedProfileId: profile.id,
         tokenProvider,
       };
       return command.action === 'upload'
-        ? userApi.uploadPicture({ ...options, picture: command.picture })
+        ? userApi.uploadPicture({
+            ...options,
+            picture: new File([command.picture], 'profile-picture.webp', { type: 'image/webp' }),
+          })
         : userApi.removePicture(options);
     });
   const latest = useRef({ mutation, refresh, profile });
   latest.current = { mutation, refresh, profile };
   const editor = useMemo(
     () =>
-      createPictureEditor(
+      createPictureEditor<File, Blob>(
         {
           version: latest.current.profile.version,
           limits: latest.current.profile.pictureUploadLimits,
         },
         {
+          createOperation: () => new AbortController(),
           availability,
           ownership,
           async save(command): Promise<PictureSaveResult> {

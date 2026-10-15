@@ -1,3 +1,8 @@
+import type {
+  ProfileCommandAvailability,
+  ProfileQueryOwnership,
+} from '@/features/profile-management';
+
 export interface PictureDimensions {
   width: number;
   height: number;
@@ -30,16 +35,20 @@ export interface PictureEncodingPolicy {
 }
 
 /** The editing session owns a decoded source until replacement or closure. */
-export interface PictureSource extends PictureDimensions {
-  preview: Blob;
-  process: (crop: PictureCrop, policy: PictureEncodingPolicy, signal: AbortSignal) => Promise<Blob>;
+export interface PictureSource<Bytes> extends PictureDimensions {
+  preview: Bytes;
+  process: (
+    crop: PictureCrop,
+    policy: PictureEncodingPolicy,
+    signal: AbortSignal
+  ) => Promise<Bytes>;
   dispose: () => void;
 }
 
-export interface PictureSelection {
-  file: File;
+export interface PictureSelection<Input, Bytes> {
+  file: Input;
   expectedVersion: number | null;
-  source: PictureSource | null;
+  source: PictureSource<Bytes> | null;
   crop: PictureCrop | null;
   previewUrl: string | null;
 }
@@ -49,37 +58,40 @@ export interface PictureEditorProfile {
   limits: PictureDecodedLimits;
 }
 
-export interface PictureEditorDependencies {
+export interface PictureEditorDependencies<Input, Bytes> {
+  createOperation: () => { signal: AbortSignal; abort: () => void };
   ownership: ProfileQueryOwnership;
   availability: ProfileCommandAvailability;
-  save: (command: PictureCommand) => Promise<PictureSaveResult>;
+  save: (command: PictureCommand<Bytes>) => Promise<PictureSaveResult>;
   refresh: () => Promise<{ version: number }>;
   notify: (message: string) => void;
   openSource: (
-    file: File,
+    file: Input,
     signal: AbortSignal,
     limits: PictureDecodedLimits
-  ) => Promise<PictureSource>;
-  previews: { create: (preview: Blob) => string; release: (url: string) => void };
+  ) => Promise<PictureSource<Bytes>>;
+  previews: { create: (preview: Bytes) => string; release: (url: string) => void };
 }
 
-export type PictureCommand =
-  | { action: 'upload'; picture: File; expectedVersion: number }
+export type PictureCommand<Bytes> =
+  | { action: 'upload'; picture: Bytes; expectedVersion: number }
   | { action: 'remove'; expectedVersion: number };
 
 export type PictureSaveResult =
   | { success: true }
   | { success: false; error: { message: string; versionConflict?: boolean } };
 
-export interface PictureEditorSnapshot {
+export interface PictureEditorSnapshot<Input, Bytes> {
   open: boolean;
   removeVersion: number | null;
-  selection: PictureSelection | null;
+  selection: PictureSelection<Input, Bytes> | null;
   processing: boolean;
   error: string | null;
   recovery: 'required' | 'review' | null;
 }
-import type {
-  ProfileCommandAvailability,
-  ProfileQueryOwnership,
-} from '@/features/profile-management';
+
+export interface PictureFile {
+  name: string;
+  type: string;
+  size: number;
+}

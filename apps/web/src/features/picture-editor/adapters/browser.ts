@@ -234,7 +234,7 @@ export async function openPictureSource(
   file: Blob,
   signal: AbortSignal,
   limits?: PictureDecodedLimits
-): Promise<PictureSource> {
+): Promise<PictureSource<Blob>> {
   await validateSource(file, signal);
   const preview = await runJob({ action: 'preview', file, limits }, signal);
   let disposed = false;

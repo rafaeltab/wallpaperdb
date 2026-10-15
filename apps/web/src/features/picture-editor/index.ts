@@ -3,6 +3,7 @@ export type {
   PictureDimensions,
   PictureDecodedLimits,
   PictureEncodingPolicy,
+  PictureFile,
   PictureSource,
   PictureSelection,
   PictureEditorProfile,

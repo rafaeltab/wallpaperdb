@@ -1,5 +1,17 @@
 import { expect, it } from 'vitest';
-import { initialPictureCrop, movePictureCrop, zoomPictureCrop, wheelPictureCrop, pinchPictureCrop } from '@/features/picture-editor';
+import { initialPictureCrop, movePictureCrop, zoomPictureCrop, wheelPictureCrop, pinchPictureCrop, pictureCropNeedsEnlargement } from '@/features/picture-editor';
+
+it.each([
+  { size: 511, width: 512, height: 512, expected: true },
+  { size: 512, width: 512, height: 512, expected: false },
+  { size: 513, width: 512, height: 512, expected: false },
+  { size: 256, width: 256, height: 128, expected: false },
+  { size: 256, width: 257, height: 128, expected: true },
+  { size: 256, width: 128, height: 257, expected: true },
+])('reports enlargement for $size retained pixels against $width by $height output', ({ size, width, height, expected }) => {
+  const crop = initialPictureCrop({ width: size, height: size });
+  expect(pictureCropNeedsEnlargement(crop, { width, height })).toBe(expected);
+});
 
 it('frames a landscape source centrally and clamps dragging to covered source pixels', () => {
   const crop = initialPictureCrop({ width: 800, height: 400 });

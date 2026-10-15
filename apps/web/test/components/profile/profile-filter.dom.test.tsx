@@ -60,7 +60,7 @@ describe('Profile wallpaper filter', () => {
     const { onChange } = renderFilter();
     await user.type(screen.getByRole('searchbox', { name: 'Profile' }), ' countess ');
     const result = await screen.findByRole('button', { name: 'Select Ada Lovelace (@ada-lovelace)' });
-    expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute('src', ada.picture.url);
+    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', ada.picture.url);
     expect(onChange).not.toHaveBeenCalled();
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(init.body as string)).toMatchObject({

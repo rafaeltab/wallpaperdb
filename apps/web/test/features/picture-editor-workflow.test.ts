@@ -28,11 +28,17 @@ function setup() {
   const requests: { command: PictureCommand; result: ReturnType<typeof deferred<PictureSaveResult>> }[] = [];
   const notices: string[] = [];
   const refreshes: ReturnType<typeof deferred<{ version: number }>>[] = [];
+  let owner = {};
+  const ownerListeners = new Set<() => void>();
   function setBusy(next: boolean, notify = true) {
     busy = next;
     if (notify) for (const listener of availabilityListeners) listener();
   }
   const editor = createPictureEditor(profile, {
+    ownership: {
+      getIdentity: () => owner,
+      subscribe(listener) { ownerListeners.add(listener); return () => { ownerListeners.delete(listener); }; },
+    },
     availability: {
       isBusy: () => busy,
       subscribe(listener) { availabilityListeners.add(listener); return () => { availabilityListeners.delete(listener); }; },
@@ -68,7 +74,9 @@ function setup() {
   });
   const deactivate = editor.activate();
   editor.open();
-  return { editor, decodes, previews, deactivate, requests, notices, setBusy, availabilityListeners, refreshes };
+  return { editor, decodes, previews, deactivate, requests, notices, setBusy, availabilityListeners, refreshes, ownerListeners,
+    replaceOwner(notify = true) { owner = {}; if (notify) for (const listener of ownerListeners) listener(); },
+  };
 }
 
 function source() {
@@ -97,6 +105,21 @@ async function selectReady(context: ReturnType<typeof setup>) {
 const canonical = new Blob(['processed'], { type: 'image/webp' });
 
 describe('picture editing session', () => {
+  it('fences local work when the owner query is replaced and releases its subscription on deactivation', async () => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    const applying = context.editor.apply(policy);
+    context.replaceOwner();
+    expect(context.editor.getSnapshot()).toMatchObject({ open: false, selection: null });
+    expect(decoded.encodes[0].signal.aborted).toBe(true);
+    expect(decoded.isDisposed()).toBe(true);
+    expect(context.previews.size).toBe(0);
+    decoded.encodes[0].result.resolve(canonical);
+    await applying;
+    expect(context.requests).toEqual([]);
+    context.deactivate();
+    expect(context.ownerListeners.size).toBe(0);
+  });
   it('preserves the crop on conflict, refreshes the saved Profile, and requires an explicit retry', async () => {
     const context = setup();
     const decoded = await selectReady(context);

@@ -50,6 +50,7 @@ export interface PictureEditorProfile {
 }
 
 export interface PictureEditorDependencies {
+  ownership: ProfileQueryOwnership;
   availability: ProfileCommandAvailability;
   save: (command: PictureCommand) => Promise<PictureSaveResult>;
   refresh: () => Promise<{ version: number }>;
@@ -77,4 +78,7 @@ export interface PictureEditorSnapshot {
   error: string | null;
   recovery: 'required' | 'review' | null;
 }
-import type { ProfileCommandAvailability } from '@/features/profile-management';
+import type {
+  ProfileCommandAvailability,
+  ProfileQueryOwnership,
+} from '@/features/profile-management';

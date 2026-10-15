@@ -1,7 +1,7 @@
 import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import type { Profile } from '@/lib/api/user';
-import type { ProfileCommandAvailability } from '../index';
+import type { ProfileCommandAvailability, ProfileQueryOwnership } from '../index';
 
 export const ownerProfileQueryRoot = ['profile'] as const;
 export function profileQueryKey(profileId: string) {
@@ -27,6 +27,14 @@ export function useOwnerProfileMutation<Command>(
   const refreshing = useIsFetching({ queryKey: key, exact: true }) > 0;
   const writing = useIsMutating({ mutationKey: key }) > 0;
   const lifecycle = useMemo(() => ({ client, profileId, generation: 0 }), [client, profileId]);
+  const ownership = useMemo<ProfileQueryOwnership>(
+    () => ({
+      getIdentity: () =>
+        client.getQueryCache().find({ queryKey: profileQueryKey(profileId), exact: true }),
+      subscribe: (listener) => client.getQueryCache().subscribe(listener),
+    }),
+    [client, profileId]
+  );
   useEffect(() => {
     lifecycle.generation++;
     return () => {
@@ -36,7 +44,8 @@ export function useOwnerProfileMutation<Command>(
   const availability = useMemo<ProfileCommandAvailability>(() => {
     const key = profileQueryKey(profileId);
     const isBusy = () =>
-      client.isFetching({ queryKey: key, exact: true }) > 0 || client.isMutating({ mutationKey: key }) > 0;
+      client.isFetching({ queryKey: key, exact: true }) > 0 ||
+      client.isMutating({ mutationKey: key }) > 0;
     return {
       isBusy,
       subscribe(listener) {
@@ -111,6 +120,7 @@ export function useOwnerProfileMutation<Command>(
       return updated;
     },
     availability,
+    ownership,
     refreshing,
     writing,
   };

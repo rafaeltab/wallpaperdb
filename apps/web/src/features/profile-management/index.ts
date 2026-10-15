@@ -1,4 +1,4 @@
-export type { AliasCommand, ProfileCommandAvailability } from './contract';
+export type { AliasCommand, ProfileCommandAvailability, ProfileQueryOwnership } from './contract';
 export {
   classifyAliases,
   aliasChangeDialog,

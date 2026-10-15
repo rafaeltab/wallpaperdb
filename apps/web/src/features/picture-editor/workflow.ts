@@ -16,6 +16,7 @@ export function createPictureEditor(
 ) {
   let active = false;
   let session = 0;
+  let owner: object | undefined;
   let operation: AbortController | null = null;
   let state: PictureEditorSnapshot = {
     open: false,
@@ -46,7 +47,10 @@ export function createPictureEditor(
     update({ open: false, recovery: null });
   }
   const current = (originatingSession: number) =>
-    active && state.open && session === originatingSession;
+    active &&
+    state.open &&
+    session === originatingSession &&
+    owner === dependencies.ownership.getIdentity();
   async function refresh(originatingSession = session) {
     if (!current(originatingSession) || dependencies.availability.isBusy()) return;
     try {
@@ -108,7 +112,11 @@ export function createPictureEditor(
     },
     activate() {
       active = true;
+      const unsubscribe = dependencies.ownership.subscribe(() => {
+        if (state.open && owner !== dependencies.ownership.getIdentity()) close();
+      });
       return () => {
+        unsubscribe();
         active = false;
         close();
       };
@@ -119,6 +127,7 @@ export function createPictureEditor(
     open() {
       if (active) {
         close();
+        owner = dependencies.ownership.getIdentity();
         update({ open: true });
       }
     },
@@ -127,8 +136,7 @@ export function createPictureEditor(
     refresh: () => refresh(),
     async apply(policy?: PictureEncodingPolicy) {
       if (
-        !active ||
-        !state.open ||
+        !current(session) ||
         !policy ||
         dependencies.availability.isBusy() ||
         operation ||
@@ -150,7 +158,12 @@ export function createPictureEditor(
         }
         if (!selected.source || !selected.crop || selected.expectedVersion === null) return;
         const blob = await selected.source.process(selected.crop, policy, controller.signal);
-        if (controller.signal.aborted || state.selection !== selected) return;
+        if (
+          controller.signal.aborted ||
+          state.selection !== selected ||
+          !current(originatingSession)
+        )
+          return;
         if (dependencies.availability.isBusy())
           throw new Error(
             'Your Profile is busy. Apply the picture again after the current change finishes.'
@@ -185,7 +198,7 @@ export function createPictureEditor(
       file: File | undefined,
       policy?: PictureEncodingPolicy & { acceptedSourceFormats: string[] }
     ) {
-      if (!active || !state.open || !policy || dependencies.availability.isBusy()) return;
+      if (!current(session) || !policy || dependencies.availability.isBusy()) return;
       clear();
       const result = pictureSelection(file, policy.acceptedSourceFormats);
       update({ error: result.error });

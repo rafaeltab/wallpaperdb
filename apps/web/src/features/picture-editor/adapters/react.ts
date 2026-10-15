@@ -4,8 +4,9 @@ import {
   type PictureCrop,
   type PictureDecodedLimits,
   type PictureEncodingPolicy,
+  type PictureSource,
 } from '../index';
-import { openPictureSource, type PictureSource } from './browser';
+import { openPictureSource } from './browser';
 
 interface Selection {
   owner: string;

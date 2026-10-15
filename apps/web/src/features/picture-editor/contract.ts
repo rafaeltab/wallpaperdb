@@ -28,3 +28,39 @@ export interface PictureEncodingPolicy {
   animation: { available: boolean };
   encoding: { staticQuality: number; animationQuality: number };
 }
+
+/** The editing session owns a decoded source until replacement or closure. */
+export interface PictureSource extends PictureDimensions {
+  preview: Blob;
+  process: (crop: PictureCrop, policy: PictureEncodingPolicy, signal: AbortSignal) => Promise<Blob>;
+  dispose: () => void;
+}
+
+export interface PictureSelection {
+  file: File;
+  expectedVersion: number | null;
+  source: PictureSource | null;
+  crop: PictureCrop | null;
+  previewUrl: string | null;
+}
+
+export interface PictureEditorProfile {
+  version: number;
+  limits: PictureDecodedLimits;
+}
+
+export interface PictureEditorDependencies {
+  openSource: (
+    file: File,
+    signal: AbortSignal,
+    limits: PictureDecodedLimits
+  ) => Promise<PictureSource>;
+  previews: { create: (preview: Blob) => string; release: (url: string) => void };
+}
+
+export interface PictureEditorSnapshot {
+  open: boolean;
+  selection: PictureSelection | null;
+  processing: boolean;
+  error: string | null;
+}

@@ -27,6 +27,7 @@ function setup() {
   const availabilityListeners = new Set<() => void>();
   const requests: { command: PictureCommand; result: ReturnType<typeof deferred<PictureSaveResult>> }[] = [];
   const notices: string[] = [];
+  const refreshes: ReturnType<typeof deferred<{ version: number }>>[] = [];
   function setBusy(next: boolean, notify = true) {
     busy = next;
     if (notify) for (const listener of availabilityListeners) listener();
@@ -44,6 +45,13 @@ function setup() {
       return result.promise.finally(() => setBusy(false));
     },
     notify(message) { notices.push(message); },
+    refresh() {
+      if (busy) throw new Error('Profile is busy');
+      setBusy(true);
+      const result = deferred<{ version: number }>();
+      refreshes.push(result);
+      return result.promise.finally(() => setBusy(false));
+    },
     openSource(file, signal) {
       const result = deferred<PictureSource>();
       decodes.push({ file, signal, result });
@@ -60,7 +68,7 @@ function setup() {
   });
   const deactivate = editor.activate();
   editor.open();
-  return { editor, decodes, previews, deactivate, requests, notices, setBusy, availabilityListeners };
+  return { editor, decodes, previews, deactivate, requests, notices, setBusy, availabilityListeners, refreshes };
 }
 
 function source() {
@@ -89,6 +97,29 @@ async function selectReady(context: ReturnType<typeof setup>) {
 const canonical = new Blob(['processed'], { type: 'image/webp' });
 
 describe('picture editing session', () => {
+  it('preserves the crop on conflict, refreshes the saved Profile, and requires an explicit retry', async () => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    const crop = { x: 300, y: 100, size: 200, zoom: 2, maxZoom: 6.25, lowResolution: false };
+    context.editor.setCrop(crop);
+    const applying = context.editor.apply(policy);
+    decoded.encodes[0].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    context.requests[0].result.resolve({ success: false, error: { message: 'Conflict', versionConflict: true } });
+    await expect.poll(() => context.refreshes.length).toBe(1);
+    expect(context.editor.getSnapshot()).toMatchObject({ recovery: 'required', selection: { crop, expectedVersion: null } });
+    context.refreshes[0].resolve({ version: 7 });
+    await applying;
+    expect(context.editor.getSnapshot()).toMatchObject({ recovery: 'review', selection: { crop, expectedVersion: 7 } });
+    expect(context.requests).toHaveLength(1);
+    const retrying = context.editor.apply(policy);
+    expect(decoded.encodes[1].crop).toEqual(crop);
+    decoded.encodes[1].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(2);
+    expect(context.requests[1].command.expectedVersion).toBe(7);
+    context.requests[1].result.resolve({ success: true });
+    await retrying;
+  });
   it('uploads processed bytes with the captured version and releases the edit after success', async () => {
     const context = setup();
     const decoded = await selectReady(context);

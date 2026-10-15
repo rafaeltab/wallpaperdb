@@ -1,6 +1,7 @@
 import { pictureSelection } from '@/features/profile-management';
 import type {
   PictureCrop,
+  PictureCommand,
   PictureEditorDependencies,
   PictureEditorProfile,
   PictureEditorSnapshot,
@@ -21,6 +22,7 @@ export function createPictureEditor(
     selection: null,
     processing: false,
     error: null,
+    recovery: null,
   };
   const listeners = new Set<() => void>();
   function update(patch: Partial<PictureEditorSnapshot>) {
@@ -41,7 +43,45 @@ export function createPictureEditor(
   function close() {
     session++;
     clear();
-    update({ open: false });
+    update({ open: false, recovery: null });
+  }
+  const current = (originatingSession: number) =>
+    active && state.open && session === originatingSession;
+  async function refresh(originatingSession = session) {
+    if (!current(originatingSession) || dependencies.availability.isBusy()) return;
+    try {
+      const updated = await dependencies.refresh();
+      if (!current(originatingSession)) return;
+      if (state.selection)
+        update({ selection: { ...state.selection, expectedVersion: updated.version } });
+      update({
+        recovery: 'review',
+        error: 'Your Profile changed elsewhere. Review the latest saved picture before retrying.',
+      });
+    } catch {
+      if (current(originatingSession))
+        update({
+          error:
+            'Your Profile changed elsewhere. Unable to refresh your saved Profile. Retry the refresh before saving.',
+        });
+    }
+  }
+  async function save(command: PictureCommand, originatingSession: number) {
+    const result = await dependencies.save(command);
+    if (!current(originatingSession)) return;
+    if (result.success) {
+      close();
+      dependencies.notify(
+        command.action === 'remove' ? 'Generated avatar selected' : 'Profile picture saved'
+      );
+    } else if (result.error.versionConflict) {
+      if (state.selection) update({ selection: { ...state.selection, expectedVersion: null } });
+      update({
+        recovery: 'required',
+        error: 'Your Profile changed elsewhere. Refreshing your saved Profile…',
+      });
+      await refresh(originatingSession);
+    } else update({ error: result.error.message });
   }
   async function decode(selected: PictureSelection, controller: AbortController) {
     const source = await dependencies.openSource(selected.file, controller.signal, profile.limits);
@@ -84,6 +124,7 @@ export function createPictureEditor(
     },
     close,
     cancel,
+    refresh: () => refresh(),
     async apply(policy?: PictureEncodingPolicy) {
       if (
         !active ||
@@ -91,6 +132,7 @@ export function createPictureEditor(
         !policy ||
         dependencies.availability.isBusy() ||
         operation ||
+        state.recovery === 'required' ||
         !state.selection ||
         state.selection.expectedVersion === null
       )
@@ -115,16 +157,14 @@ export function createPictureEditor(
           );
         operation = null;
         update({ processing: false });
-        const result = await dependencies.save({
-          action: 'upload',
-          picture: new File([blob], 'profile-picture.webp', { type: 'image/webp' }),
-          expectedVersion: selected.expectedVersion,
-        });
-        if (!active || session !== originatingSession) return;
-        if (result.success) {
-          close();
-          dependencies.notify('Profile picture saved');
-        } else update({ error: result.error.message });
+        await save(
+          {
+            action: 'upload',
+            picture: new File([blob], 'profile-picture.webp', { type: 'image/webp' }),
+            expectedVersion: selected.expectedVersion,
+          },
+          originatingSession
+        );
       } catch (cause) {
         if (!controller.signal.aborted && state.selection === selected)
           update({
@@ -152,7 +192,7 @@ export function createPictureEditor(
       if (!result.selected) return;
       const selected: PictureSelection = {
         file: result.selected,
-        expectedVersion: profile.version,
+        expectedVersion: state.recovery === 'required' ? null : profile.version,
         source: null,
         crop: null,
         previewUrl: null,

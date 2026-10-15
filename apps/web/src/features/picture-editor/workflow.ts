@@ -14,6 +14,7 @@ export function createPictureEditor(
   dependencies: PictureEditorDependencies
 ) {
   let active = false;
+  let session = 0;
   let operation: AbortController | null = null;
   let state: PictureEditorSnapshot = {
     open: false,
@@ -38,6 +39,7 @@ export function createPictureEditor(
     update({ selection: null, error: null });
   }
   function close() {
+    session++;
     clear();
     update({ open: false });
   }
@@ -82,6 +84,60 @@ export function createPictureEditor(
     },
     close,
     cancel,
+    async apply(policy?: PictureEncodingPolicy) {
+      if (
+        !active ||
+        !state.open ||
+        !policy ||
+        dependencies.availability.isBusy() ||
+        operation ||
+        !state.selection ||
+        state.selection.expectedVersion === null
+      )
+        return;
+      let selected = state.selection;
+      const originatingSession = session;
+      const controller = new AbortController();
+      operation = controller;
+      update({ processing: true, error: null });
+      try {
+        if (!selected.source) {
+          const decoded = await decode(selected, controller);
+          if (!decoded) return;
+          selected = decoded;
+        }
+        if (!selected.source || !selected.crop || selected.expectedVersion === null) return;
+        const blob = await selected.source.process(selected.crop, policy, controller.signal);
+        if (controller.signal.aborted || state.selection !== selected) return;
+        if (dependencies.availability.isBusy())
+          throw new Error(
+            'Your Profile is busy. Apply the picture again after the current change finishes.'
+          );
+        operation = null;
+        update({ processing: false });
+        const result = await dependencies.save({
+          action: 'upload',
+          picture: new File([blob], 'profile-picture.webp', { type: 'image/webp' }),
+          expectedVersion: selected.expectedVersion,
+        });
+        if (!active || session !== originatingSession) return;
+        if (result.success) {
+          close();
+          dependencies.notify('Profile picture saved');
+        } else update({ error: result.error.message });
+      } catch (cause) {
+        if (!controller.signal.aborted && state.selection === selected)
+          update({
+            error:
+              cause instanceof Error ? cause.message : 'Unable to process this picture. Try again.',
+          });
+      } finally {
+        if (operation === controller) {
+          operation = null;
+          update({ processing: false });
+        }
+      }
+    },
     setCrop(crop: PictureCrop) {
       if (state.selection) update({ selection: { ...state.selection, crop } });
     },
@@ -89,7 +145,7 @@ export function createPictureEditor(
       file: File | undefined,
       policy?: PictureEncodingPolicy & { acceptedSourceFormats: string[] }
     ) {
-      if (!active || !state.open || !policy) return;
+      if (!active || !state.open || !policy || dependencies.availability.isBusy()) return;
       clear();
       const result = pictureSelection(file, policy.acceptedSourceFormats);
       update({ error: result.error });

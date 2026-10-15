@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPictureEditor, type PictureSource } from '@/features/picture-editor';
+import { createPictureEditor, type PictureSource, type PictureCommand, type PictureSaveResult, type PictureCrop } from '@/features/picture-editor';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -23,7 +23,27 @@ function setup() {
   const decodes: { file: File; signal: AbortSignal; result: ReturnType<typeof deferred<PictureSource>> }[] = [];
   const previews = new Set<string>();
   let previewId = 0;
+  let busy = false;
+  const availabilityListeners = new Set<() => void>();
+  const requests: { command: PictureCommand; result: ReturnType<typeof deferred<PictureSaveResult>> }[] = [];
+  const notices: string[] = [];
+  function setBusy(next: boolean, notify = true) {
+    busy = next;
+    if (notify) for (const listener of availabilityListeners) listener();
+  }
   const editor = createPictureEditor(profile, {
+    availability: {
+      isBusy: () => busy,
+      subscribe(listener) { availabilityListeners.add(listener); return () => { availabilityListeners.delete(listener); }; },
+    },
+    save(command) {
+      if (busy) throw new Error('Profile is busy');
+      setBusy(true);
+      const result = deferred<PictureSaveResult>();
+      requests.push({ command, result });
+      return result.promise.finally(() => setBusy(false));
+    },
+    notify(message) { notices.push(message); },
     openSource(file, signal) {
       const result = deferred<PictureSource>();
       decodes.push({ file, signal, result });
@@ -40,20 +60,50 @@ function setup() {
   });
   const deactivate = editor.activate();
   editor.open();
-  return { editor, decodes, previews, deactivate };
+  return { editor, decodes, previews, deactivate, requests, notices, setBusy, availabilityListeners };
 }
 
 function source() {
   let disposed = false;
+  const encodes: { crop: PictureCrop; signal: AbortSignal; result: ReturnType<typeof deferred<Blob>> }[] = [];
   const picture: PictureSource = {
     width: 800, height: 400, preview: new Blob(['preview']),
-    process: async () => new Blob(['processed'], { type: 'image/webp' }),
+    process(crop, _policy, signal) {
+      const result = deferred<Blob>();
+      encodes.push({ crop, signal, result });
+      return result.promise;
+    },
     dispose() { disposed = true; },
   };
-  return { picture, isDisposed: () => disposed };
+  return { picture, encodes, isDisposed: () => disposed };
 }
 
+async function selectReady(context: ReturnType<typeof setup>) {
+  const selected = context.editor.select(new File(['source'], 'portrait.png', { type: 'image/png' }), policy);
+  const decoded = source();
+  context.decodes.at(-1)!.result.resolve(decoded.picture);
+  await selected;
+  return decoded;
+}
+
+const canonical = new Blob(['processed'], { type: 'image/webp' });
+
 describe('picture editing session', () => {
+  it('uploads processed bytes with the captured version and releases the edit after success', async () => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    context.editor.receiveProfile({ ...profile, version: 8 });
+    const applying = context.editor.apply(policy);
+    decoded.encodes[0].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    expect(context.requests[0].command).toMatchObject({ action: 'upload', expectedVersion: 1, picture: { name: 'profile-picture.webp', type: 'image/webp', size: 9 } });
+    context.requests[0].result.resolve({ success: true });
+    await applying;
+    expect(context.editor.getSnapshot()).toMatchObject({ open: false, selection: null, processing: false, error: null });
+    expect(context.previews.size).toBe(0);
+    expect(decoded.isDisposed()).toBe(true);
+    expect(context.notices).toEqual(['Profile picture saved']);
+  });
   it('replaces a source immediately, disposes its late decode, and resets the crop', async () => {
     const { editor, decodes, previews } = setup();
     const first = editor.select(new File(['first'], 'first.png', { type: 'image/png' }), policy);

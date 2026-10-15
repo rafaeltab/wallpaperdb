@@ -8,6 +8,8 @@ export type {
   PictureEditorProfile,
   PictureEditorDependencies,
   PictureEditorSnapshot,
+  PictureCommand,
+  PictureSaveResult,
 } from './contract';
 export { createPictureEditor } from './workflow';
 export {

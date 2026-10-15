@@ -6,6 +6,7 @@ import { GenericContainer, getContainerRuntimeClient, Wait } from 'testcontainer
 import { expect, it, vi } from 'vitest';
 import { createDockerProxy } from './fixtures/docker-proxy.js';
 
+// Allow seed startup (60s), the child (45s), cleanup (30s), and final teardown.
 it('starts a container when a selected Ryuk exits and preserves automatic cleanup', async () => {
   const client = await getContainerRuntimeClient();
   const session = randomUUID();
@@ -113,4 +114,4 @@ it('starts a container when a selected Ryuk exits and preserves automatic cleanu
       );
     }
   }
-}, 60000);
+}, 180000);

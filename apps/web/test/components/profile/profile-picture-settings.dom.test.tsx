@@ -66,6 +66,54 @@ async function renderPage(initial = profile, openPicture = true) {
 }
 
 describe('Profile picture settings', () => {
+  it('warns below Zoom when a crop needs enlargement, clears on reset, and still permits Apply', async () => {
+    vi.mocked(openPictureSource).mockResolvedValue({ width: 1024, height: 1024, preview: new Blob(['preview']), process: processPicture, dispose: disposePicture });
+    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'saved' });
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], 'picture.png', { type: 'image/png' }));
+    const zoom = await screen.findByRole('slider', { name: 'Zoom' });
+    const warning = 'This crop will be enlarged and may look pixelated.';
+    expect(screen.queryByText(warning)).not.toBeInTheDocument();
+    fireEvent.change(zoom, { target: { value: '3' } });
+    expect(screen.getByText(warning)).toBeVisible();
+    expect(zoom).toHaveAccessibleDescription(warning);
+    const status = screen.getByRole('status');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    const updates: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => updates.push(...records));
+    observer.observe(status, { subtree: true, childList: true, characterData: true });
+    try {
+      fireEvent.change(zoom, { target: { value: '4' } });
+      await act(async () => {});
+      expect(updates).toHaveLength(0);
+    } finally { observer.disconnect(); }
+    await user.click(screen.getByRole('button', { name: 'Reset crop' }));
+    expect(screen.queryByText(warning)).not.toBeInTheDocument();
+    expect(zoom).not.toHaveAttribute('aria-describedby');
+    fireEvent.change(zoom, { target: { value: '3' } });
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
+  });
+
+  it('uses refreshed output dimensions and replacement source pixels for quality feedback', async () => {
+    const { client } = await renderPage();
+    const user = userEvent.setup();
+    const picker = screen.getByLabelText('Choose picture');
+    await user.upload(picker, new File(['source'], 'picture.png', { type: 'image/png' }));
+    const warning = 'This crop will be enlarged and may look pixelated.';
+    expect(await screen.findByText(warning)).toBeVisible();
+    vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, output: { ...picturePolicy.output, width: 256, height: 256 } });
+    await act(async () => client.invalidateQueries({ queryKey: [...profileQueryKey(profile.id), 'picture-policy'] }));
+    await waitFor(() => expect(screen.queryByText(warning)).not.toBeInTheDocument());
+    vi.mocked(openPictureSource).mockResolvedValue({ width: 128, height: 256, preview: new Blob(['replacement']), process: processPicture, dispose: disposePicture });
+    await user.upload(picker, new File(['replacement'], 'replacement.png', { type: 'image/png' }));
+    expect(await screen.findByText(warning)).toBeVisible();
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('1');
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
+  });
+
   it('returns from filename-free cropping to selection without closing or changing the saved Profile', async () => {
     const saved = { ...profile, pictureAssetId: 'saved-picture' };
     const { client } = await renderPage(saved);
@@ -408,7 +456,8 @@ describe('Profile picture settings', () => {
     await renderPage();
     await userEvent.setup().upload(screen.getByLabelText('Choose picture'), new File(['png'], 'small.png', { type: 'image/png' }));
     expect(await screen.findByRole('slider', { name: 'Zoom' })).toBeDisabled();
-    expect(screen.getByText(/smaller than 64/)).toBeVisible();
+    expect(screen.getByText(/smaller than 64/)).toHaveTextContent('This crop will be enlarged and may look pixelated.');
+    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveAccessibleDescription(/Further zoom is disabled/);
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
   });
 

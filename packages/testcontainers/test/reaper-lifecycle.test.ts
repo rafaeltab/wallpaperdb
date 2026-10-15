@@ -32,7 +32,7 @@ it('starts a container when a selected Ryuk exits and preserves automatic cleanu
       client.info.containerRuntime.remoteSocketPath,
       seed.getId(),
       async () => {
-        const exited = client.container.getById(seed.getId()).wait();
+        const exited = client.container.getById(seed.getId()).wait({ condition: 'removed' });
         keeper.end();
         expect((await exited).StatusCode).toBe(0);
       }
@@ -44,6 +44,8 @@ it('starts a container when a selected Ryuk exits and preserves automatic cleanu
       env: {
         ...process.env,
         DOCKER_HOST: proxy.host,
+        // Holding the lookup must not hold other runners' Testcontainers lock.
+        TMPDIR: proxy.temporaryDirectory,
         TESTCONTAINERS_HOST_OVERRIDE: seed.getHost(),
         TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: client.info.containerRuntime.remoteSocketPath,
         TESTCONTAINERS_RYUK_TEST_LABEL: 'true',

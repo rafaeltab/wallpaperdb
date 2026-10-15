@@ -121,6 +121,7 @@ export async function createDockerProxy(
 
   return {
     host: `unix://${proxyPath}`,
+    temporaryDirectory: directory,
     didHoldSnapshot: () => heldSnapshot,
     ownedIds,
     async close() {

@@ -66,7 +66,7 @@ async function renderPage(initial = profile, openPicture = true) {
 }
 
 describe('Profile picture settings', () => {
-  it('simplifies a selected picture and lets Cancel discard it without changing the saved Profile', async () => {
+  it('returns from filename-free cropping to selection without closing or changing the saved Profile', async () => {
     const saved = { ...profile, pictureAssetId: 'saved-picture' };
     const { client } = await renderPage(saved);
     const user = userEvent.setup();
@@ -78,21 +78,28 @@ describe('Profile picture settings', () => {
     expect(within(dialog).queryByText(/512 × 512 WebP/)).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Your picture appears/)).not.toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Reset' })).toHaveAttribute('data-variant', 'destructive');
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('dialog', { name: 'Profile picture' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('picture.png')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('list', { name: 'Picture editing progress' }).querySelector('[aria-current=step]')).toHaveTextContent('2Frame');
+    await user.click(within(dialog).getByRole('button', { name: 'Back' }));
+    expect(dialog).toBeInTheDocument();
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(saved);
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
     expect(userApi.removePicture).not.toHaveBeenCalled();
     expect(disposePicture).toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
     expect(screen.queryByRole('slider', { name: 'Zoom' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose picture' })).toHaveFocus();
+    expect(within(dialog).getByRole('list', { name: 'Picture editing progress' }).querySelector('[aria-current=step]')).toHaveTextContent('1Choose');
     expect(screen.getByRole('button', { name: 'Choose picture' })).toBeVisible();
   });
 
   it('fetches and presents effective policy when the dialog opens', async () => {
-    vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, maxOutputBytes: 123456 });
+    vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, acceptedSourceFormats: ['image/png', 'image/webp'] });
     await renderPage();
-    expect(await screen.findByText(/512 × 512 WebP/)).toHaveTextContent('120.56 KB');
+    const drop = await screen.findByRole('group', { name: 'Picture source' });
+    expect(within(drop).getByText('Drop an image here')).toBeVisible();
+    expect(within(drop).getByText('Or paste an image from your clipboard')).toBeVisible();
+    expect(within(drop).getByText('PNG or WebP')).toBeVisible();
+    expect(screen.queryByText(/512 × 512 WebP/)).not.toBeInTheDocument();
     expect(userApi.picturePolicy).toHaveBeenCalledWith(expect.objectContaining({ tokenProvider: expect.any(Function) }));
   });
   it('blocks upload and offers retry when effective policy cannot be loaded', async () => {
@@ -175,7 +182,7 @@ describe('Profile picture settings', () => {
     const picture = new File(['png'], 'dropped.png', { type: 'image/png' });
     fireEvent.drop(screen.getByRole('dialog', { name: 'Profile picture' }), { dataTransfer: { files: [picture] } });
     expect(await screen.findByRole('slider', { name: 'Zoom' })).toHaveValue('1');
-    expect(screen.getByText('dropped.png')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Picture crop' })).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Apply' }));
     await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 1, picture: expect.objectContaining({ type: 'image/webp', size: canonical.size }) })));
   });
@@ -187,7 +194,7 @@ describe('Profile picture settings', () => {
     fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
     const picture = new File(['new'], 'pasted.png', { type: 'image/png' });
     fireEvent.paste(document, { clipboardData: { items: [{ kind: 'file', type: picture.type, getAsFile: () => picture }] } });
-    expect(await screen.findByText('pasted.png')).toBeInTheDocument();
+    await waitFor(() => expect(openPictureSource).toHaveBeenLastCalledWith(picture, expect.any(AbortSignal), profile.pictureUploadLimits));
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('1');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(disposePicture).toHaveBeenCalled();
@@ -210,7 +217,7 @@ describe('Profile picture settings', () => {
     expect(await screen.findByRole('slider', { name: 'Zoom' })).toHaveValue('1');
     await act(async () => finish?.(canonical));
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
-    expect(screen.getByText(`new.${format}`)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Picture crop' })).toBeInTheDocument();
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
@@ -240,9 +247,9 @@ describe('Profile picture settings', () => {
     }
     fireEvent.drop(screen.getByRole('dialog', { name: 'Profile picture' }), { dataTransfer: { files: [], getData: () => 'https://elsewhere.test/image.png' } });
     expect(openPictureSource).not.toHaveBeenCalled();
-    expect(screen.getByText('No picture selected')).toBeInTheDocument();
+    expect(screen.getByText('Drop an image here')).toBeInTheDocument();
     fireEvent.paste(document, { clipboardData: imageData });
-    expect(await screen.findByText('clipboard.png')).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Picture crop' })).toBeInTheDocument();
     expect(screen.getByLabelText('Choose picture')).not.toHaveAttribute('capture');
     await user.keyboard('{Escape}');
     vi.mocked(openPictureSource).mockClear();
@@ -334,7 +341,7 @@ describe('Profile picture settings', () => {
     act(() => { pending = otherCommand.execute(undefined); });
     await act(async () => finishProcessing?.(canonical));
     expect(await screen.findByRole('alert')).toHaveTextContent('Your Profile is busy');
-    expect(screen.getByText('portrait.png')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Picture crop' })).toBeInTheDocument();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
     await act(async () => { finishOtherCommand?.(); await pending; });
   });
@@ -437,7 +444,7 @@ describe('Profile picture settings', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Your Profile changed elsewhere');
     const latest = screen.getByRole('group', { name: 'Latest saved picture' });
     expect(within(latest).getByRole('img')).toHaveAttribute('src', '/media/profile-pictures/remote_picture');
-    expect(screen.getByText('portrait.png')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Picture crop' })).toBeInTheDocument();
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
     expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
     expect(userApi.uploadPicture).toHaveBeenNthCalledWith(1, expect.objectContaining({ expectedVersion: 1 }));
@@ -465,7 +472,7 @@ describe('Profile picture settings', () => {
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(refreshed);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Latest saved picture' })).not.toBeInTheDocument();
-    expect(screen.getByText('No picture selected')).toBeInTheDocument();
+    expect(screen.getByText('Drop an image here')).toBeInTheDocument();
     expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
     expect(toast.error).not.toHaveBeenCalled();
   });
@@ -490,7 +497,7 @@ describe('Profile picture settings', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
-    expect(screen.getByText('No picture selected')).toBeInTheDocument();
+    expect(screen.getByText('Drop an image here')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -540,7 +547,7 @@ describe('Profile picture settings', () => {
   it.each(['png', 'gif'])('presents rules before selection and retains a %s source when processed bytes exceed the limit', async (format) => {
     vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, maxOutputBytes: 4 });
     await renderPage();
-    expect(await screen.findByText(/Up to 4 B/)).toBeInTheDocument();
+    expect(await screen.findByText('JPEG, PNG, WebP or GIF')).toBeInTheDocument();
     const user = userEvent.setup();
     await user.upload(
       screen.getByLabelText('Choose picture'),
@@ -549,7 +556,7 @@ describe('Profile picture settings', () => {
     processPicture.mockRejectedValue(new Error('Processed picture exceeds the 4 byte limit. Choose another picture.'));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Processed picture exceeds the 4 byte limit.');
-    expect(screen.getByText(`large.${format}`)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Picture crop' })).toBeInTheDocument();
     expect(screen.queryByText(/Up to 4 B/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
@@ -564,7 +571,7 @@ describe('Profile picture settings', () => {
     fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('animation cannot fit');
-    expect(screen.getByText('animation.gif')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Picture crop' })).toBeInTheDocument();
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(profile);

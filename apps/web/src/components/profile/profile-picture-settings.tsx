@@ -1,5 +1,5 @@
-import { LoaderCircle, Pencil, X } from 'lucide-react';
-import { useEffect, useEffectEvent, useRef } from 'react';
+import { ArrowLeft, LoaderCircle, Pencil, Upload, X } from 'lucide-react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { usePictureEditor } from '@/features/picture-editor/adapters/react';
 import { ProfilePictureCrop } from '@/components/profile/profile-picture-crop';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
@@ -17,10 +17,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import type { Profile } from '@/lib/api/user';
-import { formatFileSize } from '@/lib/utils/wallpaper';
+import { cn } from '@/lib/utils';
 
 export function ProfilePictureSettings({
   profile,
@@ -31,14 +30,32 @@ export function ProfilePictureSettings({
 }) {
   const input = useRef<HTMLInputElement>(null);
   const dialogContent = useRef<HTMLDivElement>(null);
+  const picker = useRef<HTMLButtonElement>(null);
+  const focusPicker = useRef(false);
+  const dragDepth = useRef(0);
+  const [dragging, setDragging] = useState(false);
   const removeOpener = useRef<HTMLButtonElement>(null);
   const { editor, state, policyQuery, policy, policyReady, refreshing, writing, saving } =
     usePictureEditor(profile, tokenProvider);
   const { selection: selected, open, error: feedback, recovery, processing, removeVersion } = state;
-  const showPicker = !selected || (!selected.source && !processing);
+  const hasCrop = Boolean(selected?.source && selected.crop && selected.previewUrl);
+  const showPicker = !hasCrop;
+  const stage = saving || (hasCrop && processing) ? 3 : hasCrop ? 2 : 1;
+  function clearDrag() {
+    dragDepth.current = 0;
+    setDragging(false);
+  }
+  useEffect(() => {
+    if (!open) clearDrag();
+    if (showPicker && focusPicker.current) {
+      picker.current?.focus();
+      focusPicker.current = false;
+    }
+  }, [open, showPicker]);
   const importing =
     profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
   function selectPicture(picture: File | undefined) {
+    clearDrag();
     void editor.select(picture, policyReady ? policy : undefined);
   }
 
@@ -63,13 +80,29 @@ export function ProfilePictureSettings({
       <ProfileDialog
         ref={dialogContent}
         open={open}
-        onOpenChange={(next) => (next ? editor.open() : editor.close())}
+        onOpenChange={(next) => {
+          clearDrag();
+          if (next) editor.open();
+          else editor.close();
+        }}
         title="Profile picture"
-        description={showPicker ? 'Choose, drop, or paste an image to begin.' : undefined}
         busy={writing}
-        onDragOver={(event) => event.preventDefault()}
+        onDragEnter={(event) => {
+          if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+          event.preventDefault();
+          dragDepth.current++;
+          setDragging(true);
+        }}
+        onDragLeave={() => {
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (dragDepth.current === 0) setDragging(false);
+        }}
+        onDragOver={(event) => {
+          if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault();
+        }}
         onDrop={(event) => {
           event.preventDefault();
+          clearDrag();
           const picture = event.dataTransfer.files[0];
           if (picture) selectPicture(picture);
         }}
@@ -83,7 +116,32 @@ export function ProfilePictureSettings({
           </ProfileActionButton>
         }
       >
-        <div className="space-y-5">
+        <div className="space-y-4">
+          <ol
+            aria-label="Picture editing progress"
+            className="flex flex-wrap gap-4 border-b pb-4 text-sm"
+          >
+            {['Choose', 'Frame', 'Save'].map((label, index) => (
+              <li
+                key={label}
+                aria-current={stage === index + 1 ? 'step' : undefined}
+                className={cn(
+                  'flex items-center gap-2 text-muted-foreground',
+                  stage === index + 1 && 'font-medium text-foreground'
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex size-5.5 items-center justify-center rounded-full bg-muted text-xs',
+                    stage === index + 1 && 'bg-primary text-primary-foreground'
+                  )}
+                >
+                  {index + 1}
+                </span>
+                {label}
+              </li>
+            ))}
+          </ol>
           {selected?.source && selected.crop && selected.previewUrl ? (
             <ProfilePictureCrop
               source={selected.source}
@@ -92,9 +150,7 @@ export function ProfilePictureSettings({
               disabled={processing || writing}
               onChange={editor.setCrop}
             />
-          ) : (
-            <ProfilePicture profile={profile} />
-          )}
+          ) : null}
           {importing && (
             <output className="block text-sm text-muted-foreground">
               {profile.pictureImportStatus === 'retrying'
@@ -109,67 +165,61 @@ export function ProfilePictureSettings({
               void editor.apply(policyReady ? policy : undefined);
             }}
           >
-            <Field>
-              <FieldLabel className="sr-only" htmlFor="profile-picture">
-                Choose picture
-              </FieldLabel>
-              <Input
-                ref={input}
-                id="profile-picture"
-                type="file"
-                className="sr-only"
-                tabIndex={-1}
-                aria-hidden={showPicker ? undefined : true}
-                aria-describedby={showPicker ? 'picture-limits' : undefined}
-                accept={policy?.acceptedSourceFormats.join(',')}
-                disabled={refreshing || writing || !policyReady}
-                onChange={(event) => {
-                  selectPicture(event.target.files?.[0]);
-                  event.target.value = '';
-                }}
-              />
-              {showPicker && (
-                <>
-                  <div className="flex min-w-0 flex-wrap items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={refreshing || writing || !policyReady}
-                      onClick={() => input.current?.click()}
-                    >
-                      Choose picture
-                    </Button>
-                    <span className="min-w-0 break-all text-sm text-muted-foreground">
-                      {selected ? selected.file.name : 'No picture selected'}
-                    </span>
-                  </div>
-                  <FieldDescription id="picture-limits">
-                    {policyReady && policy ? (
-                      <>
-                        {policy.acceptedSourceFormats
-                          .map((format) =>
-                            format === 'image/webp'
-                              ? 'WebP'
-                              : format.replace('image/', '').toUpperCase()
-                          )
-                          .join(', ')}
-                        . Up to {formatFileSize(policy.maxOutputBytes)} processed output.{' '}
-                        {policy.output.width} × {policy.output.height} WebP, sRGB SDR. Static
-                        quality {policy.encoding.staticQuality}.{' '}
-                        {policy.animation.available
-                          ? `GIF animation is supported at quality ${policy.encoding.animationQuality}.`
-                          : 'Animated images are not supported.'}
-                      </>
-                    ) : (
-                      'Loading picture rules…'
-                    )}
-                  </FieldDescription>
-                </>
-              )}
-              {selected && !showPicker && (
-                <p className="truncate text-sm text-muted-foreground">{selected.file.name}</p>
-              )}
-            </Field>
+            <label className="sr-only" htmlFor="profile-picture">
+              Choose picture
+            </label>
+            <Input
+              ref={input}
+              id="profile-picture"
+              type="file"
+              className="sr-only"
+              tabIndex={-1}
+              aria-describedby={showPicker ? 'picture-formats' : undefined}
+              accept={policy?.acceptedSourceFormats.join(',')}
+              disabled={refreshing || writing || !policyReady}
+              onChange={(event) => {
+                selectPicture(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+            />
+            {showPicker && (
+              <fieldset
+                aria-label="Picture source"
+                className={cn(
+                  'flex min-h-58 w-full min-w-0 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/30 px-4 py-6 text-center',
+                  dragging && 'border-primary bg-primary/10'
+                )}
+              >
+                <Upload aria-hidden="true" className="size-7 text-muted-foreground" />
+                <p className="font-medium">
+                  {dragging ? 'Drop to edit picture' : 'Drop an image here'}
+                </p>
+                <Button
+                  ref={picker}
+                  type="button"
+                  variant="outline"
+                  aria-describedby="picture-formats"
+                  disabled={refreshing || writing || !policyReady}
+                  onClick={() => input.current?.click()}
+                >
+                  Choose picture
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Or paste an image from your clipboard
+                </p>
+                <p id="picture-formats" className="text-xs text-muted-foreground">
+                  {policyReady && policy
+                    ? new Intl.ListFormat('en-GB', { type: 'disjunction', style: 'short' }).format(
+                        policy.acceptedSourceFormats.map((format) =>
+                          format === 'image/webp'
+                            ? 'WebP'
+                            : format.replace('image/', '').toUpperCase()
+                        )
+                      )
+                    : 'Loading picture rules…'}
+                </p>
+              </fieldset>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               {(profile.pictureAssetId || importing) && (
                 <Button
@@ -185,13 +235,27 @@ export function ProfilePictureSettings({
                 </Button>
               )}
               <div className="ml-auto flex gap-2">
-                <Button type="button" variant="outline" disabled={writing} onClick={editor.close}>
-                  Cancel
-                </Button>
+                {hasCrop ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={processing || refreshing || writing}
+                    onClick={() => {
+                      if (editor.returnToSelection()) focusPicker.current = true;
+                    }}
+                  >
+                    <ArrowLeft aria-hidden="true" className="size-4" />
+                    Back
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" disabled={writing} onClick={editor.close}>
+                    Cancel
+                  </Button>
+                )}
                 <Button
                   type="submit"
                   disabled={
-                    !selected ||
+                    !hasCrop ||
                     refreshing ||
                     writing ||
                     processing ||

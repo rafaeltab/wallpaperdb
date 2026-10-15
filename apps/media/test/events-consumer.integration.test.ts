@@ -10,7 +10,11 @@ import { Deferred, Effect, Layer, ManagedRuntime, Schema } from 'effect';
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { NatsBroker, natsEventsLayer } from '../src/adapters/events/index.js';
 import { ConsumerHealth, natsConsumerLayer } from '../src/adapters/events/index.js';
-import { CatalogProjection, CatalogFailure, type ProjectionInput } from '../src/capabilities/catalog/index.js';
+import {
+  CatalogProjection,
+  CatalogFailure,
+  type ProjectionInput,
+} from '../src/capabilities/catalog/index.js';
 const decodeManifest = Schema.decodeUnknownSync(
   Schema.Struct({
     quarantineId: Schema.String,
@@ -367,34 +371,58 @@ it.each([
   true,
 ])('resumes a rejected chunk handoff after capacity recovery (purge partial records: %s)', async (purgePartial) => {
   let attempts = 0;
+  let verifiedChunk = 0;
+  let releaseRead = () => {};
+  const readReleased = new Promise<void>((resolve) => {
+    releaseRead = resolve;
+  });
   const options = {
     url: tester.nats.config.endpoints.fromHost,
     stream: 'WALLPAPER',
     serviceName: 'quarantine-partial-contract',
     retryDelayMs: 20,
+    shutdownTimeoutMs: 30,
   };
-  const runtime = ManagedRuntime.make(
-    natsConsumerLayer(options).pipe(
-      Layer.provide(natsEventsLayer(options)),
-      Layer.provide(
-        Layer.succeed(CatalogProjection, {
-          accept: () =>
-            Effect.suspend(() => {
-              attempts++;
-              return Effect.fail(new CatalogFailure({ operation: 'controlled', cause: 'offline' }));
-            }),
-        })
+  const makeRuntime = () =>
+    ManagedRuntime.make(
+      natsConsumerLayer(options).pipe(
+        Layer.provideMerge(natsEventsLayer(options)),
+        Layer.provide(
+          Layer.succeed(CatalogProjection, {
+            accept: () =>
+              Effect.suspend(() => {
+                attempts++;
+                return Effect.fail(
+                  new CatalogFailure({ operation: 'controlled', cause: 'offline' })
+                );
+              }),
+          })
+        )
       )
-    )
-  );
+    );
+  let runtime = makeRuntime();
   const manager = await (await tester.nats.getConnection()).jetstreamManager();
   try {
     await runtime.runPromise(ConsumerHealth);
+    if (purgePartial) {
+      const { manager: consumerManager } = await runtime.runPromise(NatsBroker);
+      const read = consumerManager.streams.getMessage.bind(consumerManager.streams);
+      consumerManager.streams.getMessage = async (...args) => {
+        const stored = await read(...args);
+        if (args[0] === 'MEDIA_QUARANTINE' && verifiedChunk === 0) {
+          // Hold a real duplicate lookup after it observes the retained first chunk.
+          // Purging now would invalidate that observation before the manifest is stored.
+          verifiedChunk = stored.seq;
+          await readReleased;
+        }
+        return stored;
+      };
+    }
     await manager.streams.update('MEDIA_QUARANTINE', { max_msg_size: 2048, max_msgs: 1 });
     const event = upload('partial-quarantine');
     event.wallpaper.originalFilename = 'x'.repeat(8192);
     const payload = new TextEncoder().encode(JSON.stringify(event));
-    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', payload);
+    const inputAck = await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', payload);
     await expect
       .poll(
         async () =>
@@ -409,8 +437,25 @@ it.each([
       (await manager.consumers.info('WALLPAPER', 'media-wallpaper-uploaded-consumer'))
         .num_ack_pending
     ).toBe(1);
-    if (purgePartial) await manager.streams.purge('MEDIA_QUARANTINE');
+    if (purgePartial) {
+      await expect.poll(() => verifiedChunk, { timeout: 5000 }).toBeGreaterThan(0);
+      // Stop every writer before destructive maintenance, including an in-flight
+      // retry which has already verified a chunk that the purge will remove.
+      await runtime.dispose();
+      const stopped = await manager.consumers.info(
+        'WALLPAPER',
+        'media-wallpaper-uploaded-consumer'
+      );
+      expect(stopped.num_ack_pending).toBe(1);
+      expect(stopped.ack_floor.stream_seq).toBeLessThan(inputAck.seq);
+      await manager.streams.purge('MEDIA_QUARANTINE');
+    }
     await manager.streams.update('MEDIA_QUARANTINE', { max_msgs: -1 });
+    releaseRead();
+    if (purgePartial) {
+      runtime = makeRuntime();
+      await runtime.runPromise(ConsumerHealth);
+    }
     await expect
       .poll(
         async () =>
@@ -419,17 +464,35 @@ it.each([
         { timeout: 5000 }
       )
       .toBe(0);
+    expect(
+      (await manager.consumers.info('WALLPAPER', 'media-wallpaper-uploaded-consumer')).ack_floor
+        .stream_seq
+    ).toBe(inputAck.seq);
     expect(attempts).toBe(3);
     const manifest = decodeManifest(
       (
-        await manager.streams.getMessage('MEDIA_QUARANTINE', {
-          last_by_subj: 'media.quarantine',
-        })
+        await manager.streams
+          .getMessage('MEDIA_QUARANTINE', {
+            last_by_subj: 'media.quarantine',
+          })
+          .catch((cause: unknown) => {
+            throw new Error('Missing quarantine manifest after acknowledgement', { cause });
+          })
       ).json()
     );
     const chunks = await Promise.all(
       manifest.sequences.map(
-        async (seq: number) => (await manager.streams.getMessage('MEDIA_QUARANTINE', { seq })).data
+        async (seq: number) =>
+          (
+            await manager.streams
+              .getMessage('MEDIA_QUARANTINE', { seq })
+              .catch((cause: unknown) => {
+                throw new Error(
+                  `Missing quarantine chunk at sequence ${seq} after acknowledgement`,
+                  { cause }
+                );
+              })
+          ).data
       )
     );
     expect(Buffer.concat(chunks)).toEqual(Buffer.from(payload));
@@ -437,6 +500,7 @@ it.each([
       manifest.chunkCount + 1
     );
   } finally {
+    releaseRead();
     await runtime.dispose();
     await manager.streams.update('MEDIA_QUARANTINE', { max_msg_size: -1, max_msgs: -1 });
   }

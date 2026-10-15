@@ -69,7 +69,7 @@
     "@wallpaperdb/vitest-config": "workspace:*",
     "esbuild": "^0.25.12",
     "pino-pretty": "^13.0.0",
-    "testcontainers": "^11.9.0",
+    "testcontainers": "^11.12.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "5.0.2"

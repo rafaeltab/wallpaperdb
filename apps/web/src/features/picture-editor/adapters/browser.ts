@@ -1,22 +1,10 @@
-import type {
-  PictureCrop,
-  PictureDecodedLimits,
-  PictureDimensions,
-  PictureEncodingPolicy,
-} from '../index';
+import type { PictureDecodedLimits, PictureSource } from '../index';
 import type { PictureJob, PictureJobResult } from './protocol';
 import { gifPictureJob } from './gif';
 import { withoutPictureMetadata } from './webp';
 import { yieldPictureWork } from './yield';
 import { validateSourceDimensions } from './source';
 import { validateJpegColor } from './jpeg';
-
-/** UI owns this decoded source and must dispose it when its editing session ends. */
-export interface PictureSource extends PictureDimensions {
-  preview: Blob;
-  process: (crop: PictureCrop, policy: PictureEncodingPolicy, signal: AbortSignal) => Promise<Blob>;
-  dispose: () => void;
-}
 
 function cancelled() {
   return new DOMException('Picture processing cancelled.', 'AbortError');

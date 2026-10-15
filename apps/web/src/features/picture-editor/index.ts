@@ -3,7 +3,13 @@ export type {
   PictureDimensions,
   PictureDecodedLimits,
   PictureEncodingPolicy,
+  PictureSource,
+  PictureSelection,
+  PictureEditorProfile,
+  PictureEditorDependencies,
+  PictureEditorSnapshot,
 } from './contract';
+export { createPictureEditor } from './workflow';
 export {
   initialPictureCrop,
   movePictureCrop,

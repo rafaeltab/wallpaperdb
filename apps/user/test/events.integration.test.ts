@@ -623,28 +623,32 @@ it('recovers replica health when another replica acknowledges its failed deliver
   }
 });
 
-it('keeps quarantine failures unacknowledged and repairs purged partial chunks before accepting responsibility', async () => {
+it.each([
+  20, 200,
+])('keeps quarantine failures unacknowledged and repairs purged partial chunks before accepting responsibility (retry delay: %i ms)', async (retryDelayMs) => {
   const options = {
     url: nats.getConnectionUrl(),
     stream: 'WALLPAPER',
     serviceName: 'user-quarantine-contract',
-    retryDelayMs: 20,
+    retryDelayMs,
     shutdownTimeoutMs: 200,
   };
   const unused = () => Effect.die('Invalid input must not enter the capability');
-  const runtime = ManagedRuntime.make(
-    ownershipConsumerLayer(options).pipe(
-      Layer.provide(brokerLayer(options)),
-      Layer.provide(
-        Layer.succeed(Maintenance, {
-          publishPending: unused,
-          cleanupEvents: unused,
-          expireAliases: unused,
-          recordWallpaperOwnership: unused,
-        })
+  const startConsumer = () =>
+    ManagedRuntime.make(
+      ownershipConsumerLayer(options).pipe(
+        Layer.provide(brokerLayer(options)),
+        Layer.provide(
+          Layer.succeed(Maintenance, {
+            publishPending: unused,
+            cleanupEvents: unused,
+            expireAliases: unused,
+            recordWallpaperOwnership: unused,
+          })
+        )
       )
-    )
-  );
+    );
+  let runtime = startConsumer();
   const manager = await connection.jetstreamManager();
   try {
     await runtime.runPromise(ConsumerHealth);
@@ -657,7 +661,9 @@ it('keeps quarantine failures unacknowledged and repairs purged partial chunks b
     const metadata = headers();
     metadata.set('ce-id', 'original-occurrence');
     metadata.set('ce-source', 'https://original.example');
-    await connection.jetstream().publish('wallpaper.uploaded', original, { headers: metadata });
+    const input = await connection
+      .jetstream()
+      .publish('wallpaper.uploaded', original, { headers: metadata });
     await expect
       .poll(async () => (await manager.streams.info('USER_QUARANTINE')).state.messages)
       .toBe(1);
@@ -667,15 +673,25 @@ it('keeps quarantine failures unacknowledged and repairs purged partial chunks b
     expect(
       (await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).num_ack_pending
     ).toBe(1);
+    // Stop in-flight retries before purging, or a retry can verify a chunk that the purge then deletes.
+    await runtime.dispose();
+    expect(
+      (await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).ack_floor.stream_seq
+    ).toBeLessThan(input.seq);
     // Purge leaves deduplication IDs alive. A repeated PubAck must be verified against actual evidence.
     await manager.streams.purge('USER_QUARANTINE');
     await manager.streams.update('USER_QUARANTINE', { max_msgs: -1 });
+    runtime = startConsumer();
+    await runtime.runPromise(ConsumerHealth);
     await expect
       .poll(
         async () =>
-          (await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).num_ack_pending
+          (
+            await manager.streams.getMessage('USER_QUARANTINE', { last_by_subj: 'user.quarantine' })
+          ).header.get('ce-type'),
+        { timeout: 5000, message: 'Waiting for the repaired User quarantine manifest' }
       )
-      .toBe(0);
+      .toBe('user.ownership.quarantine-manifest');
     const manifest = JSON.parse(
       new TextDecoder().decode(
         (await manager.streams.getMessage('USER_QUARANTINE', { last_by_subj: 'user.quarantine' }))
@@ -684,12 +700,26 @@ it('keeps quarantine failures unacknowledged and repairs purged partial chunks b
     );
     expect(manifest.encoding).toBe('json-base64');
     const chunks: Uint8Array[] = [];
-    for (const sequence of manifest.sequences)
-      chunks.push((await manager.streams.getMessage('USER_QUARANTINE', { seq: sequence })).data);
+    for (const sequence of manifest.sequences) {
+      const chunk = await manager.streams
+        .getMessage('USER_QUARANTINE', { seq: sequence })
+        .catch((cause) => {
+          throw new Error(`Missing repaired User quarantine chunk ${sequence}`, { cause });
+        });
+      chunks.push(chunk.data);
+    }
     const evidence = JSON.parse(Buffer.concat(chunks).toString());
     expect(Buffer.from(evidence.data, 'base64').toString()).toBe(original);
     expect(evidence.headers['ce-id']).toEqual(['original-occurrence']);
     expect(evidence.headers['ce-source']).toEqual(['https://original.example']);
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).ack_floor
+            .stream_seq,
+        { timeout: 5000 }
+      )
+      .toBe(input.seq);
     expect(
       await runtime.runPromise(Effect.flatMap(ConsumerHealth, (health) => health.check()))
     ).toBe(true);

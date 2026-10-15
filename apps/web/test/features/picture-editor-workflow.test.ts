@@ -104,6 +104,184 @@ async function selectReady(context: ReturnType<typeof setup>) {
 
 const canonical = new Blob(['processed'], { type: 'image/webp' });
 
+describe('picture workflow recovery and lifetimes', () => {
+  it('retains a failed decode for retry and releases a cancelled late decode', async () => {
+    const context = setup();
+    const file = new File(['source'], 'portrait.png', { type: 'image/png' });
+    const selecting = context.editor.select(file, policy);
+    context.decodes[0].result.reject(new Error('Decode failed'));
+    await selecting;
+    expect(context.editor.getSnapshot()).toMatchObject({ error: 'Decode failed', selection: { file, source: null }, processing: false });
+    const applying = context.editor.apply(policy);
+    context.editor.cancel();
+    const obsolete = source();
+    context.decodes[1].result.resolve(obsolete.picture);
+    await applying;
+    expect(obsolete.isDisposed()).toBe(true);
+    const retrying = context.editor.apply(policy);
+    const decoded = source();
+    context.decodes[2].result.resolve(decoded.picture);
+    await expect.poll(() => decoded.encodes.length).toBe(1);
+    decoded.encodes[0].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    context.requests[0].result.resolve({ success: true });
+    await retrying;
+  });
+
+  it.each(['png', 'gif'])('cancels %s processing, ignores its late result, and retries the retained crop', async (format) => {
+    const context = setup();
+    const selecting = context.editor.select(new File(['source'], `portrait.${format}`, { type: `image/${format}` }), policy);
+    const decoded = source();
+    context.decodes[0].result.resolve(decoded.picture);
+    await selecting;
+    const crop = { x: 300, y: 100, size: 200, zoom: 2, maxZoom: 6.25, lowResolution: false };
+    context.editor.setCrop(crop);
+    const applying = context.editor.apply(policy);
+    context.editor.cancel();
+    expect(decoded.encodes[0].signal.aborted).toBe(true);
+    decoded.encodes[0].result.resolve(canonical);
+    await applying;
+    expect(context.requests).toEqual([]);
+    expect(context.editor.getSnapshot()).toMatchObject({ processing: false, selection: { crop } });
+    const retrying = context.editor.apply(policy);
+    expect(decoded.encodes[1].crop).toEqual(crop);
+    decoded.encodes[1].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    context.requests[0].result.resolve({ success: true });
+    await retrying;
+  });
+
+  it('keeps processing and upload failures editable, and retries the current crop with the captured version', async () => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    let applying = context.editor.apply(policy);
+    decoded.encodes[0].result.reject(new Error('Encoding failed'));
+    await applying;
+    expect(context.editor.getSnapshot()).toMatchObject({ error: 'Encoding failed', selection: { file: { name: 'portrait.png' } } });
+    applying = context.editor.apply(policy);
+    decoded.encodes[1].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    context.requests[0].result.resolve({ success: false, error: { message: 'Upload unavailable' } });
+    await applying;
+    expect(context.editor.getSnapshot().error).toBe('Upload unavailable');
+    const crop = { x: 350, y: 150, size: 100, zoom: 4, maxZoom: 6.25, lowResolution: false };
+    context.editor.setCrop(crop);
+    context.editor.receiveProfile({ ...profile, version: 8 });
+    applying = context.editor.apply(policy);
+    expect(decoded.encodes[2].crop).toEqual(crop);
+    decoded.encodes[2].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(2);
+    expect(context.requests[1].command.expectedVersion).toBe(1);
+    context.requests[1].result.resolve({ success: true });
+    await applying;
+  });
+
+  it('checks live availability before work and again after processing without losing the edit', async () => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    context.setBusy(true, false);
+    await context.editor.apply(policy);
+    await context.editor.select(new File(['other'], 'other.png', { type: 'image/png' }), policy);
+    context.editor.requestRemoval();
+    expect(context.decodes).toHaveLength(1);
+    expect(decoded.encodes).toEqual([]);
+    expect(context.editor.getSnapshot().removeVersion).toBeNull();
+    context.setBusy(false);
+    const applying = context.editor.apply(policy);
+    await context.editor.apply(policy);
+    expect(decoded.encodes).toHaveLength(1);
+    context.setBusy(true, false);
+    decoded.encodes[0].result.resolve(canonical);
+    await applying;
+    expect(context.requests).toEqual([]);
+    expect(context.editor.getSnapshot()).toMatchObject({ processing: false, error: expect.stringContaining('Your Profile is busy'), selection: { file: { name: 'portrait.png' } } });
+    context.setBusy(false);
+    const retrying = context.editor.apply(policy);
+    decoded.encodes[1].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    context.requests[0].result.resolve({ success: true });
+    await retrying;
+  });
+
+  it('blocks stale writes after a failed refresh, including after replacing the source, until explicit recovery succeeds', async () => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    const applying = context.editor.apply(policy);
+    decoded.encodes[0].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    context.requests[0].result.resolve({ success: false, error: { message: 'Conflict', versionConflict: true } });
+    await expect.poll(() => context.refreshes.length).toBe(1);
+    context.refreshes[0].reject(new Error('Offline'));
+    await applying;
+    expect(context.editor.getSnapshot()).toMatchObject({ recovery: 'required', error: expect.stringContaining('Unable to refresh') });
+    const replacement = await selectReady(context);
+    await context.editor.apply(policy);
+    context.editor.requestRemoval();
+    expect(context.requests).toHaveLength(1);
+    expect(replacement.encodes).toEqual([]);
+    expect(context.editor.getSnapshot().selection?.expectedVersion).toBeNull();
+    const refreshing = context.editor.refresh();
+    context.refreshes[1].resolve({ version: 9 });
+    await refreshing;
+    expect(context.requests).toHaveLength(1);
+    expect(context.editor.getSnapshot()).toMatchObject({ recovery: 'review', selection: { expectedVersion: 9, crop: { zoom: 1 } } });
+    const retrying = context.editor.apply(policy);
+    replacement.encodes[0].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(2);
+    expect(context.requests[1].command.expectedVersion).toBe(9);
+    context.requests[1].result.resolve({ success: true });
+    await retrying;
+  });
+
+  it.each(['replace', 'close', 'deactivate'])('fences a late encoded result after %s', async (transition) => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    const applying = context.editor.apply(policy);
+    if (transition === 'replace') await selectReady(context);
+    if (transition === 'close') { context.editor.close(); context.editor.open(); }
+    if (transition === 'deactivate') { context.deactivate(); context.editor.activate(); context.editor.open(); }
+    const current = context.editor.getSnapshot();
+    decoded.encodes[0].result.resolve(canonical);
+    await applying;
+    expect(context.editor.getSnapshot()).toBe(current);
+    expect(context.requests).toEqual([]);
+    expect(decoded.isDisposed()).toBe(true);
+    expect(context.notices).toEqual([]);
+  });
+
+  it.each(['success', 'failure', 'conflict'])('ignores obsolete request %s feedback after reopening', async (outcome) => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    const applying = context.editor.apply(policy);
+    decoded.encodes[0].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    context.editor.close(); context.editor.open();
+    const current = context.editor.getSnapshot();
+    context.requests[0].result.resolve(outcome === 'success' ? { success: true } : { success: false, error: { message: 'Failed', versionConflict: outcome === 'conflict' } });
+    await applying;
+    expect(context.editor.getSnapshot()).toBe(current);
+    expect(context.notices).toEqual([]);
+    expect(context.refreshes).toEqual([]);
+  });
+
+  it.each(['success', 'failure'])('ignores obsolete refresh %s after replacing the session', async (outcome) => {
+    const context = setup();
+    const decoded = await selectReady(context);
+    const applying = context.editor.apply(policy);
+    decoded.encodes[0].result.resolve(canonical);
+    await expect.poll(() => context.requests.length).toBe(1);
+    context.requests[0].result.resolve({ success: false, error: { message: 'Conflict', versionConflict: true } });
+    await expect.poll(() => context.refreshes.length).toBe(1);
+    context.editor.close(); context.editor.open();
+    const current = context.editor.getSnapshot();
+    if (outcome === 'success') context.refreshes[0].resolve({ version: 7 });
+    else context.refreshes[0].reject(new Error('Offline'));
+    await applying;
+    expect(context.editor.getSnapshot()).toBe(current);
+    expect(context.notices).toEqual([]);
+  });
+});
+
 describe('picture editing session', () => {
   it('captures the removal confirmation version independently of upload policy and keeps cancellation local', async () => {
     const { editor, requests, notices } = setup();

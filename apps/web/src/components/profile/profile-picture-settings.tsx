@@ -1,17 +1,10 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { pictureSelection } from '@/features/profile-management';
 import { LoaderCircle, Pencil, X } from 'lucide-react';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 import { usePictureEditor } from '@/features/picture-editor/adapters/react';
 import { ProfilePictureCrop } from '@/components/profile/profile-picture-crop';
-import { toast } from 'sonner';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
 import { ProfileDialog } from '@/components/profile/profile-dialog';
 import { ProfilePicture } from '@/components/profile/profile-picture';
-import {
-  profileQueryKey,
-  useOwnerProfileMutation,
-} from '@/features/profile-management/adapters/query';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -26,12 +19,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { type Profile, UserApiError, userApi } from '@/lib/api/user';
+import type { Profile } from '@/lib/api/user';
 import { formatFileSize } from '@/lib/utils/wallpaper';
-
-type PictureCommand =
-  | { action: 'upload'; picture: File; expectedVersion: number; session: number }
-  | { action: 'remove'; expectedVersion: number; session: number };
 
 export function ProfilePictureSettings({
   profile,
@@ -43,145 +32,14 @@ export function ProfilePictureSettings({
   const input = useRef<HTMLInputElement>(null);
   const dialogContent = useRef<HTMLDivElement>(null);
   const removeOpener = useRef<HTMLButtonElement>(null);
-  const editor = usePictureEditor(profile.id, profile.pictureUploadLimits);
-  const selected = editor.selection;
-  const showPicker = !selected || (!selected.source && !editor.processing);
-  const session = useRef(0);
-  const client = useQueryClient();
-  const ownerQuery = useRef(
-    client.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true })
-  );
-  const [removeVersion, setRemoveVersion] = useState<number | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [recovery, setRecovery] = useState<'required' | 'review' | null>(null);
-  useEffect(
-    () => () => {
-      session.current++;
-    },
-    []
-  );
-  const policyQuery = useQuery({
-    queryKey: [...profileQueryKey(profile.id), 'picture-policy'],
-    queryFn: ({ signal }) => userApi.picturePolicy({ signal, tokenProvider }),
-    enabled: open,
-    retry: false,
-  });
-  const policy = policyQuery.data;
-  const policyReady = Boolean(policy) && !policyQuery.isError && !policyQuery.isFetching;
+  const { editor, state, policyQuery, policy, policyReady, refreshing, writing, saving } =
+    usePictureEditor(profile, tokenProvider);
+  const { selection: selected, open, error: feedback, recovery, processing, removeVersion } = state;
+  const showPicker = !selected || (!selected.source && !processing);
   const importing =
     profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
-  const {
-    mutation,
-    refreshing,
-    writing,
-    availability,
-    refresh: refreshProfile,
-  } = useOwnerProfileMutation(
-    profile.id,
-    (command: PictureCommand) => {
-      const options = {
-        expectedVersion: command.expectedVersion,
-        expectedProfileId: profile.id,
-        tokenProvider,
-      };
-      return command.action === 'upload'
-        ? userApi.uploadPicture({ ...options, picture: command.picture })
-        : userApi.removePicture(options);
-    },
-    {
-      onSuccess: (_updated: Profile, command: PictureCommand) => {
-        if (command.session !== session.current) return;
-        editor.clear();
-        if (input.current) input.current.value = '';
-        setError(null);
-        setRecovery(null);
-        setOpen(false);
-        toast.success(
-          command.action === 'remove' ? 'Generated avatar selected' : 'Profile picture saved'
-        );
-      },
-    }
-  );
-  function abandonDialog() {
-    session.current++;
-    editor.clear();
-    mutation.reset();
-    setError(null);
-    setRecovery(null);
-    setDialogOpen(false);
-    setRemoveVersion(null);
-    setOpen(false);
-  }
-  const checkOwner = useEffectEvent(() => {
-    if (
-      ownerQuery.current !==
-      client.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true })
-    )
-      abandonDialog();
-  });
-  useEffect(() => {
-    if (!open) return;
-    checkOwner();
-    return client.getQueryCache().subscribe((event) => {
-      if (event.type === 'removed' && event.query === ownerQuery.current) checkOwner();
-    });
-  }, [open, client]);
-  const feedback = error ?? editor.error;
-  function currentDialog(originatingSession: number, originatingQuery = ownerQuery.current) {
-    return (
-      originatingSession === session.current &&
-      client.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true }) ===
-        originatingQuery
-    );
-  }
-  async function refreshConflict(
-    originatingSession: number,
-    originatingQuery = ownerQuery.current
-  ) {
-    if (!currentDialog(originatingSession, originatingQuery) || availability.isBusy()) return;
-    try {
-      const updated = await refreshProfile();
-      if (!currentDialog(originatingSession, originatingQuery)) return;
-      editor.setExpectedVersion(updated.version);
-      setRecovery('review');
-      setError('Your Profile changed elsewhere. Review the latest saved picture before retrying.');
-    } catch {
-      if (currentDialog(originatingSession, originatingQuery))
-        setError(
-          'Your Profile changed elsewhere. Unable to refresh your saved Profile. Retry the refresh before saving.'
-        );
-    }
-  }
-  async function save(command: PictureCommand) {
-    const originatingQuery = ownerQuery.current;
-    try {
-      await mutation.mutateAsync(command);
-    } catch (cause) {
-      if (!currentDialog(command.session, originatingQuery)) return;
-      if (cause instanceof UserApiError && cause.type?.endsWith('/profile-version-conflict')) {
-        editor.setExpectedVersion(null);
-        setRecovery('required');
-        setError('Your Profile changed elsewhere. Refreshing your saved Profile…');
-        await refreshConflict(command.session, originatingQuery);
-      } else {
-        setError(
-          cause instanceof Error ? cause.message : 'Unable to save this picture. Try again.'
-        );
-      }
-    }
-  }
-
   function selectPicture(picture: File | undefined) {
-    if (!open || !policy || !policyReady || availability.isBusy()) return;
-    mutation.reset();
-    setError(null);
-    const result = pictureSelection(picture, policy.acceptedSourceFormats);
-    setError(result.error);
-    if (result.selected)
-      void editor.choose(result.selected, recovery === 'required' ? null : profile.version);
-    else editor.clear();
+    void editor.select(picture, policyReady ? policy : undefined);
   }
 
   const pastePicture = useEffectEvent((event: ClipboardEvent) => {
@@ -205,17 +63,7 @@ export function ProfilePictureSettings({
       <ProfileDialog
         ref={dialogContent}
         open={open}
-        onOpenChange={(next) => {
-          if (!next) {
-            abandonDialog();
-            return;
-          }
-          setOpen(true);
-          session.current++;
-          ownerQuery.current = client
-            .getQueryCache()
-            .find({ queryKey: profileQueryKey(profile.id), exact: true });
-        }}
+        onOpenChange={(next) => (next ? editor.open() : editor.close())}
         title="Profile picture"
         description={showPicker ? 'Choose, drop, or paste an image to begin.' : undefined}
         busy={writing}
@@ -241,7 +89,7 @@ export function ProfilePictureSettings({
               source={selected.source}
               crop={selected.crop}
               previewUrl={selected.previewUrl}
-              disabled={editor.processing || writing}
+              disabled={processing || writing}
               onChange={editor.setCrop}
             />
           ) : (
@@ -258,30 +106,7 @@ export function ProfilePictureSettings({
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              if (
-                !policy ||
-                !policyReady ||
-                availability.isBusy() ||
-                editor.processing ||
-                recovery === 'required'
-              )
-                return;
-              const originatingSession = session.current;
-              setError(null);
-              mutation.reset();
-              void editor.apply(policy, (picture, expectedVersion) => {
-                if (!currentDialog(originatingSession)) return;
-                if (availability.isBusy())
-                  throw new Error(
-                    'Your Profile is busy. Apply the picture again after the current change finishes.'
-                  );
-                void save({
-                  picture,
-                  expectedVersion,
-                  action: 'upload',
-                  session: originatingSession,
-                });
-              });
+              void editor.apply(policyReady ? policy : undefined);
             }}
           >
             <Field>
@@ -350,19 +175,17 @@ export function ProfilePictureSettings({
                 <Button
                   type="button"
                   variant="destructive"
-                  disabled={refreshing || writing || editor.processing || recovery === 'required'}
+                  disabled={refreshing || writing || processing || recovery === 'required'}
                   onClick={(event) => {
                     removeOpener.current = event.currentTarget;
-                    mutation.reset();
-                    setRemoveVersion(profile.version);
-                    setDialogOpen(true);
+                    editor.requestRemoval();
                   }}
                 >
                   Reset
                 </Button>
               )}
               <div className="ml-auto flex gap-2">
-                <Button type="button" variant="outline" disabled={writing} onClick={abandonDialog}>
+                <Button type="button" variant="outline" disabled={writing} onClick={editor.close}>
                   Cancel
                 </Button>
                 <Button
@@ -371,12 +194,12 @@ export function ProfilePictureSettings({
                     !selected ||
                     refreshing ||
                     writing ||
-                    editor.processing ||
+                    processing ||
                     !policyReady ||
                     recovery === 'required'
                   }
                 >
-                  {mutation.isPending
+                  {saving
                     ? 'Saving picture…'
                     : selected && (feedback || recovery)
                       ? 'Retry'
@@ -385,7 +208,7 @@ export function ProfilePictureSettings({
               </div>
             </div>
           </form>
-          {editor.processing && (
+          {processing && (
             <output className="flex items-center gap-2 text-sm">
               <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
               Processing picture…
@@ -400,7 +223,12 @@ export function ProfilePictureSettings({
               </Button>
             </output>
           )}
-          <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <AlertDialog
+            open={removeVersion !== null}
+            onOpenChange={(next) => {
+              if (!next) editor.cancelRemoval();
+            }}
+          >
             <AlertDialogContent
               onCloseAutoFocus={(event) => {
                 event.preventDefault();
@@ -420,15 +248,8 @@ export function ProfilePictureSettings({
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
-                  disabled={refreshing || writing || editor.processing || recovery === 'required'}
-                  onClick={() => {
-                    if (removeVersion !== null && recovery !== 'required')
-                      void save({
-                        action: 'remove',
-                        expectedVersion: removeVersion,
-                        session: session.current,
-                      });
-                  }}
+                  disabled={refreshing || writing || processing || recovery === 'required'}
+                  onClick={() => void editor.confirmRemoval()}
                 >
                   Use generated avatar
                 </AlertDialogAction>
@@ -458,7 +279,7 @@ export function ProfilePictureSettings({
                   type="button"
                   variant="outline"
                   disabled={refreshing || writing}
-                  onClick={() => void refreshConflict(session.current)}
+                  onClick={() => void editor.refresh()}
                 >
                   {refreshing ? 'Refreshing saved Profile…' : 'Retry Profile refresh'}
                 </Button>

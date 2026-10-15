@@ -339,93 +339,6 @@ describe('Profile picture settings', () => {
     await act(async () => { finishOtherCommand?.(); await pending; });
   });
 
-  it.each(['png', 'gif'])('cancels %s processing in the same dialog, ignores a late result, and permits the retained crop to be applied again', async (format) => {
-    let finish: ((value: Blob) => void) | undefined;
-    let signal: AbortSignal | undefined;
-    processPicture.mockImplementationOnce((_crop, _policy, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
-    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'saved' });
-    await renderPage();
-    const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], `portrait.${format}`, { type: `image/${format}` }));
-    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(screen.getAllByRole('dialog')).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: 'Cancel picture processing' }));
-    expect(signal?.aborted).toBe(true);
-    await act(async () => finish?.(canonical));
-    expect(userApi.uploadPicture).not.toHaveBeenCalled();
-    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
-    expect(processPicture.mock.calls[1][0]).toMatchObject({ x: 300, y: 100, size: 200 });
-  });
-
-  it('immediately replaces a source and ignores its late decode without opening a confirmation', async () => {
-    let finish: ((value: Awaited<ReturnType<typeof openPictureSource>>) => void) | undefined;
-    let signal: AbortSignal | undefined;
-    vi.mocked(openPictureSource).mockImplementationOnce((_file, capturedSignal) => { signal = capturedSignal; return new Promise((resolve) => { finish = resolve; }); });
-    await renderPage();
-    const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'old.png', { type: 'image/png' }));
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'new.png', { type: 'image/png' }));
-    expect(signal?.aborted).toBe(true);
-    expect(await screen.findByRole('slider', { name: 'Zoom' })).toHaveValue('1');
-    const abandonedDispose = vi.fn();
-    await act(async () => finish?.({ width: 10, height: 10, preview: new Blob(), process: processPicture, dispose: abandonedDispose }));
-    expect(abandonedDispose).toHaveBeenCalled();
-    expect(screen.getByText('new.png')).toBeInTheDocument();
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(screen.queryByText(/smaller than 64/)).not.toBeInTheDocument();
-  });
-
-  it('retains the file after a decode failure and retries its decode when Apply is chosen', async () => {
-    vi.mocked(openPictureSource).mockRejectedValueOnce(new Error('Unable to decode this picture.'));
-    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'saved' });
-    await renderPage();
-    const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to decode');
-    expect(screen.getByText('portrait.png')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
-    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
-  });
-
-  it('retains the crop after a processing failure and releases its preview when the edit is abandoned', async () => {
-    processPicture.mockRejectedValueOnce(new Error('Encoder unavailable'));
-    await renderPage();
-    const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
-    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Encoder unavailable');
-    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
-    vi.mocked(userApi.uploadPicture).mockRejectedValue(new Error('Offline'));
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
-    await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
-    expect(processPicture.mock.calls[1][0]).toMatchObject({ x: 300, y: 100, size: 200, zoom: 2 });
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Offline'));
-    await user.keyboard('{Escape}');
-    expect(disposePicture).toHaveBeenCalled();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
-    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
-  });
-
-  it('fences late processing after closing and reopening the dialog', async () => {
-    let finish: ((value: Blob) => void) | undefined;
-    processPicture.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-    await renderPage();
-    const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'old.png', { type: 'image/png' }));
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-    await user.keyboard('{Escape}');
-    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'new.png', { type: 'image/png' }));
-    await act(async () => finish?.(canonical));
-    expect(userApi.uploadPicture).not.toHaveBeenCalled();
-    expect(screen.getByText('new.png')).toBeInTheDocument();
-    expect(screen.getByRole('dialog', { name: 'Profile picture' })).toBeVisible();
-  });
-
   it('warns about a small source, disables zoom, and still permits Apply', async () => {
     vi.mocked(openPictureSource).mockResolvedValue({ width: 32, height: 48, preview: new Blob(), process: processPicture, dispose: disposePicture });
     await renderPage();
@@ -462,31 +375,6 @@ describe('Profile picture settings', () => {
     await waitFor(() => expect(remove).toHaveFocus());
     expect(screen.getByRole('dialog', { name: 'Profile picture' })).toBeInTheDocument();
     expect(userApi.removePicture).not.toHaveBeenCalled();
-  });
-
-  it.each(['png', 'gif'])('keeps the selected $format picture after failure and closes the dialog after a successful retry', async (format) => {
-    const updated = { ...profile, pictureAssetId: 'saved-picture', version: 2 };
-    vi.mocked(userApi.uploadPicture)
-      .mockRejectedValueOnce(new Error('Upload unavailable'))
-      .mockResolvedValueOnce(updated);
-    await renderPage();
-    const user = userEvent.setup();
-    await user.upload(
-      screen.getByLabelText('Choose picture'),
-      new File(['png'], `portrait.${format}`, { type: `image/${format}` })
-    );
-    expect(screen.getByText(`portrait.${format}`)).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Selected avatar' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Upload unavailable');
-    expect(screen.getByText(`portrait.${format}`)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute(
-      'src',
-      '/media/profile-pictures/saved-picture'
-    );
-    expect(toast.success).toHaveBeenLastCalledWith('Profile picture saved');
   });
 
   it('does not overwrite a recreated owner cache with a picture response from an earlier session', async () => {
@@ -559,53 +447,6 @@ describe('Profile picture settings', () => {
     expect(processPicture.mock.calls.map(([crop]) => crop)).toEqual([expect.objectContaining({ x: 300, y: 100, size: 200, zoom: 2 }), expect.objectContaining({ x: 300, y: 100, size: 200, zoom: 2 })]);
     expect(openPictureSource).toHaveBeenCalledWith(source, expect.any(AbortSignal), profile.pictureUploadLimits);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('retains the edit after a failed conflict refresh and blocks stale writes until refresh recovery succeeds', async () => {
-    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new UserApiError('Conflict', 409, { type: 'https://wallpaperdb.test/problems/profile-version-conflict' }));
-    const refreshed = { ...profile, version: 9, pictureAssetId: 'latest_picture' };
-    vi.mocked(userApi.ensureProfile).mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce(refreshed);
-    vi.mocked(userApi.uploadPicture).mockResolvedValueOnce({ ...refreshed, version: 10, pictureAssetId: 'accepted' });
-    await renderPage();
-    const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['old'], 'retained.png', { type: 'image/png' }));
-    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to refresh your saved Profile');
-    expect(screen.getByText('retained.png')).toBeInTheDocument();
-    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled();
-    const replacement = new File(['new'], 'replacement.png', { type: 'image/png' });
-    await user.upload(screen.getByLabelText('Choose picture'), replacement);
-    const retry = screen.getByRole('button', { name: 'Retry' });
-    expect(retry).toBeDisabled();
-    const form = retry.closest('form');
-    if (!form) throw new Error('Picture form missing');
-    fireEvent.submit(form);
-    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Retry Profile refresh' }));
-    expect(await screen.findByRole('group', { name: 'Latest saved picture' })).toBeVisible();
-    expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('1');
-    expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(userApi.uploadPicture).toHaveBeenNthCalledWith(2, expect.objectContaining({ expectedVersion: 9 }));
-    expect(processPicture.mock.calls[1][0]).toMatchObject({ size: 400, zoom: 1 });
-  });
-
-  it('retries the current crop after upload failure rather than the crop from the failed command', async () => {
-    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce({ ...profile, version: 2, pictureAssetId: 'accepted' });
-    await renderPage();
-    const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'current.png', { type: 'image/png' }));
-    fireEvent.change(await screen.findByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Offline');
-    fireEvent.change(screen.getByRole('slider', { name: 'Zoom' }), { target: { value: '4' } });
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(processPicture.mock.calls[1][0]).toMatchObject({ x: 350, y: 150, size: 100, zoom: 4 });
-    expect(userApi.uploadPicture).toHaveBeenNthCalledWith(2, expect.objectContaining({ expectedVersion: 1 }));
   });
 
   it('keeps valid cache refresh publication separate from a closed and reopened dialog', async () => {
@@ -768,39 +609,6 @@ describe('Profile picture settings', () => {
       tokenProvider: expect.any(Function),
     });
     expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
-  });
-
-  it('confirms picture removal with the version seen when the dialog opened and keeps cancellation local', async () => {
-    const initial = { ...profile, pictureAssetId: 'picture_old' };
-    const updated = { ...profile, version: 3 };
-    vi.mocked(userApi.removePicture).mockResolvedValue(updated);
-    const { client } = await renderPage(initial);
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Reset' }));
-    let dialog = screen.getByRole('alertdialog');
-    expect(dialog).toHaveTextContent(/generated avatar/i);
-    expect(dialog).toHaveTextContent(/pending picture import/i);
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    expect(userApi.removePicture).not.toHaveBeenCalled();
-    await user.click(screen.getByRole('button', { name: 'Reset' }));
-    dialog = screen.getByRole('alertdialog');
-    act(() =>
-      client.setQueryData(profileQueryKey(profile.id), {
-        ...initial,
-        version: 2,
-        pictureAssetId: 'newer_unseen',
-      })
-    );
-    await user.click(within(dialog).getByRole('button', { name: 'Use generated avatar' }));
-    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
-    expect(userApi.removePicture).toHaveBeenCalledWith({
-      expectedVersion: 1,
-      expectedProfileId: profile.id,
-      tokenProvider: expect.any(Function),
-    });
-    expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveTextContent(
-      'AL'
-    );
   });
 
   it('uploads the selected file with its captured version and immediately adopts the authoritative picture', async () => {

@@ -1,7 +1,7 @@
 import type { PictureDecodedLimits, PictureSource } from '../index';
 import type { PictureJob, PictureJobResult } from './protocol';
 import { gifPictureJob } from './gif';
-import { withoutPictureMetadata } from './webp';
+import { staticPictureJob } from './static';
 import { yieldPictureWork } from './yield';
 import { validateSourceDimensions } from './source';
 import { validateJpegColor } from './jpeg';
@@ -137,52 +137,32 @@ async function fallbackWork(
     signal.throwIfAborted();
     const sourceWidth = image instanceof HTMLImageElement ? image.naturalWidth : image.width;
     const sourceHeight = image instanceof HTMLImageElement ? image.naturalHeight : image.height;
-    const scale = Math.min(1, 1024 / Math.max(sourceWidth, sourceHeight));
-    const width =
-      job.action === 'preview'
-        ? Math.max(1, Math.round(sourceWidth * scale))
-        : job.policy.output.width;
-    const height =
-      job.action === 'preview'
-        ? Math.max(1, Math.round(sourceHeight * scale))
-        : job.policy.output.height;
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext('2d', { alpha: true, colorSpace: 'srgb' });
-    if (!context) throw new Error('Unable to create the picture canvas.');
-    context.imageSmoothingQuality = 'high';
-    const crop =
-      job.action === 'preview'
-        ? { x: 0, y: 0, width: sourceWidth, height: sourceHeight }
-        : { x: job.crop.x, y: job.crop.y, width: job.crop.size, height: job.crop.size };
-    // Bound each synchronous draw and let cancellation and painting run between strips.
-    for (let y = 0; y < height; y += 64) {
-      await yieldPictureWork(signal);
-      const strip = Math.min(64, height - y);
-      context.drawImage(
-        image,
-        crop.x,
-        crop.y + (crop.height * y) / height,
-        crop.width,
-        (crop.height * strip) / height,
-        0,
-        y,
-        width,
-        strip
-      );
-    }
-    const encoded = await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob(
-        (result) =>
-          result ? resolve(result) : reject(new Error('Unable to encode this picture.')),
-        job.action === 'preview' ? 'image/png' : 'image/webp',
-        job.action === 'process' ? job.policy.encoding.staticQuality / 100 : undefined
-      )
+    const result = await staticPictureJob(
+      job,
+      { width: sourceWidth, height: sourceHeight },
+      canvas,
+      async (context, crop) => {
+        // Bound each synchronous draw and let cancellation and painting run between strips.
+        for (let y = 0; y < canvas.height; y += 64) {
+          await yieldPictureWork(signal);
+          const strip = Math.min(64, canvas.height - y);
+          context.drawImage(
+            image,
+            crop.x,
+            crop.y + (crop.height * y) / canvas.height,
+            crop.width,
+            (crop.height * strip) / canvas.height,
+            0,
+            y,
+            canvas.width,
+            strip
+          );
+        }
+      }
     );
-    const blob = job.action === 'process' ? await withoutPictureMetadata(encoded) : encoded;
     signal.throwIfAborted();
-    return { ok: true, blob, width: sourceWidth, height: sourceHeight };
+    return result;
   } finally {
     if ('close' in image) image.close();
     if (sourceUrl) URL.revokeObjectURL(sourceUrl);

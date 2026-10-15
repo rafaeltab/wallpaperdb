@@ -25,6 +25,7 @@ export default defineConfig({
       enabled: true,
       provider: 'v8',
       include: ['src/features/picture-editor/**/*.ts', 'src/components/profile/**/*.tsx'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
       reporter: ['json', 'lcov', 'json-summary'],
       reportsDirectory: './coverage/integration',
     },

@@ -57,6 +57,7 @@ it.each([undefined, 'flex size-6 shrink-0 items-center justify-center object-cov
       expect(attempt.complete && attempt.naturalWidth > 0).toBe(true);
       expect(getComputedStyle(attempt).opacity).toBe('1');
       const ready = screen.getByRole('img');
+      expect(getComputedStyle(ready).backgroundColor).toBe('rgba(0, 0, 0, 0)');
       expect(ready.getBoundingClientRect().width).toBe(before.width);
       expect(ready.getBoundingClientRect().height).toBe(before.height);
       expect(ready.getBoundingClientRect().x).toBe(before.x);

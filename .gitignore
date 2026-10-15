@@ -23,6 +23,10 @@ dist
 coverage
 .nyc_output
 
+# Mutation-testing sandboxes and reports
+.stryker-tmp
+**/reports/mutation/
+
 # Vite
 .vite
 

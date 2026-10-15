@@ -2,6 +2,10 @@ import type { PictureCrop, PictureDimensions } from './contract';
 
 const clamp = (value: number, maximum: number) => Math.max(0, Math.min(value, maximum));
 
+export function pictureCropNeedsEnlargement(crop: PictureCrop, output: PictureDimensions): boolean {
+  return crop.size < output.width || crop.size < output.height;
+}
+
 export function initialPictureCrop(source: PictureDimensions): PictureCrop {
   const size = Math.min(source.width, source.height);
   return {

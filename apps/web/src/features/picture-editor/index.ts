@@ -14,6 +14,7 @@ export type {
 } from './contract';
 export { createPictureEditor } from './workflow';
 export {
+  pictureCropNeedsEnlargement,
   initialPictureCrop,
   movePictureCrop,
   zoomPictureCrop,

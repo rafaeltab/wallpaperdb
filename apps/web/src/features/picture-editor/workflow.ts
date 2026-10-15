@@ -20,6 +20,7 @@ export function createPictureEditor(
   let operation: AbortController | null = null;
   let state: PictureEditorSnapshot = {
     open: false,
+    removeVersion: null,
     selection: null,
     processing: false,
     error: null,
@@ -44,7 +45,7 @@ export function createPictureEditor(
   function close() {
     session++;
     clear();
-    update({ open: false, recovery: null });
+    update({ open: false, recovery: null, removeVersion: null });
   }
   const current = (originatingSession: number) =>
     active &&
@@ -133,6 +134,31 @@ export function createPictureEditor(
     },
     close,
     cancel,
+    requestRemoval() {
+      if (
+        current(session) &&
+        !operation &&
+        !dependencies.availability.isBusy() &&
+        state.recovery !== 'required'
+      )
+        update({ removeVersion: profile.version });
+    },
+    cancelRemoval() {
+      update({ removeVersion: null });
+    },
+    async confirmRemoval() {
+      if (
+        !current(session) ||
+        operation ||
+        dependencies.availability.isBusy() ||
+        state.recovery === 'required' ||
+        state.removeVersion === null
+      )
+        return;
+      const expectedVersion = state.removeVersion;
+      update({ removeVersion: null });
+      await save({ action: 'remove', expectedVersion }, session);
+    },
     refresh: () => refresh(),
     async apply(policy?: PictureEncodingPolicy) {
       if (

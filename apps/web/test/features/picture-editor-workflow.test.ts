@@ -105,6 +105,21 @@ async function selectReady(context: ReturnType<typeof setup>) {
 const canonical = new Blob(['processed'], { type: 'image/webp' });
 
 describe('picture editing session', () => {
+  it('captures the removal confirmation version independently of upload policy and keeps cancellation local', async () => {
+    const { editor, requests, notices } = setup();
+    editor.requestRemoval();
+    editor.cancelRemoval();
+    await editor.confirmRemoval();
+    expect(requests).toEqual([]);
+    editor.requestRemoval();
+    editor.receiveProfile({ ...profile, version: 5 });
+    const removing = editor.confirmRemoval();
+    expect(requests[0].command).toEqual({ action: 'remove', expectedVersion: 1 });
+    requests[0].result.resolve({ success: true });
+    await removing;
+    expect(editor.getSnapshot()).toMatchObject({ open: false, removeVersion: null });
+    expect(notices).toEqual(['Generated avatar selected']);
+  });
   it('fences local work when the owner query is replaced and releases its subscription on deactivation', async () => {
     const context = setup();
     const decoded = await selectReady(context);

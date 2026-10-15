@@ -73,6 +73,7 @@ export type PictureSaveResult =
 
 export interface PictureEditorSnapshot {
   open: boolean;
+  removeVersion: number | null;
   selection: PictureSelection | null;
   processing: boolean;
   error: string | null;

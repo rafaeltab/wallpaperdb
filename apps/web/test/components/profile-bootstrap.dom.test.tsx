@@ -93,7 +93,7 @@ describe('ProfileBootstrap', () => {
       expect(screen.getByRole('img', { name: "Public profile's profile picture" })).not.toHaveAttribute('src');
       auth();
       rendered.rerender(view());
-      expect(await screen.findByRole('img', { name: "Wallpaper Fan's profile picture" })).toHaveAttribute(
+      expect(await screen.findByAltText("Wallpaper Fan's profile picture")).toHaveAttribute(
         'src',
         expect.stringContaining('/profile-pictures/owner_picture')
       );
@@ -120,7 +120,7 @@ describe('ProfileBootstrap', () => {
     );
     const rendered = render(view());
     try {
-      expect(await screen.findByRole('img', { name: "Wallpaper Fan's profile picture" })).toHaveAttribute(
+      expect(await screen.findByAltText("Wallpaper Fan's profile picture")).toHaveAttribute(
         'src',
         expect.stringContaining('/profile-pictures/private_owner_picture')
       );

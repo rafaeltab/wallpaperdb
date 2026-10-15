@@ -29,7 +29,7 @@ export default mergeConfig(
           test: {
             name: 'web-node',
             environment: 'node',
-            include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
+            include: ['test/**/*.test.ts', 'test/**/*.test.tsx', 'src/**/*.test.ts'],
             exclude: [...configDefaults.exclude, ...domTests],
           },
         },

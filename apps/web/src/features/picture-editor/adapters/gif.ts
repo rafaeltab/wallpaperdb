@@ -10,29 +10,12 @@ import { yieldPictureWork } from './yield';
 import type { PictureJob, PictureJobResult } from './protocol';
 import { pictureGifSourceByteLimit, type PictureDecodedLimits } from '../contract';
 
-type PictureCanvas = OffscreenCanvas | HTMLCanvasElement;
-function canvas(width: number, height: number, offscreen: boolean): PictureCanvas {
-  if (offscreen) return new OffscreenCanvas(width, height);
-  const result = document.createElement('canvas');
-  result.width = width;
-  result.height = height;
-  return result;
-}
-function context(canvas: PictureCanvas) {
-  return 'convertToBlob' in canvas
-    ? canvas.getContext('2d', { alpha: true, colorSpace: 'srgb' })
-    : canvas.getContext('2d', { alpha: true, colorSpace: 'srgb' });
-}
-async function encode(canvas: PictureCanvas, type: string, quality?: number) {
-  if ('convertToBlob' in canvas) return canvas.convertToBlob({ type, quality });
-  return new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('Unable to encode this picture.'))),
-      type,
-      quality
-    )
-  );
-}
+import {
+  pictureCanvas as canvas,
+  pictureCanvasContext as context,
+  encodePictureCanvas as encode,
+  type PictureCanvas,
+} from './canvas';
 
 interface GifAttempt {
   result: Extract<PictureJobResult, { ok: true }>;

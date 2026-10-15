@@ -25,7 +25,7 @@ it('starts a container when a selected Ryuk exits and preserves automatic cleanu
   const keeper = connect(seed.getMappedPort(8080), seed.getHost());
   let proxy: Awaited<ReturnType<typeof createDockerProxy>> | undefined;
   try {
-    await once(keeper, 'connect');
+    await once(keeper, 'connect', { signal: AbortSignal.timeout(5000) });
     const acknowledgements = createInterface({ input: keeper });
     try {
       const acknowledgement = once(acknowledgements, 'line', {

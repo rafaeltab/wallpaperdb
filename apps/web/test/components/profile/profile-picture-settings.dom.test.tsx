@@ -80,6 +80,7 @@ describe('Profile picture settings', () => {
     expect(zoom).toHaveAccessibleDescription(warning);
     const status = screen.getByRole('status');
     expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveTextContent('Picture quality warning. This crop may look pixelated.');
     const updates: MutationRecord[] = [];
     const observer = new MutationObserver((records) => updates.push(...records));
     observer.observe(status, { subtree: true, childList: true, characterData: true });
@@ -91,6 +92,7 @@ describe('Profile picture settings', () => {
     await user.click(screen.getByRole('button', { name: 'Reset crop' }));
     expect(screen.queryByText(warning)).not.toBeInTheDocument();
     expect(zoom).not.toHaveAttribute('aria-describedby');
+    expect(status).toBeEmptyDOMElement();
     fireEvent.change(zoom, { target: { value: '3' } });
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Apply' }));

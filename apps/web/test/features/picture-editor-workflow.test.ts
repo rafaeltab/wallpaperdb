@@ -20,12 +20,12 @@ const policy = {
 const profile = { version: 1, limits: { maxPixels: 20000000, maxDecodedBytes: 80000000 } };
 
 function setup() {
-  const decodes: { file: File; signal: AbortSignal; result: ReturnType<typeof deferred<PictureSource>> }[] = [];
+  const decodes: { file: File; signal: AbortSignal; result: ReturnType<typeof deferred<PictureSource<Blob>>> }[] = [];
   const previews = new Set<string>();
   let previewId = 0;
   let busy = false;
   const availabilityListeners = new Set<() => void>();
-  const requests: { command: PictureCommand; result: ReturnType<typeof deferred<PictureSaveResult>> }[] = [];
+  const requests: { command: PictureCommand<Blob>; result: ReturnType<typeof deferred<PictureSaveResult>> }[] = [];
   const notices: string[] = [];
   const refreshes: ReturnType<typeof deferred<{ version: number }>>[] = [];
   let owner = {};
@@ -34,7 +34,8 @@ function setup() {
     busy = next;
     if (notify) for (const listener of availabilityListeners) listener();
   }
-  const editor = createPictureEditor(profile, {
+  const editor = createPictureEditor<File, Blob>(profile, {
+    createOperation: () => new AbortController(),
     ownership: {
       getIdentity: () => owner,
       subscribe(listener) { ownerListeners.add(listener); return () => { ownerListeners.delete(listener); }; },
@@ -59,7 +60,7 @@ function setup() {
       return result.promise.finally(() => setBusy(false));
     },
     openSource(file, signal) {
-      const result = deferred<PictureSource>();
+      const result = deferred<PictureSource<Blob>>();
       decodes.push({ file, signal, result });
       return result.promise;
     },
@@ -82,7 +83,7 @@ function setup() {
 function source() {
   let disposed = false;
   const encodes: { crop: PictureCrop; signal: AbortSignal; result: ReturnType<typeof deferred<Blob>> }[] = [];
-  const picture: PictureSource = {
+  const picture: PictureSource<Blob> = {
     width: 800, height: 400, preview: new Blob(['preview']),
     process(crop, _policy, signal) {
       const result = deferred<Blob>();
@@ -343,7 +344,7 @@ describe('picture editing session', () => {
     const applying = context.editor.apply(policy);
     decoded.encodes[0].result.resolve(canonical);
     await expect.poll(() => context.requests.length).toBe(1);
-    expect(context.requests[0].command).toMatchObject({ action: 'upload', expectedVersion: 1, picture: { name: 'profile-picture.webp', type: 'image/webp', size: 9 } });
+    expect(context.requests[0].command).toMatchObject({ action: 'upload', expectedVersion: 1, picture: { type: 'image/webp', size: 9 } });
     context.requests[0].result.resolve({ success: true });
     await applying;
     expect(context.editor.getSnapshot()).toMatchObject({ open: false, selection: null, processing: false, error: null });

@@ -1,6 +1,7 @@
 import { pictureSelection } from '@/features/profile-management';
 import type {
   PictureCrop,
+  PictureFile,
   PictureCommand,
   PictureEditorDependencies,
   PictureEditorProfile,
@@ -10,15 +11,16 @@ import type {
 } from './contract';
 import { initialPictureCrop } from './crop';
 
-export function createPictureEditor(
+export function createPictureEditor<Input extends PictureFile, Bytes>(
   profile: PictureEditorProfile,
-  dependencies: PictureEditorDependencies
+  dependencies: PictureEditorDependencies<Input, Bytes>
 ) {
   let active = false;
   let session = 0;
   let owner: object | undefined;
-  let operation: AbortController | null = null;
-  let state: PictureEditorSnapshot = {
+  let operation: ReturnType<PictureEditorDependencies<Input, Bytes>['createOperation']> | null =
+    null;
+  let state: PictureEditorSnapshot<Input, Bytes> = {
     open: false,
     removeVersion: null,
     selection: null,
@@ -27,7 +29,7 @@ export function createPictureEditor(
     recovery: null,
   };
   const listeners = new Set<() => void>();
-  function update(patch: Partial<PictureEditorSnapshot>) {
+  function update(patch: Partial<PictureEditorSnapshot<Input, Bytes>>) {
     state = { ...state, ...patch };
     for (const listener of listeners) listener();
   }
@@ -71,7 +73,7 @@ export function createPictureEditor(
         });
     }
   }
-  async function save(command: PictureCommand, originatingSession: number) {
+  async function save(command: PictureCommand<Bytes>, originatingSession: number) {
     const result = await dependencies.save(command);
     if (!current(originatingSession)) return;
     if (result.success) {
@@ -88,7 +90,10 @@ export function createPictureEditor(
       await refresh(originatingSession);
     } else update({ error: result.error.message });
   }
-  async function decode(selected: PictureSelection, controller: AbortController) {
+  async function decode(
+    selected: PictureSelection<Input, Bytes>,
+    controller: NonNullable<typeof operation>
+  ) {
     const source = await dependencies.openSource(selected.file, controller.signal, profile.limits);
     if (controller.signal.aborted || state.selection !== selected) {
       source.dispose();
@@ -173,7 +178,7 @@ export function createPictureEditor(
         return;
       let selected = state.selection;
       const originatingSession = session;
-      const controller = new AbortController();
+      const controller = dependencies.createOperation();
       operation = controller;
       update({ processing: true, error: null });
       try {
@@ -199,7 +204,7 @@ export function createPictureEditor(
         await save(
           {
             action: 'upload',
-            picture: new File([blob], 'profile-picture.webp', { type: 'image/webp' }),
+            picture: blob,
             expectedVersion: selected.expectedVersion,
           },
           originatingSession
@@ -221,7 +226,7 @@ export function createPictureEditor(
       if (state.selection) update({ selection: { ...state.selection, crop } });
     },
     async select(
-      file: File | undefined,
+      file: Input | undefined,
       policy?: PictureEncodingPolicy & { acceptedSourceFormats: string[] }
     ) {
       if (!current(session) || !policy || dependencies.availability.isBusy()) return;
@@ -229,14 +234,14 @@ export function createPictureEditor(
       const result = pictureSelection(file, policy.acceptedSourceFormats);
       update({ error: result.error });
       if (!result.selected) return;
-      const selected: PictureSelection = {
+      const selected: PictureSelection<Input, Bytes> = {
         file: result.selected,
         expectedVersion: state.recovery === 'required' ? null : profile.version,
         source: null,
         crop: null,
         previewUrl: null,
       };
-      const controller = new AbortController();
+      const controller = dependencies.createOperation();
       operation = controller;
       update({ selection: selected, processing: true });
       try {

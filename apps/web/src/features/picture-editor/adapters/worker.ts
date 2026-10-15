@@ -1,6 +1,6 @@
 import type { PictureJob, PictureJobResult } from './protocol';
 import { gifPictureJob } from './gif';
-import { withoutPictureMetadata } from './webp';
+import { staticPictureJob } from './static';
 
 // Each worker owns one job. Termination cancels native decode/encode and frees its bitmap.
 self.addEventListener('message', async (event: MessageEvent<PictureJob>) => {
@@ -24,48 +24,22 @@ self.addEventListener('message', async (event: MessageEvent<PictureJob>) => {
       imageOrientation: 'from-image',
       colorSpaceConversion: 'default',
     });
-    const width =
-      job.action === 'preview'
-        ? Math.max(
-            1,
-            Math.round(bitmap.width * Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height)))
-          )
-        : job.policy.output.width;
-    const height =
-      job.action === 'preview'
-        ? Math.max(
-            1,
-            Math.round(bitmap.height * Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height)))
-          )
-        : job.policy.output.height;
-    const canvas = new OffscreenCanvas(width, height);
-    const context = canvas.getContext('2d', { alpha: true, colorSpace: 'srgb' });
-    if (!context) throw new Error('Unable to create the picture canvas.');
-    context.imageSmoothingQuality = 'high';
-    if (job.action === 'preview') context.drawImage(bitmap, 0, 0, width, height);
-    else
+    const image = bitmap;
+    const canvas = new OffscreenCanvas(1, 1);
+    const result = await staticPictureJob(job, bitmap, canvas, (context, crop) => {
       context.drawImage(
-        bitmap,
-        job.crop.x,
-        job.crop.y,
-        job.crop.size,
-        job.crop.size,
+        image,
+        crop.x,
+        crop.y,
+        crop.width,
+        crop.height,
         0,
         0,
-        width,
-        height
+        canvas.width,
+        canvas.height
       );
-    const encoded = await canvas.convertToBlob({
-      type: job.action === 'preview' ? 'image/png' : 'image/webp',
-      quality: job.action === 'process' ? job.policy.encoding.staticQuality / 100 : undefined,
     });
-    const blob = job.action === 'process' ? await withoutPictureMetadata(encoded) : encoded;
-    self.postMessage({
-      ok: true,
-      blob,
-      width: bitmap.width,
-      height: bitmap.height,
-    } satisfies PictureJobResult);
+    self.postMessage(result);
   } catch (cause) {
     self.postMessage({
       ok: false,

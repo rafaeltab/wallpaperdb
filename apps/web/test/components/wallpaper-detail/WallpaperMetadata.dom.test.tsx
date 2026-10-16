@@ -41,7 +41,7 @@ describe('WallpaperMetadata contributor', () => {
       <WallpaperMetadata wallpaper={wallpaper} selectedVariantIndex={0} onVariantSelect={vi.fn()} />,
     );
 
-    expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute(
+    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute(
       'src',
       'https://media.example/pic_ada.webp',
     );

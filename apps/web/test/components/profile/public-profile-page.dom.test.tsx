@@ -200,7 +200,7 @@ describe('PublicProfilePage', () => {
       />
     );
 
-    expect(screen.getByRole('img', { name: "Grace Hopper's profile picture" })).toHaveAttribute(
+    expect(screen.getByAltText("Grace Hopper's profile picture")).toHaveAttribute(
       'src',
       'https://media.example/profile-picture.webp'
     );

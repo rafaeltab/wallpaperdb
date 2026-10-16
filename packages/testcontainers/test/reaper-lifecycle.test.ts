@@ -10,6 +10,10 @@ import { createDockerProxy } from './fixtures/docker-proxy.js';
 // Allow seed startup (60s), the child (45s), cleanup (30s), and final teardown.
 it('starts a container when a selected Ryuk exits and preserves automatic cleanup', async () => {
   const client = await getContainerRuntimeClient();
+  const modem = client.container.dockerode.modem;
+  if (!('socketPath' in modem) || typeof modem.socketPath !== 'string') {
+    throw new Error('The lifecycle probe requires a Unix socket Docker connection');
+  }
   const session = randomUUID();
   const seed = await new GenericContainer('testcontainers/ryuk:0.14.0')
     .withExposedPorts(8080)
@@ -39,7 +43,8 @@ it('starts a container when a selected Ryuk exits and preserves automatic cleanu
     }
 
     proxy = await createDockerProxy(
-      client.info.containerRuntime.remoteSocketPath,
+      // Docker Desktop's host socket differs from the socket mounted inside containers.
+      modem.socketPath,
       seed.getId(),
       async () => {
         const exited = client.container.getById(seed.getId()).wait({ condition: 'removed' });
@@ -83,7 +88,7 @@ it('starts a container when a selected Ryuk exits and preserves automatic cleanu
     });
     const [code] = await once(child, 'exit');
     expect(code, logs).toBe(0);
-    expect(proxy.didHoldSnapshot()).toBe(true);
+    expect(proxy.didHoldSnapshot(), logs).toBe(true);
     if (!containerId) throw new Error(`Container fixture returned no container ID: ${logs}`);
     const ownedIds = [...proxy.ownedIds];
     expect(ownedIds).toContain(containerId);

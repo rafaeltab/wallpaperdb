@@ -485,7 +485,7 @@ describe('Profile picture settings', () => {
   });
 
   it('refreshes a conflict without losing the edit and waits for Retry with the authoritative version', async () => {
-    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new UserApiError('Conflict', 409, { type: 'https://wallpaperdb.test/problems/profile-version-conflict' }));
+    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new UserApiError('Conflict', 409, { type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/profile-version-conflict.md' }));
     const refreshed = { ...profile, version: 7, pictureAssetId: 'remote_picture' };
     const accepted = { ...refreshed, version: 8, pictureAssetId: 'accepted_picture' };
     vi.mocked(userApi.ensureProfile).mockResolvedValue(refreshed);

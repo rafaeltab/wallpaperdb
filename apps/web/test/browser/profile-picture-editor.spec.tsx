@@ -137,6 +137,31 @@ it.each([{ width: 1280, height: 800 }, { width: 390, height: 844 }])('shows sour
   expect(zoom().value).toBe('1');
 });
 
+it.each([{ width: 1280, height: 800 }, { width: 390, height: 844 }])('places quality feedback below Zoom and removes its layout space at $width pixels', async ({ width, height }) => {
+  await page.viewport(width, height);
+  await choose(await png(1024, 1024));
+  const controls = crop().parentElement;
+  if (!controls) throw new Error('Missing crop controls');
+  const clearHeight = controls.getBoundingClientRect().height;
+  const warning = 'This crop will be enlarged and may look pixelated.';
+  expect(screen.queryByText(warning)).toBeNull();
+  await userEvent.hover(crop());
+  await userEvent.wheel(crop(), { delta: { y: -550 } });
+  await expect.element(page.getByText(warning, { exact: true })).toBeVisible();
+  const feedback = screen.getByText(warning).closest('p');
+  if (!feedback) throw new Error('Missing quality feedback');
+  expect(feedback.getBoundingClientRect().top).toBeGreaterThanOrEqual(zoom().getBoundingClientRect().bottom);
+  expect(controls.getBoundingClientRect().height).toBeGreaterThan(clearHeight);
+  expect(zoom().getAttribute('aria-describedby')).toBe(feedback.id);
+  await expect.element(page.getByRole('button', { name: 'Apply', exact: true })).toBeEnabled();
+  crop().focus();
+  await userEvent.keyboard('{ArrowLeft}');
+  expect(screen.getByText(warning)).toBeVisible();
+  await userEvent.click(page.getByRole('button', { name: 'Reset crop', exact: true }));
+  expect(screen.queryByText(warning)).toBeNull();
+  expect(controls.getBoundingClientRect().height).toBeCloseTo(clearHeight, 0);
+});
+
 it('clamps native dragging without selecting the dialog title or file name', async () => {
   await choose(await png());
   const stage = crop().getBoundingClientRect();
@@ -169,7 +194,9 @@ it('zooms with the wheel and lets a bounded crop yield scrolling to the dialog',
 });
 
 it('resizes the crop with a real two-finger pinch', async () => {
-  await choose(await png());
+  await choose(await png(1024, 1024));
+  const warning = 'This crop will be enlarged and may look pixelated.';
+  expect(screen.queryByText(warning)).toBeNull();
   const box = crop().getBoundingClientRect();
   const offset = window.frameElement?.getBoundingClientRect();
   const x = box.x + box.width / 2 + (offset?.x ?? 0);
@@ -180,6 +207,9 @@ it('resizes the crop with a real two-finger pinch', async () => {
     await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, x: x - 20, y }, { id: 2, x: x + 20, y }] });
     await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, x: x - 40, y }, { id: 2, x: x + 40, y }] });
     await expect.poll(() => zoom().value).toBe('2');
+    expect(screen.queryByText(warning)).toBeNull();
+    await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, x: x - 60, y }, { id: 2, x: x + 60, y }] });
+    await expect.element(page.getByText(warning, { exact: true })).toBeVisible();
     await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   } finally {
     await session.send('Emulation.setTouchEmulationEnabled', { enabled: false });

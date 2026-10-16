@@ -1,29 +1,46 @@
-import { useEffect, useEffectEvent, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   initialPictureCrop,
   movePictureCrop,
   zoomPictureCrop,
   wheelPictureCrop,
   pinchPictureCrop,
+  pictureCropNeedsEnlargement,
   type PictureCrop,
   type PictureDimensions,
 } from '@/features/picture-editor';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export function ProfilePictureCrop({
   source,
   crop,
+  output,
   previewUrl,
   disabled,
   onChange,
 }: {
   source: PictureDimensions;
   crop: PictureCrop;
+  output: PictureDimensions | undefined;
   previewUrl: string;
   disabled: boolean;
   onChange: (crop: PictureCrop) => void;
 }) {
+  const enlarged = Boolean(output && pictureCropNeedsEnlargement(crop, output));
+  const qualityFeedback = [
+    enlarged ? 'This crop will be enlarged and may look pixelated.' : '',
+    crop.lowResolution
+      ? 'This picture is smaller than 64 pixels. Further zoom is disabled, but you can still apply it.'
+      : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const [announcement, setAnnouncement] = useState('');
+  useEffect(() => {
+    setAnnouncement(enlarged ? 'Picture quality warning. This crop may look pixelated.' : '');
+  }, [enlarged]);
   const apertureFraction = 0.75;
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ crop: PictureCrop; distance: number } | null>(null);
@@ -135,6 +152,9 @@ export function ProfilePictureCrop({
           className="pointer-events-none absolute rounded-full border-2 border-white shadow-[0_0_0_999px_rgb(0_0_0_/0.55)]"
           style={{ inset: `${(1 - apertureFraction) * 50}%` }}
         />
+        <output aria-live="polite" className="sr-only">
+          {announcement}
+        </output>
       </fieldset>
       <p id="picture-crop-help" className="sr-only">
         Drag the picture or use the arrow keys to move it. Use the Zoom slider, mouse wheel, or
@@ -153,7 +173,7 @@ export function ProfilePictureCrop({
           step={0.01}
           value={crop.zoom}
           disabled={disabled || crop.maxZoom === 1}
-          aria-describedby={crop.lowResolution ? 'picture-quality' : undefined}
+          aria-describedby={qualityFeedback ? 'picture-quality' : undefined}
           onChange={(event) => onChange(zoomPictureCrop(crop, source, Number(event.target.value)))}
         />
         <Button
@@ -167,10 +187,16 @@ export function ProfilePictureCrop({
           <RotateCcw className="size-4" />
         </Button>
       </div>
-      {crop.lowResolution && (
-        <p id="picture-quality" className="text-sm text-muted-foreground">
-          This picture is smaller than 64 pixels. It may look blurry. Further zoom is disabled, but
-          you can still apply it.
+      {qualityFeedback && (
+        <p
+          id="picture-quality"
+          className={cn(
+            'flex items-start gap-2 text-sm',
+            enlarged ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'
+          )}
+        >
+          {enlarged && <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />}
+          <span>{qualityFeedback}</span>
         </p>
       )}
     </div>

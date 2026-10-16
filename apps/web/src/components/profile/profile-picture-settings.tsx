@@ -88,6 +88,7 @@ export function ProfilePictureSettings({
             <ProfilePictureCrop
               source={selected.source}
               crop={selected.crop}
+              output={policy?.output}
               previewUrl={selected.previewUrl}
               disabled={processing || writing}
               onChange={editor.setCrop}

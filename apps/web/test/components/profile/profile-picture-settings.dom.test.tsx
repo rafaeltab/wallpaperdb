@@ -74,6 +74,7 @@ describe('Profile picture settings', () => {
     const dialog = screen.getByRole('dialog', { name: 'Profile picture' });
     await within(dialog).findByRole('slider', { name: 'Zoom' });
     expect(within(dialog).queryByRole('button', { name: 'Choose picture' })).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Choose picture')).toHaveAttribute('aria-hidden', 'true');
     expect(within(dialog).queryByText(/Choose, drop, or paste/)).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/512 × 512 WebP/)).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/Your picture appears/)).not.toBeInTheDocument();

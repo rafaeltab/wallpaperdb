@@ -158,6 +158,7 @@ export function ProfilePictureSettings({
               type="file"
               className="sr-only"
               tabIndex={-1}
+              aria-hidden={showPicker ? undefined : true}
               aria-describedby={showPicker ? 'picture-formats' : undefined}
               accept={policy?.acceptedSourceFormats.join(',')}
               disabled={refreshing || writing || !policyReady}

@@ -5,8 +5,14 @@ import { cdp, page, userEvent } from 'vitest/browser';
 import type {} from '@vitest/browser-playwright';
 import { ProfilePictureSettings } from '../../src/components/profile/profile-picture-settings';
 import { profileQueryKey } from '../../src/features/profile-management/adapters/query';
-import { userApi, type Profile } from '../../src/lib/api/user';
+import { userApi, UserApiError, type Profile } from '../../src/lib/api/user';
+import { openPictureSource } from '../../src/features/picture-editor/adapters/browser';
 import '../../src/index.css';
+
+vi.mock('../../src/features/picture-editor/adapters/browser', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../src/features/picture-editor/adapters/browser')>();
+  return { ...original, openPictureSource: vi.fn(original.openPictureSource) };
+});
 
 const profile: Profile = {
   id: 'picture-editor-owner', handle: 'ada', displayName: 'Ada Lovelace', biographyMarkdown: '',
@@ -17,6 +23,7 @@ const profile: Profile = {
 const clients: QueryClient[] = [];
 
 beforeEach(() => {
+  vi.mocked(openPictureSource).mockReset();
   vi.spyOn(userApi, 'picturePolicy').mockResolvedValue({
     output: { width: 512, height: 512, mimeType: 'image/webp', colorSpace: 'srgb' },
     maxOutputBytes: 5242880, acceptedSourceFormats: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
@@ -33,6 +40,7 @@ afterEach(async () => {
 function mount(initial = profile) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   clients.push(client);
+  client.setQueryDefaults(profileQueryKey(initial.id), { queryFn: () => userApi.ensureProfile({ tokenProvider: async () => null }) });
   client.setQueryData(profileQueryKey(initial.id), initial);
   render(<QueryClientProvider client={client}><ProfilePictureSettings profile={initial} tokenProvider={async () => null} /></QueryClientProvider>);
 }
@@ -87,7 +95,7 @@ it.each(['corrupt', 'over-budget'])('replaces a %s source through the picker wit
   await expect.element(page.getByRole('dialog', { name: 'Profile picture', exact: true })).not.toBeInTheDocument();
 });
 
-it.each([{ width: 1280, height: 800 }, { width: 390, height: 844 }])('keeps circular avatars and the edit control on their edge at $width pixels', async ({ width, height }) => {
+it.each([{ width: 1280, height: 800 }, { width: 360, height: 800 }])('keeps circular avatars and the edit control on their edge at $width pixels', async ({ width, height }) => {
   await page.viewport(width, height);
   mount();
   const avatar = screen.getByRole('img', { name: "Ada Lovelace's profile picture" });
@@ -101,20 +109,21 @@ it.each([{ width: 1280, height: 800 }, { width: 390, height: 844 }])('keeps circ
   expect(distance).toBeLessThanOrEqual(box.width / 2 + 2);
 });
 
-it('hides selection guidance after a real file is chosen and lets Cancel discard it', async () => {
+it('hides selection guidance after a real file is chosen and lets Back discard it inside the dialog', async () => {
   await choose(await png());
   expect(screen.queryByText('Choose picture', { selector: 'button' })).toBeNull();
   expect(screen.queryByText(/Choose, drop, or paste/)).toBeNull();
   expect(screen.queryByText(/512 × 512 WebP/)).toBeNull();
   expect(screen.getByRole('button', { name: 'Reset' }).getAttribute('data-variant')).toBe('destructive');
-  await userEvent.click(page.getByRole('button', { name: 'Cancel', exact: true }));
-  expect(screen.queryByRole('dialog', { name: 'Profile picture' })).toBeNull();
-  await userEvent.click(page.getByRole('button', { name: 'Edit profile picture', exact: true }));
+  expect(screen.queryByText('picture.png')).toBeNull();
+  await userEvent.click(page.getByRole('button', { name: 'Back', exact: true }));
+  expect(screen.getByRole('dialog', { name: 'Profile picture' })).toBeTruthy();
+  expect(document.activeElement).toBe(screen.getByText('Choose picture', { selector: 'button' }));
   await expect.element(screen.getByText('Choose picture', { selector: 'button' })).toBeVisible();
   expect(screen.queryByRole('img', { name: 'Selected avatar' })).toBeNull();
 });
 
-it.each([{ width: 1280, height: 800 }, { width: 390, height: 844 }])('shows source context around the crop and supports keyboard framing at $width pixels', async ({ width, height }) => {
+it.each([{ width: 1280, height: 800 }, { width: 360, height: 800 }])('shows source context around the crop and supports keyboard framing at $width pixels', async ({ width, height }) => {
   await page.viewport(width, height);
   await choose(await png());
   const stage = crop().getBoundingClientRect();
@@ -135,6 +144,158 @@ it.each([{ width: 1280, height: 800 }, { width: 390, height: 844 }])('shows sour
   expect(Number(zoom().value)).toBeGreaterThan(1);
   await userEvent.click(page.getByRole('button', { name: 'Reset crop', exact: true }));
   expect(zoom().value).toBe('1');
+});
+
+it('keeps file-drag feedback across nested children, ignores text drags, and clears it on leave, drop, and reopening', async () => {
+  mount({ ...profile, pictureImportStatus: 'complete' });
+  await userEvent.click(page.getByRole('button', { name: 'Edit profile picture', exact: true }));
+  const dialog = screen.getByRole('dialog', { name: 'Profile picture' });
+  const picker = screen.getByText('Choose picture', { selector: 'button' });
+  const text = new DataTransfer();
+  text.setData('text/uri-list', 'https://example.test/picture.png');
+  dialog.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer: text }));
+  expect(screen.queryByText('Drop to edit picture')).toBeNull();
+  const files = new DataTransfer();
+  files.items.add(await png());
+  dialog.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer: files }));
+  await expect.element(page.getByText('Drop to edit picture', { exact: true })).toBeVisible();
+  picker.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer: files }));
+  dialog.dispatchEvent(new DragEvent('dragleave', { bubbles: true, dataTransfer: files }));
+  expect(screen.getByText('Drop to edit picture')).toBeTruthy();
+  picker.dispatchEvent(new DragEvent('dragleave', { bubbles: true, dataTransfer: files }));
+  await expect.element(page.getByText('Drop an image here', { exact: true })).toBeVisible();
+  dialog.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer: files }));
+  const dropping = new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: files });
+  dialog.dispatchEvent(dropping);
+  expect(dropping.defaultPrevented).toBe(true);
+  await expect.element(page.getByRole('button', { name: 'Apply', exact: true })).toBeEnabled();
+  await userEvent.click(page.getByRole('button', { name: 'Back', exact: true }));
+  await expect.element(page.getByText('Drop an image here', { exact: true })).toBeVisible();
+  dialog.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer: files }));
+  await userEvent.keyboard('{Escape}');
+  await userEvent.click(page.getByRole('button', { name: 'Edit profile picture', exact: true }));
+  await expect.element(page.getByText('Drop an image here', { exact: true })).toBeVisible();
+});
+
+it.each([{ width: 1280, height: 800 }, { width: 360, height: 640 }])('places wrapping initial-selection errors beside Retry and keeps exactly 16 pixels before actions at $width pixels', async ({ width, height }) => {
+  await page.viewport(width, height);
+  mount({ ...profile, pictureImportStatus: 'complete' });
+  await userEvent.click(page.getByRole('button', { name: 'Edit profile picture', exact: true }));
+  const picker = page.getByLabelText('Choose picture', { exact: true });
+  await expect.element(picker).toBeEnabled();
+  const source = screen.getByRole('group', { name: 'Picture source' });
+  const actions = screen.getByRole('group', { name: 'Picture actions' });
+  const idleHeight = screen.getByRole('dialog').getBoundingClientRect().height;
+  expect(screen.queryByRole('group', { name: 'Picture feedback' })).toBeNull();
+  expect(actions.getBoundingClientRect().top - source.getBoundingClientRect().bottom).toBe(16);
+  await userEvent.upload(picker, new File(['invalid'], 'invalid.png', { type: 'image/png' }));
+  await expect.element(page.getByRole('alert')).toBeVisible();
+  const alert = screen.getByRole('alert');
+  const message = alert.querySelector('[data-slot="alert-description"]')!;
+  const retry = screen.getByRole('button', { name: 'Retry' });
+  expect(retry.closest('[role=alert]')).toBe(alert);
+  const messageBox = message.getBoundingClientRect(), retryBox = retry.getBoundingClientRect();
+  expect(retryBox.left).toBeGreaterThanOrEqual(messageBox.right);
+  expect(Math.abs((retryBox.top + retryBox.height / 2) - (messageBox.top + messageBox.height / 2))).toBeLessThan(1);
+  const feedback = screen.getByRole('group', { name: 'Picture feedback' });
+  expect(actions.getBoundingClientRect().top - feedback.getBoundingClientRect().bottom).toBe(16);
+  expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(innerWidth);
+  const dialog = screen.getByRole('dialog');
+  expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth);
+  actions.scrollIntoView();
+  expect(actions.getBoundingClientRect().bottom).toBeLessThanOrEqual(dialog.getBoundingClientRect().bottom);
+  await userEvent.click(page.getByRole('button', { name: 'Cancel', exact: true }));
+  await userEvent.click(page.getByRole('button', { name: 'Edit profile picture', exact: true }));
+  await expect.element(picker).toBeEnabled();
+  expect(screen.getByRole('dialog').getBoundingClientRect().height).toBe(idleHeight);
+});
+
+it.each([1280, 360])('keeps status spacing, reduced motion, and recovery readable at %s pixels', async (width) => {
+  await page.viewport(width, 800);
+  let finishProcessing!: (picture: Blob) => void;
+  let failUpload!: (cause: Error) => void;
+  const file = await png();
+  const url = URL.createObjectURL(file);
+  vi.mocked(openPictureSource).mockResolvedValueOnce({
+    width: 800, height: 400, preview: file,
+    process: () => new Promise((resolve) => { finishProcessing = resolve; }),
+    dispose: () => URL.revokeObjectURL(url),
+  });
+  const upload = vi.spyOn(userApi, 'uploadPicture')
+    .mockImplementationOnce(() => new Promise((_resolve, reject) => { failUpload = reject; }))
+    .mockRejectedValueOnce(new UserApiError('Conflict', 409, { type: 'https://wallpaperdb.test/problems/profile-version-conflict' }));
+  vi.spyOn(userApi, 'ensureProfile').mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce({ ...profile, version: 7, pictureAssetId: 'latest' });
+  mount({ ...profile, pictureImportStatus: 'complete' });
+  await userEvent.click(page.getByRole('button', { name: 'Edit profile picture', exact: true }));
+  const picker = page.getByLabelText('Choose picture', { exact: true });
+  await expect.element(picker).toBeEnabled();
+  await userEvent.upload(picker, file);
+  await expect.element(page.getByRole('button', { name: 'Apply', exact: true })).toBeEnabled();
+  const dialog = screen.getByRole('dialog');
+  const idleHeight = dialog.getBoundingClientRect().height;
+  await userEvent.click(page.getByRole('button', { name: 'Apply', exact: true }));
+  const status = screen.getByRole('status');
+  const spinner = status.parentElement!.querySelector('svg')!;
+  const actions = screen.getByRole('group', { name: 'Picture actions' });
+  const feedback = screen.getByRole('group', { name: 'Picture feedback' });
+  expect(actions.getBoundingClientRect().top - feedback.getBoundingClientRect().bottom).toBe(16);
+  expect(getComputedStyle(spinner).animationName).toBe('spin');
+  const session = cdp();
+  await session.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  try {
+    await expect.poll(() => getComputedStyle(spinner).animationName).toBe('none');
+    expect(status.textContent).toBe('Processing picture…');
+    await userEvent.click(page.getByRole('button', { name: 'Cancel picture processing', exact: true }));
+    expect(screen.queryByRole('group', { name: 'Picture feedback' })).toBeNull();
+    expect(dialog.getBoundingClientRect().height).toBe(idleHeight);
+    finishProcessing(new Blob(['late']));
+    await expect.element(page.getByRole('button', { name: 'Apply', exact: true })).toBeEnabled();
+    expect(upload).not.toHaveBeenCalled();
+    await userEvent.click(page.getByRole('button', { name: 'Apply', exact: true }));
+    finishProcessing(new Blob(['processed']));
+    await expect.element(page.getByRole('status')).toHaveTextContent('Saving picture…');
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    const savingFeedback = screen.getByRole('group', { name: 'Picture feedback' });
+    expect(actions.getBoundingClientRect().top - savingFeedback.getBoundingClientRect().bottom).toBe(16);
+    failUpload(new Error('The picture could not be uploaded. Your crop is retained. Retry when the connection is available.'));
+    await expect.element(page.getByRole('alert')).toBeVisible();
+    await expect.element(page.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();
+    const errorFeedback = screen.getByRole('group', { name: 'Picture feedback' });
+    expect(actions.getBoundingClientRect().top - errorFeedback.getBoundingClientRect().bottom).toBe(16);
+    await userEvent.click(page.getByRole('button', { name: 'Retry', exact: true }));
+    finishProcessing(new Blob(['retry']));
+    await expect.element(page.getByRole('button', { name: 'Retry Profile refresh', exact: true })).toBeEnabled();
+    expect(screen.getByRole('alert').textContent).toContain('Unable to refresh');
+    await userEvent.click(page.getByRole('button', { name: 'Retry Profile refresh', exact: true }));
+    await expect.element(page.getByRole('group', { name: 'Latest saved picture', exact: true })).toBeVisible();
+    expect(upload).toHaveBeenCalledTimes(2);
+    const review = screen.getByRole('group', { name: 'Picture feedback' });
+    expect(actions.getBoundingClientRect().top - review.getBoundingClientRect().bottom).toBe(16);
+    expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth);
+    actions.scrollIntoView();
+    expect(actions.getBoundingClientRect().bottom).toBeLessThanOrEqual(dialog.getBoundingClientRect().bottom);
+    await userEvent.click(page.getByRole('button', { name: 'Back', exact: true }));
+    await expect.element(page.getByRole('group', { name: 'Picture source', exact: true })).toBeVisible();
+    expect(screen.getByRole('group', { name: 'Latest saved picture' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
+  } finally {
+    await session.send('Emulation.setEmulatedMedia', { features: [] });
+  }
+});
+
+it('traps keyboard focus and restores the opener on close', async () => {
+  await choose(await png());
+  const close = page.getByRole('button', { name: 'Close', exact: true });
+  await userEvent.click(close);
+  await userEvent.click(page.getByRole('button', { name: 'Edit profile picture', exact: true }));
+  await expect.element(page.getByRole('heading', { name: 'Profile picture' })).toHaveFocus();
+  const dialog = screen.getByRole('dialog');
+  await userEvent.tab({ shift: true });
+  expect(dialog.contains(document.activeElement)).toBe(true);
+  await userEvent.tab();
+  expect(dialog.contains(document.activeElement)).toBe(true);
+  await userEvent.click(page.getByRole('button', { name: 'Cancel', exact: true }));
+  await expect.element(page.getByRole('button', { name: 'Edit profile picture', exact: true })).toHaveFocus();
 });
 
 it('clamps native dragging without selecting the dialog title or file name', async () => {

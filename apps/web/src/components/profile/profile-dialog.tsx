@@ -16,6 +16,8 @@ export function ProfileDialog({
   className,
   onDrop,
   onDragOver,
+  onDragEnter,
+  onDragLeave,
 }: {
   ref?: Ref<HTMLDivElement>;
   open: boolean;
@@ -28,6 +30,8 @@ export function ProfileDialog({
   className?: string;
   onDrop?: DragEventHandler<HTMLDivElement>;
   onDragOver?: DragEventHandler<HTMLDivElement>;
+  onDragEnter?: DragEventHandler<HTMLDivElement>;
+  onDragLeave?: DragEventHandler<HTMLDivElement>;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const descriptionId = useId();
@@ -47,6 +51,8 @@ export function ProfileDialog({
           aria-describedby={description ? descriptionId : undefined}
           onDrop={onDrop}
           onDragOver={onDragOver}
+          onDragEnter={onDragEnter}
+          onDragLeave={onDragLeave}
           className={cn(
             'fixed top-1/2 left-1/2 z-50 max-h-[85dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-background p-5 shadow-2xl outline-none sm:p-6',
             className

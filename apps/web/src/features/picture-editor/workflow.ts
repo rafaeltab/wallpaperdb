@@ -139,6 +139,11 @@ export function createPictureEditor<Input extends PictureFile, Bytes>(
     },
     close,
     cancel,
+    returnToSelection() {
+      if (!current(session) || operation || dependencies.availability.isBusy()) return false;
+      clear();
+      return true;
+    },
     requestRemoval() {
       if (
         current(session) &&

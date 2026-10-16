@@ -52,7 +52,10 @@ export function usePictureEditor(profile: Profile, tokenProvider: () => Promise<
                       : 'Unable to save this picture. Try again.',
                   versionConflict:
                     cause instanceof UserApiError &&
-                    Boolean(cause.type?.endsWith('/profile-version-conflict')),
+                    Boolean(
+                      cause.type?.endsWith('/profile-version-conflict') ||
+                        cause.type?.endsWith('/profile-version-conflict.md')
+                    ),
                 },
               };
             }

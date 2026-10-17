@@ -103,11 +103,35 @@ function ProfilePictureLoad({
 
   if (profile.picture && status !== 'unavailable') {
     const ready = status === 'ready';
-    const loaded = () => setStatus((current) => (current === 'loading' ? 'ready' : current));
+    const failed = () =>
+      setStatus((current) =>
+        current === 'loading'
+          ? projectionRetryDelay(retries, false) === undefined
+            ? 'unavailable'
+            : 'waiting'
+          : current
+      );
     const image = (
       <img
         ref={(image) => {
-          if (image?.complete && image.naturalWidth > 0) loaded();
+          if (!image || ready) return;
+          let active = true;
+          const loaded = () => {
+            void image.decode().then(
+              () => {
+                if (active) setStatus((current) => (current === 'loading' ? 'ready' : current));
+              },
+              () => {
+                if (active) failed();
+              }
+            );
+          };
+          if (image.complete && image.naturalWidth > 0) loaded();
+          else image.addEventListener('load', loaded, { once: true });
+          return () => {
+            active = false;
+            image.removeEventListener('load', loaded);
+          };
         }}
         className={cn(
           'absolute inset-0 size-full rounded-full object-cover',
@@ -116,16 +140,7 @@ function ProfilePictureLoad({
         src={profile.picture.url}
         alt={accessibleName}
         aria-hidden="true"
-        onLoad={loaded}
-        onError={() =>
-          setStatus((current) =>
-            current === 'loading'
-              ? projectionRetryDelay(retries, false) === undefined
-                ? 'unavailable'
-                : 'waiting'
-              : current
-          )
-        }
+        onError={failed}
       />
     );
     return (

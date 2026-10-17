@@ -178,7 +178,8 @@ describe('Profile picture settings', () => {
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     const progress = screen.getByRole('list', { name: 'Picture editing progress' });
     expect(progress.querySelector('[aria-current=step]')).toHaveTextContent('3Save');
-    const status = screen.getByRole('status');
+    const feedback = screen.getByRole('group', { name: 'Picture feedback' });
+    const status = within(feedback).getByRole('status');
     expect(status).toHaveTextContent('Processing picture…');
     expect(status).not.toHaveTextContent('Cancel');
     const actions = screen.getByRole('group', { name: 'Picture actions' });
@@ -186,8 +187,8 @@ describe('Profile picture settings', () => {
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel picture processing' })).toBeEnabled();
     await act(async () => finishProcessing(canonical));
-    expect(screen.getByRole('status')).toHaveTextContent('Saving picture…');
-    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(within(feedback).getByRole('status')).toHaveTextContent('Saving picture…');
+    expect(within(feedback).getAllByRole('status')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Cancel picture processing' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled();
@@ -195,7 +196,7 @@ describe('Profile picture settings', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Upload unavailable');
     expect(progress.querySelector('[aria-current=step]')).toHaveTextContent('2Frame');
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(within(feedback).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('keeps initial decode Retry in the alert and allows selecting the same file after failure', async () => {

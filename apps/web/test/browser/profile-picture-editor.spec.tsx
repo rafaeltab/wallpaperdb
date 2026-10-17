@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cdp, page, userEvent } from 'vitest/browser';
 import type {} from '@vitest/browser-playwright';
@@ -234,10 +234,10 @@ it.each([1280, 360])('keeps status spacing, reduced motion, and recovery readabl
   const dialog = screen.getByRole('dialog');
   const idleHeight = dialog.getBoundingClientRect().height;
   await userEvent.click(page.getByRole('button', { name: 'Apply', exact: true }));
-  const status = screen.getByRole('status');
+  const feedback = screen.getByRole('group', { name: 'Picture feedback' });
+  const status = within(feedback).getByRole('status');
   const spinner = status.parentElement!.querySelector('svg')!;
   const actions = screen.getByRole('group', { name: 'Picture actions' });
-  const feedback = screen.getByRole('group', { name: 'Picture feedback' });
   expect(actions.getBoundingClientRect().top - feedback.getBoundingClientRect().bottom).toBe(16);
   expect(getComputedStyle(spinner).animationName).toBe('spin');
   const session = cdp();
@@ -253,8 +253,8 @@ it.each([1280, 360])('keeps status spacing, reduced motion, and recovery readabl
     expect(upload).not.toHaveBeenCalled();
     await userEvent.click(page.getByRole('button', { name: 'Apply', exact: true }));
     finishProcessing(new Blob(['processed']));
-    await expect.element(page.getByRole('status')).toHaveTextContent('Saving picture…');
-    expect(screen.getAllByRole('status')).toHaveLength(1);
+    await expect.element(page.getByRole('group', { name: 'Picture feedback' }).getByRole('status')).toHaveTextContent('Saving picture…');
+    expect(within(screen.getByRole('group', { name: 'Picture feedback' })).getAllByRole('status')).toHaveLength(1);
     const savingFeedback = screen.getByRole('group', { name: 'Picture feedback' });
     expect(actions.getBoundingClientRect().top - savingFeedback.getBoundingClientRect().bottom).toBe(16);
     failUpload(new Error('The picture could not be uploaded. Your crop is retained. Retry when the connection is available.'));

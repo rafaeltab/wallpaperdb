@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import type { Profile } from '@/lib/api/user';
 import { GET_PROFILE, GET_PROFILE_BY_HANDLE, GET_WALLPAPER } from '@/lib/graphql/queries';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfilePicture } from '@/components/profile/profile-picture';
 
 const profile = {
@@ -13,21 +13,85 @@ const profile = {
 };
 
 describe('ProfilePicture', () => {
+  const originalDecode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode');
+  beforeEach(() => {
+    // jsdom does not decode images. Individual tests control deferred browser decoding.
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+  });
   afterEach(() => {
     vi.restoreAllMocks();
+    if (originalDecode) Object.defineProperty(HTMLImageElement.prototype, 'decode', originalDecode);
+    else Reflect.deleteProperty(HTMLImageElement.prototype, 'decode');
     vi.useRealTimers();
     vi.unstubAllEnvs();
   });
 
-  it('shows a muted loading status without initials until the picture is ready', () => {
+  it('shows a muted loading status without initials until the picture is ready', async () => {
     render(<ProfilePicture profile={profile} />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading profile picture');
     expect(screen.getByRole('img')).not.toHaveTextContent('AL');
     const image = screen.getByAltText("Ada Lovelace's profile picture");
     expect(image).toHaveAttribute('aria-hidden', 'true');
-    fireEvent.load(image);
+    await act(async () => fireEvent.load(image));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', profile.picture.url);
+  });
+
+  it('keeps the saved picture hidden until decoding finishes after load', async () => {
+    render(<ProfilePicture profile={profile} />);
+    const image = screen.getByAltText<HTMLImageElement>("Ada Lovelace's profile picture");
+    let finishDecoding = () => {};
+    image.decode = () => new Promise<void>((resolve) => { finishDecoding = resolve; });
+    fireEvent.load(image);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading profile picture');
+    expect(image).toHaveClass('opacity-0');
+    expect(screen.getByRole('img')).not.toHaveTextContent('AL');
+    await act(async () => finishDecoding());
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(image).not.toHaveClass('opacity-0');
+  });
+
+  it('keeps the placeholder through bounded retries when decoding rejects', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockRejectedValue(new DOMException('Invalid image', 'EncodingError'));
+    render(<ProfilePicture profile={profile} />);
+    await act(async () => fireEvent.load(screen.getByAltText("Ada Lovelace's profile picture")));
+    for (const delay of [1000, 2000, 4000]) {
+      expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.getByRole('img')).not.toHaveTextContent('AL');
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
+      await act(async () => fireEvent.load(screen.getByAltText("Ada Lovelace's profile picture")));
+    }
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('img')).toHaveTextContent('AL');
+    expect(screen.getByRole('img')).toHaveAccessibleDescription('Profile picture unavailable');
+  });
+
+  it.each(['resolve', 'reject'])('bounds stalled decoding and ignores its late %s after recovery', async (outcome) => {
+    vi.useFakeTimers();
+    render(<ProfilePicture profile={profile} />);
+    const image = screen.getByAltText<HTMLImageElement>("Ada Lovelace's profile picture");
+    let finishDecoding = () => {};
+    let failDecoding = (_reason: Error) => {};
+    image.decode = () => new Promise<void>((resolve, reject) => { finishDecoding = resolve; failDecoding = reject; });
+    fireEvent.load(image);
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    expect(screen.getByRole('img')).toHaveAccessibleDescription('Profile picture unavailable');
+    fireEvent.focus(window);
+    const recovered = screen.getByAltText("Ada Lovelace's profile picture");
+    await act(async () => {
+      if (outcome === 'resolve') finishDecoding();
+      else failDecoding(new Error('Stale decode failed'));
+    });
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(recovered).toHaveClass('opacity-0');
+    await act(async () => fireEvent.load(recovered));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(recovered).not.toHaveClass('opacity-0');
   });
 
   it('recovers a signed-out same-version picture when the window regains focus after an outage', async () => {
@@ -188,7 +252,7 @@ describe('ProfilePicture', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading profile picture');
     await act(async () => vi.advanceTimersByTimeAsync(14999));
     expect(screen.getByRole('status')).toBeInTheDocument();
-    fireEvent.load(screen.getByAltText("Ada Lovelace's profile picture"));
+    await act(async () => fireEvent.load(screen.getByAltText("Ada Lovelace's profile picture")));
     await act(async () => vi.advanceTimersByTimeAsync(60000));
     expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', profile.picture.url);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -206,10 +270,14 @@ describe('ProfilePicture', () => {
     expect(screen.getByRole('img')).toHaveAccessibleDescription('Profile picture unavailable');
   });
 
-  it('shows a cached image immediately when the browser reports it already complete', () => {
+  it('shows a cached image after decoding when the browser reports it already complete', async () => {
     vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true);
     vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(512);
+    let finishDecoding = () => {};
+    vi.spyOn(HTMLImageElement.prototype, 'decode').mockImplementation(() => new Promise<void>((resolve) => { finishDecoding = resolve; }));
     render(<ProfilePicture profile={profile} />);
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    await act(async () => finishDecoding());
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', profile.picture.url);
   });
@@ -218,9 +286,13 @@ describe('ProfilePicture', () => {
     vi.useFakeTimers();
     const view = render(<ProfilePicture profile={profile} />);
     const original = screen.getByAltText("Ada Lovelace's profile picture");
+    let finishDecoding = () => {};
+    Object.defineProperty(original, 'decode', { value: () => new Promise<void>((resolve) => { finishDecoding = resolve; }) });
+    fireEvent.load(original);
     await act(async () => vi.advanceTimersByTimeAsync(10000));
     const replacement = { ...profile, picture: { id: 'new', url: '/new-picture' } };
     view.rerender(<ProfilePicture profile={replacement} />);
+    await act(async () => finishDecoding());
     fireEvent.load(original);
     fireEvent.error(original);
     await act(async () => vi.advanceTimersByTimeAsync(5000));

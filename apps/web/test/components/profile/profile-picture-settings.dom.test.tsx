@@ -106,9 +106,21 @@ describe('Profile picture settings', () => {
     await userEvent.setup().upload(screen.getByLabelText('Choose picture'), new File(['source'], 'small.png', { type: 'image/png' }));
     const zoom = await screen.findByRole('slider', { name: 'Zoom' });
     expect(zoom).toBeDisabled();
-    expect(zoom).toHaveAccessibleDescription('This picture is smaller than 64 pixels. Further zoom is disabled, but you can still apply it.');
+    expect(zoom).toHaveAccessibleDescription('The shorter side of this picture is 64 pixels or smaller. Further zoom is disabled, but you can still apply it.');
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(screen.queryByText(/may look pixelated/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
+  });
+
+  it.each([64, 512])('explains the zoom lock at exactly 64 source pixels with %i-pixel output', async (outputSize) => {
+    vi.mocked(userApi.picturePolicy).mockResolvedValue({ ...picturePolicy, output: { ...picturePolicy.output, width: outputSize, height: outputSize } });
+    vi.mocked(openPictureSource).mockResolvedValue({ width: 64, height: 96, preview: new Blob(['preview']), process: processPicture, dispose: disposePicture });
+    await renderPage();
+    await userEvent.setup().upload(screen.getByLabelText('Choose picture'), new File(['source'], 'boundary.png', { type: 'image/png' }));
+    const zoom = await screen.findByRole('slider', { name: 'Zoom' });
+    expect(zoom).toBeDisabled();
+    expect(zoom).toHaveAccessibleDescription(/The shorter side of this picture is 64 pixels or smaller\. Further zoom is disabled, but you can still apply it\./);
+    expect(screen.getAllByText(/The shorter side of this picture is 64 pixels or smaller/)).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
   });
 
@@ -472,7 +484,7 @@ describe('Profile picture settings', () => {
     await renderPage();
     await userEvent.setup().upload(screen.getByLabelText('Choose picture'), new File(['png'], 'small.png', { type: 'image/png' }));
     expect(await screen.findByRole('slider', { name: 'Zoom' })).toBeDisabled();
-    expect(screen.getByText(/smaller than 64/)).toHaveTextContent('This crop will be enlarged and may look pixelated.');
+    expect(screen.getByText(/64 pixels or smaller/)).toHaveTextContent('This crop will be enlarged and may look pixelated.');
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveAccessibleDescription(/Further zoom is disabled/);
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
   });

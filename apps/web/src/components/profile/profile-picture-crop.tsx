@@ -31,8 +31,8 @@ export function ProfilePictureCrop({
   const enlarged = Boolean(output && pictureCropNeedsEnlargement(crop, output));
   const qualityFeedback = [
     enlarged ? 'This crop will be enlarged and may look pixelated.' : '',
-    crop.lowResolution
-      ? 'This picture is smaller than 64 pixels. Further zoom is disabled, but you can still apply it.'
+    crop.maxZoom === 1
+      ? 'The shorter side of this picture is 64 pixels or smaller. Further zoom is disabled, but you can still apply it.'
       : '',
   ]
     .filter(Boolean)

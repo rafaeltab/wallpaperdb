@@ -41,7 +41,7 @@ function fixture(t) {
 		mkdirSync(directory, { recursive: true });
 		writeFileSync(
 			join(directory, "package.json"),
-			JSON.stringify({ name: `@wallpaperdb/${name}` }),
+			JSON.stringify({ name: `@wallpaperdb/${name}`, type: "module" }),
 		);
 	}
 	const source = join(root, "apps/web-e2e/src");
@@ -81,6 +81,16 @@ if (args.includes('ps') && args.some(x => x.startsWith('label=')) && process.env
 if (args.includes('build') && process.env.TEST_BUILD_EXIT) process.exit(Number(process.env.TEST_BUILD_EXIT));
 if (args.includes('run') && process.env.TEST_MOUNT_EXIT) process.exit(Number(process.env.TEST_MOUNT_EXIT));
 if (args.includes('up') && process.env.TEST_UP_EXIT) process.exit(Number(process.env.TEST_UP_EXIT));
+if (args.includes('up') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_BROWSER_FIXTURE) {
+  const start = () => {
+    console.log('Application fixture starting');
+    const watcher = fs.watch('.', () => { if (fs.existsSync('fixture-server-ready')) { watcher.close(); clearTimeout(timer); } });
+    const timer = setTimeout(() => { console.error('Fixture server did not start'); process.exit(1); }, 5000);
+    if (fs.existsSync('fixture-server-ready')) { watcher.close(); clearTimeout(timer); }
+  };
+  if (process.env.TEST_UP_DELAY) setTimeout(start, Number(process.env.TEST_UP_DELAY));
+  else start();
+}
 if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_CLEANUP_EXIT) process.exit(Number(process.env.TEST_CLEANUP_EXIT));
 if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_HOLD_CLEANUP) { console.log('Cleanup fixture running'); setTimeout(() => {}, 100); }
 `,
@@ -200,7 +210,8 @@ async function browserFixture(t, ready = true) {
 		join(f.root, "apps/web-e2e/.env"),
 		"E2E_BASE_TEST_EMAIL=private@example.com\nE2E_BASE_TEST_PASSWORD=private-password\n",
 	);
-	f.env.E2E_READY_TIMEOUT = "1";
+	f.env.E2E_READY_TIMEOUT = ready === "hang" ? "1" : ready ? "10" : "3";
+	f.env.TEST_BROWSER_FIXTURE = "1";
 	const playwright = join(f.root, "apps/web-e2e/node_modules/@playwright/test");
 	mkdirSync(playwright, { recursive: true });
 	writeFileSync(
@@ -220,9 +231,11 @@ async function browserFixture(t, ready = true) {
 				stdout += data;
 				if (
 					!server.listening &&
-					String(data).includes("Waiting for browser readiness")
+					String(data).includes("Application fixture starting")
 				)
-					server.listen(ports[0], "0.0.0.0");
+					server.listen(ports[0], () =>
+						writeFileSync(join(f.root, "fixture-server-ready"), "ready"),
+					);
 				f.onOutput?.(String(data), child);
 			});
 			child.stderr.on("data", (data) => {
@@ -279,6 +292,18 @@ test("complete explicit E2E builds current images and releases its owned browser
 			.every((call) => call.includes("--volumes")),
 	);
 	assert.match(result.stdout, /All requested E2E phases and cleanup passed/);
+});
+
+test("browser command fixtures await observable startup even when startup takes over one second", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_UP_DELAY = "1100";
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.equal(result.status, 0, result.stderr);
+	assert.ok(
+		f
+			.calls()
+			.some((call) => call[0] === "turbo" && !call.includes("--dry=json")),
+	);
 });
 
 test("readiness failure identifies affected services and endpoints, retains diagnostics, and cleans up without running tests", async (t) => {

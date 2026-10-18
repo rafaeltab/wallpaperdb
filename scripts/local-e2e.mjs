@@ -592,10 +592,12 @@ async function main() {
 			}
 		}
 		if (failure) throw failure;
-		if (interrupted)
+		if (interrupted) {
+			phase = "browser cleanup";
 			throw Object.assign(new Error("Interrupted during cleanup."), {
 				status: interrupted,
 			});
+		}
 	}
 	if (containers.length) {
 		phase = "container tests";

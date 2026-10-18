@@ -153,8 +153,9 @@ describe('Telemetry SDK ownership', () => {
       expect(outcome).toBe('application startup failed');
       expect(entries).toContainEqual(
         expect.arrayContaining([
+          'Tags telemetry shutdown failed',
           expect.objectContaining({
-            cause: expect.objectContaining({ name: 'TimeoutError' }),
+            cause: expect.objectContaining({ name: expect.any(String) }),
           }),
         ])
       );

@@ -1,6 +1,54 @@
 import { expect, it, vi } from "vitest";
 import { TelemetryExportTransport } from "../src/telemetry/index.js";
 
+it("reports recovery only after every failing exporter recovers", async () => {
+  const transport = new TelemetryExportTransport();
+  const signal = () => {
+    let code = 1;
+    return {
+      exporter: transport.monitor({
+        export(_items: readonly unknown[], callback: (result: { code: number }) => void) {
+          callback({ code });
+        },
+      }),
+      recover() {
+        code = 0;
+      },
+    };
+  };
+  const traces = signal();
+  const logs = signal();
+  const metrics = signal();
+  metrics.recover();
+  const now = vi.spyOn(Date, "now").mockReturnValue(100_000);
+  const write = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  const completed = vi.fn();
+  try {
+    traces.exporter.export([], completed);
+    logs.exporter.export([], completed);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write).toHaveBeenLastCalledWith(
+      "telemetry export unavailable; bounded best-effort export\n"
+    );
+    now.mockReturnValue(130_001);
+    metrics.exporter.export([], completed);
+    traces.recover();
+    traces.exporter.export([], completed);
+    expect(write).toHaveBeenCalledTimes(1);
+    logs.recover();
+    logs.exporter.export([], completed);
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(write).toHaveBeenLastCalledWith(
+      "telemetry export recovered; bounded best-effort export\n"
+    );
+    expect(completed).toHaveBeenCalledTimes(5);
+  } finally {
+    write.mockRestore();
+    now.mockRestore();
+    await transport.close();
+  }
+});
+
 it("preserves export completion when the local diagnostic output throws", async () => {
   const transport = new TelemetryExportTransport();
   const exporter = transport.monitor({

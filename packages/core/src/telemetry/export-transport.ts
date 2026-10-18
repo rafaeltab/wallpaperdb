@@ -36,6 +36,7 @@ export class TelemetryExportTransport {
   private readonly agents = new Map<string, Promise<Agent>>();
   private readonly sockets = new Set<Duplex>();
   private readonly resolvers = new Set<Resolver>();
+  private readonly failedExporters = new Set<symbol>();
   private closed = false;
   private nextDiagnostic = 0;
   private unavailable = false;
@@ -50,18 +51,21 @@ export class TelemetryExportTransport {
   monitor<T extends { export(items: never, callback: (result: { code: number }) => void): void }>(
     exporter: T
   ): T {
+    const signal = Symbol();
     const send = exporter.export.bind(exporter);
     exporter.export = (items, callback) =>
       send(items, (result) => {
-        this.report(result.code === 0);
+        this.report(signal, result.code === 0);
         callback(result);
       });
     return exporter;
   }
 
-  private report(success: boolean): void {
+  private report(signal: symbol, success: boolean): void {
     if (this.closed) return;
-    const recovered = success && this.unavailable;
+    if (success) this.failedExporters.delete(signal);
+    else this.failedExporters.add(signal);
+    const recovered = success && this.unavailable && this.failedExporters.size === 0;
     if (!success) this.unavailable = true;
     if ((!success || recovered) && Date.now() >= this.nextDiagnostic) {
       this.nextDiagnostic = Date.now() + 30_000;

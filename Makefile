@@ -94,8 +94,12 @@ test-unit: ## Run unit tests (no containers; optional PACKAGE)
 test-integration: ## Run integration tests (Docker required) (optional PACKAGE)
 	@$(TURBO) run test:integration $(TURBO_FLAGS) --concurrency=1
 
-test-e2e: ## Run end-to-end tests (Docker required) (optional PACKAGE)
-	@$(TURBO) run test:e2e $(TURBO_FLAGS) --concurrency=1
+test-e2e: ## Explicit E2E with owned local dependencies (optional PACKAGE and ARGS)
+ifeq ($(GITHUB_ACTIONS),true)
+	@$(TURBO) run test:e2e $(TURBO_FLAGS) --concurrency=1 $(if $(strip $(ARGS)),-- $(ARGS))
+else
+	@bash scripts/local-e2e.sh $(TURBO) $(TURBO_FLAGS) -- $(ARGS)
+endif
 
 format: ## Format workspace code (optional PACKAGE)
 	@$(TURBO) run format $(TURBO_FLAGS) --log-order grouped

@@ -123,12 +123,12 @@ async function run(
 			for (const line of lines) record(line);
 		};
 		child.stdout.on("data", (data) => {
-			stdout += data;
-			if (!capture) emit(data);
+			if (capture) stdout += data;
+			else emit(data);
 		});
 		child.stderr.on("data", (data) => {
-			stderr += data;
-			if (!capture) emit(data);
+			if (capture) stderr += data;
+			else emit(data);
 		});
 		let killer;
 		const timer = setTimeout(

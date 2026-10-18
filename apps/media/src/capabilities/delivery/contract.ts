@@ -65,7 +65,16 @@ export const PictureAuthority = Context.Service<PictureAuthority>(
   'wallpaperdb.media.delivery.PictureAuthority'
 );
 
+/** Dimensions after applying source orientation, independent of stored catalog facts. */
+export interface ImageGeometry {
+  readonly width: number;
+  readonly height: number;
+  readonly requiresOrientation: boolean;
+}
+
 export interface ImageTransformer {
+  /** Consumes and closes the byte source. Native work is bounded and reaped on interruption. */
+  inspect(body: AssetBody): Effect.Effect<ImageGeometry, DeliveryUnavailable>;
   resize(
     body: AssetBody,
     options: ResizeOptions & { readonly mimeType: string }

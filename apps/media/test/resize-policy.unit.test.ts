@@ -44,6 +44,7 @@ function fixture() {
   const objects = new Map([['sources/original', 'original']]);
   const reads: string[] = [];
   const resizes: Array<ResizeOptions & { mimeType: string; input: string }> = [];
+  const geometries = new WeakMap<object, { width: number; height: number }>();
   const dependencies = Layer.mergeAll(
     Layer.succeed(Catalog, {
       findWallpaper: (id) => Effect.succeed(wallpapers.get(id) ?? null),
@@ -61,10 +62,25 @@ function fixture() {
           const key = `${asset.storageBucket}/${asset.storageKey}`;
           reads.push(key);
           const value = objects.get(key);
-          return value === undefined ? null : body(value);
+          if (value === undefined) return null;
+          const stream = body(value);
+          const geometry =
+            asset.storageKey === 'original'
+              ? wallpapers.get(source.id)
+              : [...renditions.values()].flat().find((v) => v.storageKey === asset.storageKey);
+          if (!geometry) throw new Error('Missing controlled geometry');
+          geometries.set(stream, geometry);
+          return stream;
         }),
     }),
     Layer.succeed(ImageTransformer, {
+      inspect: (input) =>
+        Effect.sync(() => {
+          input.close();
+          const geometry = geometries.get(input);
+          if (!geometry) throw new Error('Missing controlled geometry');
+          return { width: geometry.width, height: geometry.height, requiresOrientation: false };
+        }),
       resize: (input, options) =>
         Effect.promise(async () => {
           const value = await text(input);
@@ -199,7 +215,11 @@ describe('rendition source selection', () => {
     expect(result._tag).toBe('Found');
     if (result._tag !== 'Found') throw new Error('expected rendition');
     expect(await text(result.body)).toBe(resized ? `resized ${key}` : key);
-    expect(f.reads).toEqual([key === 'original' ? 'sources/original' : `renditions/${key}`]);
+    expect(f.reads).toEqual(
+      key === 'original'
+        ? ['sources/original', 'sources/original']
+        : ['sources/original', `renditions/${key}`, `renditions/${key}`]
+    );
     expect(f.resizes).toEqual(
       resized ? [{ width, height, fit: 'contain', mimeType: 'image/jpeg', input: key }] : []
     );
@@ -210,7 +230,7 @@ describe('rendition source selection', () => {
     expect(result._tag).toBe('Found');
     if (result._tag !== 'Found') throw new Error('expected rendition');
     expect(await text(result.body)).toBe('resized original');
-    expect(f.reads).toEqual(['sources/original']);
+    expect(f.reads).toEqual(['sources/original', 'sources/original']);
   });
   it('falls back after a materialized object disappears and reports absence when both objects are gone', async () => {
     const f = fixture();
@@ -221,11 +241,11 @@ describe('rendition source selection', () => {
     expect(result._tag).toBe('Found');
     if (result._tag !== 'Found') throw new Error('expected fallback');
     expect(await text(result.body)).toBe('resized original');
-    expect(f.reads).toEqual(['renditions/medium', 'sources/original']);
+    expect(f.reads).toEqual(['sources/original', 'renditions/medium', 'sources/original']);
     expect(f.resizes).toEqual([{ ...options, mimeType: 'image/jpeg', input: 'original' }]);
     f.objects.delete('sources/original');
     expect(await f.request(options)).toEqual({ _tag: 'NotFound' });
-    expect(f.reads.slice(2)).toEqual(['renditions/medium', 'sources/original']);
+    expect(f.reads.slice(3)).toEqual(['sources/original']);
     expect(f.resizes).toHaveLength(1);
   });
   it.each([
@@ -236,7 +256,7 @@ describe('rendition source selection', () => {
     const f = fixture();
     f.addRendition(1920, 1080, 'medium');
     expect((await f.request(options))._tag).toBe('Found');
-    expect(f.reads).toEqual(['sources/original']);
+    expect(f.reads).toEqual(['sources/original', 'sources/original']);
     expect(f.resizes).toEqual([{ ...options, mimeType: 'image/jpeg', input: 'original' }]);
   });
   it('passes fill upscaling through to the image adapter', async () => {

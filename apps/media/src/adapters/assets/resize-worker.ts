@@ -8,6 +8,7 @@ const options = z
     fit: z.enum(['contain', 'cover', 'fill']),
     mimeType: z.string(),
     maxInputPixels: z.number().int().positive(),
+    inspect: z.boolean().optional(),
   })
   .parse(JSON.parse(process.argv[2] ?? 'null'));
 try {
@@ -15,18 +16,38 @@ try {
     limitInputPixels: options.maxInputPixels,
     sequentialRead: true,
     failOn: 'none',
-  })
-    // Apply EXIF to pixels before crop/resize; default output strips source metadata.
-    .rotate();
-  transformer.resize(options.width, options.height, {
-    fit: options.fit === 'contain' ? 'inside' : options.fit,
-    withoutEnlargement: options.fit !== 'fill',
-    ...(options.fit === 'cover' ? { position: sharp.strategy.entropy } : {}),
   });
-  if (options.mimeType === 'image/jpeg') transformer.jpeg({ quality: 90, progressive: true });
-  else if (options.mimeType === 'image/png') transformer.png({ compressionLevel: 6 });
-  else if (options.mimeType === 'image/webp') transformer.webp({ quality: 90 });
-  await pipeline(process.stdin, transformer, process.stdout);
+  if (options.inspect) {
+    const [, metadata] = await Promise.all([
+      pipeline(process.stdin, transformer),
+      transformer.metadata(),
+    ]);
+    if (!metadata.width || !metadata.height) throw new Error('Invalid image dimensions');
+    const swapsAxes =
+      metadata.orientation !== undefined && metadata.orientation >= 5 && metadata.orientation <= 8;
+    process.stdout.write(
+      JSON.stringify({
+        width: swapsAxes ? metadata.height : metadata.width,
+        height: swapsAxes ? metadata.width : metadata.height,
+        requiresOrientation:
+          metadata.orientation !== undefined &&
+          metadata.orientation >= 2 &&
+          metadata.orientation <= 8,
+      })
+    );
+  } else {
+    // Apply EXIF to pixels before crop/resize; default output strips source metadata.
+    transformer.rotate();
+    transformer.resize(options.width, options.height, {
+      fit: options.fit === 'contain' ? 'inside' : options.fit,
+      withoutEnlargement: options.fit !== 'fill',
+      ...(options.fit === 'cover' ? { position: sharp.strategy.entropy } : {}),
+    });
+    if (options.mimeType === 'image/jpeg') transformer.jpeg({ quality: 90, progressive: true });
+    else if (options.mimeType === 'image/png') transformer.png({ compressionLevel: 6 });
+    else if (options.mimeType === 'image/webp') transformer.webp({ quality: 90 });
+    await pipeline(process.stdin, transformer, process.stdout);
+  }
 } catch (cause) {
   // Native messages can contain input-derived text; export only bounded diagnostic categories.
   const message = cause instanceof Error ? cause.message : '';

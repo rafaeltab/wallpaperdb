@@ -76,6 +76,151 @@ async function resize(
 }
 
 describe('native image resize contract', () => {
+  describe.each(['jpeg', 'png', 'webp'] as const)('%s stored geometry inspection', (format) => {
+    it.each(
+      orientationCases
+    )('inspects displayed orientation $orientation and releases its input', async ({
+      orientation,
+      grid,
+    }) => {
+      const input = await orientationFixture(format, orientation);
+      const runtime = ManagedRuntime.make(sharpTransformerLayer({ maxInputPixels: 268435456 }));
+      let closed = false;
+      try {
+        expect(
+          await runtime.runPromise(
+            ImageTransformer.use((t) =>
+              t.inspect({
+                close() {
+                  closed = true;
+                },
+                async *[Symbol.asyncIterator]() {
+                  yield input;
+                },
+              })
+            )
+          )
+        ).toEqual({
+          width: grid[0].length * 40,
+          height: grid.length * 40,
+          requiresOrientation: typeof orientation === 'number' && orientation >= 2,
+        });
+        expect(closed).toBe(true);
+      } finally {
+        await runtime.dispose();
+      }
+    });
+  });
+  it.each([
+    { name: 'corrupt input', limit: 268435456, input: Buffer.from('invalid-image') },
+    { name: 'input pixel limit', limit: 9599, input: undefined },
+  ])('rejects $name during inspection and closes the source', async ({ input, limit }) => {
+    const bytes = input ?? (await orientationFixture('png', 6));
+    const runtime = ManagedRuntime.make(sharpTransformerLayer({ maxInputPixels: limit }));
+    let closed = false;
+    try {
+      await expect(
+        runtime.runPromise(
+          ImageTransformer.use((t) =>
+            t.inspect({
+              close() {
+                closed = true;
+              },
+              async *[Symbol.asyncIterator]() {
+                yield bytes;
+              },
+            })
+          )
+        )
+      ).rejects.toMatchObject({ _tag: 'DeliveryUnavailable', operation: 'inspect_image' });
+      expect(closed).toBe(true);
+    } finally {
+      await runtime.dispose();
+    }
+  });
+  it.each([
+    'interruption',
+    'deadline',
+  ] as const)('shares native capacity and releases it after inspection %s', async (mode) => {
+    const runtime = ManagedRuntime.make(
+      sharpTransformerLayer({
+        maxInputPixels: 268435456,
+        maxConcurrent: 1,
+        timeoutMs: mode === 'deadline' ? 2000 : 30000,
+      })
+    );
+    const controller = new AbortController();
+    let entered = () => {};
+    const ready = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let closed = false;
+    const pending = runtime.runPromise(
+      ImageTransformer.use((t) =>
+        t.inspect({
+          close() {
+            closed = true;
+            release();
+          },
+          async *[Symbol.asyncIterator]() {
+            entered();
+            await blocked;
+            yield new Uint8Array();
+          },
+        })
+      ),
+      { signal: controller.signal }
+    );
+    const settled = pending.then(
+      () => 'unexpected success',
+      () => 'failed'
+    );
+    try {
+      await ready;
+      let refusedClosed = false;
+      await expect(
+        runtime.runPromise(
+          ImageTransformer.use((t) =>
+            t.resize(
+              {
+                close() {
+                  refusedClosed = true;
+                },
+                async *[Symbol.asyncIterator]() {},
+              },
+              { width: 20, fit: 'contain', mimeType: 'image/png' }
+            )
+          )
+        )
+      ).rejects.toMatchObject({ operation: 'resize_capacity' });
+      expect(refusedClosed).toBe(true);
+      if (mode === 'interruption') controller.abort();
+      expect(await settled).toBe('failed');
+      expect(closed).toBe(true);
+      const input = await orientationFixture('png', 6);
+      expect(
+        await runtime.runPromise(
+          ImageTransformer.use((t) =>
+            t.inspect({
+              close() {},
+              async *[Symbol.asyncIterator]() {
+                yield input;
+              },
+            })
+          )
+        )
+      ).toMatchObject({ width: 80, height: 120 });
+    } finally {
+      controller.abort();
+      release();
+      await settled;
+      await runtime.dispose();
+    }
+  });
   describe.each(['jpeg', 'png', 'webp'] as const)('%s orientation and privacy', (format) => {
     it.each(
       orientationCases

@@ -5,12 +5,14 @@ import { pipeline } from 'node:stream/promises';
 import { Context, Effect, Layer } from 'effect';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
 import {
   type AssetBody,
   AssetReader,
   DeliveryUnavailable,
   ImageTransformer,
   PictureAuthority,
+  type ResizeOptions,
 } from '../../capabilities/delivery/index.js';
 
 export const sharpTransformerLayer = (limits: {
@@ -30,133 +32,181 @@ export const sharpTransformerLayer = (limits: {
           await Promise.all(pending.map((worker) => worker.closed));
         })
       );
-      return ImageTransformer.of({
-        resize: (body, options) =>
-          Effect.gen(function* () {
-            if (workers.size >= (limits.maxConcurrent ?? 4)) {
+      const run = (
+        body: AssetBody,
+        options: ResizeOptions & { mimeType: string; inspect?: boolean }
+      ) =>
+        Effect.gen(function* () {
+          if (workers.size >= (limits.maxConcurrent ?? 4)) {
+            body.close();
+            return yield* Effect.fail(
+              new DeliveryUnavailable({
+                operation: 'resize_capacity',
+                cause: new Error('Resize capacity exhausted'),
+              })
+            );
+          }
+          const result = yield* Effect.sync(() => {
+            const start = Date.now();
+            const workerPath = new URL(
+              import.meta.url.endsWith('.ts') ? './resize-worker.ts' : './resize-worker.mjs',
+              import.meta.url
+            );
+            const child = spawn(
+              process.execPath,
+              [
+                '--experimental-strip-types',
+                fileURLToPath(workerPath),
+                JSON.stringify({ ...options, maxInputPixels: limits.maxInputPixels }),
+              ],
+              { stdio: ['pipe', 'pipe', 'pipe'] }
+            );
+            const input = Readable.from(body);
+            const output = new PassThrough();
+            output.on('error', () => {});
+            const stop = () => {
               body.close();
-              return yield* Effect.fail(
-                new DeliveryUnavailable({
-                  operation: 'resize_capacity',
-                  cause: new Error('Resize capacity exhausted'),
-                })
-              );
-            }
-            const result = yield* Effect.sync(() => {
-              const start = Date.now();
-              const workerPath = new URL(
-                import.meta.url.endsWith('.ts') ? './resize-worker.ts' : './resize-worker.mjs',
-                import.meta.url
-              );
-              const child = spawn(
-                process.execPath,
-                [
-                  '--experimental-strip-types',
-                  fileURLToPath(workerPath),
-                  JSON.stringify({ ...options, maxInputPixels: limits.maxInputPixels }),
-                ],
-                { stdio: ['pipe', 'pipe', 'pipe'] }
-              );
-              const input = Readable.from(body);
-              const output = new PassThrough();
-              output.on('error', () => {});
-              const stop = () => {
+              input.destroy();
+              child.kill('SIGKILL');
+            };
+            let diagnostic = '';
+            let reason = 'worker_failed';
+            child.stderr.on('data', (chunk: Buffer) => {
+              if (Buffer.byteLength(diagnostic) + chunk.byteLength > 1024) {
+                reason = 'diagnostic_limit';
+                stop();
+              } else diagnostic += chunk.toString();
+            });
+            const closed = new Promise<{
+              code: number | null;
+              signal: string | null;
+              reason: string;
+            }>((resolve) => {
+              child.once('close', (code, signal) => {
+                clearTimeout(deadline);
+                workers.delete(worker);
                 body.close();
-                input.destroy();
-                child.kill('SIGKILL');
-              };
-              let diagnostic = '';
-              let reason = 'worker_failed';
-              child.stderr.on('data', (chunk: Buffer) => {
-                if (Buffer.byteLength(diagnostic) + chunk.byteLength > 1024) {
-                  reason = 'diagnostic_limit';
-                  stop();
-                } else diagnostic += chunk.toString();
-              });
-              const closed = new Promise<{
-                code: number | null;
-                signal: string | null;
-                reason: string;
-              }>((resolve) => {
-                child.once('close', (code, signal) => {
-                  clearTimeout(deadline);
-                  workers.delete(worker);
-                  body.close();
-                  if (code === 0) output.end();
-                  else {
-                    recordCounter('media.resize.pipeline.errors', 1, { error_type: 'Error' });
-                    output.destroy(new Error('Image encoding failed'));
-                  }
-                  const knownReasons = [
-                    'unsupported_input',
-                    'input_pixel_limit',
-                    'corrupt_image',
-                    'encoding_failed',
-                  ];
-                  resolve({
-                    code,
-                    signal,
-                    reason: knownReasons.includes(diagnostic) ? diagnostic : reason,
-                  });
+                if (code === 0) output.end();
+                else {
+                  recordCounter('media.resize.pipeline.errors', 1, { error_type: 'Error' });
+                  output.destroy(new Error('Image encoding failed'));
+                }
+                const knownReasons = [
+                  'unsupported_input',
+                  'input_pixel_limit',
+                  'corrupt_image',
+                  'encoding_failed',
+                ];
+                resolve({
+                  code,
+                  signal,
+                  reason: knownReasons.includes(diagnostic) ? diagnostic : reason,
                 });
               });
-              const worker = { stop, closed };
-              workers.add(worker);
-              const deadline = setTimeout(() => {
-                reason = 'deadline_exceeded';
-                output.destroy(new Error('Image encoding deadline exceeded'));
-                stop();
-              }, limits.timeoutMs ?? 30000);
-              deadline.unref();
-              child.once('error', (error) => {
-                reason = 'worker_start_failed';
-                output.destroy(error);
-                stop();
-              });
-              output.once('close', stop);
-              child.stdout.pipe(output, { end: false });
-              void pipeline(input, child.stdin).catch((error) => {
-                output.destroy(error);
-                stop();
-              });
-              recordHistogram('media.resize.setup_duration_ms', Date.now() - start, {
-                'resize.fit_mode': options.fit,
-                'image.format': options.mimeType.split('/')[1],
-              });
-              return { body: byteStream(output), closed, stop };
             });
-            yield* Effect.promise(() => result.closed).pipe(
-              Effect.onInterrupt(() =>
-                Effect.promise(async () => {
-                  result.stop();
-                  await result.closed;
-                })
-              ),
-              Effect.flatMap((exit) =>
-                exit.code === 0
-                  ? Effect.void
-                  : Effect.fail(new DeliveryUnavailable({ operation: 'resize', cause: exit }))
-              ),
-              Effect.withSpan('media.resize', {
-                attributes: {
-                  'resize.width': options.width,
-                  'resize.height': options.height,
-                  'resize.fit_mode': options.fit,
-                  'file.mime_type': options.mimeType,
+            const worker = { stop, closed };
+            workers.add(worker);
+            const deadline = setTimeout(() => {
+              reason = 'deadline_exceeded';
+              output.destroy(new Error('Image encoding deadline exceeded'));
+              stop();
+            }, limits.timeoutMs ?? 30000);
+            deadline.unref();
+            child.once('error', (error) => {
+              reason = 'worker_start_failed';
+              output.destroy(error);
+              stop();
+            });
+            output.once('close', stop);
+            child.stdout.pipe(output, { end: false });
+            void pipeline(input, child.stdin).catch((error) => {
+              output.destroy(error);
+              stop();
+            });
+            recordHistogram('media.resize.setup_duration_ms', Date.now() - start, {
+              'resize.fit_mode': options.fit,
+              'image.format': options.mimeType.split('/')[1],
+            });
+            return { body: byteStream(output), closed, stop };
+          });
+          yield* Effect.promise(() => result.closed).pipe(
+            Effect.onInterrupt(() =>
+              Effect.promise(async () => {
+                result.stop();
+                await result.closed;
+              })
+            ),
+            Effect.flatMap((exit) =>
+              exit.code === 0
+                ? Effect.void
+                : Effect.fail(new DeliveryUnavailable({ operation: 'resize', cause: exit }))
+            ),
+            Effect.withSpan('media.resize', {
+              attributes: {
+                'resize.width': options.width,
+                'resize.height': options.height,
+                'resize.fit_mode': options.fit,
+                'file.mime_type': options.mimeType,
+              },
+            }),
+            Effect.catchTag('DeliveryUnavailable', (error) =>
+              Effect.logError('Media resize failed', {
+                operation: error.operation,
+                diagnostic: error.cause,
+              })
+            ),
+            Effect.forkIn(scope)
+          );
+          return result;
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logError('Media resize admission failed', {
+              operation: error.operation,
+              cause: error.cause,
+            })
+          )
+        );
+      return ImageTransformer.of({
+        resize: (body, options) => run(body, options).pipe(Effect.map((result) => result.body)),
+        inspect: (body) =>
+          Effect.acquireUseRelease(
+            run(body, { fit: 'contain', mimeType: 'application/json', inspect: true }),
+            (result) =>
+              Effect.tryPromise({
+                try: async (signal) => {
+                  const abort = () => result.stop();
+                  signal.addEventListener('abort', abort, { once: true });
+                  try {
+                    signal.throwIfAborted();
+                    const chunks: Uint8Array[] = [];
+                    let size = 0;
+                    for await (const chunk of result.body) {
+                      size += chunk.byteLength;
+                      if (size > 1024) throw new Error('Image geometry exceeds its frame limit');
+                      chunks.push(chunk);
+                    }
+                    return z
+                      .object({
+                        width: z.number().int().positive(),
+                        height: z.number().int().positive(),
+                        requiresOrientation: z.boolean(),
+                      })
+                      .parse(JSON.parse(Buffer.concat(chunks).toString()));
+                  } finally {
+                    signal.removeEventListener('abort', abort);
+                  }
                 },
+                catch: (cause) => new DeliveryUnavailable({ operation: 'inspect_image', cause }),
               }),
-              Effect.catchTag('DeliveryUnavailable', (error) =>
-                Effect.logError('Media resize failed', {
-                  operation: error.operation,
-                  diagnostic: error.cause,
-                })
-              ),
-              Effect.forkIn(scope)
-            );
-            return result.body;
-          }).pipe(
+            (result) =>
+              Effect.promise(async () => {
+                result.stop();
+                result.body.close();
+                await result.closed;
+              })
+          ).pipe(
             Effect.tapError((error) =>
-              Effect.logError('Media resize admission failed', {
+              Effect.logError('Media image inspection failed', {
                 operation: error.operation,
                 cause: error.cause,
               })

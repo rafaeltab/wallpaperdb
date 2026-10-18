@@ -32,7 +32,8 @@ describe("buildWebE2EConfig", () => {
     expect(config.workers).toBe(1);
     expect(config.use?.baseURL).toBe("http://localhost:8120/web");
     expect(
-      config.projects?.find((project) => project.name === "chromium")?.dependencies,
+      config.projects?.find((project) => project.name === "chromium")
+        ?.dependencies,
     ).toEqual(["setup:base-user"]);
     expect(
       config.projects?.find((project) => project.name === "chromium")?.use,
@@ -132,7 +133,9 @@ describe("auth state contract", () => {
           { status: 200 },
         ),
       )
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      );
 
     await expect(
       ensureAuthPersonaBypassesClientTrust(
@@ -150,7 +153,9 @@ describe("auth state contract", () => {
       1,
       "https://api.clerk.com/v1/users?email_address=test.base%40example.com",
       expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: "Bearer sk_test_123" }),
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk_test_123",
+        }),
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -166,9 +171,9 @@ describe("auth state contract", () => {
 
 describe("environment contract", () => {
   it("derives the ingress origin from the browser base URL contract", () => {
-    expect(buildWebE2EBaseUrl({ INGRESS_PORT: "8120" } as NodeJS.ProcessEnv)).toBe(
-      "http://localhost:8120/web",
-    );
+    expect(
+      buildWebE2EBaseUrl({ INGRESS_PORT: "8120" } as NodeJS.ProcessEnv),
+    ).toBe("http://localhost:8120/web");
     expect(
       buildIngressOrigin({
         PLAYWRIGHT_BASE_URL: "http://localhost:9450/web",
@@ -226,7 +231,7 @@ describe("environment contract", () => {
         fetchMock,
       ),
     ).rejects.toThrowError(
-      /media readiness: http:\/\/localhost:8120\/media\/ready -> HTTP 503[\s\S]*media \/ready body: \{"ready":false,"reason":"booting"\}[\s\S]*media health: http:\/\/localhost:8120\/media\/health -> HTTP 200[\s\S]*media \/health body: \{"status":"degraded"\}[\s\S]*make infra-start[\s\S]*make dev/s,
+      /media readiness: http:\/\/localhost:8120\/media\/ready -> HTTP 503[\s\S]*media \/ready body: \{"ready":false,"reason":"booting"\}[\s\S]*media health: http:\/\/localhost:8120\/media\/health -> HTTP 200[\s\S]*media \/health body: \{"status":"degraded"\}[\s\S]*make test-e2e PACKAGE=web-e2e/s,
     );
   });
 

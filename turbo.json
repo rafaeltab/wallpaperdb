@@ -127,6 +127,7 @@
         },
         "test:e2e": {
             "cache": false,
+            "passThroughEnv": ["PLAYWRIGHT_BASE_URL", "INGRESS_PORT", "E2E_BASE_TEST_EMAIL", "E2E_BASE_TEST_PASSWORD", "CLERK_SECRET_KEY"],
             "inputs": [
                 "src/**",
                 "test/**",

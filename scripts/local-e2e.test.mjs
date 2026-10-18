@@ -398,6 +398,26 @@ test("browser command fixtures await observable startup even when startup takes 
 	);
 });
 
+for (const buildFailure of [false, true]) {
+	test(`owned application images are removed after ${buildFailure ? "a failed build" : "successful browser tests"} while pulled images are preserved`, async (t) => {
+		const f = await browserFixture(t);
+		if (buildFailure) f.env.TEST_BUILD_EXIT = "37";
+		const result = await f.runAsync("PACKAGE=web-e2e");
+		assert.equal(result.status === 0, !buildFailure, result.stderr);
+		const teardown = f.calls().filter((call) => call.includes("down"));
+		assert.equal(teardown.length, 2);
+		const apps = teardown.find((call) =>
+			call.includes("infra/docker-compose.apps.yml"),
+		);
+		assert.equal(apps[apps.indexOf("--rmi") + 1], "local");
+		assert.ok(
+			!teardown
+				.find((call) => call.includes("infra/docker-compose.yml"))
+				.includes("--rmi"),
+		);
+	});
+}
+
 test("readiness failure identifies affected services and endpoints, retains diagnostics, and cleans up without running tests", async (t) => {
 	const f = await browserFixture(t, false);
 	const result = await f.runAsync("PACKAGE=web-e2e");

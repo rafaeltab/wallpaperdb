@@ -141,8 +141,10 @@ if (args.includes('--dry=json')) {
   const selected = args.filter(x => x.startsWith('--filter=@')).map(x => x.slice(9));
   console.log(JSON.stringify({ tasks: (selected.length ? selected : ['@wallpaperdb/web-e2e', '@wallpaperdb/test-utils', '@wallpaperdb/testcontainers']).map(name => ({package: name, task: 'test:e2e', command: 'test'})) }));
 } else if (args.includes('--filter=@wallpaperdb/web-e2e')) {
-  fs.mkdirSync('apps/web-e2e/test-results', {recursive: true});
-  fs.writeFileSync('apps/web-e2e/test-results/trace.zip', 'retained browser artifact');
+  if (process.env.TEST_BEFORE_PLAYWRIGHT_EXIT) process.exit(Number(process.env.TEST_BEFORE_PLAYWRIGHT_EXIT));
+  const artifacts = process.env.E2E_ARTIFACTS_DIR || 'apps/web-e2e';
+  fs.mkdirSync(artifacts + '/test-results', {recursive: true});
+  fs.writeFileSync(artifacts + '/test-results/trace.zip', 'retained browser artifact');
   if (process.env.TEST_HOLD) { fs.writeFileSync('active-fixture-child.pid', String(process.pid)); console.log('Browser fixture running'); setInterval(() => {}, 1000); }
   else if (process.env.TEST_BROWSER_EXIT) { console.error('private-password sk_test_private'); process.exit(Number(process.env.TEST_BROWSER_EXIT)); }
 }
@@ -627,6 +629,30 @@ test("readiness deadline cancels hanging HTTP probes and still cleans up", async
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /browser readiness.*exit 124/);
 	assert.ok(Date.now() - start < 8000);
+	assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+});
+
+test("browser task failure before Playwright starts preserves old reports without retaining them as current evidence", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_BEFORE_PLAYWRIGHT_EXIT = "41";
+	for (const name of ["test-results", "playwright-report"]) {
+		const directory = join(f.root, "apps/web-e2e", name);
+		mkdirSync(directory, { recursive: true });
+		writeFileSync(join(directory, "old.txt"), "previous browser run");
+	}
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.match(result.stderr, /browser tests.*exit 41/);
+	const diagnostics = result.stdout.match(
+		/E2E diagnostics retained at (\S+)\./,
+	)[1];
+	for (const name of ["test-results", "playwright-report"]) {
+		assert.ok(!existsSync(join(diagnostics, name)));
+		assert.equal(
+			readFileSync(join(f.root, "apps/web-e2e", name, "old.txt"), "utf8"),
+			"previous browser run",
+		);
+	}
+	assert.ok(existsSync(join(diagnostics, "apps.log")));
 	assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
 });
 

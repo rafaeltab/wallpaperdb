@@ -307,8 +307,24 @@ async function preflightBrowser() {
 				throw new Error(
 					`${service} requires a Clerk development sk_test_ key for browser E2E.`,
 				);
+			if (
+				key.endsWith("CLERK_PUBLISHABLE_KEY") &&
+				!value.startsWith("pk_test_")
+			)
+				throw new Error(
+					`${service} requires a Clerk development pk_test_ publishable key for browser E2E.`,
+				);
 		}
 	}
+	const publishableKeys = [
+		config.services.ingestor.environment.CLERK_PUBLISHABLE_KEY,
+		config.services.user.environment.CLERK_PUBLISHABLE_KEY,
+		config.services.web.environment.VITE_CLERK_PUBLISHABLE_KEY,
+	];
+	if (new Set(publishableKeys).size !== 1)
+		throw new Error(
+			"Clerk publishable keys must match across Ingestor, User, and Web. Configure one development instance and run make install.",
+		);
 	if (
 		config.services.user.environment.USER_MEDIA_SERVICE_TOKEN !==
 		config.services.media.environment.USER_MEDIA_SERVICE_TOKEN

@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Clock, Context, Effect, Layer, Metric, Semaphore } from 'effect';
 import { resolveOriginalAsset, resolveVariantAsset } from '@wallpaperdb/core/assets';
-import { encodeImage } from './process.js';
+import { encodeImage, inspectImage } from './process.js';
 import { storeVariant } from './storage.js';
 import {
   GenerationUnavailable,
@@ -54,6 +54,84 @@ class StoredVariantImages implements VariantImages {
     private readonly config: ImageConfig
   ) {}
 
+  private readonly readSource = Effect.fn('variant-generation.image.read-source')(function* (
+    this: StoredVariantImages,
+    input: GenerationInput
+  ) {
+    const storage = input.storage;
+    const original =
+      'owner' in storage
+        ? yield* request('resolve-original', async () => {
+            if (storage.id !== input.wallpaperId)
+              throw new Error('Original reference identity mismatch');
+            return resolveOriginalAsset(storage, input.mimeType, this.config.bucket);
+          })
+        : storage;
+    const bytes = yield* request('read-image', async (abortSignal) => {
+      const response = await this.client.send(
+        new GetObjectCommand({ Bucket: original.bucket, Key: original.key }),
+        { abortSignal }
+      );
+      if (!(response.Body instanceof Readable))
+        throw new Error('Object storage returned no readable image');
+      const body = response.Body;
+      const cancel = () => {
+        body.destroy(new Error('Image read interrupted'));
+      };
+      abortSignal.addEventListener('abort', cancel, { once: true });
+      try {
+        abortSignal.throwIfAborted();
+        if (response.ContentLength !== undefined && response.ContentLength > maxImageBytes) {
+          throw new Error('Stored image exceeds 50 MiB');
+        }
+        let totalBytes = 0;
+        const chunks: Buffer[] = [];
+        for await (const chunk of body) {
+          if (typeof chunk !== 'string' && !(chunk instanceof Uint8Array)) {
+            throw new Error('Object storage returned invalid image bytes');
+          }
+          const chunkBytes =
+            typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.byteLength;
+          if (chunkBytes > maxImageBytes - totalBytes) {
+            throw new Error('Stored image exceeds 50 MiB');
+          }
+          totalBytes += chunkBytes;
+          chunks.push(Buffer.from(chunk));
+        }
+        return Buffer.concat(chunks, totalBytes);
+      } finally {
+        abortSignal.removeEventListener('abort', cancel);
+        body.destroy();
+      }
+    });
+    return { original, bytes };
+  });
+
+  readonly inspect = Effect.fn('variant-generation.image.inspect')(function* (
+    this: StoredVariantImages,
+    input: GenerationInput
+  ) {
+    return yield* this.nativeWork
+      .withPermit(
+        Effect.gen({ self: this }, function* () {
+          const { bytes } = yield* this.readSource(input);
+          return yield* inspectImage(bytes);
+        })
+      )
+      .pipe(
+        Effect.timeoutOrElse({
+          duration: '100 seconds',
+          orElse: () =>
+            Effect.fail(
+              new GenerationUnavailable({
+                operation: 'inspect-image',
+                cause: new Error('Image inspection exceeded 100 seconds'),
+              })
+            ),
+        })
+      );
+  });
+
   readonly generate = Effect.fn('variant-generation.image.generate')(function* (
     this: StoredVariantImages,
     input: GenerationInput,
@@ -64,51 +142,7 @@ class StoredVariantImages implements VariantImages {
         Effect.gen({ self: this }, function* () {
           const start = yield* Clock.currentTimeMillis;
           const storage = input.storage;
-          const original =
-            'owner' in storage
-              ? yield* request('resolve-original', async () => {
-                  if (storage.id !== input.wallpaperId)
-                    throw new Error('Original reference identity mismatch');
-                  return resolveOriginalAsset(storage, input.mimeType, this.config.bucket);
-                })
-              : storage;
-          const bytes = yield* request('read-image', async (abortSignal) => {
-            const response = await this.client.send(
-              new GetObjectCommand({ Bucket: original.bucket, Key: original.key }),
-              { abortSignal }
-            );
-            if (!(response.Body instanceof Readable))
-              throw new Error('Object storage returned no readable image');
-            const body = response.Body;
-            const cancel = () => {
-              body.destroy(new Error('Image read interrupted'));
-            };
-            abortSignal.addEventListener('abort', cancel, { once: true });
-            try {
-              abortSignal.throwIfAborted();
-              if (response.ContentLength !== undefined && response.ContentLength > maxImageBytes) {
-                throw new Error('Stored image exceeds 50 MiB');
-              }
-              let totalBytes = 0;
-              const chunks: Buffer[] = [];
-              for await (const chunk of body) {
-                if (typeof chunk !== 'string' && !(chunk instanceof Uint8Array)) {
-                  throw new Error('Object storage returned invalid image bytes');
-                }
-                const chunkBytes =
-                  typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.byteLength;
-                if (chunkBytes > maxImageBytes - totalBytes) {
-                  throw new Error('Stored image exceeds 50 MiB');
-                }
-                totalBytes += chunkBytes;
-                chunks.push(Buffer.from(chunk));
-              }
-              return Buffer.concat(chunks, totalBytes);
-            } finally {
-              abortSignal.removeEventListener('abort', cancel);
-              body.destroy();
-            }
-          });
+          const { original, bytes } = yield* this.readSource(input);
           const mimeType = input.mimeType;
           if (mimeType !== 'image/jpeg' && mimeType !== 'image/png' && mimeType !== 'image/webp') {
             return yield* Effect.fail(

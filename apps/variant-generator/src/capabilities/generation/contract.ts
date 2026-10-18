@@ -58,6 +58,12 @@ export class GenerationUnavailable extends Schema.TaggedError<GenerationUnavaila
  * Interruption stops the underlying image and storage work before completing.
  */
 export interface VariantImages {
+  /** Reads immutable source bytes and reports displayed axes, including EXIF rotations.
+   * Inspection shares generation's size, concurrency, deadline and interruption bounds.
+   */
+  inspect(
+    input: GenerationInput
+  ): Effect.Effect<{ readonly width: number; readonly height: number }, GenerationUnavailable>;
   generate(
     input: GenerationInput,
     preset: ResolutionPreset

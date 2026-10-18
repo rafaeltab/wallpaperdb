@@ -23,11 +23,23 @@ export interface EncodedImage {
   readonly height: number;
 }
 
+export function encodeImage(bytes: Uint8Array, options: EncodingOptions) {
+  return runImage(bytes, options);
+}
+
+export function inspectImage(bytes: Uint8Array) {
+  return runImage(bytes, { inspect: true }).pipe(
+    Effect.map(({ width, height }) => ({ width, height }))
+  );
+}
+
 /** Own the operating-system process until close, including interrupted execution. */
-export function encodeImage(
+function runImage(
   bytes: Uint8Array,
-  options: EncodingOptions
+  options: EncodingOptions | { readonly inspect: true }
 ): Effect.Effect<EncodedImage, GenerationUnavailable> {
+  const inspection = 'inspect' in options;
+  const operation = inspection ? 'inspect-image' : 'encode-image';
   return Effect.callback<EncodedImage, GenerationUnavailable>((resume) => {
     const worker = new URL(
       import.meta.url.endsWith('.ts') ? './encoder.ts' : './encoder.mjs',
@@ -56,7 +68,7 @@ export function encodeImage(
           resume(
             Effect.fail(
               new GenerationUnavailable({
-                operation: 'encode-image',
+                operation,
                 cause:
                   failure ??
                   new Error(
@@ -67,13 +79,21 @@ export function encodeImage(
           );
         } else {
           const output = Buffer.concat(chunks);
-          const width = output.length > dimensionFrameBytes ? output.readUInt32BE(0) : 0;
-          const height = output.length > dimensionFrameBytes ? output.readUInt32BE(4) : 0;
-          if (width <= 0 || height <= 0 || width > options.width || height > options.height) {
+          const width = output.length >= dimensionFrameBytes ? output.readUInt32BE(0) : 0;
+          const height = output.length >= dimensionFrameBytes ? output.readUInt32BE(4) : 0;
+          if (
+            width <= 0 ||
+            height <= 0 ||
+            (!inspection &&
+              (output.length <= dimensionFrameBytes ||
+                width > options.width ||
+                height > options.height)) ||
+            (inspection && output.length !== dimensionFrameBytes)
+          ) {
             resume(
               Effect.fail(
                 new GenerationUnavailable({
-                  operation: 'encode-image',
+                  operation,
                   cause: new Error('Image encoder returned invalid dimensions'),
                 })
               )
@@ -88,7 +108,7 @@ export function encodeImage(
     child.stdin.once('error', stop);
     child.stdout.on('data', (chunk: Buffer) => {
       size += chunk.byteLength;
-      if (size > maxPixelBytes + dimensionFrameBytes)
+      if (size > (inspection ? dimensionFrameBytes : maxPixelBytes + dimensionFrameBytes))
         stop(new Error('Image encoder output exceeds the pixel limit'));
       else chunks.push(chunk);
     });
@@ -109,7 +129,7 @@ export function encodeImage(
       orElse: () =>
         Effect.fail(
           new GenerationUnavailable({
-            operation: 'encode-image',
+            operation,
             cause: new Error('Image encoder exceeded 60 seconds'),
           })
         ),

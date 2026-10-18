@@ -8,6 +8,7 @@ import {
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import sharp from 'sharp';
+import { orientationCases, orientationColors, orientationFixture, samplePixelGrid } from '@wallpaperdb/test-utils/fixtures';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { InProcessVariantGeneratorTesterBuilder } from '../builders/index.js';
 
@@ -137,5 +138,66 @@ describe('variant generation composition', () => {
     expect((await manager.streams.info('WALLPAPER')).state.messages - before).toBe(4);
     expect(await tester.s3.objectExists('wallpapers', `${id}/variant_854x480.png`)).toBe(false);
   });
+
+  it.each(orientationCases.filter(({ orientation }) => typeof orientation === 'number' && orientation >= 5))(
+    'selects phone targets from stored orientation $orientation and publishes actual pixels', async ({ orientation, grid }) => {
+      const id = `wlpr_oriented_presets_${orientation}`;
+      // Enlarge the asymmetric coded grid without applying orientation; keep raw event axes.
+      const original = await sharp(await orientationFixture('png', orientation))
+        .resize(1920, 1080, { fit: 'fill' }).withMetadata({ orientation: Number(orientation) }).png().toBuffer();
+      expect(await sharp(original).metadata()).toMatchObject({ width: 1920, height: 1080, orientation });
+      const key = `${id}/original.png`;
+      await tester.s3.uploadObject('wallpapers', key, original);
+      const timestamp = '2026-10-18T00:00:00.000Z';
+      const event = { eventId: `${id}-upload`, eventType: 'wallpaper.uploaded', timestamp, wallpaper: {
+        id, userId: 'user_test', fileType: 'image', mimeType: 'image/png', fileSizeBytes: original.length,
+        width: 1920, height: 1080, aspectRatio: 1920 / 1080, uploadedAt: timestamp,
+        storageBucket: 'wallpapers', storageKey: key, originalFilename: 'source.png',
+      } };
+      const js = await tester.nats.getJsClient();
+      const manager = await (await tester.nats.getConnection()).jetstreamManager();
+      const before = (await manager.streams.info('WALLPAPER')).state.messages;
+      const consumer = await js.consumers.get('WALLPAPER', { filterSubjects: 'wallpaper.variant.uploaded' });
+      await js.publish('wallpaper.uploaded', JSON.stringify(event));
+      const expected = [
+        { target: '720x1280', width: 720, height: 1280 },
+        { target: '480x854', width: 480, height: 853 },
+      ];
+      for (const dimensions of expected) {
+        let publication;
+        do {
+          const message = await consumer.next({ expires: 10000 });
+          if (!message) throw new Error('Missing oriented variant publication');
+          publication = WallpaperVariantUploadedEventSchema.parse(message.json());
+        } while (publication.variant.wallpaperId !== id);
+        const variant = publication.variant;
+        expect(variant).toMatchObject({ width: dimensions.width, height: dimensions.height,
+          aspectRatio: dimensions.width / dimensions.height,
+          storageKey: `${id}/variant_${dimensions.target}.png`, storageBucket: 'wallpapers' });
+        const object = await tester.s3.getS3Client().send(new GetObjectCommand({
+          Bucket: 'wallpapers', Key: `${id}/variant_${dimensions.target}.png`,
+        }));
+        const bytes = await object.Body!.transformToByteArray();
+        const metadata = await sharp(bytes).metadata();
+        expect(metadata).toMatchObject({ width: dimensions.width, height: dimensions.height });
+        expect(metadata.orientation).toBeUndefined();
+        expect(metadata.exif).toBeUndefined();
+        expect(variant.fileSizeBytes).toBe(bytes.length);
+        const pixels = await samplePixelGrid(bytes, grid[0].length, grid.length);
+        for (const [row, colors] of grid.entries()) for (const [column, color] of [...colors].entries()) {
+          for (const [channel, value] of orientationColors[color]!.entries()) {
+            expect(Math.abs(pixels[row]![column]![channel]! - value)).toBeLessThan(25);
+          }
+        }
+      }
+      const replay = await js.publish('wallpaper.uploaded', JSON.stringify(event));
+      await expect.poll(async () => (await manager.consumers.info('WALLPAPER',
+        'variant-generator-wallpaper-uploaded-consumer')).ack_floor.stream_seq, { timeout: 15000 }).toBe(replay.seq);
+      expect((await manager.streams.info('WALLPAPER')).state.messages - before).toBe(4);
+      const storedOriginal = await tester.s3.getS3Client().send(new GetObjectCommand({ Bucket: 'wallpapers', Key: key }));
+      expect(Buffer.from(await storedOriginal.Body!.transformToByteArray())).toEqual(original);
+      expect(event.wallpaper).toMatchObject({ width: 1920, height: 1080, aspectRatio: 1920 / 1080 });
+    }
+  );
 
 });

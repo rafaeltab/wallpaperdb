@@ -601,9 +601,11 @@ async function main() {
 	}
 	if (containers.length) {
 		phase = "container tests";
-		rerunPackage = containers[0].split("/").at(-1);
 		record("Container E2E: using suite-owned test containers.");
-		await runSuites(containers);
+		for (const container of containers) {
+			rerunPackage = container.split("/").at(-1);
+			await runSuites([container]);
+		}
 	}
 	record("All requested E2E phases and cleanup passed.");
 }

@@ -584,6 +584,9 @@ async function main() {
 		throw new Error(
 			"No E2E suite selected. Use PACKAGE=web-e2e, PACKAGE=test-utils, PACKAGE=testcontainers, or omit PACKAGE for all.",
 		);
+	rerunPackage = selected.includes("@wallpaperdb/web-e2e")
+		? "web-e2e"
+		: selected[0].split("/").at(-1);
 	phase = "Docker preflight";
 	await run("docker", ["info"], { capture: true, timeout: 15_000 });
 	const containers = selected.filter((name) => name !== "@wallpaperdb/web-e2e");

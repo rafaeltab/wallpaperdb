@@ -167,6 +167,7 @@ if (!args.includes('--dry=json') && process.env.TEST_VERBOSE_OUTPUT) {
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync('calls.jsonl', JSON.stringify(['docker', ...args]) + '\\n');
+if (args.includes('info') && process.env.TEST_INFO_EXIT) process.exit(Number(process.env.TEST_INFO_EXIT));
 if (args.includes('config')) console.log(fs.readFileSync('compose.json', 'utf8'));
 if (args.includes('logs')) console.log('private-password sk_test_private');
 if (args.includes('ps') && args.some(x => x.startsWith('label=')) && process.env.TEST_EXISTING) console.log('existing-resource');
@@ -228,6 +229,29 @@ if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && p
 				.split("\n")
 				.map((line) => JSON.parse(line)),
 	};
+}
+
+for (const packageName of ["test-utils", "testcontainers"]) {
+	test(`Docker preflight failure preserves the ${packageName} focused rerun`, (t) => {
+		const f = fixture(t);
+		f.env.TEST_INFO_EXIT = "39";
+		const result = f.run(
+			`PACKAGE=${packageName}`,
+			"ARGS=selected.test.ts",
+			"FORCE=1",
+		);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /phase "Docker preflight" failed, exit 39/);
+		assert.match(
+			result.stderr,
+			new RegExp(
+				`Focused rerun: make test-e2e PACKAGE=${packageName}.*selected.test.ts.*FORCE=1`,
+			),
+		);
+		assert.ok(
+			!f.calls().some((call) => call.includes("build") || call.includes("up")),
+		);
+	});
 }
 
 async function browserFixture(t, ready = true) {

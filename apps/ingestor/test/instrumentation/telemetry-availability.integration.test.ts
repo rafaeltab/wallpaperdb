@@ -2,12 +2,16 @@ import { fileURLToPath } from 'node:url';
 import { GenericContainer, Wait } from 'testcontainers';
 import { expect, it } from 'vitest';
 
-it('keeps HTTP uploads with fresh S3 connections available during real exporter DNS failure and recovers', async () => {
+it.each([
+  'ingestor',
+  'gateway',
+])('keeps HTTP uploads with fresh S3 connections available during %s exporter DNS failure and recovers', async (service) => {
   const root = fileURLToPath(new URL('../../../../', import.meta.url));
   const container = await new GenericContainer('node:22-bookworm')
     .withBindMounts([{ source: root, target: root, mode: 'ro' }])
     .withWorkingDir(`${root}/apps/ingestor`)
     .withEnvironment({
+      TELEMETRY_SERVICE: service,
       OTEL_BSP_SCHEDULE_DELAY: '100',
       OTEL_BSP_MAX_EXPORT_BATCH_SIZE: '1',
       OTEL_BLRP_SCHEDULE_DELAY: '100',

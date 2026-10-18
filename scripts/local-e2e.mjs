@@ -8,6 +8,7 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { createServer } from "node:net";
@@ -635,7 +636,12 @@ async function main() {
 			await runSuites([container]);
 		}
 	}
-	record("All requested E2E phases and cleanup passed.");
+	phase = "diagnostics cleanup";
+	rmSync(diagnostics, { recursive: true });
+	diagnostics = undefined;
+	record(
+		"All requested E2E phases and cleanup passed. Temporary diagnostics removed.",
+	);
 }
 
 try {

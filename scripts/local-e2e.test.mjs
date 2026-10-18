@@ -398,6 +398,23 @@ test("browser command fixtures await observable startup even when startup takes 
 	);
 });
 
+for (const browser of [false, true]) {
+	test(`successful ${browser ? "browser" : "container-only"} runs remove their temporary diagnostics`, async (t) => {
+		const f = browser ? await browserFixture(t) : fixture(t);
+		const result = browser
+			? await f.runAsync("PACKAGE=web-e2e")
+			: f.run("PACKAGE=test-utils");
+		assert.equal(result.status, 0, result.stderr);
+		const directory = result.stdout.match(
+			/E2E diagnostics retained at (\S+)\./,
+		)[1];
+		assert.ok(
+			!existsSync(directory),
+			"successful runs must remove private temporary diagnostics",
+		);
+	});
+}
+
 for (const buildFailure of [false, true]) {
 	test(`owned application images are removed after ${buildFailure ? "a failed build" : "successful browser tests"} while pulled images are preserved`, async (t) => {
 		const f = await browserFixture(t);
@@ -831,7 +848,8 @@ test("verbose stdout and stderr remain streamed under a bounded runner heap", (t
 		const directory = header
 			.toString()
 			.match(/E2E diagnostics retained at (\S+)\./)[1];
-		assert.ok(statSync(join(directory, "run.log")).size >= 64 * 1024 * 1024);
+		assert.ok(statSync(join(f.root, "output.log")).size >= 64 * 1024 * 1024);
+		assert.ok(!existsSync(directory));
 		assert.equal(
 			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
 			0,

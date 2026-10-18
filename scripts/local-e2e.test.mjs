@@ -185,7 +185,19 @@ const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.appendFileSync('calls.jsonl', JSON.stringify(['docker', ...args]) + '\\n');
 if (args.includes('info') && process.env.TEST_INFO_EXIT) process.exit(Number(process.env.TEST_INFO_EXIT));
-if (args.includes('config')) console.log(fs.readFileSync('compose.json', 'utf8'));
+const largeCapture = (args.includes('logs') && process.env.TEST_LARGE_CAPTURE === 'logs') || (args.includes('config') && process.env.TEST_LARGE_CAPTURE === 'config');
+if (largeCapture) {
+  fs.writeFileSync('capture-fixture-' + (args.includes('infra/docker-compose.apps.yml') ? 'apps' : 'infra') + '.pid', String(process.pid));
+  (async () => {
+    const chunk = 'capture fixture '.repeat(4096);
+    const combined = process.env.TEST_CAPTURE_STREAM === 'both';
+    for (let index = 0; index < (combined ? 24 : 1024); index++) {
+      const destination = combined ? (index % 2 ? process.stderr : process.stdout) : process.env.TEST_CAPTURE_STREAM === 'stderr' ? process.stderr : process.stdout;
+      if (!destination.write(chunk)) await new Promise(resolve => destination.once('drain', resolve));
+    }
+  })().catch(error => { console.error(error); process.exitCode = 1; });
+}
+if (args.includes('config') && !largeCapture) console.log(fs.readFileSync('compose.json', 'utf8'));
 if (args.includes('logs')) console.log(process.env.TEST_LOG_MESSAGE || 'private-password sk_test_private');
 if (args.includes('ps') && args.some(x => x.startsWith('label=')) && process.env.TEST_EXISTING) console.log('existing-resource');
 if (args.includes('build') && process.env.TEST_BUILD_EXIT) process.exit(Number(process.env.TEST_BUILD_EXIT));
@@ -395,11 +407,21 @@ async function browserFixture(t, ready = true) {
 	);
 	f.runAsync = (...extra) =>
 		new Promise((resolve, reject) => {
-			const child = spawn("make", [...f.args, ...extra], {
-				cwd: f.root,
-				env: f.env,
-				detached: true,
-			});
+			const child = spawn(
+				"bash",
+				[
+					"-c",
+					'ulimit -c 0; exec make "$@"',
+					"browser-fixture",
+					...f.args,
+					...extra,
+				],
+				{
+					cwd: f.root,
+					env: f.env,
+					detached: true,
+				},
+			);
 			let stdout = "";
 			let stderr = "";
 			child.stdout.on("data", (data) => {
@@ -1258,6 +1280,79 @@ for (const [stream, keepOpen] of [
 					try {
 						process.kill(-pid, "SIGKILL");
 					} catch {}
+				}
+			}
+		},
+	);
+}
+
+for (const [capture, stream, browserStatus] of [
+	["logs", "stdout", 0],
+	["logs", "stderr", 23],
+	["logs", "both", 0],
+	["config", "stdout", 0],
+]) {
+	test(
+		`oversized ${capture} ${stream} capture fails safely${browserStatus ? " without replacing the browser failure" : ""}`,
+		{ timeout: 15_000 },
+		async (t) => {
+			const f = await browserFixture(t);
+			f.env.TEST_LARGE_CAPTURE = capture;
+			f.env.TEST_CAPTURE_STREAM = stream;
+			f.env.NODE_OPTIONS = "--max-old-space-size=32";
+			if (browserStatus) f.env.TEST_BROWSER_EXIT = String(browserStatus);
+			try {
+				const result = await f.runAsync("PACKAGE=web-e2e");
+				assert.notEqual(result.status, 0);
+				assert.doesNotMatch(result.stderr, /heap out of memory|FATAL ERROR/);
+				assert.match(result.stderr, /Capture exceeded 1048576 bytes/);
+				assert.match(
+					result.stderr,
+					new RegExp(
+						`phase "${browserStatus ? "browser tests" : capture === "logs" ? "browser cleanup" : "browser preflight"}" failed, exit ${browserStatus || 1}`,
+					),
+				);
+				const calls = f.calls();
+				assert.equal(
+					calls.filter((call) => call.includes("down")).length,
+					capture === "logs" ? 2 : 0,
+				);
+				if (capture === "logs")
+					assert.equal(calls.filter((call) => call.includes("logs")).length, 2);
+				if (capture === "config")
+					assert.ok(
+						!calls.some(
+							(call) => call.includes("build") || call.includes("up"),
+						),
+					);
+				const directory = result.stdout.match(
+					/E2E diagnostics retained at (\S+)\./,
+				)[1];
+				assert.ok(existsSync(join(directory, "run.log")));
+				assert.doesNotMatch(
+					result.stdout,
+					/All requested E2E phases and cleanup passed/,
+				);
+				for (const name of ["apps", "infra"]) {
+					const pidFile = join(f.root, `capture-fixture-${name}.pid`);
+					if (existsSync(pidFile))
+						assert.throws(
+							() => process.kill(Number(readFileSync(pidFile, "utf8")), 0),
+							{ code: "ESRCH" },
+						);
+				}
+				assert.equal(
+					spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+					0,
+				);
+			} finally {
+				for (const name of ["apps", "infra"]) {
+					const pidFile = join(f.root, `capture-fixture-${name}.pid`);
+					if (existsSync(pidFile)) {
+						try {
+							process.kill(-Number(readFileSync(pidFile, "utf8")), "SIGKILL");
+						} catch {}
+					}
 				}
 			}
 		},

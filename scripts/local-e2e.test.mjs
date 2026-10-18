@@ -67,6 +67,7 @@ if (args.includes('--dry=json')) {
 }
 if (!args.includes('--dry=json') && args.includes('--filter=!@wallpaperdb/web-e2e') && process.env.TEST_CONTAINER_EXIT) process.exit(Number(process.env.TEST_CONTAINER_EXIT));
 if (!args.includes('--dry=json') && args.includes('--filter=' + process.env.TEST_FAILED_PACKAGE)) process.exit(27);
+if (!args.includes('--dry=json') && process.env.TEST_CHILD_SIGNAL) process.kill(process.pid, process.env.TEST_CHILD_SIGNAL);
 `,
 		{ mode: 0o700 },
 	);
@@ -624,6 +625,26 @@ test("explicit container-only selection preserves test arguments and FORCE witho
 	assert.ok(!calls.some((call) => call.includes("compose")));
 	assert.match(result.stdout, /Container E2E/);
 });
+
+for (const [signal, status] of [
+	["SIGKILL", 137],
+	["SIGUSR2", 140],
+]) {
+	test(`a child terminated by ${signal} retains exit status ${status}`, (t) => {
+		const f = fixture(t);
+		f.env.TEST_CHILD_SIGNAL = signal;
+		const result = f.run("PACKAGE=test-utils");
+		assert.notEqual(result.status, 0);
+		assert.match(
+			result.stderr,
+			new RegExp(`phase "container tests" failed, exit ${status}`),
+		);
+		assert.equal(
+			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+			0,
+		);
+	});
+}
 
 test("a complete run suggests the container suite that actually failed", async (t) => {
 	const f = await browserFixture(t);

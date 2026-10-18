@@ -21,6 +21,83 @@ import { test } from "node:test";
 
 const repository = new URL("../", import.meta.url).pathname;
 
+test("Make passes browser credentials only to the browser E2E package", (t) => {
+	const f = fixture(t);
+	const manifest = JSON.parse(
+		readFileSync(join(repository, "package.json"), "utf8"),
+	);
+	writeFileSync(
+		join(f.root, "package.json"),
+		JSON.stringify({
+			name: "e2e-environment-fixture",
+			private: true,
+			packageManager: manifest.packageManager,
+		}),
+	);
+	for (const name of ["turbo.json", "pnpm-workspace.yaml", "pnpm-lock.yaml"])
+		copyFileSync(join(repository, name), join(f.root, name));
+	const browserConfig = "apps/web-e2e/turbo.json";
+	if (existsSync(join(repository, browserConfig)))
+		copyFileSync(join(repository, browserConfig), join(f.root, browserConfig));
+	writeFileSync(
+		join(f.root, "probe.mjs"),
+		`import { appendFileSync } from 'node:fs';
+appendFileSync(new URL('./environment.jsonl', import.meta.url), JSON.stringify({
+  package: process.env.npm_package_name,
+  credentials: Object.fromEntries(['CLERK_SECRET_KEY', 'E2E_BASE_TEST_EMAIL', 'E2E_BASE_TEST_PASSWORD'].map(key => [key, process.env[key] ?? null]))
+}) + '\\n');`,
+	);
+	for (const name of ["web-e2e", "test-utils", "testcontainers"]) {
+		const directory = join(
+			f.root,
+			name === "web-e2e" ? "apps" : "packages",
+			name,
+		);
+		writeFileSync(
+			join(directory, "package.json"),
+			JSON.stringify({
+				name: `@wallpaperdb/${name}`,
+				scripts: { "test:e2e": "node ../../probe.mjs" },
+			}),
+		);
+	}
+	const credentials = {
+		CLERK_SECRET_KEY: "sk_test_fixture_secret",
+		E2E_BASE_TEST_EMAIL: "fixture@example.test",
+		E2E_BASE_TEST_PASSWORD: "fixture-password",
+	};
+	const result = spawnSync(
+		"make",
+		[
+			"--no-print-directory",
+			"test-e2e",
+			"GITHUB_ACTIONS=true",
+			`TURBO=${join(repository, "node_modules/.bin/turbo")}`,
+		],
+		{
+			cwd: f.root,
+			env: { ...f.env, ...credentials },
+			encoding: "utf8",
+			timeout: 15_000,
+		},
+	);
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	const observed = readFileSync(join(f.root, "environment.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	assert.equal(observed.length, 3);
+	for (const entry of observed)
+		assert.deepEqual(
+			entry.credentials,
+			entry.package === "@wallpaperdb/web-e2e"
+				? credentials
+				: Object.fromEntries(
+						Object.keys(credentials).map((key) => [key, null]),
+					),
+		);
+});
+
 function fixture(t) {
 	const root = mkdtempSync(join(tmpdir(), "wallpaperdb-local-e2e-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));

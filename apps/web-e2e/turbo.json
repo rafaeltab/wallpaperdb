@@ -1,0 +1,8 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "test:e2e": {
+      "passThroughEnv": ["PLAYWRIGHT_BASE_URL", "INGRESS_PORT", "E2E_BASE_TEST_EMAIL", "E2E_BASE_TEST_PASSWORD", "CLERK_SECRET_KEY"]
+    }
+  }
+}

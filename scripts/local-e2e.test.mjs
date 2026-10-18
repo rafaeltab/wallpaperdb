@@ -66,6 +66,7 @@ if (args.includes('--dry=json')) {
   else if (process.env.TEST_BROWSER_EXIT) { console.error('private-password sk_test_private'); process.exit(Number(process.env.TEST_BROWSER_EXIT)); }
 }
 if (!args.includes('--dry=json') && args.includes('--filter=!@wallpaperdb/web-e2e') && process.env.TEST_CONTAINER_EXIT) process.exit(Number(process.env.TEST_CONTAINER_EXIT));
+if (!args.includes('--dry=json') && args.includes('--filter=' + process.env.TEST_FAILED_PACKAGE)) process.exit(27);
 `,
 		{ mode: 0o700 },
 	);
@@ -600,4 +601,27 @@ test("explicit container-only selection preserves test arguments and FORCE witho
 	assert.ok(calls.some((call) => call[0] === "docker" && call[1] === "info"));
 	assert.ok(!calls.some((call) => call.includes("compose")));
 	assert.match(result.stdout, /Container E2E/);
+});
+
+test("a complete run suggests the container suite that actually failed", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_FAILED_PACKAGE = "@wallpaperdb/testcontainers";
+	const result = await f.runAsync();
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /phase "container tests" failed, exit 27/);
+	assert.match(
+		result.stderr,
+		/Focused rerun: make test-e2e PACKAGE=testcontainers/,
+	);
+	const executions = f
+		.calls()
+		.filter((call) => call[0] === "turbo" && !call.includes("--dry=json"));
+	assert.deepEqual(
+		executions.map((call) => call.filter((arg) => arg.startsWith("--filter="))),
+		[
+			["--filter=@wallpaperdb/web-e2e"],
+			["--filter=@wallpaperdb/test-utils"],
+			["--filter=@wallpaperdb/testcontainers"],
+		],
+	);
 });

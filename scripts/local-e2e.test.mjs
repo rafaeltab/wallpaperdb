@@ -155,7 +155,8 @@ if (!args.includes('--dry=json') && args.includes('--filter=' + process.env.TEST
 if (!args.includes('--dry=json') && process.env.TEST_CHILD_SIGNAL) process.kill(process.pid, process.env.TEST_CHILD_SIGNAL);
 if (!args.includes('--dry=json') && process.env.TEST_VERBOSE_OUTPUT) {
   (async () => {
-    const chunk = 'v '.repeat(32767) + 'v\\n';
+    const ending = process.env.TEST_VERBOSE_OUTPUT === 'unterminated' ? '' : process.env.TEST_VERBOSE_OUTPUT === 'progress' ? '\\r' : '\\n';
+    const chunk = 'v '.repeat(32767) + 'v' + ending;
     for (let index = 0; index < 1024; index++) {
       const destination = index % 2 ? process.stderr : process.stdout;
       if (!destination.write(chunk)) await new Promise(resolve => destination.once('drain', resolve));
@@ -1023,53 +1024,61 @@ for (const [signal, status] of [
 	});
 }
 
-test("verbose stdout and stderr remain streamed under a bounded runner heap", (t) => {
-	const f = fixture(t);
-	f.env.TEST_VERBOSE_OUTPUT = "1";
-	f.env.NODE_OPTIONS = "--max-old-space-size=32";
-	const output = openSync(join(f.root, "output.log"), "w+");
-	try {
-		const result = spawnSync(
-			"bash",
-			[
-				"-c",
-				'ulimit -c 0; exec "$@"',
-				"bounded-output",
-				"make",
-				...f.args,
-				"PACKAGE=test-utils",
-			],
-			{
-				cwd: f.root,
-				env: f.env,
-				stdio: ["ignore", output, output],
-				timeout: 30_000,
-			},
-		);
-		const header = Buffer.alloc(4096);
-		readSync(output, header, 0, header.length, 0);
-		const tail = Buffer.alloc(4096);
-		readSync(
-			output,
-			tail,
-			0,
-			tail.length,
-			Math.max(0, statSync(join(f.root, "output.log")).size - tail.length),
-		);
-		assert.equal(result.status, 0, result.error?.message ?? tail.toString());
-		const directory = header
-			.toString()
-			.match(/E2E diagnostics retained at (\S+)\./)[1];
-		assert.ok(statSync(join(f.root, "output.log")).size >= 64 * 1024 * 1024);
-		assert.ok(!existsSync(directory));
-		assert.equal(
-			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
-			0,
-		);
-	} finally {
-		closeSync(output);
-	}
-});
+for (const mode of ["lines", "unterminated", "progress"]) {
+	test(`verbose ${mode} stdout and stderr remain streamed under a bounded runner heap`, (t) => {
+		const f = fixture(t);
+		f.env.TEST_VERBOSE_OUTPUT = mode;
+		f.env.NODE_OPTIONS = "--max-old-space-size=32";
+		const output = openSync(join(f.root, "output.log"), "w+");
+		try {
+			const result = spawnSync(
+				"bash",
+				[
+					"-c",
+					'ulimit -c 0; exec "$@"',
+					"bounded-output",
+					"make",
+					...f.args,
+					"PACKAGE=test-utils",
+				],
+				{
+					cwd: f.root,
+					env: f.env,
+					stdio: ["ignore", output, output],
+					timeout: 30_000,
+				},
+			);
+			const header = Buffer.alloc(4096);
+			readSync(output, header, 0, header.length, 0);
+			const tail = Buffer.alloc(4096);
+			readSync(
+				output,
+				tail,
+				0,
+				tail.length,
+				Math.max(0, statSync(join(f.root, "output.log")).size - tail.length),
+			);
+			assert.equal(result.status, 0, result.error?.message ?? tail.toString());
+			const directory = header
+				.toString()
+				.match(/E2E diagnostics retained at (\S+)\./)[1];
+			if (mode === "unterminated") {
+				assert.match(tail.toString(), /Omitted output line longer than/);
+				assert.ok(statSync(join(f.root, "output.log")).size < 128 * 1024);
+			} else
+				assert.ok(
+					statSync(join(f.root, "output.log")).size >= 64 * 1024 * 1024 - 1024,
+				);
+			assert.ok(!existsSync(directory));
+			assert.equal(
+				spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+				0,
+			);
+		} finally {
+			closeSync(output);
+		}
+	});
+}
 
 test("a complete run suggests the container suite that actually failed", async (t) => {
 	const f = await browserFixture(t);

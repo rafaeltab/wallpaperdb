@@ -132,27 +132,47 @@ async function run(
 		activeChild = child;
 		let stdout = "";
 		let stderr = "";
-		let pending = "";
+
+		const outputs = [
+			{ stream: child.stdout, pending: "", omitted: false, error: false },
+			{ stream: child.stderr, pending: "", omitted: false, error: true },
+		];
 		let timedOut = false;
 		let stoppingForDiagnostics = false;
-		const emit = (data) => {
-			pending += data;
-			const lines = pending.split("\n");
-			pending = lines.pop();
-			for (const line of lines) record(line);
-			if (diagnosticsFailure && !cleanupRunning && !stoppingForDiagnostics) {
-				stoppingForDiagnostics = true;
-				stopChild();
-			}
-		};
-		child.stdout.on("data", (data) => {
-			if (capture) stdout += data;
-			else emit(data);
-		});
-		child.stderr.on("data", (data) => {
-			if (capture) stderr += data;
-			else emit(data);
-		});
+		for (const output of outputs) {
+			output.stream.setEncoding("utf8");
+			output.stream.on("data", (data) => {
+				if (capture) {
+					if (output.error) stderr += data;
+					else stdout += data;
+					return;
+				}
+				const parts = data.split(/\r\n|[\r\n]/);
+				for (const [index, part] of parts.entries()) {
+					if (!output.omitted) {
+						output.pending += part;
+						if (output.pending.length > 65_536) {
+							// Omit the entire oversized line, including secrets at its boundary.
+							output.pending = "";
+							output.omitted = true;
+							record(
+								"Omitted output line longer than 65536 characters.",
+								output.error,
+							);
+						}
+					}
+					if (index < parts.length - 1) {
+						if (!output.omitted) record(output.pending, output.error);
+						output.pending = "";
+						output.omitted = false;
+					}
+				}
+				if (diagnosticsFailure && !cleanupRunning && !stoppingForDiagnostics) {
+					stoppingForDiagnostics = true;
+					stopChild();
+				}
+			});
+		}
 		let killer;
 		const timer = setTimeout(
 			() => {
@@ -176,7 +196,8 @@ async function run(
 			clearTimeout(killer);
 			activeChild = undefined;
 			const priorDiagnosticsFailure = diagnosticsFailure;
-			if (pending && !capture) record(pending);
+			for (const output of outputs)
+				if (output.pending && !capture) record(output.pending, output.error);
 			if (priorDiagnosticsFailure && !cleanupRunning) {
 				reject(priorDiagnosticsFailure);
 				return;

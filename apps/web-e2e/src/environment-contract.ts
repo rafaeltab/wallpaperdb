@@ -77,7 +77,11 @@ export async function verifyWebE2EEnvironment(
 }
 
 function isSuccessful(probe: ProbeResult): boolean {
-  return probe.error === undefined && probe.status !== undefined && probe.status < 400;
+  return (
+    probe.error === undefined &&
+    probe.status !== undefined &&
+    probe.status < 400
+  );
 }
 
 async function probeEndpoint(
@@ -130,22 +134,33 @@ function formatEnvironmentFailure({
 
   for (const failure of failedReadiness) {
     lines.push(
-      formatProbeSummary(`${failure.service.name} readiness`, failure.readyProbe),
-      formatProbeBody(`${failure.service.name} /ready body`, failure.readyProbe.body),
+      formatProbeSummary(
+        `${failure.service.name} readiness`,
+        failure.readyProbe,
+      ),
+      formatProbeBody(
+        `${failure.service.name} /ready body`,
+        failure.readyProbe.body,
+      ),
     );
 
     if (failure.healthProbe) {
       lines.push(
-        formatProbeSummary(`${failure.service.name} health`, failure.healthProbe),
-        formatProbeBody(`${failure.service.name} /health body`, failure.healthProbe.body),
+        formatProbeSummary(
+          `${failure.service.name} health`,
+          failure.healthProbe,
+        ),
+        formatProbeBody(
+          `${failure.service.name} /health body`,
+          failure.healthProbe.body,
+        ),
       );
     }
   }
 
   lines.push(
-    "Start the local stack before rerunning browser E2E:",
-    "make infra-start",
-    "make dev",
+    "Explicit local E2E provisions and cleans up its own stack. Inspect retained diagnostics, then rerun:",
+    "make test-e2e PACKAGE=web-e2e",
   );
 
   return lines.join("\n");

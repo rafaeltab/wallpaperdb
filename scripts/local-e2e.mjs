@@ -1,47 +1,545 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import {
+	appendFileSync,
+	cpSync,
+	existsSync,
+	lstatSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
+import { createServer } from "node:net";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+import { parseEnv } from "node:util";
 
 const [turbo, ...arguments_] = process.argv.slice(2);
 const separator = arguments_.indexOf("--");
 const flags = separator < 0 ? arguments_ : arguments_.slice(0, separator);
 const testArguments = separator < 0 ? [] : arguments_.slice(separator + 1);
+const executionFlags = flags.filter((flag) => !flag.startsWith("--filter="));
+const abort = new AbortController();
+const secrets = new Set();
+let interrupted;
+let activeChild;
+let diagnostics;
+let phase = "selection";
+let owned = false;
+let project;
+let environment = { ...process.env };
+let cleanupRunning = false;
+let rerunPackage = "web-e2e";
 
-async function run(command, args, capture = false) {
-	return await new Promise((resolve, reject) => {
+for (const [signal, status] of [
+	["SIGINT", 130],
+	["SIGTERM", 143],
+]) {
+	process.on(signal, () => {
+		interrupted = status;
+		if (cleanupRunning) return;
+		abort.abort();
+		stopChild();
+	});
+}
+
+function stopChild() {
+	if (!activeChild) return;
+	const child = activeChild;
+	try {
+		process.kill(-child.pid, "SIGTERM");
+	} catch {
+		/* Already exited. */
+	}
+	const killer = setTimeout(() => {
+		try {
+			process.kill(-child.pid, "SIGKILL");
+		} catch {}
+	}, 5000);
+	killer.unref();
+	child.once("close", () => clearTimeout(killer));
+}
+
+function redact(value) {
+	let result = String(value);
+	for (const secret of secrets)
+		result = result.split(secret).join("[REDACTED]");
+	return result
+		.replace(/\b(?:sk|pk)_(?:test|live)_[\w-]+/g, "[REDACTED]")
+		.replace(/(Bearer\s+)\S+/gi, "$1[REDACTED]")
+		.replace(/(\w+:\/\/)[^\s/@]+:[^\s/@]+@/g, "$1[REDACTED]@");
+}
+
+function rememberSecrets(values) {
+	for (const [key, value] of Object.entries(values)) {
+		if (
+			/SECRET|PASSWORD|TOKEN|KEY|EMAIL/.test(key) &&
+			value &&
+			String(value).length >= 4
+		)
+			secrets.add(String(value));
+	}
+}
+
+function record(message, error = false) {
+	const safe = redact(message);
+	if (diagnostics) appendFileSync(join(diagnostics, "run.log"), `${safe}\n`);
+	(error ? console.error : console.log)(safe);
+}
+
+function seconds(key, fallback) {
+	const value = Number(process.env[key] ?? fallback);
+	if (!Number.isFinite(value) || value <= 0)
+		throw new Error(`${key} must be a positive number of seconds.`);
+	return value * 1000;
+}
+
+async function run(
+	command,
+	args,
+	{ capture = false, timeout = 1_200_000 } = {},
+) {
+	if (interrupted && !cleanupRunning)
+		throw Object.assign(new Error("Interrupted."), { status: interrupted });
+	return await new Promise((resolveResult, reject) => {
 		const child = spawn(command, args, {
-			stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
+			env: environment,
+			detached: true,
+			stdio: ["ignore", "pipe", "pipe"],
 		});
+		activeChild = child;
 		let stdout = "";
 		let stderr = "";
-		child.stdout?.on("data", (data) => {
+		let pending = "";
+		let timedOut = false;
+		const emit = (data) => {
+			pending += data;
+			const lines = pending.split("\n");
+			pending = lines.pop();
+			for (const line of lines) record(line);
+		};
+		child.stdout.on("data", (data) => {
 			stdout += data;
+			if (!capture) emit(data);
 		});
-		child.stderr?.on("data", (data) => {
+		child.stderr.on("data", (data) => {
 			stderr += data;
+			if (!capture) emit(data);
 		});
-		child.on("error", reject);
+		let killer;
+		const timer = setTimeout(
+			() => {
+				timedOut = true;
+				stopChild();
+				killer = setTimeout(() => {
+					try {
+						process.kill(-child.pid, "SIGKILL");
+					} catch {}
+				}, 5000);
+			},
+			Math.max(1, timeout),
+		);
+		child.on("error", (error) => {
+			clearTimeout(timer);
+			activeChild = undefined;
+			reject(error);
+		});
 		child.on("close", (code, signal) => {
-			if (code !== 0)
+			clearTimeout(timer);
+			clearTimeout(killer);
+			activeChild = undefined;
+			if (pending && !capture) record(pending);
+			if (code !== 0 || timedOut || (interrupted && !cleanupRunning)) {
+				const status =
+					!cleanupRunning && interrupted
+						? interrupted
+						: timedOut
+							? 124
+							: (code ?? (signal === "SIGINT" ? 130 : 143));
 				reject(
 					Object.assign(
-						new Error(`${command} failed (exit ${code ?? signal}). ${stderr}`),
-						{ status: code ?? 1 },
+						new Error(
+							`${command} failed (exit ${status})${timedOut ? ": deadline exceeded" : ""}. ${capture ? redact(stderr) : "See run.log."}`,
+						),
+						{ status },
 					),
 				);
-			else resolve(stdout);
+			} else resolveResult(stdout);
 		});
 	});
 }
 
+function compose(file, ...args) {
+	return [
+		"compose",
+		"-p",
+		project,
+		"-f",
+		`infra/docker-compose${file === "apps" ? ".apps" : ""}.yml`,
+		...args,
+	];
+}
+
+async function availablePort(key, value) {
+	const port = Number(value);
+	if (!Number.isInteger(port) || port < 1 || port > 65535)
+		throw new Error(`Invalid ${key}; rerun make install.`);
+	await new Promise((done, reject) => {
+		const server = createServer();
+		server.once("error", (error) =>
+			reject(
+				new Error(
+					`${key}=${port} is unavailable (${error.code}). Preserve the existing stack; use a free worktree slot or stop your development stack deliberately.`,
+				),
+			),
+		);
+		server.listen({ port, host: "0.0.0.0", exclusive: true }, () =>
+			server.close(done),
+		);
+	});
+}
+
+function readEnv(path) {
+	if (!existsSync(path))
+		throw new Error(`Missing ${path}. Configure secrets and run make install.`);
+	const values = parseEnv(readFileSync(path, "utf8"));
+	rememberSecrets(values);
+	return values;
+}
+
+async function preflightBrowser() {
+	phase = "browser preflight";
+	const worktree = readEnv(".worktree");
+	if (!worktree.COMPOSE_PROJECT_NAME)
+		throw new Error("Missing worktree Compose project; run make install.");
+	project = `${worktree.COMPOSE_PROJECT_NAME.slice(0, 42)}-e2e-${randomUUID().slice(0, 8)}`;
+	environment = { ...process.env, ...worktree, COMPOSE_PROJECT_NAME: project };
+	const portKeys = [
+		"INGRESS_PORT",
+		"POSTGRES_HOST_PORT",
+		"S3_API_HOST_PORT",
+		"NATS_HOST_PORT",
+		"REDIS_HOST_PORT",
+		"OPENSEARCH_HOST_PORT",
+		"OTEL_HTTP_HOST_PORT",
+		"OTEL_GRPC_HOST_PORT",
+	];
+	if (new Set(portKeys.map((key) => worktree[key])).size !== portKeys.length)
+		throw new Error("Worktree ports must be distinct. Rerun make install.");
+	for (const key of portKeys) await availablePort(key, worktree[key]);
+	const browser = { ...readEnv("apps/web-e2e/.env"), ...process.env };
+	const baseUrl = `http://localhost:${worktree.INGRESS_PORT}/web`;
+	if (browser.PLAYWRIGHT_BASE_URL && browser.PLAYWRIGHT_BASE_URL !== baseUrl)
+		throw new Error(
+			"PLAYWRIGHT_BASE_URL must match this worktree ingress for an owned local run. Rerun make install without an external URL override.",
+		);
+	for (const key of ["E2E_BASE_TEST_EMAIL", "E2E_BASE_TEST_PASSWORD"]) {
+		if (!browser[key]?.trim())
+			throw new Error(
+				`Missing ${key}. Configure secrets and run make install.`,
+			);
+	}
+	const require = createRequire(resolve("apps/web-e2e/package.json"));
+	const { chromium } = require("@playwright/test");
+	if (!existsSync(chromium.executablePath()))
+		throw new Error(
+			"Chromium is missing. Run make run PACKAGE=web-e2e SCRIPT=test:browser:install.",
+		);
+	environment = {
+		...environment,
+		E2E_BASE_TEST_EMAIL: browser.E2E_BASE_TEST_EMAIL,
+		E2E_BASE_TEST_PASSWORD: browser.E2E_BASE_TEST_PASSWORD,
+		PLAYWRIGHT_BASE_URL: baseUrl,
+	};
+	rememberSecrets(environment);
+	await run("docker", ["compose", "version"], { capture: true });
+	await run("docker", ["buildx", "version"], { capture: true });
+	// Compose can include values in parse errors. Load generated secrets before invoking it.
+	for (const service of [
+		"ingestor",
+		"media",
+		"gateway",
+		"user",
+		"web",
+		"tags",
+		"variant-generator",
+		"color-extractor",
+	]) {
+		const path = `apps/${service}/.env`;
+		if (existsSync(path)) rememberSecrets(readEnv(path));
+	}
+	await run("docker", compose("infra", "config", "--format", "json"), {
+		capture: true,
+	});
+	const config = JSON.parse(
+		await run("docker", compose("apps", "config", "--format", "json"), {
+			capture: true,
+		}),
+	);
+	for (const service of Object.values(config.services))
+		rememberSecrets(service.environment ?? {});
+	const requirements = {
+		ingestor: ["CLERK_SECRET_KEY", "CLERK_PUBLISHABLE_KEY", "CLERK_DOMAIN"],
+		user: [
+			"CLERK_SECRET_KEY",
+			"CLERK_PUBLISHABLE_KEY",
+			"USER_MEDIA_SERVICE_TOKEN",
+		],
+		media: ["USER_MEDIA_SERVICE_TOKEN"],
+		gateway: ["CURSOR_SECRET"],
+		web: ["VITE_CLERK_PUBLISHABLE_KEY"],
+	};
+	for (const [service, keys] of Object.entries(requirements)) {
+		for (const key of keys) {
+			const value = config.services[service]?.environment?.[key];
+			if (!value?.trim() || /replace|your-clerk/i.test(value))
+				throw new Error(
+					`Missing or placeholder ${key} for ${service}. Configure secrets and run make install.`,
+				);
+			if (key === "CLERK_SECRET_KEY" && !value.startsWith("sk_test_"))
+				throw new Error(
+					`${service} requires a Clerk development sk_test_ key for browser E2E.`,
+				);
+		}
+	}
+	if (
+		config.services.user.environment.USER_MEDIA_SERVICE_TOKEN !==
+		config.services.media.environment.USER_MEDIA_SERVICE_TOKEN
+	)
+		throw new Error(
+			"User and Media USER_MEDIA_SERVICE_TOKEN values must match. Rerun make install.",
+		);
+	environment.CLERK_SECRET_KEY =
+		config.services.user.environment.CLERK_SECRET_KEY;
+	const init = resolve("infra/postgres/init");
+	if (
+		lstatSync(init).isSymbolicLink() ||
+		(lstatSync(init).mode & 0o005) !== 0o005
+	)
+		throw new Error(
+			"PostgreSQL initialization directory is not container-accessible. Run chmod a+rx infra/postgres/init and chmod a+r infra/postgres/init/*.sql. Only public initialization files need these permissions.",
+		);
+	for (const entry of readdirSync(init)) {
+		const stat = lstatSync(join(init, entry));
+		if (!stat.isFile() || stat.isSymbolicLink() || !(stat.mode & 0o004))
+			throw new Error(
+				`PostgreSQL initialization file infra/postgres/init/${entry} is not a public readable file. Run chmod a+r infra/postgres/init/*.sql; keep the directory searchable with chmod a+rx infra/postgres/init.`,
+			);
+	}
+	for (const args of [
+		["ps", "-aq", "--filter", `label=com.docker.compose.project=${project}`],
+		[
+			"volume",
+			"ls",
+			"-q",
+			"--filter",
+			`label=com.docker.compose.project=${project}`,
+		],
+		[
+			"network",
+			"ls",
+			"-q",
+			"--filter",
+			`label=com.docker.compose.project=${project}`,
+		],
+	]) {
+		if ((await run("docker", args, { capture: true })).trim())
+			throw new Error(
+				`Refusing existing resources for ${project}. Retry for a new isolated project.`,
+			);
+	}
+	owned = true;
+	record(
+		`Owned browser project: ${project}. Development projects and volumes are preserved.`,
+	);
+	try {
+		await run(
+			"docker",
+			[
+				"run",
+				"--rm",
+				"--name",
+				`${project}-init-check`,
+				"--label",
+				`com.docker.compose.project=${project}`,
+				"--user",
+				"postgres",
+				"--mount",
+				`type=bind,src=${init},dst=/init,readonly`,
+				"postgres:16-alpine",
+				"sh",
+				"-ec",
+				'test -r /init && test -x /init; for file in /init/*; do test -r "$file" || exit 1; done',
+			],
+			{ timeout: 60_000 },
+		);
+	} catch (error) {
+		throw Object.assign(
+			new Error(
+				`PostgreSQL initialization mount probe failed. Verify Docker bind-mount access, parent traversal, SELinux/AppArmor, or remote daemon paths. Public-file chmod cannot resolve host mount restrictions. ${error.message}`,
+			),
+			{ status: error.status },
+		);
+	}
+}
+
+async function waitForBrowser(deadline) {
+	const { verifyWebE2EEnvironment } = await import(
+		"../apps/web-e2e/src/environment-contract.ts"
+	);
+	let failure;
+	record(
+		"Waiting for browser readiness using the browser environment contract.",
+	);
+	do {
+		try {
+			await verifyWebE2EEnvironment(environment, (url, options) =>
+				fetch(url, {
+					...options,
+					signal: AbortSignal.any([
+						abort.signal,
+						AbortSignal.timeout(
+							Math.max(1, Math.min(5000, deadline - Date.now())),
+						),
+					]),
+				}),
+			);
+			return;
+		} catch (error) {
+			failure = error;
+			if (abort.signal.aborted)
+				throw Object.assign(new Error("Interrupted during readiness."), {
+					status: interrupted,
+				});
+		}
+		if (Date.now() < deadline)
+			await delay(Math.min(1000, deadline - Date.now()), undefined, {
+				signal: abort.signal,
+			});
+	} while (Date.now() < deadline);
+	throw Object.assign(
+		new Error(`Browser readiness deadline exceeded.\n${failure.message}`),
+		{ status: 124 },
+	);
+}
+
+async function retainBrowserDiagnostics() {
+	if (
+		(phase === "application startup" || phase === "infrastructure startup") &&
+		!interrupted
+	) {
+		try {
+			const { verifyWebE2EEnvironment } = await import(
+				"../apps/web-e2e/src/environment-contract.ts"
+			);
+			await verifyWebE2EEnvironment(environment, (url, options) =>
+				fetch(url, { ...options, signal: AbortSignal.timeout(3000) }),
+			);
+		} catch (error) {
+			record(error.message, true);
+		}
+	}
+	for (const file of ["apps", "infra"]) {
+		try {
+			const output = await run(
+				"docker",
+				compose(file, "logs", "--no-color", "--tail", "200"),
+				{ capture: true, timeout: 15_000 },
+			);
+			writeFileSync(join(diagnostics, `${file}.log`), redact(output));
+		} catch (error) {
+			record(`Diagnostic capture failed: ${error.message}`, true);
+		}
+	}
+	for (const name of ["test-results", "playwright-report"]) {
+		const source = join("apps/web-e2e", name);
+		if (existsSync(source))
+			cpSync(source, join(diagnostics, name), { recursive: true });
+	}
+}
+
+async function cleanup() {
+	if (!owned) return;
+	cleanupRunning = true;
+	let failure;
+	try {
+		await retainBrowserDiagnostics();
+	} catch (error) {
+		record(`Artifact retention failed: ${error.message}`, true);
+		failure = error;
+	}
+	for (const file of ["apps", "infra"]) {
+		try {
+			await run(
+				"docker",
+				compose(file, "down", "--volumes", "--remove-orphans"),
+				{ timeout: 60_000 },
+			);
+		} catch (error) {
+			record(
+				`Cleanup failed for ${file}, exit ${error.status ?? 1}: ${error.message}`,
+				true,
+			);
+			failure ??= error;
+		}
+	}
+	try {
+		const probe = await run(
+			"docker",
+			["ps", "-aq", "--filter", `name=^${project}-init-check$`],
+			{ capture: true, timeout: 15_000 },
+		);
+		if (probe.trim())
+			await run("docker", ["rm", "-f", `${project}-init-check`], {
+				timeout: 15_000,
+			});
+	} catch (error) {
+		record(`Initialization probe cleanup failed: ${error.message}`, true);
+		failure ??= error;
+	}
+	owned = false;
+	cleanupRunning = false;
+	if (failure) {
+		record(
+			`Retained project ${project} may need manual cleanup. Inspect diagnostics before running docker compose -p ${project} -f infra/docker-compose.apps.yml down --volumes and docker compose -p ${project} -f infra/docker-compose.yml down --volumes.`,
+			true,
+		);
+		throw failure;
+	}
+}
+
+async function runSuites(packages) {
+	await run(turbo, [
+		"run",
+		"test:e2e",
+		...executionFlags,
+		...packages.map((name) => `--filter=${name}`),
+		"--concurrency=1",
+		...(testArguments.length ? ["--", ...testArguments] : []),
+	]);
+}
+
 async function main() {
 	if (flags.some((flag) => flag.startsWith("--dry"))) {
-		await run(turbo, ["run", "test:e2e", ...flags, "--concurrency=1"]);
+		process.stdout.write(
+			await run(turbo, ["run", "test:e2e", ...flags, "--concurrency=1"], {
+				capture: true,
+			}),
+		);
 		return;
 	}
+	diagnostics = mkdtempSync(join(tmpdir(), "wallpaperdb-e2e-"));
+	record(
+		`E2E diagnostics retained at ${diagnostics}. Keep browser artifacts private; sanitize excerpts before publication.`,
+	);
 	const plan = JSON.parse(
 		await run(
 			turbo,
 			["run", "test:e2e", ...flags, "--concurrency=1", "--dry=json"],
-			true,
+			{ capture: true },
 		),
 	);
 	const selected = [
@@ -58,27 +556,70 @@ async function main() {
 		throw new Error(
 			"No E2E suite selected. Use PACKAGE=web-e2e, PACKAGE=test-utils, PACKAGE=testcontainers, or omit PACKAGE for all.",
 		);
-	await run("docker", ["info"], true);
-	const executionFlags = flags.filter((flag) => !flag.startsWith("--filter="));
+	phase = "Docker preflight";
+	await run("docker", ["info"], { capture: true, timeout: 15_000 });
 	const containers = selected.filter((name) => name !== "@wallpaperdb/web-e2e");
-	if (selected.includes("@wallpaperdb/web-e2e"))
-		throw new Error("Browser E2E stack lifecycle is not configured.");
-	if (containers.length) {
-		console.log("Container E2E: using suite-owned test containers.");
-		await run(turbo, [
-			"run",
-			"test:e2e",
-			...executionFlags,
-			...containers.map((name) => `--filter=${name}`),
-			"--concurrency=1",
-			...(testArguments.length ? ["--", ...testArguments] : []),
-		]);
+	if (selected.includes("@wallpaperdb/web-e2e")) {
+		let failure;
+		try {
+			await preflightBrowser();
+			phase = "current-checkout image build";
+			await run("docker", compose("apps", "build"), {
+				timeout: seconds("E2E_BUILD_TIMEOUT", 1200),
+			});
+			const deadline = Date.now() + seconds("E2E_READY_TIMEOUT", 240);
+			phase = "infrastructure startup";
+			await run("docker", compose("infra", "up", "-d"), {
+				timeout: deadline - Date.now(),
+			});
+			phase = "application startup";
+			await run("docker", compose("apps", "up", "-d", "--no-build"), {
+				timeout: deadline - Date.now(),
+			});
+			phase = "browser readiness";
+			await waitForBrowser(deadline);
+			phase = "browser tests";
+			await runSuites(["@wallpaperdb/web-e2e"]);
+		} catch (error) {
+			failure = error;
+		}
+		try {
+			await cleanup();
+		} catch (error) {
+			if (!failure) {
+				phase = "browser cleanup";
+				failure = error;
+			}
+		}
+		if (failure) throw failure;
+		if (interrupted)
+			throw Object.assign(new Error("Interrupted during cleanup."), {
+				status: interrupted,
+			});
 	}
+	if (containers.length) {
+		phase = "container tests";
+		rerunPackage = containers[0].split("/").at(-1);
+		record("Container E2E: using suite-owned test containers.");
+		await runSuites(containers);
+	}
+	record("All requested E2E phases and cleanup passed.");
 }
 
 try {
 	await main();
 } catch (error) {
-	console.error(error.message);
-	process.exitCode = error.status ?? 1;
+	record(
+		`E2E phase "${phase}" failed, exit ${error.status ?? interrupted ?? 1}: ${error.message}`,
+		true,
+	);
+	record(
+		`Diagnostics: ${diagnostics ?? "not created"}. Focused rerun: make test-e2e PACKAGE=${rerunPackage}${testArguments.length ? ` ARGS=${shellQuote(testArguments.map(shellQuote).join(" "))}` : ""}${flags.includes("--force") ? " FORCE=1" : ""}`,
+		true,
+	);
+	process.exitCode = error.status ?? interrupted ?? 1;
+}
+
+function shellQuote(value) {
+	return `'${value.replaceAll("'", "'\\''")}'`;
 }

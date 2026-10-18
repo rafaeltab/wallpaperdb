@@ -15,7 +15,9 @@ try {
     limitInputPixels: options.maxInputPixels,
     sequentialRead: true,
     failOn: 'none',
-  });
+  })
+    // Apply EXIF to pixels before crop/resize; default output strips source metadata.
+    .rotate();
   transformer.resize(options.width, options.height, {
     fit: options.fit === 'contain' ? 'inside' : options.fit,
     withoutEnlargement: options.fit !== 'fill',

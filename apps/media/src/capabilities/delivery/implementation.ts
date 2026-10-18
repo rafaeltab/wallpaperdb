@@ -1,5 +1,5 @@
 import { Effect, Layer, Metric } from 'effect';
-import type { DeliveryLimits, ResizeOptions } from './contract.js';
+import type { DeliveryLimits, ResizeOptions, ImageGeometry } from './contract.js';
 import {
   AssetReader,
   Catalog,
@@ -8,6 +8,24 @@ import {
   MediaDelivery,
   PictureAuthority,
 } from './contract.js';
+
+function exceedsOutputLimits(
+  geometry: ImageGeometry,
+  options: ResizeOptions,
+  limits: DeliveryLimits
+): boolean {
+  const width =
+    options.width ??
+    Math.ceil((geometry.width * (options.height ?? geometry.height)) / geometry.height);
+  const height =
+    options.height ??
+    Math.ceil((geometry.height * (options.width ?? geometry.width)) / geometry.width);
+  return (
+    width > limits.maxResizeWidth ||
+    height > limits.maxResizeHeight ||
+    width * height > limits.maxOutputPixels
+  );
+}
 
 export const deliveryLayer = (limits: DeliveryLimits) =>
   Layer.effect(
@@ -40,10 +58,23 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             } as const;
           }
           const wallpaper = yield* catalog.findWallpaper(id);
+          if (!wallpaper) return { _tag: 'NotFound' } as const;
+          const resizing =
+            options !== undefined && (options.width !== undefined || options.height !== undefined);
+          let geometry: ImageGeometry = {
+            width: wallpaper.width,
+            height: wallpaper.height,
+            requiresOrientation: false,
+          };
+          if (resizing) {
+            // Catalog facts retain their historical raw/nominal meaning. Inspect immutable
+            // bytes for this request instead of rewriting existing rows or trusting new ingestion.
+            const inspection = yield* assets.read(wallpaper, { source: 'original' });
+            if (!inspection) return { _tag: 'NotFound' } as const;
+            geometry = yield* transformer.inspect(inspection);
+          }
           const matchesOriginal =
-            wallpaper !== null &&
-            options?.width === wallpaper.width &&
-            options?.height === wallpaper.height;
+            options?.width === geometry.width && options?.height === geometry.height;
           if (
             !matchesOriginal &&
             ((options?.width ?? 0) > limits.maxResizeWidth ||
@@ -54,34 +85,25 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
               reason: 'Requested dimensions exceed media limits',
             } as const;
           }
-          if (!wallpaper) return { _tag: 'NotFound' } as const;
           if (!matchesOriginal && options && (options.width || options.height)) {
-            const width =
-              options.width ??
-              Math.ceil(
-                (wallpaper.width * (options.height ?? wallpaper.height)) / wallpaper.height
-              );
-            const height =
-              options.height ??
-              Math.ceil((wallpaper.height * (options.width ?? wallpaper.width)) / wallpaper.width);
-            if (
-              width > limits.maxResizeWidth ||
-              height > limits.maxResizeHeight ||
-              width * height > limits.maxOutputPixels
-            ) {
+            if (exceedsOutputLimits(geometry, options, limits)) {
               return { _tag: 'Rejected', reason: 'Requested output exceeds media limits' } as const;
             }
           }
           const wouldUpscale =
             options?.fit !== 'fill' &&
-            ((options?.width ?? wallpaper.width) > wallpaper.width ||
-              (options?.height ?? wallpaper.height) > wallpaper.height);
+            ((options?.width ?? geometry.width) > geometry.width ||
+              (options?.height ?? geometry.height) > geometry.height);
           const variant =
-            !matchesOriginal && options && (options.width || options.height) && !wouldUpscale
+            !matchesOriginal &&
+            options &&
+            (options.width || options.height) &&
+            !wouldUpscale &&
+            !geometry.requiresOrientation
               ? yield* catalog.findSmallestVariant(
                   id,
-                  options.width ?? wallpaper.width,
-                  options.height ?? wallpaper.height
+                  options.width ?? geometry.width,
+                  options.height ?? geometry.height
                 )
               : null;
           yield* Metric.update(
@@ -108,7 +130,7 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
               }),
               Number(
                 (
-                  (1 - (variant.width * variant.height) / (wallpaper.width * wallpaper.height)) *
+                  (1 - (variant.width * variant.height) / (geometry.width * geometry.height)) *
                   100
                 ).toFixed(2)
               )
@@ -117,7 +139,21 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             ? { ...wallpaper, storageKey: variant.storageKey, storageBucket: variant.storageBucket }
             : wallpaper;
           let rendition = variant ?? wallpaper;
+          let renditionGeometry = geometry;
           let body = yield* assets.read(source, { source: variant ? 'variant' : 'original' });
+          if (body && variant && options) {
+            renditionGeometry = yield* transformer.inspect(body);
+            // Historical variants can advertise nominal bounds. Never admit an
+            // inferred output using those bounds when their actual pixels disagree.
+            if (
+              renditionGeometry.requiresOrientation ||
+              exceedsOutputLimits(renditionGeometry, options, limits)
+            ) {
+              body = null;
+            } else {
+              body = yield* assets.read(source, { source: 'variant' });
+            }
+          }
           if (!body && variant) {
             yield* Metric.update(
               Metric.counter('media.variant.fallback.total', {
@@ -128,10 +164,12 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             );
             body = yield* assets.read(wallpaper, { source: 'original', fallback: true });
             rendition = wallpaper;
+            renditionGeometry = geometry;
           }
           if (!body) return { _tag: 'NotFound' } as const;
           const matchesRendition =
-            options?.width === rendition.width && options?.height === rendition.height;
+            options?.width === renditionGeometry.width &&
+            options?.height === renditionGeometry.height;
           if (options && (options.width || options.height) && !matchesRendition) {
             const resized = yield* transformer.resize(body, {
               ...options,

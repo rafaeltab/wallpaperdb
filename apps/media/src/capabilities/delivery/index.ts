@@ -1,6 +1,7 @@
 export type {
   AssetBody,
   DeliveryLimits,
+  ImageGeometry,
   MediaOutcome,
   ResizeOptions,
   StoredAsset,

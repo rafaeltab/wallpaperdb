@@ -422,6 +422,19 @@ test("browser command fixtures await observable startup even when startup takes 
 	);
 });
 
+for (const value of ["invalid", "0", "-1"]) {
+	test(`invalid readiness timeout ${value} fails before building application images`, async (t) => {
+		const f = await browserFixture(t);
+		f.env.E2E_READY_TIMEOUT = value;
+		const result = await f.runAsync("PACKAGE=web-e2e");
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /E2E_READY_TIMEOUT must be a positive number/);
+		assert.ok(
+			!f.calls().some((call) => call.includes("build") || call.includes("up")),
+		);
+	});
+}
+
 for (const browser of [false, true]) {
 	test(`successful ${browser ? "browser" : "container-only"} runs remove their temporary diagnostics`, async (t) => {
 		const f = browser ? await browserFixture(t) : fixture(t);

@@ -593,12 +593,15 @@ async function main() {
 	if (selected.includes("@wallpaperdb/web-e2e")) {
 		let failure;
 		try {
+			phase = "browser preflight";
+			const buildTimeout = seconds("E2E_BUILD_TIMEOUT", 1200);
+			const readyTimeout = seconds("E2E_READY_TIMEOUT", 240);
 			await preflightBrowser();
 			phase = "current-checkout image build";
 			await run("docker", compose("apps", "build"), {
-				timeout: seconds("E2E_BUILD_TIMEOUT", 1200),
+				timeout: buildTimeout,
 			});
-			const deadline = Date.now() + seconds("E2E_READY_TIMEOUT", 240);
+			const deadline = Date.now() + readyTimeout;
 			phase = "infrastructure startup";
 			await run("docker", compose("infra", "up", "-d"), {
 				timeout: deadline - Date.now(),

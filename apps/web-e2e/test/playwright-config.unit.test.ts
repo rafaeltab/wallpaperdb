@@ -101,6 +101,10 @@ describe("buildWebE2EConfig", () => {
       E2E_ARTIFACTS_DIR: "/tmp/owned-e2e-diagnostics",
     });
     expect(config.outputDir).toBe("/tmp/owned-e2e-diagnostics/test-results");
+    expect(
+      config.projects?.find((project) => project.name === "chromium")?.use
+        ?.storageState,
+    ).toBe("/tmp/owned-e2e-diagnostics/.auth/base-user.json");
     expect(config.reporter).toEqual([
       ["list"],
       [

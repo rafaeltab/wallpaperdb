@@ -1,7 +1,7 @@
 import { devices, type PlaywrightTestConfig } from "@playwright/test";
 import { join } from "node:path";
 
-import { BASE_USER_AUTH } from "./auth-state";
+import { BASE_USER_AUTH, resolveAuthStorageStatePath } from "./auth-state";
 import { buildWebE2EBaseUrl } from "./environment-contract";
 
 type WebE2EEnv = NodeJS.ProcessEnv;
@@ -57,7 +57,7 @@ export function buildWebE2EConfig(
         testIgnore: /.*\.setup\.ts/,
         use: {
           ...devices["Desktop Chrome"],
-          storageState: BASE_USER_AUTH.storageStatePath,
+          storageState: resolveAuthStorageStatePath(env),
         },
       },
     ],

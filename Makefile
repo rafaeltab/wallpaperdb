@@ -198,17 +198,17 @@ check-crap: ## Check CRAP scores (requires CRAP_THRESHOLD; optional PACKAGE)
 worktree-remove: ## Tear down this worktree and release its slot
 	@node scripts/teardown-worktree.mjs
 
-ci: ## Run full CI pipeline (FORCE=1 bypasses cache; always all packages)
-	@echo "Running full CI checks locally..."
+ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packages)
+	@echo "Running local build, lint, type, unit, and integration checks..."
+	@echo "E2E excluded (browser and container). GitHub Actions enforces E2E; opt in locally with make test-e2e."
 	@set -e; \
 	start_time=$$(date +%s); \
 	$(TURBO) run build lint check-types test:unit test:integration --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
-	$(TURBO) run test:e2e --concurrency=1 $(if $(filter 1,$(FORCE)),--force); \
-	pnpm coverage:merge; \
+	pnpm coverage:merge --local; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \
 	echo ""; \
-	echo "✓ All CI checks passed in $${duration}s"; \
+	echo "✓ All local CI checks passed in $${duration}s"; \
 	echo "✓ Coverage report: coverage/lcov.info"
 
 clean: ## Remove dependencies, build output, caches, and coverage

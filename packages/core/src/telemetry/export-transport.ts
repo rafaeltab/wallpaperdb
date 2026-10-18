@@ -5,6 +5,9 @@ import { isIP, Socket, type LookupFunction } from "node:net";
 import type { Duplex } from "node:stream";
 
 export const telemetryExportTimeoutMillis = 1000;
+// Reserve half the export budget for connecting and receiving a response, including
+// when one DNS family succeeds and the other must be cancelled.
+const dnsTimeoutMillis = telemetryExportTimeoutMillis / 2;
 export const telemetryBatchOptions = {
   maxQueueSize: 256,
   maxExportBatchSize: 64,
@@ -98,12 +101,12 @@ export class TelemetryExportTransport {
       queueMicrotask(() => finish(null, local));
       return;
     }
-    const resolver = new Resolver({ timeout: telemetryExportTimeoutMillis, tries: 1 });
+    const resolver = new Resolver({ timeout: dnsTimeoutMillis, tries: 1 });
     this.resolvers.add(resolver);
     const addresses: LookupAddress[] = [];
     let pending = family ? 1 : 2;
     let failure: Error | null = null;
-    const deadline = setTimeout(() => resolver.cancel(), telemetryExportTimeoutMillis);
+    const deadline = setTimeout(() => resolver.cancel(), dnsTimeoutMillis);
     const resolved = (version: number) => (error: Error | null, records: string[]) => {
       if (error) failure = error;
       else addresses.push(...records.map((address) => ({ address, family: version })));

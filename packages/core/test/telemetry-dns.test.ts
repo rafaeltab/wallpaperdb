@@ -30,9 +30,10 @@ function request(agent: Agent, url: string): Promise<number> {
   });
 }
 
-it("cancels network DNS work, recovers on a later export and honors startup hosts aliases without system lookups", async () => {
+it("bounds DNS work, uses a resolved family when its peer stalls and recovers without system lookups", async () => {
   const dns = createSocket("udp4");
   let healthy = false;
+  let dropIpv6 = false;
   let queries = 0;
   dns.on("message", (query, peer) => {
     queries++;
@@ -42,6 +43,7 @@ it("cancels network DNS work, recovers on a later export and honors startup host
     end += 5;
     const header = Buffer.from(query.subarray(0, 12));
     const ipv4 = query.readUInt16BE(end - 4) === 1;
+    if (!ipv4 && dropIpv6) return;
     header.writeUInt16BE(0x8180, 2);
     header.writeUInt16BE(ipv4 ? 1 : 0, 6);
     header.writeUInt32BE(0, 8);
@@ -81,9 +83,12 @@ it("cancels network DNS work, recovers on a later export and honors startup host
     expect(queries).toBe(beforeHosts);
     expect(systemLookups).toBe(0);
     expect(getServers()).toEqual(originalServers);
+    dropIpv6 = true;
+    await expect(request(agent, endpoint)).resolves.toBe(200);
+    const beforeClose = queries;
     healthy = false;
     const closedRequest = request(agent, endpoint).catch(() => "closed");
-    await vi.waitFor(() => expect(queries).toBeGreaterThan(beforeHosts));
+    await vi.waitFor(() => expect(queries).toBeGreaterThan(beforeClose));
     const started = performance.now();
     await transport.close();
     await expect(closedRequest).resolves.toBe("closed");

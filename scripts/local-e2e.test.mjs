@@ -82,6 +82,7 @@ if (args.includes('build') && process.env.TEST_BUILD_EXIT) process.exit(Number(p
 if (args.includes('run') && process.env.TEST_MOUNT_EXIT) process.exit(Number(process.env.TEST_MOUNT_EXIT));
 if (args.includes('up') && process.env.TEST_UP_EXIT) process.exit(Number(process.env.TEST_UP_EXIT));
 if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_CLEANUP_EXIT) process.exit(Number(process.env.TEST_CLEANUP_EXIT));
+if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_HOLD_CLEANUP) { console.log('Cleanup fixture running'); setTimeout(() => {}, 100); }
 `,
 		{ mode: 0o700 },
 	);
@@ -432,6 +433,26 @@ test("interruption cleans its owned stack and releases the lock", async (t) => {
 	assert.equal(
 		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
 		0,
+	);
+});
+
+test("interruption during successful browser cleanup finishes teardown and reports the cleanup phase", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_HOLD_CLEANUP = "1";
+	f.onOutput = (output, child) => {
+		if (output.includes("Cleanup fixture running"))
+			process.kill(-child.pid, "SIGTERM");
+	};
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.match(result.stderr, /phase "browser cleanup" failed, exit 143/);
+	assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+	assert.equal(
+		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		0,
+	);
+	assert.doesNotMatch(
+		result.stdout,
+		/All requested E2E phases and cleanup passed/,
 	);
 });
 

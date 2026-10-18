@@ -255,6 +255,7 @@ for (const packageName of ["test-utils", "testcontainers"]) {
 }
 
 for (const [signal, status] of [
+	["SIGHUP", 129],
 	["SIGINT", 130],
 	["SIGTERM", 143],
 ]) {
@@ -786,6 +787,35 @@ for (const [service, key, value] of [
 		);
 	});
 }
+
+test("terminal hangup cleans its owned stack, stops its detached child, and releases the lock", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_HOLD = "1";
+	f.onOutput = (output, child) => {
+		if (output.includes("Browser fixture running"))
+			process.kill(-child.pid, "SIGHUP");
+	};
+	let pid;
+	try {
+		const result = await f.runAsync("PACKAGE=web-e2e");
+		pid = Number(
+			readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
+		);
+		assert.match(result.stderr, /browser tests.*exit 129/);
+		assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+		assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+		assert.equal(
+			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+			0,
+		);
+	} finally {
+		if (Number.isInteger(pid) && pid > 0) {
+			try {
+				process.kill(-pid, "SIGKILL");
+			} catch {}
+		}
+	}
+});
 
 test("interruption cleans its owned stack and releases the lock", async (t) => {
 	const f = await browserFixture(t);

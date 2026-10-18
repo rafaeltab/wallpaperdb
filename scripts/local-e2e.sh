@@ -14,6 +14,7 @@ lock_file=${E2E_LOCK_FILE:-/tmp/wallpaperdb-perf-validation.lock}
 lock_timeout=${E2E_LOCK_TIMEOUT:-900}
 case "$lock_timeout" in ''|*[!0-9]*) echo 'E2E_LOCK_TIMEOUT must be a positive integer in seconds.' >&2; exit 1 ;; esac
 test "$lock_timeout" -gt 0 || exit 1
+trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 exec 9>"$lock_file"

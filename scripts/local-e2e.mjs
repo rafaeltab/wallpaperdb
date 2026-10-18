@@ -38,6 +38,7 @@ let rerunPackage = "web-e2e";
 let browserTestsStarted = false;
 
 for (const [signal, status] of [
+	["SIGHUP", 129],
 	["SIGINT", 130],
 	["SIGTERM", 143],
 ]) {

@@ -10,8 +10,13 @@ import {
   samplePixelGrid,
 } from '@wallpaperdb/test-utils/fixtures';
 
-async function transform(input: Buffer, options: ResizeOptions, format: 'jpeg' | 'png' | 'webp') {
-  const runtime = ManagedRuntime.make(sharpTransformerLayer({ maxInputPixels: 268435456 }));
+async function transform(
+  input: Buffer,
+  options: ResizeOptions,
+  format: 'jpeg' | 'png' | 'webp',
+  maxInputPixels = 268435456
+) {
+  const runtime = ManagedRuntime.make(sharpTransformerLayer({ maxInputPixels }));
   try {
     const body = await runtime.runPromise(
       ImageTransformer.use((t) =>
@@ -52,27 +57,7 @@ async function resize(
   })
     .toFormat(format)
     .toBuffer();
-  const runtime = ManagedRuntime.make(sharpTransformerLayer({ maxInputPixels }));
-  try {
-    const body = await runtime.runPromise(
-      ImageTransformer.use((t) =>
-        t.resize(
-          {
-            close() {},
-            async *[Symbol.asyncIterator]() {
-              yield input;
-            },
-          },
-          { ...options, mimeType: `image/${format}` }
-        )
-      )
-    );
-    const chunks = [];
-    for await (const chunk of body) chunks.push(chunk);
-    return Buffer.concat(chunks);
-  } finally {
-    await runtime.dispose();
-  }
+  return transform(input, options, format, maxInputPixels);
 }
 
 describe('native image resize contract', () => {

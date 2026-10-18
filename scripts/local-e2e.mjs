@@ -167,6 +167,8 @@ async function run(
 		activeChild = child;
 		let stdout = "";
 		let stderr = "";
+		let capturedBytes = 0;
+		let captureFailure;
 
 		const outputs = [
 			{ stream: child.stdout, pending: "", omitted: false, error: false },
@@ -178,6 +180,23 @@ async function run(
 			output.stream.setEncoding("utf8");
 			output.stream.on("data", (data) => {
 				if (capture) {
+					if (captureFailure) return;
+					capturedBytes += Buffer.byteLength(data);
+					if (capturedBytes > 1_048_576) {
+						captureFailure = Object.assign(
+							new Error(
+								`Capture exceeded 1048576 bytes; stopped ${command} without retaining incomplete output.`,
+							),
+							{
+								status: interrupted ?? 1,
+								phase: cleanupRunning ? "browser cleanup" : phase,
+							},
+						);
+						stdout = "";
+						stderr = "";
+						stopChild();
+						return;
+					}
 					if (output.error) stderr += data;
 					else stdout += data;
 					return;
@@ -230,6 +249,10 @@ async function run(
 			clearTimeout(timer);
 			clearTimeout(killer);
 			activeChild = undefined;
+			if (captureFailure) {
+				reject(captureFailure);
+				return;
+			}
 			const priorDiagnosticsFailure = diagnosticsFailure ?? outputFailure;
 			for (const output of outputs)
 				if (output.pending && !capture) record(output.pending, output.error);
@@ -536,6 +559,7 @@ async function waitForBrowser(deadline) {
 }
 
 async function retainBrowserDiagnostics() {
+	let failure;
 	if (
 		(phase === "application startup" || phase === "infrastructure startup") &&
 		!interrupted
@@ -561,8 +585,10 @@ async function retainBrowserDiagnostics() {
 			writeFileSync(join(diagnostics, `${file}.log`), redact(output));
 		} catch (error) {
 			record(`Diagnostic capture failed: ${error.message}`, true);
+			failure ??= error;
 		}
 	}
+	if (failure) throw failure;
 }
 
 async function cleanup() {

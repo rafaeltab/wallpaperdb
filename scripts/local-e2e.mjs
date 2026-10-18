@@ -68,7 +68,7 @@ function stopChild() {
 
 function redact(value) {
 	let result = String(value);
-	for (const secret of secrets)
+	for (const secret of [...secrets].sort((a, b) => b.length - a.length))
 		result = result.split(secret).join("[REDACTED]");
 	return result
 		.replace(/\b(?:sk|pk)_(?:test|live)_[\w-]+/g, "[REDACTED]")

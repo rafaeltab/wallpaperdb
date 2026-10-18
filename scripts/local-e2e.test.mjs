@@ -171,7 +171,7 @@ const args = process.argv.slice(2);
 fs.appendFileSync('calls.jsonl', JSON.stringify(['docker', ...args]) + '\\n');
 if (args.includes('info') && process.env.TEST_INFO_EXIT) process.exit(Number(process.env.TEST_INFO_EXIT));
 if (args.includes('config')) console.log(fs.readFileSync('compose.json', 'utf8'));
-if (args.includes('logs')) console.log('private-password sk_test_private');
+if (args.includes('logs')) console.log(process.env.TEST_LOG_MESSAGE || 'private-password sk_test_private');
 if (args.includes('ps') && args.some(x => x.startsWith('label=')) && process.env.TEST_EXISTING) console.log('existing-resource');
 if (args.includes('build') && process.env.TEST_BUILD_EXIT) process.exit(Number(process.env.TEST_BUILD_EXIT));
 if (args.includes('run') && process.env.TEST_MOUNT_EXIT) process.exit(Number(process.env.TEST_MOUNT_EXIT));
@@ -1090,4 +1090,28 @@ test("a complete run suggests the container suite that actually failed", async (
 			["--filter=@wallpaperdb/testcontainers"],
 		],
 	);
+});
+
+test("overlapping credentials are fully redacted in console and retained diagnostics", async (t) => {
+	const f = await browserFixture(t);
+	mkdirSync(join(f.root, "apps/ingestor"), { recursive: true });
+	writeFileSync(
+		join(f.root, "apps/ingestor/.env"),
+		"A_TOKEN=fixture-overlap\nZ_TOKEN=fixture-overlap-private-suffix\n",
+	);
+	f.env.TEST_LOG_MESSAGE = "fixture-overlap-private-suffix fixture-overlap";
+	f.env.TEST_BROWSER_EXIT = "23";
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.match(result.stderr, /browser tests.*exit 23/);
+	const directory = result.stdout.match(
+		/E2E diagnostics retained at (\S+)\./,
+	)[1];
+	for (const text of [
+		result.stdout + result.stderr,
+		readFileSync(join(directory, "apps.log"), "utf8"),
+		readFileSync(join(directory, "infra.log"), "utf8"),
+		readFileSync(join(directory, "run.log"), "utf8"),
+	]) {
+		assert.doesNotMatch(text, /fixture-overlap|private-suffix/);
+	}
 });

@@ -29,7 +29,7 @@ Make small, focused changes following existing code conventions and patterns. Af
 make ci
 ```
 
-This runs build, lint, and all tests. Fix any failures before continuing.
+This runs build, lint, type checks, unit and integration tests, and non-E2E coverage merging. Fix failures before continuing. GitHub Actions enforces the complete E2E suites by default. Use explicit local `make test-e2e` only when requested or needed for diagnosis or deliberate validation; follow [contributor guidance](../../../CONTRIBUTING.md#check-a-change) for prerequisites, owned automatic startup/cleanup, and the shared Docker host lock. Replace manual local E2E stack setup with that supported command.
 
 ### 5. Open a PR
 

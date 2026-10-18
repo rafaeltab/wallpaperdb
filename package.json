@@ -12,7 +12,7 @@
         "architecture:workspaces": "node scripts/check-architecture-workspaces.mjs",
         "test:coverage": "vitest run --coverage",
         "test:ui": "vitest --ui",
-        "coverage:merge": "mkdir -p coverage && find packages apps -path '*/coverage/*' -name lcov.info -exec cat {} + > coverage/lcov.info",
+        "coverage:merge": "node scripts/merge-coverage.mjs",
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check-types": "tsc --project tsconfig.tooling.json"
     },

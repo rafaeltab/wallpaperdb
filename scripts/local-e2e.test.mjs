@@ -188,8 +188,8 @@ if (args.includes('up') && args.includes('infra/docker-compose.apps.yml') && pro
   if (process.env.TEST_UP_DELAY) setTimeout(start, Number(process.env.TEST_UP_DELAY));
   else start();
 }
-if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_CLEANUP_EXIT) process.exit(Number(process.env.TEST_CLEANUP_EXIT));
-if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_HOLD_CLEANUP) { console.log('Cleanup fixture running'); setTimeout(() => {}, 100); }
+if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_CLEANUP_EXIT && !process.env.TEST_HOLD_CLEANUP) process.exit(Number(process.env.TEST_CLEANUP_EXIT));
+if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_HOLD_CLEANUP) { console.log('Cleanup fixture running'); setTimeout(() => process.exit(Number(process.env.TEST_CLEANUP_EXIT || 0)), 100); }
 `,
 		{ mode: 0o700 },
 	);
@@ -1142,6 +1142,41 @@ for (const failed of [false, true]) {
 				name.startsWith("wallpaperdb-e2e-"),
 			),
 			[],
+		);
+	});
+}
+
+for (const [signal, status, browserStatus] of [
+	["SIGHUP", 129, 0],
+	["SIGINT", 130, 0],
+	["SIGTERM", 143, 0],
+	["SIGTERM", 143, 26],
+]) {
+	test(`${signal} during failed cleanup preserves ${browserStatus ? "the prior browser failure" : "the interruption"}`, async (t) => {
+		const f = await browserFixture(t);
+		f.env.TEST_HOLD_CLEANUP = "1";
+		f.env.TEST_CLEANUP_EXIT = "29";
+		if (browserStatus) f.env.TEST_BROWSER_EXIT = String(browserStatus);
+		f.onOutput = (output, child) => {
+			if (output.includes("Cleanup fixture running"))
+				process.kill(-child.pid, signal);
+		};
+		const result = await f.runAsync("PACKAGE=web-e2e");
+		assert.match(
+			result.stderr,
+			new RegExp(
+				`phase "${browserStatus ? "browser tests" : "browser cleanup"}" failed, exit ${browserStatus || status}`,
+			),
+		);
+		assert.match(result.stderr, /Cleanup failed for apps, exit 29/);
+		assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+		assert.equal(
+			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+			0,
+		);
+		assert.doesNotMatch(
+			result.stdout,
+			/All requested E2E phases and cleanup passed/,
 		);
 	});
 }

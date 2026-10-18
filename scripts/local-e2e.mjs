@@ -646,7 +646,11 @@ async function main() {
 		} catch (error) {
 			if (!failure) {
 				phase = "browser cleanup";
-				failure = error;
+				failure = interrupted
+					? Object.assign(new Error("Interrupted during cleanup."), {
+							status: interrupted,
+						})
+					: error;
 			}
 		}
 		if (failure) throw failure;

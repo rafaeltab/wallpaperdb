@@ -94,13 +94,14 @@ export const generationLayer = Layer.effect(
           yield* count('skipped', { reason: 'not_image' });
           return { _tag: 'Skipped', reason: 'not_image' } as const;
         }
-        const category = matchAspectRatioCategory(input.width, input.height);
+        const displayed = yield* images.inspect(input);
+        const category = matchAspectRatioCategory(displayed.width, displayed.height);
         yield* category === null
           ? count('aspect_ratio_no_match', {
-              aspect_ratio: (input.width / input.height).toFixed(2),
+              aspect_ratio: (displayed.width / displayed.height).toFixed(2),
             })
           : count('aspect_ratio_matches', { category });
-        const presets = getApplicablePresets(input.width, input.height);
+        const presets = getApplicablePresets(displayed.width, displayed.height);
         if (category !== null) yield* count('presets_selected', { category }, presets.length);
         if (presets.length === 0) {
           yield* count('skipped', { reason: 'no_presets' });

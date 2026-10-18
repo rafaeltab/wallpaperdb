@@ -44,6 +44,10 @@ describe('Stored variant image adapter', () => {
         ...input, wallpaperId: `wlpr_${key}`, mimeType: `image/${format}`, width: 120, height: 80,
         storage: { bucket: 'originals', key },
       }, { width: 60, height: 60, label: 'orientation' }));
+      expect(await runtime.runPromise(VariantImages.use((images) => images.inspect({
+        ...input, mimeType: `image/${format}`, width: 120, height: 80,
+        storage: { bucket: 'originals', key },
+      })))).toEqual({ width: grid[0].length * 40, height: grid.length * 40 });
       const variant = await runtime.runPromise(generate);
       const object = await tester.s3.getS3Client().send(new GetObjectCommand({ Bucket: variant.storageBucket, Key: variant.storageKey }));
       if (!object.Body) throw new Error('Missing stored variant');
@@ -142,6 +146,23 @@ describe('Stored variant image adapter', () => {
     expect(Result.isFailure(result)).toBe(true);
     if (Result.isFailure(result)) expect(result.failure._tag).toBe('GenerationUnavailable');
   });
+  it.each(['missing', 'corrupt'])('returns a typed inspection failure for %s originals', async (key) => {
+    if (key === 'corrupt') await tester.s3.uploadObject('originals', key, Buffer.from('invalid image'));
+    const result = await runtime.runPromise(Effect.result(VariantImages.use((images) =>
+      images.inspect({ ...input, storage: { bucket: 'originals', key } }))));
+    expect(Result.isFailure(result)).toBe(true);
+    if (Result.isFailure(result)) expect(result.failure).toMatchObject({
+      _tag: 'GenerationUnavailable', operation: key === 'missing' ? 'read-image' : 'inspect-image',
+    });
+  });
+  it('enforces the native input-pixel limit during inspection', async () => {
+    const key = 'pixel-limit.svg';
+    await tester.s3.uploadObject('originals', key, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="20000" height="20000"><rect width="20000" height="20000" fill="red"/></svg>'));
+    const result = await runtime.runPromise(Effect.result(VariantImages.use((images) =>
+      images.inspect({ ...input, storage: { bucket: 'originals', key } }))));
+    expect(Result.isFailure(result)).toBe(true);
+    if (Result.isFailure(result)) expect(result.failure.operation).toBe('inspect-image');
+  });
   it('rejects originals above the accepted 50 MiB storage limit', async () => {
     await tester.s3.uploadObject('originals', 'oversized', Buffer.alloc(50 * 1024 * 1024 + 1));
     const result = await runtime.runPromise(Effect.result(Effect.gen(function* () {
@@ -149,6 +170,10 @@ describe('Stored variant image adapter', () => {
     })));
     expect(Result.isFailure(result)).toBe(true);
     if (Result.isFailure(result)) expect(result.failure.operation).toBe('read-image');
+    const inspected = await runtime.runPromise(Effect.result(VariantImages.use((images) =>
+      images.inspect({ ...input, storage: { bucket: 'originals', key: 'oversized' } }))));
+    expect(Result.isFailure(inspected)).toBe(true);
+    if (Result.isFailure(inspected)) expect(inspected.failure.operation).toBe('read-image');
   });
   it('returns a typed failure for unsupported image formats without writing a variant', async () => {
     const key = 'unsupported-format';

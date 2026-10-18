@@ -28,14 +28,20 @@ const input: GenerationInput = {
 function controlledAdapters(
   failGeneration?: number,
   failPublication?: number,
-  publicationGate: Effect.Effect<void> = Effect.void
+  publicationGate: Effect.Effect<void> = Effect.void,
+  displayed?: { width: number; height: number }
 ) {
+  const inspected: GenerationInput[] = [];
   const generated: GeneratedVariant[] = [];
   const attempts: ResolutionPreset[] = [];
   const publications: { input: GenerationInput; variant: GeneratedVariant }[] = [];
   const failure = new GenerationUnavailable({ operation: 'controlled', cause: new Error('unavailable') });
   const layer = generationLayer.pipe(Layer.provide(Layer.mergeAll(
     Layer.succeed(VariantImages, {
+      inspect: (original) => Effect.sync(() => {
+        inspected.push(original);
+        return displayed ?? { width: original.width, height: original.height };
+      }),
       generate: (original, preset) => Effect.gen(function* () {
         attempts.push(preset);
         if (preset.width === failGeneration) return yield* Effect.fail(failure);
@@ -66,7 +72,7 @@ function controlledAdapters(
   const generate = (original = input) => Effect.gen(function* () {
     return yield* (yield* GenerateVariants).generate(original);
   }).pipe(Effect.provide(layer));
-  return { generated, attempts, publications, failure, generate };
+  return { inspected, generated, attempts, publications, failure, generate };
 }
 
 describe('variant generation', () => {
@@ -78,11 +84,53 @@ describe('variant generation', () => {
     expect(adapters.publications).toEqual(adapters.generated.map((variant) => ({ input, variant })));
   });
 
+  it('selects phone presets using inspected displayed dimensions without rewriting the upload', async () => {
+    const original = { ...input, width: 3840, height: 2160 };
+    const adapters = controlledAdapters(undefined, undefined, Effect.void, { width: 2160, height: 3840 });
+    const outcome = await Effect.runPromise(adapters.generate(original));
+    expect(outcome._tag).toBe('Generated');
+    expect(adapters.attempts.map(({ width, height }) => [width, height])).toEqual([
+      [1440, 3200], [1080, 2400], [1080, 1920], [720, 1280], [480, 854],
+    ]);
+    expect(adapters.publications.every(({ input: published }) => published === original)).toBe(true);
+    expect(original).toMatchObject({ width: 3840, height: 2160 });
+  });
+
+  it('uses displayed landscape axes and skips presets that would upscale an oriented source', async () => {
+    const landscape = controlledAdapters(undefined, undefined, Effect.void, { width: 1920, height: 1080 });
+    await Effect.runPromise(landscape.generate({ ...input, width: 1080, height: 1920 }));
+    expect(landscape.attempts.map(({ width, height }) => [width, height])).toEqual([
+      [1600, 900], [1280, 720], [854, 480], [640, 360],
+    ]);
+    const small = controlledAdapters(undefined, undefined, Effect.void, { width: 360, height: 640 });
+    expect(await Effect.runPromise(small.generate({ ...input, width: 640, height: 360 })))
+      .toEqual({ _tag: 'Skipped', reason: 'no_presets' });
+    expect(small.attempts).toEqual([]);
+  });
+
+  it('fails inspection before generating or publishing and never inspects videos', async () => {
+    const failure = new GenerationUnavailable({ operation: 'inspect-image', cause: new Error('unavailable') });
+    let inspections = 0;
+    const layer = generationLayer.pipe(Layer.provide(Layer.mergeAll(
+      Layer.succeed(VariantImages, {
+        inspect: () => Effect.sync(() => { inspections++; }).pipe(Effect.andThen(Effect.fail(failure))),
+        generate: () => Effect.die('must not generate'),
+      }),
+      Layer.succeed(VariantEvents, { publish: () => Effect.die('must not publish') }),
+    )));
+    const generate = (original: GenerationInput) => GenerateVariants.use((service) => service.generate(original)).pipe(Effect.provide(layer));
+    expect(await Effect.runPromise(generate({ ...input, fileType: 'video' })))
+      .toEqual({ _tag: 'Skipped', reason: 'not_image' });
+    expect(inspections).toBe(0);
+    expect(await Effect.runPromise(generate(input).pipe(Effect.flip))).toBe(failure);
+    expect(inspections).toBe(1);
+  });
+
   it.each([
     { original: { ...input, fileType: 'video' as const }, reason: 'not_image' },
     { original: { ...input, width: 1000, height: 1000 }, reason: 'no_presets' },
     { original: { ...input, width: 640, height: 360 }, reason: 'no_presets' },
-  ])('skips without external effects: $reason', async ({ original, reason }) => {
+  ])('skips without generating or publishing variants: $reason', async ({ original, reason }) => {
     const adapters = controlledAdapters();
     expect(await Effect.runPromise(adapters.generate(original))).toEqual({ _tag: 'Skipped', reason });
     expect(adapters.attempts).toEqual([]);
@@ -138,7 +186,10 @@ describe('variant generation', () => {
   it('keeps unexpected defects out of the technical failure channel', async () => {
     const defect = new Error('programmer error');
     const layer = generationLayer.pipe(Layer.provide(Layer.mergeAll(
-      Layer.succeed(VariantImages, { generate: () => Effect.die(defect) }),
+      Layer.succeed(VariantImages, {
+        inspect: () => Effect.succeed({ width: 1920, height: 1080 }),
+        generate: () => Effect.die(defect),
+      }),
       Layer.succeed(VariantEvents, { publish: () => Effect.die('must not publish') }),
     )));
     const effect = Effect.gen(function* () { return yield* (yield* GenerateVariants).generate(input); });

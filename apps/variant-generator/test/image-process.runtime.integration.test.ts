@@ -35,9 +35,11 @@ function running(pid: number): boolean {
 // No encoder replacement or application-only test hooks are used.
 describe.skipIf(process.platform !== 'linux')('Native image process ownership', () => {
   it.each([
-    'deadline',
-    'interruption',
-  ])('reaps a stopped encoder before %s completes', async (mode) => {
+    { mode: 'deadline', operation: 'generate' },
+    { mode: 'interruption', operation: 'generate' },
+    { mode: 'deadline', operation: 'inspect' },
+    { mode: 'interruption', operation: 'inspect' },
+  ] as const)('reaps native $operation before $mode completes', async ({ mode, operation }) => {
     const server = createServer((_request, response) => response.end('image bytes'));
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
@@ -49,19 +51,23 @@ describe.skipIf(process.platform !== 'linux')('Native image process ownership', 
     const controller = new AbortController();
     let child: number | undefined;
     try {
-      const operation = runtime.runPromise(
+      const pending = runtime.runPromise(
         Effect.result(Effect.gen(function* () {
-          return yield* (yield* VariantImages).generate({
-            wallpaperId: 'wlpr_process', fileType: 'image', mimeType: 'image/jpeg', width: 160, height: 90,
+          const images = yield* VariantImages;
+          const input = {
+            wallpaperId: 'wlpr_process', fileType: 'image' as const, mimeType: 'image/jpeg', width: 160, height: 90,
             storage: { bucket: 'wallpapers', key: 'original.jpg' }, occurrence: { source: 'test', id: 'process' },
             timestamp: '2026-01-01T00:00:00.000Z',
-          }, { width: 80, height: 45, label: 'small' });
+          };
+          return yield* operation === 'inspect'
+            ? images.inspect(input)
+            : images.generate(input, { width: 80, height: 45, label: 'small' });
         })),
         {
           signal: controller.signal,
         }
       );
-      const settled = operation.then(
+      const settled = pending.then(
         (value) => ({ value }),
         (error: unknown) => ({ error })
       );
@@ -77,7 +83,7 @@ describe.skipIf(process.platform !== 'linux')('Native image process ownership', 
           expect(Result.isFailure(result.value)).toBe(true);
           if (Result.isFailure(result.value)) {
             expect(result.value.failure._tag).toBe('GenerationUnavailable');
-            expect(result.value.failure.operation).toBe('encode-image');
+            expect(result.value.failure.operation).toBe(operation === 'inspect' ? 'inspect-image' : 'encode-image');
           }
         }
       } else expect('error' in result).toBe(true);

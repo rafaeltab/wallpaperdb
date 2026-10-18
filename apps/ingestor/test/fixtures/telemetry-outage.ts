@@ -6,7 +6,15 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { metrics, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { Effect, Exit, Layer, ManagedRuntime, Scope } from 'effect';
-import { initializeOtel } from '../../src/otel-init.js';
+const service = process.env.TELEMETRY_SERVICE ?? 'ingestor';
+assert(
+  ['ingestor', 'gateway', 'media', 'user', 'tags', 'color-extractor', 'variant-generator'].includes(
+    service
+  )
+);
+const { initializeOtel } = await import(
+  new URL(`../../../${service}/src/otel-init.ts`, import.meta.url).href
+);
 
 // This entire process runs in an owned container with its own resolver configuration.
 // Drop collector DNS packets, while localhost remains a healthy /etc/hosts dependency.
@@ -94,7 +102,7 @@ try {
   assert.deepEqual(
     await Effect.runPromise(
       initializeOtel({
-        otelServiceName: 'ingestor-outage',
+        otelServiceName: `${service}-outage`,
         otelEndpoint: `http://${outage === 'ip' ? '127.0.0.1' : 'collector.test'}:${collectorPort}`,
       }).pipe(Scope.provide(scope))
     ),
@@ -170,6 +178,7 @@ try {
           queries,
           pendingSystemLookups: lookups.size,
           outage,
+          service,
         })
       );
       const before = storageConnections;

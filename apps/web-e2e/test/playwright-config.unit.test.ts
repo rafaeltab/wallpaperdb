@@ -95,6 +95,23 @@ describe("buildWebE2EConfig", () => {
     expect(String(setupProject?.testMatch)).toContain("\\.setup\\.ts");
     expect(String(chromiumProject?.testIgnore)).toContain("\\.setup\\.ts");
   });
+
+  it("writes owned-run browser artifacts directly into its isolated diagnostics directory", () => {
+    const config = buildWebE2EConfig({
+      E2E_ARTIFACTS_DIR: "/tmp/owned-e2e-diagnostics",
+    });
+    expect(config.outputDir).toBe("/tmp/owned-e2e-diagnostics/test-results");
+    expect(config.reporter).toEqual([
+      ["list"],
+      [
+        "html",
+        {
+          open: "never",
+          outputFolder: "/tmp/owned-e2e-diagnostics/playwright-report",
+        },
+      ],
+    ]);
+  });
 });
 
 describe("auth state contract", () => {

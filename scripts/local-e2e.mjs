@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
 	appendFileSync,
-	cpSync,
 	existsSync,
 	lstatSync,
 	mkdtempSync,
@@ -35,7 +34,6 @@ let project;
 let environment = { ...process.env };
 let cleanupRunning = false;
 let rerunPackage = "web-e2e";
-let browserTestsStarted = false;
 
 for (const [signal, status] of [
 	["SIGHUP", 129],
@@ -506,12 +504,6 @@ async function retainBrowserDiagnostics() {
 			record(`Diagnostic capture failed: ${error.message}`, true);
 		}
 	}
-	if (!browserTestsStarted) return;
-	for (const name of ["test-results", "playwright-report"]) {
-		const source = join("apps/web-e2e", name);
-		if (existsSync(source))
-			cpSync(source, join(diagnostics, name), { recursive: true });
-	}
 }
 
 async function cleanup() {
@@ -644,7 +636,7 @@ async function main() {
 			phase = "browser readiness";
 			await waitForBrowser(deadline);
 			phase = "browser tests";
-			browserTestsStarted = true;
+			environment.E2E_ARTIFACTS_DIR = diagnostics;
 			await runSuites(["@wallpaperdb/web-e2e"]);
 		} catch (error) {
 			failure = error;

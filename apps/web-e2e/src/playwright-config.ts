@@ -1,4 +1,5 @@
 import { devices, type PlaywrightTestConfig } from "@playwright/test";
+import { join } from "node:path";
 
 import { BASE_USER_AUTH } from "./auth-state";
 import { buildWebE2EBaseUrl } from "./environment-contract";
@@ -19,14 +20,26 @@ export function buildWebE2EConfig(
   | "workers"
 > {
   const authSetupProjectName = `setup:${BASE_USER_AUTH.name}`;
+  const artifacts = env.E2E_ARTIFACTS_DIR;
 
   return {
     testDir: "./specs",
     fullyParallel: false,
     workers: 1,
     retries: env.CI ? 1 : 0,
-    outputDir: "test-results",
-    reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
+    outputDir: artifacts ? join(artifacts, "test-results") : "test-results",
+    reporter: [
+      ["list"],
+      [
+        "html",
+        {
+          open: "never",
+          outputFolder: artifacts
+            ? join(artifacts, "playwright-report")
+            : "playwright-report",
+        },
+      ],
+    ],
     use: {
       baseURL: buildWebE2EBaseUrl(env),
       screenshot: "only-on-failure",

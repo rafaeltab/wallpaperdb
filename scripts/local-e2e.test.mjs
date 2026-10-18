@@ -139,6 +139,7 @@ function fixture(t) {
 		`#!/usr/bin/env node
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+if (process.env.TEST_OBSERVE_CHILD_ENV) fs.appendFileSync('child-env.jsonl', JSON.stringify({kind: process.argv[1].endsWith('/docker') ? 'docker' : 'turbo', args, values: Object.fromEntries(['CLERK_SECRET_KEY', 'E2E_BASE_TEST_EMAIL', 'E2E_BASE_TEST_PASSWORD', 'E2E_ARTIFACTS_DIR'].map(key => [key, process.env[key] ?? null]))}) + String.fromCharCode(10));
 fs.appendFileSync('calls.jsonl', JSON.stringify(['turbo', ...args]) + '\\n');
 if (args.includes('--dry=json')) {
   const selected = args.filter(x => x.startsWith('--filter=@')).map(x => x.slice(9));
@@ -185,6 +186,7 @@ if (!args.includes('--dry=json') && process.env.TEST_VERBOSE_OUTPUT) {
 		`#!/usr/bin/env node
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+if (process.env.TEST_OBSERVE_CHILD_ENV) fs.appendFileSync('child-env.jsonl', JSON.stringify({kind: process.argv[1].endsWith('/docker') ? 'docker' : 'turbo', args, values: Object.fromEntries(['CLERK_SECRET_KEY', 'E2E_BASE_TEST_EMAIL', 'E2E_BASE_TEST_PASSWORD', 'E2E_ARTIFACTS_DIR'].map(key => [key, process.env[key] ?? null]))}) + String.fromCharCode(10));
 fs.appendFileSync('calls.jsonl', JSON.stringify(['docker', ...args]) + '\\n');
 if (args.includes('info') && process.env.TEST_INFO_EXIT) process.exit(Number(process.env.TEST_INFO_EXIT));
 const largeCapture = (args.includes('logs') && process.env.TEST_LARGE_CAPTURE === 'logs') || (args.includes('config') && process.env.TEST_LARGE_CAPTURE === 'config');
@@ -1400,3 +1402,55 @@ test("a FIFO lock target is rejected without blocking or starting Docker", (t) =
 	assert.ok(statSync(selected).isFIFO());
 	assert.ok(!existsSync(join(f.root, "calls.jsonl")));
 });
+
+for (const failure of ["none", "build", "browser"]) {
+	test(`browser credentials reach only its suite child during ${failure === "none" ? "a complete run" : failure + " failure"}`, async (t) => {
+		const f = await browserFixture(t);
+		f.env.TEST_OBSERVE_CHILD_ENV = "1";
+		f.env.CLERK_SECRET_KEY = "sk_test_parent_override";
+		f.env.E2E_BASE_TEST_EMAIL = "override@example.test";
+		f.env.E2E_BASE_TEST_PASSWORD = "override-fixture-password";
+		if (failure === "build") f.env.TEST_BUILD_EXIT = "23";
+		if (failure === "browser") f.env.TEST_BROWSER_EXIT = "26";
+		const result = await f.runAsync();
+		assert.equal(result.status, failure === "none" ? 0 : 2, result.stderr);
+		const directory = result.stdout.match(
+			/E2E diagnostics retained at (\S+)\./,
+		)[1];
+		const observed = readFileSync(join(f.root, "child-env.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		let browserCalls = 0;
+		for (const entry of observed) {
+			const browser =
+				entry.kind === "turbo" &&
+				!entry.args.includes("--dry=json") &&
+				entry.args.includes("--filter=@wallpaperdb/web-e2e");
+			if (browser) browserCalls++;
+			assert.deepEqual(
+				entry.values,
+				browser
+					? {
+							CLERK_SECRET_KEY: "sk_test_private",
+							E2E_BASE_TEST_EMAIL: "override@example.test",
+							E2E_BASE_TEST_PASSWORD: "override-fixture-password",
+							E2E_ARTIFACTS_DIR: directory,
+						}
+					: {
+							CLERK_SECRET_KEY: null,
+							E2E_BASE_TEST_EMAIL: null,
+							E2E_BASE_TEST_PASSWORD: null,
+							E2E_ARTIFACTS_DIR: null,
+						},
+				JSON.stringify({ kind: entry.kind, args: entry.args }),
+			);
+		}
+		assert.equal(browserCalls, failure === "build" ? 0 : 1);
+		assert.ok(
+			observed.some(
+				(entry) => entry.kind === "docker" && entry.args.includes("down"),
+			),
+		);
+	});
+}

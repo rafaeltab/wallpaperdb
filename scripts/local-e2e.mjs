@@ -28,6 +28,12 @@ const testArguments = separator < 0 ? [] : arguments_.slice(separator + 1);
 const executionFlags = flags.filter((flag) => !flag.startsWith("--filter="));
 const abort = new AbortController();
 const secrets = new Set();
+const browserOnlyKeys = [
+	"CLERK_SECRET_KEY",
+	"E2E_BASE_TEST_EMAIL",
+	"E2E_BASE_TEST_PASSWORD",
+	"E2E_ARTIFACTS_DIR",
+];
 let interrupted;
 let activeChild;
 let diagnostics;
@@ -38,13 +44,21 @@ const failedOutputs = new Set();
 let phase = "selection";
 let owned = false;
 let project;
-let environment = { ...process.env };
+let environment = orchestrationEnvironment(process.env);
+let browserEnvironment = {};
+rememberSecrets(process.env);
 let cleanupRunning = false;
 let rerunPackage =
 	flags
 		.find((flag) => /^--filter=@wallpaperdb\/[a-z0-9-]+$/.test(flag))
 		?.split("/")
 		.at(-1) ?? "web-e2e";
+
+function orchestrationEnvironment(values) {
+	const result = { ...values };
+	for (const key of browserOnlyKeys) delete result[key];
+	return result;
+}
 
 for (const stream of [process.stdout, process.stderr]) {
 	stream.on("error", (cause) => failOutput(stream, cause));
@@ -161,7 +175,12 @@ function seconds(key, fallback) {
 async function run(
 	command,
 	args,
-	{ capture = false, timeout = 1_200_000, inheritLock = false } = {},
+	{
+		capture = false,
+		timeout = 1_200_000,
+		inheritLock = false,
+		env = environment,
+	} = {},
 ) {
 	if (interrupted && !cleanupRunning)
 		throw Object.assign(new Error("Interrupted."), { status: interrupted });
@@ -169,7 +188,7 @@ async function run(
 	if (outputFailure && !cleanupRunning) throw outputFailure;
 	return await new Promise((resolveResult, reject) => {
 		const child = spawn(command, args, {
-			env: environment,
+			env,
 			detached: true,
 			stdio: inheritLock
 				? ["ignore", "pipe", "pipe", ...Array(6).fill("ignore"), lockDescriptor]
@@ -340,7 +359,11 @@ async function preflightBrowser() {
 	if (!worktree.COMPOSE_PROJECT_NAME)
 		throw new Error("Missing worktree Compose project; run make install.");
 	project = `${worktree.COMPOSE_PROJECT_NAME.slice(0, 42)}-e2e-${randomUUID().slice(0, 8)}`;
-	environment = { ...process.env, ...worktree, COMPOSE_PROJECT_NAME: project };
+	environment = orchestrationEnvironment({
+		...process.env,
+		...worktree,
+		COMPOSE_PROJECT_NAME: project,
+	});
 	const portKeys = [
 		"INGRESS_PORT",
 		"POSTGRES_HOST_PORT",
@@ -372,13 +395,12 @@ async function preflightBrowser() {
 		throw new Error(
 			"Chromium is missing. Run make run PACKAGE=web-e2e SCRIPT=test:browser:install.",
 		);
-	environment = {
-		...environment,
+	browserEnvironment = {
 		E2E_BASE_TEST_EMAIL: browser.E2E_BASE_TEST_EMAIL,
 		E2E_BASE_TEST_PASSWORD: browser.E2E_BASE_TEST_PASSWORD,
-		PLAYWRIGHT_BASE_URL: baseUrl,
 	};
-	rememberSecrets(environment);
+	environment.PLAYWRIGHT_BASE_URL = baseUrl;
+	rememberSecrets(browserEnvironment);
 	await run("docker", ["compose", "version"], { capture: true });
 	await run("docker", ["buildx", "version"], { capture: true });
 	// Compose can include values in parse errors. Load generated secrets before invoking it.
@@ -452,7 +474,7 @@ async function preflightBrowser() {
 		throw new Error(
 			"User and Media USER_MEDIA_SERVICE_TOKEN values must match. Rerun make install.",
 		);
-	environment.CLERK_SECRET_KEY =
+	browserEnvironment.CLERK_SECRET_KEY =
 		config.services.user.environment.CLERK_SECRET_KEY;
 	const init = resolve("infra/postgres/init");
 	if (
@@ -658,15 +680,19 @@ async function cleanup() {
 	}
 }
 
-async function runSuites(packages) {
-	await run(turbo, [
-		"run",
-		"test:e2e",
-		...executionFlags,
-		...packages.map((name) => `--filter=${name}`),
-		"--concurrency=1",
-		...(testArguments.length ? ["--", ...testArguments] : []),
-	]);
+async function runSuites(packages, env = environment) {
+	await run(
+		turbo,
+		[
+			"run",
+			"test:e2e",
+			...executionFlags,
+			...packages.map((name) => `--filter=${name}`),
+			"--concurrency=1",
+			...(testArguments.length ? ["--", ...testArguments] : []),
+		],
+		{ env },
+	);
 }
 
 async function acquireDockerLock() {
@@ -824,8 +850,11 @@ async function main() {
 			phase = "browser readiness";
 			await waitForBrowser(deadline);
 			phase = "browser tests";
-			environment.E2E_ARTIFACTS_DIR = diagnostics;
-			await runSuites(["@wallpaperdb/web-e2e"]);
+			await runSuites(["@wallpaperdb/web-e2e"], {
+				...environment,
+				...browserEnvironment,
+				E2E_ARTIFACTS_DIR: diagnostics,
+			});
 		} catch (error) {
 			failure = error;
 		}

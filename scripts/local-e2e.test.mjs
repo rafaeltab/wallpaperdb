@@ -147,7 +147,19 @@ if (args.includes('--dry=json')) {
   const artifacts = process.env.E2E_ARTIFACTS_DIR || 'apps/web-e2e';
   fs.mkdirSync(artifacts + '/test-results', {recursive: true});
   fs.writeFileSync(artifacts + '/test-results/trace.zip', 'retained browser artifact');
-  if (process.env.TEST_HOLD) { fs.writeFileSync('active-fixture-child.pid', String(process.pid)); console.log('Browser fixture running'); setInterval(() => {}, 1000); }
+  if (process.env.TEST_HOLD) {
+    fs.writeFileSync('active-fixture-child.pid', String(process.pid));
+    const hold = setInterval(() => {}, 1000);
+    if (process.env.TEST_PIPE_STREAM) {
+      const watcher = fs.watch('.', () => {
+        if (!fs.existsSync('pipe-consumer-closed')) return;
+        watcher.close();
+        process[process.env.TEST_PIPE_STREAM].write('pipe fixture '.repeat(4000) + '\\n');
+        if (!process.env.TEST_PIPE_KEEP_OPEN) clearInterval(hold);
+      });
+    }
+    console.log('Browser fixture running');
+  }
   else if (process.env.TEST_BROWSER_EXIT) { console.error('private-password sk_test_private'); process.exit(Number(process.env.TEST_BROWSER_EXIT)); }
 }
 if (!args.includes('--dry=json') && args.includes('--filter=!@wallpaperdb/web-e2e') && process.env.TEST_CONTAINER_EXIT) process.exit(Number(process.env.TEST_CONTAINER_EXIT));
@@ -1139,7 +1151,7 @@ for (const failed of [false, true]) {
 			/E2E diagnostics retained at (\S+)\./,
 		)[1];
 		assert.ok(isAbsolute(directory), directory);
-		assert.ok(directory.startsWith(f.root + "/wallpaperdb-e2e-"));
+		assert.ok(directory.startsWith(`${f.root}/wallpaperdb-e2e-`));
 		if (failed)
 			assert.equal(
 				readFileSync(join(directory, "test-results/trace.zip"), "utf8"),
@@ -1188,4 +1200,66 @@ for (const [signal, status, browserStatus] of [
 			/All requested E2E phases and cleanup passed/,
 		);
 	});
+}
+
+for (const [stream, keepOpen] of [
+	["stdout", false],
+	["stderr", false],
+	["stdout", true],
+	["stderr", true],
+]) {
+	test(
+		`a closed ${stream} consumer ${keepOpen ? "stops active browser work" : "handles a finite producer"} and completes owned teardown`,
+		{ timeout: 10_000 },
+		async (t) => {
+			const f = await browserFixture(t);
+			f.env.TEST_HOLD = "1";
+			f.env.TEST_PIPE_STREAM = stream;
+			f.env.TEST_PIPE_KEEP_OPEN = keepOpen ? "1" : "";
+			f.onOutput = (output, child) => {
+				if (!output.includes("Browser fixture running")) return;
+				child[stream].once("close", () =>
+					writeFileSync(join(f.root, "pipe-consumer-closed"), "closed"),
+				);
+				child[stream].destroy();
+			};
+			let pid;
+			try {
+				const result = await f.runAsync("PACKAGE=web-e2e");
+				pid = Number(
+					readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
+				);
+				assert.notEqual(result.status, 0);
+				assert.equal(
+					f.calls().filter((call) => call.includes("down")).length,
+					2,
+				);
+				assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+				const directory = result.stdout.match(
+					/E2E diagnostics retained at (\S+)\./,
+				)[1];
+				const log = readFileSync(join(directory, "run.log"), "utf8");
+				assert.match(log, /Console output failed.*EPIPE/);
+				assert.match(
+					log,
+					/phase "(?:browser tests|browser cleanup)" failed, exit 1/,
+				);
+				assert.doesNotMatch(result.stdout + result.stderr, /Unhandled/);
+				assert.equal(
+					spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+					0,
+				);
+			} finally {
+				if (!pid && existsSync(join(f.root, "active-fixture-child.pid")))
+					pid = Number(
+						readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
+					);
+				if (Number.isInteger(pid) && pid > 0) {
+					try {
+						process.kill(-pid, "SIGKILL");
+					} catch {}
+				}
+			}
+		},
+	);
 }

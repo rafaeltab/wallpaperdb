@@ -33,6 +33,7 @@ let project;
 let environment = { ...process.env };
 let cleanupRunning = false;
 let rerunPackage = "web-e2e";
+let browserTestsStarted = false;
 
 for (const [signal, status] of [
 	["SIGINT", 130],
@@ -454,6 +455,7 @@ async function retainBrowserDiagnostics() {
 			record(`Diagnostic capture failed: ${error.message}`, true);
 		}
 	}
+	if (!browserTestsStarted) return;
 	for (const name of ["test-results", "playwright-report"]) {
 		const source = join("apps/web-e2e", name);
 		if (existsSync(source))
@@ -579,6 +581,7 @@ async function main() {
 			phase = "browser readiness";
 			await waitForBrowser(deadline);
 			phase = "browser tests";
+			browserTestsStarted = true;
 			await runSuites(["@wallpaperdb/web-e2e"]);
 		} catch (error) {
 			failure = error;

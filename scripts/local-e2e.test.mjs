@@ -347,6 +347,28 @@ test("readiness deadline cancels hanging HTTP probes and still cleans up", async
 	assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
 });
 
+test("failures before browser tests preserve old reports without copying them into new diagnostics", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_BUILD_EXIT = "23";
+	for (const name of ["test-results", "playwright-report"]) {
+		const directory = join(f.root, "apps/web-e2e", name);
+		mkdirSync(directory, { recursive: true });
+		writeFileSync(join(directory, "old.txt"), "previous browser run");
+	}
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.match(result.stderr, /image build.*exit 23/);
+	const diagnostics = result.stdout.match(
+		/E2E diagnostics retained at (\S+)\./,
+	)[1];
+	for (const name of ["test-results", "playwright-report"]) {
+		assert.ok(!existsSync(join(diagnostics, name)));
+		assert.equal(
+			readFileSync(join(f.root, "apps/web-e2e", name, "old.txt"), "utf8"),
+			"previous browser run",
+		);
+	}
+});
+
 for (const [name, settings, expectedPhase, status] of [
 	[
 		"build failure",

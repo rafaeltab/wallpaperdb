@@ -3,6 +3,36 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { sharpTransformerLayer } from '../src/adapters/assets/index.js';
 import { ImageTransformer, type ResizeOptions } from '../src/capabilities/delivery/index.js';
+import {
+  orientationCases,
+  orientationColors,
+  orientationFixture,
+  samplePixelGrid,
+} from '@wallpaperdb/test-utils/fixtures';
+
+async function transform(input: Buffer, options: ResizeOptions, format: 'jpeg' | 'png' | 'webp') {
+  const runtime = ManagedRuntime.make(sharpTransformerLayer({ maxInputPixels: 268435456 }));
+  try {
+    const body = await runtime.runPromise(
+      ImageTransformer.use((t) =>
+        t.resize(
+          {
+            close() {},
+            async *[Symbol.asyncIterator]() {
+              yield input;
+            },
+          },
+          { ...options, mimeType: `image/${format}` }
+        )
+      )
+    );
+    const chunks = [];
+    for await (const chunk of body) chunks.push(chunk);
+    return Buffer.concat(chunks);
+  } finally {
+    await runtime.dispose();
+  }
+}
 
 async function resize(
   width: number,
@@ -46,6 +76,110 @@ async function resize(
 }
 
 describe('native image resize contract', () => {
+  describe.each(['jpeg', 'png', 'webp'] as const)('%s orientation and privacy', (format) => {
+    it.each(
+      orientationCases
+    )('resizes using displayed orientation $orientation and removes private metadata', async ({
+      orientation,
+      grid,
+    }) => {
+      const input = await orientationFixture(format, orientation);
+      const original = Buffer.from(input);
+      const source = await sharp(input).metadata();
+      expect(source.orientation).toBe(orientation === 'absent' ? undefined : orientation);
+      expect(source.exif?.includes(Buffer.from('Private camera'))).toBe(true);
+      expect(source.exif?.includes(Buffer.from('Private serial'))).toBe(true);
+      expect(source.exif?.includes(Buffer.from([0xff, 0xd8]))).toBe(true);
+      const bytes = await transform(input, { width: 60, height: 60, fit: 'contain' }, format);
+      const metadata = await sharp(bytes).metadata();
+      expect(metadata).toMatchObject({
+        width: grid[0].length * 20,
+        height: grid.length * 20,
+        format,
+      });
+      expect(metadata.orientation).toBeUndefined();
+      expect(metadata.exif).toBeUndefined();
+      expect(metadata.xmp).toBeUndefined();
+      expect(metadata.iptc).toBeUndefined();
+      const pixels = await samplePixelGrid(bytes, grid[0].length, grid.length);
+      for (const [row, colors] of grid.entries())
+        for (const [column, color] of [...colors].entries()) {
+          for (const [channel, expected] of orientationColors[color]!.entries()) {
+            expect(Math.abs(pixels[row]![column]![channel]! - expected)).toBeLessThan(25);
+          }
+        }
+      expect(input).toEqual(original);
+    });
+  });
+
+  describe.each(
+    orientationCases.filter(
+      ({ orientation }) => typeof orientation === 'number' && orientation >= 5
+    )
+  )('swapped axes orientation $orientation', ({ orientation, grid }) => {
+    it.each([
+      {
+        name: 'width only',
+        options: { width: 40, fit: 'contain' as const },
+        width: 40,
+        height: 60,
+      },
+      {
+        name: 'height only',
+        options: { height: 60, fit: 'contain' as const },
+        width: 40,
+        height: 60,
+      },
+      {
+        name: 'contain bounds',
+        options: { width: 40, height: 80, fit: 'contain' as const },
+        width: 40,
+        height: 60,
+      },
+      {
+        name: 'cover crop',
+        options: { width: 40, height: 80, fit: 'cover' as const },
+        width: 40,
+        height: 80,
+      },
+      {
+        name: 'fill stretch',
+        options: { width: 40, height: 80, fit: 'fill' as const },
+        width: 40,
+        height: 80,
+      },
+      {
+        name: 'contain without enlargement',
+        options: { width: 200, height: 200, fit: 'contain' as const },
+        width: 80,
+        height: 120,
+      },
+      {
+        name: 'cover without enlargement',
+        options: { width: 160, height: 240, fit: 'cover' as const },
+        width: 80,
+        height: 120,
+      },
+      {
+        name: 'fill enlargement',
+        options: { width: 160, height: 240, fit: 'fill' as const },
+        width: 160,
+        height: 240,
+      },
+    ])('uses oriented geometry for $name', async ({ options, width, height }) => {
+      const bytes = await transform(await orientationFixture('png', orientation), options, 'png');
+      expect(await sharp(bytes).metadata()).toMatchObject({ width, height });
+      // The cover request trims at most 14 horizontal pixels. Both column
+      // centers remain in their known blocks regardless of entropy's crop edge.
+      const pixels = await samplePixelGrid(bytes, 2, 3);
+      for (const [row, colors] of grid.entries())
+        for (const [column, color] of [...colors].entries()) {
+          for (const [channel, expected] of orientationColors[color]!.entries()) {
+            expect(Math.abs(pixels[row]![column]![channel]! - expected)).toBeLessThan(25);
+          }
+        }
+    });
+  });
   it.each([
     {
       name: 'landscape width',

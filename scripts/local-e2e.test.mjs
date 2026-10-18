@@ -481,6 +481,44 @@ for (const kind of [
 	});
 }
 
+for (const [service, key, value] of [
+	["ingestor", "CLERK_PUBLISHABLE_KEY", "pk_live_other"],
+	["user", "CLERK_PUBLISHABLE_KEY", "pk_live_other"],
+	["web", "VITE_CLERK_PUBLISHABLE_KEY", "pk_live_other"],
+	["user", "CLERK_PUBLISHABLE_KEY", "pk_test_other_instance"],
+	["web", "VITE_CLERK_PUBLISHABLE_KEY", "pk_test_other_instance"],
+]) {
+	test(`Clerk preflight rejects incompatible ${service} ${key} before building`, async (t) => {
+		const f = await browserFixture(t);
+		const path = join(f.root, "compose.json");
+		const config = JSON.parse(readFileSync(path, "utf8"));
+		config.services[service].environment[key] = value;
+		writeFileSync(path, JSON.stringify(config));
+		const result = await f.runAsync("PACKAGE=web-e2e");
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /browser preflight/);
+		assert.match(
+			result.stderr,
+			/development pk_test_|publishable keys must match/,
+		);
+		assert.ok(
+			!f
+				.calls()
+				.some(
+					(call) =>
+						call[0] === "docker" &&
+						(call.includes("build") ||
+							call.includes("up") ||
+							call.includes("run")),
+				),
+		);
+		assert.doesNotMatch(
+			result.stdout + result.stderr,
+			/pk_live_other|pk_test_other_instance/,
+		);
+	});
+}
+
 test("interruption cleans its owned stack and releases the lock", async (t) => {
 	const f = await browserFixture(t);
 	f.env.TEST_HOLD = "1";

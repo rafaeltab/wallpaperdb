@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { createServer } from "node:net";
 import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
+import { constants, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { parseEnv } from "node:util";
@@ -159,7 +159,10 @@ async function run(
 						? interrupted
 						: timedOut
 							? 124
-							: (code ?? (signal === "SIGINT" ? 130 : 143));
+							: (code ??
+								(constants.signals[signal]
+									? 128 + constants.signals[signal]
+									: 1));
 				reject(
 					Object.assign(
 						new Error(

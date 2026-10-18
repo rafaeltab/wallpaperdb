@@ -2,16 +2,26 @@ import { fileURLToPath } from 'node:url';
 import { GenericContainer, Wait } from 'testcontainers';
 import { expect, it } from 'vitest';
 
-it.each([
-  'ingestor',
-  'gateway',
-])('keeps HTTP uploads with fresh S3 connections available during %s exporter DNS failure and recovers', async (service) => {
+const cases = [
+  ...['ingestor', 'gateway', 'media', 'user', 'tags', 'color-extractor', 'variant-generator'].map(
+    (service) => ({ service, outage: 'unresolved' })
+  ),
+  ...['refused', 'stalled', 'error'].map((outage) => ({ service: 'ingestor', outage })),
+];
+
+it.each(
+  cases
+)('keeps fresh-connection HTTP uploads available during $service exporter $outage failure and recovers', async ({
+  service,
+  outage,
+}) => {
   const root = fileURLToPath(new URL('../../../../', import.meta.url));
   const container = await new GenericContainer('node:22-bookworm')
     .withBindMounts([{ source: root, target: root, mode: 'ro' }])
     .withWorkingDir(`${root}/apps/ingestor`)
     .withEnvironment({
       TELEMETRY_SERVICE: service,
+      TELEMETRY_OUTAGE_MODE: outage,
       OTEL_BSP_SCHEDULE_DELAY: '100',
       OTEL_BSP_MAX_EXPORT_BATCH_SIZE: '1',
       OTEL_BLRP_SCHEDULE_DELAY: '100',
@@ -32,6 +42,7 @@ it.each([
     console.log(diagnostics);
     expect(diagnostics).toContain('OUTAGE_EXIT=0');
     expect(diagnostics).toContain('"phase":"collector-restored"');
+    expect(diagnostics).toContain('"pendingSystemLookups":0');
   } finally {
     await container.stop();
   }

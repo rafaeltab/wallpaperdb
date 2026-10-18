@@ -4,6 +4,7 @@ set -eu
 # Dry runs only inspect Turbo's graph. They acquire no Docker resources.
 for argument in "$@"; do
   case "$argument" in
+    --) break ;;
     --dry*) exec node --experimental-strip-types scripts/local-e2e.mjs "$@" ;;
   esac
 done

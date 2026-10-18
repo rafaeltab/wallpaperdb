@@ -501,6 +501,28 @@ test("concurrent worktrees wait visibly within a deadline and cannot overlap own
 	assert.equal(contender.run("PACKAGE=test-utils").status, 0);
 });
 
+test("test-runner dry flags cannot bypass a lock held by another worktree", async (t) => {
+	const owner = await browserFixture(t);
+	const contender = fixture(t);
+	contender.env.E2E_LOCK_FILE = owner.env.E2E_LOCK_FILE;
+	contender.env.E2E_LOCK_TIMEOUT = "1";
+	owner.env.TEST_HOLD = "1";
+	let waiting;
+	owner.onOutput = (output, child) => {
+		if (!output.includes("Browser fixture running")) return;
+		waiting = contender.run("PACKAGE=test-utils", "ARGS=--dry-run");
+		process.kill(-child.pid, "SIGTERM");
+	};
+	await owner.runAsync("PACKAGE=web-e2e");
+	assert.notEqual(waiting.status, 0);
+	assert.match(waiting.stderr, /lock timed out/);
+	assert.ok(!existsSync(join(contender.root, "calls.jsonl")));
+	const inspection = contender.run("TURBO_FLAGS=--dry=json");
+	assert.equal(inspection.status, 0, inspection.stderr);
+	assert.ok(JSON.parse(inspection.stdout).tasks.length > 0);
+	assert.ok(!contender.calls().some((call) => call[0] === "docker"));
+});
+
 test("occupied worktree ingress fails early without altering the existing listener or any stack", async (t) => {
 	const f = await browserFixture(t);
 	const listener = createServer();

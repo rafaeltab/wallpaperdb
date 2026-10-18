@@ -11,12 +11,13 @@ import {
 	openSync,
 	readSync,
 	readFileSync,
+	readdirSync,
 	statSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { test } from "node:test";
 
 const repository = new URL("../", import.meta.url).pathname;
@@ -142,6 +143,7 @@ if (args.includes('--dry=json')) {
   console.log(JSON.stringify({ tasks: (selected.length ? selected : ['@wallpaperdb/web-e2e', '@wallpaperdb/test-utils', '@wallpaperdb/testcontainers']).map(name => ({package: name, task: 'test:e2e', command: 'test'})) }));
 } else if (args.includes('--filter=@wallpaperdb/web-e2e')) {
   if (process.env.TEST_BEFORE_PLAYWRIGHT_EXIT) process.exit(Number(process.env.TEST_BEFORE_PLAYWRIGHT_EXIT));
+  if (process.env.TEST_PACKAGE_CWD) process.chdir('apps/web-e2e');
   const artifacts = process.env.E2E_ARTIFACTS_DIR || 'apps/web-e2e';
   fs.mkdirSync(artifacts + '/test-results', {recursive: true});
   fs.writeFileSync(artifacts + '/test-results/trace.zip', 'retained browser artifact');
@@ -1115,3 +1117,31 @@ test("overlapping credentials are fully redacted in console and retained diagnos
 		assert.doesNotMatch(text, /fixture-overlap|private-suffix/);
 	}
 });
+
+for (const failed of [false, true]) {
+	test(`relative TMPDIR keeps browser artifacts owned on ${failed ? "failure" : "success"}`, async (t) => {
+		const f = await browserFixture(t);
+		f.env.TMPDIR = ".";
+		f.env.TEST_PACKAGE_CWD = "1";
+		if (failed) f.env.TEST_BROWSER_EXIT = "23";
+		const result = await f.runAsync("PACKAGE=web-e2e");
+		assert.equal(result.status, failed ? 2 : 0, result.stderr);
+		const directory = result.stdout.match(
+			/E2E diagnostics retained at (\S+)\./,
+		)[1];
+		assert.ok(isAbsolute(directory), directory);
+		assert.ok(directory.startsWith(f.root + "/wallpaperdb-e2e-"));
+		if (failed)
+			assert.equal(
+				readFileSync(join(directory, "test-results/trace.zip"), "utf8"),
+				"retained browser artifact",
+			);
+		else assert.ok(!existsSync(directory));
+		assert.deepEqual(
+			readdirSync(join(f.root, "apps/web-e2e")).filter((name) =>
+				name.startsWith("wallpaperdb-e2e-"),
+			),
+			[],
+		);
+	});
+}

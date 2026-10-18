@@ -582,7 +582,7 @@ async function main() {
 		);
 		return;
 	}
-	diagnostics = mkdtempSync(join(tmpdir(), "wallpaperdb-e2e-"));
+	diagnostics = mkdtempSync(resolve(tmpdir(), "wallpaperdb-e2e-"));
 	record(
 		`E2E diagnostics retained at ${diagnostics}. Keep browser artifacts private; sanitize excerpts before publication.`,
 	);

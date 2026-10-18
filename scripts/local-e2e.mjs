@@ -8,9 +8,9 @@ import {
 	mkdtempSync,
 	readdirSync,
 	readFileSync,
-	rmSync,
 	writeFileSync,
 } from "node:fs";
+import { rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { createRequire } from "node:module";
 import { constants, tmpdir } from "node:os";
@@ -42,6 +42,7 @@ for (const [signal, status] of [
 ]) {
 	process.on(signal, () => {
 		interrupted = status;
+		process.exitCode = status;
 		if (cleanupRunning) return;
 		abort.abort();
 		stopChild();
@@ -643,8 +644,12 @@ async function main() {
 		}
 	}
 	phase = "diagnostics cleanup";
-	rmSync(diagnostics, { recursive: true });
+	await rm(diagnostics, { recursive: true });
 	diagnostics = undefined;
+	if (interrupted)
+		throw Object.assign(new Error("Interrupted during diagnostics cleanup."), {
+			status: interrupted,
+		});
 	record(
 		"All requested E2E phases and cleanup passed. Temporary diagnostics removed.",
 	);

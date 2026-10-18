@@ -254,6 +254,47 @@ for (const packageName of ["test-utils", "testcontainers"]) {
 	});
 }
 
+for (const [signal, status] of [
+	["SIGINT", 130],
+	["SIGTERM", 143],
+]) {
+	test(`${signal} during final diagnostics deletion reports status ${status} without success`, (t) => {
+		const f = fixture(t);
+		const hook = join(f.root, "removal-signal.mjs");
+		writeFileSync(
+			hook,
+			`import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+function interrupt(path) {
+  if (!String(path).startsWith(process.env.TMPDIR + '/wallpaperdb-e2e-')) return;
+  process.kill(process.pid, ${JSON.stringify(signal)});
+  const deadline = Date.now() + 50;
+  while (Date.now() < deadline) {}
+}
+const syncRemove = fs.rmSync;
+fs.rmSync = (path, options) => { interrupt(path); return syncRemove(path, options); };
+const asyncRemove = fs.promises.rm;
+fs.promises.rm = async (path, options) => { interrupt(path); return await asyncRemove(path, options); };
+syncBuiltinESMExports();`,
+		);
+		f.env.NODE_OPTIONS = `--import=${hook}`;
+		const result = f.run("PACKAGE=test-utils");
+		assert.notEqual(result.status, 0);
+		assert.match(
+			result.stderr,
+			new RegExp(`phase "diagnostics cleanup" failed, exit ${status}`),
+		);
+		assert.doesNotMatch(
+			result.stdout,
+			/All requested E2E phases and cleanup passed/,
+		);
+		assert.equal(
+			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+			0,
+		);
+	});
+}
+
 async function browserFixture(t, ready = true) {
 	const f = fixture(t);
 	const server = createServer((_req, res) => {

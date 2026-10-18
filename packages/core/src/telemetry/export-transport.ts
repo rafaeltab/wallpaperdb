@@ -67,9 +67,15 @@ export class TelemetryExportTransport {
       this.nextDiagnostic = Date.now() + 30_000;
       // Never send exporter failures back through the telemetry logger. No endpoint,
       // credentials, payload, collector response or vendor error reaches stderr.
-      process.stderr.write(
-        `telemetry export ${success ? "recovered" : "unavailable"}; bounded best-effort export\n`
-      );
+      try {
+        if (!process.stderr.writableNeedDrain && !process.stderr.destroyed) {
+          process.stderr.write(
+            `telemetry export ${success ? "recovered" : "unavailable"}; bounded best-effort export\n`
+          );
+        }
+      } catch {
+        // Diagnostic output cannot prevent exporter completion or application cleanup.
+      }
       if (success) this.unavailable = false;
     }
   }

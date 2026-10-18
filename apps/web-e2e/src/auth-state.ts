@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import { config as loadEnv } from "dotenv";
 
@@ -20,14 +21,25 @@ export const BASE_USER_AUTH = {
   ),
 } as const satisfies AuthPersonaConfig;
 
+export function resolveAuthStorageStatePath(
+  env: WebE2EEnv,
+  persona: AuthPersonaConfig = BASE_USER_AUTH,
+): string {
+  return env.E2E_ARTIFACTS_DIR
+    ? join(env.E2E_ARTIFACTS_DIR, ".auth", `${persona.name}.json`)
+    : persona.storageStatePath;
+}
+
 export function resolveAuthCredentials(
   env: WebE2EEnv,
   persona: AuthPersonaConfig = BASE_USER_AUTH,
 ): { email: string; password: string } {
-  const missingKeys = [persona.emailEnvKey, persona.passwordEnvKey].filter((key) => {
-    const value = env[key]?.trim();
-    return !value;
-  });
+  const missingKeys = [persona.emailEnvKey, persona.passwordEnvKey].filter(
+    (key) => {
+      const value = env[key]?.trim();
+      return !value;
+    },
+  );
 
   if (missingKeys.length > 0) {
     throw new Error(
@@ -90,15 +102,14 @@ export async function ensureAuthPersonaBypassesClientTrust(
     bypass_client_trust?: boolean;
   }>;
   const user = users.find((candidate) =>
-    candidate.email_addresses?.some((address) => address.email_address === email),
+    candidate.email_addresses?.some(
+      (address) => address.email_address === email,
+    ),
   );
 
   if (!user) {
     throw new Error(
-      formatAuthSetupFailure(
-        persona,
-        `No Clerk user found for ${email}.`,
-      ),
+      formatAuthSetupFailure(persona, `No Clerk user found for ${email}.`),
     );
   }
 
@@ -106,14 +117,17 @@ export async function ensureAuthPersonaBypassesClientTrust(
     return;
   }
 
-  const patchResponse = await fetchImpl(`https://api.clerk.com/v1/users/${user.id}`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${clerkSecretKey}`,
-      "Content-Type": "application/json",
+  const patchResponse = await fetchImpl(
+    `https://api.clerk.com/v1/users/${user.id}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${clerkSecretKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ bypass_client_trust: true }),
     },
-    body: JSON.stringify({ bypass_client_trust: true }),
-  });
+  );
 
   if (!patchResponse.ok) {
     throw new Error(
@@ -131,7 +145,9 @@ export function resolveClerkSecretKey(env: WebE2EEnv): string {
     return configuredSecret;
   }
 
-  const userEnvPath = fileURLToPath(new URL("../../user/.env", import.meta.url));
+  const userEnvPath = fileURLToPath(
+    new URL("../../user/.env", import.meta.url),
+  );
   const userEnv = loadEnv({ path: userEnvPath }).parsed;
   const userServiceSecret = userEnv?.CLERK_SECRET_KEY?.trim();
 

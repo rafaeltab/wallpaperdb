@@ -8,6 +8,7 @@ import {
   ensureAuthPersonaBypassesClientTrust,
   formatAuthSetupFailure,
   resolveAuthCredentials,
+  resolveAuthStorageStatePath,
 } from "../src/auth-state";
 
 test.setTimeout(60000);
@@ -72,6 +73,7 @@ test("authenticates the seeded base user and saves browser state", async ({
 
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
 
-  mkdirSync(dirname(BASE_USER_AUTH.storageStatePath), { recursive: true });
-  await page.context().storageState({ path: BASE_USER_AUTH.storageStatePath });
+  const storageStatePath = resolveAuthStorageStatePath(process.env);
+  mkdirSync(dirname(storageStatePath), { recursive: true });
+  await page.context().storageState({ path: storageStatePath });
 });

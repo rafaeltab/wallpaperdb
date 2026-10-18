@@ -93,6 +93,7 @@ if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && p
 		MAKELEVEL: "0",
 		GITHUB_ACTIONS: "",
 		E2E_LOCK_FILE: join(root, "host.lock"),
+		TMPDIR: root,
 	};
 	for (const key of [
 		"PACKAGE",
@@ -139,12 +140,15 @@ async function browserFixture(t, ready = true) {
 	});
 	// Reserve another eight ports independently; startup itself is controlled by the Docker adapter.
 	const ports = [];
+	const reservations = [];
 	for (let index = 0; index < 8; index++) {
 		const reservation = createServer();
 		await new Promise((resolve) => reservation.listen(0, "0.0.0.0", resolve));
 		ports.push(reservation.address().port);
-		await new Promise((resolve) => reservation.close(resolve));
+		reservations.push(reservation);
 	}
+	for (const reservation of reservations)
+		await new Promise((resolve) => reservation.close(resolve));
 	const keys = [
 		"INGRESS_PORT",
 		"POSTGRES_HOST_PORT",

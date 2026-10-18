@@ -496,7 +496,13 @@ async function cleanup() {
 		try {
 			await run(
 				"docker",
-				compose(file, "down", "--volumes", "--remove-orphans"),
+				compose(
+					file,
+					"down",
+					"--volumes",
+					"--remove-orphans",
+					...(file === "apps" ? ["--rmi", "local"] : []),
+				),
 				{ timeout: 60_000 },
 			);
 		} catch (error) {
@@ -525,7 +531,7 @@ async function cleanup() {
 	cleanupRunning = false;
 	if (failure) {
 		record(
-			`Retained project ${project} may need manual cleanup. Inspect diagnostics before running docker compose -p ${project} -f infra/docker-compose.apps.yml down --volumes and docker compose -p ${project} -f infra/docker-compose.yml down --volumes.`,
+			`Retained project ${project} may need manual cleanup. Inspect diagnostics before running docker compose -p ${project} -f infra/docker-compose.apps.yml down --volumes --rmi local and docker compose -p ${project} -f infra/docker-compose.yml down --volumes.`,
 			true,
 		);
 		throw failure;

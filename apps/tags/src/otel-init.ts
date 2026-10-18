@@ -1,5 +1,9 @@
-import { Agent as HttpAgent } from 'node:http';
-import { Agent as HttpsAgent } from 'node:https';
+import {
+  TelemetryExportTransport,
+  telemetryBatchOptions,
+  telemetryExportTimeoutMillis,
+} from '@wallpaperdb/core/telemetry';
+import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { OtelMetrics, Resource } from '@effect/opentelemetry';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
@@ -19,7 +23,7 @@ class OtelInitializationError extends Schema.TaggedError<OtelInitializationError
   { cause: Schema.Defect() }
 ) {}
 
-const exportTimeoutMillis = 1000;
+const exportTimeoutMillis = telemetryExportTimeoutMillis;
 
 /** Keep useful error fields while excluding raw inputs, response bodies, stacks and nested objects. */
 function diagnostic(cause: unknown, endpoint: string) {
@@ -60,7 +64,7 @@ function redactEndpoint(endpoint: string) {
   };
 }
 
-const shutdownSdk = (sdk: NodeSDK, endpoint: string) =>
+const shutdownSdk = (sdk: NodeSDK, endpoint: string, transports: TelemetryExportTransport) =>
   Effect.tryPromise(() => sdk.shutdown()).pipe(
     Effect.interruptible,
     Effect.timeout('4 seconds'),
@@ -68,7 +72,8 @@ const shutdownSdk = (sdk: NodeSDK, endpoint: string) =>
       Effect.logWarning('Tags telemetry shutdown failed', {
         cause: diagnostic(error, endpoint),
       })
-    )
+    ),
+    Effect.ensuring(Effect.promise(() => transports.close()))
   );
 
 /** Initialize before loading adapters so auto-instrumentation sees their first imports. */
@@ -78,40 +83,46 @@ export const initializeOtel = Effect.fn('tags.telemetry.initialize')(function* (
 }): Effect.fn.Return<OtelStatus, never, Scope.Scope> {
   if (!config.otelEndpoint) return { _tag: 'Disabled' };
   const endpoint = config.otelEndpoint.replace(/\/+$/, '');
+  const transports = yield* Effect.acquireRelease(
+    Effect.sync(() => new TelemetryExportTransport()),
+    (transports) => Effect.promise(() => transports.close())
+  );
   const initialize = Effect.gen(function* () {
-    const url = yield* Effect.try({
+    yield* Effect.try({
       try: () => new URL(endpoint),
       catch: (cause) => new OtelInitializationError({ cause }),
     });
-    // Exporter deadlines can leave streaming responses open, so the scope owns their sockets too.
-    const agent = yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        url.protocol === 'https:'
-          ? new HttpsAgent({ keepAlive: false, maxTotalSockets: 3 })
-          : new HttpAgent({ keepAlive: false, maxTotalSockets: 3 })
-      ),
-      (agent) => Effect.sync(() => agent.destroy())
-    );
     const effectMetrics = yield* OtelMetrics.makeProducer().pipe(
       Effect.provide(Resource.layer({ serviceName: config.otelServiceName }))
     );
-    const transport = { timeoutMillis: exportTimeoutMillis, httpAgentOptions: async () => agent };
+    const transport = transports.options;
     const acquireSdk = Effect.gen(function* () {
       const sdk = yield* Effect.try({
         try: () =>
           new NodeSDK({
             serviceName: config.otelServiceName,
-            traceExporter: new OTLPTraceExporter({ ...transport, url: `${endpoint}/v1/traces` }),
+            spanProcessors: [
+              new BatchSpanProcessor(
+                transports.monitor(
+                  new OTLPTraceExporter({ ...transport, url: `${endpoint}/v1/traces` })
+                ),
+                telemetryBatchOptions
+              ),
+            ],
             logRecordProcessors: [
               new sdkLogs.BatchLogRecordProcessor({
-                exporter: new OTLPLogExporter({ ...transport, url: `${endpoint}/v1/logs` }),
-                exportTimeoutMillis,
+                exporter: transports.monitor(
+                  new OTLPLogExporter({ ...transport, url: `${endpoint}/v1/logs` })
+                ),
+                ...telemetryBatchOptions,
               }),
             ],
             metricReaders: [
               new PeriodicExportingMetricReader({
                 metricProducers: [effectMetrics],
-                exporter: new OTLPMetricExporter({ ...transport, url: `${endpoint}/v1/metrics` }),
+                exporter: transports.monitor(
+                  new OTLPMetricExporter({ ...transport, url: `${endpoint}/v1/metrics` })
+                ),
                 exportIntervalMillis: 60000,
                 exportTimeoutMillis,
               }),
@@ -127,10 +138,10 @@ export const initializeOtel = Effect.fn('tags.telemetry.initialize')(function* (
       yield* Effect.try({
         try: () => sdk.start(),
         catch: (cause) => new OtelInitializationError({ cause }),
-      }).pipe(Effect.onError(() => shutdownSdk(sdk, endpoint)));
+      }).pipe(Effect.onError(() => shutdownSdk(sdk, endpoint, transports)));
       return sdk;
     });
-    yield* Effect.acquireRelease(acquireSdk, (sdk) => shutdownSdk(sdk, endpoint));
+    yield* Effect.acquireRelease(acquireSdk, (sdk) => shutdownSdk(sdk, endpoint, transports));
     return { _tag: 'Started' } as const;
   });
   return yield* initialize.pipe(

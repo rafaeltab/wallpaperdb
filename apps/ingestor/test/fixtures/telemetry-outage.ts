@@ -160,7 +160,7 @@ try {
       { logger: false }
     );
     try {
-      await app.ready();
+      const address = await app.listen({ host: '127.0.0.1', port: 0 });
       const emit = () => {
         trace.getTracer('outage').startSpan('upload.activity').end();
         logs.getLogger('outage').emit({ body: 'outage activity' });
@@ -183,21 +183,22 @@ try {
       );
       const before = storageConnections;
       const started = Date.now();
-      const response = await app.inject({
+      const response = await fetch(`${address}/upload`, {
         method: 'POST',
-        url: '/upload',
         headers: {
           authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'outage-profile' })).toString('base64')}`,
           'content-type': 'multipart/form-data; boundary=file',
         },
-        payload: Buffer.from(
+        body: Buffer.from(
           '--file\r\nContent-Disposition: form-data; name="file"; filename="test.png"\r\nContent-Type: image/png\r\n\r\nimage\r\n--file--\r\n'
         ),
+        signal: AbortSignal.timeout(15_000),
       });
+      const receipt = await response.json();
       console.log(
         JSON.stringify({
           phase: 'upload-during-dns-outage',
-          status: response.statusCode,
+          status: response.status,
           elapsedMs: Date.now() - started,
           freshStorageConnections: storageConnections - before,
           objects: objects.size,
@@ -211,7 +212,9 @@ try {
       await provider.forceFlush();
       await until(() => exports.size === 3, 30_000);
       console.log(JSON.stringify({ phase: 'collector-restored', exports: [...exports].sort() }));
-      assert.equal(response.statusCode, 200, 'Telemetry DNS must not turn uploads into HTTP 503');
+      assert.equal(response.status, 200, 'Telemetry DNS must not turn uploads into HTTP 503');
+      assert(receipt && typeof receipt === 'object' && 'status' in receipt);
+      assert.equal(receipt.status, 'processing');
       assert.equal(objects.size, 1);
       assert.equal([...objects.values()][0]?.toString(), 'image');
       assert(storageConnections > before, 'Upload must open a fresh storage connection');

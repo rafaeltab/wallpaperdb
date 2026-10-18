@@ -17,7 +17,8 @@ async function request(
   input: Buffer,
   options: ResizeOptions | undefined,
   limits: Partial<DeliveryLimits> = {},
-  variant?: Buffer
+  variant?: Buffer,
+  missingOriginal = false
 ) {
   const stored = Buffer.from(input);
   const runtime = ManagedRuntime.make(
@@ -58,14 +59,16 @@ async function request(
           }),
           Layer.succeed(AssetReader, {
             read: (asset) =>
-              Effect.succeed({
-                close() {},
-                async *[Symbol.asyncIterator]() {
-                  const bytes = asset.storageKey === 'variant' ? variant : input;
-                  if (!bytes) throw new Error('Missing controlled image');
-                  yield bytes;
-                },
-              }),
+              asset.storageKey === 'original' && missingOriginal
+                ? Effect.succeed(null)
+                : Effect.succeed({
+                    close() {},
+                    async *[Symbol.asyncIterator]() {
+                      const bytes = asset.storageKey === 'variant' ? variant : input;
+                      if (!bytes) throw new Error('Missing controlled image');
+                      yield bytes;
+                    },
+                  }),
           }),
           Layer.succeed(PictureAuthority, { isAvailable: () => Effect.succeed(false) })
         )
@@ -179,5 +182,44 @@ describe('stored source geometry and real native output', () => {
     if (result._tag !== 'Found') throw new Error('Expected a safe original fallback');
     expect(await sharp(result.bytes).metadata()).toMatchObject({ width: 40, height: 27 });
     expect((await sharp(result.bytes).metadata()).exif).toBeUndefined();
+  });
+  it('delivers retained variant bytes when its original object is absent', async () => {
+    const input = await orientationFixture('png', 'absent');
+    const variant = await sharp(input).resize(60, 40).png().toBuffer();
+    const result = await request(
+      input,
+      { width: 60, height: 40, fit: 'contain' },
+      {},
+      variant,
+      true
+    );
+    if (result._tag !== 'Found') throw new Error('Expected retained variant');
+    expect(result.bytes).toEqual(variant);
+  });
+  it.each([
+    { options: { width: 40 }, limits: { maxResizeHeight: 50 }, outcome: 'Rejected' },
+    { options: { width: 40 }, limits: { maxOutputPixels: 2399 }, outcome: 'Rejected' },
+    {
+      options: { height: 40 },
+      limits: { maxResizeWidth: 30, maxResizeHeight: 50, maxOutputPixels: 1080 },
+      outcome: 'Found',
+    },
+  ])('uses actual retained-variant geometry when the original is missing: %j', async ({
+    options,
+    limits,
+    outcome,
+  }) => {
+    const result = await request(
+      await orientationFixture('png', 'absent'),
+      { ...options, fit: 'contain' },
+      limits,
+      await orientationFixture('png', 6),
+      true
+    );
+    expect(result._tag).toBe(outcome);
+    if (result._tag === 'Found') {
+      expect(await sharp(result.bytes).metadata()).toMatchObject({ width: 27, height: 40 });
+      expect((await sharp(result.bytes).metadata()).exif).toBeUndefined();
+    }
   });
 });

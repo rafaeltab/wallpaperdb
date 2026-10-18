@@ -61,20 +61,17 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
           if (!wallpaper) return { _tag: 'NotFound' } as const;
           const resizing =
             options !== undefined && (options.width !== undefined || options.height !== undefined);
-          let geometry: ImageGeometry = {
-            width: wallpaper.width,
-            height: wallpaper.height,
-            requiresOrientation: false,
-          };
+          let geometry: ImageGeometry | undefined;
           if (resizing) {
             // Catalog facts retain their historical raw/nominal meaning. Inspect immutable
             // bytes for this request instead of rewriting existing rows or trusting new ingestion.
             const inspection = yield* assets.read(wallpaper, { source: 'original' });
-            if (!inspection) return { _tag: 'NotFound' } as const;
-            geometry = yield* transformer.inspect(inspection);
+            if (inspection) geometry = yield* transformer.inspect(inspection);
           }
           const matchesOriginal =
-            options?.width === geometry.width && options?.height === geometry.height;
+            geometry !== undefined &&
+            options?.width === geometry.width &&
+            options?.height === geometry.height;
           if (
             !matchesOriginal &&
             ((options?.width ?? 0) > limits.maxResizeWidth ||
@@ -86,11 +83,18 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             } as const;
           }
           if (!matchesOriginal && options && (options.width || options.height)) {
-            if (exceedsOutputLimits(geometry, options, limits)) {
+            if (
+              geometry
+                ? exceedsOutputLimits(geometry, options, limits)
+                : options.width !== undefined &&
+                  options.height !== undefined &&
+                  options.width * options.height > limits.maxOutputPixels
+            ) {
               return { _tag: 'Rejected', reason: 'Requested output exceeds media limits' } as const;
             }
           }
           const wouldUpscale =
+            geometry !== undefined &&
             options?.fit !== 'fill' &&
             ((options?.width ?? geometry.width) > geometry.width ||
               (options?.height ?? geometry.height) > geometry.height);
@@ -99,11 +103,11 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             options &&
             (options.width || options.height) &&
             !wouldUpscale &&
-            !geometry.requiresOrientation
+            !geometry?.requiresOrientation
               ? yield* catalog.findSmallestVariant(
                   id,
-                  options.width ?? geometry.width,
-                  options.height ?? geometry.height
+                  options.width ?? geometry?.width ?? 1,
+                  options.height ?? geometry?.height ?? 1
                 )
               : null;
           yield* Metric.update(
@@ -122,7 +126,7 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             }),
             1
           );
-          if (variant)
+          if (variant && geometry)
             yield* Metric.update(
               Metric.histogram('media.variant_selection.efficiency_percent', {
                 boundaries: [0, 25, 50, 75, 90, 100],
@@ -140,21 +144,28 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             : wallpaper;
           let rendition = variant ?? wallpaper;
           let renditionGeometry = geometry;
+          if (resizing && !geometry && !variant) return { _tag: 'NotFound' } as const;
           let body = yield* assets.read(source, { source: variant ? 'variant' : 'original' });
           if (body && variant && options) {
             renditionGeometry = yield* transformer.inspect(body);
             // Historical variants can advertise nominal bounds. Never admit an
             // inferred output using those bounds when their actual pixels disagree.
             if (
-              renditionGeometry.requiresOrientation ||
+              (geometry !== undefined && renditionGeometry.requiresOrientation) ||
               exceedsOutputLimits(renditionGeometry, options, limits)
             ) {
+              if (!geometry)
+                return {
+                  _tag: 'Rejected',
+                  reason: 'Requested output exceeds media limits',
+                } as const;
               body = null;
             } else {
               body = yield* assets.read(source, { source: 'variant' });
             }
           }
           if (!body && variant) {
+            if (!geometry) return { _tag: 'NotFound' } as const;
             yield* Metric.update(
               Metric.counter('media.variant.fallback.total', {
                 incremental: true,
@@ -168,8 +179,9 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
           }
           if (!body) return { _tag: 'NotFound' } as const;
           const matchesRendition =
-            options?.width === renditionGeometry.width &&
-            options?.height === renditionGeometry.height;
+            !(rendition === variant && renditionGeometry?.requiresOrientation) &&
+            options?.width === renditionGeometry?.width &&
+            options?.height === renditionGeometry?.height;
           if (options && (options.width || options.height) && !matchesRendition) {
             const resized = yield* transformer.resize(body, {
               ...options,

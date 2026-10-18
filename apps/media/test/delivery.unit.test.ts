@@ -160,6 +160,65 @@ describe('media delivery', () => {
     expect(f.resizes).toEqual([]);
     expect(f.queries).toEqual([]);
   });
+  it('retains exact variant delivery when its original object is missing', async () => {
+    const f = fixture();
+    f.loseOriginal();
+    expect(
+      await f.run(
+        MediaDelivery.use((d) =>
+          d.wallpaper('wall_1', { width: 960, height: 1080, fit: 'contain' })
+        )
+      )
+    ).toMatchObject({ _tag: 'Found' });
+    expect(f.reads).toEqual(['original', 'variant', 'variant']);
+    expect(f.resizes).toEqual([]);
+  });
+  it('rejects an explicit output pixel budget before variant inspection when its original is absent', async () => {
+    const f = fixture({ maxOutputPixels: 10 });
+    f.loseOriginal();
+    expect(
+      await f.run(
+        MediaDelivery.use((d) => d.wallpaper('wall_1', { width: 20, height: 20, fit: 'contain' }))
+      )
+    ).toMatchObject({ _tag: 'Rejected' });
+    expect(f.queries).toEqual([]);
+    expect(f.resizes).toEqual([]);
+  });
+  it('transforms an orientation-bearing retained variant even at its exact displayed size', async () => {
+    const f = fixture({ variantGeometry: { width: 80, height: 120, requiresOrientation: true } });
+    f.loseOriginal();
+    expect(
+      await f.run(
+        MediaDelivery.use((d) => d.wallpaper('wall_1', { width: 80, height: 120, fit: 'contain' }))
+      )
+    ).toMatchObject({ _tag: 'Found' });
+    expect(f.resizes).toEqual([{ width: 80, height: 120, fit: 'contain', mimeType: 'image/png' }]);
+  });
+  it.each([
+    {
+      name: 'reject unknown-original output beyond its actual width cap',
+      cap: 25,
+      outcome: 'Rejected',
+    },
+    {
+      name: 'accept a valid output without inferring from the missing original catalog dimensions',
+      cap: 30,
+      outcome: 'Found',
+    },
+  ])('$name', async ({ cap, outcome }) => {
+    const f = fixture({
+      variantGeometry: { width: 80, height: 120, requiresOrientation: true },
+      maxResizeWidth: cap,
+    });
+    f.loseOriginal();
+    expect(
+      await f.run(MediaDelivery.use((d) => d.wallpaper('wall_1', { height: 40, fit: 'contain' })))
+    ).toMatchObject({ _tag: outcome });
+    expect(f.queries).toEqual([[1, 40]]);
+    expect(f.resizes).toEqual(
+      outcome === 'Found' ? [{ height: 40, fit: 'contain', mimeType: 'image/png' }] : []
+    );
+  });
   it.each([
     {
       name: 'inferred width',

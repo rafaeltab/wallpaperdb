@@ -245,7 +245,7 @@ describe('rendition source selection', () => {
     expect(f.resizes).toEqual([{ ...options, mimeType: 'image/jpeg', input: 'original' }]);
     f.objects.delete('sources/original');
     expect(await f.request(options)).toEqual({ _tag: 'NotFound' });
-    expect(f.reads.slice(3)).toEqual(['sources/original']);
+    expect(f.reads.slice(3)).toEqual(['sources/original', 'renditions/medium']);
     expect(f.resizes).toHaveLength(1);
   });
   it.each([

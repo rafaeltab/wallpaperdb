@@ -138,7 +138,7 @@ test("clean-checkout web checks have a Web integration task", () => {
 test("test tiers preserve sequential container execution", () => {
 	for (const tier of ["integration", "e2e"]) {
 		assert.match(
-			output(`test-${tier}`, "PACKAGE=test-utils"),
+			output(`test-${tier}`, "PACKAGE=test-utils", "GITHUB_ACTIONS=true"),
 			/--concurrency=1/,
 		);
 	}

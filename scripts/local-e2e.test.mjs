@@ -143,7 +143,7 @@ if (args.includes('--dry=json')) {
 } else if (args.includes('--filter=@wallpaperdb/web-e2e')) {
   fs.mkdirSync('apps/web-e2e/test-results', {recursive: true});
   fs.writeFileSync('apps/web-e2e/test-results/trace.zip', 'retained browser artifact');
-  if (process.env.TEST_HOLD) { console.log('Browser fixture running'); setInterval(() => {}, 1000); }
+  if (process.env.TEST_HOLD) { fs.writeFileSync('active-fixture-child.pid', String(process.pid)); console.log('Browser fixture running'); setInterval(() => {}, 1000); }
   else if (process.env.TEST_BROWSER_EXIT) { console.error('private-password sk_test_private'); process.exit(Number(process.env.TEST_BROWSER_EXIT)); }
 }
 if (!args.includes('--dry=json') && args.includes('--filter=!@wallpaperdb/web-e2e') && process.env.TEST_CONTAINER_EXIT) process.exit(Number(process.env.TEST_CONTAINER_EXIT));
@@ -462,6 +462,82 @@ test("browser command fixtures await observable startup even when startup takes 
 			.some((call) => call[0] === "turbo" && !call.includes("--dry=json")),
 	);
 });
+
+function failRunLog(f, line) {
+	const hook = join(f.root, "full-diagnostics.mjs");
+	writeFileSync(
+		hook,
+		`import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const append = fs.appendFileSync;
+fs.appendFileSync = (path, content, ...options) => {
+  if (String(path).endsWith('/run.log') && String(content).includes(${JSON.stringify(line)}))
+    throw Object.assign(new Error('fixture diagnostics filesystem is full'), { code: 'ENOSPC' });
+  return append(path, content, ...options);
+};
+syncBuiltinESMExports();`,
+	);
+	f.env.NODE_OPTIONS = `--import=${hook}`;
+}
+
+test("run-log write failure stops the detached child, tears down the owned stack, and releases the lock", async (t) => {
+	const f = await browserFixture(t);
+	failRunLog(f, "Browser fixture running");
+	f.env.TEST_HOLD = "1";
+	let pid;
+	try {
+		const result = await f.runAsync("PACKAGE=web-e2e");
+		pid = Number(
+			readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
+		);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /phase "browser tests" failed, exit 1/);
+		assert.match(result.stderr, /run.log.*ENOSPC/);
+		assert.doesNotMatch(
+			result.stdout,
+			/All requested E2E phases and cleanup passed/,
+		);
+		assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+		assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+		assert.equal(
+			spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+			0,
+		);
+	} finally {
+		if (Number.isInteger(pid) && pid > 0) {
+			try {
+				process.kill(-pid, "SIGKILL");
+			} catch {}
+		}
+	}
+});
+
+for (const browserStatus of [0, 23]) {
+	test(`run-log failure during teardown preserves ${browserStatus ? "the original browser failure" : "the cleanup failure"}`, async (t) => {
+		const f = await browserFixture(t);
+		failRunLog(f, "Cleanup fixture running");
+		if (browserStatus) f.env.TEST_BROWSER_EXIT = String(browserStatus);
+		f.env.TEST_HOLD_CLEANUP = "1";
+		const result = await f.runAsync("PACKAGE=web-e2e");
+		assert.notEqual(result.status, 0);
+		assert.match(
+			result.stderr,
+			new RegExp(
+				`phase "${browserStatus ? "browser tests" : "browser cleanup"}" failed, exit ${browserStatus || 1}`,
+			),
+		);
+		assert.match(result.stderr, /run.log.*ENOSPC/);
+		assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+		assert.doesNotMatch(
+			result.stdout,
+			/All requested E2E phases and cleanup passed/,
+		);
+		const directory = result.stdout.match(
+			/E2E diagnostics retained at (\S+)\./,
+		)[1];
+		assert.ok(existsSync(directory));
+	});
+}
 
 for (const value of ["invalid", "0", "-1"]) {
 	test(`invalid readiness timeout ${value} fails before building application images`, async (t) => {

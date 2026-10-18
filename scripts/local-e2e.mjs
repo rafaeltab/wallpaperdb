@@ -28,6 +28,7 @@ const secrets = new Set();
 let interrupted;
 let activeChild;
 let diagnostics;
+let diagnosticsFailure;
 let phase = "selection";
 let owned = false;
 let project;
@@ -89,7 +90,22 @@ function rememberSecrets(values) {
 
 function record(message, error = false) {
 	const safe = redact(message);
-	if (diagnostics) appendFileSync(join(diagnostics, "run.log"), `${safe}\n`);
+	if (diagnostics && !diagnosticsFailure) {
+		try {
+			appendFileSync(join(diagnostics, "run.log"), `${safe}\n`);
+		} catch (cause) {
+			diagnosticsFailure = Object.assign(
+				new Error(
+					`run.log write failed (${cause.code ?? "unknown error"}); retained diagnostics may be incomplete. Further output is console-only.`,
+				),
+				{
+					status: interrupted ?? 1,
+					phase: cleanupRunning ? "browser cleanup" : phase,
+				},
+			);
+			console.error(redact(diagnosticsFailure.message));
+		}
+	}
 	(error ? console.error : console.log)(safe);
 }
 
@@ -107,6 +123,7 @@ async function run(
 ) {
 	if (interrupted && !cleanupRunning)
 		throw Object.assign(new Error("Interrupted."), { status: interrupted });
+	if (diagnosticsFailure && !cleanupRunning) throw diagnosticsFailure;
 	return await new Promise((resolveResult, reject) => {
 		const child = spawn(command, args, {
 			env: environment,
@@ -118,11 +135,16 @@ async function run(
 		let stderr = "";
 		let pending = "";
 		let timedOut = false;
+		let stoppingForDiagnostics = false;
 		const emit = (data) => {
 			pending += data;
 			const lines = pending.split("\n");
 			pending = lines.pop();
 			for (const line of lines) record(line);
+			if (diagnosticsFailure && !cleanupRunning && !stoppingForDiagnostics) {
+				stoppingForDiagnostics = true;
+				stopChild();
+			}
 		};
 		child.stdout.on("data", (data) => {
 			if (capture) stdout += data;
@@ -154,7 +176,12 @@ async function run(
 			clearTimeout(timer);
 			clearTimeout(killer);
 			activeChild = undefined;
+			const priorDiagnosticsFailure = diagnosticsFailure;
 			if (pending && !capture) record(pending);
+			if (priorDiagnosticsFailure && !cleanupRunning) {
+				reject(priorDiagnosticsFailure);
+				return;
+			}
 			if (code !== 0 || timedOut || (interrupted && !cleanupRunning)) {
 				const status =
 					!cleanupRunning && interrupted
@@ -173,7 +200,9 @@ async function run(
 						{ status },
 					),
 				);
-			} else resolveResult(stdout);
+			} else if (diagnosticsFailure && !cleanupRunning)
+				reject(diagnosticsFailure);
+			else resolveResult(stdout);
 		});
 	});
 }
@@ -628,6 +657,7 @@ async function main() {
 			}
 		}
 		if (failure) throw failure;
+		if (diagnosticsFailure) throw diagnosticsFailure;
 		if (interrupted) {
 			phase = "browser cleanup";
 			throw Object.assign(new Error("Interrupted during cleanup."), {
@@ -643,6 +673,7 @@ async function main() {
 			await runSuites([container]);
 		}
 	}
+	if (diagnosticsFailure) throw diagnosticsFailure;
 	phase = "diagnostics cleanup";
 	await rm(diagnostics, { recursive: true });
 	diagnostics = undefined;
@@ -659,7 +690,7 @@ try {
 	await main();
 } catch (error) {
 	record(
-		`E2E phase "${phase}" failed, exit ${error.status ?? interrupted ?? 1}: ${error.message}`,
+		`E2E phase "${error.phase ?? phase}" failed, exit ${error.status ?? interrupted ?? 1}: ${error.message}`,
 		true,
 	);
 	record(

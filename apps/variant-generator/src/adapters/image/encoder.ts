@@ -17,7 +17,10 @@ try {
     limitInputPixels: 268402689,
     sequentialRead: true,
     failOnError: false,
-  }).resize(options.width, options.height, { fit: 'inside', withoutEnlargement: true });
+  })
+    // Apply EXIF to pixels before fitting; default output strips source metadata.
+    .rotate()
+    .resize(options.width, options.height, { fit: 'inside', withoutEnlargement: true });
   if (options.mimeType === 'image/jpeg')
     transformer.jpeg({ quality: options.jpegQuality, progressive: true });
   else if (options.mimeType === 'image/png')

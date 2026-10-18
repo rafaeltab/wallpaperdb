@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
 import { VariantImages, type GenerationInput } from '../src/capabilities/generation/index.js';
+import { orientationCases, orientationColors, orientationFixture, samplePixelGrid } from '@wallpaperdb/test-utils/fixtures';
 
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).build();
 const input: GenerationInput = {
@@ -28,6 +29,45 @@ describe('Stored variant image adapter', () => {
     }));
   });
   afterAll(async () => { await runtime?.dispose(); await tester?.destroy(); });
+
+  describe.each(['jpeg', 'png', 'webp'] as const)('%s orientation and privacy', (format) => {
+    it.each(orientationCases)('applies orientation $orientation before fitting and strips private metadata', async ({ orientation, grid }) => {
+      const original = await orientationFixture(format, orientation);
+      const sourceMetadata = await sharp(original).metadata();
+      expect(sourceMetadata.orientation).toBe(orientation === 'absent' ? undefined : orientation);
+      expect(sourceMetadata.exif?.includes(Buffer.from('Private camera'))).toBe(true);
+      expect(sourceMetadata.exif?.includes(Buffer.from('Private serial'))).toBe(true);
+      expect(sourceMetadata.exif?.includes(Buffer.from([0xff, 0xd8]))).toBe(true);
+      const key = `${format}-orientation-${orientation}`;
+      await tester.s3.uploadObject('originals', key, original);
+      const generate = VariantImages.use((images) => images.generate({
+        ...input, wallpaperId: `wlpr_${key}`, mimeType: `image/${format}`, width: 120, height: 80,
+        storage: { bucket: 'originals', key },
+      }, { width: 60, height: 60, label: 'orientation' }));
+      const variant = await runtime.runPromise(generate);
+      const object = await tester.s3.getS3Client().send(new GetObjectCommand({ Bucket: variant.storageBucket, Key: variant.storageKey }));
+      if (!object.Body) throw new Error('Missing stored variant');
+      const bytes = await object.Body.transformToByteArray();
+      const width = grid[0].length * 20;
+      const height = grid.length * 20;
+      expect(variant).toMatchObject({ width, height, aspectRatio: width / height, fileSizeBytes: bytes.length, format: `image/${format}` });
+      const metadata = await sharp(bytes).metadata();
+      expect(metadata).toMatchObject({ width, height, format });
+      expect(metadata.orientation).toBeUndefined();
+      expect(metadata.exif).toBeUndefined();
+      expect(metadata.xmp).toBeUndefined();
+      expect(metadata.iptc).toBeUndefined();
+      const pixels = await samplePixelGrid(bytes, grid[0].length, grid.length);
+      for (const [row, colors] of grid.entries()) for (const [column, color] of [...colors].entries()) {
+        for (const [channel, expected] of orientationColors[color]!.entries()) {
+          expect(Math.abs(pixels[row]![column]![channel]! - expected)).toBeLessThan(25);
+        }
+      }
+      expect(await runtime.runPromise(generate)).toEqual(variant);
+      const storedOriginal = await tester.s3.getS3Client().send(new GetObjectCommand({ Bucket: 'originals', Key: key }));
+      expect(Buffer.from(await storedOriginal.Body!.transformToByteArray())).toEqual(original);
+    });
+  });
 
   it.each(['jpeg', 'png', 'webp'] as const)('stores deterministic %s variants in the original bucket with unchanged encoding', async (format) => {
     const original = await sharp({ create: { width: 160, height: 100, channels: 3, background: '#aa3377' } }).toFormat(format).toBuffer();

@@ -28,12 +28,46 @@ let interrupted;
 let activeChild;
 let diagnostics;
 let diagnosticsFailure;
+let outputFailure;
+const failedOutputs = new Set();
 let phase = "selection";
 let owned = false;
 let project;
 let environment = { ...process.env };
 let cleanupRunning = false;
 let rerunPackage = "web-e2e";
+
+for (const stream of [process.stdout, process.stderr]) {
+	stream.on("error", (cause) => failOutput(stream, cause));
+}
+
+function failOutput(stream, cause) {
+	failedOutputs.add(stream);
+	if (outputFailure) return;
+	outputFailure = Object.assign(
+		new Error(`Console output failed (${cause.code ?? "unknown error"}).`),
+		{
+			status: interrupted ?? 1,
+			phase: cleanupRunning ? "browser cleanup" : phase,
+		},
+	);
+	process.exitCode ??= outputFailure.status;
+	if (!cleanupRunning) {
+		abort.abort();
+		stopChild();
+	}
+	record(outputFailure.message, true);
+}
+
+function writeConsole(message, error) {
+	const stream = error ? process.stderr : process.stdout;
+	if (failedOutputs.has(stream)) return;
+	try {
+		stream.write(`${message}\n`);
+	} catch (cause) {
+		failOutput(stream, cause);
+	}
+}
 
 for (const [signal, status] of [
 	["SIGHUP", 129],
@@ -102,10 +136,10 @@ function record(message, error = false) {
 					phase: cleanupRunning ? "browser cleanup" : phase,
 				},
 			);
-			console.error(redact(diagnosticsFailure.message));
+			writeConsole(redact(diagnosticsFailure.message), true);
 		}
 	}
-	(error ? console.error : console.log)(safe);
+	writeConsole(safe, error);
 }
 
 function seconds(key, fallback) {
@@ -123,6 +157,7 @@ async function run(
 	if (interrupted && !cleanupRunning)
 		throw Object.assign(new Error("Interrupted."), { status: interrupted });
 	if (diagnosticsFailure && !cleanupRunning) throw diagnosticsFailure;
+	if (outputFailure && !cleanupRunning) throw outputFailure;
 	return await new Promise((resolveResult, reject) => {
 		const child = spawn(command, args, {
 			env: environment,
@@ -195,7 +230,7 @@ async function run(
 			clearTimeout(timer);
 			clearTimeout(killer);
 			activeChild = undefined;
-			const priorDiagnosticsFailure = diagnosticsFailure;
+			const priorDiagnosticsFailure = diagnosticsFailure ?? outputFailure;
 			for (const output of outputs)
 				if (output.pending && !capture) record(output.pending, output.error);
 			if (priorDiagnosticsFailure && !cleanupRunning) {
@@ -220,8 +255,8 @@ async function run(
 						{ status },
 					),
 				);
-			} else if (diagnosticsFailure && !cleanupRunning)
-				reject(diagnosticsFailure);
+			} else if ((diagnosticsFailure || outputFailure) && !cleanupRunning)
+				reject(diagnosticsFailure ?? outputFailure);
 			else resolveResult(stdout);
 		});
 	});
@@ -482,9 +517,12 @@ async function waitForBrowser(deadline) {
 		} catch (error) {
 			failure = error;
 			if (abort.signal.aborted)
-				throw Object.assign(new Error("Interrupted during readiness."), {
-					status: interrupted,
-				});
+				throw (
+					outputFailure ??
+					Object.assign(new Error("Interrupted during readiness."), {
+						status: interrupted,
+					})
+				);
 		}
 		if (Date.now() < deadline)
 			await delay(Math.min(1000, deadline - Date.now()), undefined, {
@@ -676,6 +714,7 @@ async function main() {
 		}
 		if (failure) throw failure;
 		if (diagnosticsFailure) throw diagnosticsFailure;
+		if (outputFailure) throw outputFailure;
 		if (interrupted) {
 			phase = "browser cleanup";
 			throw Object.assign(new Error("Interrupted during cleanup."), {
@@ -692,9 +731,11 @@ async function main() {
 		}
 	}
 	if (diagnosticsFailure) throw diagnosticsFailure;
+	if (outputFailure) throw outputFailure;
 	phase = "diagnostics cleanup";
 	await rm(diagnostics, { recursive: true });
 	diagnostics = undefined;
+	if (outputFailure) throw outputFailure;
 	if (interrupted)
 		throw Object.assign(new Error("Interrupted during diagnostics cleanup."), {
 			status: interrupted,

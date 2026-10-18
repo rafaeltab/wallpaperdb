@@ -2,6 +2,10 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
 	appendFileSync,
+	closeSync,
+	constants as fsConstants,
+	fstatSync,
+	openSync,
 	existsSync,
 	lstatSync,
 	mkdtempSync,
@@ -28,6 +32,7 @@ let interrupted;
 let activeChild;
 let diagnostics;
 let diagnosticsFailure;
+let lockDescriptor;
 let outputFailure;
 const failedOutputs = new Set();
 let phase = "selection";
@@ -35,7 +40,11 @@ let owned = false;
 let project;
 let environment = { ...process.env };
 let cleanupRunning = false;
-let rerunPackage = "web-e2e";
+let rerunPackage =
+	flags
+		.find((flag) => /^--filter=@wallpaperdb\/[a-z0-9-]+$/.test(flag))
+		?.split("/")
+		.at(-1) ?? "web-e2e";
 
 for (const stream of [process.stdout, process.stderr]) {
 	stream.on("error", (cause) => failOutput(stream, cause));
@@ -152,7 +161,7 @@ function seconds(key, fallback) {
 async function run(
 	command,
 	args,
-	{ capture = false, timeout = 1_200_000 } = {},
+	{ capture = false, timeout = 1_200_000, inheritLock = false } = {},
 ) {
 	if (interrupted && !cleanupRunning)
 		throw Object.assign(new Error("Interrupted."), { status: interrupted });
@@ -162,7 +171,9 @@ async function run(
 		const child = spawn(command, args, {
 			env: environment,
 			detached: true,
-			stdio: ["ignore", "pipe", "pipe"],
+			stdio: inheritLock
+				? ["ignore", "pipe", "pipe", ...Array(6).fill("ignore"), lockDescriptor]
+				: ["ignore", "pipe", "pipe"],
 		});
 		activeChild = child;
 		let stdout = "";
@@ -658,6 +669,96 @@ async function runSuites(packages) {
 	]);
 }
 
+async function acquireDockerLock() {
+	phase = "Docker host lock";
+	const file =
+		process.env.E2E_LOCK_FILE || "/tmp/wallpaperdb-perf-validation.lock";
+	const requested = process.env.E2E_LOCK_TIMEOUT ?? "900";
+	const timeout = Number(requested) * 1000;
+	if (
+		!/^\d+$/.test(requested) ||
+		!Number.isSafeInteger(timeout) ||
+		timeout <= 0
+	)
+		throw new Error("E2E_LOCK_TIMEOUT must be a positive integer in seconds.");
+	try {
+		lockDescriptor = openSync(
+			file,
+			fsConstants.O_CREAT |
+				fsConstants.O_WRONLY |
+				fsConstants.O_APPEND |
+				fsConstants.O_NOFOLLOW |
+				fsConstants.O_NONBLOCK,
+			0o600,
+		);
+		const stat = fstatSync(lockDescriptor);
+		if (
+			!stat.isFile() ||
+			stat.uid !== process.getuid() ||
+			stat.nlink !== 1 ||
+			stat.size !== 0 ||
+			stat.mode & 0o022
+		)
+			throw new Error(
+				"Expected an empty regular file owned by the current user, without hard links or group/other write access.",
+			);
+	} catch (error) {
+		throw new Error(
+			`Unsafe Docker host lock target ${file}: ${error.code ?? error.message}. Use a dedicated empty owned file; symbolic links are not permitted.`,
+		);
+	}
+	const deadline = Date.now() + timeout;
+	record(`Waiting for Docker host lock ${file} (deadline ${requested}s)...`);
+	async function attempt(flags) {
+		try {
+			await run("flock", ["-E", "75", ...flags, "9"], {
+				capture: true,
+				inheritLock: true,
+				timeout: Math.max(1, deadline - Date.now()) + 1000,
+			});
+			return true;
+		} catch (error) {
+			if (error.code === "ENOENT")
+				throw new Error(
+					"Local E2E requires flock (util-linux) for shared Docker host coordination.",
+				);
+			if (
+				error.status === 75 &&
+				!interrupted &&
+				!outputFailure &&
+				!diagnosticsFailure
+			)
+				return false;
+			throw error;
+		}
+	}
+	let acquired = await attempt(["-n"]);
+	while (!acquired) {
+		const remaining = deadline - Date.now();
+		if (remaining <= 0)
+			throw Object.assign(
+				new Error(
+					`Docker host lock timed out. Another validation owns ${file}; retry after it finishes.`,
+				),
+				{ status: 75 },
+			);
+		record(`Docker host lock busy; ${Math.ceil(remaining / 1000)}s remaining.`);
+		acquired = await attempt(["-w", String(Math.min(5000, remaining) / 1000)]);
+	}
+	const current = lstatSync(file);
+	const opened = fstatSync(lockDescriptor);
+	if (
+		current.isSymbolicLink() ||
+		current.ino !== opened.ino ||
+		current.dev !== opened.dev ||
+		opened.nlink !== 1
+	)
+		throw new Error(
+			`Unsafe Docker host lock target ${file}: file changed while acquiring ownership.`,
+		);
+	record("Docker host lock acquired.");
+}
+
 async function main() {
 	if (flags.some((flag) => flag.startsWith("--dry"))) {
 		process.stdout.write(
@@ -667,6 +768,8 @@ async function main() {
 		);
 		return;
 	}
+	await acquireDockerLock();
+	phase = "selection";
 	diagnostics = mkdtempSync(resolve(tmpdir(), "wallpaperdb-e2e-"));
 	record(
 		`E2E diagnostics retained at ${diagnostics}. Keep browser artifacts private; sanitize excerpts before publication.`,
@@ -783,6 +886,15 @@ try {
 		true,
 	);
 	process.exitCode = error.status ?? interrupted ?? 1;
+} finally {
+	if (lockDescriptor !== undefined) {
+		try {
+			closeSync(lockDescriptor);
+		} catch (error) {
+			record(`Docker host lock release failed: ${error.message}`, true);
+			process.exitCode ||= 1;
+		}
+	}
 }
 
 function shellQuote(value) {

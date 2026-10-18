@@ -9,6 +9,8 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	openSync,
+	symlinkSync,
+	linkSync,
 	readSync,
 	readFileSync,
 	readdirSync,
@@ -1358,3 +1360,43 @@ for (const [capture, stream, browserStatus] of [
 		},
 	);
 }
+
+for (const kind of ["existing data", "symbolic link", "hard link"]) {
+	test(`unsafe lock target ${kind} is rejected without modifying existing data`, (t) => {
+		const f = fixture(t);
+		const target = join(f.root, ".env");
+		writeFileSync(target, "PRIVATE_FIXTURE_VALUE=preserved\n");
+		const before = statSync(target);
+		const selected =
+			kind === "existing data" ? target : join(f.root, "selected.lock");
+		if (kind === "symbolic link") symlinkSync(target, selected);
+		if (kind === "hard link") linkSync(target, selected);
+		f.env.E2E_LOCK_FILE = selected;
+		const result = f.run("PACKAGE=test-utils");
+		assert.equal(
+			readFileSync(target, "utf8"),
+			"PRIVATE_FIXTURE_VALUE=preserved\n",
+		);
+		assert.equal(statSync(target).mtimeMs, before.mtimeMs);
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /Unsafe Docker host lock target/);
+		assert.match(
+			result.stderr,
+			/Focused rerun: make test-e2e PACKAGE=test-utils/,
+		);
+		assert.ok(!existsSync(join(f.root, "calls.jsonl")));
+	});
+}
+
+test("a FIFO lock target is rejected without blocking or starting Docker", (t) => {
+	const f = fixture(t);
+	const selected = join(f.root, "unsafe.fifo");
+	assert.equal(spawnSync("mkfifo", [selected]).status, 0);
+	f.env.E2E_LOCK_FILE = selected;
+	const result = f.run("PACKAGE=test-utils");
+	assert.equal(result.error, undefined);
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /Unsafe Docker host lock target/);
+	assert.ok(statSync(selected).isFIFO());
+	assert.ok(!existsSync(join(f.root, "calls.jsonl")));
+});

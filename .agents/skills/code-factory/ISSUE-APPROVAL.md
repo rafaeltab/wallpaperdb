@@ -10,6 +10,8 @@ Identify the repository and its policy source through authenticated repository m
 
 Read the exact repository name, issue number, title, body, creation time, and `lastEditedAt` from the authenticated [Issue API](https://docs.github.com/en/graphql/reference/issues#issue). Also retrieve paginated [title-rename events](https://docs.github.com/en/graphql/reference/issues#renamedtitleevent), since approval covers the title as well as the body. Compute its content digest using this fixed serialization, with values supplied as parsed data rather than interpolated into executable code:
 
+Python's [`json.dumps`](https://docs.python.org/3/library/json.html#json.dumps), [`str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode), and [`hashlib.sha256`](https://docs.python.org/3/library/hashlib.html#hashlib.sha256) APIs define the serialization, byte encoding, and hashing operations used in this approval contract.
+
 ```python
 payload = [repository, issue_number, title, body]
 encoded = json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("ascii")

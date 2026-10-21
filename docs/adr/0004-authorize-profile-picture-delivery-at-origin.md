@@ -1,5 +1,7 @@
 # Authorize Profile picture delivery against User state
 
+Status: superseded for the target Media architecture by [ADR 0011](0011-unlink-profile-pictures-before-asynchronous-media-deletion.md) and [ADR 0012](0012-own-stable-assets-and-immutable-sources-in-media.md). Profile unlink succeeds before asynchronous Media deletion; an already-known URL may remain usable until Media processes deletion. Media owns local availability and source storage, replacing the immediate origin-denial guarantee and synchronous User callback below. Media also takes responsibility for private evidence under per-Asset-type retention configuration, preserving the 30-day Profile picture default and recorded expiry. No new cache policy is selected. The text below records the existing implementation and its historical rationale.
+
 User owns immutable Profile picture assets in private object storage and publishes their delivery metadata to Media. Media checks the asset's current public availability with User on every origin request, using an authenticated internal endpoint and failing closed; an asynchronous projection alone cannot stop delivery immediately after replacement or removal.
 
 ## Consequences

@@ -1,0 +1,278 @@
+import { execFileSync } from "node:child_process";
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import {
+	git,
+	isMutationSource,
+	isMutationToolInput,
+	mutationContext,
+	restoreBaseline,
+	publishBaseline,
+	importBaseline,
+} from "./lib/mutation-state.mjs";
+import { runBounded } from "./lib/mutation-process.mjs";
+import { downloadBaseline } from "./lib/mutation-remote.mjs";
+
+const json = (file) => JSON.parse(readFileSync(file, "utf8"));
+async function main() {
+	const { values } = parseArgs({
+		options: {
+			package: { type: "string" },
+			suite: { type: "string", default: "unit" },
+			scope: { type: "string", default: "changed" },
+			base: { type: "string", default: "origin/main" },
+			budget: { type: "string", default: "900" },
+			baseline: { type: "string" },
+			offline: { type: "boolean", default: false },
+		},
+	});
+	if (!values.package || !/^[a-z0-9-]+$/.test(values.package))
+		throw new Error("--package requires a workspace basename");
+	if (!["all", "changed"].includes(values.scope))
+		throw new Error("--scope must be all or changed");
+	const budgetMs = Number(values.budget) * 1000;
+	if (!Number.isFinite(budgetMs) || budgetMs < 1000 || budgetMs > 3_600_000)
+		throw new Error("--budget must be 1 to 3600 seconds");
+	const root = git(process.cwd(), "rev-parse", "--show-toplevel");
+	const workspace = ["apps", "packages"]
+		.map((p) => `${p}/${values.package}`)
+		.find((p) => existsSync(join(root, p, "package.json")));
+	if (!workspace) throw new Error(`Workspace not found: ${values.package}`);
+	const cwd = join(root, workspace);
+	const configPath = join(cwd, "mutation.config.json");
+	if (!existsSync(configPath))
+		throw new Error(
+			`Add mutation.config.json to opt ${workspace} into mutation testing`,
+		);
+	const config = json(configPath).suites[values.suite];
+	if (!config) throw new Error(`Unknown mutation suite: ${values.suite}`);
+	const files = execFileSync(
+		"git",
+		[
+			"ls-files",
+			"-z",
+			"--cached",
+			"--others",
+			"--exclude-standard",
+			"--",
+			workspace,
+		],
+		{ cwd: root, encoding: "utf8" },
+	)
+		.split("\0")
+		.filter(Boolean);
+	const sourceFiles = [
+		...new Set(
+			files
+				.map((f) => f.slice(workspace.length + 1))
+				.filter(
+					(f) =>
+						isMutationSource(f) &&
+						existsSync(join(cwd, f)) &&
+						(!config.sourceRoots ||
+							config.sourceRoots.some((prefix) => f.startsWith(prefix))),
+				),
+		),
+	].sort();
+	const contextConfig = { ...config, sourceFiles };
+	const context = mutationContext(root, workspace, values.suite, contextConfig);
+	const output = join(cwd, "reports/mutation", values.suite);
+	mkdirSync(output, { recursive: true });
+	// Each invocation has private input/output files, even in the same worktree.
+	const run = mkdtempSync(join(output, "run-"));
+	const sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
+	let scope = values.scope,
+		mutate = sourceFiles;
+	if (scope === "changed") {
+		const base = git(root, "merge-base", values.base, "HEAD");
+		const changed = [
+			...new Set(
+				[
+					...execFileSync("git", ["diff", "--name-only", "-z", base], {
+						cwd: root,
+						encoding: "utf8",
+					}).split("\0"),
+					...execFileSync(
+						"git",
+						["ls-files", "--others", "--exclude-standard", "-z"],
+						{ cwd: root, encoding: "utf8" },
+					).split("\0"),
+				].filter(Boolean),
+			),
+		];
+		// Source-only edits can narrow scope. Test/helper/toolchain/dependency changes
+		// select the full workspace and let Stryker decide which results remain valid.
+		if (
+			changed
+				.filter(
+					(f) =>
+						isMutationToolInput(f) ||
+						context.watchRoots.some((dir) => f.startsWith(`${dir}/`)),
+				)
+				.some(
+					(f) =>
+						!f.startsWith(`${workspace}/`) ||
+						!sourceFiles.includes(f.slice(workspace.length + 1)),
+				)
+		)
+			scope = "all";
+		else
+			mutate = sourceFiles.filter((f) => changed.includes(`${workspace}/${f}`));
+	}
+	const summary = {
+		workspace,
+		suite: values.suite,
+		scope,
+		budgetSeconds: budgetMs / 1000,
+		outcome: "completed",
+		total: 0,
+		completed: 0,
+		executed: 0,
+		errors: 0,
+		baselineRestored: false,
+		checkpointSaved: false,
+	};
+	try {
+		if (mutate.length === 0) {
+			summary.outcome = "no-changes";
+			console.log(
+				"No mutation sources selected. This does not establish a full baseline.",
+			);
+			return 0;
+		}
+		if (values.baseline && !importBaseline(context, resolve(values.baseline)))
+			throw new Error("Baseline is incompatible with this workspace/toolchain");
+		let baseline = restoreBaseline(context);
+		if (!baseline && !values.offline) {
+			downloadBaseline(context);
+			baseline = restoreBaseline(context);
+		}
+		summary.baselineRestored = Boolean(baseline);
+		const incrementalFile = join(run, "incremental.json");
+		if (baseline)
+			writeFileSync(incrementalFile, JSON.stringify(baseline.report));
+		const initialReport = existsSync(incrementalFile)
+			? readFileSync(incrementalFile, "utf8")
+			: null;
+		const progress = join(run, "progress.json"),
+			complete = join(run, "complete");
+		const options = {
+			testRunner: "vitest",
+			plugins: [
+				import.meta.resolve("@stryker-mutator/vitest-runner"),
+				new URL("./lib/mutation-reporter.mjs", import.meta.url).href,
+			],
+			vitest: config.vitest,
+			mutate,
+			coverageAnalysis: "perTest",
+			concurrency: 1,
+			incremental: true,
+			incrementalFile,
+			tempDirName: sandbox,
+			ignorePatterns: ["/reports", "/coverage", "/dist"],
+			reporters: [
+				"progress-append-only",
+				"html",
+				"json",
+				"checkpoint-progress",
+			],
+			htmlReporter: { fileName: join(run, "mutation.html") },
+			jsonReporter: { fileName: join(run, "mutation.json") },
+			thresholds: { high: 80, low: 60, break: null },
+			timeoutMS: config.timeoutMS ?? 5000,
+			timeoutFactor: 1.5,
+		};
+		const configFile = join(run, "stryker.json");
+		writeFileSync(configFile, JSON.stringify(options));
+		const start = performance.now();
+		const result = await runBounded(
+			process.execPath,
+			[
+				fileURLToPath(new URL("./mutation-worker.mjs", import.meta.url)),
+				configFile,
+				complete,
+			],
+			{
+				cwd,
+				budgetMs,
+				env: { ...process.env, WALLPAPERDB_MUTATION_PROGRESS: progress },
+			},
+		);
+		summary.elapsedSeconds = Math.round((performance.now() - start) / 100) / 10;
+		Object.assign(
+			summary,
+			existsSync(progress) ? json(progress) : { total: null },
+		);
+		summary.outcome = result.outcome;
+		if (
+			summary.errors ||
+			(result.outcome === "completed" && !existsSync(complete))
+		)
+			summary.outcome = "failed";
+		const after = mutationContext(root, workspace, values.suite, contextConfig);
+		const unchanged =
+			after.key === context.key && after.inputDigest === context.inputDigest;
+		if (!unchanged) {
+			summary.outcome = "failed";
+			console.error(
+				"Inputs changed during the run; checkpoint will not be published.",
+			);
+		}
+		const updated =
+			existsSync(incrementalFile) &&
+			(existsSync(complete) ||
+				readFileSync(incrementalFile, "utf8") !== initialReport);
+		if (unchanged && updated && summary.outcome !== "failed") {
+			const checkpoint = publishBaseline(context, json(incrementalFile), {
+				complete: scope === "all" && summary.outcome === "completed",
+			});
+			copyFileSync(checkpoint, join(run, "checkpoint.json"));
+			summary.checkpointSaved = true;
+		}
+		return summary.outcome === "completed"
+			? 0
+			: summary.outcome === "budget-exhausted"
+				? 2
+				: summary.outcome === "cancelled"
+					? 130
+					: 1;
+	} catch (error) {
+		summary.outcome = "failed";
+		throw error;
+	} finally {
+		rmSync(sandbox, { recursive: true, force: true });
+		writeFileSync(join(run, "summary.json"), JSON.stringify(summary, null, 2));
+		// Stable paths are presentation/artifact outputs only, never cache inputs.
+		for (const name of [
+			"summary.json",
+			"checkpoint.json",
+			"mutation.json",
+			"mutation.html",
+		]) {
+			const file = join(run, name),
+				destination = join(output, name);
+			if (existsSync(file)) copyFileSync(file, destination);
+			else rmSync(destination, { force: true });
+		}
+		console.log(
+			`Mutation ${summary.outcome}: ${summary.completed}/${summary.total ?? "?"} results, ${summary.executed} executed; checkpoint ${summary.checkpointSaved ? "saved" : "not saved"}.`,
+		);
+	}
+}
+try {
+	process.exitCode = await main();
+} catch (error) {
+	console.error(error.message);
+	process.exitCode = 1;
+}

@@ -18,7 +18,7 @@
     "lint": "biome lint .",
     "test": "vitest run",
     "test:unit": "vitest run --coverage",
-    "test:mutation": "stryker run",
+    "test:mutation": "node ../../scripts/mutation.mjs --package profile-markdown",
     "test:watch": "vitest",
     "check-types": "tsc --noEmit",
     "build": "esbuild src/index.ts --bundle --platform=neutral --format=esm --target=es2022 --outfile=dist/index.js"
@@ -30,7 +30,6 @@
     "rehype-sanitize": "^6.0.0"
   },
   "devDependencies": {
-    "@stryker-mutator/core": "10.0.0",
     "@types/mdast": "^4.0.4",
     "@types/hast": "^3.0.4",
     "@types/node": "^22.10.2",

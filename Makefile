@@ -91,8 +91,10 @@ test-focused: ## Build dependencies and run selected tests serially (requires PA
 test-unit: ## Run unit tests (no containers; optional PACKAGE)
 	@$(TURBO) run test:unit $(TURBO_FLAGS)
 
-test-mutation: ## Run the mutation-testing POC (optional PACKAGE=profile-markdown; optional ARGS)
-	@$(TURBO) run test:mutation $(TURBO_FLAGS) --concurrency=1 -- $(ARGS)
+test-mutation: ## Run bounded incremental mutations (requires PACKAGE; optional ARGS)
+	$(if $(PACKAGE),,$(error test-mutation requires PACKAGE, e.g. make test-mutation PACKAGE=profile-markdown))
+	@$(TURBO) run build --filter="$(TURBO_PACKAGE)^..." --concurrency=1
+	@node scripts/mutation.mjs --package "$(PACKAGE)" $(ARGS)
 
 test-integration: ## Run integration tests (Docker required) (optional PACKAGE)
 	@$(TURBO) run test:integration $(TURBO_FLAGS) --concurrency=1

@@ -1,0 +1,12 @@
+{
+  "suites": {
+    "integration": {
+      "sourceRoots": ["src/adapters/redis/"],
+      "vitest": {
+        "configFile": "vitest.mutation.config.ts",
+        "related": false
+      },
+      "timeoutMS": 10000
+    }
+  }
+}

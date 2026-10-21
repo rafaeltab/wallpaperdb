@@ -19,6 +19,12 @@ export const isMutationSource = (file) =>
 	!/\.(?:d|test|spec|stories)\.[cm]?[jt]sx?$/.test(file) &&
 	file !== "src/routeTree.gen.ts";
 const isTest = (file) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
+export const isMutationToolInput = (file) =>
+	/^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|turbo\.json)$/.test(
+		file,
+	) ||
+	file.startsWith("patches/") ||
+	/^scripts\/(?:lib\/)?mutation/.test(file);
 
 export function git(root, ...args) {
 	return execFileSync("git", args, {
@@ -86,16 +92,17 @@ export function mutationContext(root, workspace, suite, config) {
 		if (!existsSync(join(root, file))) continue;
 		const inside = file.startsWith(`${workspace}/`),
 			local = inside ? file.slice(workspace.length + 1) : "";
-		const controlled =
-			/^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|turbo\.json)$/.test(
-				file,
-			) ||
-			file.startsWith("patches/") ||
-			/^scripts\/(?:lib\/)?mutation/.test(file);
+		const controlled = isMutationToolInput(file);
 		const dependency = [...dependencies].some((d) => file.startsWith(`${d}/`));
 		if (inside || controlled || dependency) {
 			const entry = [file, digest(readFileSync(join(root, file)))];
-			if (inside && (isMutationSource(local) || isTest(local)))
+			if (
+				inside &&
+				((config.sourceFiles
+					? config.sourceFiles.includes(local)
+					: isMutationSource(local)) ||
+					isTest(local))
+			)
 				inputs.push(entry);
 			else compatibility.push(entry);
 		}
@@ -109,7 +116,7 @@ export function mutationContext(root, workspace, suite, config) {
 			version,
 			workspace,
 			suite,
-			config,
+			config: { ...config, sourceFiles: undefined },
 			compatibility,
 			environment,
 			node: process.version,
@@ -130,6 +137,7 @@ export function mutationContext(root, workspace, suite, config) {
 		config,
 		key,
 		inputDigest: digest(JSON.stringify([key, inputs])),
+		watchRoots: [workspace, ...dependencies],
 		cacheDirectory: join(
 			common,
 			"mutation",

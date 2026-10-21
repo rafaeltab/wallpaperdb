@@ -60,6 +60,7 @@ test coverage != "$CI_TEST_FAILURE"
 					MFLAGS: "",
 					CI_TEST_LOG: log,
 					DOCKER_VALIDATION_LOCK_FILE: join(directory, "host.lock"),
+					DOCKER_VALIDATION_TIMEOUT: "5",
 					CI_TEST_FAILURE: failingStage,
 				},
 			},

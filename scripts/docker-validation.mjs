@@ -15,6 +15,7 @@ const abort = new AbortController();
 let child;
 let interrupted;
 let killer;
+let stopping;
 for (const signal of ["SIGHUP", "SIGINT", "SIGTERM"]) {
 	process.on(signal, () => {
 		interrupted = 128 + constants.signals[signal];
@@ -23,12 +24,14 @@ for (const signal of ["SIGHUP", "SIGINT", "SIGTERM"]) {
 		try {
 			process.kill(-child.pid, signal);
 		} catch {}
-		killer = setTimeout(() => {
-			try {
-				process.kill(-child.pid, "SIGKILL");
-			} catch {}
-		}, 5000);
-		killer.unref();
+		stopping ??= new Promise((resolve) => {
+			killer = setTimeout(() => {
+				try {
+					process.kill(-child.pid, "SIGKILL");
+				} catch {}
+				resolve();
+			}, 5000);
+		});
 	});
 }
 
@@ -83,6 +86,7 @@ try {
 				resolve(interrupted ?? status ?? 128 + constants.signals[signal]),
 			);
 		});
+		await stopping;
 		console.log(
 			`Docker validation waited ${(lease.waitedMs / 1000).toFixed(1)}s; execution ${((Date.now() - start) / 1000).toFixed(1)}s; exit ${result}.`,
 		);
@@ -92,6 +96,7 @@ try {
 	console.error(error.message);
 	process.exitCode = interrupted ?? error.status ?? 1;
 } finally {
+	await stopping;
 	clearTimeout(killer);
 	lease?.release();
 }

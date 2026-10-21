@@ -1,0 +1,83 @@
+{
+  "initialValidation": [
+    {
+      "label": "prototype",
+      "command": [
+        "make",
+        "prototype-redis"
+      ],
+      "status": 0,
+      "elapsedSeconds": 34.51212459098315
+    },
+    {
+      "label": "independent-hashes",
+      "command": [
+        "make",
+        "prototype-redis",
+        "ARGS=-t \"independent hashes\""
+      ],
+      "status": 0,
+      "elapsedSeconds": 4.326596288010478
+    },
+    {
+      "label": "original-redis",
+      "command": [
+        "make",
+        "test-focused",
+        "PACKAGE=test-utils",
+        "ARGS=tests/redis.test.ts"
+      ],
+      "status": 0,
+      "elapsedSeconds": 6.84848496702034
+    },
+    {
+      "label": "make-ci",
+      "command": [
+        "make",
+        "ci"
+      ],
+      "status": 0,
+      "elapsedSeconds": 318.7481334939948
+    }
+  ],
+  "postRebaseCi": {
+    "command": [
+      "make",
+      "ci"
+    ],
+    "status": 0,
+    "reportedSeconds": 249,
+    "successfulTasks": 96,
+    "head": "d2790ee1ae45813b4dadde453e35875d8bd76a10",
+    "base": "9d1dec6b85084bf14c3249c900aaf8bb3e4f3e52"
+  },
+  "sourceIdentity": {
+    "sourceSha256": "2a541481c044c6dace2ff3f915be60c1fae9871efedcad2c1c519d1e03be40d8",
+    "verifiedCommit": "d2790ee1ae45813b4dadde453e35875d8bd76a10",
+    "originalCodeCommit": "1ad72ccb7c440a55a7c605f3128edf9caf156cc6",
+    "runnableTreeUnchangedAfterRestack": true,
+    "reusedSamplesAfterDocumentationOnlyRebase": true
+  },
+  "prototypeTestResult": {
+    "passed": 9,
+    "failed": 0
+  },
+  "selectedHashesResult": {
+    "passed": 1,
+    "failed": 0
+  },
+  "originalRedisResult": {
+    "passed": 12,
+    "skipped": 2,
+    "failed": 0
+  },
+  "unchangedPaths": [
+    ".github",
+    "turbo.json",
+    "packages/test-utils/tests",
+    "packages/test-utils/src",
+    "packages/test-utils/vitest.config.ts",
+    "packages/test-utils/package.json"
+  ],
+  "browserEvidence": "No browser UI. CLI and Redis/Docker assertions validate the fixture."
+}

@@ -1,0 +1,103 @@
+{
+  "baseline": {
+    "samples": 5,
+    "failures": 0,
+    "elapsedMs": 3189.417275,
+    "elapsedWithoutVerificationMs": 2827.1041449999975,
+    "metrics": {
+      "startAttempts": 5,
+      "starts": 5,
+      "stopAttempts": 5,
+      "stops": 5,
+      "startupReadinessMs": 562.4468179999985,
+      "clientSetupMs": 5.685448000000179,
+      "bodyMs": 1026.1598740000009,
+      "scopedCleanupMs": 1.2533349999976053,
+      "verificationMs": 345.73482999999965,
+      "containerCleanupMs": 1224.6264490000012,
+      "clientsClosed": 6,
+      "containersRemoved": 5
+    }
+  },
+  "pilot": {
+    "samples": 5,
+    "failures": 0,
+    "elapsedMs": 1487.4396629999992,
+    "elapsedWithoutVerificationMs": 1406.8936510000003,
+    "metrics": {
+      "startAttempts": 1,
+      "starts": 1,
+      "stopAttempts": 1,
+      "stops": 1,
+      "startupReadinessMs": 104.98007700000016,
+      "clientSetupMs": 3.7646889999978157,
+      "bodyMs": 1028.2658719999981,
+      "scopedCleanupMs": 1.8020270000033634,
+      "verificationMs": 78.28908900000079,
+      "containerCleanupMs": 259.8863220000021,
+      "clientsClosed": 6,
+      "containersRemoved": 1
+    }
+  },
+  "pairs": [
+    {
+      "pair": 1,
+      "order": [
+        "baseline",
+        "pilot"
+      ],
+      "baselineMs": 3197.8083599999995,
+      "pilotMs": 1458.636805,
+      "savingsMs": 1739.1715549999994
+    },
+    {
+      "pair": 2,
+      "order": [
+        "pilot",
+        "baseline"
+      ],
+      "baselineMs": 3223.5923220000004,
+      "pilotMs": 1492.8498130000007,
+      "savingsMs": 1730.7425089999997
+    },
+    {
+      "pair": 3,
+      "order": [
+        "baseline",
+        "pilot"
+      ],
+      "baselineMs": 3160.941062,
+      "pilotMs": 1487.8471580000005,
+      "savingsMs": 1673.0939039999994
+    },
+    {
+      "pair": 4,
+      "order": [
+        "pilot",
+        "baseline"
+      ],
+      "baselineMs": 3189.417275,
+      "pilotMs": 1487.4396629999992,
+      "savingsMs": 1701.9776120000006
+    },
+    {
+      "pair": 5,
+      "order": [
+        "baseline",
+        "pilot"
+      ],
+      "baselineMs": 3132.1645830000016,
+      "pilotMs": 1472.3390139999974,
+      "savingsMs": 1659.8255690000042
+    }
+  ],
+  "elapsedMs": {
+    "savingsMs": 1701.9776120000006,
+    "reductionPercent": 53.36327815556842
+  },
+  "elapsedWithoutVerificationMs": {
+    "savingsMs": 1420.2104939999972,
+    "reductionPercent": 50.2355209132205
+  },
+  "verifiedSourceCommit": "d2790ee1ae45813b4dadde453e35875d8bd76a10"
+}

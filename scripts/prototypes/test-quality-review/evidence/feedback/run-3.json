@@ -1,0 +1,86 @@
+{
+  "repeat": 3,
+  "elapsedMs": 10973,
+  "valid": true,
+  "usage": {
+    "input_tokens": 21257,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 345,
+    "reasoning_output_tokens": 47
+  },
+  "findings": [
+    {
+      "caseId": "C05",
+      "category": "missing-outcome",
+      "title": "Blank-input rejection is untested",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 4,
+        "quote": "test('save accepts', () => { const calls=[]; assert.deepEqual(save(' x ',{write:v=>calls.push(v)}),{tag:'Saved'}); assert.deepEqual(calls,['x']); });"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "Blank input returns Invalid and never calls write."
+      },
+      "failure": "An implementation that writes an empty string and returns Saved for blank input would pass the complete supplied suite.",
+      "correction": "Add a public save test with whitespace-only input that expects Invalid and verifies that write was never called."
+    },
+    {
+      "caseId": "C06",
+      "category": "self-derived",
+      "title": "Pending polling interval has no independent oracle",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 4,
+        "quote": "const expected=poll('pending',false); assert.equal(poll('pending',false),expected);"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "Pending and retrying poll at 5000ms unless writing."
+      },
+      "failure": "Returning false or an incorrect interval consistently for pending while not writing passes this comparison and all surrounding tests.",
+      "correction": "Assert that poll('pending', false) equals the contractual value 5000 directly."
+    }
+  ],
+  "candidateReview": {
+    "findings": [
+      {
+        "caseId": "C05",
+        "category": "missing-outcome",
+        "title": "Blank-input rejection is untested",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "test('save accepts', () => { const calls=[]; assert.deepEqual(save(' x ',{write:v=>calls.push(v)}),{tag:'Saved'}); assert.deepEqual(calls,['x']); });"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Blank input returns Invalid and never calls write."
+        },
+        "failure": "An implementation that writes an empty string and returns Saved for blank input would pass the complete supplied suite.",
+        "correction": "Add a public save test with whitespace-only input that expects Invalid and verifies that write was never called."
+      },
+      {
+        "caseId": "C06",
+        "category": "self-derived",
+        "title": "Pending polling interval has no independent oracle",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "const expected=poll('pending',false); assert.equal(poll('pending',false),expected);"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Pending and retrying poll at 5000ms unless writing."
+        },
+        "failure": "Returning false or an incorrect interval consistently for pending while not writing passes this comparison and all surrounding tests.",
+        "correction": "Assert that poll('pending', false) equals the contractual value 5000 directly."
+      }
+    ]
+  }
+}

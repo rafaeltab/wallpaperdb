@@ -51,6 +51,22 @@ Token usage and measured runtime come from each CLI completion and the parent pr
 
 `evidence/calibration` preserves the earlier, smaller-context three-run experiment and its exact prompt. `pilot-invalid-run.json` records an earlier validator rejection of a legitimate helper citation. That validator was corrected before calibration. Final evaluation adds originating issues 338, 170 and 122 and a scoped cursor production diff; context rounds must not be pooled as repeatability trials or independent findings. Include all model calls in total experiment cost.
 
+## Human feedback and contextual controls
+
+`human-feedback.json` records the requesting user's response to the simplified illustrations. Examples 2 and 8 repeat one concern, so there are eight distinct principle responses. The user supports precise outcomes, separating unrelated scenarios, public-interface assertions, explicit helper inputs, and avoiding redundant wider matrices. The response qualifies round-trip and repeated-call warnings and requires successful and failed input classes to be tested at their appropriate owning boundary. This is human feedback on review usefulness and conditions, not verification of the original repository findings; `judgments.json` and human precision remain unchanged.
+
+The revised rubric must inspect surrounding independent encode/decode tests before criticizing a round trip. It permits explicit repeatability/idempotency invariants and comparison of generated POST input with a GET result. Business input matrices belong at their narrow public unit/capability/workflow owner. Wider tests cover their distinct translation/infrastructure/lifecycle guarantees and failures. This does not require reproducing the full business matrix at every integration boundary.
+
+`feedback-packet.json` freezes four additional clean controls: an independently checked encoder/decoder plus round trip, an explicitly stable opaque key, generated input preserved through POST/GET, and uppercase/lowercase successes plus failed input classes at a narrow policy with focused wider outcome translation. Two original seeded defects remain to check that exceptions do not hide missing failures or a circular expectation. Packet-local grading metadata is withheld from the reviewer prompt. Historical evidence retains its original prompt; the revised rubric is evaluated separately.
+
+```sh
+make run PACKAGE=scripts SCRIPT=prototype:test-quality ARGS='controls --packet prototypes/test-quality-review/feedback-packet.json'
+make run PACKAGE=scripts SCRIPT=prototype:test-quality ARGS='run --live --packet prototypes/test-quality-review/feedback-packet.json --out /tmp/test-quality-feedback-new --repeats 3'
+make run PACKAGE=scripts SCRIPT=prototype:test-quality ARGS='report --packet prototypes/test-quality-review/feedback-packet.json --out prototypes/test-quality-review/evidence/feedback'
+```
+
+Pass `--packet` when reporting the follow-up set so its own two seeded defects and four controls determine the denominators. Do not pool the follow-up runs with the original runs for repeatability or independent precision. Decisions about numeric readability warnings are still open.
+
 ## Limits and adoption decisions
 
 The seeds are conspicuous and the wider-boundary wrapper is synthetic. The three real suites are existing snapshots with selected historical changes, not a representative sample of live PRs. Requirements from large originating issues are explicitly scoped to the selected owner; other modules and system outcomes are outside each case. Source analysis uses coding standards as its contract, with related issue context rather than a recovered original standalone tooling spec.

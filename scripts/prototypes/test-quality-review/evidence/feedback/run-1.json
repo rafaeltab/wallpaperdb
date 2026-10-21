@@ -1,0 +1,86 @@
+{
+  "repeat": 1,
+  "elapsedMs": 9098,
+  "valid": true,
+  "usage": {
+    "input_tokens": 21259,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 286,
+    "reasoning_output_tokens": 32
+  },
+  "findings": [
+    {
+      "caseId": "C05",
+      "category": "missing-outcome",
+      "title": "Blank-input rejection is untested",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 4,
+        "quote": "test('save accepts'"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "Blank input returns Invalid and never calls write."
+      },
+      "failure": "An implementation that writes blank values and returns Saved would pass the supplied suite.",
+      "correction": "Add a public save test with whitespace-only input that asserts Invalid and no write calls."
+    },
+    {
+      "caseId": "C06",
+      "category": "self-derived",
+      "title": "Pending interval uses itself as the expected value",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 4,
+        "quote": "const expected=poll('pending',false); assert.equal(poll('pending',false),expected);"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "Pending and retrying poll at 5000ms unless writing."
+      },
+      "failure": "Returning false or an incorrect interval consistently for pending while not writing passes this test and every other supplied assertion.",
+      "correction": "Assert that poll('pending', false) equals the independent contractual value 5000."
+    }
+  ],
+  "candidateReview": {
+    "findings": [
+      {
+        "caseId": "C05",
+        "category": "missing-outcome",
+        "title": "Blank-input rejection is untested",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "test('save accepts'"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Blank input returns Invalid and never calls write."
+        },
+        "failure": "An implementation that writes blank values and returns Saved would pass the supplied suite.",
+        "correction": "Add a public save test with whitespace-only input that asserts Invalid and no write calls."
+      },
+      {
+        "caseId": "C06",
+        "category": "self-derived",
+        "title": "Pending interval uses itself as the expected value",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "const expected=poll('pending',false); assert.equal(poll('pending',false),expected);"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Pending and retrying poll at 5000ms unless writing."
+        },
+        "failure": "Returning false or an incorrect interval consistently for pending while not writing passes this test and every other supplied assertion.",
+        "correction": "Assert that poll('pending', false) equals the independent contractual value 5000."
+      }
+    ]
+  }
+}

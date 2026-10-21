@@ -1,0 +1,10 @@
+{
+  "originalModelCalls": 7,
+  "feedbackModelCalls": 3,
+  "totalModelCalls": 10,
+  "totalElapsedMs": 341906,
+  "totalInputTokens": 347471,
+  "totalOutputTokens": 12602,
+  "dollarCharge": null,
+  "humanFeedbackScope": "Eight illustrated principles, including conditional feedback; no repository-specific precision measurement."
+}

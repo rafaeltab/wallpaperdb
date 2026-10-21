@@ -1,0 +1,115 @@
+{
+  "uniqueFindings": [
+    {
+      "key": "C05/missing-outcome",
+      "finding": {
+        "caseId": "C05",
+        "category": "missing-outcome",
+        "title": "Blank-input rejection is untested",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "test('save accepts'"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Blank input returns Invalid and never calls write."
+        },
+        "failure": "An implementation that writes blank values and returns Saved would pass the supplied suite.",
+        "correction": "Add a public save test with whitespace-only input that asserts Invalid and no write calls."
+      },
+      "runs": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "key": "C06/self-derived",
+      "finding": {
+        "caseId": "C06",
+        "category": "self-derived",
+        "title": "Pending interval uses itself as the expected value",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "const expected=poll('pending',false); assert.equal(poll('pending',false),expected);"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Pending and retrying poll at 5000ms unless writing."
+        },
+        "failure": "Returning false or an incorrect interval consistently for pending while not writing passes this test and every other supplied assertion.",
+        "correction": "Assert that poll('pending', false) equals the independent contractual value 5000."
+      },
+      "runs": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "humanJudged": 0,
+  "actionable": 0,
+  "falsePositives": 0,
+  "humanPrecision": null,
+  "thresholdValidated": false,
+  "pending": 2,
+  "pairwiseJaccard": [
+    1,
+    1,
+    1
+  ],
+  "seedOpportunities": 6,
+  "seedMisses": 0,
+  "cleanControlOpportunities": 12,
+  "cleanControlFlagCount": 0,
+  "seedDetection": [
+    {
+      "id": "C05",
+      "expected": "missing-outcome",
+      "detectedRuns": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "C06",
+      "expected": "self-derived",
+      "detectedRuns": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "cleanControlFlags": [
+    {
+      "id": "C14",
+      "flaggedRuns": []
+    },
+    {
+      "id": "C15",
+      "flaggedRuns": []
+    },
+    {
+      "id": "C16",
+      "flaggedRuns": []
+    },
+    {
+      "id": "C17",
+      "flaggedRuns": []
+    }
+  ],
+  "totalMs": 33209,
+  "tokens": {
+    "input_tokens": 63775,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 968,
+    "reasoning_output_tokens": 129
+  }
+}

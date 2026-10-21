@@ -8,11 +8,74 @@ import {
 
 type Api = { source: string; name: string; members: string[] };
 const testNames = new Set(["expect", "it", "test", "describe", "suite"]);
-const testSources = new Set(["vitest", "@playwright/test", "playwright/test"]);
+const testSources = new Set([
+	"vitest",
+	"@effect/vitest",
+	"@playwright/test",
+	"playwright/test",
+]);
 
 function literal(text: string | undefined): string | undefined {
 	if (!text) return undefined;
 	return /^(['"]).*\1$/.test(text) ? text.slice(1, -1) : text;
+}
+
+function taskContextApi(
+	declaration: AnyJsAstNode,
+	model: SemanticModel,
+	seen: Set<string>,
+): Api | undefined {
+	const parameter = declaration
+		.ancestors()
+		.find((n) => n.kind === "JS_FORMAL_PARAMETER");
+	const fn = declaration
+		.ancestors()
+		.find(
+			(n) =>
+				n.kind === "JS_ARROW_FUNCTION_EXPRESSION" ||
+				n.kind === "JS_FUNCTION_EXPRESSION",
+		);
+	if (!fn || !("parameters" in fn) || !fn.parameters) return undefined;
+	const call = fn.parent?.parent?.parent;
+	if (
+		call?.kind !== "JS_CALL_EXPRESSION" ||
+		call.arguments?.args.at(-1)?.text !== fn.text
+	)
+		return undefined;
+	const registration = resolveApi(call.callee, model, seen);
+	if (
+		!registration ||
+		!["vitest", "@effect/vitest", "global"].includes(registration.source) ||
+		!["it", "test"].includes(registration.name) ||
+		registration.members.includes("each")
+	)
+		return undefined;
+	const index =
+		fn.parameters.kind === "JS_PARAMETERS"
+			? fn.parameters.items.findIndex((p) => p.text === parameter?.text)
+			: fn.parameters.text === declaration.text
+				? 0
+				: -1;
+	if (index !== (registration.members.includes("for") ? 1 : 0))
+		return undefined;
+	const parent = declaration.parent;
+	if (
+		fn.parameters.kind === "JS_IDENTIFIER_BINDING" ||
+		(parameter?.kind === "JS_FORMAL_PARAMETER" &&
+			parameter.binding?.kind === "JS_IDENTIFIER_BINDING")
+	)
+		return { source: registration.source, name: "<context>", members: [] };
+	if (
+		parent?.kind === "JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY" &&
+		declaration.text === "expect"
+	)
+		return { source: registration.source, name: "expect", members: [] };
+	if (
+		parent?.kind === "JS_OBJECT_BINDING_PATTERN_PROPERTY" &&
+		literal(parent.member?.text) === "expect"
+	)
+		return { source: registration.source, name: "expect", members: [] };
+	return undefined;
 }
 
 function resolveApi(
@@ -41,6 +104,8 @@ function resolveApi(
 						: undefined
 					: literal(node.member?.text);
 			if (!api || !member) return undefined;
+			if (api.name === "<context>")
+				return member === "expect" ? { ...api, name: "expect" } : undefined;
 			return api.name === "*"
 				? { ...api, name: member }
 				: { ...api, members: [...api.members, member] };
@@ -59,6 +124,8 @@ function resolveApi(
 			if (seen.has(key)) return undefined;
 			seen.add(key);
 			const parent = declaration.parent;
+			const contextApi = taskContextApi(declaration, model, seen);
+			if (contextApi) return contextApi;
 			if (parent?.kind === "JS_VARIABLE_DECLARATOR")
 				return resolveApi(parent.initializer?.expression, model, seen);
 			const clause = declaration
@@ -187,7 +254,7 @@ export const noTestRetries = defineRule({
 		const api = resolveApi(node.callee, context.model);
 		if (
 			!api ||
-			!["vitest", "global"].includes(api.source) ||
+			!["vitest", "@effect/vitest", "global"].includes(api.source) ||
 			!["it", "test", "describe", "suite"].includes(api.name)
 		)
 			return;

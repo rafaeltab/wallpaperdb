@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { controls, header, source } from "./controls.mjs";
 import { eslintChecks } from "./static-checks.mjs";
+import { summarize } from "./analysis.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const repo = path.resolve(here, "../..");
@@ -144,6 +145,7 @@ function biomeChecks(files, scratch, artifacts) {
 }
 
 export async function runExperiment({ controlsOnly }) {
+	const started = performance.now();
 	const scratch = fs.mkdtempSync(path.join(here, ".prototype-run-"));
 	const artifacts = fs.mkdtempSync(
 		path.join(os.tmpdir(), "wallpaperdb-assertions-415-"),
@@ -307,6 +309,8 @@ export async function runExperiment({ controlsOnly }) {
 				report.real.push({ workspace, preparation, runs });
 			}
 		}
+		report.summary = summarize(report, repo);
+		report.totalMs = Math.round(performance.now() - started);
 		write(path.join(artifacts, "report.json"), report);
 		return report;
 	} finally {

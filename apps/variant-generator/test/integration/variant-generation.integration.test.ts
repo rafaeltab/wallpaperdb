@@ -164,7 +164,7 @@ describe('variant generation composition', () => {
         { target: '480x854', width: 480, height: 853 },
       ];
       for (const dimensions of expected) {
-        let publication;
+        let publication: ReturnType<typeof WallpaperVariantUploadedEventSchema.parse>;
         do {
           const message = await consumer.next({ expires: 10000 });
           if (!message) throw new Error('Missing oriented variant publication');

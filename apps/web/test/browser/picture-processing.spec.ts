@@ -203,7 +203,7 @@ it.each(['worker', 'fallback'])('fits excessive frame rates without trimming ela
 it.each(['worker', 'fallback'])('reports impossible fitting and keeps the source retryable with the real %s codec', async (mode) => {
   if (mode === 'fallback') vi.stubGlobal('Worker', undefined);
   const controller = new AbortController();
-  let source;
+  let source: Awaited<ReturnType<typeof openPictureSource>> | undefined;
   try {
     source = await openPictureSource(await fixture('profile-fitting.gif'), controller.signal, resolvedLimits);
     const crop = initialPictureCrop(source);
@@ -222,7 +222,7 @@ it.each(['worker', 'fallback'])('cancels an observed pending fitting job and rel
   let releaseEncode = () => {};
   const started = new Promise<void>((resolve) => { notifyStarted = resolve; });
   const release = new Promise<void>((resolve) => { releaseEncode = resolve; });
-  let source;
+  let source: Awaited<ReturnType<typeof openPictureSource>> | undefined;
   try {
     source = await openPictureSource(await fixture('profile-fitting.gif'), controller.signal, resolvedLimits);
     if (mode === 'worker') {

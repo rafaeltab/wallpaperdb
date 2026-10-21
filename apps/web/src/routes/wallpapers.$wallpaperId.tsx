@@ -248,7 +248,7 @@ function WallpaperDetailContent({ wallpaperId }: { wallpaperId: string }) {
 
                     return (
                       <DropdownMenuItem
-                        key={`${variant.url}-${index}`}
+                        key={variant.url}
                         onClick={() => handleDownloadVariant(index)}
                       >
                         <div className="flex w-full items-center justify-between gap-3">

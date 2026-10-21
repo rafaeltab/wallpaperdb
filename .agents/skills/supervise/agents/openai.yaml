@@ -1,0 +1,5 @@
+interface:
+  display_name: "Supervise"
+  short_description: "Supervise T3 conversations through verified results"
+policy:
+  allow_implicit_invocation: false

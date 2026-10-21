@@ -262,6 +262,10 @@
     1,
     1
   ],
+  "seedOpportunities": 18,
+  "seedMisses": 0,
+  "cleanControlOpportunities": 9,
+  "cleanControlFlagCount": 0,
   "seedDetection": [
     {
       "id": "C05",

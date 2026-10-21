@@ -124,6 +124,30 @@ export function summarize(runs, judgments, truth = []) {
 		thresholdValidated: false,
 		pending: unique.size - human.length,
 		pairwiseJaccard: pairs,
+		seedOpportunities: truth.filter((c) => c.expected).length * runs.length,
+		seedMisses: truth
+			.filter((c) => c.expected)
+			.reduce(
+				(sum, c) =>
+					sum +
+					runs.filter(
+						(r) =>
+							!r.findings.some(
+								(f) => f.caseId === c.id && f.category === c.expected,
+							),
+					).length,
+				0,
+			),
+		cleanControlOpportunities:
+			truth.filter((c) => c.clean).length * runs.length,
+		cleanControlFlagCount: truth
+			.filter((c) => c.clean)
+			.reduce(
+				(sum, c) =>
+					sum +
+					runs.filter((r) => r.findings.some((f) => f.caseId === c.id)).length,
+				0,
+			),
 		seedDetection: truth
 			.filter((c) => c.expected)
 			.map((c) => ({

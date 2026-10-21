@@ -202,3 +202,22 @@ test("agent judgments cannot masquerade as human judgments", () => {
 		null,
 	);
 });
+
+test("metrics count seeded misses and clean-control flags by independent case and run", () => {
+	const result = summarize(
+		[
+			{ findings: [finding], elapsedMs: 1, usage: {} },
+			{ findings: [], elapsedMs: 1, usage: {} },
+		],
+		[],
+		[
+			{ id: "C1", expected: "self-derived" },
+			{ id: "C2", expected: "hidden-helper" },
+			{ id: "C1", clean: true },
+		],
+	);
+	assert.equal(result.seedOpportunities, 4);
+	assert.equal(result.seedMisses, 3);
+	assert.equal(result.cleanControlOpportunities, 2);
+	assert.equal(result.cleanControlFlagCount, 1);
+});

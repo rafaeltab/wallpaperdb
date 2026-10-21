@@ -64,6 +64,8 @@ Publish the approved tickets. **How** depends on the tracker `/setup-matt-pocock
 
 Work the **frontier**: any ticket whose blockers are all done. For a purely linear chain that means top to bottom.
 
+For GitHub tickets, follow the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) to verify each new child's membership and `Planned` after publishing and linking it. The status records its agreed plan; its blockers still govern implementation readiness.
+
 Do NOT close or modify any parent issue.
 
 <local-ticket-template>

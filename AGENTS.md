@@ -6,7 +6,7 @@ Use the [coding guidelines index](CODING_STANDARDS.md) to select the authoritati
 
 ### Issue tracker
 
-Issues and specs are tracked in GitHub Issues; external pull requests are not a triage surface. See `docs/agents/issue-tracker.md`.
+Issues and specs are tracked in GitHub Issues, with membership and lifecycle status in the WallpaperDB GitHub Project. Read `docs/agents/issue-tracker.md` when creating, planning, implementing, reopening, or reviewing issue work. External pull requests are not a triage surface.
 
 ### Triage labels
 

@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateReview, summarize } from "./protocol.mjs";
+import { hash, validateReview, summarize } from "./protocol.mjs";
 
 test("offline corpus controls execute green and the live runner requires explicit opt-in", () => {
 	const cli = fileURLToPath(new URL("./cli.mjs", import.meta.url));
@@ -37,7 +37,13 @@ test("feedback controls execute and report grades only the declared packet cases
 	assert.match(offline.stdout, /6 seed suites passed/);
 	const out = mkdtempSync(join(tmpdir(), "feedback-report-"));
 	try {
-		writeFileSync(join(out, "manifest.json"), JSON.stringify({ repeats: 1 }));
+		writeFileSync(
+			join(out, "manifest.json"),
+			JSON.stringify({
+				repeats: 1,
+				packetSha256: hash(readFileSync(packetPath)),
+			}),
+		);
 		writeFileSync(
 			join(out, "run-1.json"),
 			JSON.stringify({ valid: true, findings: [], elapsedMs: 1, usage: {} }),
@@ -52,6 +58,13 @@ test("feedback controls execute and report grades only the declared packet cases
 		assert.equal(summary.seedOpportunities, 2);
 		assert.equal(summary.seedMisses, 2);
 		assert.equal(summary.cleanControlOpportunities, 4);
+		const wrongPacket = spawnSync(
+			process.execPath,
+			[cli, "report", "--out", out],
+			{ encoding: "utf8", timeout: 5000 },
+		);
+		assert.notEqual(wrongPacket.status, 0);
+		assert.match(wrongPacket.stderr, /Packet does not match/);
 	} finally {
 		rmSync(out, { recursive: true, force: true });
 	}

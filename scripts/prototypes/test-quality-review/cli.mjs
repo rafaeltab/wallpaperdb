@@ -222,6 +222,8 @@ try {
 		);
 		const packet = load(packetPath);
 		const caseIds = new Set(packet.cases.map((c) => c.id));
+		if (hash(readFileSync(packetPath)) !== manifest.packetSha256)
+			throw new Error("Packet does not match the evaluation manifest");
 		const evaluationTruth = (packet.evaluationTruth ?? truth).filter((c) =>
 			caseIds.has(c.id),
 		);

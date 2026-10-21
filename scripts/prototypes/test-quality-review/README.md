@@ -65,7 +65,7 @@ make run PACKAGE=scripts SCRIPT=prototype:test-quality ARGS='run --live --packet
 make run PACKAGE=scripts SCRIPT=prototype:test-quality ARGS='report --packet prototypes/test-quality-review/feedback-packet.json --out prototypes/test-quality-review/evidence/feedback'
 ```
 
-Pass `--packet` when reporting the follow-up set so its own two seeded defects and four controls determine the denominators. Do not pool the follow-up runs with the original runs for repeatability or independent precision. Decisions about numeric readability warnings are still open.
+Pass `--packet` when reporting the follow-up set so its own two seeded defects and four controls determine the denominators. Reports reject a packet whose byte hash differs from the run's manifest. Keep the frozen packet unchanged. Do not pool the follow-up runs with the original runs for repeatability or independent precision. Decisions about numeric readability warnings are still open.
 
 ## Limits and adoption decisions
 

@@ -21,6 +21,37 @@ test("incomplete expect calls fail, including accidental two-argument assertions
 		);
 });
 
+test("assertion wrappers preserve valid matchers", () => {
+	for (const expression of [
+		"(expect(1)).toBe(1)",
+		"((expect(1))).not.toBe(2)",
+		"(expect(1) as ReturnType<typeof expect>).toBe(1)",
+		"(expect(1) satisfies ReturnType<typeof expect>).toBe(1)",
+		"expect(1)!.toBe(1)",
+	])
+		assert.deepEqual(
+			lint(`import { expect } from 'vitest'; ${expression};`),
+			[],
+			expression,
+		);
+});
+
+test("assertion modifiers require a real matcher", () => {
+	for (const expression of [
+		"expect(1).not()",
+		"expect(Promise.resolve(1)).resolves()",
+		"expect(Promise.reject(1)).rejects()",
+		"expect(1).not.not()",
+		"(expect(1)).not()",
+	])
+		assert.ok(
+			lint(`import { expect } from 'vitest'; ${expression};`).some((d) =>
+				d.message.includes("Complete the assertion"),
+			),
+			expression,
+		);
+});
+
 test("assertion validation follows imported and local aliases without matching unrelated functions", () => {
 	for (const source of [
 		"import { expect as check } from 'vitest'; check(1, 2);",

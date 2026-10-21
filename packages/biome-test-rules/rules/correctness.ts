@@ -15,6 +15,7 @@ const testSources = new Set([
 	"playwright/test",
 	"effect",
 	"effect/Effect",
+	"node:test",
 ]);
 
 function literal(text: string | undefined): string | undefined {
@@ -137,6 +138,7 @@ function resolveApi(
 						"JS_IMPORT_NAMED_CLAUSE",
 						"JS_IMPORT_NAMESPACE_CLAUSE",
 						"JS_IMPORT_COMBINED_CLAUSE",
+						"JS_IMPORT_DEFAULT_CLAUSE",
 					].includes(n.kind),
 				);
 			if (!clause || !("source" in clause)) return undefined;
@@ -145,9 +147,12 @@ function resolveApi(
 			const name =
 				parent?.kind === "JS_NAMESPACE_IMPORT_SPECIFIER"
 					? "*"
-					: parent?.kind === "JS_NAMED_IMPORT_SPECIFIER"
-						? literal(parent.name?.text)
-						: declaration.text;
+					: parent?.kind === "JS_DEFAULT_IMPORT_SPECIFIER" &&
+							source === "node:test"
+						? "test"
+						: parent?.kind === "JS_NAMED_IMPORT_SPECIFIER"
+							? literal(parent.name?.text)
+							: declaration.text;
 			return name ? { source, name, members: [] } : undefined;
 		}
 		default:
@@ -290,6 +295,33 @@ export const noTodoTests = defineRule({
 	},
 });
 
+export const noAliasedTestModifiers = defineRule({
+	query: semantic("JS_CALL_EXPRESSION"),
+	run(node, context) {
+		const api = resolveApi(node.callee, context.model);
+		if (
+			!api ||
+			!["it", "test", "describe", "suite"].includes(api.name) ||
+			!api.members.some((member) => ["only", "skip"].includes(member))
+		)
+			return;
+		const callee = node.callee;
+		// Biome's built-ins cover direct registrations, including their existing
+		// issue-linked suppressions. Fill aliases and namespace chains here.
+		if (
+			callee?.kind === "JS_STATIC_MEMBER_EXPRESSION" &&
+			callee.object?.kind === "JS_IDENTIFIER_EXPRESSION" &&
+			["it", "test", "describe", "suite"].includes(callee.object.text)
+		)
+			return;
+		registerDiagnostic(
+			node,
+			"error",
+			"Do not focus or disable tests through registration aliases.",
+		);
+	},
+});
+
 function handled(
 	node: AnyJsAstNode,
 	model: SemanticModel,
@@ -417,8 +449,7 @@ export const awaitAsyncAssertions = defineRule({
 	run(node, context) {
 		const api = resolveApi(node.callee, context.model);
 		if (
-			!api ||
-			api.name !== "expect" ||
+			api?.name !== "expect" ||
 			!["vitest", "@effect/vitest", "global"].includes(api.source)
 		)
 			return;

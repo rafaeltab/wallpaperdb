@@ -8,6 +8,8 @@
 		"wallpaperdb-crap": "./crap.mts"
 	},
 	"scripts": {
+		"prototype:completeness": "node prototypes/test-completeness/pilot.mjs",
+		"prototype:completeness:controls": "node --test prototypes/test-completeness/*.test.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:unit": "cd .. && node --test scripts/*.test.mjs scripts/lib/*.test.mjs && scripts/node_modules/.bin/vitest run scripts/ci-runner.test.ts scripts/lib/env-pipeline.test.ts --maxWorkers=1 --no-file-parallelism",

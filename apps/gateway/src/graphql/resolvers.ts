@@ -13,10 +13,10 @@ import type {
   Wallpaper,
 } from '../capabilities/catalogue/index.js';
 
-export interface MediaUrls {
-  mediaServiceUrl: string;
-  mediaPublicBaseUrl?: string;
-  mediaPublicPath: string;
+export interface AssetUrls {
+  assetServiceUrl: string;
+  assetPublicBaseUrl?: string;
+  assetPublicPath: string;
 }
 interface GraphqlContext {
   reply?: { request?: { headers: IncomingHttpHeaders; gatewaySignal?: AbortSignal } };
@@ -213,7 +213,7 @@ const searchQuery = Effect.fn('graphql.searchWallpapers')(function* (input: Sear
 export class GraphqlAdapter {
   constructor(
     private readonly execution: HttpExecution['Service'],
-    private readonly media: MediaUrls
+    private readonly asset: AssetUrls
   ) {}
   resolvers() {
     return {
@@ -269,7 +269,7 @@ export class GraphqlAdapter {
           profile.pictureAssetId
             ? {
                 id: profile.pictureAssetId,
-                url: `${this.mediaBase(context)}/profile-pictures/${profile.pictureAssetId}`,
+                url: `${this.assetBase(context)}/profile-pictures/${profile.pictureAssetId}`,
               }
             : null,
         wallpapers: async (profile: ProfileView, args: unknown, context: GraphqlContext) =>
@@ -278,7 +278,7 @@ export class GraphqlAdapter {
       Wallpaper: { userId: (wallpaper: WallpaperView) => wallpaper.profileId },
       Variant: {
         url: (variant: VariantView, _args: unknown, context: GraphqlContext) =>
-          `${this.mediaBase(context)}/wallpapers/${variant.wallpaperId}?w=${variant.width}&h=${variant.height}&format=${variant.format}`,
+          `${this.assetBase(context)}/wallpapers/${variant.wallpaperId}?w=${variant.width}&h=${variant.height}&format=${variant.format}`,
       },
     };
   }
@@ -320,13 +320,13 @@ export class GraphqlAdapter {
   private search(input: SearchWallpapers, context?: GraphqlContext) {
     return this.run(searchQuery(input), context).then(searchValue);
   }
-  private mediaBase(context?: GraphqlContext): string {
-    if (this.media.mediaPublicBaseUrl) return trimTrailingSlash(this.media.mediaPublicBaseUrl);
+  private assetBase(context?: GraphqlContext): string {
+    if (this.asset.assetPublicBaseUrl) return trimTrailingSlash(this.asset.assetPublicBaseUrl);
     const origin = requestOrigin(context);
-    if (!origin) return trimTrailingSlash(this.media.mediaServiceUrl);
-    const path = this.media.mediaPublicPath.startsWith('/')
-      ? this.media.mediaPublicPath
-      : `/${this.media.mediaPublicPath}`;
+    if (!origin) return trimTrailingSlash(this.asset.assetServiceUrl);
+    const path = this.asset.assetPublicPath.startsWith('/')
+      ? this.asset.assetPublicPath
+      : `/${this.asset.assetPublicPath}`;
     return `${origin}${trimTrailingSlash(path)}`;
   }
 }

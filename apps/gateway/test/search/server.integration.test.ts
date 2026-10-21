@@ -56,7 +56,7 @@ describe('Gateway bootstrap and deployed artifact', () => {
       NATS_STREAM: 'WALLPAPER',
       REDIS_ENABLED: 'false',
       RATE_LIMIT_ENABLED: 'false',
-      MEDIA_SERVICE_URL: 'http://media.example.test',
+      ASSET_SERVICE_URL: 'http://asset.example.test',
       CURSOR_SECRET: 'gateway-bootstrap-test-secret-over-32-characters',
     };
   }

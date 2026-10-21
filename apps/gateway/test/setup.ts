@@ -38,7 +38,7 @@ export function createGatewayTester(
           OPENSEARCH_PROFILE_INDEX: search.options.profileIndex,
           NATS_URL: broker.nats.config.endpoints.fromHost,
           REDIS_ENABLED: 'false',
-          MEDIA_SERVICE_URL: 'http://media.example.test',
+          ASSET_SERVICE_URL: 'http://asset.example.test',
           CURSOR_SECRET: 'gateway-test-secret-at-least-thirty-two-characters',
         }),
         ...options.configOverrides,

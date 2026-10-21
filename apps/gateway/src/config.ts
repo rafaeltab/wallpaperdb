@@ -108,12 +108,12 @@ export const gatewayConfig = Effect.gen(function* () {
     otelServiceName: Configuration.NonEmptyString('OTEL_SERVICE_NAME').pipe(
       Configuration.withDefault('gateway')
     ),
-    mediaServiceUrl: Configuration.schema(urlString, 'MEDIA_SERVICE_URL'),
-    mediaPublicBaseUrl: optional(
-      Configuration.schema(Schema.Union([Schema.Literal(''), urlString]), 'MEDIA_PUBLIC_BASE_URL')
+    assetServiceUrl: Configuration.schema(urlString, 'ASSET_SERVICE_URL'),
+    assetPublicBaseUrl: optional(
+      Configuration.schema(Schema.Union([Schema.Literal(''), urlString]), 'ASSET_PUBLIC_BASE_URL')
     ).pipe(Configuration.map((value) => value || undefined)),
-    mediaPublicPath: Configuration.NonEmptyString('MEDIA_PUBLIC_PATH').pipe(
-      Configuration.withDefault('/media')
+    assetPublicPath: Configuration.NonEmptyString('ASSET_PUBLIC_PATH').pipe(
+      Configuration.withDefault('/asset')
     ),
     graphqlDeadlineMs: positive('GRAPHQL_DEADLINE_MS', 5000),
     graphqlMaxActive: positive('GRAPHQL_MAX_ACTIVE', 32),

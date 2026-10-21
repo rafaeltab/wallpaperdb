@@ -22,7 +22,7 @@ import type {
   SearchWallpapers,
   Wallpaper,
 } from '../src/capabilities/catalogue/index.js';
-import { createGraphql, type MediaUrls } from '../src/graphql/index.js';
+import { createGraphql, type AssetUrls } from '../src/graphql/index.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
 const wallpaper: Wallpaper = {
@@ -110,7 +110,7 @@ const applications: Array<ReturnType<typeof Fastify>> = [];
 afterEach(async () => {
   await Promise.all(applications.splice(0).map((app) => app.close()));
 });
-async function setup(media: Partial<MediaUrls> = {}) {
+async function setup(asset: Partial<AssetUrls> = {}) {
   const inbound = new Inbound();
   const app = Fastify();
   applications.push(app);
@@ -120,9 +120,9 @@ async function setup(media: Partial<MediaUrls> = {}) {
   app.addHook('onClose', () => runtime.dispose());
   const execution = await runtime.runPromise(HttpExecution);
   const graphql = createGraphql(execution, {
-    mediaServiceUrl: 'http://media:3000/',
-    mediaPublicPath: '/media',
-    ...media,
+    assetServiceUrl: 'http://asset:3000/',
+    assetPublicPath: '/asset',
+    ...asset,
   });
   await app.register(mercurius, { ...graphql });
   await app.ready();
@@ -301,7 +301,7 @@ describe('GraphQL driving adapter contract', () => {
       input: { profileId: 'legacy', last: 3, before: 'before', variants: { width: undefined } },
     });
   });
-  it('returns every public wallpaper and variant field and builds the fallback media URL', async () => {
+  it('returns every public wallpaper and variant field and builds the fallback asset URL', async () => {
     const { query, inbound } = await setup();
     const response = await query(
       `{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId profileId userId uploadedAt updatedAt variants{width height aspectRatio format fileSizeBytes createdAt url}}}`
@@ -312,33 +312,33 @@ describe('GraphQL driving adapter contract', () => {
       variants: [
         {
           ...wallpaper.variants[0],
-          url: 'http://media:3000/wallpapers/wlpr_a?w=1920&h=1080&format=image/webp',
+          url: 'http://asset:3000/wallpapers/wlpr_a?w=1920&h=1080&format=image/webp',
         },
       ],
     });
     expect(inbound.calls).toEqual([{ operation: 'wallpaper', input: 'wlpr_a' }]);
   });
   it.each([
-    [{ origin: 'https://public.example' }, 'https://public.example/media'],
+    [{ origin: 'https://public.example' }, 'https://public.example/asset'],
     [
       { 'x-forwarded-proto': 'https, http', 'x-forwarded-host': 'proxy.example, internal' },
-      'https://proxy.example/media',
+      'https://proxy.example/asset',
     ],
-    [{ origin: 'invalid' }, 'http://media:3000'],
-    [{ origin: 'ftp://public.example' }, 'http://media:3000'],
-    [{ origin: 'https://public.example/path' }, 'http://media:3000'],
-    [{ 'x-forwarded-proto': 'https' }, 'http://media:3000'],
-    [{ 'x-forwarded-proto': 'ftp', 'x-forwarded-host': 'proxy.example' }, 'http://media:3000'],
-    [{ 'x-forwarded-proto': ',', 'x-forwarded-host': ',' }, 'http://media:3000'],
-  ])('resolves media URLs from parsed request headers %j', async (headers, base) => {
+    [{ origin: 'invalid' }, 'http://asset:3000'],
+    [{ origin: 'ftp://public.example' }, 'http://asset:3000'],
+    [{ origin: 'https://public.example/path' }, 'http://asset:3000'],
+    [{ 'x-forwarded-proto': 'https' }, 'http://asset:3000'],
+    [{ 'x-forwarded-proto': 'ftp', 'x-forwarded-host': 'proxy.example' }, 'http://asset:3000'],
+    [{ 'x-forwarded-proto': ',', 'x-forwarded-host': ',' }, 'http://asset:3000'],
+  ])('resolves asset URLs from parsed request headers %j', async (headers, base) => {
     const { query } = await setup();
     const response = await query('{getWallpaper(wallpaperId:"wlpr_a"){variants{url}}}', headers);
     expect(response.body.data.getWallpaper.variants[0].url).toBe(
       `${base}/wallpapers/wlpr_a?w=1920&h=1080&format=image/webp`
     );
   });
-  it('prioritizes configured public media URL and normalizes its trailing slash', async () => {
-    const { query } = await setup({ mediaPublicBaseUrl: 'https://cdn.example/assets///' });
+  it('prioritizes configured public asset URL and normalizes its trailing slash', async () => {
+    const { query } = await setup({ assetPublicBaseUrl: 'https://cdn.example/assets///' });
     const response = await query('{getWallpaper(wallpaperId:"wlpr_a"){variants{url}}}', {
       origin: 'https://ignored.example',
     });
@@ -346,8 +346,8 @@ describe('GraphQL driving adapter contract', () => {
       'https://cdn.example/assets/wallpapers/'
     );
   });
-  it('normalizes a relative public media path', async () => {
-    const { query } = await setup({ mediaPublicPath: 'images/' });
+  it('normalizes a relative public asset path', async () => {
+    const { query } = await setup({ assetPublicPath: 'images/' });
     const response = await query('{getWallpaper(wallpaperId:"wlpr_a"){variants{url}}}', {
       origin: 'https://public.example',
     });
@@ -368,7 +368,7 @@ describe('GraphQL driving adapter contract', () => {
       createdAt: timestamp,
     };
     expect(graphql.resolvers.Variant.url(parent, {}, {})).toContain(
-      'http://media:3000/wallpapers/'
+      'http://asset:3000/wallpapers/'
     );
     expect(
       graphql.resolvers.Variant.url(
@@ -385,7 +385,7 @@ describe('GraphQL driving adapter contract', () => {
           },
         }
       )
-    ).toContain('https://first.example/media/wallpapers/');
+    ).toContain('https://first.example/asset/wallpapers/');
   });
   it('returns Profiles by ID and Handle, public picture and canonical path', async () => {
     const { query, inbound } = await setup();
@@ -401,7 +401,7 @@ describe('GraphQL driving adapter contract', () => {
       createdAt: timestamp,
       updatedAt: timestamp,
       canonicalPath: '/profiles/@artist',
-      picture: { id: 'picture_a', url: 'http://media:3000/profile-pictures/picture_a' },
+      picture: { id: 'picture_a', url: 'http://asset:3000/profile-pictures/picture_a' },
     });
     expect(response.body.data.profileByHandle).toEqual({
       profile: { id: 'profile_a' },
@@ -444,7 +444,7 @@ describe('GraphQL driving adapter contract', () => {
         version: 1,
         handle: 'artist',
         canonicalPath: '/profiles/@artist',
-        picture: { id: 'picture_a', url: 'http://media:3000/profile-pictures/picture_a' },
+        picture: { id: 'picture_a', url: 'http://asset:3000/profile-pictures/picture_a' },
       },
     });
     const enumeration = await query('{profile(id:"profile_a"){aliases}}');
@@ -471,7 +471,7 @@ describe('GraphQL driving adapter contract', () => {
             handle: 'artist',
             displayName: 'Artist',
             canonicalPath: '/profiles/@artist',
-            picture: { id: 'picture_a', url: 'http://media:3000/profile-pictures/picture_a' },
+            picture: { id: 'picture_a', url: 'http://asset:3000/profile-pictures/picture_a' },
           },
         },
       ],

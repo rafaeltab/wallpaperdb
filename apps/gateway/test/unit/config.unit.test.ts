@@ -4,7 +4,7 @@ import { gatewayConfig, loadConfig } from '../../src/config.js';
 const environment = {
   OPENSEARCH_URL: 'http://127.0.0.1:9200',
   NATS_URL: 'nats://127.0.0.1:4222',
-  MEDIA_SERVICE_URL: 'http://127.0.0.1:3003',
+  ASSET_SERVICE_URL: 'http://127.0.0.1:3003',
   CURSOR_SECRET: 'test-secret-000000000000000000000000',
   REDIS_ENABLED: 'false',
 };
@@ -75,6 +75,8 @@ describe('startup configuration', () => {
   });
   it('parses defaults once without reading ambient configuration', () => {
     expect(loadConfig(environment)).toMatchObject({
+      assetServiceUrl: 'http://127.0.0.1:3003',
+      assetPublicPath: '/asset',
       port: 3004,
       opensearchProfileIndex: undefined,
       redisEnabled: false,
@@ -115,7 +117,7 @@ describe('startup configuration', () => {
         REDIS_ENABLED: 'true',
         REDIS_HOST: '127.0.0.1',
         REDIS_PORT: '6379',
-        MEDIA_PUBLIC_BASE_URL: 'https://cdn.example.com',
+        ASSET_PUBLIC_BASE_URL: 'https://cdn.example.com',
       })
     ).toMatchObject({
       port: 7000,
@@ -150,7 +152,7 @@ describe('startup configuration', () => {
     { CURSOR_SECRET: 'short' },
     { RATE_LIMIT_ENABLED: 'yes' },
     { GRAPHQL_MAX_DEPTH: '0' },
-    { MEDIA_PUBLIC_BASE_URL: 'invalid' },
+    { ASSET_PUBLIC_BASE_URL: 'invalid' },
     { PORT: '65536' },
   ])('fails invalid startup configuration without exposing supplied values %j', (invalid) => {
     expect(() => loadConfig({ ...environment, ...invalid })).toThrow(

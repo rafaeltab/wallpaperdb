@@ -1,8 +1,8 @@
 import mercurius, { type MercuriusOptions } from 'mercurius';
 import type { HttpExecution } from '../runtime.js';
-import { GraphqlAdapter, type MediaUrls } from './resolvers.js';
+import { GraphqlAdapter, type AssetUrls } from './resolvers.js';
 import { schema } from './schema.js';
-export type { MediaUrls } from './resolvers.js';
+export type { AssetUrls } from './resolvers.js';
 const errorFormatter: NonNullable<MercuriusOptions['errorFormatter']> = (execution, context) => {
   const formatted = mercurius.defaultErrorFormatter(execution, context);
   if (
@@ -18,7 +18,7 @@ const errorFormatter: NonNullable<MercuriusOptions['errorFormatter']> = (executi
   return formatted;
 };
 /** Mercurius driving adapter. The composition root supplies the inbound capability. */
-export function createGraphql(execution: HttpExecution['Service'], media: MediaUrls) {
-  const adapter = new GraphqlAdapter(execution, media);
+export function createGraphql(execution: HttpExecution['Service'], asset: AssetUrls) {
+  const adapter = new GraphqlAdapter(execution, asset);
   return { schema, resolvers: adapter.resolvers(), loaders: adapter.loaders(), errorFormatter };
 }

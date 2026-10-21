@@ -20,8 +20,8 @@ export interface HttpTestServices {
 export const httpConfig: HttpConfig = {
   trustedProxies: [],
   nodeEnv: 'test',
-  mediaServiceUrl: 'http://media.example.com',
-  mediaPublicPath: '/media',
+  assetServiceUrl: 'http://asset.example.com',
+  assetPublicPath: '/asset',
   graphqlMaxActive: 32,
   graphqlDeadlineMs: 5000,
   graphqlMaxDepth: 5,

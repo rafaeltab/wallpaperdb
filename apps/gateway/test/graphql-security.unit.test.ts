@@ -366,7 +366,7 @@ describe('GraphQL security driving contract', () => {
       TRUSTED_PROXIES: '10.0.0.1',
       OPENSEARCH_URL: 'http://127.0.0.1:9200',
       NATS_URL: 'nats://127.0.0.1:4222',
-      MEDIA_SERVICE_URL: 'http://127.0.0.1:3003',
+      ASSET_SERVICE_URL: 'http://127.0.0.1:3003',
       CURSOR_SECRET: 'test-secret-000000000000000000000000',
     });
     const app = await build(config, { catalogue });

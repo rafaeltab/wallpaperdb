@@ -17,9 +17,9 @@ import { installAdmissionSchema } from './admission-schema.js';
 export interface HttpConfig {
   readonly trustedProxies: readonly string[];
   readonly nodeEnv: 'development' | 'production' | 'test';
-  readonly mediaServiceUrl: string;
-  readonly mediaPublicBaseUrl?: string;
-  readonly mediaPublicPath: string;
+  readonly assetServiceUrl: string;
+  readonly assetPublicBaseUrl?: string;
+  readonly assetPublicPath: string;
   readonly graphqlMaxActive: number;
   readonly graphqlDeadlineMs: number;
   readonly graphqlMaxDepth: number;

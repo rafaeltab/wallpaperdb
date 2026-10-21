@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
+	existsSync,
+	readdirSync,
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
@@ -13,7 +15,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-test("CLI cold run, reusable baseline, changed test invalidation and portable import", (t) => {
+test("CLI cold run, reusable baseline, changed test invalidation and portable import", async (t) => {
 	const root = mkdtempSync(join(tmpdir(), "mutation-cli-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const workspace = join(root, "packages/demo");
@@ -133,7 +135,10 @@ test("CLI cold run, reusable baseline, changed test invalidation and portable im
 		"packages/demo/test/index.test.js",
 		"import {it,expect} from 'vitest'; import {allowed} from '../src/index.js'; it('boundary', async () => {await new Promise(r => setTimeout(r, 25)); expect(allowed(1)).toBe(80); expect(allowed(0)).toBe(0);});",
 	);
-	const partial = spawnSync(
+
+	const reports = join(workspace, "reports/mutation/unit");
+	rmSync(reports, { recursive: true });
+	const partial = spawn(
 		process.execPath,
 		[
 			fileURLToPath(new URL("./mutation.mjs", import.meta.url)),
@@ -142,16 +147,40 @@ test("CLI cold run, reusable baseline, changed test invalidation and portable im
 			"--scope",
 			"all",
 			"--budget",
-			"2",
+			"30",
 			"--offline",
 		],
-		{ cwd: root, encoding: "utf8", timeout: 20_000 },
+		{ cwd: root, stdio: "ignore" },
 	);
-	assert.equal(partial.status, 2, partial.stdout + partial.stderr);
+	t.after(() => partial.kill("SIGINT"));
+	// Interrupt after observed progress, so slow CI startup cannot make this test
+	// expire before Stryker has any results. Deadline behavior has separate tests.
+	const poll = setInterval(() => {
+		if (!existsSync(reports)) return;
+		for (const name of readdirSync(reports).filter((n) =>
+			n.startsWith("run-"),
+		)) {
+			const path = join(reports, name, "progress.json");
+			if (existsSync(path) && JSON.parse(readFileSync(path)).executed >= 3) {
+				clearInterval(poll);
+				partial.kill("SIGINT");
+				break;
+			}
+		}
+	}, 20);
+	try {
+		const code = await new Promise((resolve, reject) => {
+			partial.once("exit", resolve);
+			partial.once("error", reject);
+		});
+		assert.equal(code, 130);
+	} finally {
+		clearInterval(poll);
+	}
 	const interrupted = JSON.parse(
 		readFileSync(join(workspace, "reports/mutation/unit/summary.json")),
 	);
-	assert.equal(interrupted.outcome, "budget-exhausted");
+	assert.equal(interrupted.outcome, "cancelled");
 	assert.ok(
 		interrupted.completed > 0 && interrupted.completed < interrupted.total,
 		JSON.stringify(interrupted),

@@ -31,7 +31,7 @@ For a discovery created by this worker in the current admitted cycle, the user's
 
 ## Pin and execute
 
-Before assignment or implementation, write `<admission directory>/approved-issue.json` once. It contains the exact payload, its digest, the trusted policy commit, and the authenticated approval event or comment ID, actor account ID, and permission evidence. Use exclusive creation, such as Python's `open(path, "x")`, and read it back. Once written, treat this record as immutable; verify its digest whenever loading it. A changed or conflicting snapshot is a blocker, not permission to overwrite it.
+Before assignment or implementation, write `<admission directory>/approved-issue.json` once. It contains the exact payload, its digest, the trusted policy commit, and the authenticated approval event or comment ID, actor account ID, and permission evidence. Use exclusive creation, such as Python's [`open(path, "x")`](https://docs.python.org/3/library/functions.html#open), and read it back. Once written, treat this record as immutable; verify its digest whenever loading it. A changed or conflicting snapshot is a blocker, not permission to overwrite it.
 
 Immediately before claiming, re-fetch the issue and approval record. Require the same title/body digest, verified approval, open state, current readiness label, and normal dependency/competing-work checks. Supply the pinned payload and approval identity to implementation and review tasks. Their spec is the approved payload, not newly fetched mutable issue text.
 

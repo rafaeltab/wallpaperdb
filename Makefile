@@ -34,7 +34,7 @@ DB ?=
 SCRIPT ?=
 ARGS ?=
 FORCE ?=
-WORKSPACES := root scripts infra-local $(notdir $(patsubst %/,%,$(dir $(wildcard apps/*/package.json packages/*/package.json))))
+WORKSPACES := root scripts infra-local $(notdir $(patsubst %/,%,$(dir $(wildcard apps/*/package.json packages/*/package.json experiments/*/package.json))))
 ifneq ($(strip $(PACKAGE)),)
 ifneq ($(words $(PACKAGE)),1)
 $(error PACKAGE must select exactly one workspace)

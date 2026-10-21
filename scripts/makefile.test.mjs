@@ -318,7 +318,7 @@ test("stop tears down apps before infrastructure for the selected Compose projec
 		"docker compose -p isolated -f infra/docker-compose.apps.yml down",
 	);
 	const infra = commands.indexOf(
-		"docker compose -p isolated -f infra/docker-compose.yml down",
+		"docker compose -p isolated -f infra/docker-compose.yml --profile '*' down",
 	);
 	assert.ok(apps >= 0, "stop must tear down the app stack");
 	assert.ok(infra > apps, "stop must tear down infrastructure after apps");
@@ -334,6 +334,14 @@ test("database and Compose commands use explicit selectors", () => {
 	assert.match(output("apps-stop", "SERVICE=ingestor"), /stop ingestor/);
 	assert.doesNotMatch(output("apps-stop", "SERVICE=ingestor"), / down/);
 	assert.match(output("apps-stop"), / down/);
+});
+
+test("admin infrastructure has an explicit Make path and participates in teardown", () => {
+	assert.match(output("infra-start-admin"), /--profile admin up -d/);
+	assert.doesNotMatch(output("infra-start"), /--profile admin/);
+	for (const target of ["infra-stop", "infra-reset", "infra-logs"]) {
+		assert.match(output(target), /--profile '\*'/);
+	}
 });
 
 test("one-off scripts require a package and script", () => {

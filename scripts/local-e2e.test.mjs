@@ -186,6 +186,7 @@ if (!args.includes('--dry=json') && process.env.TEST_VERBOSE_OUTPUT) {
 		`#!/usr/bin/env node
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+if (process.env.TEST_PROFILES_FILE && args.includes('compose')) fs.appendFileSync(process.env.TEST_PROFILES_FILE, JSON.stringify({args, profiles: process.env.COMPOSE_PROFILES}) + '\\n');
 if (process.env.TEST_OBSERVE_CHILD_ENV) fs.appendFileSync('child-env.jsonl', JSON.stringify({kind: process.argv[1].endsWith('/docker') ? 'docker' : 'turbo', args, values: Object.fromEntries(['CLERK_SECRET_KEY', 'E2E_BASE_TEST_EMAIL', 'E2E_BASE_TEST_PASSWORD', 'E2E_ARTIFACTS_DIR'].map(key => [key, process.env[key] ?? null]))}) + String.fromCharCode(10));
 fs.appendFileSync('calls.jsonl', JSON.stringify(['docker', ...args]) + '\\n');
 if (args.includes('info') && process.env.TEST_INFO_EXIT) process.exit(Number(process.env.TEST_INFO_EXIT));
@@ -447,6 +448,21 @@ async function browserFixture(t, ready = true) {
 		});
 	return f;
 }
+
+test("owned browser Compose ignores developer profiles throughout startup and cleanup", async (t) => {
+	const f = await browserFixture(t);
+	f.env.COMPOSE_PROFILES = "admin,*";
+	f.env.TEST_PROFILES_FILE = join(f.root, "profiles.jsonl");
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.equal(result.status, 0, result.stderr);
+	const observed = readFileSync(f.env.TEST_PROFILES_FILE, "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	assert.ok(observed.some(({ args }) => args.includes("up")));
+	assert.ok(observed.some(({ args }) => args.includes("down")));
+	for (const { profiles } of observed) assert.equal(profiles, "");
+});
 
 test("complete explicit E2E builds current images and releases its owned browser stack before container suites", async (t) => {
 	const f = await browserFixture(t);

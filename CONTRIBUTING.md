@@ -23,6 +23,8 @@ make dev
 
 Open the ingress address printed by `make help`, followed by `/web`. The same ingress exposes `/grafana` and the service routes; see [Caddy's routing configuration](infra/caddy/Caddyfile) for the full list. Port assignments vary by worktree, so use the generated values rather than assuming service default ports.
 
+`make infra-start` and browser E2E omit the optional database and search admin UIs. Run `make infra-start-admin` to include both, then access `/pgadmin/` and `/opensearch-dashboards/` through the application stack's existing Caddy ingress. Infrastructure stop, reset, logs, and worktree teardown include the admin profile. LGTM stays enabled because the applications export telemetry to its collector. Headless runs preserve that behavior while omitting the admin UIs.
+
 `make dev` runs the applications in Docker with source watching. `make dev PACKAGE=<workspace>` runs that workspace's development script; the script determines whether it runs on the host or in Docker. Host-run services need host-accessible dependency endpoints. Use [service upgrade instructions](apps/docs/content/docs/guides/service-upgrades.mdx) and the [storage migration procedure](apps/docs/content/docs/infrastructure/seaweedfs.mdx) when upgrading existing data.
 
 ## Check a change

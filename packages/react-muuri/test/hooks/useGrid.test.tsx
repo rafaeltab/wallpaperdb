@@ -1,3 +1,5 @@
+// Resolve the layout dependency before the hook's readiness deadlines begin.
+import 'muuri';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -55,7 +57,7 @@ describe('useGrid', () => {
       );
     }
 
-    it('should return grid instance when used inside MuuriGrid', { retry: 3 }, async () => {
+    it('should return grid instance when used inside MuuriGrid', async () => {
       const { result } = renderHook(() => useGrid(), {
         wrapper: GridWrapper,
       });

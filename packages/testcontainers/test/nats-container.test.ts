@@ -82,7 +82,7 @@ describe("NATS Container", { timeout: 10000 }, () => {
         const testMessage = "Hello from NATS test!";
 
         // Create a promise that resolves when we receive the message
-        const messagePromise = new Promise<string>((resolve) => {
+        const messagePromise = new Promise<string>((resolve, reject) => {
             const sub = natsClient.subscribe(subject);
             (async () => {
                 for await (const msg of sub) {
@@ -91,7 +91,7 @@ describe("NATS Container", { timeout: 10000 }, () => {
                     sub.unsubscribe();
                     break;
                 }
-            })();
+            })().catch(reject);
         });
 
         // Wait for the server to process the subscription before publishing.

@@ -187,4 +187,11 @@ export const cases: ReadonlyArray<{
       expect(await f.occurrences(), 'G8 no occurrence').toBe(events);
     },
   },
+  {
+    id: 'G9 missing profile is an explicit absence',
+    async check(f) {
+      expect(await run(f.store.read(query.profileId, now)), 'G9 missing record').toBeNull();
+      expect(await f.occurrences(), 'G9 reading absence writes nothing').toBe(0);
+    },
+  },
 ];

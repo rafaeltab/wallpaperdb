@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { GenericContainer, Wait } from 'testcontainers';
-import { expect, it } from 'vitest';
+import { it } from 'vitest';
 
 const cases = [
   ...['ingestor', 'gateway', 'media', 'user', 'tags', 'color-extractor', 'variant-generator'].map(
@@ -9,12 +9,9 @@ const cases = [
   ...['refused', 'stalled', 'error'].map((outage) => ({ service: 'ingestor', outage })),
 ];
 
-it.concurrent.each(
+it.concurrent.for(
   cases
-)('keeps fresh-connection HTTP uploads available during $service exporter $outage failure and recovers', async ({
-  service,
-  outage,
-}) => {
+)('keeps fresh-connection HTTP uploads available during $service exporter $outage failure and recovers', { timeout: 90_000 }, async ({ service, outage }, { expect }) => {
   const root = fileURLToPath(new URL('../../../../', import.meta.url));
   const container = await new GenericContainer('node:22-bookworm')
     .withBindMounts([{ source: root, target: root, mode: 'ro' }])
@@ -46,4 +43,4 @@ it.concurrent.each(
   } finally {
     await container.stop();
   }
-}, 90_000);
+});

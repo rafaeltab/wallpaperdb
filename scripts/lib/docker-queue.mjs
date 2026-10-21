@@ -1,0 +1,284 @@
+import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import {
+	closeSync,
+	constants,
+	fstatSync,
+	lstatSync,
+	mkdirSync,
+	openSync,
+	readFileSync,
+	readdirSync,
+	renameSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { basename, join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+
+export const defaultDockerLock = "/tmp/wallpaperdb-perf-validation.lock";
+
+function identity(pid) {
+	try {
+		const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+		return `${readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim()}:${stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19]}`;
+	} catch (error) {
+		if (error.code === "ENOENT" || error.code === "ESRCH") return null;
+		throw error;
+	}
+}
+
+function safeStat(stat, directory = false) {
+	return (
+		(directory ? stat.isDirectory() : stat.isFile()) &&
+		stat.uid === process.getuid() &&
+		!(stat.mode & 0o022) &&
+		(directory || stat.nlink === 1)
+	);
+}
+
+function openLock(file) {
+	let fd;
+	try {
+		fd = openSync(
+			file,
+			constants.O_CREAT |
+				constants.O_RDWR |
+				constants.O_APPEND |
+				constants.O_NOFOLLOW |
+				constants.O_NONBLOCK,
+			0o600,
+		);
+		const stat = fstatSync(fd);
+		if (!safeStat(stat) || stat.size !== 0)
+			throw new Error(
+				"expected an empty owned regular file without hard links or group/other write access",
+			);
+		return fd;
+	} catch (error) {
+		if (fd !== undefined) closeSync(fd);
+		throw new Error(`Unsafe Docker host lock target ${file}: ${error.message}`);
+	}
+}
+
+function verifyLock(file, fd) {
+	const current = lstatSync(file);
+	const opened = fstatSync(fd);
+	if (
+		!safeStat(current) ||
+		!safeStat(opened) ||
+		current.ino !== opened.ino ||
+		current.dev !== opened.dev ||
+		opened.size !== 0
+	)
+		throw new Error(
+			`Unsafe Docker host lock target ${file}: file changed while acquiring ownership.`,
+		);
+}
+
+function directoryFor(file, create) {
+	const directory = `${file}.queue`;
+	if (create) {
+		try {
+			mkdirSync(directory, { mode: 0o700 });
+		} catch (error) {
+			if (error.code !== "EEXIST") throw error;
+		}
+	}
+	try {
+		if (!safeStat(lstatSync(directory), true))
+			throw new Error(`Unsafe Docker queue directory ${directory}`);
+	} catch (error) {
+		if (!create && error.code === "ENOENT") return null;
+		throw error;
+	}
+	return directory;
+}
+
+function entries(directory, prune) {
+	if (!directory) return [];
+	const result = [];
+	for (const name of readdirSync(directory)
+		.filter((name) => /^\d{24}-[a-f0-9-]+\.json$/.test(name))
+		.sort()) {
+		const path = join(directory, name);
+		let record;
+		try {
+			const stat = lstatSync(path);
+			if (!safeStat(stat) || stat.size > 4096)
+				throw new Error(`Unsafe Docker queue entry ${path}`);
+			record = JSON.parse(readFileSync(path, "utf8"));
+		} catch (error) {
+			if (error.code === "ENOENT") continue;
+			throw error;
+		}
+		if (
+			!Number.isSafeInteger(record.pid) ||
+			record.pid <= 0 ||
+			typeof record.identity !== "string" ||
+			typeof record.label !== "string" ||
+			!["waiting", "running"].includes(record.state)
+		)
+			throw new Error(`Invalid Docker queue entry ${path}`);
+		if (identity(record.pid) !== record.identity) {
+			if (prune) {
+				try {
+					unlinkSync(path);
+				} catch (error) {
+					if (error.code !== "ENOENT") throw error;
+				}
+			}
+			continue;
+		}
+		result.push({ ...record, name });
+	}
+	return result;
+}
+
+function saveTicket(path, record) {
+	const temporary = `${path}.tmp`;
+	try {
+		writeFileSync(temporary, JSON.stringify(record), {
+			flag: "wx",
+			mode: 0o600,
+		});
+		renameSync(temporary, path);
+	} catch (error) {
+		try {
+			unlinkSync(temporary);
+		} catch (cleanup) {
+			if (cleanup.code !== "ENOENT")
+				throw new AggregateError(
+					[error, cleanup],
+					"Docker queue publication and cleanup failed.",
+				);
+		}
+		throw error;
+	}
+}
+
+export function inspectDockerQueue(file = defaultDockerLock) {
+	return entries(directoryFor(file, false), false);
+}
+
+function lock(fd) {
+	const result = spawnSync("flock", ["-E", "75", "-n", "3"], {
+		stdio: ["ignore", "pipe", "pipe", fd],
+		encoding: "utf8",
+		timeout: 1000,
+	});
+	if (result.error)
+		throw new Error(
+			`Docker validation requires flock (util-linux): ${result.error.message}`,
+		);
+	if (result.status === 0) return true;
+	if (result.status === 75) return false;
+	throw new Error(
+		`Docker host lock failed: ${result.stderr || result.signal || result.status}`,
+	);
+}
+
+export async function acquireDockerLease({
+	file = defaultDockerLock,
+	timeoutSeconds = "900",
+	label = "validation",
+	signal,
+	report = () => {},
+} = {}) {
+	file = resolve(file);
+	if (
+		!/^\d+$/.test(String(timeoutSeconds)) ||
+		!Number.isSafeInteger(Number(timeoutSeconds) * 1000) ||
+		Number(timeoutSeconds) <= 0
+	)
+		throw new Error(
+			"Docker validation timeout must be a positive integer in seconds.",
+		);
+	if (!/^[\w .:/-]{1,160}$/.test(label))
+		throw new Error("Invalid Docker validation label.");
+	const inherited = process.env.WALLPAPERDB_DOCKER_LEASE_FD;
+	if (
+		inherited !== undefined &&
+		process.env.WALLPAPERDB_DOCKER_LEASE_FILE === file
+	) {
+		if (!/^\d+$/.test(inherited) || Number(inherited) < 3)
+			throw new Error("Invalid inherited Docker lease descriptor.");
+		const descriptor = Number(inherited);
+		verifyLock(file, descriptor);
+		if (!lock(descriptor))
+			throw new Error(
+				"Inherited Docker lease does not own the selected host lock.",
+			);
+		report("Reusing the inherited Docker host lock.");
+		return { descriptor, file, waitedMs: 0, release() {} };
+	}
+	const fd = openLock(file);
+	let ticket;
+	let released = false;
+	const started = Date.now();
+	const deadline = started + Number(timeoutSeconds) * 1000;
+	function release() {
+		if (released) return;
+		released = true;
+		try {
+			if (ticket) unlinkSync(ticket);
+		} finally {
+			closeSync(fd);
+		}
+	}
+	try {
+		const directory = directoryFor(file, true);
+		const name = `${process.hrtime.bigint().toString().padStart(24, "0")}-${randomUUID()}.json`;
+		const destination = join(directory, name);
+		const record = {
+			pid: process.pid,
+			identity: identity(process.pid),
+			label,
+			workspace: basename(process.cwd()),
+			state: "waiting",
+			queuedAt: new Date(started).toISOString(),
+		};
+		if (!record.identity)
+			throw new Error(
+				"Docker validation requires Linux procfs to identify queue owners.",
+			);
+		saveTicket(destination, record);
+		ticket = destination;
+		report(
+			`Waiting for Docker host lock ${file} (deadline ${timeoutSeconds}s)...`,
+		);
+		let lastReport = 0;
+		while (true) {
+			signal?.throwIfAborted();
+			const remaining = deadline - Date.now();
+			if (remaining <= 0)
+				throw Object.assign(
+					new Error("Docker host lock timed out before execution."),
+					{ status: 75 },
+				);
+			const queue = entries(directory, true);
+			if (queue[0]?.name === name && lock(fd)) {
+				verifyLock(file, fd);
+				record.state = "running";
+				record.startedAt = new Date().toISOString();
+				saveTicket(ticket, record);
+				const waitedMs = Date.now() - started;
+				report(
+					`Docker host lock acquired after ${(waitedMs / 1000).toFixed(1)}s.`,
+				);
+				return { descriptor: fd, file, waitedMs, release };
+			}
+			if (Date.now() - lastReport >= 5000) {
+				const owner = queue.find((entry) => entry.state === "running");
+				report(
+					`Docker host lock busy; owner: ${owner ? `${owner.label} (${owner.workspace}, pid ${owner.pid})` : "unregistered flock user"}; ${queue.filter((entry) => entry.state === "waiting").length} waiting; ${Math.ceil(remaining / 1000)}s remaining.`,
+				);
+				lastReport = Date.now();
+			}
+			await delay(Math.min(100, remaining), undefined, { signal });
+		}
+	} catch (error) {
+		release();
+		throw error;
+	}
+}

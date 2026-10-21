@@ -48,7 +48,7 @@ FILTER = $(if $(PACKAGE),--filter=$(TURBO_PACKAGE))
 TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 
 .PHONY: help install dev stop build test test-unit test-integration test-e2e test-focused \
-        format lint lint-fix check-types check run \
+        format lint lint-fix check-types check run docker-status docker-run \
         infra-start infra-start-admin infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
         coverage-summary crap check-crap \
@@ -92,7 +92,7 @@ test-unit: ## Run unit tests (no containers; optional PACKAGE)
 	@$(TURBO) run test:unit $(TURBO_FLAGS)
 
 test-integration: ## Run integration tests (Docker required) (optional PACKAGE)
-	@$(TURBO) run test:integration $(TURBO_FLAGS) --concurrency=1
+	@$(if $(filter --dry%,$(TURBO_FLAGS)),,node scripts/docker-validation.mjs --label integration --) $(TURBO) run test:integration $(TURBO_FLAGS) --concurrency=1
 
 test-e2e: ## Explicit E2E with owned local dependencies (optional PACKAGE and ARGS)
 ifeq ($(GITHUB_ACTIONS),true)
@@ -120,6 +120,13 @@ run: ## Run a package.json script (requires PACKAGE and SCRIPT; optional ARGS)
 	$(if $(PACKAGE),,$(error run requires PACKAGE, e.g. make run PACKAGE=web SCRIPT=preview))
 	$(if $(SCRIPT),,$(error run requires SCRIPT, e.g. make run PACKAGE=web SCRIPT=preview))
 	@pnpm --filter @wallpaperdb/$(PACKAGE) run $(SCRIPT) $(ARGS)
+
+docker-status: ## Show the shared Docker validation owner and queue
+	@node scripts/docker-validation.mjs --status
+
+docker-run: ## Queue another Docker experiment (requires ARGS='command arguments')
+	$(if $(strip $(ARGS)),,$(error docker-run requires ARGS='command arguments'))
+	@node scripts/docker-validation.mjs --label experiment -- $(ARGS)
 
 infra-start: ## Start infrastructure
 	@COMPOSE_PROFILES='' $(INFRA_COMPOSE) $(INFRA_PROFILES) up -d
@@ -211,7 +218,7 @@ ci: ## Run local checks excluding E2E (FORCE=1 bypasses cache; always all packag
 	@echo "E2E excluded (browser and container). GitHub Actions enforces E2E; opt in locally with make test-e2e."
 	@set -e; \
 	start_time=$$(date +%s); \
-	$(TURBO) run build lint check-types test:unit test:integration --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
+	node scripts/docker-validation.mjs --label ci -- $(TURBO) run build lint check-types test:unit test:integration --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
 	pnpm coverage:merge --local; \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \

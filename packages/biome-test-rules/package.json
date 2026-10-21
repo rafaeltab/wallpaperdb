@@ -9,7 +9,7 @@
 	"scripts": {
 		"format": "biome format --write .",
 		"lint": "biome lint .",
-		"test:unit": "node --test test/*.test.mjs",
+		"test:unit": "node --test",
 		"check-types": "tsc --noEmit"
 	},
 	"devDependencies": {
@@ -18,6 +18,8 @@
 		"@types/node": "^26.0.1",
 		"typescript": "^5.7.2",
 		"vitest": "5.0.2",
-		"@playwright/test": "^1.55.1"
+		"@playwright/test": "^1.55.1",
+		"@wallpaperdb/test-utils": "workspace:*",
+		"effect": "4.0.0-rc.115"
 	}
 }

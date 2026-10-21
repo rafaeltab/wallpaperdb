@@ -1,57 +1,6 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import {
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	symlinkSync,
-	writeFileSync,
-} from "node:fs";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
-
-const require = createRequire(import.meta.url);
-const workspace = fileURLToPath(new URL("../", import.meta.url));
-const biome = join(
-	dirname(require.resolve("@biomejs/biome/package.json")),
-	"bin/biome",
-);
-
-function lint(source, files = {}) {
-	const directory = mkdtempSync(join(tmpdir(), "biome-test-rules-"));
-	try {
-		const config = JSON.parse(
-			readFileSync(join(workspace, "test-correctness.json"), "utf8"),
-		);
-		config.plugins = config.plugins.map((path) => join(workspace, path));
-		writeFileSync(join(directory, "biome.json"), JSON.stringify(config));
-		symlinkSync(
-			join(workspace, "node_modules"),
-			join(directory, "node_modules"),
-		);
-		writeFileSync(join(directory, "example.test.ts"), source);
-		for (const [path, content] of Object.entries(files))
-			writeFileSync(join(directory, path), content);
-		const result = spawnSync(
-			process.execPath,
-			[biome, "lint", "--reporter=json", "example.test.ts"],
-			{
-				cwd: directory,
-				encoding: "utf8",
-				timeout: 30_000,
-			},
-		);
-		assert.equal(result.error, undefined);
-		assert.ok(result.status === 0 || result.status === 1, result.stderr);
-		const report = JSON.parse(result.stdout);
-		return report.diagnostics;
-	} finally {
-		rmSync(directory, { recursive: true, force: true });
-	}
-}
+import { lint } from "./lint.mjs";
 
 test("incomplete expect calls fail, including accidental two-argument assertions", () => {
 	for (const source of ["expect(1);", "expect(1, 2);", "expect(1).not;"])
@@ -70,4 +19,27 @@ test("incomplete expect calls fail, including accidental two-argument assertions
 			[],
 			source,
 		);
+});
+
+test("assertion validation follows imported and local aliases without matching unrelated functions", () => {
+	for (const source of [
+		"import { expect as check } from 'vitest'; check(1, 2);",
+		"import * as v from 'vitest'; v.expect(1);",
+		"import { expect } from 'vitest'; const check = expect; check(1);",
+		"import { expect } from '@playwright/test'; expect(1);",
+		"import { expect } from 'vitest'; expect();",
+		"import { expect } from 'vitest'; expect(1, 'reason', 2).toBe(1);",
+	])
+		assert.ok(
+			lint(source).some((d) => d.message.includes("assertion")),
+			source,
+		);
+	for (const source of [
+		"function expect(a: number, b: number) { return a + b; } expect(1, 2);",
+		"import { expect } from 'other-library'; expect(1);",
+		"import { expect } from 'vitest'; expect.assertions(1); expect.hasAssertions();",
+		"import { expect } from 'vitest'; expect(1).toEqual(expect.any(Number));",
+		"import { expect as check } from 'vitest'; check(1, 'reason').toBe(1);",
+	])
+		assert.deepEqual(lint(source), [], source);
 });

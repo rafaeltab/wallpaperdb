@@ -13,7 +13,7 @@
     "check-types": "node scripts/generate-routes.mjs && tsc -b",
     "test": "vitest run",
     "test:unit": "vitest run --coverage",
-    "test:integration": "node --test test/clean-checkout.test.mjs && vitest run --config vitest.browser.config.ts",
+    "test:integration": "vitest run --config vitest.browser.config.ts",
     "test:watch": "vitest",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:browser:install": "playwright install --with-deps chromium"

@@ -128,11 +128,25 @@ test("specialized test shortcuts are absent from the Make interface", () => {
 	}
 });
 
-test("clean-checkout web checks have a Web integration task", () => {
+test("web integration runs cached browser contracts with dependency builds and coverage", () => {
 	const task = plannedTask("test-integration", "web", "test:integration");
-	const manifest = JSON.parse(readFileSync("apps/web/package.json", "utf8"));
-	assert.ok(manifest.scripts["test:integration"]);
+	assert.equal(task.command, "vitest run --config vitest.browser.config.ts");
 	assert.equal(task.resolvedTaskDefinition.cache, true);
+	assert.ok(task.dependencies.includes("@wallpaperdb/profile-markdown#build"));
+	assert.deepEqual(task.resolvedTaskDefinition.outputs, [
+		"coverage/integration/**",
+	]);
+	for (const input of [
+		"test/browser/picture-processing.spec.ts",
+		"vitest.browser.config.ts",
+		"../web-e2e/fixtures/profile-small.png",
+		"../web-e2e/fixtures/profile-transparent-p3.png",
+	]) {
+		assert.ok(
+			Object.hasOwn(task.inputs, input),
+			`${input} must invalidate browser contracts`,
+		);
+	}
 });
 
 test("test tiers preserve sequential container execution", () => {

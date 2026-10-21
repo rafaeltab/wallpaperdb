@@ -197,6 +197,39 @@ describe('stored source geometry and real native output', () => {
     expect(result.bytes).toEqual(variant);
   });
   it.each([
+    { missingOriginal: false, width: 60, height: 40 },
+    { missingOriginal: true, width: 30, height: 20 },
+  ])('uses available source pixels for nominally sufficient variants: %j', async ({
+    missingOriginal,
+    width,
+    height,
+  }) => {
+    const input = await orientationFixture('png', 'absent');
+    const variant = await sharp(input).resize(30, 20).png().toBuffer();
+    const result = await request(
+      input,
+      { width: 60, height: 80, fit: 'contain' },
+      {},
+      variant,
+      missingOriginal
+    );
+    if (result._tag !== 'Found') throw new Error('Expected available source delivery');
+    expect(await sharp(result.bytes).metadata()).toMatchObject({ width, height });
+    expect((await sharp(result.bytes).metadata()).exif).toBeUndefined();
+    expect(await samplePixelGrid(result.bytes, 3, 2)).toEqual([
+      [
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+      ],
+      [
+        [255, 255, 0],
+        [255, 0, 255],
+        [0, 255, 255],
+      ],
+    ]);
+  });
+  it.each([
     { options: { width: 40 }, limits: { maxResizeHeight: 50 }, outcome: 'Rejected' },
     { options: { width: 40 }, limits: { maxOutputPixels: 2399 }, outcome: 'Rejected' },
     {

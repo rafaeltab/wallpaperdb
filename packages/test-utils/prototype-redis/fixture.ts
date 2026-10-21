@@ -193,10 +193,17 @@ export async function createGroup(metrics = timing()) {
           } finally {
             metrics.containerCleanupMs += performance.now() - start;
           }
-          assert.ok(
-            !(await docker.listContainers({ all: true })).some((container) => container.Id === id),
-            'owned container still exists'
-          );
+          const removalCheck = performance.now();
+          try {
+            assert.ok(
+              !(await docker.listContainers({ all: true })).some(
+                (container) => container.Id === id
+              ),
+              'owned container still exists'
+            );
+          } finally {
+            metrics.verificationMs += performance.now() - removalCheck;
+          }
           metrics.containersRemoved++;
         }
       }

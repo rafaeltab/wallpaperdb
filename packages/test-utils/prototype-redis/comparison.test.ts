@@ -1,5 +1,43 @@
 import { expect, it } from 'vitest';
 import { createGroup } from './fixture';
+import { caseNames, runOperation } from './operations';
+
+it.each(caseNames)('independent %s', async (name) => {
+  const group = await createGroup();
+  try {
+    await group.runCase(name, (scope) => runOperation(name, scope));
+  } finally {
+    await group.close();
+  }
+});
+
+it.each(['reversed', 'overlapping'] as const)('%s operation cases', async (schedule) => {
+  const group = await createGroup();
+  try {
+    if (schedule === 'reversed') {
+      for (const name of [...caseNames].reverse()) {
+        await group.runCase(name, (scope) => runOperation(name, scope));
+      }
+    } else {
+      let arrived = 0;
+      const results = await Promise.allSettled(
+        caseNames.map((name) =>
+          group.runCase(name, async (scope) => {
+            arrived++;
+            // Bound the barrier so one failed connection cannot strand the other cases.
+            await expect
+              .poll(() => arrived, { timeout: 5000, interval: 10 })
+              .toBe(caseNames.length);
+            await runOperation(name, scope);
+          })
+        )
+      );
+      expect(results.filter((result) => result.status === 'rejected')).toEqual([]);
+    }
+  } finally {
+    await group.close();
+  }
+});
 
 it('cleans a failed case while an overlapping case retains its data and subscription', async () => {
   const group = await createGroup();

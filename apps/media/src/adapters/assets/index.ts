@@ -43,8 +43,12 @@ export const sharpTransformerLayer = (limits: {
             body.close();
             return yield* Effect.fail(
               new DeliveryUnavailable({
-                operation: 'resize_capacity',
-                cause: new Error('Resize capacity exhausted'),
+                operation: `${operation}_capacity`,
+                cause: new Error(
+                  options.inspect
+                    ? 'Image inspection capacity exhausted'
+                    : 'Resize capacity exhausted'
+                ),
               })
             );
           }

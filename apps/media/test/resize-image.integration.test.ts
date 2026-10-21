@@ -181,8 +181,28 @@ describe('native image resize contract', () => {
             )
           )
         )
-      ).rejects.toMatchObject({ operation: 'resize_capacity' });
+      ).rejects.toMatchObject({
+        operation: 'resize_capacity',
+        cause: { message: 'Resize capacity exhausted' },
+      });
       expect(refusedClosed).toBe(true);
+      let inspectionClosed = false;
+      await expect(
+        runtime.runPromise(
+          ImageTransformer.use((t) =>
+            t.inspect({
+              close() {
+                inspectionClosed = true;
+              },
+              async *[Symbol.asyncIterator]() {},
+            })
+          )
+        )
+      ).rejects.toMatchObject({
+        operation: 'inspect_image_capacity',
+        cause: { message: 'Image inspection capacity exhausted' },
+      });
+      expect(inspectionClosed).toBe(true);
       if (mode === 'interruption') controller.abort();
       expect(await settled).toBe('failed');
       expect(closed).toBe(true);

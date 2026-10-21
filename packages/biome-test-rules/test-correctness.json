@@ -2,7 +2,18 @@
 	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
 	"linter": {
 		"rules": {
-			"recommended": false
+			"nursery": {
+				"noFloatingPromises": "error"
+			},
+			"correctness": {
+				"noPlaywrightMissingAwait": "error"
+			},
+			"preset": "none",
+			"suspicious": {
+				"noFocusedTests": "error",
+				"noSkippedTests": "error",
+				"noSelfCompare": "error"
+			}
 		}
 	},
 	"plugins": ["./rules/test-correctness.ts"]

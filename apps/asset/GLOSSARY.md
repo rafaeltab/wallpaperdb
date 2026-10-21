@@ -1,21 +1,21 @@
-# Asset
+# Asset service
 
-Asset's accepted target model owns the lifecycle of Assets and delivers requested Renditions. The [Source rendition resolution](https://github.com/rafaeltab/wallpaperdb/issues/269#issuecomment-6152919559) records the product policy; [architecture reconciliation](https://github.com/rafaeltab/wallpaperdb/issues/391) tracks the transition from the existing producer-owned immutable-Asset model.
+The Asset service's accepted target model owns the lifecycle of Assets and delivers requested Renditions. The [Source rendition resolution](https://github.com/rafaeltab/wallpaperdb/issues/269#issuecomment-6152919559) records the product policy; [architecture reconciliation](https://github.com/rafaeltab/wallpaperdb/issues/391) tracks the transition from the existing producer-owned immutable-Asset model.
 
 ## Language
 
 **Delivery catalog**:
-Asset's local record of which Assets, Source renditions, and Materialized renditions can be delivered.
+The Asset service's local record of which Assets, Source renditions, and Materialized renditions can be delivered.
 
 **Asset**:
-Stable asset identity containing immutable Source renditions whose membership can change while its identity remains the same. An Asset may be empty before its first accepted source; afterward, source management retains at least one source until full Asset deletion.
+Stable media identity containing immutable Source renditions whose membership can change while its identity remains the same. An Asset may be empty before its first accepted source; afterward, source management retains at least one source until full Asset deletion.
 _Avoid_: File, original when referring to non-Wallpaper assets
 
 **Asset ID**:
-The stable identity assigned to an Asset by Asset, distinct from Source rendition identities and the consuming application's domain identities.
+The stable identity assigned to an Asset by the Asset service, distinct from Source rendition identities and the consuming application's domain identities.
 
 **Asset deletion**:
-The terminal end of an Asset's lifecycle, authorized by its application and executed by Asset. A deleted Asset cannot be restored by later source activity; completing physical cleanup is distinct from disabling its delivery.
+The terminal end of an Asset's lifecycle, authorized by its application and executed by the Asset service. A deleted Asset cannot be restored by later source activity; completing physical cleanup is distinct from disabling its delivery.
 
 **Application reference**:
 An opaque reference supplied by an application to associate Asset creation and its confirmation with the application's own domain record. It is distinct from Asset ID, Owner reference and command identity; a new creation command can reuse it for a fresh Asset.
@@ -33,14 +33,14 @@ The principal whose ownership permits author operations on an Asset's Source ren
 The combination of an Owner namespace and an opaque subject identifying an Asset owner. Both parts must match for ownership; the same subject in another namespace identifies a different owner.
 
 **Owner namespace**:
-The identity authority within which an Owner reference's subject has meaning. Applications sharing that authority can refer to the same owner without making their own domain identities part of Asset's language.
+The identity authority within which an Owner reference's subject has meaning. Applications sharing that authority can refer to the same owner without making their own domain identities part of the Asset service's language.
 
 **Rendition**:
 A representation of an Asset with specified delivery characteristics such as dimensions, fit, format, motion, color gamut, dynamic range, bit depth, and transparency. A Rendition may be materialized or produced on request.
 _Avoid_: Version, variant
 
 **Rendition request**:
-The delivery characteristics requested for an Asset. Asset either satisfies the complete request or rejects an unsupported combination.
+The delivery characteristics requested for an Asset. The Asset service either satisfies the complete request or rejects an unsupported combination.
 _Avoid_: Transformation options
 
 **Preserve selector**:
@@ -68,13 +68,13 @@ The accepted Source rendition designated as an Asset's reference for preservatio
 Removal of a non-default Source rendition from an Asset's active membership while retaining at least one source. It is distinct from deleting the entire Asset.
 
 **Private evidence retention**:
-Asset's retention of retired Source bytes under the policy selected by Asset type, separately from public delivery and active source membership. Retained evidence does not restore a deleted Asset, and its recorded expiry survives later configuration changes.
+The Asset service's retention of retired Source bytes under the policy selected by Asset type, separately from public delivery and active source membership. Retained evidence does not restore a deleted Asset, and its recorded expiry survives later configuration changes.
 
 **Source acceptance policy**:
-The rules selected by Asset type governing whether Asset accepts a proposed Source rendition. Changes apply to later additions and replacements without automatically withdrawing already accepted sources.
+The rules selected by Asset type governing whether the Asset service accepts a proposed Source rendition. Changes apply to later additions and replacements without automatically withdrawing already accepted sources.
 
 **Source acceptance**:
-Asset's admission of a Source rendition into an Asset's active membership after verifying every mandatory Source acceptance policy rule. Supplementary Inspection can remain pending without preventing unchanged delivery.
+The Asset service's admission of a Source rendition into an Asset's active membership after verifying every mandatory Source acceptance policy rule. Supplementary Inspection can remain pending without preventing unchanged delivery.
 
 **Source intake**:
 The preparation and validation of creator-supplied material before accepting it as a Source rendition, including Profile picture crop processing. Its authoring policy may allow enlargement before acceptance; rendition delivery cannot enlarge the resulting accepted Source.
@@ -87,29 +87,29 @@ _Avoid_: Shape compatibility rule
 A deferred Source acceptance rule requiring additions or replacements to preserve the Asset's visual composition and content, while permitting changes in representation or quality.
 
 **Generated rendition**:
-A representation Asset produces by processing source asset. A Generated rendition may be produced on request or stored as a Materialized rendition.
+A representation the Asset service produces by processing source media. A Generated rendition may be produced on request or stored as a Materialized rendition.
 
 **Materialized rendition**:
-A stored Generated rendition that Asset can reuse to satisfy Rendition requests.
+A stored Generated rendition that the Asset service can reuse to satisfy Rendition requests.
 _Avoid_: Cached file, pre-generated version
 
 **Source facts**:
-The characteristics Asset has established about a Source rendition, including its displayed dimensions, orientation, format, motion, color, precision, and transparency. An unknown characteristic remains unknown rather than taking an assumed value.
+The characteristics the Asset service has established about a Source rendition, including its displayed dimensions, orientation, format, motion, color, precision, and transparency. An unknown characteristic remains unknown rather than taking an assumed value.
 
 **Inspection**:
-Asset's examination of a Source rendition to establish its Source facts. Inspection readiness is separate from its availability for unchanged delivery.
+The Asset service's examination of a Source rendition to establish its Source facts. Inspection readiness is separate from its availability for unchanged delivery.
 
 **Original-delivery availability**:
-Asset's confirmation that a Source rendition has entered its delivery catalog for unchanged delivery, subject to the Asset's lifecycle rules. This is independent of Inspection readiness and is not a continuous service-health guarantee.
+The Asset service's confirmation that a Source rendition has entered its delivery catalog for unchanged delivery, subject to the Asset's lifecycle rules. This is independent of Inspection readiness and is not a continuous service-health guarantee.
 
 **Delivery capabilities**:
-The combinations of Faithful renditions Asset can deliver for an Asset from eligible sources under current processing support and limits, without enlarging an accepted Source. They do not describe the inventory of Materialized renditions.
+The combinations of Faithful renditions the Asset service can deliver for an Asset from eligible sources under current processing support and limits, without enlarging an accepted Source. They do not describe the inventory of Materialized renditions.
 
 **Available renditions announcement**:
-Asset's published snapshot of an Asset's faithful Delivery capabilities, including qualified conversions and unchanged delivery. It describes jointly supported output characteristics and sizing constraints without enumerating Source membership, stored inventory or every output resolution.
+The Asset service's published snapshot of an Asset's faithful Delivery capabilities, including qualified conversions and unchanged delivery. It describes jointly supported output characteristics and sizing constraints without enumerating Source membership, stored inventory or every output resolution.
 
 **Original-only**:
-A Source rendition readiness state in which Asset offers unchanged bytes but no transformations. Unknown required Source facts prevent transformation capabilities for that source.
+A Source rendition readiness state in which the Asset service offers unchanged bytes but no transformations. Unknown required Source facts prevent transformation capabilities for that source.
 
 **Original**:
 The exact immutable bytes of a selected Source rendition.

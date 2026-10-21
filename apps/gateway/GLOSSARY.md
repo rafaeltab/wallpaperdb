@@ -1,6 +1,6 @@
 # Gateway Catalogue
 
-The Gateway Catalogue lets visitors discover wallpapers and their public contributors. It interprets published wallpaper, Asset delivery, color, and Profile facts.
+The Gateway Catalogue lets visitors discover wallpapers and their public contributors. It interprets published wallpaper, the Asset service delivery, color, and Profile facts.
 
 The Wallpaper Asset and discovery terms below follow the [accepted Source rendition model](https://github.com/rafaeltab/wallpaperdb/issues/269#issuecomment-6152919559). [Architecture reconciliation](https://github.com/rafaeltab/wallpaperdb/issues/391) tracks its replacement of the earlier single-source model.
 
@@ -15,20 +15,20 @@ A published image available for discovery, associated with its contributor's Pro
 _Avoid_: Upload command, asset file
 
 **Wallpaper Asset**:
-The stable Asset associated with a Wallpaper, containing its Source renditions and Asset-established delivery capabilities and Source facts.
+The stable Asset associated with a Wallpaper, containing its Source renditions and the Asset service-established delivery capabilities and Source facts.
 _Avoid_: Variant, stored rendition inventory
 
 **Source facts**:
-Asset-established characteristics of actual Source renditions, distinct from the characteristics of possible outputs. Unknown characteristics remain unknown; a qualified conversion does not change the Source facts.
+The Asset service-established characteristics of actual Source renditions, distinct from the characteristics of possible outputs. Unknown characteristics remain unknown; a qualified conversion does not change the Source facts.
 
 **Delivery capabilities**:
-Asset's announced combinations of Faithful renditions for a Wallpaper Asset, including qualified conversions and unchanged delivery. Faithfulness follows [Asset's definition](../asset/GLOSSARY.md); the catalogue does not classify transformations independently.
+The Asset service's announced combinations of Faithful renditions for a Wallpaper Asset, including qualified conversions and unchanged delivery. Faithfulness follows [the Asset service's definition](../media/GLOSSARY.md); the catalogue does not classify transformations independently.
 
 **Rendition filter**:
-A criterion on characteristics that Asset can faithfully deliver together for a Wallpaper Asset. A converted output can satisfy it without that output format having been uploaded or materialized.
+A criterion on characteristics that the Asset service can faithfully deliver together for a Wallpaper Asset. A converted output can satisfy it without that output format having been uploaded or materialized.
 
 **Native coverage**:
-The displayed Source dimensions and shapes from which Asset can faithfully produce a particular output combination. Browse size-and-shape criteria use these native facts, not merely the dimensions or shape of a requested or generated output.
+The displayed Source dimensions and shapes from which the Asset service can faithfully produce a particular output combination. Browse size-and-shape criteria use these native facts, not merely the dimensions or shape of a requested or generated output.
 
 **Discovery eligibility**:
 The catalogue's knowledge that a Wallpaper has been published and its Asset has a non-empty announced set of Delivery capabilities, including unchanged-source delivery. Asset deletion removes eligibility; temporary delivery outages do not, and source management cannot withdraw the last source under the [revised lifecycle decision](https://github.com/rafaeltab/wallpaperdb/issues/391).

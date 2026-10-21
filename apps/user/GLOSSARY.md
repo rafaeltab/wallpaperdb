@@ -20,7 +20,7 @@ _Avoid_: Internal user ID, Clerk ID mapping
 The custom image accepted for a Profile, represented by a Asset whose identity remains stable across complete Source-set replacement. A generated avatar represents the absence of a custom picture and needs no Asset.
 
 **Profile picture removal**:
-The Profile's transition to having no custom picture, accompanied by a durable request to delete its former Asset. It completes independently of Asset's deletion; a later custom picture has a new Asset identity.
+The Profile's transition to having no custom picture, accompanied by a durable request to delete its former Asset. It completes independently of the Asset service's deletion; a later custom picture has a new Asset identity.
 
 **Handle**:
 A unique, changeable identifier for a Profile that provides its human-readable URL slug.

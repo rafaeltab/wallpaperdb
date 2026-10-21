@@ -12,6 +12,10 @@ Issues and specs are tracked in GitHub Issues; external pull requests are not a 
 
 Use the five canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
 
+### Code factory
+
+For scheduled code-quality discovery and automatic `ready-for-agent` pickup, use [code-factory](.agents/skills/code-factory/SKILL.md).
+
 ### Domain docs
 
 WallpaperDB uses a multi-context layout rooted at `GLOSSARY-MAP.md`; system-wide ADRs live in `docs/adr/`. See `docs/agents/domain.md`.

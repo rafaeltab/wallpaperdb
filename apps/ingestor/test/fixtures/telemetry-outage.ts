@@ -6,39 +6,18 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { metrics, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { Effect, Exit, Layer, ManagedRuntime, Scope } from 'effect';
-
-function recordPhase(phase: string, startedAt: number) {
-  if (process.env.CI_RUNTIME_PROFILE !== 'true') return;
-  console.log(
-    JSON.stringify({
-      kind: 'ci-runtime-profile',
-      phase: `ingestor.telemetry.${phase}`,
-      service: process.env.TELEMETRY_SERVICE ?? 'ingestor',
-      outage: process.env.TELEMETRY_OUTAGE_MODE ?? 'unresolved',
-      startedAt: new Date(performance.timeOrigin + startedAt).toISOString(),
-      durationMs: performance.now() - startedAt,
-      pid: process.pid,
-      ...(phase === 'process' ? { maxRssKiB: process.resourceUsage().maxRSS } : {}),
-    })
-  );
-}
-
-recordPhase('imports.bootstrap', 0);
 const service = process.env.TELEMETRY_SERVICE ?? 'ingestor';
 assert(
   ['ingestor', 'gateway', 'media', 'user', 'tags', 'color-extractor', 'variant-generator'].includes(
     service
   )
 );
-const telemetryImportStartedAt = performance.now();
 const { initializeOtel } = await import(
   new URL(`../../../${service}/src/otel-init.ts`, import.meta.url).href
 );
-recordPhase('imports.telemetry', telemetryImportStartedAt);
 
 // This entire process runs in an owned container with its own resolver configuration.
 // Drop collector DNS packets, while localhost remains a healthy /etc/hosts dependency.
-const infrastructureStartedAt = performance.now();
 const dns = createSocket('udp4');
 const outage = process.env.TELEMETRY_OUTAGE_MODE ?? 'unresolved';
 let resolving = outage !== 'unresolved';
@@ -118,10 +97,8 @@ const storage = createServer((request, response) => {
 storage.on('connection', () => storageConnections++);
 const storagePort = await listen(storage);
 const scope = Effect.runSync(Scope.make());
-recordPhase('setup.infrastructure', infrastructureStartedAt);
 let pulse: ReturnType<typeof setInterval> | undefined;
 try {
-  const telemetryStartedAt = performance.now();
   assert.deepEqual(
     await Effect.runPromise(
       initializeOtel({
@@ -131,8 +108,6 @@ try {
     ),
     { _tag: 'Started' }
   );
-  recordPhase('setup.telemetry', telemetryStartedAt);
-  const applicationImportStartedAt = performance.now();
   const { assetsLayer } = await import('../../src/adapters/assets/index.js');
   const { AssetStorage } = await import('../../src/capabilities/ingestion/index.js');
   const { fixture, metadata } = await import('../helpers/ingestion.js');
@@ -141,8 +116,6 @@ try {
   const { availabilityLayer, AvailabilityProbe } = await import(
     '../../src/capabilities/availability/index.js'
   );
-  recordPhase('imports.application', applicationImportStartedAt);
-  const applicationStartedAt = performance.now();
   const assets = ManagedRuntime.make(
     assetsLayer({
       endpoint: `http://localhost:${storagePort}`,
@@ -188,8 +161,6 @@ try {
     );
     try {
       const address = await app.listen({ host: '127.0.0.1', port: 0 });
-      recordPhase('setup.application', applicationStartedAt);
-      const outageStartedAt = performance.now();
       const emit = () => {
         trace.getTracer('outage').startSpan('upload.activity').end();
         logs.getLogger('outage').emit({ body: 'outage activity' });
@@ -201,7 +172,6 @@ try {
       pulse = setInterval(emit, 50);
       emit();
       await until(() => lookups.size >= 4 || queries >= 6 || attempts >= 4);
-      recordPhase('outage', outageStartedAt);
       console.log(
         JSON.stringify({
           phase: 'exporter-dns-active',
@@ -213,7 +183,6 @@ try {
       );
       const before = storageConnections;
       const started = Date.now();
-      const uploadStartedAt = performance.now();
       const response = await fetch(`${address}/upload`, {
         method: 'POST',
         headers: {
@@ -226,7 +195,6 @@ try {
         signal: AbortSignal.timeout(15_000),
       });
       const receipt = await response.json();
-      recordPhase('upload', uploadStartedAt);
       console.log(
         JSON.stringify({
           phase: 'upload-during-dns-outage',
@@ -236,7 +204,6 @@ try {
           objects: objects.size,
         })
       );
-      const recoveryStartedAt = performance.now();
       resolving = true;
       healthy = true;
       if (outage === 'refused')
@@ -251,40 +218,23 @@ try {
       assert.equal(objects.size, 1);
       assert.equal([...objects.values()][0]?.toString(), 'image');
       assert(storageConnections > before, 'Upload must open a fresh storage connection');
-      recordPhase('recovery', recoveryStartedAt);
     } finally {
-      const cleanupStartedAt = performance.now();
-      try {
-        if (pulse) clearInterval(pulse);
-        await app.close();
-      } finally {
-        recordPhase('cleanup.application', cleanupStartedAt);
-      }
+      if (pulse) clearInterval(pulse);
+      await app.close();
     }
   } finally {
-    const cleanupStartedAt = performance.now();
-    try {
-      await assets.dispose();
-    } finally {
-      recordPhase('cleanup.assets', cleanupStartedAt);
-    }
+    await assets.dispose();
   }
 } finally {
-  const cleanupStartedAt = performance.now();
-  try {
-    resolving = true;
-    await Effect.runPromise(Scope.close(scope, Exit.void));
-    objects.clear();
-    dns.close();
-    collector.closeAllConnections();
-    storage.closeAllConnections();
-    await Promise.all(
-      [collector, storage].map(
-        (server) => new Promise<void>((resolve) => server.close(() => resolve()))
-      )
-    );
-  } finally {
-    recordPhase('cleanup.infrastructure', cleanupStartedAt);
-    recordPhase('process', 0);
-  }
+  resolving = true;
+  await Effect.runPromise(Scope.close(scope, Exit.void));
+  objects.clear();
+  dns.close();
+  collector.closeAllConnections();
+  storage.closeAllConnections();
+  await Promise.all(
+    [collector, storage].map(
+      (server) => new Promise<void>((resolve) => server.close(() => resolve()))
+    )
+  );
 }

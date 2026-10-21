@@ -35,8 +35,6 @@ make ci
 
 Choose tests using the [testing guidelines](docs/coding-standards/project-organization.md#shared-testing-principles). The focused command builds workspace dependencies and runs selected tests serially. Local `make ci` runs build, lint, type checks, unit tests, integration tests, and non-E2E coverage merging. It reports that browser and container E2E are excluded. Integration tests retain their own containers and browser adapter contracts; install their Chromium dependency with `make run PACKAGE=web SCRIPT=test:browser:install` when needed. Ordinary validation needs only the prerequisites of those checks, without application-stack or E2E credentials.
 
-The independently containerized Ingestor telemetry outage cases run at most two at a time on GitHub Actions and one at a time locally. The [Ingestor test configuration](apps/ingestor/vitest.config.ts) retains its existing file worker limit. Hosted runs upload phase and resource measurements through the [runtime profiler](scripts/ci-runtime.mjs); set `CI_RUNTIME_PROFILE=true` to retain the [fixture timing records](packages/test-logger/src/index.ts) during local integration validation.
-
 GitHub Actions is the default place for complete browser and container E2E. Both jobs in the [E2E workflow](.github/workflows/e2e.yml) enforce failures on pull requests and main. Use explicit local E2E for diagnosis or deliberate validation:
 
 ```sh

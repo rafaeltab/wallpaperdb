@@ -8,9 +8,6 @@ export default mergeConfig(
   defineConfig({
     test: {
       name: 'ingestor',
-      silent: process.env.CI_RUNTIME_PROFILE === 'true' ? false : 'passed-only',
-      reporters: process.env.CI_RUNTIME_PROFILE === 'true' ? ['default', 'json'] : ['default'],
-      outputFile: { json: 'test-results/ci-runtime-vitest.json' },
       environment: 'node',
       testTimeout: 60000,
       hookTimeout: 60000,

@@ -15,8 +15,8 @@
     "lint:fix": "biome lint --write .",
     "check-types": "tsc --noEmit",
     "check": "biome check --write .",
-    "test": "vitest run --outputFile.json=test-results/ci-runtime-vitest-all.json",
-    "test:unit": "vitest run --project=gateway-unit --coverage --coverage.reportsDirectory=coverage/unit --outputFile.json=test-results/ci-runtime-vitest-unit.json",
+    "test": "vitest run",
+    "test:unit": "vitest run --project=gateway-unit --coverage --coverage.reportsDirectory=coverage/unit",
     "test:integration": "vitest run --project=gateway-integration --project=gateway-search --project=gateway-instrumentation --coverage",
     "test:watch": "vitest",
     "load:admission": "node scripts/load-admission.mjs"

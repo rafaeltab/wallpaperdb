@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from '@opensearch-project/opensearch';
-import { measureTestPhase } from '@wallpaperdb/test-logger';
 import { inject } from 'vitest';
 import { Layer, ManagedRuntime } from 'effect';
 import {
@@ -29,39 +28,31 @@ export function createSearchFixture() {
     },
     index,
     async destroy() {
-      return measureTestPhase('gateway.search.cleanup', async () => {
-        const client = new Client({ node: connection.url });
-        try {
-          await client.indices.delete({
-            index: `${prefix}*`,
-            expand_wildcards: 'all',
-            ignore_unavailable: true,
-            allow_no_indices: true,
-          });
-        } finally {
-          await client.close();
-        }
-      });
+      const client = new Client({ node: connection.url });
+      try {
+        await client.indices.delete({
+          index: `${prefix}*`,
+          expand_wildcards: 'all',
+          ignore_unavailable: true,
+          allow_no_indices: true,
+        });
+      } finally {
+        await client.close();
+      }
     },
   };
 }
 
 export async function acquireSearchFixture(options: OpenSearchGatewayOptions) {
-  return measureTestPhase('gateway.search.acquire', async () => {
-    const runtime = ManagedRuntime.make(
-      projectionLayer.pipe(Layer.provideMerge(openSearchLayer(options)))
-    );
-    try {
-      const adapter = await runtime.runPromise(OpenSearchGateway);
-      const project = await runtime.runPromise(ProjectCatalogue);
-      return {
-        adapter,
-        project,
-        dispose: () => measureTestPhase('gateway.search.dispose', () => runtime.dispose()),
-      };
-    } catch (error) {
-      await measureTestPhase('gateway.search.dispose-after-failure', () => runtime.dispose());
-      throw error;
-    }
-  });
+  const runtime = ManagedRuntime.make(
+    projectionLayer.pipe(Layer.provideMerge(openSearchLayer(options)))
+  );
+  try {
+    const adapter = await runtime.runPromise(OpenSearchGateway);
+    const project = await runtime.runPromise(ProjectCatalogue);
+    return { adapter, project, dispose: () => runtime.dispose() };
+  } catch (error) {
+    await runtime.dispose();
+    throw error;
+  }
 }

@@ -2,7 +2,6 @@ import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import { WallpaperUploadedEventSchema } from '@wallpaperdb/events/schemas';
-import { measureTestPhase } from '@wallpaperdb/test-logger';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { FastifyInstance } from 'fastify';
@@ -24,44 +23,38 @@ let app: FastifyInstance;
 let config: Config;
 beforeAll(async () => {
   [database, storage, broker] = await Promise.all([
-    measureTestPhase('ingestor.composition.postgres.readiness', () =>
-      new PostgreSqlContainer('postgres:16-alpine').start()
-    ),
-    measureTestPhase('ingestor.composition.storage.readiness', () =>
-      new GenericContainer('chrislusf/seaweedfs:4.47')
-        .withEnvironment({ AWS_ACCESS_KEY_ID: 'access', AWS_SECRET_ACCESS_KEY: 'secret' })
-        .withCommand([
-          'mini',
-          '-dir=/data',
-          '-ip=127.0.0.1',
-          '-ip.bind=0.0.0.0',
-          '-s3.port=9000',
-          '-s3.autoCreateBucket=false',
-          '-s3.port.iceberg=0',
-          '-s3.port.lance=0',
-          '-admin.ui=false',
-          '-webdav=false',
-          '-master.telemetry=false',
+    new PostgreSqlContainer('postgres:16-alpine').start(),
+    new GenericContainer('chrislusf/seaweedfs:4.47')
+      .withEnvironment({ AWS_ACCESS_KEY_ID: 'access', AWS_SECRET_ACCESS_KEY: 'secret' })
+      .withCommand([
+        'mini',
+        '-dir=/data',
+        '-ip=127.0.0.1',
+        '-ip.bind=0.0.0.0',
+        '-s3.port=9000',
+        '-s3.autoCreateBucket=false',
+        '-s3.port.iceberg=0',
+        '-s3.port.lance=0',
+        '-admin.ui=false',
+        '-webdav=false',
+        '-master.telemetry=false',
+      ])
+      .withExposedPorts(9000)
+      .withWaitStrategy(
+        Wait.forAll([
+          Wait.forLogMessage('All enabled components are running and ready to use:'),
+          Wait.forHttp('/healthz', 9000),
         ])
-        .withExposedPorts(9000)
-        .withWaitStrategy(
-          Wait.forAll([
-            Wait.forLogMessage('All enabled components are running and ready to use:'),
-            Wait.forHttp('/healthz', 9000),
-          ])
-        )
-        .start()
-    ),
-    measureTestPhase('ingestor.composition.nats.readiness', () => createNatsContainer()),
+      )
+      .start(),
+    createNatsContainer(),
   ]);
   const databaseUrl = database.getConnectionUri().replace('localhost', '127.0.0.1');
   const pool = new pg.Pool({ connectionString: databaseUrl });
   try {
-    await measureTestPhase('ingestor.composition.postgres.migrate', () =>
-      migrate(drizzle(pool), {
-        migrationsFolder: new URL('../drizzle', import.meta.url).pathname,
-      })
-    );
+    await migrate(drizzle(pool), {
+      migrationsFolder: new URL('../drizzle', import.meta.url).pathname,
+    });
   } finally {
     await pool.end();
   }
@@ -73,18 +66,14 @@ beforeAll(async () => {
     forcePathStyle: true,
   });
   try {
-    await measureTestPhase('ingestor.composition.storage.configure', () =>
-      s3.send(new CreateBucketCommand({ Bucket: 'wallpapers' }))
-    );
+    await s3.send(new CreateBucketCommand({ Bucket: 'wallpapers' }));
   } finally {
     s3.destroy();
   }
-  await measureTestPhase('ingestor.composition.nats.configure', async () => {
-    connection = await connect({ servers: broker.getConnectionUrl() });
-    await (await connection.jetstreamManager()).streams.add({
-      name: 'WALLPAPER',
-      subjects: ['wallpaper.uploaded'],
-    });
+  connection = await connect({ servers: broker.getConnectionUrl() });
+  await (await connection.jetstreamManager()).streams.add({
+    name: 'WALLPAPER',
+    subjects: ['wallpaper.uploaded'],
   });
   config = loadConfig({
     NODE_ENV: 'test',
@@ -95,16 +84,12 @@ beforeAll(async () => {
     NATS_URL: broker.getConnectionUrl(),
     REDIS_ENABLED: 'false',
   });
-  app = await measureTestPhase('ingestor.composition.app.start', () =>
-    createApp(config, { logger: false })
-  );
+  app = await createApp(config, { logger: false });
 });
 afterAll(async () => {
-  await measureTestPhase('ingestor.composition.cleanup', async () => {
-    await app?.close();
-    await connection?.close();
-    await Promise.all([database?.stop(), storage?.stop(), broker?.stop()]);
-  });
+  await app?.close();
+  await connection?.close();
+  await Promise.all([database?.stop(), storage?.stop(), broker?.stop()]);
 });
 it('composes authenticated upload, durable asset publication, duplicate response, and health', async () => {
   const bytes = await sharp({

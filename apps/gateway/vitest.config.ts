@@ -15,8 +15,6 @@ export default mergeConfig(
     },
     test: {
       name: 'gateway',
-      reporters: process.env.CI_RUNTIME_PROFILE === 'true' ? ['default', 'json'] : ['default'],
-      outputFile: { json: 'test-results/ci-runtime-vitest.json' },
       environment: 'node',
       testTimeout: 60000,
       hookTimeout: 120000,

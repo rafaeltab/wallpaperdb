@@ -14,7 +14,8 @@
         "test:ui": "vitest --ui",
         "coverage:merge": "node scripts/merge-coverage.mjs",
         "test:integration": "vitest run --config vitest.integration.config.ts",
-        "check-types": "tsc --project tsconfig.tooling.json"
+        "check-types": "tsc --project tsconfig.tooling.json",
+        "lint": "biome lint test"
     },
     "peerDependencies": {
         "graphql": "16.12.0"
@@ -29,7 +30,9 @@
         "graphql": "16.12.0",
         "turbo": "2.7.2",
         "typescript": "^5.7.2",
-        "vitest": "5.0.2"
+        "vitest": "5.0.2",
+        "@biomejs/biome": "2.6.2",
+        "@wallpaperdb/biome-test-rules": "workspace:*"
     },
     "pnpm": {
         "overrides": {

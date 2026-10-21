@@ -28,7 +28,7 @@
     "@types/node": "^22.10.2",
     "nats": "^2.29.1",
     "typescript": "^5.7.2",
-    "@biomejs/biome": "^2.3.8",
+    "@biomejs/biome": "2.6.2",
     "@wallpaperdb/vitest-config": "workspace:*",
     "vitest": "5.0.2"
   }

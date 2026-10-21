@@ -22,6 +22,15 @@ test("Biome rejects unhandled directly imported helper promises", () => {
 	);
 });
 
+test("awaited lifecycle promises from the real shared tester remain valid", () => {
+	assert.deepEqual(
+		lint(
+			"import { createDefaultTesterBuilder } from '@wallpaperdb/test-utils'; const Tester = createDefaultTesterBuilder().build(); const tester = new Tester(); await tester.setup(); await tester.cleanup(); await tester.destroy();",
+		),
+		[],
+	);
+});
+
 test("Biome's Playwright rule checks the real imported assertion types in specs", () => {
 	const source =
 		"import { expect, test } from '@playwright/test'; test('page', async ({ page }) => { expect(page.getByRole('button')).toBeVisible(); });";

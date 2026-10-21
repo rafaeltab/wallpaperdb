@@ -4,5 +4,7 @@
 		"rules": {
 			"preset": "recommended"
 		}
-	}
+	},
+	"root": false,
+	"extends": "//"
 }

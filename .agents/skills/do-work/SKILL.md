@@ -39,6 +39,6 @@ Before pushing or updating a stack, fetch its trunk and check each layer against
 
 Push the completed branch and open a PR automatically. Summarize the changes, link the relevant issue when there is one, and report the validation performed. Use the github-markdown-bodies skill for the PR description and [pr-video-attachment](../pr-video-attachment/SKILL.md) for each recording. Confirm the PR renders each video and that reviewers can access it.
 
-For issue work, follow the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) to verify `In Review` after publication and before handoff. Keep the issue open until verified default-branch landing; completion automation owns `Done`.
+For issue work, follow the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) to verify `In Review` after the completed PR is ready for review and before handoff. A draft PR keeps its ticket `In Progress`. Keep the issue open until verified default-branch landing; completion automation owns `Done`.
 
 After publishing or updating a stack, inspect GitHub's native stack status. Report the stack as merge-ready only when each layer is ready there; ordinary PR mergeability alone is insufficient.

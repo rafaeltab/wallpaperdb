@@ -1,5 +1,5 @@
 import { type ApiPageProps, createAPIPage } from "fumadocs-openapi/ui";
-import { ingestorOpenApi, assetOpenApi } from "@/lib/openapi";
+import { assetOpenApi, ingestorOpenApi } from "@/lib/openapi";
 import client from "./api-page.client";
 
 const AssetApiPage = createAPIPage(assetOpenApi, {

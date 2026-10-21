@@ -1,5 +1,5 @@
 import { generateFiles } from "fumadocs-openapi";
-import { ingestorOpenApi, assetOpenApi } from "../src/lib/openapi.ts";
+import { assetOpenApi, ingestorOpenApi } from "../src/lib/openapi.ts";
 
 void generateFiles({
   input: ingestorOpenApi,

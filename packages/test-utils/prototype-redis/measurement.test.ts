@@ -82,7 +82,8 @@ it('matched baseline and pilot timings', async () => {
           expect(sample.metrics.starts).toBe(expectedContainers);
           expect(sample.metrics.stops).toBe(expectedContainers);
           expect(sample.metrics.containersRemoved).toBe(expectedContainers);
-          expect(sample.metrics.clientsClosed).toBe(6);
+          // Six case clients plus one private deletion client for each of the five cases.
+          expect(sample.metrics.clientsClosed).toBe(11);
           sample.status = 'passed';
         } catch (error) {
           sample.status = 'failed';

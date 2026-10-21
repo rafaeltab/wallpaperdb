@@ -6,6 +6,14 @@ import { getContainerRuntimeClient } from 'testcontainers';
 import { expect, it, vi } from 'vitest';
 import { createGroup, docker, timing } from './fixture';
 
+function causes(error: unknown): unknown[] {
+  return [
+    error,
+    ...(error instanceof AggregateError ? error.errors.flatMap(causes) : []),
+    ...(error instanceof Error && error.cause ? causes(error.cause) : []),
+  ];
+}
+
 it.each([
   'stop',
   'remove',
@@ -152,7 +160,11 @@ it.each([
     expect(errors.map(String).join(' ')).toContain('pending cases');
     const caseError = await running;
     expect(caseError).toBeInstanceOf(Error);
-    expect(errors).toContain((caseError as Error).cause);
+    const pendingFailure = causes(error).find(
+      (cause) => cause instanceof Error && cause.message === 'timed out waiting for pending cases'
+    );
+    expect(pendingFailure).toBeInstanceOf(Error);
+    expect(causes(caseError)).toContain(pendingFailure);
     for (const phase of stalled === 'all' ? ['stop', 'remove', 'list'] : [stalled]) {
       expect(errors.map(String).join(' ')).toContain(`Docker ${phase}`);
     }

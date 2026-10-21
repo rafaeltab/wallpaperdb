@@ -37,38 +37,19 @@ export interface CaseScope {
   subscribe(channel: string, listener: (message: string) => void): Promise<void>;
 }
 
-function remaining(deadline: number) {
-  return Math.max(1, deadline - performance.now());
-}
-
 function throwErrors(errors: unknown[], message: string) {
   if (errors.length === 1) throw errors[0];
   if (errors.length) throw new AggregateError(errors, message);
 }
 
-async function closeClient(client: RedisClientType, deadline: number) {
-  const errors: unknown[] = [];
-  try {
-    // redis 4's quit() clears isOpen before its reply. Keep disconnect available.
-    if (client.isOpen)
-      await within(client.sendCommand(['QUIT']), remaining(deadline), 'Redis QUIT timed out');
-  } catch (error) {
-    errors.push(error);
-  }
-  try {
-    if (client.isOpen)
-      await within(client.disconnect(), remaining(deadline), 'Redis disconnect timed out');
-  } catch (error) {
-    errors.push(error);
-  }
-  throwErrors(errors, 'Redis client cleanup failed');
-}
-
-async function within<T>(operation: Promise<T>, timeoutMs: number, message: string) {
+async function within<T>(operation: () => Promise<T>, deadline: number, message: string) {
+  const timeoutMs = deadline - performance.now();
+  // Check before calling the operation, so an expired budget starts no new commands.
+  if (timeoutMs <= 0) throw new Error(message);
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      operation,
+      operation(),
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error(message)), timeoutMs);
       }),
@@ -100,7 +81,66 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
   const keys = new Set<string>();
   const channels = new Set<string>();
   const pending = new Set<Promise<void>>();
+  const cancellations = new WeakMap<RedisClientType, AbortController>();
   let closing = false;
+  let shutdownDeadline = Number.POSITIVE_INFINITY;
+
+  function newClient(name?: string) {
+    const cancellation = new AbortController();
+    // node-redis forwards this object to net.connect, including its native signal.
+    const socket = {
+      reconnectStrategy: false as const,
+      connectTimeout: 3000,
+      signal: cancellation.signal,
+    };
+    const client: RedisClientType = createClient({
+      url: tester.redis.config.endpoints.fromHost,
+      name,
+      socket,
+    });
+    cancellations.set(client, cancellation);
+    // Commands reject normally; socket error events must also have an observer.
+    client.on('error', () => {});
+    return client;
+  }
+
+  function forceClients(connections: RedisClientType[]) {
+    // Abort the actual transport even when Redis has not stored a connecting socket yet.
+    // Invoke every cancellation before awaiting pool drainage or another client.
+    return Promise.allSettled(
+      connections.map(async (client) => {
+        cancellations.get(client)?.abort();
+        if (client.isOpen) await client.disconnect();
+      })
+    );
+  }
+
+  async function closeClients(connections: RedisClientType[], deadline: number) {
+    const errors: unknown[] = [];
+    try {
+      for (const client of connections) {
+        if (!client.isOpen) continue;
+        try {
+          // redis 4's quit() clears isOpen before its reply. Keep disconnect available.
+          await within(() => client.sendCommand(['QUIT']), deadline, 'Redis QUIT timed out');
+        } catch (error) {
+          errors.push(error);
+          if (performance.now() >= deadline) break;
+        }
+      }
+    } finally {
+      const disconnected = forceClients(connections);
+      try {
+        const results = await within(() => disconnected, deadline, 'Redis disconnect timed out');
+        for (const result of results) {
+          if (result.status === 'rejected') errors.push(result.reason);
+        }
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    throwErrors(errors, 'Redis client cleanup failed');
+  }
 
   async function dockerRequest<T>(
     action: string,
@@ -108,7 +148,9 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
     operation: (signal: AbortSignal) => Promise<T>
   ) {
     const cancellation = new AbortController();
-    const timer = setTimeout(() => cancellation.abort(), remaining(deadline));
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) cancellation.abort();
+    const timer = remaining > 0 ? setTimeout(() => cancellation.abort(), remaining) : undefined;
     try {
       return await operation(cancellation.signal);
     } catch (error) {
@@ -121,15 +163,9 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
 
   async function connect(name: string, owned: RedisClientType[], assertOpen: () => void) {
     assertOpen();
-    const client: RedisClientType = createClient({
-      url: tester.redis.config.endpoints.fromHost,
-      name,
-      socket: { reconnectStrategy: false, connectTimeout: 3000 },
-    });
+    const client = newClient(name);
     owned.push(client);
     clients.push(client);
-    // connect/commands reject normally; keep socket errors from becoming unhandled events.
-    client.on('error', () => {});
     const open = client.connect.bind(client);
     // Retained clients cannot reopen after their case or group has closed.
     client.connect = async () => {
@@ -138,7 +174,7 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
       try {
         assertOpen();
       } catch (error) {
-        if (client.isOpen) await client.disconnect();
+        await forceClients([client]);
         throw error;
       }
       return client;
@@ -205,7 +241,10 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
               const subscriber = await connect(`${prefix}:subscriber`, owned, assertOpen);
               assertOpen();
               subscriptions.push({ client: subscriber, channel });
-              await subscriber.subscribe(channel, listener);
+              await subscriber.subscribe(channel, (message) => {
+                if (!closed && !abort.signal.aborted) listener(message);
+              });
+              assertOpen();
             },
           };
           const start = performance.now();
@@ -219,34 +258,50 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
         } finally {
           closed = true;
           const start = performance.now();
-          const deadline = start + shutdownTimeoutMs;
+          const deadline = Math.min(start + shutdownTimeoutMs, shutdownDeadline);
           // Attempt every release even if a previous one fails. Never FLUSHALL.
           for (const subscription of subscriptions) {
             try {
               if (subscription.client.isOpen) {
                 await within(
-                  subscription.client.unsubscribe(subscription.channel),
-                  remaining(deadline),
+                  () => subscription.client.unsubscribe(subscription.channel),
+                  deadline,
                   'Redis UNSUBSCRIBE timed out'
                 );
               }
             } catch (error) {
               errors.push(error);
+              if (performance.now() >= deadline) break;
             }
           }
+          // Close user command access before the final DEL. A retained raw client's
+          // detached SET can otherwise be queued between DEL and QUIT.
           try {
-            if (ownedKeys.size && client?.isReady) {
-              await within(client.del([...ownedKeys]), remaining(deadline), 'Redis DEL timed out');
-            }
+            await closeClients(owned, deadline);
+            metrics.clientsClosed += owned.length;
           } catch (error) {
             errors.push(error);
           }
-          for (const connection of owned) {
-            try {
-              await closeClient(connection, deadline);
-              metrics.clientsClosed++;
-            } catch (error) {
-              errors.push(error);
+          const cleanup: RedisClientType[] = [];
+          try {
+            if (ownedKeys.size) {
+              const cleaner = await within(
+                () => connect(`${prefix}:cleanup`, cleanup, () => abort.signal.throwIfAborted()),
+                deadline,
+                'Redis cleanup connection timed out'
+              );
+              await within(() => cleaner.del([...ownedKeys]), deadline, 'Redis DEL timed out');
+            }
+          } catch (error) {
+            errors.push(error);
+          } finally {
+            if (cleanup.length) {
+              try {
+                await closeClients(cleanup, deadline);
+                metrics.clientsClosed += cleanup.length;
+              } catch (error) {
+                errors.push(error);
+              }
             }
           }
           metrics.scopedCleanupMs += performance.now() - start;
@@ -260,6 +315,7 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
     async close() {
       closing = true;
       const deadline = performance.now() + shutdownTimeoutMs;
+      shutdownDeadline = deadline;
       // One aggregate bound, with Docker time reserved after the Redis window.
       const dockerDeadline = deadline + 5000;
       const verification = performance.now();
@@ -268,21 +324,18 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
       try {
         try {
           await within(
-            Promise.allSettled([...pending]),
-            remaining(deadline),
+            () => Promise.allSettled([...pending]),
+            deadline,
             'timed out waiting for pending cases'
           );
         } catch (error) {
           abort.abort(new Error('group is closed', { cause: error }));
           const errors = [error];
+          const forced = forceClients(clients);
           try {
             const disconnected = await within(
-              Promise.allSettled(
-                clients.map(async (client) => {
-                  if (client.isOpen) await client.disconnect();
-                })
-              ),
-              remaining(deadline),
+              () => forced,
+              deadline,
               'client disconnection timed out'
             );
             for (const result of disconnected) {
@@ -293,8 +346,8 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
           }
           try {
             await within(
-              Promise.allSettled([...pending]),
-              remaining(deadline),
+              () => Promise.allSettled([...pending]),
+              deadline,
               'pending cases cleanup timed out'
             );
           } catch (cleanupError) {
@@ -308,36 +361,39 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
           clients.every((client) => !client.isOpen),
           'case clients closed before stop'
         );
-        observer = createClient({
-          url: tester.redis.config.endpoints.fromHost,
-          socket: { reconnectStrategy: false, connectTimeout: 3000 },
-        });
-        observer.on('error', () => {});
+        observer = newClient();
         const inspect = observer;
-        await within(
-          (async () => {
-            await inspect.connect();
-            for (const key of keys) assert.equal(await inspect.exists(key), 0, `leaked key ${key}`);
-            for (const channel of channels) {
-              assert.equal(
-                (await inspect.pubSubNumSub(channel))[channel],
-                0,
-                'leaked subscription'
-              );
-            }
-            assert.ok(
-              (await inspect.clientList()).every((client) => !client.name.startsWith(owner)),
-              'owned client still visible to Redis'
-            );
-          })(),
-          remaining(deadline),
+        await within(() => inspect.connect(), deadline, 'Redis verification timed out');
+        for (const key of keys) {
+          const exists = await within(
+            () => inspect.exists(key),
+            deadline,
+            'Redis verification timed out'
+          );
+          assert.equal(exists, 0, `leaked key ${key}`);
+        }
+        for (const channel of channels) {
+          const subscriptions = await within(
+            () => inspect.pubSubNumSub(channel),
+            deadline,
+            'Redis verification timed out'
+          );
+          assert.equal(subscriptions[channel], 0, 'leaked subscription');
+        }
+        const visible = await within(
+          () => inspect.clientList(),
+          deadline,
           'Redis verification timed out'
+        );
+        assert.ok(
+          visible.every((client) => !client.name.startsWith(owner)),
+          'owned client still visible to Redis'
         );
       } catch (error) {
         errors.push(error);
       }
       try {
-        if (observer) await closeClient(observer, deadline);
+        if (observer) await closeClients([observer], deadline);
       } catch (error) {
         errors.push(error);
       }

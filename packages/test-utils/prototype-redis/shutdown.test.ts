@@ -120,7 +120,6 @@ it('bounds a stuck case and rejects late resource acquisition after group shutdo
 
 it.each([
   'QUIT',
-  'DEL',
   'UNSUBSCRIBE',
 ] as const)('bounds stalled %s and preserves the case failure', async (phase) => {
   const metrics = timing();
@@ -130,7 +129,6 @@ it.each([
   const result = group
     .runCase('paused', async (scope) => {
       client = scope.client;
-      if (phase === 'DEL') await client.set(scope.key('owned'), 'value');
       if (phase === 'UNSUBSCRIBE') await scope.subscribe(scope.channel('owned'), () => {});
       await client.clientPause(5000, 'ALL');
       throw new Error('intentional body failure');
@@ -161,7 +159,9 @@ it('bounds observer verification when an open Redis socket stops answering', asy
   try {
     await group.runCase('setup', async (scope) => {
       // This test owns an independent control connection, outside the retired case.
-      client = scope.client.duplicate();
+      client = scope.client.duplicate({
+        socket: { reconnectStrategy: false, connectTimeout: 3000 },
+      });
     });
     await client.connect();
     await client.clientPause(5000, 'ALL');

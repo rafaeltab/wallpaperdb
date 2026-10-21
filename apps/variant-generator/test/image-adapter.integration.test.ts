@@ -154,6 +154,13 @@ describe('Stored variant image adapter', () => {
     if (Result.isFailure(result)) expect(result.failure).toMatchObject({
       _tag: 'GenerationUnavailable', operation: key === 'missing' ? 'read-image' : 'inspect-image',
     });
+    if (key === 'corrupt' && Result.isFailure(result)) {
+      expect(result.failure.cause).toBeInstanceOf(Error);
+      if (result.failure.cause instanceof Error) {
+        expect(result.failure.cause.message).toBe('Image inspection failed');
+        expect(result.failure.cause.cause).toBeInstanceOf(Error);
+      }
+    }
   });
   it('enforces the native input-pixel limit during inspection', async () => {
     const key = 'pixel-limit.svg';

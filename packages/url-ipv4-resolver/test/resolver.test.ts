@@ -9,7 +9,7 @@ describe("Resolver", () => {
 
         const result = await resolveUrlIpv4(given);
 
-        expect(result, "127.0.0.1");
+        expect(result).toBe("127.0.0.1");
     });
 
     it("Should resolve plain localhost to 127.0.0.1", async () => {
@@ -17,7 +17,7 @@ describe("Resolver", () => {
 
         const result = await resolveUrlIpv4(given);
 
-        expect(result, "127.0.0.1");
+        expect(result).toBe("127.0.0.1");
     });
 
     it("Should resolve example.com to an ip", async () => {
@@ -34,8 +34,7 @@ describe("Resolver", () => {
 
         const result = await resolveUrlIpv4(given);
 
-        expect(
-            result,
+        expect(result).toBe(
             "postgres://username:password@127.0.0.1:5432/database_name?sslmode=disable",
         );
     });

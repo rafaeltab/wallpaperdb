@@ -4,7 +4,7 @@ import type { DatabaseConfig } from "../src/connections/types.js";
 
 describe("Database Utilities", () => {
   describe("createPool", () => {
-    it("should create a pool with default options", () => {
+    it("should create a pool with default options", async () => {
       const config: DatabaseConfig = {
         databaseUrl: "postgresql://test:test@localhost:5432/test",
       };
@@ -13,10 +13,10 @@ describe("Database Utilities", () => {
 
       expect(pool).toBeDefined();
       // Pool is created but not connected - that's expected
-      pool.end(); // Clean up
+      await pool.end(); // Clean up
     });
 
-    it("should accept custom pool options", () => {
+    it("should accept custom pool options", async () => {
       const config: DatabaseConfig = {
         databaseUrl: "postgresql://test:test@localhost:5432/test",
       };
@@ -28,7 +28,7 @@ describe("Database Utilities", () => {
       });
 
       expect(pool).toBeDefined();
-      pool.end(); // Clean up
+      await pool.end(); // Clean up
     });
   });
 

@@ -22,7 +22,7 @@ _Avoid_: Variant, stored rendition inventory
 The Asset service-established characteristics of actual Source renditions, distinct from the characteristics of possible outputs. Unknown characteristics remain unknown; a qualified conversion does not change the Source facts.
 
 **Delivery capabilities**:
-The Asset service's announced combinations of Faithful renditions for a Wallpaper Asset, including qualified conversions and unchanged delivery. Faithfulness follows [the Asset service's definition](../media/GLOSSARY.md); the catalogue does not classify transformations independently.
+The Asset service's announced combinations of Faithful renditions for a Wallpaper Asset, including qualified conversions and unchanged delivery. Faithfulness follows [the Asset service's definition](../asset/GLOSSARY.md); the catalogue does not classify transformations independently.
 
 **Rendition filter**:
 A criterion on characteristics that the Asset service can faithfully deliver together for a Wallpaper Asset. A converted output can satisfy it without that output format having been uploaded or materialized.

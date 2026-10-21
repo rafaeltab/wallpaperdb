@@ -4,12 +4,18 @@ This workspace owns WallpaperDB's shared test correctness policy for Biome. It a
 
 ## Capabilities
 
-The assertion rule rejects incomplete matcher chains, including accidental two-argument `expect` calls. A reason as the second argument remains valid when the assertion has a matcher.
+The assertion rules reject incomplete matchers and unhandled Vitest async assertions, including task-local `expect` bindings. A reason as the second argument remains valid when the assertion has a matcher. Retry checks follow Vitest registration aliases and shared options while accepting application retry settings and test data.
+
+The shared policy uses Biome's built-in focus, skip, self-comparison, floating-promise and Playwright checks. Targeted plugins cover known Effect promise APIs and unfinished registrations. Normal repository linting applies the policy to test sources, including maintained fixture helpers, and excludes generated output and deliberate CRAP input fixtures.
 
 The regression tests run the actual Biome CLI with the exported configuration. Keep invalid examples in those tests so ordinary repository linting does not discover them as test sources.
 
 ## Maintenance
 
 The CLI and runtime versions are pinned together because Biome's JavaScript plugin API is a developer preview. Check the [upstream plugin documentation](https://biomejs.dev/linter/plugins/) and run the regression suite when upgrading either dependency.
+
+Biome does not infer every imported generic return type. The plugins use supported bindings and syntax APIs, which do not expose TypeScript type inference. The demonstrated shared-tester promise gap and the migration decision remain tracked in [#477](https://github.com/rafaeltab/wallpaperdb/issues/477).
+
+The [root configuration](../../biome.json) leaves the newly recommended component-hook-factory rule disabled to keep unrelated React refactors outside this upgrade.
 
 Use the standard workspace tasks through [Make](../../Makefile). Repository ownership and testing requirements are in the [coding guidelines](../../CODING_STANDARDS.md).

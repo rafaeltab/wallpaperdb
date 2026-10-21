@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@wallpaperdb/scripts": "workspace:*",
-    "@biomejs/biome": "^2.3.8",
+    "@biomejs/biome": "2.6.2",
     "@types/node": "^22.10.2",
     "@wallpaperdb/test-utils": "workspace:*",
     "@wallpaperdb/testcontainers": "workspace:*",

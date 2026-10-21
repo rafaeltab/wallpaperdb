@@ -49,10 +49,18 @@
             "dependsOn": [
                 "^build",
                 "lint:architecture"
+            ],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/biome.json",
+                "$TURBO_ROOT$/packages/biome-test-rules/test-correctness.json",
+                "$TURBO_ROOT$/packages/biome-test-rules/rules/**"
             ]
         },
         "lint:architecture": {
-            "dependsOn": ["//#architecture:workspaces"],
+            "dependsOn": [
+                "//#architecture:workspaces"
+            ],
             "inputs": [
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/scripts/check-architecture.mjs"
@@ -77,6 +85,12 @@
         "lint:fix": {
             "dependsOn": [
                 "^build"
+            ],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/biome.json",
+                "$TURBO_ROOT$/packages/biome-test-rules/test-correctness.json",
+                "$TURBO_ROOT$/packages/biome-test-rules/rules/**"
             ]
         },
         "format": {
@@ -149,7 +163,9 @@
             ]
         },
         "check-types": {
-            "dependsOn": ["^build"],
+            "dependsOn": [
+                "^build"
+            ],
             "cache": true,
             "inputs": [
                 "$TURBO_DEFAULT$"
@@ -228,7 +244,9 @@
             "cache": false
         },
         "@wallpaperdb/scripts#check-types": {
-            "dependsOn": ["^build"],
+            "dependsOn": [
+                "^build"
+            ],
             "inputs": [
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/crap.config.mts",
@@ -238,16 +256,53 @@
             "outputs": []
         },
         "@wallpaperdb/web#test:integration": {
-            "dependsOn": ["^build"],
+            "dependsOn": [
+                "^build"
+            ],
             "inputs": [
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/pnpm-lock.yaml",
                 "$TURBO_ROOT$/apps/web-e2e/fixtures/profile-*.png"
             ],
-            "outputs": ["coverage/integration/**"]
+            "outputs": [
+                "coverage/integration/**"
+            ]
         },
         "@wallpaperdb/infra-local#test:unit": {
-            "inputs": ["$TURBO_DEFAULT$"],
+            "inputs": [
+                "$TURBO_DEFAULT$"
+            ],
+            "outputs": []
+        },
+        "//#lint": {
+            "inputs": [
+                "test/**",
+                "biome.json",
+                "package.json",
+                "pnpm-lock.yaml"
+            ],
+            "outputs": []
+        },
+        "@wallpaperdb/biome-test-rules#test:unit": {
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/Makefile",
+                "$TURBO_ROOT$/biome.json",
+                "$TURBO_ROOT$/turbo.json",
+                "$TURBO_ROOT$/pnpm-workspace.yaml",
+                "$TURBO_ROOT$/package.json",
+                "$TURBO_ROOT$/pnpm-lock.yaml",
+                "$TURBO_ROOT$/apps/*/package.json",
+                "$TURBO_ROOT$/packages/*/package.json",
+                "$TURBO_ROOT$/apps/*/biome.json",
+                "$TURBO_ROOT$/packages/*/biome.json",
+                "$TURBO_ROOT$/scripts/package.json",
+                "$TURBO_ROOT$/infra/package.json",
+                "$TURBO_ROOT$/apps/*/{test,tests,specs}/**",
+                "$TURBO_ROOT$/packages/*/{test,tests,specs}/**",
+                "$TURBO_ROOT$/apps/*/src/**/*.{test,spec}.{ts,tsx}",
+                "$TURBO_ROOT$/packages/*/src/**/*.{test,spec}.{ts,tsx}"
+            ],
             "outputs": []
         }
     }

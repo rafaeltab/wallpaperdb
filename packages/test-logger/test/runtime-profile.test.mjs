@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it, mock } from "node:test";
 import { measureTestPhase } from "../src/index.ts";
 
 describe("measureTestPhase", { concurrency: false }, () => {
@@ -25,6 +25,7 @@ describe("measureTestPhase", { concurrency: false }, () => {
 	});
 
 	afterEach(() => {
+		mock.restoreAll();
 		process.chdir(previousDirectory);
 		if (previousProfiling === undefined) delete process.env.CI_RUNTIME_PROFILE;
 		else process.env.CI_RUNTIME_PROFILE = previousProfiling;
@@ -86,6 +87,7 @@ describe("measureTestPhase", { concurrency: false }, () => {
 	});
 
 	it("preserves results and errors when the profile output cannot be created", async () => {
+		const warning = mock.method(console, "warn", () => {});
 		process.env.CI_RUNTIME_PROFILE = "true";
 		writeFileSync(join(directory, "test-results"), "blocked output");
 		const result = { value: "retained" };
@@ -104,6 +106,11 @@ describe("measureTestPhase", { concurrency: false }, () => {
 		assert.equal(
 			readFileSync(join(directory, "test-results"), "utf8"),
 			"blocked output",
+		);
+		assert.equal(warning.mock.callCount(), 1);
+		assert.match(
+			warning.mock.calls[0].arguments[0],
+			/phase evidence could not be written/,
 		);
 	});
 });

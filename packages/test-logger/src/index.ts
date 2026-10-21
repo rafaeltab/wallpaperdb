@@ -2,6 +2,8 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import pino from "pino";
 
+let phaseEvidenceWarningEmitted = false;
+
 export function createTestLogger(name: string) {
 	return pino({
 		name,
@@ -38,7 +40,12 @@ export async function measureTestPhase<T>(
 				})}\n`,
 			);
 		} catch {
-			// Profiling must preserve the operation's result, including its original failure.
+			if (!phaseEvidenceWarningEmitted) {
+				phaseEvidenceWarningEmitted = true;
+				console.warn(
+					"ci-runtime: phase evidence could not be written; operation result is preserved.",
+				);
+			}
 		}
 	}
 }

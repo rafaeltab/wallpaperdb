@@ -1,0 +1,16 @@
+{
+  "scope": "Human feedback on simplified illustrations and review principles. It does not independently verify repository-specific findings or their bundled subclaims.",
+  "source": "Requesting user's numbered response in this conversation after clarification that the examples are simplified.",
+  "principles": [
+    {"examples": [1], "category": "missing-outcome", "response": "supported", "quote": "This indeed seems like something that is a problem!"},
+    {"examples": [2, 8], "category": "mixed-scenarios", "response": "supported", "quote": "This indeed should not be allowed.", "duplicateQuote": "Wait why do we list the same one twice? I mean it is still the same answer.", "interpretation": "Count as one principle judgment. The real and seeded cases were separate detection cases, not two independent human endorsements."},
+    {"examples": [3], "category": "missing-outcome", "response": "conditional", "quote": "it is not enough to say that just this idea is not allowed, it needs to consider the surrounding context.", "interpretation": "Inspect independent encode and decode examples elsewhere in the suite before criticizing a round-trip test. Do not ban round-trip tests."},
+    {"examples": [4], "category": "missing-outcome", "response": "supported-with-boundary-constraints", "quote": "We should cover all types of failure cases yeah, but also all types of success cases.", "boundaryQuote": "NOTE: only for unit tests, we don't want to have too many cases in integration tests. We do want to make sure all failures are tested, but where they are tested matters.", "interpretation": "Cover specified successful and failed input classes at their narrow public owner. Wider boundaries cover their own risks and failures, without repeating the complete business matrix."},
+    {"examples": [5], "category": "self-derived", "response": "conditional", "quote": "A test might also create a randomized object, and assert that those values are returned correctly by a get call after a post call for example. So this is situational.", "interpretation": "Explicit stability or idempotency assertions and preservation of generated POST input through GET may be meaningful. A concrete missing independent oracle must justify a warning."},
+    {"examples": [6], "category": "private-detail", "response": "supported", "quote": "Assertions should always go through the public interface."},
+    {"examples": [7], "category": "hidden-helper", "response": "supported", "quote": "correct"},
+    {"examples": [9], "category": "wide-matrix", "response": "supported", "quote": "correct"}
+  ],
+  "independentFindingPrecision": null,
+  "reason": "The human evaluated illustrated principles, supplied contextual exceptions, and explicitly reported insufficient repository familiarity. No illustrated response is promoted to a verified finding judgment. Optional nesting and snapshot warnings were not judged."
+}

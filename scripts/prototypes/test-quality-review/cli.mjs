@@ -220,7 +220,12 @@ try {
 		const judgments = load(
 			resolve(option("--judgments", join(here, "judgments.json"))),
 		);
-		const result = summarize(runs, judgments, truth);
+		const packet = load(packetPath);
+		const caseIds = new Set(packet.cases.map((c) => c.id));
+		const evaluationTruth = (packet.evaluationTruth ?? truth).filter((c) =>
+			caseIds.has(c.id),
+		);
+		const result = summarize(runs, judgments, evaluationTruth);
 		save(join(out, "summary.json"), result);
 		console.log(JSON.stringify(result, null, 2));
 	} else

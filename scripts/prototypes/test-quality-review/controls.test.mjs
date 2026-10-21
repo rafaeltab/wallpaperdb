@@ -23,6 +23,40 @@ test("offline corpus controls execute green and the live runner requires explici
 	assert.match(denied.stderr, /--live/);
 });
 
+test("feedback controls execute and report grades only the declared packet cases", () => {
+	const cli = fileURLToPath(new URL("./cli.mjs", import.meta.url));
+	const packetPath = fileURLToPath(
+		new URL("./feedback-packet.json", import.meta.url),
+	);
+	const offline = spawnSync(
+		process.execPath,
+		[cli, "controls", "--packet", packetPath],
+		{ encoding: "utf8", timeout: 30000 },
+	);
+	assert.equal(offline.status, 0, offline.stderr + offline.stdout);
+	assert.match(offline.stdout, /6 seed suites passed/);
+	const out = mkdtempSync(join(tmpdir(), "feedback-report-"));
+	try {
+		writeFileSync(join(out, "manifest.json"), JSON.stringify({ repeats: 1 }));
+		writeFileSync(
+			join(out, "run-1.json"),
+			JSON.stringify({ valid: true, findings: [], elapsedMs: 1, usage: {} }),
+		);
+		const r = spawnSync(
+			process.execPath,
+			[cli, "report", "--packet", packetPath, "--out", out],
+			{ encoding: "utf8", timeout: 5000 },
+		);
+		assert.equal(r.status, 0, r.stderr);
+		const summary = JSON.parse(readFileSync(join(out, "summary.json"), "utf8"));
+		assert.equal(summary.seedOpportunities, 2);
+		assert.equal(summary.seedMisses, 2);
+		assert.equal(summary.cleanControlOpportunities, 4);
+	} finally {
+		rmSync(out, { recursive: true, force: true });
+	}
+});
+
 test("live runner records usage and rejects bad model citations through its public CLI", () => {
 	const dir = mkdtempSync(join(tmpdir(), "review-control-"));
 	try {

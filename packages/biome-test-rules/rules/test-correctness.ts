@@ -13,6 +13,8 @@ const testSources = new Set([
 	"@effect/vitest",
 	"@playwright/test",
 	"playwright/test",
+	"effect",
+	"effect/Effect",
 ]);
 
 function literal(text: string | undefined): string | undefined {
@@ -292,10 +294,13 @@ function handled(
 	node: AnyJsAstNode,
 	model: SemanticModel,
 	seen = new Set<string>(),
+	allowVoid = false,
 ): boolean {
 	const parent = node.parent;
 	if (!parent) return false;
 	switch (parent.kind) {
+		case "JS_UNARY_EXPRESSION":
+			return allowVoid && parent.operatorToken === "void";
 		case "JS_AWAIT_EXPRESSION":
 		case "JS_RETURN_STATEMENT":
 		case "JS_ARROW_FUNCTION_EXPRESSION":
@@ -304,14 +309,14 @@ function handled(
 		case "TS_AS_EXPRESSION":
 		case "TS_SATISFIES_EXPRESSION":
 		case "TS_NON_NULL_ASSERTION_EXPRESSION":
-			return handled(parent, model, seen);
+			return handled(parent, model, seen, allowVoid);
 		case "JS_STATIC_MEMBER_EXPRESSION": {
 			const call = parent.parent;
 			if (call?.kind !== "JS_CALL_EXPRESSION") return false;
 			const count = call.arguments?.args.length ?? 0;
 			if (parent.member?.text === "catch" && count >= 1) return true;
 			if (parent.member?.text === "then" && count >= 2) return true;
-			return handled(call, model, seen);
+			return handled(call, model, seen, allowVoid);
 		}
 		case "JS_INITIALIZER_CLAUSE": {
 			const declaration = parent.parent;
@@ -329,7 +334,7 @@ function handled(
 				const expression = reference.syntax().parent;
 				return (
 					expression?.kind === "JS_IDENTIFIER_EXPRESSION" &&
-					handled(expression, model, seen)
+					handled(expression, model, seen, allowVoid)
 				);
 			});
 		}
@@ -351,7 +356,7 @@ function handled(
 			return (
 				call?.kind === "JS_CALL_EXPRESSION" &&
 				/^Promise\.(all|allSettled|race|any)$/.test(call.callee?.text ?? "") &&
-				handled(call, model, seen)
+				handled(call, model, seen, allowVoid)
 			);
 		}
 		default:
@@ -390,5 +395,32 @@ export const awaitAsyncAssertions = defineRule({
 				"error",
 				"Await or return this async assertion, or handle its rejection.",
 			);
+	},
+});
+
+export const handleEffectPromises = defineRule({
+	query: semantic("JS_CALL_EXPRESSION"),
+	run(node, context) {
+		const api = resolveApi(node.callee, context.model);
+		if (!api) return;
+		const method =
+			api.source === "effect" &&
+			api.name === "Effect" &&
+			api.members.length === 1
+				? api.members[0]
+				: api.source === "effect/Effect" && api.members.length === 0
+					? api.name
+					: undefined;
+		if (
+			method &&
+			["runPromise", "runPromiseExit"].includes(method) &&
+			!handled(node, context.model, new Set(), true)
+		) {
+			registerDiagnostic(
+				node,
+				"error",
+				"Handle this Effect promise with await, return, or a rejection handler, or explicitly discard it with void.",
+			);
+		}
 	},
 });

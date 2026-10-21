@@ -71,6 +71,76 @@ function blockInitialEvidence(f) {
 	return path;
 }
 
+for (const failure of ["missing", "nonzero exit"]) {
+	for (const status of [0, 23]) {
+		test(`Docker observers warn on ${failure} and preserve command status ${status}`, (t) => {
+			const f = fixture(t);
+			if (failure === "missing") {
+				rmSync(join(f.root, "docker"));
+				f.env.PATH = f.root;
+			} else {
+				writeFileSync(
+					join(f.root, "docker"),
+					`#!${process.execPath}
+require('node:fs').writeFileSync(process.argv[2] + '.ready', String(process.pid));
+console.error('fixture Docker daemon unavailable');
+process.exit(41);
+`,
+					{ mode: 0o700 },
+				);
+			}
+			const result = run(
+				f,
+				`
+const { existsSync, readFileSync, readdirSync } = require('node:fs');
+const gone = kind => {
+  if (!existsSync(kind + '.ready')) return false;
+  try { process.kill(Number(readFileSync(kind + '.ready', 'utf8')), 0); return false; }
+  catch (error) { return error.code === 'ESRCH'; }
+};
+const deadline = Date.now() + 3000;
+setInterval(() => {
+  const name = readdirSync('test-results/ci-runtime')[0];
+  const evidence = readFileSync('test-results/ci-runtime/' + name, 'utf8').trim().split('\\n').map(JSON.parse);
+  const ready = ${failure === "missing" ? "evidence.filter(row => row.type === 'observer-error').length === 2" : "gone('stats') && gone('events')"};
+  if (ready) { console.log('wrapped command ran'); process.exit(${status}); }
+  if (Date.now() > deadline) process.exit(99);
+}, 10);
+`,
+			);
+			assert.equal(result.status, status, result.stderr);
+			assert.equal(result.stdout.trim(), "wrapped command ran");
+			for (const kind of ["stats", "events"]) {
+				assert.equal(
+					(
+						result.stderr.match(
+							new RegExp(`Docker ${kind} observer unavailable`, "g"),
+						) ?? []
+					).length,
+					1,
+				);
+			}
+			const evidence = records(f);
+			assert.equal(
+				evidence.find((row) => row.type === "finish").exitCode,
+				status,
+			);
+			for (const kind of ["stats", "events"]) {
+				assert.ok(
+					evidence.some(
+						(row) =>
+							row.kind === kind &&
+							(failure === "missing"
+								? row.type === "observer-error" &&
+									row.message.includes("ENOENT")
+								: row.type === "observer-exit" && row.exitCode === 41),
+					),
+				);
+			}
+		});
+	}
+}
+
 for (const status of [0, 23]) {
 	test(`an initially blocked evidence directory preserves cleanup output and status ${status}`, (t) => {
 		const f = fixture(t);
@@ -155,6 +225,7 @@ const ready = setInterval(() => {
 `,
 	);
 	assert.equal(result.status, 23, result.stderr);
+	assert.doesNotMatch(result.stderr, /observer unavailable/);
 	const stopped = readFileSync(join(f.root, "stopped.jsonl"), "utf8")
 		.trim()
 		.split("\n")

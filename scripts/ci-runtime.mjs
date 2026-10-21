@@ -93,10 +93,28 @@ record("start", {
 const interval = evidenceFailed ? undefined : setInterval(sample, 1000);
 function observeDocker(kind, args) {
 	const observer = spawn("docker", args, { stdio: ["ignore", "pipe", "pipe"] });
-	const closed = new Promise((resolve) => observer.once("close", resolve));
-	observer.on("error", (error) =>
-		record("observer-error", { kind, message: error.message }),
+	const observation = { observer, stopping: false };
+	let warned = false;
+	function warn(reason) {
+		if (warned) return;
+		warned = true;
+		console.error(
+			`ci-runtime: Docker ${kind} observer unavailable (${reason}); command result is preserved.`,
+		);
+	}
+	observation.closed = new Promise((resolve) =>
+		observer.once("close", (exitCode, signal) => {
+			if (exitCode !== 0 && exitCode !== null && !observation.stopping) {
+				record("observer-exit", { kind, exitCode, signal });
+				warn(`exit ${exitCode}`);
+			}
+			resolve();
+		}),
 	);
+	observer.on("error", (error) => {
+		record("observer-error", { kind, message: error.message });
+		warn(error.code);
+	});
 	for (const [stream, type] of [
 		[observer.stdout, `docker-${kind}`],
 		[observer.stderr, "observer-diagnostic"],
@@ -112,16 +130,18 @@ function observeDocker(kind, args) {
 			record(type, { kind, data });
 		});
 	}
-	return { observer, closed };
+	return observation;
 }
 
-async function stopObserver({ observer, closed }) {
+async function stopObserver(observation) {
+	const { observer, closed } = observation;
 	if (
 		observer.exitCode !== null ||
 		observer.signalCode !== null ||
 		!observer.pid
 	)
 		return closed;
+	observation.stopping = true;
 	observer.kill("SIGTERM");
 	const timeout = setTimeout(() => observer.kill("SIGKILL"), 1000);
 	await closed;

@@ -105,9 +105,8 @@ async function pixels(
 ) {
   return page.evaluate(
     async ({ data, positions }) => {
-      const bitmap = await createImageBitmap(
-        new Blob([new Uint8Array(data)], { type: "image/webp" }),
-      );
+      const encoded = await fetch(`data:image/webp;base64,${data}`);
+      const bitmap = await createImageBitmap(await encoded.blob());
       const canvas = document.createElement("canvas");
       canvas.width = bitmap.width;
       canvas.height = bitmap.height;
@@ -125,7 +124,7 @@ async function pixels(
       bitmap.close();
       return result;
     },
-    { data: Array.from(bytes), positions },
+    { data: bytes.toString("base64"), positions },
   );
 }
 
@@ -143,8 +142,9 @@ async function animatedPixels(
       const Decoder = window.ImageDecoder;
       if (typeof Decoder !== "function")
         throw new Error("Native animation decoder unavailable");
+      const encoded = await fetch(`data:${mimeType};base64,${data}`);
       const decoder = new Decoder({
-        data: new Uint8Array(data),
+        data: await encoded.arrayBuffer(),
         type: mimeType,
         preferAnimation: true,
       });
@@ -190,7 +190,7 @@ async function animatedPixels(
         decoder.close();
       }
     },
-    { data: Array.from(bytes), mimeType, positions },
+    { data: bytes.toString("base64"), mimeType, positions },
   );
 }
 
@@ -305,10 +305,11 @@ test("Profile picture upload reaches public delivery and removal retires the old
   test.setTimeout(120000);
   await withDisposableOwner(process.env, async ({ email, password }) => {
     const outgoing: Buffer[] = [];
+    // Base64 avoids Playwright validating and tracing each byte as a separate value.
     await page.exposeFunction(
       "observePictureUpload",
-      async (bytes: number[]) => {
-        const picture = Buffer.from(bytes);
+      async (base64: string) => {
+        const picture = Buffer.from(base64, "base64");
         outgoing.push(picture);
         await writeFile(
           test.info().outputPath(`processed-picture-${outgoing.length}.webp`),
@@ -327,13 +328,17 @@ test("Profile picture upload reaches public delivery and removal retires the old
         ) {
           const picture = options.body.get("picture");
           if (picture instanceof Blob) {
-            const observe: (bytes: number[]) => Promise<void> = Reflect.get(
+            const observe: (base64: string) => Promise<void> = Reflect.get(
               window,
               "observePictureUpload",
             );
-            await observe(
-              Array.from(new Uint8Array(await picture.arrayBuffer())),
-            );
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result));
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(picture);
+            });
+            await observe(dataUrl.slice(dataUrl.indexOf(",") + 1));
           }
         }
         return send(input, options);

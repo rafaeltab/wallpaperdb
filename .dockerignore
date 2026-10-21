@@ -16,9 +16,9 @@ coverage
 **/playwright-report
 
 # Development
-.env
-.env.local
-.env*.local
+**/.env
+**/.env.local
+**/.env*.local
 
 # Agent / local sandbox artifacts (can contain nested worktrees and gigabytes of data)
 .sandcastle

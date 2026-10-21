@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.20
+
 FROM node:22.22.3-alpine
 
 RUN apk update && apk add --no-cache libc6-compat python3 make g++
@@ -8,10 +10,20 @@ RUN corepack enable && corepack prepare pnpm@10.18.3 --activate
 
 WORKDIR /app
 
-COPY . .
+# Preserve workspace paths, lifecycle inputs, and local executable targets.
+COPY --parents package.json pnpm-lock.yaml pnpm-workspace.yaml \
+    apps/*/package.json packages/*/package.json experiments/*/package.json \
+    infra/package.json scripts/package.json ./
+COPY --parents apps/docs/source.config.ts apps/docs/content \
+    scripts/check-architecture.mjs scripts/crap.mts \
+    scripts/setup-worktree.mjs scripts/lib/worktree-project.mjs \
+    scripts/lib/env-pipeline.mjs ./
 
 RUN pnpm install --frozen-lockfile && \
     sha256sum pnpm-lock.yaml | cut -d' ' -f1 > .pnpm-lockfile-hash
+
+# Application edits reuse the dependency installation above.
+COPY . .
 
 RUN pnpm exec turbo run build --filter='@wallpaperdb/user^...' --concurrency=1
 

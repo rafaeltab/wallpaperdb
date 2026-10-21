@@ -17,7 +17,19 @@ const script = new URL("./ci-runtime.mjs", import.meta.url).pathname;
 
 function fixture(t) {
 	const root = mkdtempSync(join(tmpdir(), "wallpaperdb-ci-runtime-"));
-	t.after(() => rmSync(root, { recursive: true, force: true }));
+	t.after(() => {
+		for (const kind of ["stats", "events", "command", "descendant"]) {
+			try {
+				process.kill(
+					Number(readFileSync(join(root, `${kind}.ready`), "utf8")),
+					"SIGKILL",
+				);
+			} catch {
+				/* The fixture process may already have exited. */
+			}
+		}
+		rmSync(root, { recursive: true, force: true });
+	});
 	writeFileSync(join(root, "docker"), "#!/bin/sh\nexit 1\n", { mode: 0o700 });
 	return {
 		root,
@@ -78,15 +90,14 @@ test("runtime evidence preserves command output and arguments and records host t
 	);
 });
 
-test("runtime evidence stops Docker observers and preserves a failed command status", (t) => {
-	const f = fixture(t);
+function installDockerObserver(f) {
 	writeFileSync(
 		join(f.root, "docker"),
 		`#!${process.execPath}
 const { appendFileSync, writeFileSync } = require('node:fs');
 const kind = process.argv[2];
 writeFileSync(kind + '.ready', String(process.pid));
-console.log(JSON.stringify({ kind, sample: 'observed' }));
+process.stdout.write((kind === 'stats' ? String.fromCharCode(27) + '[2J' + String.fromCharCode(27) + '[1;1H' : '') + JSON.stringify({ kind, sample: 'observed' }) + '\\n');
 process.on('SIGTERM', () => {
   appendFileSync('stopped.jsonl', JSON.stringify({kind}) + '\\n');
   process.exit(0);
@@ -95,6 +106,11 @@ setInterval(() => {}, 1000);
 `,
 		{ mode: 0o700 },
 	);
+}
+
+test("runtime evidence decodes ANSI Docker stats, stops observers, and preserves a failed status", (t) => {
+	const f = fixture(t);
+	installDockerObserver(f);
 	const result = run(
 		f,
 		`
@@ -126,6 +142,50 @@ const ready = setInterval(() => {
 		);
 		const pid = Number(readFileSync(join(f.root, `${kind}.ready`), "utf8"));
 		assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+	}
+});
+
+test("evidence and summary write failures preserve command status and observer cleanup", (t) => {
+	const f = fixture(t);
+	installDockerObserver(f);
+	f.env.GITHUB_STEP_SUMMARY = join(f.root, "missing/summary.md");
+	const result = run(
+		f,
+		`
+const { existsSync, rmSync } = require('node:fs');
+const deadline = Date.now() + 3000;
+setInterval(() => {
+  if (existsSync('stats.ready') && existsSync('events.ready')) {
+    rmSync('test-results/ci-runtime', {recursive: true});
+    process.exit(23);
+  }
+  if (Date.now() > deadline) process.exit(99);
+}, 10);
+`,
+	);
+	assert.equal(result.status, 23, result.stderr);
+	assert.equal(
+		(result.stderr.match(/ci-runtime: evidence write failed/g) ?? []).length,
+		1,
+	);
+	assert.match(result.stderr, /ci-runtime: summary write failed/);
+	const stopped = readFileSync(join(f.root, "stopped.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.deepEqual(stopped.map((entry) => entry.kind).sort(), [
+		"events",
+		"stats",
+	]);
+	for (const kind of ["stats", "events"]) {
+		assert.throws(
+			() =>
+				process.kill(
+					Number(readFileSync(join(f.root, `${kind}.ready`), "utf8")),
+					0,
+				),
+			{ code: "ESRCH" },
+		);
 	}
 });
 

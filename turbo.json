@@ -2,6 +2,7 @@
     "$schema": "https://turbo.build/schema.json",
     "globalPassThroughEnv": [
         "GITHUB_ACTIONS",
+        "CI_RUNTIME_PROFILE",
         "COMPOSE_PROJECT_NAME"
     ],
     "globalDependencies": [

@@ -20,6 +20,7 @@ it.each(
     .withBindMounts([{ source: root, target: root, mode: 'ro' }])
     .withWorkingDir(`${root}/apps/ingestor`)
     .withEnvironment({
+      CI_RUNTIME_PROFILE: process.env.CI_RUNTIME_PROFILE ?? '',
       TELEMETRY_SERVICE: service,
       TELEMETRY_OUTAGE_MODE: outage,
       OTEL_BSP_SCHEDULE_DELAY: '100',

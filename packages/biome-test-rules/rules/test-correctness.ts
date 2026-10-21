@@ -176,3 +176,22 @@ export const noTestRetries = defineRule({
 		}
 	},
 });
+
+export const noTodoTests = defineRule({
+	query: semantic("JS_CALL_EXPRESSION"),
+	run(node, context) {
+		const api = resolveApi(node.callee, context.model);
+		if (
+			api &&
+			["it", "test", "describe", "suite"].includes(api.name) &&
+			(api.members.includes("todo") ||
+				((node.arguments?.args.length ?? 0) < 2 && api.members.length === 0))
+		) {
+			registerDiagnostic(
+				node,
+				"error",
+				"Track unfinished tests in an issue rather than a passing placeholder.",
+			);
+		}
+	},
+});

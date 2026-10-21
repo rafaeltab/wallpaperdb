@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import { createServer, type ServerResponse } from 'node:http';
 import type { Socket } from 'node:net';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
@@ -5,6 +6,8 @@ import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { expect, it, vi } from 'vitest';
 import { TelemetryExportTransport, telemetryBatchOptions } from '@wallpaperdb/core/telemetry';
+
+vi.mock('node:fs', { spy: true });
 
 it('bounds streaming collector sockets and preserves a local diagnostic without exporting it', async () => {
   const sockets = new Set<Socket>();
@@ -38,11 +41,13 @@ it('bounds streaming collector sockets and preserves a local diagnostic without 
       url: `http://127.0.0.1:${address.port}/private-collector-token/v1/traces`,
     })
   );
-  const write = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
+  const write = vi.spyOn(fs, 'write').mockImplementation((_fd, message, callback) => {
+    callback(null, Buffer.byteLength(message), message);
+  });
   try {
     await new Promise((resolve) => exporter.export([], resolve));
     await vi.waitFor(() => expect(sockets.size).toBe(0));
-    expect(write.mock.calls.map(([message]) => message).join('')).toContain(
+    expect(write.mock.calls.map(([_fd, message]) => message).join('')).toContain(
       'telemetry export unavailable'
     );
     const started = performance.now();
@@ -56,10 +61,10 @@ it('bounds streaming collector sockets and preserves a local diagnostic without 
     await vi.waitFor(() => expect(sockets.size).toBe(0));
     expect(connections).toBe(2);
     expect(results.filter((result) => result.code !== 0).length).toBeGreaterThanOrEqual(19);
-    expect(write.mock.calls.map(([message]) => message).join('')).toContain(
+    expect(write.mock.calls.map(([_fd, message]) => message).join('')).toContain(
       'telemetry export unavailable'
     );
-    expect(write.mock.calls.map(([message]) => message).join('')).not.toContain(
+    expect(write.mock.calls.map(([_fd, message]) => message).join('')).not.toContain(
       'private-collector-token'
     );
     expect(write).toHaveBeenCalledTimes(1);

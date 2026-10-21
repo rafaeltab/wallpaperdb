@@ -1,1 +1,72 @@
-[]
+[
+	{
+		"key": "C01/missing-outcome",
+		"judgeKind": "agent",
+		"verdict": "actionable",
+		"rationale": "Provisional agent judgment only. The primary claim has a concrete missed outcome or maintenance dependency. Human judgment is pending.",
+		"caveat": "C01 missing-outcome bundles additional absences with the cited dialog claim. Do not infer repository-wide absence from this packet; classify these subclaims separately in any larger study."
+	},
+	{
+		"key": "C01/mixed-scenarios",
+		"judgeKind": "agent",
+		"verdict": "actionable",
+		"rationale": "Provisional agent judgment only. The primary claim has a concrete missed outcome or maintenance dependency. Human judgment is pending.",
+		"caveat": ""
+	},
+	{
+		"key": "C02/missing-outcome",
+		"judgeKind": "agent",
+		"verdict": "actionable",
+		"rationale": "Provisional agent judgment only. The primary claim has a concrete missed outcome or maintenance dependency. Human judgment is pending.",
+		"caveat": ""
+	},
+	{
+		"key": "C05/missing-outcome",
+		"judgeKind": "agent",
+		"verdict": "actionable",
+		"rationale": "Provisional agent judgment only. The primary claim has a concrete missed outcome or maintenance dependency. Human judgment is pending.",
+		"caveat": ""
+	},
+	{
+		"key": "C06/self-derived",
+		"judgeKind": "agent",
+		"verdict": "actionable",
+		"rationale": "Provisional agent judgment only. The primary claim has a concrete missed outcome or maintenance dependency. Human judgment is pending.",
+		"caveat": ""
+	},
+	{
+		"key": "C07/private-detail",
+		"judgeKind": "agent",
+		"verdict": "actionable",
+		"rationale": "Provisional agent judgment only. The primary claim has a concrete missed outcome or maintenance dependency. Human judgment is pending.",
+		"caveat": ""
+	},
+	{
+		"key": "C08/hidden-helper",
+		"judgeKind": "agent",
+		"verdict": "actionable",
+		"rationale": "Provisional agent judgment only. The primary claim has a concrete missed outcome or maintenance dependency. Human judgment is pending.",
+		"caveat": ""
+	},
+	{
+		"key": "C09/mixed-scenarios",
+		"judgeKind": "agent",
+		"verdict": "actionable",
+		"rationale": "Provisional agent judgment only. The primary claim has a concrete missed outcome or maintenance dependency. Human judgment is pending.",
+		"caveat": ""
+	},
+	{
+		"key": "C11/wide-matrix",
+		"judgeKind": "agent",
+		"verdict": "actionable",
+		"rationale": "Provisional agent judgment only. The primary claim has a concrete missed outcome or maintenance dependency. Human judgment is pending.",
+		"caveat": ""
+	},
+	{
+		"key": "C12/optional-nesting",
+		"judgeKind": "agent",
+		"verdict": "false-positive",
+		"rationale": "Provisional agent judgment only. Optional nesting advice adds little value to this tiny scenario; human judgment is pending.",
+		"caveat": ""
+	}
+]

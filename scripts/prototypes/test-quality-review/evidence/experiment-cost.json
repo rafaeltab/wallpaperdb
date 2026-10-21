@@ -1,0 +1,15 @@
+{
+  "modelCalls": 7,
+  "elapsedMs": 308697,
+  "inputTokens": 283696,
+  "outputTokens": 11634,
+  "dollarCharge": null,
+  "billingLimitation": "The authenticated CLI exposes subscription tokens but no per-run USD charge.",
+  "humanJudged": 0,
+  "humanPrecision": null,
+  "humanJudgmentStatus": "Requested from the user in conversation; no reply yet. Agent judgments are explicitly excluded.",
+  "finalRequiredSeedMisses": 0,
+  "finalSeedOpportunities": 18,
+  "finalCleanControlFlags": 0,
+  "finalCleanControlOpportunities": 9
+}

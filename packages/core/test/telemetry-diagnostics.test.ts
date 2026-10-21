@@ -96,3 +96,50 @@ it("does not add diagnostic output while stderr is backpressured", async () => {
     await transport.close();
   }
 });
+
+it("bounds pending diagnostics across transports without delaying export completion or close", async () => {
+  const transports = [new TelemetryExportTransport(), new TelemetryExportTransport()];
+  const exporters = transports.map((transport) =>
+    transport.monitor({
+      export(_items: readonly unknown[], callback: (result: { code: number }) => void) {
+        callback({ code: 1 });
+      },
+    })
+  );
+  const now = vi.spyOn(Date, "now").mockReturnValue(100_000);
+  const write = vi.spyOn(fs, "write").mockImplementation(() => undefined);
+  const completion = vi.fn();
+  try {
+    exporters[0]?.export([], completion);
+    now.mockReturnValue(130_001);
+    exporters[0]?.export([], completion);
+    exporters[1]?.export([], completion);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(completion).toHaveBeenCalledTimes(3);
+    await transports[0]?.close();
+
+    // The OS callback may arrive after the transport closes. It must release the
+    // shared slot even on error, without a retry or a recursive diagnostic.
+    const pending = write.mock.calls[0];
+    expect(pending).toBeDefined();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    pending?.[2](Object.assign(new Error("Broken pipe"), { code: "EPIPE" }), 0, pending[1]);
+    expect(write).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(160_002);
+    exporters[1]?.export([], completion);
+    expect(write).toHaveBeenCalledTimes(2);
+    const partial = write.mock.calls[1];
+    partial?.[2](null, 1, partial[1]);
+    expect(write).toHaveBeenCalledTimes(2);
+    await transports[1]?.close();
+    now.mockReturnValue(190_003);
+    exporters[1]?.export([], completion);
+    expect(completion).toHaveBeenCalledTimes(5);
+    expect(write).toHaveBeenCalledTimes(2);
+  } finally {
+    for (const [_fd, message, callback] of write.mock.calls) callback(null, 0, message);
+    write.mockRestore();
+    now.mockRestore();
+    for (const transport of transports) await transport.close();
+  }
+});

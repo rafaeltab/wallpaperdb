@@ -34,6 +34,11 @@ export const controls = [
 		body: "return expect(Promise.reject(new Error('denied'))).rejects.toThrow('denied');",
 	},
 	{
+		id: "awaited-catch-assertion",
+		valid: true,
+		body: "await Promise.reject(new Error('denied')).catch(error => { expect(error.message).toBe('denied'); });",
+	},
+	{
 		id: "awaited-poll",
 		valid: true,
 		body: "await expect.poll(() => 'Ada', { timeout: 100 }).toBe('Ada');",
@@ -185,6 +190,11 @@ export const controls = [
 		body: "await Effect.runPromise(Effect.exit(Effect.sync(() => expect('Ada').toBe('Grace'))));",
 	},
 	{
+		id: "swallowed-helper",
+		valid: false,
+		body: "try { assertName('Grace'); } catch {}",
+	},
+	{
 		id: "wrong-claim",
 		valid: false,
 		body: "const actualName = 'Grace'; expect('Ada'.length).toBe(3);",
@@ -205,6 +215,7 @@ export const expectedStatic = {
 		"tautology-operator": ["lint/suspicious/noSelfCompare"],
 	},
 	eslint: {
+		"awaited-catch-assertion": ["vitest/no-conditional-expect"],
 		narrowing: ["vitest/no-conditional-expect"],
 		"failure-helper": ["vitest/no-conditional-expect"],
 		"guarded-nonempty-loop": ["vitest/no-conditional-expect"],

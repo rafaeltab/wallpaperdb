@@ -84,7 +84,8 @@ const prototypeRules = {
 							parent.type === "CallExpression" &&
 							parent.callee.type === "MemberExpression" &&
 							parent.callee.property.name === "catch" &&
-							parent.callee.object.range[0] <= node.range[0]
+							parent.callee.object.range[0] <= node.range[0] &&
+							node.range[1] <= parent.callee.object.range[1]
 						) {
 							const callback = parent.arguments[0];
 							if (

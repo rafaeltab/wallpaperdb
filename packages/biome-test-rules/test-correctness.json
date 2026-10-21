@@ -1,20 +1,49 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
-	"linter": {
-		"rules": {
-			"nursery": {
-				"noFloatingPromises": "error"
-			},
-			"correctness": {
-				"noPlaywrightMissingAwait": "error"
-			},
-			"preset": "none",
-			"suspicious": {
-				"noFocusedTests": "error",
-				"noSkippedTests": "error",
-				"noSelfCompare": "error"
+	"plugins": [
+		{
+			"path": "./rules/test-correctness.ts",
+			"resolutionKind": "config",
+			"includes": [
+				"**/*.{test,spec}.{js,mjs,ts,tsx}",
+				"**/{test,tests,specs}/**/*.{js,mjs,ts,tsx}",
+				"!**/fixtures/**",
+				"!**/node_modules/**",
+				"!**/{dist,build,coverage,.next,.output}/**"
+			]
+		}
+	],
+	"overrides": [
+		{
+			"includes": [
+				"**/*.{test,spec}.{js,mjs,ts,tsx}",
+				"**/{test,tests,specs}/**/*.{js,mjs,ts,tsx}",
+				"!**/fixtures/**",
+				"!**/node_modules/**",
+				"!**/{dist,build,coverage,.next,.output}/**"
+			],
+			"linter": {
+				"rules": {
+					"nursery": {
+						"noFloatingPromises": "error"
+					},
+					"suspicious": {
+						"noFocusedTests": "error",
+						"noSkippedTests": "error",
+						"noSelfCompare": "error"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["**/specs/**/*.spec.ts"],
+			"linter": {
+				"rules": {
+					"correctness": {
+						"noPlaywrightMissingAwait": "error"
+					}
+				}
 			}
 		}
-	},
-	"plugins": ["./rules/test-correctness.ts"]
+	]
 }

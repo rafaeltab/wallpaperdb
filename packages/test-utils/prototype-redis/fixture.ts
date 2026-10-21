@@ -44,7 +44,23 @@ async function closeClient(client: RedisClientType) {
   }
 }
 
-export async function createGroup(metrics = timing()) {
+async function within<T>(operation: Promise<T>, timeoutMs: number, message: string) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) {
+  assert.ok(Number.isFinite(shutdownTimeoutMs) && shutdownTimeoutMs > 0);
+  const abort = new AbortController();
   const owner = randomUUID();
   const tester = new Tester().withRedis((builder) => builder.withImage(image));
   const startup = performance.now();
@@ -66,6 +82,7 @@ export async function createGroup(metrics = timing()) {
   let closing = false;
 
   async function connect(name: string, owned: RedisClientType[]) {
+    assert.equal(abort.signal.aborted, false, 'group is closed');
     const client: RedisClientType = createClient({
       url: tester.redis.config.endpoints.fromHost,
       name,
@@ -75,8 +92,32 @@ export async function createGroup(metrics = timing()) {
     clients.push(client);
     // connect/commands reject normally; keep socket errors from becoming unhandled events.
     client.on('error', () => {});
+    const open = client.connect.bind(client);
+    // A callback can retain its client after cancellation. Never let it reopen the socket.
+    client.connect = async () => {
+      assert.equal(abort.signal.aborted, false, 'group is closed');
+      await open();
+      if (abort.signal.aborted && client.isOpen) await client.disconnect();
+      assert.equal(abort.signal.aborted, false, 'group is closed');
+      return client;
+    };
     await client.connect();
     return client;
+  }
+
+  async function runBody(scope: CaseScope, body: (scope: CaseScope) => Promise<void>) {
+    abort.signal.throwIfAborted();
+    let cancel!: () => void;
+    const cancelled = new Promise<never>((_, reject) => {
+      cancel = () => reject(abort.signal.reason);
+      abort.signal.addEventListener('abort', cancel, { once: true });
+    });
+    try {
+      // Observe the callback's eventual rejection even when cancellation wins.
+      await Promise.race([body(scope), cancelled]);
+    } finally {
+      abort.signal.removeEventListener('abort', cancel);
+    }
   }
 
   return {
@@ -99,17 +140,20 @@ export async function createGroup(metrics = timing()) {
           const scope: CaseScope = {
             client,
             key(suffix) {
+              assert.equal(abort.signal.aborted, false, 'group is closed');
               const key = `${prefix}:key:${suffix}`;
               ownedKeys.add(key);
               keys.add(key);
               return key;
             },
             channel(suffix) {
+              assert.equal(abort.signal.aborted, false, 'group is closed');
               const channel = `${prefix}:channel:${suffix}`;
               channels.add(channel);
               return channel;
             },
             async subscribe(channel, listener) {
+              assert.equal(abort.signal.aborted, false, 'group is closed');
               assert.ok(channels.has(channel) && channel.startsWith(prefix));
               const subscriber = await connect(`${prefix}:subscriber`, owned);
               subscriptions.push({ client: subscriber, channel });
@@ -118,7 +162,7 @@ export async function createGroup(metrics = timing()) {
           };
           const start = performance.now();
           try {
-            await body(scope);
+            await runBody(scope, body);
           } finally {
             metrics.bodyMs += performance.now() - start;
           }
@@ -129,7 +173,9 @@ export async function createGroup(metrics = timing()) {
           // Attempt every release even if a previous one fails. Never FLUSHALL.
           for (const subscription of subscriptions) {
             try {
-              await subscription.client.unsubscribe(subscription.channel);
+              if (subscription.client.isOpen) {
+                await subscription.client.unsubscribe(subscription.channel);
+              }
             } catch (error) {
               errors.push(error);
             }
@@ -158,10 +204,47 @@ export async function createGroup(metrics = timing()) {
     },
     async close() {
       closing = true;
-      await Promise.allSettled([...pending]);
       const verification = performance.now();
       let observer: RedisClientType | undefined;
       try {
+        try {
+          await within(
+            Promise.allSettled([...pending]),
+            shutdownTimeoutMs,
+            'timed out waiting for pending cases'
+          );
+        } catch (error) {
+          abort.abort(new Error('group is closed', { cause: error }));
+          const errors = [error];
+          try {
+            const disconnected = await within(
+              Promise.allSettled(
+                clients.map(async (client) => {
+                  if (client.isOpen) await client.disconnect();
+                })
+              ),
+              shutdownTimeoutMs,
+              'client disconnection timed out'
+            );
+            for (const result of disconnected) {
+              if (result.status === 'rejected') errors.push(result.reason);
+            }
+          } catch (disconnectError) {
+            errors.push(disconnectError);
+          }
+          try {
+            await within(
+              Promise.allSettled([...pending]),
+              shutdownTimeoutMs,
+              'pending cases cleanup timed out'
+            );
+          } catch (cleanupError) {
+            errors.push(cleanupError);
+          }
+          if (errors.length === 1) throw error;
+          throw new AggregateError(errors, 'pending cases and cleanup failed');
+        }
+        abort.abort(new Error('group is closed'));
         assert.ok(
           clients.every((client) => !client.isOpen),
           'case clients closed before stop'

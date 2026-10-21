@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import pino from "pino";
 
@@ -48,9 +48,14 @@ export async function measureTestPhase<T>(
 		} catch {
 			if (!phaseEvidenceWarningEmitted) {
 				phaseEvidenceWarningEmitted = true;
-				console.warn(
-					"ci-runtime: phase evidence could not be written; operation result is preserved.",
-				);
+				try {
+					writeSync(
+						2,
+						"ci-runtime: phase evidence could not be written; operation result is preserved.\n",
+					);
+				} catch {
+					// A failed diagnostic must preserve the operation's outcome too.
+				}
 			}
 		}
 	}

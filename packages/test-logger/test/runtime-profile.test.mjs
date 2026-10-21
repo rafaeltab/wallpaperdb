@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
 	mkdtempSync,
 	readFileSync,
@@ -8,7 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, it, mock } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 import { measureTestPhase } from "../src/index.ts";
 
 describe("measureTestPhase", { concurrency: false }, () => {
@@ -28,7 +29,6 @@ describe("measureTestPhase", { concurrency: false }, () => {
 	});
 
 	afterEach(() => {
-		mock.restoreAll();
 		process.chdir(previousDirectory);
 		if (previousProfiling === undefined) delete process.env.CI_RUNTIME_PROFILE;
 		else process.env.CI_RUNTIME_PROFILE = previousProfiling;
@@ -107,7 +107,6 @@ describe("measureTestPhase", { concurrency: false }, () => {
 	}
 
 	it("preserves results and errors when the profile output cannot be created", async () => {
-		const warning = mock.method(console, "warn", () => {});
 		process.env.CI_RUNTIME_PROFILE = "true";
 		writeFileSync(join(directory, "test-results"), "blocked output");
 		const result = { value: "retained" };
@@ -127,10 +126,40 @@ describe("measureTestPhase", { concurrency: false }, () => {
 			readFileSync(join(directory, "test-results"), "utf8"),
 			"blocked output",
 		);
-		assert.equal(warning.mock.callCount(), 1);
-		assert.match(
-			warning.mock.calls[0].arguments[0],
-			/phase evidence could not be written/,
+	});
+
+	it("preserves operation outcomes when both evidence and warning output fail", () => {
+		writeFileSync(join(directory, "test-results"), "blocked output");
+		const child = spawnSync(
+			process.execPath,
+			[
+				"--experimental-strip-types",
+				"--input-type=module",
+				"-e",
+				`
+import assert from 'node:assert/strict';
+import { closeSync } from 'node:fs';
+const { measureTestPhase } = await import(process.argv[1]);
+closeSync(2);
+const result = { retained: true };
+const failure = new Error('original operation failure');
+assert.equal(await measureTestPhase('blocked.success', async () => result), result);
+await assert.rejects(measureTestPhase('blocked.failure', async () => { throw failure; }), error => error === failure);
+`,
+				new URL("../src/index.ts", import.meta.url).href,
+			],
+			{
+				cwd: directory,
+				env: { ...process.env, CI_RUNTIME_PROFILE: "true" },
+				encoding: "utf8",
+				timeout: 10_000,
+			},
+		);
+		assert.equal(child.error, undefined);
+		assert.equal(child.status, 0, child.stdout + child.stderr);
+		assert.equal(
+			readFileSync(join(directory, "test-results"), "utf8"),
+			"blocked output",
 		);
 	});
 });

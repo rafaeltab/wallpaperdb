@@ -52,6 +52,15 @@ test("Vitest retry overrides are rejected through registration and options alias
 		);
 });
 
+test("computed identifier spellings are not interpreted as literal retry or API names", () => {
+	for (const source of [
+		"import { it } from 'vitest'; const retry = 'timeout'; it('case', { [retry]: 100 }, () => {});",
+		"import * as v from 'vitest'; const test = 'request'; v[test]('case', { retry: 2 }, () => {});",
+		"import { it } from 'vitest'; const todo = 'each'; it[todo]([1]);",
+	])
+		assert.deepEqual(lint(source), [], source);
+});
+
 test("retry checks allow application options and test data and terminate alias cycles", () => {
 	for (const source of [
 		"import { it } from 'vitest'; const request = { retry: 3 }; it('case', () => request);",

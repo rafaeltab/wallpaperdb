@@ -24,6 +24,8 @@ function resolveApi(
 	switch (node.kind) {
 		case "JS_CALL_EXPRESSION":
 			return resolveApi(node.callee, model, seen);
+		case "JS_TEMPLATE_EXPRESSION":
+			return resolveApi(node.tag, model, seen);
 		case "JS_PARENTHESIZED_EXPRESSION":
 		case "TS_AS_EXPRESSION":
 		case "TS_SATISFIES_EXPRESSION":
@@ -108,5 +110,69 @@ export const validExpect = defineRule({
 				"error",
 				"Complete the assertion with a matcher and one value plus an optional reason.",
 			);
+	},
+});
+
+function hasRetry(
+	node: AnyJsAstNode | undefined,
+	model: SemanticModel,
+	seen = new Set<string>(),
+): boolean {
+	if (!node) return false;
+	switch (node.kind) {
+		case "JS_PARENTHESIZED_EXPRESSION":
+		case "TS_AS_EXPRESSION":
+		case "TS_SATISFIES_EXPRESSION":
+			return hasRetry(node.expression, model, seen);
+		case "JS_IDENTIFIER_EXPRESSION": {
+			if (!node.name) return false;
+			const binding = model.binding(node.name);
+			if (!binding) return false;
+			const key = `${binding.syntax().text}:${binding.scope().syntax().text}`;
+			if (seen.has(key)) return false;
+			seen.add(key);
+			const parent = binding.syntax().parent;
+			return (
+				parent?.kind === "JS_VARIABLE_DECLARATOR" &&
+				hasRetry(parent.initializer?.expression, model, seen)
+			);
+		}
+		case "JS_OBJECT_EXPRESSION":
+			return node.members.some((member) => {
+				if (member.kind === "JS_SPREAD")
+					return hasRetry(member.argument, model, seen);
+				if (!("name" in member)) return false;
+				const name = member.name;
+				return (
+					literal(
+						name?.kind === "JS_COMPUTED_MEMBER_NAME"
+							? name.expression?.text
+							: name?.text,
+					) === "retry"
+				);
+			});
+		default:
+			return false;
+	}
+}
+
+export const noTestRetries = defineRule({
+	query: semantic("JS_CALL_EXPRESSION"),
+	run(node, context) {
+		const api = resolveApi(node.callee, context.model);
+		if (
+			!api ||
+			!["vitest", "global"].includes(api.source) ||
+			!["it", "test", "describe", "suite"].includes(api.name)
+		)
+			return;
+		for (const argument of node.arguments?.args.slice(1) ?? []) {
+			if (hasRetry(argument, context.model))
+				registerDiagnostic(
+					argument,
+					"error",
+					"Use the shared retry policy. Repair failing tests instead of overriding retries.",
+				);
+		}
 	},
 });

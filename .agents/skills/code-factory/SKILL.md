@@ -11,11 +11,11 @@ Use coordinator mode unless the launch message explicitly selects worker mode. F
 
 ## Initial operating policy
 
-- Admit at most one cycle per UTC date, with at most one new issue and one implementation PR per admitted cycle.
+- Admit at most one cycle per UTC date, with at most one discovery issue and one implementation PR per admitted cycle. Required flaky-test tracking follows the babysitting skill's workflow.
 - Allow one active factory worker and one open factory implementation PR across the project. An open draft also counts. Other work in the project can continue.
 - Check existing `ready-for-agent` issues before implementing a new discovery. A safe, fully specified new finding can receive `ready-for-agent` and proceed automatically.
 - Use a separate local Git worktree from the current upstream default branch. There is no sandbox provisioning.
-- Stop at a reviewable PR. Keep its issue open until the change reaches the default branch.
+- Carry the implementation PR through CI and review before handing it back for human merging. Keep its issue open until the change reaches the default branch.
 
 These limits apply to the factory, not to manual agent work. Use `<!-- wallpaperdb-code-factory -->` in every factory issue, claim comment, and implementation PR body. Retain the marker when editing bodies. Use the five existing triage labels according to [triage-labels.md](../../../docs/agents/triage-labels.md).
 

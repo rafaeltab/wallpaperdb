@@ -14,7 +14,7 @@ The initial automatic scope excludes schema or data migrations, authentication o
 
 Search open and closed issues, PRs, and relevant active T3 conversations for each serious candidate, including proposals without the factory marker. Paginate rather than treating a truncated result as complete. Compare the underlying problem and affected code, not just titles. Respect rejected proposals and deferred `future-work`. A recurrence after a landed fix needs evidence and the repository's verified reopen procedure, not a fresh duplicate.
 
-Create at most one new issue if a worthwhile, fresh finding exists. If none qualifies, report a skipped discovery and continue to existing issue pickup. Do not create quota-filling work.
+Create at most one discovery issue if a worthwhile, fresh finding exists. If none qualifies, report a skipped discovery and continue to existing issue pickup. Do not create quota-filling work.
 
 The issue body includes:
 
@@ -47,4 +47,12 @@ Before publication, review the diff against both the issue and applicable standa
 
 Publish using the repository's [pr](../pr/SKILL.md) and GitHub body workflows. Include the factory marker, `Closes #<issue>`, the preserved behavior, actual validation and review evidence, and any limitations. Explain when a browser demonstration is inapplicable, such as an internal refactor without a user-visible feature. Immediately register the PR using T3's `link_pull_request`; before finishing, verify it with `list_thread_pull_requests` and correct missing links. Report a linking failure accurately.
 
-Comment on the issue with the PR URL, tested commit, validation result, and remaining gaps. Keep the issue open for landing. Leave merging to the user. End with the discovery outcome, selected issue or skip reason, commit and PR links, checks and review results, and any required recovery. State clearly whether the PR is ready for human review or remains a draft.
+Comment on the issue with the PR URL, tested commit, validation result, and remaining gaps. Keep the issue open for landing.
+
+## Babysit the published PR
+
+Once the PR is published and linked, invoke [babysit-pr](../babysit-pr/SKILL.md) for that PR in this worker conversation. Follow its CI failure handling, review fixes, current-head Codex approval, and watcher handoff rules. Preserve its progress ledger across T3 watcher wakes and resume babysitting on each wake. Yielding to the watcher is a monitoring state, not completed factory work.
+
+Keep subsequent fixes within the factory's automatic scope. If a fix requires an excluded change or unresolved human decision, follow the babysitting skill's blocker handoff instead of broadening the assignment. Leave merging to the user.
+
+When babysitting completes or hands back a blocker, report the discovery outcome, selected issue, commit and PR links, checks and review results, and any required recovery alongside its handoff summary. State clearly whether the PR passed the babysitting gates or still needs attention.

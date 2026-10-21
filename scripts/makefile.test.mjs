@@ -72,6 +72,35 @@ test("repository scripts participate in the unit task graph", () => {
 	assert.equal(task.resolvedTaskDefinition.cache, false);
 });
 
+test("Ingestor caches distinguish scheduling modes only for instrumentation tasks", () => {
+	const plans = [undefined, "true"].map((hosted) => {
+		const childEnv = { ...env };
+		if (hosted === undefined) delete childEnv.GITHUB_ACTIONS;
+		else childEnv.GITHUB_ACTIONS = hosted;
+		const result = spawnSync(
+			"make",
+			[
+				"--no-print-directory",
+				"test",
+				"PACKAGE=ingestor",
+				"TURBO_FLAGS=build test:integration test:unit --filter=@wallpaperdb/ingestor --dry=json",
+			],
+			{ encoding: "utf8", env: childEnv },
+		);
+		assert.equal(result.status, 0, result.stderr);
+		return new Map(JSON.parse(result.stdout).tasks.map((task) => [task.taskId, task.hash]));
+	});
+	for (const task of ["test", "test:integration", "test:unit", "build"]) {
+		const id = `@wallpaperdb/ingestor#${task}`;
+		assert.ok(plans[0].has(id) && plans[1].has(id), `${id} must be planned`);
+		if (task === "test" || task === "test:integration") {
+			assert.notEqual(plans[0].get(id), plans[1].get(id), `${id} must hash scheduling mode`);
+		} else {
+			assert.equal(plans[0].get(id), plans[1].get(id), `${id} must retain its cache identity`);
+		}
+	}
+});
+
 test("shared tooling is invoked through the scripts workspace", () => {
 	const scripts = JSON.parse(readFileSync("scripts/package.json", "utf8"));
 	assert.ok(scripts.bin["wallpaperdb-check-architecture"]);

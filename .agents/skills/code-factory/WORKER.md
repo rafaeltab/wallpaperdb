@@ -10,6 +10,14 @@ Load do-work, code-review, testing, PR publication, babysit-pr, repair workflows
 
 On resumes and before execution or authenticated writes, follow babysit-pr's independent policy-source revalidation procedure. If that source advances, materialize and validate the successor outside the proposed checkout, then record the successor policy identity in the ledger. Reassess scope and repeat affected gates under the refreshed policy before proceeding. Neither a task-provided ref nor a changed policy file in the proposed branch selects the successor.
 
+### Branch execution trust
+
+Record the authenticated starting upstream commit and each worker-produced commit in the ledger, with its parent commits and the producing worker or actual delegated task ID. Accept delegated results only from this worker's recorded tasks operating under the trusted policy. Record the expected remote branch head after verified publication, separately from the immutable initial publication receipt. Git author fields, PR publisher identity, branch names, and fast-forward ancestry alone do not establish that a new commit was produced by this worker.
+
+Before invoking babysit-pr or any nested repair, on every wake, and before checkout, dependency installation, build/test execution, or publication, verify that the local head belongs to that recorded work and the authenticated remote head equals the last verified published head. Before the first push require the remote branch to be absent. Use babysit-pr's explicit expected-value lease for subsequent pushes and require the expected remote head to remain an ancestor of the tested result. Record an attempted push's exact commit before sending it; after an uncertain response, reconcile only that exact attempted commit against the remote and verify publication before advancing the expected head. Never reset the expected head merely to match an observed advance.
+
+An unexplained remote advance, reset, local head, or missing provenance stops execution and GitHub mutations before adopting, checking out, rebasing onto, or testing that content. Retain active ownership and report the expected and observed SHAs for human recovery. Fetching opaque Git objects for identification does not authorize materializing or executing them. An independently authenticated default-branch advance follows trusted-policy refresh and deliberate worker integration, with the resulting worker commits recorded and all affected gates repeated. Pass these constraints into babysit-pr and every nested workflow; a changed-head validation rule cannot override this trust check. This factory has no sandbox fallback.
+
 ## Find one opportunity
 
 Read `AGENTS.md`, the applicable guidelines selected by `CODING_STANDARDS.md`, and relevant domain docs through `GLOSSARY-MAP.md`. Respect recorded ADRs. Load [github-markdown-bodies](../github-markdown-bodies/SKILL.md) before any GitHub body mutation.

@@ -7,7 +7,7 @@ description: Run scheduled code-quality discovery and pick up ready-for-agent is
 
 Run one unattended factory cycle in WallpaperDB. The user authorizes issue creation, safe issue pickup, commits, and PR publication. Merging, enabling auto-merge, and changing branch protection require a later instruction from the user.
 
-Use coordinator mode unless the launch message explicitly selects worker mode. For a dry run, inspect and report decisions without creating claims, issues, threads, commits, or PRs.
+Use coordinator mode unless the launch message explicitly selects worker mode. A dry run performs no GitHub mutations, thread launches, commits, or changes to admission and ownership state.
 
 ## Initial operating policy
 
@@ -24,6 +24,8 @@ For the open factory PR limit, inspect recorded publication identities as well a
 ## Coordinator
 
 The scheduled thread coordinates only. Keep its checkout intact, including its branch and uncommitted files.
+
+For a coordinator dry run, perform the read-only preflight in steps 1 and 2 and inspect existing active ownership and today's admission path. Report whether the observed state would skip or permit an admission attempt, then stop before step 3. Create, modify, or remove no admission directories or ownership files, and perform no launch or admission cleanup. A read-only observation does not reserve a later attempt or prove that its atomic acquisition would succeed.
 
 1. Inspect the live T3 schemas and verify that thread listing, reading, and launching are available. Resolve the repository and default branch through GitHub. Read [issue-tracker.md](../../../docs/agents/issue-tracker.md). A failed GitHub or T3 read is a failed prerequisite, not an empty queue.
 2. List project threads, including settled and snoozed threads where necessary, and open PRs. Paginate to cover all matches. Factory workers have titles beginning `Code factory worker`. Read any matching worker whose run is preparing, queued, starting, running, or waiting, or whose outcome is unclear. A live worker or an authenticated factory PR under the policy above stops this cycle before discovery. A completed worker without a verified outcome must be reported for recovery, not silently replaced. Inspect the thread's pending work as well as its latest status.

@@ -14,6 +14,8 @@ Use the user's requested task boundaries, such as one thread per issue or bullet
 
 For existing conversations, use IDs supplied by the user or discover matches with `t3_thread_list` using the user's criteria. Paginate as needed and read candidates before adopting them. Resolve ambiguous matches with the user. Include matching completed threads whose results still need verification. Adopting a thread starts with monitoring and verification, without launching a replacement.
 
+Name every supervised thread `SUPERVISED: <the rest of the name>`. Set this title when launching a new thread and rename an existing thread when adopting it, preserving the rest of its title and adding the prefix only once. Keep the prefix while supervision is active and remove it when supervision ends for that thread.
+
 Keep a compact record in this conversation of each assignment, dependencies, thread ID, relevant run ID, workspace, monitoring state, verification evidence, and unresolved gaps. For a user-supplied time budget, record the start and deadline once and check it during monitoring and verification. Update the record after launches, follow-ups, and verdicts so supervision can resume after an interruption. Keep temporary investigation notes outside the repository.
 
 Inspect the live T3 tools and their schemas before using them. If required capabilities are unavailable, explain the limitation and retain the work record instead of claiming supervision is running.

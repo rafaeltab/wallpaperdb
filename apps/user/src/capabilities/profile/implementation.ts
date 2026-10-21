@@ -24,7 +24,7 @@ const reserved = new Set([
   'health',
   'ingestor',
   'login',
-  'media',
+  'asset',
   'openapi',
   'profile',
   'profiles',

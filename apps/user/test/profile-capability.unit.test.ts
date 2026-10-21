@@ -136,6 +136,7 @@ describe('Profiles capability', () => {
     const test = controlledProfiles();
     for (const [display, handle] of [
       ['Admin', 'admin-profile'],
+      ['Asset', 'asset-profile'],
       ['GraphQL', 'graphql-profile'],
       ['Tags', 'tags-profile'],
     ]) {
@@ -279,6 +280,7 @@ describe('Profiles capability', () => {
       ' ADMÍN ',
       'sUpPoRt',
       'GraphQL',
+      'Asset',
       'settings',
       '--!!!',
       ' A ',

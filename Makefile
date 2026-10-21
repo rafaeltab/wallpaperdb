@@ -52,7 +52,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
         infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
         coverage-summary crap check-crap \
-        worktree-remove ci clean
+        worktree-remove ci clean prototype-redis
 
 help: ## Show commands and selectors
 	@echo "WallpaperDB — project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
@@ -87,6 +87,12 @@ test-focused: ## Build dependencies and run selected tests serially (requires PA
 	$(if $(PACKAGE),,$(error test-focused requires PACKAGE, e.g. make test-focused PACKAGE=web))
 	@$(TURBO) run build --filter="$(TURBO_PACKAGE)^..." --concurrency=1
 	@pnpm --filter @wallpaperdb/$(PACKAGE) exec vitest run --maxWorkers=1 --no-file-parallelism $(ARGS)
+
+prototype-redis: ## Opt-in throwaway Redis fixture comparison for issue 435 (optional ARGS)
+	@$(TURBO) run build --filter="@wallpaperdb/test-utils^..." --concurrency=1
+	@pnpm --filter @wallpaperdb/test-utils exec biome lint prototype-redis
+	@pnpm --filter @wallpaperdb/test-utils exec tsc --project prototype-redis/tsconfig.json
+	@pnpm --filter @wallpaperdb/test-utils exec vitest run --config prototype-redis/vitest.config.ts $(ARGS)
 
 test-unit: ## Run unit tests (no containers; optional PACKAGE)
 	@$(TURBO) run test:unit $(TURBO_FLAGS)

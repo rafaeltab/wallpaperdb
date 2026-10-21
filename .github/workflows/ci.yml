@@ -81,9 +81,9 @@ jobs:
           path: |
             test-results/ci-runtime/
             apps/gateway/test-results/ci-runtime-*.jsonl
-            apps/gateway/test-results/ci-runtime-vitest.json
+            apps/gateway/test-results/ci-runtime-vitest*.json
             apps/ingestor/test-results/ci-runtime-*.jsonl
-            apps/ingestor/test-results/ci-runtime-vitest.json
+            apps/ingestor/test-results/ci-runtime-vitest*.json
             apps/gateway/.turbo/turbo-test_integration.log
             apps/ingestor/.turbo/turbo-test_integration.log
 

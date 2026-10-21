@@ -100,8 +100,8 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
   const pending = new Set<Promise<void>>();
   let closing = false;
 
-  async function connect(name: string, owned: RedisClientType[]) {
-    assert.equal(abort.signal.aborted, false, 'group is closed');
+  async function connect(name: string, owned: RedisClientType[], assertOpen: () => void) {
+    assertOpen();
     const client: RedisClientType = createClient({
       url: tester.redis.config.endpoints.fromHost,
       name,
@@ -112,12 +112,16 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
     // connect/commands reject normally; keep socket errors from becoming unhandled events.
     client.on('error', () => {});
     const open = client.connect.bind(client);
-    // A callback can retain its client after cancellation. Never let it reopen the socket.
+    // Retained clients cannot reopen after their case or group has closed.
     client.connect = async () => {
-      assert.equal(abort.signal.aborted, false, 'group is closed');
+      assertOpen();
       await open();
-      if (abort.signal.aborted && client.isOpen) await client.disconnect();
-      assert.equal(abort.signal.aborted, false, 'group is closed');
+      try {
+        assertOpen();
+      } catch (error) {
+        if (client.isOpen) await client.disconnect();
+        throw error;
+      }
       return client;
     };
     await client.connect();
@@ -147,34 +151,40 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
         const owned: RedisClientType[] = [];
         const ownedKeys = new Set<string>();
         const subscriptions: { client: RedisClientType; channel: string }[] = [];
+        let closed = false;
+        const assertOpen = () => {
+          assert.equal(abort.signal.aborted, false, 'group is closed');
+          assert.equal(closed, false, 'case is closed');
+        };
         let client: RedisClientType | undefined;
         const errors: unknown[] = [];
         try {
           const setup = performance.now();
           try {
-            client = await connect(prefix, owned);
+            client = await connect(prefix, owned, assertOpen);
           } finally {
             metrics.clientSetupMs += performance.now() - setup;
           }
           const scope: CaseScope = {
             client,
             key(suffix) {
-              assert.equal(abort.signal.aborted, false, 'group is closed');
+              assertOpen();
               const key = `${prefix}:key:${suffix}`;
               ownedKeys.add(key);
               keys.add(key);
               return key;
             },
             channel(suffix) {
-              assert.equal(abort.signal.aborted, false, 'group is closed');
+              assertOpen();
               const channel = `${prefix}:channel:${suffix}`;
               channels.add(channel);
               return channel;
             },
             async subscribe(channel, listener) {
-              assert.equal(abort.signal.aborted, false, 'group is closed');
+              assertOpen();
               assert.ok(channels.has(channel) && channel.startsWith(prefix));
-              const subscriber = await connect(`${prefix}:subscriber`, owned);
+              const subscriber = await connect(`${prefix}:subscriber`, owned, assertOpen);
+              assertOpen();
               subscriptions.push({ client: subscriber, channel });
               await subscriber.subscribe(channel, listener);
             },
@@ -188,6 +198,7 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
         } catch (error) {
           errors.push(error);
         } finally {
+          closed = true;
           const start = performance.now();
           const deadline = start + shutdownTimeoutMs;
           // Attempt every release even if a previous one fails. Never FLUSHALL.

@@ -39,6 +39,19 @@ test("known imported Effect promise APIs require handling through bindings", () 
 	}
 });
 
+test("Effect promises can be handled by async matchers or a later assignment read", () => {
+	for (const source of [
+		"import { Effect } from 'effect'; import { expect } from 'vitest'; await expect(Effect.runPromise(Effect.succeed('done'))).resolves.toBe('done');",
+		"import { Effect } from 'effect'; let pending: Promise<string> | undefined; pending = Effect.runPromise(Effect.succeed('done')); await pending;",
+	])
+		assert.deepEqual(lint(source), [], source);
+	assert.ok(
+		lint(
+			"import { Effect } from 'effect'; import { expect } from 'vitest'; expect(Effect.runPromise(Effect.succeed('done'))).toBeDefined();",
+		).length > 0,
+	);
+});
+
 test("Effect promise checks accept synchronous APIs and unrelated or shadowed names", () => {
 	for (const source of [
 		"import { Effect } from 'effect'; Effect.runSync(Effect.succeed('done'));",

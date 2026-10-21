@@ -29,6 +29,7 @@ function resolveApi(
 		case "JS_PARENTHESIZED_EXPRESSION":
 		case "TS_AS_EXPRESSION":
 		case "TS_SATISFIES_EXPRESSION":
+		case "TS_NON_NULL_ASSERTION_EXPRESSION":
 			return resolveApi(node.expression, model, seen);
 		case "JS_STATIC_MEMBER_EXPRESSION":
 		case "JS_COMPUTED_MEMBER_EXPRESSION": {
@@ -91,18 +92,30 @@ export const validExpect = defineRule({
 			return;
 		const count = node.arguments?.args.length ?? 0;
 		let expression = node.parent;
-		let members = 0;
-		while (
-			expression?.kind === "JS_STATIC_MEMBER_EXPRESSION" ||
-			expression?.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
-		) {
-			members++;
-			expression = expression.parent;
+		let matcher: string | undefined;
+		while (expression) {
+			if (
+				[
+					"JS_PARENTHESIZED_EXPRESSION",
+					"TS_AS_EXPRESSION",
+					"TS_SATISFIES_EXPRESSION",
+					"TS_NON_NULL_ASSERTION_EXPRESSION",
+				].includes(expression.kind)
+			) {
+				expression = expression.parent;
+			} else if (
+				expression.kind === "JS_STATIC_MEMBER_EXPRESSION" ||
+				expression.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
+			) {
+				matcher = literal(expression.member?.text);
+				expression = expression.parent;
+			} else break;
 		}
 		if (
 			count < 1 ||
 			count > 2 ||
-			members === 0 ||
+			!matcher ||
+			["not", "resolves", "rejects"].includes(matcher) ||
 			expression?.kind !== "JS_CALL_EXPRESSION"
 		)
 			registerDiagnostic(

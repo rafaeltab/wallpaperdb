@@ -34,6 +34,8 @@ export default mergeConfig(
           test: {
             name: 'ingestor-instrumentation',
             include: instrumentationTests,
+            // Each outage case owns a container; retain serial cases on local Docker hosts.
+            maxConcurrency: process.env.GITHUB_ACTIONS === 'true' ? 2 : 1,
             // OpenTelemetry SDK module patches outlive exporter shutdown.
             pool: 'forks',
             isolate: true,

@@ -9,7 +9,7 @@ const cases = [
   ...['refused', 'stalled', 'error'].map((outage) => ({ service: 'ingestor', outage })),
 ];
 
-it.each(
+it.concurrent.each(
   cases
 )('keeps fresh-connection HTTP uploads available during $service exporter $outage failure and recovers', async ({
   service,

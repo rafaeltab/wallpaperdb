@@ -25,6 +25,8 @@ For every fix in this workflow, including fixes delegated to other skills, prese
 
 ## 2. Handle review feedback
 
+Follow the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) for issue work. Substantive review or CI fixes use `In Progress` until tested fixes are pushed, then `In Review`. Monitoring and reruns alone do not change status. CI success and Codex approval leave the issue `In Review`; completion automation handles `Done` after verified default-branch landing.
+
 Invoke [fix-pr-review-comments](../fix-pr-review-comments/SKILL.md) for each batch of unhandled actionable feedback. Its verification, incremental commits, checks, replies, reactions, and resolution rules govern the batch. An outdated comment or an existing reaction alone does not establish completion.
 
 Record each actionable comment whose concern was fixed by a verified change pushed during this babysitting session. Count each comment ID once, including distinct comments reporting the same defect. Track invalid feedback and concerns already fixed before this session separately; neither increases the number of comments fixed. CI-only fixes do not increase this count. On each head change, audit delivered fixes against the new tree. Verify each fix commit remains reachable and its mapped concern remains fixed; ancestry alone does not detect a later revert. For rewritten history, verify an equivalent replacement and record its commit and evidence. If a concern returns, explicitly select that comment for fix-pr-review-comments even when its thread remains resolved, mark it pending, and repair it before success. Count its comment ID only once after the verified fix is delivered again.

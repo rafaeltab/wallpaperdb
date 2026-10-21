@@ -36,6 +36,8 @@ The verification step is complete when every selected claim has either an eviden
 
 ## 3. Fix in incremental commits
 
+For fixes tied to an issue, follow the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) to verify `In Progress` when substantive rework starts and `In Review` after the tested fixes are pushed. Feedback investigation or monitoring alone does not change status. Preserve the issue's open state until verified default-branch landing.
+
 Apply the repository's [development-principles](../development-principles/SKILL.md) and [testing](../testing/SKILL.md) skills. For each independent fix, implement the smallest complete change, run the relevant checks and formatting through Make, then commit it before starting the next fix. Group duplicate comments reporting the same defect into that commit and map every duplicate to it. Keep unrelated fixes in separate commits.
 
 Address the verified problem; use the reviewer's suggested implementation only if it is appropriate. If a valid concern is already fixed on the PR branch, verify the existing change and identify its commit or code location. Acknowledge it without an empty commit. Invalid feedback needs an explanation, not a code change.

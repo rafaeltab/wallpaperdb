@@ -11,11 +11,11 @@ description: Structured workflow for implementing tasks. Use when the user asks 
 
 Gather context. Read relevant files, search the codebase, and clarify ambiguities before proceeding.
 
-For work tied to a GitHub issue, follow [issue claiming](../../../docs/agents/issue-tracker.md#claiming-an-issue) before planning or implementation.
+For work tied to a GitHub issue, verify [issue claiming](../../../docs/agents/issue-tracker.md#claiming-an-issue) and dependency readiness, then follow the [project lifecycle and CLI](../../../docs/agents/issue-tracker.md#project-lifecycle) to set and verify `In Progress` before code edits.
 
 ### 2. Plan
 
-Create a todo list of the implementation steps.
+Create a todo list of the implementation steps. Design planning belongs to grilling before this workflow; this checklist keeps the issue `In Progress`.
 
 ### 3. Implement and Commit
 
@@ -38,5 +38,7 @@ For each feature touched, exercise the completed feature in a browser and record
 Before pushing or updating a stack, fetch its trunk and check each layer against the head that will be published immediately below it. `git merge-base --is-ancestor <base-head> <layer-head>` must succeed, and `git rev-list --count --min-parents=2 <base-head>..<layer-head>` must return `0`. If either check fails, rebase that layer and its descendants, then check every layer again. Repeat after changes to the trunk or a lower layer. After the final restack, rerun Step 4 for every layer whose file tree changed since its last successful validation.
 
 Push the completed branch and open a PR automatically. Summarize the changes, link the relevant issue when there is one, and report the validation performed. Use the github-markdown-bodies skill for the PR description and [pr-video-attachment](../pr-video-attachment/SKILL.md) for each recording. Confirm the PR renders each video and that reviewers can access it.
+
+For issue work, follow the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) to verify `In Review` after publication and before handoff. Keep the issue open until verified default-branch landing; completion automation owns `Done`.
 
 After publishing or updating a stack, inspect GitHub's native stack status. Report the stack as merge-ready only when each layer is ready there; ordinary PR mergeability alone is insufficient.

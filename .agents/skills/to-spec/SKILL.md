@@ -16,7 +16,7 @@ The issue tracker and triage label vocabulary should have been provided to you. 
 
 Check with the user that the proposed seams match their expectations after applying that guidance.
 
-3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage.
+3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage. Follow the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) to verify project membership and `Planned` after publishing.
 
 <spec-template>
 

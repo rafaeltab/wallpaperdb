@@ -42,9 +42,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Install turbo
-        run: pnpm add -g turbo
-
       - name: Set up Vercel Remote Cache
         if: env.USE_VERCEL_CACHE == 'true'
         uses: vercel/setup-turborepo-remote-cache-action@v1.1.0
@@ -122,9 +119,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
-
-      - name: Install turbo
-        run: pnpm add -g turbo
 
       - name: Set up Vercel Remote Cache
         if: env.USE_VERCEL_CACHE == 'true'

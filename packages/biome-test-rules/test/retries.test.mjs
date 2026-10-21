@@ -14,7 +14,7 @@ test("Vitest retry overrides are rejected through registration and options alias
 		"it.each([1])",
 		"it.concurrent",
 		"checks['test']",
-		"it.each`value\n${1}`",
+		`it.each\`value\n\${1}\``,
 	])
 		assert.ok(
 			lint(`${prelude} ${registration}('case', { retry: 3 }, check);`).some(

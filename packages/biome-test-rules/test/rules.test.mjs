@@ -21,6 +21,15 @@ test("incomplete expect calls fail, including accidental two-argument assertions
 		);
 });
 
+test("a line-scoped plugin exception permits public matcher introspection", () => {
+	assert.deepEqual(
+		lint(
+			"import { expect } from 'vitest';\n// biome-ignore lint/plugin/validExpect: The outer assertion checks available matcher methods.\nexpect('customMatcher' in expect(null)).toBe(false);",
+		),
+		[],
+	);
+});
+
 test("assertion wrappers preserve valid matchers", () => {
 	for (const expression of [
 		"(expect(1)).toBe(1)",

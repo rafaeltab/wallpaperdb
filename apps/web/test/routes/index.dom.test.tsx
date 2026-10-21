@@ -54,7 +54,7 @@ vi.mock('@/components/WallpaperGrid', () => ({
 
 vi.mock('@/components/LoadMoreTrigger', () => ({
   LoadMoreTrigger: ({ hasMore, onLoadMore }: { hasMore: boolean; onLoadMore: () => void }) =>
-    hasMore ? <button onClick={onLoadMore}>Automatic load more</button> : null,
+    hasMore ? <button type="button" onClick={onLoadMore}>Automatic load more</button> : null,
 }));
 
 vi.mock('@/components/grid', () => ({

@@ -52,7 +52,7 @@ vi.mock('@/components/WallpaperGrid', () => ({
 
 vi.mock('@/components/LoadMoreTrigger', () => ({
   LoadMoreTrigger: ({ onLoadMore, hasMore }: { onLoadMore: () => void; hasMore: boolean }) =>
-    hasMore ? <button onClick={onLoadMore}>Load more wallpapers</button> : null,
+    hasMore ? <button type="button" onClick={onLoadMore}>Load more wallpapers</button> : null,
 }));
 
 describe('PublicProfilePage', () => {

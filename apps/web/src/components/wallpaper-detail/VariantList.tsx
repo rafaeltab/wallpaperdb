@@ -32,7 +32,7 @@ export function VariantList({ variants, selectedIndex, onSelect }: VariantListPr
               const formatName = variant.format.split('/')[1]?.toUpperCase() || 'UNKNOWN';
 
               return (
-                <li key={`${variant.url}-${index}`}>
+                <li key={variant.url}>
                   {index > 0 && <Separator className="my-2.5" decorative={false} />}
 
                   <div className="flex items-center justify-between gap-2">

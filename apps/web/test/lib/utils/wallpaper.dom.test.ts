@@ -64,7 +64,7 @@ describe('wallpaper utilities', () => {
     });
 
     it('formats 21:9 ultrawide ratio', () => {
-      expect(formatAspectRatio(2.3333333333333333)).toBe('21:9');
+      expect(formatAspectRatio(21 / 9)).toBe('21:9');
       expect(formatAspectRatio(2.33)).toBe('21:9');
     });
 

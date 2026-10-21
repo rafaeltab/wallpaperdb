@@ -50,7 +50,7 @@ function ControlledTestComponent({
   return (
     <div>
       <TestComponent enabled={enabled} onStateChange={onStateChange} />
-      <button data-testid="toggle-enabled" onClick={() => setEnabled((e) => !e)}>
+      <button type="button" data-testid="toggle-enabled" onClick={() => setEnabled((e) => !e)}>
         Toggle
       </button>
     </div>

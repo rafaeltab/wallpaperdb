@@ -2,14 +2,14 @@
 	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
 	"plugins": [
 		{
-			"path": "./rules/test-correctness.ts",
+			"path": "./rules/correctness.ts",
 			"resolutionKind": "config",
 			"includes": [
 				"**/*.{test,spec}.{js,mjs,ts,tsx}",
 				"**/{test,tests,specs}/**/*.{js,mjs,ts,tsx}",
-				"!**/fixtures/**",
 				"!**/node_modules/**",
-				"!**/{dist,build,coverage,.next,.output}/**"
+				"!**/{dist,build,coverage,.next,.output}/**",
+				"!**/test/fixtures/crap/**"
 			]
 		}
 	],
@@ -18,9 +18,9 @@
 			"includes": [
 				"**/*.{test,spec}.{js,mjs,ts,tsx}",
 				"**/{test,tests,specs}/**/*.{js,mjs,ts,tsx}",
-				"!**/fixtures/**",
 				"!**/node_modules/**",
-				"!**/{dist,build,coverage,.next,.output}/**"
+				"!**/{dist,build,coverage,.next,.output}/**",
+				"!**/test/fixtures/crap/**"
 			],
 			"linter": {
 				"rules": {

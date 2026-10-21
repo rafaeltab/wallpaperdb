@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	rmSync,
@@ -19,24 +20,29 @@ const biome = join(
 	"bin/biome",
 );
 
-export function lint(source, files = {}) {
+export function lint(source, files = {}, filename = "example.test.ts") {
 	const directory = mkdtempSync(join(tmpdir(), "biome-test-rules-"));
 	try {
 		const config = JSON.parse(
 			readFileSync(join(workspace, "test-correctness.json"), "utf8"),
 		);
-		config.plugins = config.plugins.map((path) => join(workspace, path));
+		config.linter = { rules: { preset: "none" } };
+		config.plugins = config.plugins.map((plugin) => ({
+			...plugin,
+			path: join(workspace, plugin.path),
+		}));
 		writeFileSync(join(directory, "biome.json"), JSON.stringify(config));
 		symlinkSync(
 			join(workspace, "node_modules"),
 			join(directory, "node_modules"),
 		);
-		writeFileSync(join(directory, "example.test.ts"), source);
+		mkdirSync(dirname(join(directory, filename)), { recursive: true });
+		writeFileSync(join(directory, filename), source);
 		for (const [path, content] of Object.entries(files))
 			writeFileSync(join(directory, path), content);
 		const result = spawnSync(
 			process.execPath,
-			[biome, "lint", "--reporter=json", "example.test.ts"],
+			[biome, "lint", "--reporter=json", filename],
 			{
 				cwd: directory,
 				encoding: "utf8",

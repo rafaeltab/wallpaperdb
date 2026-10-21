@@ -287,3 +287,108 @@ export const noTodoTests = defineRule({
 		}
 	},
 });
+
+function handled(
+	node: AnyJsAstNode,
+	model: SemanticModel,
+	seen = new Set<string>(),
+): boolean {
+	const parent = node.parent;
+	if (!parent) return false;
+	switch (parent.kind) {
+		case "JS_AWAIT_EXPRESSION":
+		case "JS_RETURN_STATEMENT":
+		case "JS_ARROW_FUNCTION_EXPRESSION":
+			return true;
+		case "JS_PARENTHESIZED_EXPRESSION":
+		case "TS_AS_EXPRESSION":
+		case "TS_SATISFIES_EXPRESSION":
+		case "TS_NON_NULL_ASSERTION_EXPRESSION":
+			return handled(parent, model, seen);
+		case "JS_STATIC_MEMBER_EXPRESSION": {
+			const call = parent.parent;
+			if (call?.kind !== "JS_CALL_EXPRESSION") return false;
+			const count = call.arguments?.args.length ?? 0;
+			if (parent.member?.text === "catch" && count >= 1) return true;
+			if (parent.member?.text === "then" && count >= 2) return true;
+			return handled(call, model, seen);
+		}
+		case "JS_INITIALIZER_CLAUSE": {
+			const declaration = parent.parent;
+			if (
+				declaration?.kind !== "JS_VARIABLE_DECLARATOR" ||
+				declaration.id?.kind !== "JS_IDENTIFIER_BINDING"
+			)
+				return false;
+			const binding = model.asBinding(declaration.id);
+			if (!binding) return false;
+			const key = `${binding.syntax().text}:${binding.scope().syntax().text}`;
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return binding.allReads().some((reference) => {
+				const expression = reference.syntax().parent;
+				return (
+					expression?.kind === "JS_IDENTIFIER_EXPRESSION" &&
+					handled(expression, model, seen)
+				);
+			});
+		}
+		case "JS_ARRAY_ELEMENT_LIST":
+		case "JS_ARRAY_EXPRESSION":
+		case "JS_CALL_ARGUMENT_LIST":
+		case "JS_CALL_ARGUMENTS": {
+			let call: AnyJsAstNode | undefined = parent;
+			while (
+				call &&
+				[
+					"JS_ARRAY_ELEMENT_LIST",
+					"JS_ARRAY_EXPRESSION",
+					"JS_CALL_ARGUMENT_LIST",
+					"JS_CALL_ARGUMENTS",
+				].includes(call.kind)
+			)
+				call = call.parent;
+			return (
+				call?.kind === "JS_CALL_EXPRESSION" &&
+				/^Promise\.(all|allSettled|race|any)$/.test(call.callee?.text ?? "") &&
+				handled(call, model, seen)
+			);
+		}
+		default:
+			return false;
+	}
+}
+
+export const awaitAsyncAssertions = defineRule({
+	query: semantic("JS_CALL_EXPRESSION"),
+	run(node, context) {
+		const api = resolveApi(node.callee, context.model);
+		if (
+			!api ||
+			api.name !== "expect" ||
+			!["vitest", "@effect/vitest", "global"].includes(api.source)
+		)
+			return;
+		if (!api.members.some((m) => ["poll", "resolves", "rejects"].includes(m)))
+			return;
+		if (
+			[
+				"poll",
+				"soft",
+				"not",
+				"resolves",
+				"rejects",
+				"then",
+				"catch",
+				"finally",
+			].includes(api.members.at(-1) ?? "")
+		)
+			return;
+		if (!handled(node, context.model))
+			registerDiagnostic(
+				node,
+				"error",
+				"Await or return this async assertion, or handle its rejection.",
+			);
+	},
+});

@@ -53,7 +53,7 @@ A Rendition request value referring to a characteristic or sizing reference of t
 The selected Source's native displayed size when both axes inherit, or the proportional axis derived from its aspect ratio when the other axis is numeric. Omitted dimensions inherit.
 
 **Faithful rendition**:
-A Rendition that satisfies every requested characteristic through exact source-byte delivery or a source/request combination qualified under the [accepted delivery policy](https://github.com/rafaeltab/wallpaperdb/issues/250) and applicable [HDR qualification policy](https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153). Requested crops, explicit SDR conversion, and re-encoding can be faithful when their processing path qualifies; preservation requests retain the characteristics they promise.
+A Rendition that satisfies every requested characteristic through exact source-byte delivery or a source/request combination qualified under the [accepted delivery policy](https://github.com/rafaeltab/wallpaperdb/issues/250) and applicable [HDR qualification policy](https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153). Explicitly requested fitting, SDR conversion, and re-encoding can be faithful when their processing path qualifies; preservation requests retain the characteristics they promise.
 
 **Source rendition**:
 A creator-supplied immutable representation of an Asset, including a processed crop accepted through source intake. Different Source renditions can carry separately authored SDR/HDR appearances or encode the Asset at different resolutions or in different formats.
@@ -90,7 +90,7 @@ A deferred Source acceptance rule requiring additions or replacements to preserv
 A representation the Asset service produces by processing source media. A Generated rendition may be produced on request or stored as a Materialized rendition.
 
 **Materialized rendition**:
-A stored Generated rendition that the Asset service can reuse to satisfy Rendition requests.
+A stored Generated rendition with an immutable identity and Source provenance that the Asset service can reuse to satisfy Rendition requests. It is distinct from a creator-supplied Source rendition.
 _Avoid_: Cached file, pre-generated version
 
 **Source facts**:

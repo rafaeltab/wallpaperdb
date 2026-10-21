@@ -1,6 +1,6 @@
 # Wallpaper variant generation
 
-Owns lower-resolution renditions of uploaded wallpaper originals for device-sized delivery.
+The existing implementation owns lower-resolution renditions of uploaded wallpaper originals for device-sized delivery. The [accepted Asset generation policy](https://github.com/rafaeltab/wallpaperdb/issues/256#issuecomment-6320862525) and [ADR 0012](../../docs/adr/0012-own-stable-assets-and-immutable-sources-in-media.md) retire this separate context and the active Variant concept in the clean rebuild. The terms below describe the legacy implementation.
 
 ## Language
 

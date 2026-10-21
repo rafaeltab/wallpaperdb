@@ -24,6 +24,11 @@ function fixture(t, allowedCapabilityDependencies = {}, configOverrides = {}) {
 		path.join(repository, "scripts/check-architecture.mjs"),
 		path.join(root, "scripts/check-architecture.mjs"),
 	);
+	fs.mkdirSync(path.join(root, "scripts/lib"), { recursive: true });
+	fs.copyFileSync(
+		path.join(repository, "scripts/lib/architecture-boundaries.mjs"),
+		path.join(root, "scripts/lib/architecture-boundaries.mjs"),
+	);
 	fs.writeFileSync(
 		path.join(example, "package.json"),
 		JSON.stringify({ name: "@wallpaperdb/example", type: "module" }),

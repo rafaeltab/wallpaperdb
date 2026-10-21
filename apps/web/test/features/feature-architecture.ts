@@ -17,6 +17,14 @@ const publicAdapters = new Set([
   'wallpaper-details/adapters/react.ts',
   'wallpaper-details/adapters/share.ts',
 ]);
+// Shared with the opt-in test-boundary prototype. Keep the public adapter list here.
+export function isPublicFeatureEntry(root: string, filename: string) {
+  const relative = path.relative(root, filename);
+  return (
+    (relative.split(path.sep).length === 2 && path.basename(filename) === 'index.ts') ||
+    publicAdapters.has(relative.split(path.sep).join('/'))
+  );
+}
 const browserGlobals = new Set([
   'window',
   'document',
@@ -70,7 +78,7 @@ export function featureArchitectureErrors(src: string, sources: Map<string, stri
       )
         errors.push(`${filename}: core cannot import ${specifier}`);
       if (destination && destination !== feature) {
-        if (!publicCore && !publicAdapters.has(path.relative(root, target)))
+        if (!isPublicFeatureEntry(root, target))
           errors.push(`${filename}: use the ${destination} public entry point`);
         if (feature) graph.get(feature)?.add(destination);
       }

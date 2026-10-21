@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { backendBoundaries } from "./lib/architecture-boundaries.mjs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -61,21 +62,11 @@ function files(directory) {
 	});
 }
 
-function capability(filename) {
-	const relative = path.relative(capabilitiesRoot, filename);
-	if (relative.startsWith("..") || path.isAbsolute(relative)) return undefined;
-	const segment = relative.split(path.sep)[0];
-	return capabilityNames.has(segment) ? segment : undefined;
-}
-
-function publicModule(filename) {
-	const relative = path.relative(src, filename).split(path.sep).join("/");
-	const capabilityName = capability(filename);
-	if (capabilityName) return `capabilities/${capabilityName}`;
-	return config.publicModules.find((module) =>
-		relative.startsWith(`${module}/`),
-	);
-}
+const { capability, publicModule } = backendBoundaries(
+	src,
+	config,
+	capabilityNames,
+);
 
 function importPaths(source) {
 	const imports = [];

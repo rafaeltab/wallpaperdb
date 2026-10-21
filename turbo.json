@@ -55,7 +55,8 @@
             "dependsOn": ["//#architecture:workspaces"],
             "inputs": [
                 "$TURBO_DEFAULT$",
-                "$TURBO_ROOT$/scripts/check-architecture.mjs"
+                "$TURBO_ROOT$/scripts/check-architecture.mjs",
+                "$TURBO_ROOT$/scripts/lib/architecture-boundaries.mjs"
             ]
         },
         "//#architecture:workspaces": {
@@ -63,6 +64,7 @@
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/scripts/check-architecture-workspaces.mjs",
                 "$TURBO_ROOT$/scripts/check-architecture.mjs",
+                "$TURBO_ROOT$/scripts/lib/architecture-boundaries.mjs",
                 "$TURBO_ROOT$/apps/*/package.json",
                 "$TURBO_ROOT$/apps/*/Dockerfile",
                 "$TURBO_ROOT$/apps/*/quality.config.json",

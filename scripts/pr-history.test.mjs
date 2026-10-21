@@ -65,8 +65,19 @@ test("already-landed contents fail even when the original commits differ", (t) =
 	const f = fixture(t);
 	const head = f.git("rev-parse", "feature");
 	f.git("checkout", "main");
-	f.git("-c", "commit.gpgSign=false", "cherry-pick", head);
+	f.git("-c", "commit.gpgSign=false", "cherry-pick", "-x", head);
 	const result = f.check();
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /already match/);
+});
+
+test("already-landed patches fail after the base gains unrelated changes", (t) => {
+	const f = fixture(t);
+	const head = f.git("rev-parse", "feature");
+	f.git("checkout", "main");
+	f.git("-c", "commit.gpgSign=false", "cherry-pick", "-x", head);
+	f.commit("independent");
+	const result = f.check();
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /already match|already landed/);
 });

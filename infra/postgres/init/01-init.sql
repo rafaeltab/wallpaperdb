@@ -4,7 +4,7 @@
 -- Create database for the ingestor service
 CREATE DATABASE wallpaperdb_ingestor;
 
--- Create database for the media service
+-- Create database for the asset service
 CREATE DATABASE wallpaperdb_media;
 
 -- Create database for the tags service

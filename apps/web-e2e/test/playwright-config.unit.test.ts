@@ -229,13 +229,13 @@ describe("environment contract", () => {
         return new Response("<html></html>", { status: 200 });
       }
 
-      if (url === "http://localhost:8120/media/ready") {
+      if (url === "http://localhost:8120/asset/ready") {
         return new Response('{"ready":false,"reason":"booting"}', {
           status: 503,
         });
       }
 
-      if (url === "http://localhost:8120/media/health") {
+      if (url === "http://localhost:8120/asset/health") {
         return new Response('{"status":"degraded"}', { status: 200 });
       }
 
@@ -252,7 +252,7 @@ describe("environment contract", () => {
         fetchMock,
       ),
     ).rejects.toThrowError(
-      /media readiness: http:\/\/localhost:8120\/media\/ready -> HTTP 503[\s\S]*media \/ready body: \{"ready":false,"reason":"booting"\}[\s\S]*media health: http:\/\/localhost:8120\/media\/health -> HTTP 200[\s\S]*media \/health body: \{"status":"degraded"\}[\s\S]*make test-e2e PACKAGE=web-e2e/s,
+      /asset readiness: http:\/\/localhost:8120\/asset\/ready -> HTTP 503[\s\S]*asset \/ready body: \{"ready":false,"reason":"booting"\}[\s\S]*asset health: http:\/\/localhost:8120\/asset\/health -> HTTP 200[\s\S]*asset \/health body: \{"status":"degraded"\}[\s\S]*make test-e2e PACKAGE=web-e2e/s,
     );
   });
 

@@ -17,7 +17,7 @@ const wallpaper: Wallpaper = {
     displayName: 'Ada Lovelace',
     handle: 'ada-lovelace',
     biographyMarkdown: '',
-    picture: { id: 'pic_ada', url: 'https://media.example/pic_ada.webp' },
+    picture: { id: 'pic_ada', url: 'https://asset.example/pic_ada.webp' },
     canonicalPath: '/profiles/@ada-lovelace',
   },
   variants: [
@@ -28,7 +28,7 @@ const wallpaper: Wallpaper = {
       format: 'image/webp',
       fileSizeBytes: 1024,
       createdAt: '2026-03-01T00:00:00.000Z',
-      url: 'https://media.example/wallpaper.webp',
+      url: 'https://asset.example/wallpaper.webp',
     },
   ],
   uploadedAt: '2026-03-01T00:00:00.000Z',
@@ -43,7 +43,7 @@ describe('WallpaperMetadata contributor', () => {
 
     expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute(
       'src',
-      'https://media.example/pic_ada.webp',
+      'https://asset.example/pic_ada.webp',
     );
     expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
     expect(screen.getByText('@ada-lovelace')).toBeInTheDocument();

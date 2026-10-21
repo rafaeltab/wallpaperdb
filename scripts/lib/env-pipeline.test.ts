@@ -17,13 +17,13 @@ describe('Profile picture service credentials', () => {
     expect(updated.USER_MEDIA_SERVICE_TOKEN).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it('generates one persistent token shared by User and Media only', () => {
+  it('generates one persistent token shared by User and Asset only', () => {
     const content = syncKnownSecretsToContent('', knownUserSecrets);
     const secrets = parseEnvValues(content);
     expect(secrets.USER_MEDIA_SERVICE_TOKEN).toMatch(/^[a-f0-9]{64}$/);
     expect(syncKnownSecretsToContent(content, knownUserSecrets)).toBe(content);
 
-    for (const service of ['apps/user', 'apps/media']) {
+    for (const service of ['apps/user', 'apps/asset']) {
       const example = 'USER_MEDIA_SERVICE_TOKEN=\n';
       const applicable = filterApplicableSecrets(secrets, extractKeys(example), service, () => {});
       expect(parseEnvValues(applyOverrides(example, applicable, {})).USER_MEDIA_SERVICE_TOKEN)

@@ -40,14 +40,14 @@ services:
         - action: rebuild
           path: ../pnpm-lock.yaml
 
-  media:
+  asset:
     build:
       context: ..
-      dockerfile: apps/media/Dockerfile.dev
+      dockerfile: apps/asset/Dockerfile.dev
     environment:
       RUN_DB_MIGRATE: "true"
     env_file:
-      - path: ../apps/media/.env
+      - path: ../apps/asset/.env
         required: false
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3003/ready || exit 1"]
@@ -58,14 +58,14 @@ services:
     develop:
       watch:
         - action: sync
-          path: ../apps/media/src
-          target: /app/apps/media/src
+          path: ../apps/asset/src
+          target: /app/apps/asset/src
         - action: sync+restart
           path: ../packages
           target: /app/packages
         - action: sync
-          path: ../apps/media/package.json
-          target: /app/apps/media/package.json
+          path: ../apps/asset/package.json
+          target: /app/apps/asset/package.json
         - action: rebuild
           path: ../pnpm-lock.yaml
 
@@ -252,7 +252,7 @@ services:
     depends_on:
       ingestor:
         condition: service_healthy
-      media:
+      asset:
         condition: service_healthy
       gateway:
         condition: service_healthy

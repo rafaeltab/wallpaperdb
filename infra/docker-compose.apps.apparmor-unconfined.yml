@@ -2,7 +2,7 @@ services:
   ingestor:
     security_opt:
       - apparmor=unconfined
-  media:
+  asset:
     security_opt:
       - apparmor=unconfined
   gateway:

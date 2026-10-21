@@ -14,7 +14,7 @@ test.each([
     integration: 'test/search/opensearch.integration.test.ts',
   },
   {
-    service: 'media',
+    service: 'asset',
     unit: 'test/delivery.unit.test.ts',
     integration: 'test/health.integration.test.ts',
   },
@@ -106,7 +106,7 @@ test.each([
 });
 
 test.each([
-  'media',
+  'asset',
   'user',
 ])('%s complete suite schedules both test types in one project', async (service) => {
   const root = path.join(repository, 'apps', service);
@@ -134,7 +134,7 @@ test.each([
 
 test.each([
   'gateway',
-  'media',
+  'asset',
   'user',
   'ingestor',
 ])('%s selects new tests by type without a config edit', async (service) => {

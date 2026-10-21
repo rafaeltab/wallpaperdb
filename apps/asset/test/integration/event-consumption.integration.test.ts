@@ -1,0 +1,840 @@
+import {
+  WallpaperVariantAvailableEventSchema,
+  type WallpaperUploadedEvent,
+} from '@wallpaperdb/events/schemas';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  S3TesterBuilder,
+  NatsTesterBuilder,
+  PostgresTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import { eq } from 'drizzle-orm';
+import { headers as natsHeaders } from 'nats';
+import sharp from 'sharp';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { variants, wallpapers } from '../../src/db/schema.js';
+import { InProcessAssetTesterBuilder, AssetMigrationsTesterBuilder } from '../builders/index.js';
+
+describe('Asset Service - Event Consumption', () => {
+  const setup = () => {
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(S3TesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(AssetMigrationsTesterBuilder)
+      .with(InProcessAssetTesterBuilder)
+      .build();
+
+    const tester = new TesterClass();
+
+    tester
+      .withPostgres((builder) => builder.withDatabase(`test_asset_events_${Date.now()}`))
+      .withS3()
+      .withS3Bucket('wallpapers')
+      .withS3Bucket('historical-wallpapers')
+      .withNats((builder) => builder.withJetstream())
+      .withStream('WALLPAPER')
+      .withMigrations()
+      .withInProcessApp();
+
+    return tester;
+  };
+
+  let tester: ReturnType<typeof setup>;
+
+  beforeAll(async () => {
+    tester = setup();
+    await tester.setup();
+  }, 60000);
+
+  afterAll(async () => {
+    await tester.destroy();
+  });
+
+  async function waitForAccepted(sequence: number) {
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await vi.waitFor(
+      async () => {
+        const info = await manager.consumers.info('WALLPAPER', 'media-wallpaper-uploaded-consumer');
+        expect(info.ack_floor.stream_seq).toBeGreaterThanOrEqual(sequence);
+      },
+      { timeout: 10000, interval: 25 }
+    );
+  }
+
+  async function observeAvailable(wallpaperId: string) {
+    const connection = await tester.nats.getConnection();
+    const subscription = connection.subscribe('wallpaper.variant.available', { timeout: 10000 });
+    const result = (async () => {
+      for await (const message of subscription) {
+        const event = WallpaperVariantAvailableEventSchema.parse(
+          JSON.parse(new TextDecoder().decode(message.data))
+        );
+        if (event.variant.wallpaperId === wallpaperId) return event;
+      }
+      throw new Error('Availability subscription closed before matching output');
+    })();
+    // Attach a handler immediately while publication is in flight.
+    void result.catch(() => undefined);
+    await connection.flush();
+    return { result, close: () => subscription.unsubscribe() };
+  }
+
+  it('consumes an original logical reference through the composed storage and catalogue adapters', async () => {
+    const id = 'wlpr_logical_composition';
+    const reference = { owner: 'ingestor', id } as const;
+    const original = Buffer.from('logical original bytes');
+    await tester.s3.uploadObject('wallpapers', `${id}/original.webp`, original);
+    const timestamp = '2026-09-24T10:00:00.000Z';
+    const observation = await observeAvailable(id);
+    try {
+      const accepted = await (await tester.nats.getJsClient()).publish(
+        'wallpaper.uploaded',
+        JSON.stringify({
+          specversion: '1.0',
+          source: 'https://wallpaperdb/ingestor',
+          id: 'logical-composition',
+          type: 'wallpaper.uploaded',
+          time: timestamp,
+          datacontenttype: 'application/json',
+          data: {
+            wallpaper: {
+              id,
+              userId: 'profile-logical',
+              fileType: 'image',
+              mimeType: 'image/webp',
+              fileSizeBytes: 100,
+              width: 20,
+              height: 10,
+              aspectRatio: 2,
+              uploadedAt: timestamp,
+              asset: reference,
+            },
+          },
+        })
+      );
+      await waitForAccepted(accepted.seq);
+      expect((await observation.result).variant.wallpaperId).toBe(id);
+      const delivered = await tester.getApp().inject({ method: 'GET', url: `/wallpapers/${id}` });
+      expect(delivered.statusCode).toBe(200);
+      expect(delivered.rawPayload).toEqual(original);
+    } finally {
+      observation.close();
+    }
+  });
+
+  it('delivers a retained variant from its announced historical bucket after broker replay', async () => {
+    const id = 'wlpr_historical_variant';
+    const timestamp = '2026-09-24T10:00:00.000Z';
+    const bytes = await sharp({
+      create: { width: 853, height: 480, channels: 3, background: '#336699' },
+    })
+      .png()
+      .toBuffer();
+    const storageKey = `${id}/variant_854x480.png`;
+    await tester.s3.uploadObject('historical-wallpapers', storageKey, bytes);
+    const js = await tester.nats.getJsClient();
+    const parent = await js.publish(
+      'wallpaper.uploaded',
+      JSON.stringify({
+        eventId: 'historical-parent',
+        eventType: 'wallpaper.uploaded',
+        timestamp,
+        wallpaper: {
+          id,
+          userId: 'user_historical',
+          fileType: 'image',
+          mimeType: 'image/png',
+          width: 1280,
+          height: 720,
+          aspectRatio: 1280 / 720,
+          fileSizeBytes: 100,
+          uploadedAt: timestamp,
+          storageBucket: 'historical-wallpapers',
+          storageKey: 'custom/original.png',
+          originalFilename: 'original.png',
+        },
+      })
+    );
+    await waitForAccepted(parent.seq);
+    const payload = JSON.stringify({
+      eventId: 'historical-variant',
+      eventType: 'wallpaper.variant.uploaded',
+      timestamp,
+      variant: {
+        wallpaperId: id,
+        width: 853,
+        height: 480,
+        aspectRatio: 853 / 480,
+        format: 'image/png',
+        fileSizeBytes: bytes.length,
+        createdAt: timestamp,
+        storageBucket: 'historical-wallpapers',
+        storageKey,
+      },
+    });
+    await js.publish('wallpaper.variant.uploaded', payload);
+    const replay = await js.publish('wallpaper.variant.uploaded', payload);
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'media-wallpaper-variant-uploaded-consumer'))
+            .ack_floor.stream_seq,
+        { timeout: 10000 }
+      )
+      .toBe(replay.seq);
+    // The original is deliberately absent. Only the announced historical variant can satisfy delivery.
+    const response = await tester
+      .getApp()
+      .inject({ method: 'GET', url: `/wallpapers/${id}?w=853&h=480` });
+    expect(response.statusCode).toBe(200);
+    expect(await sharp(response.rawPayload).metadata()).toMatchObject({ width: 853, height: 480 });
+    expect(await sharp(response.rawPayload).raw().toBuffer()).toEqual(
+      await sharp(bytes).raw().toBuffer()
+    );
+    expect(await tester.s3.objectExists('wallpapers', storageKey)).toBe(false);
+  });
+
+  it('should consume wallpaper.uploaded event and send wallpaper.variant.available event', async () => {
+    const js = await tester.nats.getJsClient();
+
+    const event: WallpaperUploadedEvent = {
+      eventId: 'evt_test_001',
+      eventType: 'wallpaper.uploaded',
+      timestamp: new Date().toISOString(),
+      wallpaper: {
+        id: 'wlpr_test_001',
+        userId: 'user_test_001',
+        fileType: 'image',
+        mimeType: 'image/jpeg',
+        fileSizeBytes: 1024000,
+        width: 1920,
+        height: 1080,
+        aspectRatio: 1.777,
+        storageKey: 'wlpr_test_001/original.jpg',
+        storageBucket: 'wallpapers',
+        originalFilename: 'test-image.jpg',
+        uploadedAt: new Date().toISOString(),
+      },
+    };
+
+    const observation = await observeAvailable('wlpr_test_001');
+
+    // Publish event to NATS
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
+
+    // Wait for event to be processed (with timeout)
+    await waitForAccepted(accepted.seq);
+
+    // Verify database contains the wallpaper
+    const db = tester.getFixtureDatabase();
+    const [result] = await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_test_001'));
+
+    expect(result).toBeDefined();
+    expect(result.id).toBe('wlpr_test_001');
+
+    try {
+      const res = await observation.result;
+      expect(res.variant).toEqual({
+        wallpaperId: 'wlpr_test_001',
+        width: 1920,
+        height: 1080,
+        aspectRatio: 1920 / 1080,
+        format: 'image/jpeg',
+        fileSizeBytes: 1024000,
+        createdAt: event.wallpaper.uploadedAt,
+      });
+    } finally {
+      observation.close();
+    }
+  });
+
+  it('should consume wallpaper.uploaded event and store in database', async () => {
+    const js = await tester.nats.getJsClient();
+
+    const event: WallpaperUploadedEvent = {
+      eventId: 'evt_store_001',
+      eventType: 'wallpaper.uploaded',
+      timestamp: new Date().toISOString(),
+      wallpaper: {
+        id: 'wlpr_store_001',
+        userId: 'user_test_001',
+        fileType: 'image',
+        mimeType: 'image/jpeg',
+        fileSizeBytes: 1024000,
+        width: 1920,
+        height: 1080,
+        aspectRatio: 1.777,
+        storageKey: 'wlpr_store_001/original.jpg',
+        storageBucket: 'wallpapers',
+        originalFilename: 'test-image.jpg',
+        uploadedAt: new Date().toISOString(),
+      },
+    };
+
+    // Publish event to NATS
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
+
+    // Wait for event to be processed (with timeout)
+    await waitForAccepted(accepted.seq);
+
+    // Verify database contains the wallpaper
+    const db = tester.getFixtureDatabase();
+    const [result] = await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_store_001'));
+
+    expect(result).toBeDefined();
+    expect(result.id).toBe('wlpr_store_001');
+    expect(result.storageKey).toBe('wlpr_store_001/original.jpg');
+    expect(result.storageBucket).toBe('wallpapers');
+    expect(result.mimeType).toBe('image/jpeg');
+    expect(result.width).toBe(1920);
+    expect(result.height).toBe(1080);
+    expect(result.fileSizeBytes).toBe(1024000);
+    expect(result.createdAt).toBeDefined();
+  });
+
+  it('should handle duplicate events idempotently', async () => {
+    const js = await tester.nats.getJsClient();
+
+    const event: WallpaperUploadedEvent = {
+      eventId: 'evt_test_002',
+      eventType: 'wallpaper.uploaded',
+      timestamp: new Date().toISOString(),
+      wallpaper: {
+        id: 'wlpr_test_002',
+        userId: 'user_test_002',
+        fileType: 'image',
+        mimeType: 'image/png',
+        fileSizeBytes: 2048000,
+        width: 2560,
+        height: 1440,
+        aspectRatio: 1.777,
+        storageKey: 'wlpr_test_002/original.png',
+        storageBucket: 'wallpapers',
+        originalFilename: 'test-image.png',
+        uploadedAt: new Date().toISOString(),
+      },
+    };
+
+    // Wait for the second delivery's acknowledgement, not merely the first insert.
+    await js.publish('wallpaper.uploaded', JSON.stringify(event));
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
+
+    // Wait for both events to be processed
+    await waitForAccepted(accepted.seq);
+
+    // Verify only one record exists
+    const db = tester.getFixtureDatabase();
+    const results = await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_test_002'));
+
+    expect(results).toHaveLength(1);
+    expect(results[0].width).toBe(2560);
+    expect(results[0].height).toBe(1440);
+  });
+
+  it('quarantines malformed input before acknowledgement and keeps the service healthy', async () => {
+    const js = await tester.nats.getJsClient();
+
+    const malformedEvent = {
+      eventId: 'evt_test_003',
+      eventType: 'wallpaper.uploaded',
+      wallpaper: { id: 'wlpr_malformed' },
+      // Missing timestamp and required wallpaper metadata
+    };
+
+    // Publish malformed event
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(malformedEvent));
+
+    // Wait for processing
+    await waitForAccepted(accepted.seq);
+
+    // Service should still be healthy (no crash)
+    const app = tester.getApp();
+    const response = await app.inject({
+      method: 'GET',
+      url: '/health',
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    const quarantined = await manager.streams.getMessage('MEDIA_QUARANTINE', {
+      last_by_subj: 'media.quarantine',
+    });
+    expect(JSON.parse(new TextDecoder().decode(quarantined.data))).toEqual(malformedEvent);
+    expect(quarantined.header.get('ce-reason')).toBe('Invalid');
+    expect(quarantined.header.get('ce-originalsubject')).toBe('wallpaper.uploaded');
+    const db = tester.getFixtureDatabase();
+    expect(await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_malformed'))).toEqual(
+      []
+    );
+  });
+
+  it('projects WebP upload metadata when the publisher includes tracing headers', async () => {
+    const js = await tester.nats.getJsClient();
+
+    const event: WallpaperUploadedEvent = {
+      eventId: 'evt_test_004',
+      eventType: 'wallpaper.uploaded',
+      timestamp: new Date().toISOString(),
+      wallpaper: {
+        id: 'wlpr_test_004',
+        userId: 'user_test_004',
+        fileType: 'image',
+        mimeType: 'image/webp',
+        fileSizeBytes: 512000,
+        width: 1280,
+        height: 720,
+        aspectRatio: 1.777,
+        storageKey: 'wlpr_test_004/original.webp',
+        storageBucket: 'wallpapers',
+        originalFilename: 'test-image.webp',
+        uploadedAt: new Date().toISOString(),
+      },
+    };
+
+    // Publish with trace headers
+    const headers = natsHeaders();
+    headers.set('traceparent', '00-11111111111111111111111111111111-2222222222222222-01');
+
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event), {
+      headers,
+    });
+
+    // Wait for processing
+    await waitForAccepted(accepted.seq);
+
+    // Verify event was processed
+    const db = tester.getFixtureDatabase();
+    const [result] = await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_test_004'));
+
+    expect(result).toBeDefined();
+    expect(result.mimeType).toBe('image/webp');
+    expect(result.width).toBe(1280);
+    expect(result.height).toBe(720);
+  });
+
+  it('should retrieve wallpaper via GET endpoint after event is processed', async () => {
+    const js = await tester.nats.getJsClient();
+
+    // Opaque fixture bytes are returned unchanged by the original-image endpoint.
+    const imageBuffer = Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00,
+      0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xd9,
+    ]);
+
+    // Upload the image to S3 first (simulating what ingestor does)
+    const storageKey = 'wlpr_test_005/original.jpg';
+    await tester.s3.uploadObject('wallpapers', storageKey, imageBuffer);
+
+    // Publish wallpaper.uploaded event
+    const event: WallpaperUploadedEvent = {
+      eventId: 'evt_test_005',
+      eventType: 'wallpaper.uploaded',
+      timestamp: new Date().toISOString(),
+      wallpaper: {
+        id: 'wlpr_test_005',
+        userId: 'user_test_005',
+        fileType: 'image',
+        mimeType: 'image/jpeg',
+        fileSizeBytes: imageBuffer.length,
+        width: 1920,
+        height: 1080,
+        aspectRatio: 1.777,
+        storageKey: storageKey,
+        storageBucket: 'wallpapers',
+        originalFilename: 'test-image.jpg',
+        uploadedAt: new Date().toISOString(),
+      },
+    };
+
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
+
+    // Wait for event processing
+    await waitForAccepted(accepted.seq);
+
+    // Verify database has the record
+    const db = tester.getFixtureDatabase();
+    const [dbResult] = await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_test_005'));
+
+    expect(dbResult).toBeDefined();
+
+    // Now test the GET endpoint
+    const app = tester.getApp();
+    const response = await app.inject({
+      method: 'GET',
+      url: '/wallpapers/wlpr_test_005',
+    });
+
+    // Verify successful retrieval
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toBe('image/jpeg');
+    expect(response.headers['cache-control']).toContain('public');
+    expect(response.headers['cache-control']).toContain('max-age');
+
+    // Verify the body is the image data
+    const responseBuffer = response.rawPayload;
+    expect(responseBuffer).toBeDefined();
+    expect(responseBuffer.length).toBeGreaterThan(0);
+    expect(responseBuffer).toEqual(imageBuffer);
+  });
+
+  it('should return 404 when wallpaper exists in DB but file missing from S3', async () => {
+    const js = await tester.nats.getJsClient();
+
+    // Publish event for a wallpaper (but DON'T upload to S3)
+    const event: WallpaperUploadedEvent = {
+      eventId: 'evt_test_006',
+      eventType: 'wallpaper.uploaded',
+      timestamp: new Date().toISOString(),
+      wallpaper: {
+        id: 'wlpr_test_006',
+        userId: 'user_test_006',
+        fileType: 'image',
+        mimeType: 'image/png',
+        fileSizeBytes: 1024,
+        width: 800,
+        height: 600,
+        aspectRatio: 1.333,
+        storageKey: 'wlpr_test_006/original.png',
+        storageBucket: 'wallpapers',
+        originalFilename: 'missing.png',
+        uploadedAt: new Date().toISOString(),
+      },
+    };
+
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
+
+    // Wait for event processing
+    await waitForAccepted(accepted.seq);
+
+    // Verify database has the record
+    const db = tester.getFixtureDatabase();
+    const [dbResult] = await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_test_006'));
+
+    expect(dbResult).toBeDefined();
+
+    // Try to GET the wallpaper (should fail - file not in S3)
+    const app = tester.getApp();
+    const response = await app.inject({
+      method: 'GET',
+      url: '/wallpapers/wlpr_test_006',
+    });
+
+    // Should return 404
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+
+    const body = JSON.parse(response.body);
+    expect(body.type).toBeDefined();
+    expect(body.title).toBeDefined();
+    expect(body.status).toBe(404);
+    expect(body.detail).toContain('not found');
+  });
+
+  it('should return 404 when wallpaper does not exist in database', async () => {
+    const app = tester.getApp();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/wallpapers/wlpr_nonexistent',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+
+    const body = JSON.parse(response.body);
+    expect(body.type).toBeDefined();
+    expect(body.title).toBeDefined();
+    expect(body.status).toBe(404);
+  });
+
+  describe('resize composition', () => {
+    async function createTestImage(
+      width: number,
+      height: number,
+      format: 'jpeg' | 'png' | 'webp' = 'jpeg',
+      color: 'red' | 'green' | 'blue' = 'red'
+    ): Promise<Buffer> {
+      return await sharp({
+        create: {
+          width,
+          height,
+          channels: 3,
+          background:
+            color === 'red'
+              ? { r: 255, g: 0, b: 0 }
+              : color === 'green'
+                ? { r: 0, g: 255, b: 0 }
+                : { r: 0, g: 0, b: 255 },
+        },
+      })
+        .toFormat(format)
+        .toBuffer();
+    }
+
+    async function expectSourceColor(bytes: Buffer, color: 'red' | 'green') {
+      const pixel = await sharp(bytes)
+        .extract({ left: 0, top: 0, width: 1, height: 1 })
+        .removeAlpha()
+        .raw()
+        .toBuffer();
+      expect(Math.abs(pixel[0] - (color === 'red' ? 255 : 0))).toBeLessThanOrEqual(3);
+      expect(Math.abs(pixel[1] - (color === 'green' ? 255 : 0))).toBeLessThanOrEqual(3);
+      expect(pixel[2]).toBeLessThanOrEqual(2);
+    }
+
+    it('returns a successful resized response for a large image', async () => {
+      const app = tester.getApp();
+      const db = tester.getFixtureDatabase();
+      const image = await createTestImage(3840, 2160, 'jpeg');
+      const wallpaperId = 'wlpr_test_resize_003';
+
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, image);
+
+      await db.insert(wallpapers).values({
+        id: wallpaperId,
+        mimeType: 'image/jpeg',
+        fileSizeBytes: image.length,
+        width: 3840,
+        height: 2160,
+        storageKey: `${wallpaperId}/original.jpg`,
+        storageBucket: 'wallpapers',
+        createdAt: new Date(),
+      });
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/wallpapers/${wallpaperId}?w=1920`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(await sharp(response.rawPayload).metadata()).toMatchObject({
+        width: 1920,
+        height: 1080,
+        format: 'jpeg',
+      });
+      expect(response.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+      expect(response.headers['content-length']).toBeUndefined();
+      const unchanged = await app.inject(`/wallpapers/${wallpaperId}`);
+      expect(unchanged.statusCode).toBe(200);
+      expect(unchanged.rawPayload).toEqual(image);
+      expect(unchanged.headers['content-length']).toBe(String(image.length));
+    });
+
+    it('should use exact matching variant when dimensions match exactly', async () => {
+      const app = tester.getApp();
+      const db = tester.getFixtureDatabase();
+      const wallpaperId = 'wlpr_variant_exact_001';
+
+      // Create original and variants
+      const original = await createTestImage(384, 216, 'jpeg');
+      const variant192 = await createTestImage(192, 108, 'jpeg', 'green');
+      const variant128 = await createTestImage(128, 72, 'jpeg', 'blue');
+
+      // Upload to S3
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/192x108.jpg`, variant192);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/128x72.jpg`, variant128);
+
+      // Insert into DB
+      await db.insert(wallpapers).values({
+        id: wallpaperId,
+        mimeType: 'image/jpeg',
+        fileSizeBytes: original.length,
+        width: 384,
+        height: 216,
+        storageKey: `${wallpaperId}/original.jpg`,
+        storageBucket: 'wallpapers',
+        createdAt: new Date(),
+      });
+
+      // Insert variants
+      await db.insert(variants).values([
+        {
+          id: 'var_001',
+          wallpaperId,
+          storageKey: `${wallpaperId}/192x108.jpg`,
+          width: 192,
+          height: 108,
+          fileSizeBytes: variant192.length,
+        },
+        {
+          id: 'var_002',
+          wallpaperId,
+          storageKey: `${wallpaperId}/128x72.jpg`,
+          width: 128,
+          height: 72,
+          fileSizeBytes: variant128.length,
+        },
+      ]);
+
+      // Request exact match: 192x108
+      const response = await app.inject({
+        method: 'GET',
+        url: `/wallpapers/${wallpaperId}?w=192&h=108`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'green');
+
+      // Should use the 192x108 variant (no resizing needed)
+      const metadata = await sharp(response.rawPayload).metadata();
+      expect(metadata.width).toBe(192);
+      expect(metadata.height).toBe(108);
+    });
+
+    it('should use next larger variant when requested size is between variants', async () => {
+      const app = tester.getApp();
+      const db = tester.getFixtureDatabase();
+      const wallpaperId = 'wlpr_variant_larger_001';
+
+      const original = await createTestImage(384, 216, 'jpeg');
+      const variant256 = await createTestImage(256, 144, 'jpeg', 'blue');
+      const variant192 = await createTestImage(192, 108, 'jpeg', 'green');
+      const variant128 = await createTestImage(128, 72, 'jpeg', 'blue');
+
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/256x144.jpg`, variant256);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/192x108.jpg`, variant192);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/128x72.jpg`, variant128);
+
+      await db.insert(wallpapers).values({
+        id: wallpaperId,
+        mimeType: 'image/jpeg',
+        fileSizeBytes: original.length,
+        width: 384,
+        height: 216,
+        storageKey: `${wallpaperId}/original.jpg`,
+        storageBucket: 'wallpapers',
+        createdAt: new Date(),
+      });
+
+      await db.insert(variants).values([
+        {
+          id: 'var_003',
+          wallpaperId,
+          storageKey: `${wallpaperId}/256x144.jpg`,
+          width: 256,
+          height: 144,
+          fileSizeBytes: variant256.length,
+        },
+        {
+          id: 'var_004',
+          wallpaperId,
+          storageKey: `${wallpaperId}/192x108.jpg`,
+          width: 192,
+          height: 108,
+          fileSizeBytes: variant192.length,
+        },
+        {
+          id: 'var_005',
+          wallpaperId,
+          storageKey: `${wallpaperId}/128x72.jpg`,
+          width: 128,
+          height: 72,
+          fileSizeBytes: variant128.length,
+        },
+      ]);
+
+      // Request 160x90 - should use 192x108 variant (next larger)
+      const response = await app.inject({
+        method: 'GET',
+        url: `/wallpapers/${wallpaperId}?w=160&h=90`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'green');
+
+      // Should resize 192x108 variant down to 160x90
+      const metadata = await sharp(response.rawPayload).metadata();
+      expect(metadata.width).toBe(160);
+      expect(metadata.height).toBe(90);
+    });
+
+    it('should use original when no variants exist', async () => {
+      const app = tester.getApp();
+      const db = tester.getFixtureDatabase();
+      const wallpaperId = 'wlpr_no_variants_001';
+
+      const original = await createTestImage(384, 216, 'jpeg');
+
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
+
+      await db.insert(wallpapers).values({
+        id: wallpaperId,
+        mimeType: 'image/jpeg',
+        fileSizeBytes: original.length,
+        width: 384,
+        height: 216,
+        storageKey: `${wallpaperId}/original.jpg`,
+        storageBucket: 'wallpapers',
+        createdAt: new Date(),
+      });
+
+      // No variants inserted - should use original
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/wallpapers/${wallpaperId}?w=192`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'red');
+
+      // Should resize original down to 192x108
+      const metadata = await sharp(response.rawPayload).metadata();
+      expect(metadata.width).toBe(192);
+      expect(metadata.height).toBe(108);
+    });
+
+    it('should fallback to original when variant file is missing from S3', async () => {
+      const app = tester.getApp();
+      const db = tester.getFixtureDatabase();
+      const wallpaperId = 'wlpr_missing_variant_001';
+
+      const original = await createTestImage(384, 216, 'jpeg');
+
+      // Upload only original (not the variant file)
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
+
+      await db.insert(wallpapers).values({
+        id: wallpaperId,
+        mimeType: 'image/jpeg',
+        fileSizeBytes: original.length,
+        width: 384,
+        height: 216,
+        storageKey: `${wallpaperId}/original.jpg`,
+        storageBucket: 'wallpapers',
+        createdAt: new Date(),
+      });
+
+      // Insert variant in DB but file doesn't exist in S3
+      await db.insert(variants).values({
+        id: 'var_missing',
+        wallpaperId,
+        storageKey: `${wallpaperId}/192x108.jpg`, // File doesn't exist
+        width: 192,
+        height: 108,
+        fileSizeBytes: 300000,
+      });
+
+      // Request should fallback to original gracefully
+      const response = await app.inject({
+        method: 'GET',
+        url: `/wallpapers/${wallpaperId}?w=192&h=108`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'red'); // Not 404
+
+      // Should have used original and resized it
+      const metadata = await sharp(response.rawPayload).metadata();
+      expect(metadata.width).toBe(192);
+      expect(metadata.height).toBe(108);
+    });
+  });
+});

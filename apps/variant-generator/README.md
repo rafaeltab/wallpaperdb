@@ -1,6 +1,6 @@
 # Variant generator
 
-Variant Generator creates lower-resolution renditions of uploaded wallpapers so clients can retrieve images suited to their devices. It preserves the immutable original and announces stored variants for Media to deliver.
+Variant Generator creates lower-resolution renditions of uploaded wallpapers so clients can retrieve images suited to their devices. It preserves the immutable original and announces stored variants for Asset to deliver.
 
 ## Core capabilities
 

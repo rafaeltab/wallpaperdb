@@ -56,7 +56,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 
 help: ## Show commands and selectors
 	@echo "WallpaperDB — project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
-	@echo "Usage: make build PACKAGE=web | make apps-start SERVICE=ingestor | make psql DB=media"
+	@echo "Usage: make build PACKAGE=web | make apps-start SERVICE=ingestor | make psql DB=asset"
 	@echo "Workspace tasks default to all packages. FORCE=1 bypasses Turbo cache."
 	@echo "One-off scripts: make run PACKAGE=web SCRIPT=preview ARGS='--host 0.0.0.0'"
 	@echo ""
@@ -169,8 +169,8 @@ apps-logs: ## Follow app logs (optional SERVICE)
 migrate: ## Apply database migrations (optional PACKAGE)
 	@$(TURBO) run db:migrate $(FILTER)
 
-psql: ## Open PostgreSQL shell (optional DB=ingestor/media/tags/user)
-	@$(INFRA_COMPOSE) exec postgres psql -U wallpaperdb $(if $(DB),-d wallpaperdb_$(DB))
+psql: ## Open PostgreSQL shell (optional DB=ingestor/asset/tags/user)
+	@$(INFRA_COMPOSE) exec postgres psql -U wallpaperdb $(if $(DB),-d wallpaperdb_$(if $(filter asset,$(DB)),media,$(DB)))
 
 redis-cli: ## Open Redis CLI
 	@$(INFRA_COMPOSE) exec redis redis-cli
@@ -227,5 +227,5 @@ clean: ## Remove dependencies, build output, caches, and coverage
 	@echo "Cleaning TypeScript incremental build cache..."
 	@find . -name "*.tsbuildinfo" -not -path "*/node_modules/*" -delete
 	@echo "Cleaning generated OpenAPI specs..."
-	@rm -f apps/ingestor/swagger.json apps/media/swagger.json apps/user/swagger.json
+	@rm -f apps/ingestor/swagger.json apps/asset/swagger.json apps/user/swagger.json
 	@echo "✓ Clean complete"

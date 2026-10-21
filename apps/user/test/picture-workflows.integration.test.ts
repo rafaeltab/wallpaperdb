@@ -124,7 +124,7 @@ describe('Profile picture transactions and recovery', () => {
       profilePictureMaxDecodedBytes: 64 * 1024 * 1024,
       profilePictureImportTimeoutMs: 10_000,
       profilePictureImportHosts: ['img.clerk.com', 'images.clerk.dev'],
-      userMediaServiceToken: 'test-media-token',
+      userAssetServiceToken: 'test-media-token',
     };
     storage = storageTester.s3.getS3Client();
     await restart();

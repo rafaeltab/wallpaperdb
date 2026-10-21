@@ -1,5 +1,5 @@
 import { generateFiles } from "fumadocs-openapi";
-import { ingestorOpenApi, mediaOpenApi } from "../src/lib/openapi.ts";
+import { ingestorOpenApi, assetOpenApi } from "../src/lib/openapi.ts";
 
 void generateFiles({
   input: ingestorOpenApi,
@@ -10,8 +10,8 @@ void generateFiles({
 });
 
 void generateFiles({
-  input: mediaOpenApi,
-  output: "./content/docs/openapi/media",
+  input: assetOpenApi,
+  output: "./content/docs/openapi/asset",
   // we recommend to enable it
   // make sure your endpoint description doesn't break MDX syntax.
   includeDescription: true,

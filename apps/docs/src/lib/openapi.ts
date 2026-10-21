@@ -5,7 +5,7 @@ export const ingestorOpenApi = createOpenAPI({
   input: ["../ingestor/swagger.json"],
 });
 
-export const mediaOpenApi = createOpenAPI({
+export const assetOpenApi = createOpenAPI({
   // the OpenAPI schema, you can also give it an external URL.
-  input: ["../media/swagger.json"],
+  input: ["../asset/swagger.json"],
 });

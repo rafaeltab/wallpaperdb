@@ -1,0 +1,451 @@
+import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
+import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
+import { Readable, PassThrough } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { Context, Effect, Layer } from 'effect';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { z } from 'zod';
+import {
+  type AssetBody,
+  AssetReader,
+  DeliveryUnavailable,
+  ImageTransformer,
+  PictureAuthority,
+  type ResizeOptions,
+} from '../../capabilities/delivery/index.js';
+
+export const sharpTransformerLayer = (limits: {
+  maxInputPixels: number;
+  maxConcurrent?: number;
+  timeoutMs?: number;
+}) =>
+  Layer.effect(
+    ImageTransformer,
+    Effect.gen(function* () {
+      const scope = yield* Effect.scope;
+      const workers = new Set<{ stop(): void; closed: Promise<unknown> }>();
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(async () => {
+          const pending = [...workers];
+          for (const worker of pending) worker.stop();
+          await Promise.all(pending.map((worker) => worker.closed));
+        })
+      );
+      const run = (
+        body: AssetBody,
+        options: ResizeOptions & { mimeType: string; inspect?: boolean }
+      ) => {
+        const operation = options.inspect ? 'inspect_image' : 'resize';
+        const metricPrefix = options.inspect ? 'asset.image_inspection' : 'asset.resize';
+        return Effect.gen(function* () {
+          if (workers.size >= (limits.maxConcurrent ?? 4)) {
+            body.close();
+            return yield* Effect.fail(
+              new DeliveryUnavailable({
+                operation: `${operation}_capacity`,
+                cause: new Error(
+                  options.inspect
+                    ? 'Image inspection capacity exhausted'
+                    : 'Resize capacity exhausted'
+                ),
+              })
+            );
+          }
+          const result = yield* Effect.sync(() => {
+            const start = Date.now();
+            const workerPath = new URL(
+              import.meta.url.endsWith('.ts') ? './resize-worker.ts' : './resize-worker.mjs',
+              import.meta.url
+            );
+            const child = spawn(
+              process.execPath,
+              [
+                '--experimental-strip-types',
+                fileURLToPath(workerPath),
+                JSON.stringify({ ...options, maxInputPixels: limits.maxInputPixels }),
+              ],
+              { stdio: ['pipe', 'pipe', 'pipe'] }
+            );
+            const input = Readable.from(body);
+            const output = new PassThrough();
+            output.on('error', () => {});
+            const stop = () => {
+              body.close();
+              input.destroy();
+              child.kill('SIGKILL');
+            };
+            let diagnostic = '';
+            let reason = 'worker_failed';
+            child.stderr.on('data', (chunk: Buffer) => {
+              if (Buffer.byteLength(diagnostic) + chunk.byteLength > 1024) {
+                reason = 'diagnostic_limit';
+                stop();
+              } else diagnostic += chunk.toString();
+            });
+            const closed = new Promise<{
+              code: number | null;
+              signal: string | null;
+              reason: string;
+            }>((resolve) => {
+              child.once('close', (code, signal) => {
+                clearTimeout(deadline);
+                workers.delete(worker);
+                body.close();
+                if (code === 0) output.end();
+                else {
+                  recordCounter(`${metricPrefix}.pipeline.errors`, 1, { error_type: 'Error' });
+                  output.destroy(new Error('Image encoding failed'));
+                }
+                const knownReasons = [
+                  'unsupported_input',
+                  'input_pixel_limit',
+                  'corrupt_image',
+                  'encoding_failed',
+                ];
+                resolve({
+                  code,
+                  signal,
+                  reason: knownReasons.includes(diagnostic) ? diagnostic : reason,
+                });
+              });
+            });
+            const worker = { stop, closed };
+            workers.add(worker);
+            const deadline = setTimeout(() => {
+              reason = 'deadline_exceeded';
+              output.destroy(new Error('Image encoding deadline exceeded'));
+              stop();
+            }, limits.timeoutMs ?? 30000);
+            deadline.unref();
+            child.once('error', (error) => {
+              reason = 'worker_start_failed';
+              output.destroy(error);
+              stop();
+            });
+            output.once('close', stop);
+            child.stdout.pipe(output, { end: false });
+            void pipeline(input, child.stdin).catch((error) => {
+              output.destroy(error);
+              stop();
+            });
+            recordHistogram(
+              `${metricPrefix}.setup_duration_ms`,
+              Date.now() - start,
+              options.inspect
+                ? {}
+                : {
+                    'resize.fit_mode': options.fit,
+                    'image.format': options.mimeType.split('/')[1],
+                  }
+            );
+            return { body: byteStream(output), closed, stop };
+          });
+          yield* Effect.promise(() => result.closed).pipe(
+            Effect.onInterrupt(() =>
+              Effect.promise(async () => {
+                result.stop();
+                await result.closed;
+              })
+            ),
+            Effect.flatMap((exit) =>
+              exit.code === 0
+                ? Effect.void
+                : Effect.fail(new DeliveryUnavailable({ operation, cause: exit }))
+            ),
+            Effect.withSpan(metricPrefix, {
+              attributes: options.inspect
+                ? {}
+                : {
+                    'resize.width': options.width,
+                    'resize.height': options.height,
+                    'resize.fit_mode': options.fit,
+                    'file.mime_type': options.mimeType,
+                  },
+            }),
+            Effect.catchTag('DeliveryUnavailable', (error) =>
+              options.inspect
+                ? Effect.void
+                : Effect.logError('Asset resize failed', {
+                    operation: error.operation,
+                    diagnostic: error.cause,
+                  })
+            ),
+            Effect.forkIn(scope)
+          );
+          return result;
+        }).pipe(
+          Effect.tapError((error) =>
+            options.inspect
+              ? Effect.void
+              : Effect.logError('Asset resize admission failed', {
+                  operation: error.operation,
+                  cause: error.cause,
+                })
+          )
+        );
+      };
+      return ImageTransformer.of({
+        resize: (body, options) => run(body, options).pipe(Effect.map((result) => result.body)),
+        inspect: (body) =>
+          Effect.acquireUseRelease(
+            run(body, { fit: 'contain', mimeType: 'application/json', inspect: true }),
+            (result) =>
+              Effect.tryPromise({
+                try: async (signal) => {
+                  const abort = () => result.stop();
+                  signal.addEventListener('abort', abort, { once: true });
+                  try {
+                    signal.throwIfAborted();
+                    const chunks: Uint8Array[] = [];
+                    let size = 0;
+                    for await (const chunk of result.body) {
+                      size += chunk.byteLength;
+                      if (size > 1024) throw new Error('Image geometry exceeds its frame limit');
+                      chunks.push(chunk);
+                    }
+                    return z
+                      .object({
+                        width: z.number().int().positive(),
+                        height: z.number().int().positive(),
+                        requiresOrientation: z.boolean(),
+                      })
+                      .parse(JSON.parse(Buffer.concat(chunks).toString()));
+                  } catch (cause) {
+                    // Inspection owns failure reporting. Retain the worker's bounded
+                    // diagnostic without also reporting it as a resize failure.
+                    result.stop();
+                    const worker = await result.closed;
+                    throw new Error('Image inspection failed', { cause: { cause, worker } });
+                  } finally {
+                    signal.removeEventListener('abort', abort);
+                  }
+                },
+                catch: (cause) => new DeliveryUnavailable({ operation: 'inspect_image', cause }),
+              }),
+            (result) =>
+              Effect.promise(async () => {
+                result.stop();
+                result.body.close();
+                await result.closed;
+              })
+          ).pipe(
+            Effect.tapError((error) =>
+              Effect.logError('Asset image inspection failed', {
+                operation: error.operation,
+                cause: error.cause,
+              })
+            )
+          ),
+      });
+    })
+  );
+
+/** Closing before the first read must release the already acquired socket/pipeline, too. */
+function byteStream(stream: Readable): AssetBody {
+  return {
+    close: () => {
+      stream.destroy();
+    },
+    [Symbol.asyncIterator]() {
+      const iterator = stream[Symbol.asyncIterator]();
+      return {
+        async next() {
+          const item = await iterator.next();
+          if (item.done) return { done: true, value: undefined };
+          if (!(item.value instanceof Uint8Array)) {
+            stream.destroy();
+            throw new Error('Invalid byte stream');
+          }
+          return { done: false, value: item.value };
+        },
+        async return() {
+          stream.destroy();
+          return { done: true, value: undefined };
+        },
+      };
+    },
+  };
+}
+
+export const pictureAuthorityLayer = (config: {
+  origin?: string;
+  token?: string;
+  timeoutMs?: number;
+}) =>
+  Layer.succeed(
+    PictureAuthority,
+    PictureAuthority.of({
+      isAvailable: (id) =>
+        Effect.tryPromise({
+          try: async (signal) => {
+            if (!config.origin || !config.token)
+              throw new Error('Picture authority is not configured');
+            const response = await fetch(
+              `${config.origin.replace(/\/+$/, '')}/internal/profile-pictures/${encodeURIComponent(id)}/availability`,
+              {
+                headers: { Authorization: `Bearer ${config.token}`, 'Cache-Control': 'no-store' },
+                redirect: 'error',
+                signal: AbortSignal.any([signal, AbortSignal.timeout(config.timeoutMs ?? 3000)]),
+              }
+            );
+            await response.body?.cancel();
+            if (response.status === 404) return false;
+            if (response.status !== 204)
+              throw new Error('Picture availability could not be verified');
+            return true;
+          },
+          catch: (cause) => new DeliveryUnavailable({ operation: 'picture_authority', cause }),
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logError('Profile picture authority failed', { cause: error.cause })
+          ),
+          Effect.withSpan('asset.picture_authority', { attributes: { 'picture.id': id } })
+        ),
+    })
+  );
+
+export interface AssetHealth {
+  check(): Effect.Effect<void, DeliveryUnavailable>;
+}
+export const AssetHealth = Context.Service<AssetHealth>('wallpaperdb.asset.adapters.AssetHealth');
+export interface S3AssetsConfig {
+  endpoint?: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  readTimeoutMs?: number;
+  maxConcurrentReads?: number;
+}
+export const s3AssetsLayer = (config: S3AssetsConfig) =>
+  Layer.effectContext(
+    Effect.gen(function* () {
+      const streams = new Set<Readable>();
+      const requests = new Set<AbortController>();
+      const client = yield* Effect.acquireRelease(
+        Effect.sync(
+          () =>
+            new S3Client({
+              endpoint: config.endpoint,
+              region: config.region,
+              forcePathStyle: true,
+              credentials: {
+                accessKeyId: config.accessKeyId,
+                secretAccessKey: config.secretAccessKey,
+              },
+              maxAttempts: 2,
+            })
+        ),
+        (client) =>
+          Effect.sync(() => {
+            for (const controller of requests) controller.abort();
+            for (const stream of streams) stream.destroy();
+            client.destroy();
+          })
+      );
+      const reader: AssetReader = {
+        read: (asset, context) =>
+          Effect.suspend(() => {
+            if (requests.size >= (config.maxConcurrentReads ?? 128))
+              return Effect.fail(
+                new DeliveryUnavailable({
+                  operation: 'storage_capacity',
+                  cause: new Error('Storage read capacity exhausted'),
+                })
+              );
+            const controller = new AbortController();
+            requests.add(controller);
+            const start = Date.now();
+            const attributes = {
+              'operation.name': 'get_object',
+              ...(context ? { source: context.source } : {}),
+              ...(context?.fallback ? { fallback: 'true' } : {}),
+            };
+            return Effect.tryPromise({
+              try: async (signal) => {
+                let body: Readable | undefined;
+                const abort = () => {
+                  controller.abort();
+                  body?.destroy(new Error('Storage read interrupted'));
+                };
+                signal.addEventListener('abort', abort, { once: true });
+                const deadline = setTimeout(abort, config.readTimeoutMs ?? 30000);
+                deadline.unref();
+                const release = () => {
+                  clearTimeout(deadline);
+                  signal.removeEventListener('abort', abort);
+                  requests.delete(controller);
+                  if (body) streams.delete(body);
+                };
+                try {
+                  signal.throwIfAborted();
+                  const response = await client.send(
+                    new GetObjectCommand({ Bucket: asset.storageBucket, Key: asset.storageKey }),
+                    { abortSignal: controller.signal }
+                  );
+                  if (!(response.Body instanceof Readable))
+                    throw new Error('Storage returned no readable body');
+                  body = response.Body;
+                  if (controller.signal.aborted) {
+                    body.destroy();
+                    throw new Error('Storage read interrupted');
+                  }
+                  streams.add(body);
+                  body.once('close', () => {
+                    // SDK checksum streams do not destroy their source when closed early.
+                    // Abort the HTTP request as well, or its socket stays occupied.
+                    if (!body?.readableEnded) controller.abort();
+                    release();
+                  });
+                  body.on('error', () => {});
+                  recordCounter('asset.s3.operations.total', 1, {
+                    ...attributes,
+                    'operation.success': 'true',
+                  });
+                  recordHistogram('asset.s3.get_duration_ms', Date.now() - start, attributes);
+                  return byteStream(body);
+                } catch (cause) {
+                  release();
+                  recordCounter('asset.s3.operations.total', 1, {
+                    ...attributes,
+                    'operation.success': 'false',
+                    'error.type': cause instanceof Error ? cause.name : 'UnknownError',
+                  });
+                  if (cause instanceof Error && cause.name === 'NoSuchKey') return null;
+                  throw cause;
+                }
+              },
+              catch: (cause) => new DeliveryUnavailable({ operation: 'read_asset', cause }),
+            });
+          }).pipe(
+            Effect.tapError((error) =>
+              Effect.logError('Asset asset read failed', {
+                operation: error.operation,
+                cause: error.cause,
+              })
+            ),
+            Effect.withSpan('asset.s3.get_object', {
+              attributes: {
+                'storage.bucket': asset.storageBucket,
+                'storage.key': asset.storageKey,
+              },
+            })
+          ),
+      };
+      const health: AssetHealth = {
+        check: () =>
+          Effect.tryPromise({
+            try: (signal) =>
+              client.send(new HeadBucketCommand({ Bucket: config.bucket }), {
+                abortSignal: AbortSignal.any([
+                  signal,
+                  AbortSignal.timeout(config.readTimeoutMs ?? 30000),
+                ]),
+              }),
+            catch: (cause) => new DeliveryUnavailable({ operation: 'storage_health', cause }),
+          }).pipe(Effect.asVoid),
+      };
+      return Context.make(AssetReader, reader).pipe(Context.add(AssetHealth, health));
+    })
+  );

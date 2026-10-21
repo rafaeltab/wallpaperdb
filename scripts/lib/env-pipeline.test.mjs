@@ -6,7 +6,7 @@ import { applyOverrides, extractKeys, filterApplicableSecrets, parseEnvValues } 
 const templatePaths = [
   "infra/.env.example",
   "apps/ingestor/.env.example",
-  "apps/media/.env.example",
+  "apps/asset/.env.example",
   "apps/user/.env.example",
   "apps/color-extractor/.env.example",
   "apps/variant-generator/.env.example",

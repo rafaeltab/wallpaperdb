@@ -8,7 +8,7 @@ import { logs } from '@opentelemetry/api-logs';
 import { Effect, Exit, Layer, ManagedRuntime, Scope } from 'effect';
 const service = process.env.TELEMETRY_SERVICE ?? 'ingestor';
 assert(
-  ['ingestor', 'gateway', 'media', 'user', 'tags', 'color-extractor', 'variant-generator'].includes(
+  ['ingestor', 'gateway', 'asset', 'user', 'tags', 'color-extractor', 'variant-generator'].includes(
     service
   )
 );

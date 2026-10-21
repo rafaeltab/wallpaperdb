@@ -389,7 +389,7 @@ async function browserFixture(t, ready = true) {
 					"user",
 					"ingestor",
 					"gateway",
-					"media",
+					"asset",
 					"tags",
 					"variant-generator",
 					"color-extractor",

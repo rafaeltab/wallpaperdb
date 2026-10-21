@@ -3,7 +3,7 @@
 #
 # On each container start:
 #   1. Re-runs pnpm install if pnpm-lock.yaml has changed since the image was built.
-#   2. Optionally runs database migrations (set RUN_DB_MIGRATE=true for ingestor/media).
+#   2. Optionally runs database migrations (set RUN_DB_MIGRATE=true for ingestor/asset).
 #   3. Hands off to CMD.
 
 set -e
@@ -31,7 +31,7 @@ if [ -f "$LOCKFILE" ]; then
 fi
 
 # ── Database migrations ───────────────────────────────────────────────────────
-# Set RUN_DB_MIGRATE=true in docker-compose.apps.yml for ingestor and media.
+# Set RUN_DB_MIGRATE=true in docker-compose.apps.yml for ingestor and asset.
 # Drizzle migrations are idempotent — safe to run on every container start.
 if [ "${RUN_DB_MIGRATE:-false}" = "true" ]; then
     echo "[entrypoint] Running database migrations..."

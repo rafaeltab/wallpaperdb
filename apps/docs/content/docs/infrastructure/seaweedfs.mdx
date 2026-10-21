@@ -45,7 +45,7 @@ For data you want to retain:
 1. While application writes are stopped, take backups of the database and old object storage. Keep the old MinIO volume and a usable source server or backup until migration is verified.
 2. Stop/remove the old service containers as described above, then start SeaweedFS with its new volume. If a running source is needed, restore or run the old MinIO server under a separate Compose project with a different host port and network, so it cannot claim SeaweedFS's port. Preserve the source's original data.
 3. Copy every required bucket and object through the S3 API. An S3 migration tool must support distinct source and destination endpoints and preserve content types, user metadata, and other headers your application relies on. An ordinary download/upload through a local directory does not preserve all object metadata automatically.
-4. Compare bucket inventories, object counts, sizes, contents or checksums, and metadata. Exercise uploads and media retrieval against the destination while writes remain paused.
+4. Compare bucket inventories, object counts, sizes, contents or checksums, and metadata. Exercise uploads and asset retrieval against the destination while writes remain paused.
 5. Resume applications against SeaweedFS after verification. Keep the source and backups until you explicitly decide to retire them.
 
 For disposable development data, start with the new empty object store and reset the associated database only if you intend to discard its existing wallpaper records. Avoid `make infra-reset` while preserving data, as it deletes active infrastructure volumes.

@@ -106,14 +106,14 @@ describe('Biography settings', () => {
             format: 'image/webp',
             fileSizeBytes: 100,
             createdAt: '',
-            url: '/media/own.webp',
+            url: '/asset/own.webp',
           },
         ],
       },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
     await act(async () => vi.advanceTimersByTimeAsync(1));
-    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/media/own.webp');
+    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/asset/own.webp');
     expect(request).toHaveBeenCalledTimes(5);
   });
 

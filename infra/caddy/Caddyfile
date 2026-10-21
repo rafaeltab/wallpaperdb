@@ -10,7 +10,7 @@
 #
 # Service routing summary:
 #   /ingestor/*               → ingestor:3001          (prefix stripped)
-#   /media/*                  → media:3003             (prefix stripped)
+#   /asset/*                  → asset:3003             (prefix stripped)
 #   /gateway/*                → gateway:3004           (prefix stripped)
 #   /variant-generator/*      → variant-generator:3006 (prefix stripped)
 #   /color-extractor/*        → color-extractor:3007   (prefix stripped)
@@ -34,8 +34,8 @@
         reverse_proxy ingestor:3001
     }
 
-    handle_path /media/* {
-        reverse_proxy media:3003
+    handle_path /asset/* {
+        reverse_proxy asset:3003
     }
 
     handle_path /gateway/* {

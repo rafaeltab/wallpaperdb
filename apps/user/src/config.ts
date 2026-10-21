@@ -35,7 +35,7 @@ const configSchema = z
     profilePictureMaxDecodedBytes: z.number().int().positive(),
     profilePictureImportTimeoutMs: z.number().int().positive(),
     profilePictureImportHosts: z.array(z.string().min(1)).min(1),
-    userMediaServiceToken: z.string().min(1).optional(),
+    userAssetServiceToken: z.string().min(1).optional(),
   })
   .superRefine((config, context) => {
     if (config.profileHandleMinLength > config.profileHandleMaxLength) {
@@ -95,7 +95,7 @@ export function loadConfig(): Config {
       .split(',')
       .map((host) => host.trim().toLowerCase())
       .filter(Boolean),
-    userMediaServiceToken: process.env.USER_MEDIA_SERVICE_TOKEN,
+    userAssetServiceToken: process.env.USER_MEDIA_SERVICE_TOKEN,
   };
 
   return configSchema.parse(raw);

@@ -195,7 +195,7 @@ export function createApp(config: Config, options: AppOptions = {}) {
       port: config.port,
       clerkSecretKey: config.clerkSecretKey,
       profilePictureMaxBytes: config.profilePictureMaxBytes,
-      userMediaServiceToken: config.userMediaServiceToken,
+      userAssetServiceToken: config.userAssetServiceToken,
     },
     userLayer(config, options),
     options

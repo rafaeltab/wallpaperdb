@@ -102,7 +102,7 @@ describe('Profile picture commands', () => {
       profilePictureMaxDecodedBytes: 64 * 1024 * 1024,
       profilePictureImportTimeoutMs: 10_000,
       profilePictureImportHosts: ['img.clerk.com', 'images.clerk.dev'],
-      userMediaServiceToken: 'test-media-token',
+      userAssetServiceToken: 'test-asset-token',
     };
     storage = storageTester.s3.getS3Client();
     await restart();
@@ -157,7 +157,7 @@ describe('Profile picture commands', () => {
     const active = await app.inject({
       method: 'GET',
       url,
-      headers: { authorization: 'Bearer test-media-token' },
+      headers: { authorization: 'Bearer test-asset-token' },
     });
     expect(active.statusCode).toBe(204);
     expect(active.headers['cache-control']).toBe('no-store');
@@ -173,7 +173,7 @@ describe('Profile picture commands', () => {
     const unknown = await app.inject({
       method: 'GET',
       url: '/internal/profile-pictures/pic_unknown/availability',
-      headers: { authorization: 'Bearer test-media-token' },
+      headers: { authorization: 'Bearer test-asset-token' },
     });
     expect(unknown.statusCode).toBe(404);
     expect(unknown.headers['cache-control']).toBe('no-store');

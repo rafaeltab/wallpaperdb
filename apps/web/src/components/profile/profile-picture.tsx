@@ -24,7 +24,7 @@ export function ProfilePicture({ profile, className }: ProfilePictureProps) {
   const resolved = resolveProfilePicture(
     profile,
     cachedOwner,
-    import.meta.env.VITE_MEDIA_URL || '/media'
+    import.meta.env.VITE_ASSET_URL || '/asset'
   );
   const picture = resolved.picture;
   const publicVersion = 'version' in profile ? profile.version : 0;

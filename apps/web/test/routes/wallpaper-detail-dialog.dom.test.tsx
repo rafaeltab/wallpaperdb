@@ -26,7 +26,7 @@ const wallpaper: Wallpaper = {
       format: 'image/webp',
       fileSizeBytes: 1024,
       createdAt: '2026-03-01T00:00:00.000Z',
-      url: 'https://media.example/wallpaper.webp',
+      url: 'https://asset.example/wallpaper.webp',
     },
   ],
   uploadedAt: '2026-03-01T00:00:00.000Z',
@@ -48,7 +48,7 @@ describe('Wallpaper detail action feedback', () => {
   ] as const)('keeps keyboard share feedback with its originating page: %s', async (destination) => {
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: false,
-      media: query,
+      asset: query,
       addEventListener() {},
       removeEventListener() {},
     }));
@@ -114,12 +114,12 @@ describe('Wallpaper detail dialog', () => {
   });
 
   it('starts at the original with loading feedback on each A to B to A navigation', async () => {
-    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, asset: query, addEventListener() {}, removeEventListener() {} }));
     vi.stubGlobal('fetch', vi.fn((_url, options) => {
       const id=JSON.parse(options.body).variables.wallpaperId;
       return Promise.resolve(new Response(JSON.stringify({data:{getWallpaper:{...wallpaper,wallpaperId:id,variants:[
-        {...wallpaper.variants[0],url:`https://media.example/${id}-original.webp`},
-        {...wallpaper.variants[0],width:640,height:360,url:`https://media.example/${id}-small.webp`},
+        {...wallpaper.variants[0],url:`https://asset.example/${id}-original.webp`},
+        {...wallpaper.variants[0],width:640,height:360,url:`https://asset.example/${id}-small.webp`},
       ]}}}),{headers:{'Content-Type':'application/json'}}));
     }));
     const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
@@ -134,7 +134,7 @@ describe('Wallpaper detail dialog', () => {
     for(const id of ['b','a']) {
       await act(async()=>{await router.navigate({to:'/wallpapers/$wallpaperId',params:{wallpaperId:id}});});
       const image=await screen.findByAltText('Wallpaper 1920×1080');
-      expect(image).toHaveAttribute('src',`https://media.example/${id}-original.webp`);
+      expect(image).toHaveAttribute('src',`https://asset.example/${id}-original.webp`);
       expect(screen.getByTestId('wallpaper-skeleton')).toBeInTheDocument();
       fireEvent.load(image);
     }
@@ -144,7 +144,7 @@ describe('Wallpaper detail dialog', () => {
     localStorage.clear();
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: false,
-      media: query,
+      asset: query,
       addEventListener() {},
       removeEventListener() {},
     }));
@@ -199,7 +199,7 @@ describe('Wallpaper detail admission errors', () => {
   afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 
   it.each([[429, false], [503, false], [429, true], [503, true]] as const)('shows HTTP %s safely with cached=%s and supports manual retry', async (status, cached) => {
-    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, asset: query, addEventListener() {}, removeEventListener() {} }));
     const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(
       JSON.stringify({ errors: [{ message: 'private error' }] }),
       { status, headers: { 'content-type': 'application/json', 'retry-after': '0' } },

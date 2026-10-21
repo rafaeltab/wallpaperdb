@@ -1,6 +1,6 @@
 vars {
   baseUrl: http://localhost:8000/ingestor
-  mediaBaseUrl: http://localhost:8000/media
+  assetBaseUrl: http://localhost:8000/asset
   gatewayBaseUrl: http://localhost:8000/gateway
   colorExtractorBaseUrl: http://localhost:8000/color-extractor
   tagsBaseUrl: http://localhost:8000/tagging

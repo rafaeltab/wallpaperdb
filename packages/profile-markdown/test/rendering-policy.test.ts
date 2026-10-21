@@ -93,7 +93,7 @@ describe("Profile Markdown rendering policy", () => {
     "<!-- hidden HTML -->",
     "![external](https://example.com/image.jpg)",
     "![data](data:image/png;base64,abc)",
-    "![path](/media/wallpapers/one)",
+    "![path](/asset/wallpapers/one)",
     "![file](file:///etc/passwd)",
     "![custom](photo:one)",
     "![bad](wallpaper:)",

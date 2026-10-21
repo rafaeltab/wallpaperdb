@@ -9,7 +9,7 @@ import { ProfilePicture } from '@/components/profile/profile-picture';
 const profile = {
   id: 'user_123',
   displayName: 'Ada Lovelace',
-  picture: { id: 'picture_1', url: '/media/profile-pictures/picture_1' },
+  picture: { id: 'picture_1', url: '/asset/profile-pictures/picture_1' },
 };
 
 describe('ProfilePicture', () => {
@@ -113,7 +113,7 @@ describe('ProfilePicture', () => {
 
   it('retries an exhausted same-asset picture after an owner refresh or public projection convergence', async () => {
     vi.useFakeTimers();
-    vi.stubEnv('VITE_MEDIA_URL', '/media');
+    vi.stubEnv('VITE_ASSET_URL', '/asset');
     const client = new QueryClient();
     const owner: Profile = {
       pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
@@ -161,7 +161,7 @@ describe('ProfilePicture', () => {
   });
 
   it('adopts matching owner pictures and removals immediately while allowing newer public versions to win', () => {
-    vi.stubEnv('VITE_MEDIA_URL', '/media');
+    vi.stubEnv('VITE_ASSET_URL', '/asset');
     const client = new QueryClient();
     const owner: Profile = {
       pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
@@ -180,7 +180,7 @@ describe('ProfilePicture', () => {
       </QueryClientProvider>
     );
     const rendered = render(view(1));
-    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', '/media/profile-pictures/owner_picture');
+    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', '/asset/profile-pictures/owner_picture');
     act(() =>
       client.setQueryData(profileQueryKey(profile.id), {
         ...owner,
@@ -225,18 +225,18 @@ describe('ProfilePicture', () => {
       <ProfilePicture
         profile={{
           ...profile,
-          picture: { id: 'picture_2', url: '/media/profile-pictures/picture_2' },
+          picture: { id: 'picture_2', url: '/asset/profile-pictures/picture_2' },
         }}
       />
     );
     expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute(
       'src',
-      '/media/profile-pictures/picture_2'
+      '/asset/profile-pictures/picture_2'
     );
     fireEvent.load(screen.getByAltText("Ada Lovelace's profile picture"));
     expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute(
       'src',
-      '/media/profile-pictures/picture_2'
+      '/asset/profile-pictures/picture_2'
     );
   });
 

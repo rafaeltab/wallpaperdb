@@ -31,7 +31,7 @@ export async function uniquePng(page: Page, width = 1280, height = 720) {
 
 export async function waitForWallpaper(page: Page, wallpaperId: string) {
   // Poll the public projection before opening the cached details query. This
-  // waits for the real ingestion -> variants -> Media -> Gateway delivery chain.
+  // waits for the real ingestion -> variants -> Asset -> Gateway delivery chain.
   await expect
     .poll(
       async () => {

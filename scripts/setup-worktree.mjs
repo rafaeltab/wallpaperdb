@@ -412,17 +412,17 @@ function buildServiceOverrides() {
 			DATABASE_URL:
 				"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_ingestor",
 		},
-		"apps/media": {
+		"apps/asset": {
 			DATABASE_URL:
 				"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_media",
 			USER_SERVICE_URL: "http://user:3009",
 		},
 		"apps/gateway": {
 			OPENSEARCH_URL: "http://opensearch:9200",
-			MEDIA_SERVICE_URL: (ctx) =>
-				`http://localhost:${ctx.ports.INGRESS_PORT}/media`,
-			MEDIA_PUBLIC_PATH: "/media",
-			MEDIA_PUBLIC_BASE_URL: "",
+			ASSET_SERVICE_URL: (ctx) =>
+				`http://localhost:${ctx.ports.INGRESS_PORT}/asset`,
+			ASSET_PUBLIC_PATH: "/asset",
+			ASSET_PUBLIC_BASE_URL: "",
 		},
 		"apps/user": {
 			DATABASE_URL:
@@ -439,7 +439,7 @@ function buildServiceOverrides() {
 			VITE_GATEWAY_URL: "/gateway/graphql",
 			VITE_INGESTOR_URL: "/ingestor",
 			VITE_USER_URL: "/user",
-			VITE_MEDIA_URL: "/media",
+			VITE_ASSET_URL: "/asset",
 		},
 		"apps/web-e2e": {
 			PLAYWRIGHT_BASE_URL: (ctx) =>
@@ -588,7 +588,7 @@ function generateAllEnvFiles(repoRoot, projectName, ports) {
  * worktree's slot.
  *
  * Bruno is an API client that stores request collections in `api/`. Each request
- * references variables like {{baseUrl}}, {{gatewayBaseUrl}}, and {{mediaBaseUrl}}
+ * references variables like {{baseUrl}}, {{gatewayBaseUrl}}, and {{assetBaseUrl}}
  * that are resolved from the active environment file.
  *
  * Idempotent: only writes the file when the content has changed.
@@ -614,7 +614,7 @@ function generateBrunoEnv(repoRoot, ports) {
 
 	const overrides = {
 		baseUrl: `http://localhost:${ingressPort}/ingestor`,
-		mediaBaseUrl: `http://localhost:${ingressPort}/media`,
+		assetBaseUrl: `http://localhost:${ingressPort}/asset`,
 		gatewayBaseUrl: `http://localhost:${ingressPort}/gateway`,
 		colorExtractorBaseUrl: `http://localhost:${ingressPort}/color-extractor`,
 		tagsBaseUrl: `http://localhost:${ingressPort}/tagging`,

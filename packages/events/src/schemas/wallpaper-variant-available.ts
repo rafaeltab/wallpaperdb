@@ -2,14 +2,14 @@ import { z } from "zod";
 
 /**
  * Schema for the wallpaper.variant.available event.
- * Published when the Media service makes a new variant available for a wallpaper.
+ * Published when the Asset service makes a new variant available for a wallpaper.
  *
  * Design Notes:
- * - Does NOT include variant ID (internal to Media service)
+ * - Does NOT include variant ID (internal to Asset service)
  * - Dimensions (width + height) uniquely identify a variant within a wallpaper
  * - Pre-calculated aspect ratio for efficient filtering
  * - Format enum derived from MIME type for easy GraphQL filtering
- * - No storage details (internal to Media service)
+ * - No storage details (internal to Asset service)
  * - Extensible for future video support
  */
 export const WallpaperVariantAvailableEventSchema = z.object({

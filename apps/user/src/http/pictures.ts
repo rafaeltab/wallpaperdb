@@ -68,7 +68,7 @@ function malformed(reply: FastifyReply) {
 export async function registerPictureRoutes(
   app: FastifyInstance,
   execution: Execution,
-  config: { readonly profilePictureMaxBytes?: number; readonly userMediaServiceToken?: string }
+  config: { readonly profilePictureMaxBytes?: number; readonly userAssetServiceToken?: string }
 ) {
   await app.register(multipart, {
     limits: {
@@ -102,8 +102,8 @@ export async function registerPictureRoutes(
     { config: { skipAuth: true } },
     (request, reply) => {
       reply.header('Cache-Control', 'no-store');
-      const expected = config.userMediaServiceToken
-        ? Buffer.from(`Bearer ${config.userMediaServiceToken}`)
+      const expected = config.userAssetServiceToken
+        ? Buffer.from(`Bearer ${config.userAssetServiceToken}`)
         : null;
       const supplied = Buffer.from(request.headers.authorization ?? '');
       if (!expected || supplied.length !== expected.length || !timingSafeEqual(supplied, expected))

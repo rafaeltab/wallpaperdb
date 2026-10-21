@@ -31,7 +31,7 @@ const wallpaper: Wallpaper = {
       format: 'image/jpeg',
       fileSizeBytes: 1024,
       createdAt: '2026-01-01',
-      url: 'https://media.example/a.jpg',
+      url: 'https://asset.example/a.jpg',
     },
   ],
   uploadedAt: '2026-01-01',

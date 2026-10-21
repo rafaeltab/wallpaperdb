@@ -577,7 +577,7 @@ describe('Profile picture settings', () => {
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(refreshed));
     expect(screen.getByRole('alert')).toHaveTextContent('Your Profile changed elsewhere');
     const latest = screen.getByRole('group', { name: 'Latest saved picture' });
-    expect(within(latest).getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', '/media/profile-pictures/remote_picture');
+    expect(within(latest).getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', '/asset/profile-pictures/remote_picture');
     expect(screen.getByRole('group', { name: 'Picture crop' })).toBeInTheDocument();
     expect(screen.getByRole('slider', { name: 'Zoom' })).toHaveValue('2');
     expect(userApi.uploadPicture).toHaveBeenCalledTimes(1);
@@ -770,7 +770,7 @@ describe('Profile picture settings', () => {
     });
     expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute(
       'src',
-      '/media/profile-pictures/picture_new'
+      '/asset/profile-pictures/picture_new'
     );
     expect(toast.success).toHaveBeenLastCalledWith('Profile picture saved');
   });

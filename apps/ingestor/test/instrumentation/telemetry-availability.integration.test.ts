@@ -3,7 +3,7 @@ import { GenericContainer, Wait } from 'testcontainers';
 import { expect, it } from 'vitest';
 
 const cases = [
-  ...['ingestor', 'gateway', 'media', 'user', 'tags', 'color-extractor', 'variant-generator'].map(
+  ...['ingestor', 'gateway', 'asset', 'user', 'tags', 'color-extractor', 'variant-generator'].map(
     (service) => ({ service, outage: 'unresolved' })
   ),
   ...['refused', 'stalled', 'error'].map((outage) => ({ service: 'ingestor', outage })),

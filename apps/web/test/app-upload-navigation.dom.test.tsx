@@ -27,7 +27,7 @@ describe('App upload notification navigation', () => {
     window.history.replaceState({}, '', `${basePath}/upload`);
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: false,
-      media: query,
+      asset: query,
       addEventListener() {},
       removeEventListener() {},
     }));

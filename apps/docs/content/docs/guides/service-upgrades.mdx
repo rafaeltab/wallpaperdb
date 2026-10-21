@@ -9,15 +9,15 @@ Apply generated database migrations before starting the corresponding new servic
 
 ## Immutable asset references
 
-Storage adapters derive addresses from logical references and the image metadata in events. Keep `S3_BUCKET` consistent across Ingestor, Variant Generator, Color Extractor, and Media. Keep `PROFILE_PICTURE_BUCKET` consistent between User and Media. Consumers need read access to their producers' objects; only owners may delete bytes. [ADR 0008](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/adr/0008-resolve-assets-through-stable-object-layouts.md) records why these layouts are stable contracts.
+Storage adapters derive addresses from logical references and the image metadata in events. Keep `S3_BUCKET` consistent across Ingestor, Variant Generator, Color Extractor, and Asset. Keep `PROFILE_PICTURE_BUCKET` consistent between User and Asset. Consumers need read access to their producers' objects; only owners may delete bytes. [ADR 0008](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/adr/0008-resolve-assets-through-stable-object-layouts.md) records why these layouts are stable contracts.
 
 When upgrading a development installation from the descriptor-registry revision, stop producers while upgrading all applications together. Before switching, compare its descriptors against the deterministic layouts and configured buckets. Preserve any mismatching object and its descriptor, and migrate it deliberately before replaying its logical reference. The current layout preserves the original, variant, and Profile-picture paths; matching assets need no copy or reset. The old `asset-references` bucket is no longer a runtime dependency. Leave retained descriptors intact until the audit and replay checks are complete. Rolling back to descriptor-based binaries also requires descriptors for assets created after the switch; the old descriptor records alone are insufficient.
 
-Do not rename buckets or change layouts through configuration alone. A migration must preserve object bytes and identities and account for producer records, Media's stored locations, and retained messages. Historical coordinate-based events continue to use their recorded locations. Back up the object buckets with their owning databases and configuration, and verify restore and replay together. The production release procedure and Grafana alerts that reach a human are tracked in [issue 236](https://github.com/rafaeltab/wallpaperdb/issues/236).
+Do not rename buckets or change layouts through configuration alone. A migration must preserve object bytes and identities and account for producer records, Asset's stored locations, and retained messages. Historical coordinate-based events continue to use their recorded locations. Back up the object buckets with their owning databases and configuration, and verify restore and replay together. The production release procedure and Grafana alerts that reach a human are tracked in [issue 236](https://github.com/rafaeltab/wallpaperdb/issues/236).
 
 ## Quarantine replay
 
-Media, Color Extractor, and Variant Generator share a replay decoder in [`@wallpaperdb/core/quarantine`](https://github.com/rafaeltab/wallpaperdb/blob/main/packages/core/src/quarantine/index.ts). Ordinary single records and raw chunk manifests retain their formats and identities. Header-heavy inputs use a manifest with `encoding: "original-message-v1"` to archive their complete original headers and bytes inside bounded chunks. Upgrade replay tooling to read this format before processing those records.
+Asset, Color Extractor, and Variant Generator share a replay decoder in [`@wallpaperdb/core/quarantine`](https://github.com/rafaeltab/wallpaperdb/blob/main/packages/core/src/quarantine/index.ts). Ordinary single records and raw chunk manifests retain their formats and identities. Header-heavy inputs use a manifest with `encoding: "original-message-v1"` to archive their complete original headers and bytes inside bounded chunks. Upgrade replay tooling to read this format before processing those records.
 
 Read a manifest's chunk sequences in order and pass their data with the manifest to `decodeQuarantineReplay`; pass a single record without chunks. The decoder validates bounded metadata, lengths, and SHA-256 before restoring original bytes and CloudEvent/trace headers, including repeated values. Do not silently normalize invalid metadata: repair it deliberately before replay. Archived broker publication controls are excluded from replay. Publish to the recorded original subject with a fresh broker publication ID, preserving the original CloudEvent occurrence instead of the quarantine envelope's identity.
 
@@ -27,7 +27,7 @@ Partial chunks without a completed manifest do not establish durable handoff. Fa
 
 The CloudEvents upload migration requires consumer-first deployment:
 
-1. Upgrade every Media, Variant Generator, Color Extractor, and User replica to a revision whose `@wallpaperdb/events` accepts both legacy uploads and CloudEvents. Upgrade Gateway's event intake too if it predates CloudEvents support.
+1. Upgrade every Asset, Variant Generator, Color Extractor, and User replica to a revision whose `@wallpaperdb/events` accepts both legacy uploads and CloudEvents. Upgrade Gateway's event intake too if it predates CloudEvents support.
 2. Drain and stop all old Ingestor replicas.
 3. Apply the Ingestor migrations with `make migrate PACKAGE=ingestor`, then start the new Ingestor.
 
@@ -35,11 +35,30 @@ Older upload consumers reject the new envelope and can terminate deliveries. Upg
 
 The migration prepares legacy reservations and outbox recovery metadata in one transaction. Incomplete committed records stop migration for repair; investigate those records and rerun the migration rather than making their originals eligible for cleanup. Keep committed originals and their metadata intact. The [Ingestion context decisions](https://github.com/rafaeltab/wallpaperdb/tree/main/apps/ingestor/docs/adr) explain the compatibility limits.
 
-## Media
+## Asset
+
+### Rename from Media
+
+The workspace, Compose service, telemetry service name and public delivery prefix are now `asset`. Gateway uses `ASSET_SERVICE_URL`, `ASSET_PUBLIC_BASE_URL` and `ASSET_PUBLIC_PATH`; Web uses `VITE_ASSET_URL`. Existing `/media` URLs have no redirect. Regenerate worktree configuration with `make install`; update custom deployments and saved client URLs to `/asset`.
+
+Before upgrading an existing development stack, stop its old `media` application container using the previous checkout's `make apps-stop SERVICE=media`. Keep the same Compose project and infrastructure volumes, regenerate configuration, then start the renamed application with `make apps-start SERVICE=asset`. Do not reset infrastructure, purge streams or recreate consumers for this rename. The recovery procedure below applies only when startup reports an older consumer's exhausted delivery limit.
+
+Persistent identities deliberately retain their earlier names:
+
+- `wallpaperdb_media` remains the Asset database. Its tables, Drizzle migration history, catalog, occurrence ledgers and pending outbox rows are unchanged. `make psql DB=asset` selects this database.
+- All Compose infrastructure volume keys and the project name remain unchanged, preserving PostgreSQL, JetStream, object storage and Grafana state. Asset has no dedicated data volume. Object bucket names and keys remain unchanged.
+- The three `media-*` consumer names listed below retain their acknowledgement floors and pending deliveries. `MEDIA_QUARANTINE`, its `media.quarantine` subject and `media.upload.*` record types retain quarantined records and replay compatibility.
+- `https://wallpaperdb/media` remains the CloudEvent source and part of the NATS publication deduplication key. Changing it could make an interrupted outbox publication appear to be a new occurrence. Gateway also retains `wallpaperdb/media` for legacy event decoding. These are event identities, not delivery routes.
+- `USER_MEDIA_SERVICE_TOKEN` remains the shared User/Asset credential setting, so setup reuses the existing secret instead of rotating it. It is unrelated to Gateway's renamed URL configuration.
+- The dashboard file and display name use Asset, but its `wallpaperdb-media-overview` UID remains stable to preserve saved Grafana links. Queries use the renamed `asset_*` metrics and `service_name="asset"`. Historical `media_*` telemetry remains under its original name.
+
+The delivery catalog stores bucket/key references and asset identities, not public delivery URLs. Gateway constructs wallpaper and Profile picture URLs at read time; Web constructs the owner's picture URL from its asset identity. User's stored picture-import `source_url` is the external identity provider's input URL and remains unchanged. No stored delivery-URL rewrite or event replay is required. Back up the existing databases, object storage and JetStream state as a unit before an upgrade, and verify delivery and consumer progress afterward.
+
+### Catalog and consumer recovery
 
 Apply migrations without resetting the delivery catalog. Legacy reconciliation preserves stored metadata and can emit one new availability announcement because older releases had no publication ledger.
 
-Startup rejects a legacy consumer with a finite `MaxDeliver` and recorded redeliveries. Increasing that limit cannot revive already exhausted messages. Recover it with every Media replica stopped:
+Startup rejects a legacy consumer with a finite `MaxDeliver` and recorded redeliveries. Increasing that limit cannot revive already exhausted messages. Recover it with every Asset replica stopped:
 
 1. Save `manager.consumers.info(stream, durable)` to an operator-owned file. Verify that source history still contains the required messages. Do not purge it.
 2. Record `saved.ack_floor.stream_seq + 1` as the restart sequence. Previously acknowledged legacy omissions need a separately chosen earlier replay point.
@@ -57,13 +76,13 @@ await manager.consumers.add(stream, {
 });
 ```
 
-4. Restart Media and monitor dependency and consumer health, pending outbox work, and quarantine.
+4. Restart Asset and monitor dependency and consumer health, pending outbox work, and quarantine.
 
 The durables are `media-wallpaper-uploaded-consumer` and `media-wallpaper-variant-uploaded-consumer` on the configured wallpaper stream, and `media-profile-picture-snapshots` on `PROFILE`. New consumers bound application processing attempts while broker redelivery remains unlimited when quarantine is unavailable.
 
 `MEDIA_QUARANTINE` has a thirty-day repair horizon, one-GiB capacity, and discard-new overflow. Startup rejects incompatible policies. Export or repair failures before expiry. Failed quarantine writes leave originals pending; restore NATS or capacity so they can retry.
 
-Use the [shared quarantine replay procedure](#quarantine-replay), including its framed-record decoder. See the [Media decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/media/docs/adr/0001-replay-safe-delivery-catalog.md).
+Use the [shared quarantine replay procedure](#quarantine-replay), including its framed-record decoder. See the [Asset decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/asset/docs/adr/0001-replay-safe-delivery-catalog.md).
 
 ## Gateway
 
@@ -102,14 +121,14 @@ Drain old User replicas before applying `0010_dark_terrax.sql` and `0011_faithfu
 If startup rejects the legacy `WALLPAPER/user-wallpaper-ownership` consumer for a finite delivery limit and recorded redeliveries:
 
 1. Stop every User replica. Save the consumer configuration and acknowledgement floor, and verify retained history.
-2. Recreate only that durable with explicit acknowledgements, the `wallpaper.uploaded` filter, unlimited broker delivery attempts, and a starting sequence one greater than the saved acknowledgement floor. Startup diagnostics include that sequence. Use the same NATS recovery pattern described for [Media](#media).
+2. Recreate only that durable with explicit acknowledgements, the `wallpaper.uploaded` filter, unlimited broker delivery attempts, and a starting sequence one greater than the saved acknowledgement floor. Startup diagnostics include that sequence. Use the same NATS recovery pattern described for [Asset](#asset).
 3. Restart User and monitor consumer health. Duplicate projection is safe because the first accepted owner remains authoritative. Application processing still stops after three attempts and requires durable quarantine before acknowledging failed input.
 
 `USER_QUARANTINE` uses discard-new storage with a 64-MiB bound and thirty-day retention. A full or unavailable quarantine leaves delivery unacknowledged. Restore capacity or repair the failure before replaying affected input.
 
 ### Private pictures and evidence
 
-Provision the Profile picture bucket without anonymous access, including any custom `PROFILE_PICTURE_BUCKET`. Do not put Profile pictures in a public wallpaper bucket. Set the same `USER_MEDIA_SERVICE_TOKEN` in User and Media, with Media's `USER_SERVICE_URL` pointing to User's internal origin. Worktree setup generates these settings for Docker development. For host-based development, use the reachable host User URL and the same token in both services. Never expose this token in browser configuration. A missing or mismatched token makes picture delivery fail closed.
+Provision the Profile picture bucket without anonymous access, including any custom `PROFILE_PICTURE_BUCKET`. Do not put Profile pictures in a public wallpaper bucket. Set the same `USER_MEDIA_SERVICE_TOKEN` in User and Asset, with Asset's `USER_SERVICE_URL` pointing to User's internal origin. Worktree setup generates these settings for Docker development. For host-based development, use the reachable host User URL and the same token in both services. Never expose this token in browser configuration. A missing or mismatched token makes picture delivery fail closed.
 
 Removing a picture stops future origin delivery; it cannot recall immutable copies already cached by browsers or a CDN. Replaced and removed originals remain private until their recorded expiry. Changing the configured retention duration does not rewrite existing asset deadlines.
 

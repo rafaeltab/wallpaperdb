@@ -406,7 +406,7 @@ async function preflightBrowser() {
 	// Compose can include values in parse errors. Load generated secrets before invoking it.
 	for (const service of [
 		"ingestor",
-		"media",
+		"asset",
 		"gateway",
 		"user",
 		"web",
@@ -434,7 +434,7 @@ async function preflightBrowser() {
 			"CLERK_PUBLISHABLE_KEY",
 			"USER_MEDIA_SERVICE_TOKEN",
 		],
-		media: ["USER_MEDIA_SERVICE_TOKEN"],
+		asset: ["USER_MEDIA_SERVICE_TOKEN"],
 		gateway: ["CURSOR_SECRET"],
 		web: ["VITE_CLERK_PUBLISHABLE_KEY"],
 	};
@@ -469,10 +469,10 @@ async function preflightBrowser() {
 		);
 	if (
 		config.services.user.environment.USER_MEDIA_SERVICE_TOKEN !==
-		config.services.media.environment.USER_MEDIA_SERVICE_TOKEN
+		config.services.asset.environment.USER_MEDIA_SERVICE_TOKEN
 	)
 		throw new Error(
-			"User and Media USER_MEDIA_SERVICE_TOKEN values must match. Rerun make install.",
+			"User and Asset USER_MEDIA_SERVICE_TOKEN values must match. Rerun make install.",
 		);
 	browserEnvironment.CLERK_SECRET_KEY =
 		config.services.user.environment.CLERK_SECRET_KEY;

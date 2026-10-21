@@ -87,7 +87,7 @@ describe('UserMenu', () => {
       })
     );
     expect(screen.getByRole('status')).toHaveTextContent('Loading profile picture');
-    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', '/media/profile-pictures/owner_picture');
+    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', '/asset/profile-pictures/owner_picture');
     expect(screen.getByTestId('user-menu-trigger')).toHaveAccessibleName("Ada Lovelace's profile picture Ada Lovelace");
     act(() =>
       client.setQueryData(profileQueryKey('user_123'), {

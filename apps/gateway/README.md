@@ -5,7 +5,7 @@ Gateway lets visitors discover wallpapers and contributor Profiles through a cat
 ## Core capabilities
 
 - Search wallpapers by contributor, rendition dimensions, aspect ratio, and format, with [color query ranking](src/graphql/schema.ts) and pagination.
-- Retrieve wallpapers with their contributor Profiles and media URLs.
+- Retrieve wallpapers with their contributor Profiles and asset URLs.
 - Find Profiles by Handle, active alias, or Display name, and resolve earlier Handles to the current Profile address.
 - Keep the catalogue up to date as wallpapers, variants, colors, and Profiles are published, without allowing replayed events to undo newer state.
 - Limit query complexity, visitor cost budgets, and active GraphQL work to protect public discovery.
@@ -22,4 +22,4 @@ The [admission contract](../docs/content/docs/guides/gateway-admission.mdx) expl
 
 Gateway serves Swagger UI at `/documentation` and its OpenAPI document at `/documentation/json`, registered by the [HTTP adapter](src/http/index.ts) and the [shared OpenAPI plugin](../../packages/core/src/openapi/plugin.ts).
 
-Offline OpenAPI artifact generation is not a supported Gateway workflow. The former `gen:swagger` script pointed to a missing source file and was removed because no in-repository consumer requires a Gateway artifact. The [documentation site's OpenAPI inputs](../docs/src/lib/openapi.ts) consume only Ingestor and Media artifacts.
+Offline OpenAPI artifact generation is not a supported Gateway workflow. The former `gen:swagger` script pointed to a missing source file and was removed because no in-repository consumer requires a Gateway artifact. The [documentation site's OpenAPI inputs](../docs/src/lib/openapi.ts) consume only Ingestor and Asset artifacts.

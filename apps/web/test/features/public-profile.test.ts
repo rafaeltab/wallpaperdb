@@ -20,10 +20,10 @@ it('retries missing projections but never retries a different owner or admission
 it('uses newer owner pictures and names while respecting newer public projections', () => {
   const projection={id:'owner',displayName:'Public',version:3,picture:{id:'public',url:'public-url'}};
   const owner={id:'owner',displayName:'Owner',version:4,pictureAssetId:'owner-picture'};
-  expect(resolveProfilePicture(projection,owner,'/media')).toMatchObject({displayName:'Owner',picture:{url:'/media/profile-pictures/owner-picture'}});
-  expect(resolveProfilePicture({...projection,version:5},owner,'/media')).toMatchObject({displayName:'Public',picture:{url:'public-url'}});
-  expect(resolveProfilePicture(projection,{...owner,id:'other'},'/media')).toMatchObject({displayName:'Public',picture:{url:'public-url'}});
-  expect(resolveProfilePicture(projection,{...owner,pictureAssetId:null},'/media').picture).toBeNull();
+  expect(resolveProfilePicture(projection,owner,'/asset')).toMatchObject({displayName:'Owner',picture:{url:'/asset/profile-pictures/owner-picture'}});
+  expect(resolveProfilePicture({...projection,version:5},owner,'/asset')).toMatchObject({displayName:'Public',picture:{url:'public-url'}});
+  expect(resolveProfilePicture(projection,{...owner,id:'other'},'/asset')).toMatchObject({displayName:'Public',picture:{url:'public-url'}});
+  expect(resolveProfilePicture(projection,{...owner,pictureAssetId:null},'/asset').picture).toBeNull();
 });
 it('renders deterministic initials and fallback colors', () => {
   expect(profileInitials('  Ada  Byron ')).toBe('AB');

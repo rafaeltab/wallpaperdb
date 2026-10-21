@@ -51,7 +51,7 @@ type PictureSource = {
 export function resolveProfilePicture(
   profile: PictureSource,
   cachedOwner: (PictureSource & { version: number }) | null | undefined,
-  mediaUrl: string
+  assetUrl: string
 ) {
   const owner =
     'pictureAssetId' in profile
@@ -63,7 +63,7 @@ export function resolveProfilePicture(
     ? owner.pictureAssetId
       ? {
           id: owner.pictureAssetId,
-          url: `${mediaUrl.replace(/\/+$/, '')}/profile-pictures/${encodeURIComponent(owner.pictureAssetId)}`,
+          url: `${assetUrl.replace(/\/+$/, '')}/profile-pictures/${encodeURIComponent(owner.pictureAssetId)}`,
         }
       : null
     : (profile.picture ?? null);

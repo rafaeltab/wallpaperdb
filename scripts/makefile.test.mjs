@@ -78,7 +78,7 @@ test("shared tooling is invoked through the scripts workspace", () => {
 	assert.ok(scripts.bin["wallpaperdb-crap"]);
 	for (const app of [
 		"ingestor",
-		"media",
+		"asset",
 		"tags",
 		"user",
 		"gateway",
@@ -214,8 +214,8 @@ test("test task graphs do not build production images", () => {
 });
 
 test("typecheck cache inputs include test files compiled by the workspace", () => {
-	const task = plannedTask("check-types", "media", "check-types");
-	const tsconfig = JSON.parse(readFileSync("apps/media/tsconfig.json", "utf8"));
+	const task = plannedTask("check-types", "asset", "check-types");
+	const tsconfig = JSON.parse(readFileSync("apps/asset/tsconfig.json", "utf8"));
 	assert.ok(tsconfig.include.includes("test/**/*"));
 	assert.ok(
 		Object.hasOwn(task.inputs, "test/catalog-postgres.integration.test.ts"),
@@ -297,7 +297,7 @@ test("stop tears down apps before infrastructure for the selected Compose projec
 
 test("database and Compose commands use explicit selectors", () => {
 	assert.match(output("psql"), /psql -U wallpaperdb\s/);
-	assert.match(output("psql", "DB=media"), /-d wallpaperdb_media/);
+	assert.match(output("psql", "DB=asset"), /-d wallpaperdb_media/);
 	assert.match(
 		output("apps-start", "SERVICE=ingestor", "COMPOSE_PROJECT_NAME=isolated"),
 		/-p isolated .*up -d --build ingestor/,

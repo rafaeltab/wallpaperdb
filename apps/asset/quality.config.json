@@ -1,0 +1,3 @@
+{
+  "publicModules": ["http", "adapters/assets", "adapters/catalog", "adapters/events"]
+}

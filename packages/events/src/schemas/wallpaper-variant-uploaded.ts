@@ -6,7 +6,7 @@ import { AssetReferenceSchema } from "./asset-reference.js";
  * Published by the variant-generator service when a new variant has been
  * generated and uploaded to object storage.
  *
- * This event is consumed by the media service to update its variants table.
+ * This event is consumed by the Asset service to update its variants table.
  *
  * Design Notes:
  * - Identifies immutable assets without publishing storage coordinates

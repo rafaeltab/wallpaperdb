@@ -199,7 +199,7 @@ describe('User HTTP adapter', () => {
   });
   it('protects picture availability with the service token and avoids cached authorization decisions', async () => {
     const app = await createHttpApp(
-      { nodeEnv: 'test', port: 3009, userMediaServiceToken: 'test-token' },
+      { nodeEnv: 'test', port: 3009, userAssetServiceToken: 'test-token' },
       services(() => Effect.die('Must not run'))
     );
     try {

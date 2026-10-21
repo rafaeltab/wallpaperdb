@@ -15,7 +15,7 @@ export interface HttpConfig {
   readonly port: number;
   readonly clerkSecretKey?: string;
   readonly profilePictureMaxBytes?: number;
-  readonly userMediaServiceToken?: string;
+  readonly userAssetServiceToken?: string;
 }
 export interface ConnectionsState {
   isShuttingDown: boolean;

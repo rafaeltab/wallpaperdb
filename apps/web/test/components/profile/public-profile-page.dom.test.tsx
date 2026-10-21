@@ -194,7 +194,7 @@ describe('PublicProfilePage', () => {
           handle: 'grace-hopper',
           displayName: 'Grace Hopper',
           biographyMarkdown: 'Compiler pioneer',
-          picture: { id: 'picture_1', url: 'https://media.example/profile-picture.webp' },
+          picture: { id: 'picture_1', url: 'https://asset.example/profile-picture.webp' },
           canonicalPath: '/profiles/@grace-hopper',
         }}
       />
@@ -202,7 +202,7 @@ describe('PublicProfilePage', () => {
 
     expect(screen.getByAltText("Grace Hopper's profile picture")).toHaveAttribute(
       'src',
-      'https://media.example/profile-picture.webp'
+      'https://asset.example/profile-picture.webp'
     );
     expect(screen.getByText('Compiler pioneer')).toBeInTheDocument();
   });

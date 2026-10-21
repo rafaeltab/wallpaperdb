@@ -1,8 +1,8 @@
 import { type ApiPageProps, createAPIPage } from "fumadocs-openapi/ui";
-import { ingestorOpenApi, mediaOpenApi } from "@/lib/openapi";
+import { ingestorOpenApi, assetOpenApi } from "@/lib/openapi";
 import client from "./api-page.client";
 
-const MediaApiPage = createAPIPage(mediaOpenApi, {
+const AssetApiPage = createAPIPage(assetOpenApi, {
   client,
 });
 
@@ -11,6 +11,6 @@ const IngestorApiPage = createAPIPage(ingestorOpenApi, {
 });
 
 export const APIPage = (props: ApiPageProps) => {
-  if (props.document.toString().includes("media")) return MediaApiPage(props);
+  if (props.document.toString().includes("asset")) return AssetApiPage(props);
   return IngestorApiPage(props);
 };

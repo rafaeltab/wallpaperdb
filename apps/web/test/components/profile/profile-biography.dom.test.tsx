@@ -63,14 +63,14 @@ describe('Biography Markdown', () => {
             format: 'image/webp',
             fileSizeBytes: 100,
             createdAt: '',
-            url: '/media/own.webp',
+            url: '/asset/own.webp',
           },
         ],
       },
     });
     act(() => client.setQueryData(profileQueryKey(profileId), { ...profile, version: 8 }));
     await act(async () => vi.advanceTimersByTimeAsync(1));
-    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/media/own.webp');
+    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/asset/own.webp');
     expect(request).toHaveBeenCalledTimes(5);
   });
 
@@ -129,7 +129,7 @@ describe('Biography Markdown', () => {
             format: 'image/webp',
             fileSizeBytes: 100,
             createdAt: '',
-            url: '/media/own.webp',
+            url: '/asset/own.webp',
           },
         ],
       },
@@ -200,14 +200,14 @@ describe('Biography Markdown', () => {
           format: 'image/webp',
           fileSizeBytes: 100,
           createdAt: '',
-          url: '/media/own.webp',
+          url: '/asset/own.webp',
         },
       ],
     };
     vi.mocked(request).mockResolvedValue({ getWallpaper: wallpaper });
     fireEvent.click(screen.getByRole('button', { name: 'Try wallpaper again' }));
     await act(async () => vi.advanceTimersByTimeAsync(1));
-    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/media/own.webp');
+    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/asset/own.webp');
     expect(request).toHaveBeenCalledTimes(5);
   });
 
@@ -226,7 +226,7 @@ describe('Biography Markdown', () => {
           format: 'image/webp',
           fileSizeBytes: 100,
           createdAt: '',
-          url: '/media/own.webp',
+          url: '/asset/own.webp',
         },
       ],
     };
@@ -245,7 +245,7 @@ describe('Biography Markdown', () => {
     await act(async () => vi.advanceTimersByTimeAsync(1000));
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     await act(async () => vi.advanceTimersByTimeAsync(2000));
-    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/media/own.webp');
+    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/asset/own.webp');
     expect(request).toHaveBeenCalledTimes(3);
   });
 
@@ -281,7 +281,7 @@ describe('Biography Markdown', () => {
           format: 'image/webp',
           fileSizeBytes: 100,
           createdAt: '',
-          url: '/media/foreign.webp',
+          url: '/asset/foreign.webp',
         },
       ],
     };
@@ -311,7 +311,7 @@ describe('Biography Markdown', () => {
           format: 'image/webp',
           fileSizeBytes: 100,
           createdAt: '',
-          url: '/media/wallpapers/wlpr_own.webp',
+          url: '/asset/wallpapers/wlpr_own.webp',
         },
       ],
     };
@@ -326,7 +326,7 @@ describe('Biography Markdown', () => {
       </QueryClientProvider>
     );
     const picture = await screen.findByRole('img', { name: 'Forest at dawn' });
-    expect(picture).toHaveAttribute('src', '/media/wallpapers/wlpr_own.webp');
+    expect(picture).toHaveAttribute('src', '/asset/wallpapers/wlpr_own.webp');
     expect(picture.closest('a')).toHaveAttribute('href', '/wallpapers/wlpr_own');
     expect(container.querySelector('p div, p figure')).toBeNull();
     expect(request).toHaveBeenCalledWith(expect.any(String), { wallpaperId: 'wlpr_own' });

@@ -63,6 +63,14 @@ The runner prints the failing phase and original status, reports cleanup failure
 
 For other scripts use `make run PACKAGE=<workspace> SCRIPT=<script>`. `PACKAGE` selects a workspace, `SERVICE` selects an application container, and `DB` selects a database. Read `make help` instead of maintaining a second command list here.
 
+## Pull request history
+
+This repository uses rebase merging. Check each PR layer against its actual base with `make run PACKAGE=scripts SCRIPT=check:pr-history ARGS='<base> <head>'` before publishing. The [history check](scripts/check-pr-history.mjs) rejects merge commits in the PR and contents already identical to its base. The [PR history workflow](.github/workflows/pr-history.yml) runs this check for all PRs, including documentation changes. A base advance alone does not require rewriting an existing PR.
+
+Preserve published commits while making review fixes, and keep additional commits linear. Resolve base conflicts by preparing a linear rebase, rather than merging the base into the PR. Rewriting published history still needs explicit user authorization; prepare and validate the proposed resolution before requesting it. After an authorized rewrite, use an explicit expected-head lease, rerun affected validation, and obtain fresh reviews for the new comparison. A PR with pre-existing merge commits remains incomplete until its history is resolved.
+
+Before reporting a PR ready for the user to merge, read GitHub's authenticated `rebaseable` status for the current head and base, in addition to checks and reviews. `mergeable: true` alone is insufficient. Refresh an unknown result; if it stays unknown or false, report that limitation instead of declaring readiness. When the branch's contents already landed, verify the landing and report that outcome. Native stack readiness remains required for every stacked layer.
+
 ## Stop or remove a worktree
 
 `make apps-stop` and `make infra-stop` stop this worktree's containers and preserve its data. `make infra-reset` deletes infrastructure data after confirmation.

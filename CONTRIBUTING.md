@@ -59,19 +59,34 @@ The runner prints the failing phase and original status, reports cleanup failure
 
 For other scripts use `make run PACKAGE=<workspace> SCRIPT=<script>`. `PACKAGE` selects a workspace, `SERVICE` selects an application container, and `DB` selects a database. Read `make help` instead of maintaining a second command list here.
 
-### Mutation-testing proof of concept
+### Incremental mutation-testing pilot
 
-The opt-in Stryker POC checks whether the existing Profile Markdown tests detect deliberate changes to the shared policy. Run it with Node.js 22.18+ on the 22.x line, 24.11+ on the 24.x line, or 26+. Stryker 10's Babel dependencies require this newer runtime.
+Mutation testing is opt-in and separate from `make ci`. Use Node 22.22.3 to share checkpoints with the [on-demand CI workflow](.github/workflows/mutation.yml). The initial pilots cover [Profile Markdown's unit suite](packages/profile-markdown/mutation.config.json) and [Gateway's Redis adapter integration suite](apps/gateway/mutation.config.json). The Gateway pilot uses real Redis and in-process adapter calls; it does not establish coverage for Gateway's search, instrumentation, or subprocess suites.
 
 ```sh
+# Check source files changed from origin/main, with a 15-minute execution budget.
 make test-mutation PACKAGE=profile-markdown
+
+# Build or extend a complete baseline, bounded to one hour per invocation.
+make test-mutation PACKAGE=profile-markdown ARGS='--scope all --budget 3600'
+
+# Bounded integration pilot. Hold the shared Docker validation lock locally.
+flock -w 900 /tmp/wallpaperdb-perf-validation.lock make test-mutation PACKAGE=gateway ARGS='--suite integration --scope all --budget 900'
 ```
 
-Open `packages/profile-markdown/reports/mutation/mutation.html` to inspect each mutation and its outcome. The same directory contains the JSON report. See the [Stryker configuration](packages/profile-markdown/stryker.config.json) for scope and reporter settings. Generated reports and sandboxes are ignored by Git.
+The budget covers Stryker startup, its initial test run, and mutation execution. Dependency installation/build and downloading a CI checkpoint happen before that budget. Shutdown gets up to 15 additional seconds to save a partial checkpoint before workers are killed. A completed run exits successfully regardless of score during the pilot. Budget expiry reports **incomplete** and the runner exits with code 2; test/runner errors fail with code 1. Make maps failed recipes to its own exit status, so automation reads the runner's `summary.json` to distinguish them. A timeout before mutation execution may leave no new checkpoint. GitHub's outer job timeout is a failure and may prevent checkpoint upload.
 
-The POC uses Stryker's command runner because its Vitest plugin currently [selects zero tests for covered mutants on Vitest 5](https://github.com/stryker-mutator/stryker-js/issues/6210). Each mutation runs the complete workspace test suite, so this approach costs more than per-test selection and does not distinguish uncovered mutations. No TypeScript checker filters mutations before execution. Review survivors for missing assertions or equivalent behavior before setting a score threshold.
+The CI workflow initially runs only on demand. Budget expiry produces an advisory warning, uploads completed work, and does not block a PR. Actual baseline-test or runner failures fail the workflow. If PR mutation checks become required later, incomplete results must block that required check. The proposed initial PR budget is 15 minutes **per affected workspace**, not a repository-wide cap. No score threshold is enforced yet.
 
-Mutation testing runs separately from `make ci`, bypasses Turbo caching, and has no failing score threshold. Ordinary test failures in the initial run still fail the command. To narrow an investigation, pass a source range relative to the workspace, for example `ARGS='--mutate src/index.ts:59-61'`.
+Run the same full-scope command again to resume. Each invocation copies compatible Stryker results into a private run directory. Completed results are saved atomically under the repository's shared Git directory, so a new Git worktree can reuse them after installation. Concurrent worktrees publish separate snapshots; the runner selects a compatible snapshot with the most results, rather than merging independent reports. Independent clones need artifact transfer.
+
+When local state is missing, the runner tries compatible artifacts from recent successful default-branch runs of the mutation workflow using authenticated `gh`. PR artifacts never seed that baseline. Run the workflow on the default branch to build shared CI progress; branch runs can consume it. Artifacts expire after 90 days. Use `--offline` to skip GitHub, or `--baseline /path/to/checkpoint.json` to import a downloaded artifact. Missing/incompatible artifacts start a bounded cold run.
+
+Stryker compares source/test changes and uses per-test coverage to select tests. Source-only changes narrow mutation scope to changed files. Relevant test, helper, dependency, or toolchain changes select the full configured scope. Completed work outside the selected scope does not establish a fresh full baseline. The runner invalidates reuse for toolchain, workspace dependency, fixture, configuration, OS/architecture, exact Node version, and declared environment changes. Workspaces that read environment settings must list those names in `environmentKeys` in their suite configuration; values are hashed. External services and undeclared environment inputs remain the suite owner's responsibility. See [Stryker's incremental limitations](https://stryker-mutator.io/docs/stryker-js/incremental/). A baseline is an optimization, not a substitute for ordinary tests.
+
+Reports live under `<workspace>/reports/mutation/<suite>/`. `summary.json` records completion and reuse; `checkpoint.json` is portable state; completed runs also emit `mutation.html` and `mutation.json`. A budget-exhausted checkpoint contains only available results. Generated artifacts are ignored by Git.
+
+The [shared runner](scripts/mutation.mjs) supports additional workspaces through their `mutation.config.json`. Opt in after checking that tests execute instrumented code in the Vitest process. The pinned [Vitest 5 compatibility patch](patches/stryker-vitest-10.0.0.patch) fixes nested test selection, suite failures, error serialization, and static-module isolation. Its [regression test](scripts/mutation-runner.test.mjs) verifies actual detected mutations. Recheck the patch when upgrading Stryker or Vitest; the original selection bug is tracked in [Stryker issue 6210](https://github.com/stryker-mutator/stryker-js/issues/6210).
 
 ## Stop or remove a worktree
 

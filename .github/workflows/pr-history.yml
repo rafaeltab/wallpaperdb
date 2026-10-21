@@ -1,0 +1,24 @@
+name: PR history
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  history:
+    name: Rebase merge history
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reject merge commits and already-landed contents
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-pr-history.mjs "$BASE_SHA" "$HEAD_SHA"

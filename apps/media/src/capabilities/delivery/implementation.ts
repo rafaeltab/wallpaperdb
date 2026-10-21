@@ -149,9 +149,14 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
           if (body && variant && options) {
             renditionGeometry = yield* transformer.inspect(body);
             // Historical variants can advertise nominal bounds. Never admit an
-            // inferred output using those bounds when their actual pixels disagree.
+            // inferred output or choose a source using bounds their pixels cannot satisfy.
+            const variantTooSmall =
+              options.fit !== 'fill' &&
+              ((options.width ?? renditionGeometry.width) > renditionGeometry.width ||
+                (options.height ?? renditionGeometry.height) > renditionGeometry.height);
             if (
-              (geometry !== undefined && renditionGeometry.requiresOrientation) ||
+              (geometry !== undefined &&
+                (renditionGeometry.requiresOrientation || variantTooSmall)) ||
               exceedsOutputLimits(renditionGeometry, options, limits)
             ) {
               if (!geometry)

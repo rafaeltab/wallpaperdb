@@ -40,6 +40,7 @@ function runImage(
 ): Effect.Effect<EncodedImage, GenerationUnavailable> {
   const inspection = 'inspect' in options;
   const operation = inspection ? 'inspect-image' : 'encode-image';
+  const stage = inspection ? 'Image inspection' : 'Image encoder';
   return Effect.callback<EncodedImage, GenerationUnavailable>((resume) => {
     const worker = new URL(
       import.meta.url.endsWith('.ts') ? './encoder.ts' : './encoder.mjs',
@@ -65,15 +66,17 @@ function runImage(
       child.once('close', (code, signal) => {
         resolve();
         if (failure !== undefined || code !== 0) {
+          const cause =
+            failure ??
+            new Error(
+              Buffer.concat(diagnostics).toString() ||
+                `${inspection ? 'Inspection' : 'Encoder'} exited ${code ?? signal}`
+            );
           resume(
             Effect.fail(
               new GenerationUnavailable({
                 operation,
-                cause:
-                  failure ??
-                  new Error(
-                    Buffer.concat(diagnostics).toString() || `Encoder exited ${code ?? signal}`
-                  ),
+                cause: inspection ? new Error('Image inspection failed', { cause }) : cause,
               })
             )
           );
@@ -94,7 +97,7 @@ function runImage(
               Effect.fail(
                 new GenerationUnavailable({
                   operation,
-                  cause: new Error('Image encoder returned invalid dimensions'),
+                  cause: new Error(`${stage} returned invalid dimensions`),
                 })
               )
             );
@@ -109,13 +112,19 @@ function runImage(
     child.stdout.on('data', (chunk: Buffer) => {
       size += chunk.byteLength;
       if (size > (inspection ? dimensionFrameBytes : maxPixelBytes + dimensionFrameBytes))
-        stop(new Error('Image encoder output exceeds the pixel limit'));
+        stop(
+          new Error(
+            inspection
+              ? 'Image inspection output exceeds its frame limit'
+              : 'Image encoder output exceeds the pixel limit'
+          )
+        );
       else chunks.push(chunk);
     });
     child.stderr.on('data', (chunk: Buffer) => {
       diagnosticSize += chunk.byteLength;
       if (diagnosticSize > maxDiagnosticBytes)
-        stop(new Error('Image encoder diagnostics exceed their limit'));
+        stop(new Error(`${stage} diagnostics exceed their limit`));
       else diagnostics.push(chunk);
     });
     child.stdin.end(bytes);
@@ -130,10 +139,15 @@ function runImage(
         Effect.fail(
           new GenerationUnavailable({
             operation,
-            cause: new Error('Image encoder exceeded 60 seconds'),
+            cause: new Error(`${stage} exceeded 60 seconds`),
           })
         ),
     }),
-    Effect.tapError((error) => Effect.logError('Image encoding failed', { cause: error.cause }))
+    Effect.tapError((error) =>
+      Effect.logError(inspection ? 'Image inspection failed' : 'Image encoding failed', {
+        operation,
+        cause: error.cause,
+      })
+    )
   );
 }

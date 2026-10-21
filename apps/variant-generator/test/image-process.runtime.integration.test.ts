@@ -84,6 +84,11 @@ describe.skipIf(process.platform !== 'linux')('Native image process ownership', 
           if (Result.isFailure(result.value)) {
             expect(result.value.failure._tag).toBe('GenerationUnavailable');
             expect(result.value.failure.operation).toBe(operation === 'inspect' ? 'inspect-image' : 'encode-image');
+            if (operation === 'inspect') {
+              expect(result.value.failure.cause).toBeInstanceOf(Error);
+              if (result.value.failure.cause instanceof Error)
+                expect(result.value.failure.cause.message).toBe('Image inspection exceeded 60 seconds');
+            }
           }
         }
       } else expect('error' in result).toBe(true);

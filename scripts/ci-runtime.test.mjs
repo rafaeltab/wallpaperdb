@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import {
 	existsSync,
+	mkdirSync,
 	mkdtempSync,
 	readFileSync,
 	readdirSync,
@@ -63,6 +64,37 @@ function records(f) {
 		.map(JSON.parse);
 }
 
+function blockInitialEvidence(f) {
+	mkdirSync(join(f.root, "test-results"));
+	const path = join(f.root, "test-results/ci-runtime");
+	writeFileSync(path, "existing evidence-path blocker");
+	return path;
+}
+
+for (const status of [0, 23]) {
+	test(`an initially blocked evidence directory preserves cleanup output and status ${status}`, (t) => {
+		const f = fixture(t);
+		const blocker = blockInitialEvidence(f);
+		const owned = join(f.root, "owned-resource");
+		writeFileSync(owned, "resource requiring cleanup");
+		const result = run(
+			f,
+			`require('node:fs').rmSync('owned-resource'); console.log('cleanup ran'); process.exit(${status});`,
+		);
+		assert.equal(result.status, status, result.stderr);
+		assert.equal(result.stdout.trim(), "cleanup ran");
+		assert.equal(existsSync(owned), false);
+		assert.equal(
+			readFileSync(blocker, "utf8"),
+			"existing evidence-path blocker",
+		);
+		assert.equal(
+			(result.stderr.match(/ci-runtime: evidence write failed/g) ?? []).length,
+			1,
+		);
+	});
+}
+
 test("runtime evidence preserves command output and arguments and records host timing", (t) => {
 	const f = fixture(t);
 	const literal = "literal ; $(false) ' argument";
@@ -96,12 +128,12 @@ function installDockerObserver(f) {
 		`#!${process.execPath}
 const { appendFileSync, writeFileSync } = require('node:fs');
 const kind = process.argv[2];
-writeFileSync(kind + '.ready', String(process.pid));
 process.stdout.write((kind === 'stats' ? String.fromCharCode(27) + '[2J' + String.fromCharCode(27) + '[1;1H' : '') + JSON.stringify({ kind, sample: 'observed' }) + '\\n');
 process.on('SIGTERM', () => {
   appendFileSync('stopped.jsonl', JSON.stringify({kind}) + '\\n');
   process.exit(0);
 });
+writeFileSync(kind + '.ready', String(process.pid));
 setInterval(() => {}, 1000);
 `,
 		{ mode: 0o700 },
@@ -214,15 +246,17 @@ for (const [signal, status] of [
 	["SIGINT", 130],
 	["SIGTERM", 143],
 ]) {
-	test(
-		`runtime evidence forwards ${signal} to the command process group`,
-		{ timeout: 5000 },
-		async (t) => {
-			const f = fixture(t);
-			const program = join(f.root, "command.mjs");
-			writeFileSync(
-				program,
-				`
+	for (const blocked of [false, true]) {
+		test(
+			`runtime evidence forwards ${signal} to the command process group${blocked ? " with an initially blocked evidence directory" : ""}`,
+			{ timeout: 5000 },
+			async (t) => {
+				const f = fixture(t);
+				const blocker = blocked ? blockInitialEvidence(f) : undefined;
+				const program = join(f.root, "command.mjs");
+				writeFileSync(
+					program,
+					`
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 const role = process.argv[2];
@@ -234,53 +268,71 @@ if (role === 'command') spawn(process.execPath, [new URL(import.meta.url).pathna
 writeFileSync(role + '.ready', String(process.pid));
 setInterval(() => {}, 1000);
 `,
-			);
-			const child = spawn(
-				process.execPath,
-				[script, "signal", "--", process.execPath, program, "command"],
-				{
-					cwd: f.root,
-					env: f.env,
-					stdio: "ignore",
-				},
-			);
-			t.after(() => {
-				child.kill("SIGKILL");
-				for (const role of ["command", "descendant"]) {
-					try {
-						process.kill(
-							Number(readFileSync(join(f.root, `${role}.ready`), "utf8")),
-							"SIGKILL",
-						);
-					} catch {
-						/* Already exited. */
-					}
-				}
-			});
-			const closed = new Promise((resolve) =>
-				child.once("close", (code) => resolve(code)),
-			);
-			const deadline = Date.now() + 3000;
-			while (!existsSync(join(f.root, "descendant.ready"))) {
-				assert.ok(
-					Date.now() < deadline,
-					"command process group did not become ready",
 				);
-				await delay(10);
-			}
-			child.kill(signal);
-			assert.equal(await closed, status);
-			const observed = readFileSync(join(f.root, "signals.jsonl"), "utf8")
-				.trim()
-				.split("\n")
-				.map(JSON.parse);
-			assert.deepEqual(observed.map((entry) => entry.role).sort(), [
-				"command",
-				"descendant",
-			]);
-			const finish = records(f).find((entry) => entry.type === "finish");
-			assert.equal(finish.signal, signal);
-			assert.equal(finish.exitCode, status);
-		},
-	);
+				const child = spawn(
+					process.execPath,
+					[script, "signal", "--", process.execPath, program, "command"],
+					{
+						cwd: f.root,
+						env: f.env,
+						stdio: ["ignore", "ignore", "pipe"],
+					},
+				);
+				let diagnostics = "";
+				child.stderr.setEncoding("utf8");
+				child.stderr.on("data", (data) => {
+					diagnostics += data;
+				});
+				t.after(() => {
+					child.kill("SIGKILL");
+					for (const role of ["command", "descendant"]) {
+						try {
+							process.kill(
+								Number(readFileSync(join(f.root, `${role}.ready`), "utf8")),
+								"SIGKILL",
+							);
+						} catch {
+							/* Already exited. */
+						}
+					}
+				});
+				const closed = new Promise((resolve) =>
+					child.once("close", (code) => resolve(code)),
+				);
+				const deadline = Date.now() + 3000;
+				while (!existsSync(join(f.root, "descendant.ready"))) {
+					assert.ok(
+						Date.now() < deadline,
+						"command process group did not become ready",
+					);
+					await delay(10);
+				}
+				child.kill(signal);
+				assert.equal(await closed, status);
+				const observed = readFileSync(join(f.root, "signals.jsonl"), "utf8")
+					.trim()
+					.split("\n")
+					.map(JSON.parse);
+				assert.deepEqual(observed.map((entry) => entry.role).sort(), [
+					"command",
+					"descendant",
+				]);
+				if (blocked) {
+					assert.equal(
+						readFileSync(blocker, "utf8"),
+						"existing evidence-path blocker",
+					);
+					assert.equal(
+						(diagnostics.match(/ci-runtime: evidence write failed/g) ?? [])
+							.length,
+						1,
+					);
+				} else {
+					const finish = records(f).find((entry) => entry.type === "finish");
+					assert.equal(finish.signal, signal);
+					assert.equal(finish.exitCode, status);
+				}
+			},
+		);
+	}
 }

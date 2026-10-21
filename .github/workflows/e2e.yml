@@ -80,6 +80,9 @@ jobs:
       - name: Prepare Compose image build plan
         run: make apps-build ARGS=--print > "$RUNNER_TEMP/app-images.json"
 
+      - name: Start infrastructure
+        run: make infra-start
+
       - name: Build and load application images
         uses: docker/bake-action@v7
         with:
@@ -105,8 +108,9 @@ jobs:
             web.cache-from=type=gha,version=2,scope=browser-e2e-web,timeout=60s
             web.cache-to=type=gha,version=2,scope=browser-e2e-web,mode=max,ignore-error=true,timeout=60s
 
-      - name: Start infrastructure
-        run: make infra-start
+      - name: Wait for OpenSearch before starting Gateway
+        # A cache hit can remove the build time that previously masked this race.
+        run: make infra-start ARGS='--wait --wait-timeout 240 opensearch'
 
       - name: Start application stack for browser E2E
         run: make apps-start ARGS=--no-build

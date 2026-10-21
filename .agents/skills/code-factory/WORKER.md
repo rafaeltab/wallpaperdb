@@ -1,0 +1,50 @@
+# Factory worker
+
+Use the policy in [SKILL.md](SKILL.md). Work only in the T3-assigned worktree and keep the coordinator's checkout intact. Verify its branch and admission before proceeding. Read `<admission directory>/worker-thread-id` and compare it with this conversation's actual T3 thread ID. Launch preparation can race the coordinator's ownership write, so allow up to 60 seconds of read-only rechecks with waits of at most 10 seconds. Stop before external changes if the recorded owner differs or ownership remains unresolved. A dry run reports the ownership checks it would require without acquiring admission.
+
+## Find one opportunity
+
+Read `AGENTS.md`, the applicable guidelines selected by `CODING_STANDARDS.md`, and relevant domain docs through `GLOSSARY-MAP.md`. Respect recorded ADRs. Load [github-markdown-bodies](../github-markdown-bodies/SKILL.md) before any GitHub body mutation.
+
+Inspect recent upstream changes and relevant tests. Investigate one bounded area that has changed recently, using concrete maintenance friction or test evidence. The existing [codebase-design](../codebase-design/SKILL.md) vocabulary can help assess a local simplification. The interactive `improve-codebase-architecture` skill expects human selection and grilling, so it is not the unattended discovery workflow.
+
+Look for small, behavior-preserving simplifications, duplicated policy that can be consolidated locally, unused internal code whose callers can be fully checked, and missing tests for an established behavior. A smell alone does not justify an issue. Record the observed cost, exact source references at the inspected commit, expected benefit, and a verification method.
+
+The initial automatic scope excludes schema or data migrations, authentication or authorization changes, public contract or event changes, new dependencies, infrastructure and deployment changes, broad renames, and cross-context redesigns. Apply this scope to existing ready issues as well as discoveries. A `ready-for-agent` label supplies readiness, not an exemption from this factory's initial limits.
+
+Search open and closed issues, PRs, and relevant active T3 conversations for each serious candidate, including proposals without the factory marker. Paginate rather than treating a truncated result as complete. Compare the underlying problem and affected code, not just titles. Respect rejected proposals and deferred `future-work`. A recurrence after a landed fix needs evidence and the repository's verified reopen procedure, not a fresh duplicate.
+
+Create at most one new issue if a worthwhile, fresh finding exists. If none qualifies, report a skipped discovery and continue to existing issue pickup. Do not create quota-filling work.
+
+The issue body includes:
+
+- The factory marker and this worker's T3 conversation link.
+- The problem, source evidence, and why the change is worth maintaining.
+- Bounded acceptance criteria and explicit exclusions.
+- The proposed change, behavior that must remain intact, and relevant dependencies.
+- Tests and validation appropriate to the behavior, including how to detect a regression.
+- Why automatic implementation fits the initial scope, or which human decision is missing.
+
+Use `ready-for-agent` only when the evidence, acceptance criteria, dependencies, and verification are sufficient for unattended work. Otherwise use `needs-triage` and leave implementation to a later decision. Read the issue back and verify its body and labels. Search again immediately before creation; reconcile an uncertain creation response with GitHub before retrying.
+
+## Pick up one issue
+
+List open `ready-for-agent` issues excluding `future-work`. Consider existing eligible issues before the issue discovered in this cycle. Prefer the oldest eligible bounded task, using impact and validation confidence to break ties. Read its full body, comments, labels, native dependencies, parent context when relevant, and fallback `Blocked by` references.
+
+Skip issues with open blockers, another assignee, unresolved decisions, another active or uncertain T3 worker, an existing implementation PR, or a prior unresolved factory claim. An assignment to the authenticated account can belong to another agent, so inspect PRs, issue comments, and project conversations even for that account. Check linked closing issues and body references as well as PR titles. Do not revive a factory attempt that already failed without a human recovery decision.
+
+Before claiming, recheck that this issue is still open, still eligible, and still has `ready-for-agent`. Recheck active threads and PRs, including the factory open-PR limit. Follow [issue claiming](../../../docs/agents/issue-tracker.md#claiming-an-issue), including assignment read-back verification. Post one claim comment with the factory marker, date, branch, and this worker's T3 link. Assignment alone is not a lock; the daily admission directory prevents competing factory launches, while the final eligibility read detects other work already in progress.
+
+If nothing is eligible, report why and finish. A cycle may create an issue without starting implementation.
+
+## Implement and publish
+
+Use [do-work](../do-work/SKILL.md), [development-principles](../development-principles/SKILL.md), and [testing](../testing/SKILL.md) for the selected issue. The issue body and acceptance criteria determine the work. Apply the initial automatic scope throughout implementation. If new evidence expands the risk or requires a human decision, stop, preserve useful work, and comment with the exact blocker. Move an incomplete specification to `needs-info` or `needs-triage` as appropriate, preserving category labels.
+
+Run the required repository validation and report its real results. Keep infrastructure failures distinct from code failures. Use bounded diagnosis grounded in new evidence; do not disable checks, broaden permissions, or keep retrying unchanged failures. If required validation cannot pass, leave the issue open with the blocker and do not publish a ready PR. A draft may preserve useful completed work and counts toward the open-PR limit.
+
+Before publication, review the diff against both the issue and applicable standards. Fix material findings and rerun affected checks. Use the existing [code-review](../code-review/SKILL.md) for its independent Standards and Spec reviews, passing the captured upstream base commit and the selected issue as the spec. Supply both reviewers the initial factory scope. Follow that skill's delegation instructions and preserve evidence of the reviewed head. Resolve material findings before calling the PR ready. If independent review cannot run, preserve the result as a draft and report the gap.
+
+Publish using the repository's [pr](../pr/SKILL.md) and GitHub body workflows. Include the factory marker, `Closes #<issue>`, the preserved behavior, actual validation and review evidence, and any limitations. Explain when a browser demonstration is inapplicable, such as an internal refactor without a user-visible feature. Immediately register the PR using T3's `link_pull_request`; before finishing, verify it with `list_thread_pull_requests` and correct missing links. Report a linking failure accurately.
+
+Comment on the issue with the PR URL, tested commit, validation result, and remaining gaps. Keep the issue open for landing. Leave merging to the user. End with the discovery outcome, selected issue or skip reason, commit and PR links, checks and review results, and any required recovery. State clearly whether the PR is ready for human review or remains a draft.

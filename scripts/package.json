@@ -11,7 +11,12 @@
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:unit": "cd .. && node --test scripts/*.test.mjs scripts/lib/*.test.mjs && scripts/node_modules/.bin/vitest run scripts/ci-runner.test.ts scripts/lib/env-pipeline.test.ts --maxWorkers=1 --no-file-parallelism",
-		"check-types": "tsc --project tsconfig.json"
+		"check-types": "tsc --project tsconfig.json",
+		"prototype:boundaries:controls": "node --experimental-strip-types --test prototypes/test-boundaries/controls.test.mjs",
+		"prototype:boundaries": "node --experimental-strip-types prototypes/test-boundaries/run.mjs",
+		"prototype:boundaries:format": "biome format --write prototypes/test-boundaries lib/architecture-boundaries.mjs check-architecture.mjs check-architecture.test.mjs package.json",
+		"prototype:boundaries:evaluate": "node --experimental-strip-types prototypes/test-boundaries/evaluate.mjs",
+		"prototype:boundaries:benchmark": "node prototypes/test-boundaries/benchmark.mjs"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

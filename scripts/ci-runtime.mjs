@@ -25,10 +25,23 @@ if (!phase || !/^[a-z0-9_-]+$/i.test(phase) || separator !== "--" || !command) {
 }
 
 const directory = "test-results/ci-runtime";
-mkdirSync(directory, { recursive: true });
 const output = join(directory, `${phase}-${Date.now()}-${process.pid}.jsonl`);
 const started = performance.now();
 let evidenceFailed = false;
+
+function failEvidence(error) {
+	if (evidenceFailed) return;
+	evidenceFailed = true;
+	console.error(
+		`ci-runtime: evidence write failed (${error.code}); command result is preserved.`,
+	);
+}
+
+try {
+	mkdirSync(directory, { recursive: true });
+} catch (error) {
+	failEvidence(error);
+}
 
 function record(type, data) {
 	if (evidenceFailed) return;
@@ -44,10 +57,7 @@ function record(type, data) {
 			})}\n`,
 		);
 	} catch (error) {
-		evidenceFailed = true;
-		console.error(
-			`ci-runtime: evidence write failed (${error.code}); command result is preserved.`,
-		);
+		failEvidence(error);
 	}
 }
 
@@ -80,7 +90,7 @@ record("start", {
 		].map((key) => [key, process.env[key] ?? null]),
 	),
 });
-const interval = setInterval(sample, 1000);
+const interval = evidenceFailed ? undefined : setInterval(sample, 1000);
 function observeDocker(kind, args) {
 	const observer = spawn("docker", args, { stdio: ["ignore", "pipe", "pipe"] });
 	const closed = new Promise((resolve) => observer.once("close", resolve));
@@ -118,10 +128,12 @@ async function stopObserver({ observer, closed }) {
 	clearTimeout(timeout);
 }
 
-const observers = [
-	observeDocker("stats", ["stats", "--no-trunc", "--format", "{{json .}}"]),
-	observeDocker("events", ["events", "--format", "{{json .}}"]),
-];
+const observers = evidenceFailed
+	? []
+	: [
+			observeDocker("stats", ["stats", "--no-trunc", "--format", "{{json .}}"]),
+			observeDocker("events", ["events", "--format", "{{json .}}"]),
+		];
 const childStarted = performance.now();
 const child = spawn(command, args, { stdio: "inherit", detached: true });
 let receivedSignal;

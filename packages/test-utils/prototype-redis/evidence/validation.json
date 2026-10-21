@@ -1,27 +1,27 @@
 {
   "validation": [
     {
-      "label": "round3-regressions-green",
+      "label": "round4-regressions-green",
       "command": [
         "make",
         "prototype-redis",
-        "ARGS=comparison.test.ts shutdown.test.ts docker-shutdown.test.ts"
+        "ARGS=comparison.test.ts shutdown.test.ts docker-shutdown.test.ts retirement.test.ts subscription-retirement.test.ts expired-budget.test.ts delayed-connect.test.ts"
       ],
       "status": 0,
-      "elapsedSeconds": 35.54322595198755
+      "elapsedSeconds": 39.42466919400613
     },
     {
-      "label": "round3-measurement",
+      "label": "round4-measurement",
       "command": [
         "make",
         "prototype-redis",
         "ARGS=measurement.test.ts"
       ],
       "status": 0,
-      "elapsedSeconds": 27.425559026014525
+      "elapsedSeconds": 27.442510895984014
     },
     {
-      "label": "round3-original-redis",
+      "label": "round4-original-redis",
       "command": [
         "make",
         "test-focused",
@@ -29,16 +29,16 @@
         "ARGS=tests/redis.test.ts"
       ],
       "status": 0,
-      "elapsedSeconds": 7.4598841440165415
+      "elapsedSeconds": 7.812517775979359
     },
     {
-      "label": "round3-final-ci",
+      "label": "round4-final-ci",
       "command": [
         "make",
         "ci"
       ],
       "status": 0,
-      "elapsedSeconds": 251.51363244102686
+      "elapsedSeconds": 253.63175184099237
     }
   ],
   "localCi": {
@@ -47,23 +47,34 @@
       "ci"
     ],
     "status": 0,
-    "reportedSeconds": 250,
+    "reportedSeconds": 252,
     "successfulTasks": 96,
     "totalTasks": 96,
-    "head": "2ac99ddb7406a8c17a693a8fa0e1470640d5ae67"
+    "head": "4872ad2081a42986c5f27c362ed582ddb872e8c8"
   },
   "sourceIdentity": {
-    "sourceSha256": "2b7d0157aa3d2b45d290c89bad0aa9676219ec183caa968934d2cc958f8dce30",
-    "verifiedCommit": "2ac99ddb7406a8c17a693a8fa0e1470640d5ae67",
+    "sourceSha256": "89c60508244fd8d87b48a02d30da573e5c0abbf66b05f1c99f68173b3cc3f47b",
+    "verifiedCommit": "4872ad2081a42986c5f27c362ed582ddb872e8c8",
+    "fixtureSha256": "15abd057d156860ece494ee99a97348052c2576e752cc142cefc39da87b3ffe5",
     "remeasuredAfterTeardownFixes": true,
+    "remeasuredAfterCaseRetirementFixes": true,
     "baselineAndPilotUseSameSource": true
   },
   "prototypeTestResult": {
-    "passed": 21,
+    "passed": 27,
     "failed": 0,
-    "regressionTests": 20,
+    "regressionTests": 26,
     "measurementTests": 1,
-    "execution": "Regression and measurement selections ran separately."
+    "regressionFiles": [
+      "comparison.test.ts",
+      "shutdown.test.ts",
+      "docker-shutdown.test.ts",
+      "retirement.test.ts",
+      "subscription-retirement.test.ts",
+      "expired-budget.test.ts",
+      "delayed-connect.test.ts"
+    ],
+    "execution": "Regression selection passed before committing the same frozen source bytes. Measurement and CI ran after that commit."
   },
   "originalRedisResult": {
     "passed": 12,
@@ -80,14 +91,19 @@
       "failed": 4
     },
     "after": {
-      "commit": "2ac99ddb7406a8c17a693a8fa0e1470640d5ae67",
-      "passed": 20,
+      "commit": "4872ad2081a42986c5f27c362ed582ddb872e8c8",
+      "passed": 26,
       "failed": 0
     },
     "historicalAfter": [
       {
         "commit": "3b117d1deb18a8b50534c21228ca7bd977db136d",
         "passed": 13,
+        "failed": 0
+      },
+      {
+        "commit": "2ac99ddb7406a8c17a693a8fa0e1470640d5ae67",
+        "passed": 20,
         "failed": 0
       }
     ],
@@ -167,8 +183,13 @@
     "failed": 0,
     "serial": true,
     "pairs": 5,
-    "recordedAt": "2026-10-21T17:48:10.050Z",
-    "imageId": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99"
+    "recordedAt": "2026-10-21T18:32:07.912Z",
+    "imageId": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+    "clientsClosedPerMode": 11,
+    "userClientsPerMode": 6,
+    "privateDeletionClientsPerMode": 5,
+    "privateDeletionSetupPhase": "scopedCleanupMs",
+    "rawSamplesSha256": "13654dd66e3b28ce88df69368735c9212294f2c7ca2cd9a730e516de4ca01a7b"
   },
   "scope": "Opt-in throwaway fixture only; no default test or CI adoption. Local lifecycle savings do not establish hosted CI savings.",
   "validationHistory": [
@@ -266,25 +287,419 @@
         "pairs": 5
       },
       "scope": "Opt-in throwaway fixture only; no default test or CI adoption. Local lifecycle savings do not establish hosted CI savings."
+    },
+    {
+      "validation": [
+        {
+          "label": "round3-regressions-green",
+          "command": [
+            "make",
+            "prototype-redis",
+            "ARGS=comparison.test.ts shutdown.test.ts docker-shutdown.test.ts"
+          ],
+          "status": 0,
+          "elapsedSeconds": 35.54322595198755
+        },
+        {
+          "label": "round3-measurement",
+          "command": [
+            "make",
+            "prototype-redis",
+            "ARGS=measurement.test.ts"
+          ],
+          "status": 0,
+          "elapsedSeconds": 27.425559026014525
+        },
+        {
+          "label": "round3-original-redis",
+          "command": [
+            "make",
+            "test-focused",
+            "PACKAGE=test-utils",
+            "ARGS=tests/redis.test.ts"
+          ],
+          "status": 0,
+          "elapsedSeconds": 7.4598841440165415
+        },
+        {
+          "label": "round3-final-ci",
+          "command": [
+            "make",
+            "ci"
+          ],
+          "status": 0,
+          "elapsedSeconds": 251.51363244102686
+        }
+      ],
+      "localCi": {
+        "command": [
+          "make",
+          "ci"
+        ],
+        "status": 0,
+        "reportedSeconds": 250,
+        "successfulTasks": 96,
+        "totalTasks": 96,
+        "head": "2ac99ddb7406a8c17a693a8fa0e1470640d5ae67"
+      },
+      "sourceIdentity": {
+        "sourceSha256": "2b7d0157aa3d2b45d290c89bad0aa9676219ec183caa968934d2cc958f8dce30",
+        "verifiedCommit": "2ac99ddb7406a8c17a693a8fa0e1470640d5ae67",
+        "remeasuredAfterTeardownFixes": true,
+        "baselineAndPilotUseSameSource": true
+      },
+      "prototypeTestResult": {
+        "passed": 21,
+        "failed": 0,
+        "regressionTests": 20,
+        "measurementTests": 1,
+        "execution": "Regression and measurement selections ran separately."
+      },
+      "originalRedisResult": {
+        "passed": 12,
+        "skipped": 2,
+        "failed": 0
+      },
+      "shutdownRegressions": {
+        "stuckCaseBefore": {
+          "commit": "3df121986e6c68942f77555a9cea3ed38431e6d5",
+          "failed": 1
+        },
+        "pausedRedisBefore": {
+          "commit": "e261edb90337a4c248fa014b8f52a904c4fbb3dd",
+          "failed": 4
+        },
+        "after": {
+          "commit": "2ac99ddb7406a8c17a693a8fa0e1470640d5ae67",
+          "passed": 20,
+          "failed": 0
+        },
+        "historicalAfter": [
+          {
+            "commit": "3b117d1deb18a8b50534c21228ca7bd977db136d",
+            "passed": 13,
+            "failed": 0
+          }
+        ],
+        "caseScopeBefore": {
+          "commit": "3f574ba3a7dbd26b2fbdf747b23f57404e778c4e",
+          "fixedBy": "6b56a5e35781202560854a57db7d0c7e8626c619",
+          "failed": 2,
+          "evidence": {
+            "result": {
+              "event": "completed",
+              "label": "case-scope-red",
+              "command": [
+                "make",
+                "prototype-redis",
+                "ARGS=shutdown.test.ts -t \"invalidates a finished\""
+              ],
+              "status": 2,
+              "elapsedSeconds": 6.28073123600916
+            },
+            "logSha256": "41070a9cdf91ea830143951ebc4415b0ddb4fbc1426a1ead410bfd5761904f49"
+          }
+        },
+        "detachedAcquisitionBefore": {
+          "commit": "3f574ba3a7dbd26b2fbdf747b23f57404e778c4e",
+          "fixedBy": "6b56a5e35781202560854a57db7d0c7e8626c619",
+          "failed": 1,
+          "note": "The old run rejected with 'The client is closed' instead of the explicit case-scope error. This assertion failure alone does not prove a leaked socket.",
+          "evidence": {
+            "result": {
+              "event": "completed",
+              "label": "case-acquisition-red",
+              "command": [
+                "make",
+                "prototype-redis",
+                "ARGS=shutdown.test.ts -t \"detached subscription\""
+              ],
+              "status": 2,
+              "elapsedSeconds": 5.617230025003664
+            },
+            "logSha256": "eb616cb9080018ad9e53ecf239f5dc35130c86bb34fca826654f3a98459ef02b"
+          }
+        },
+        "dockerBefore": {
+          "commit": "6b56a5e35781202560854a57db7d0c7e8626c619",
+          "failed": 3,
+          "evidence": {
+            "result": {
+              "event": "completed",
+              "label": "docker-deadline-red-2",
+              "command": [
+                "make",
+                "prototype-redis",
+                "ARGS=docker-shutdown.test.ts"
+              ],
+              "status": 2,
+              "elapsedSeconds": 33.28505890897941
+            },
+            "logSha256": "36057f3db3f76374768096f80a43e0d3062da1636dfff521e17afbabe90daeb8"
+          },
+          "seam": "Real HTTP stop, removal, and incomplete list-response stalls; legacy teardown and current lookup paths are routed to the controlled endpoint."
+        }
+      },
+      "unchangedSincePublishedPrototype": {
+        "commit": "3df121986e6c68942f77555a9cea3ed38431e6d5",
+        "paths": [
+          ".github",
+          "turbo.json",
+          "Makefile",
+          "packages/test-utils/tests",
+          "packages/test-utils/src",
+          "packages/test-utils/vitest.config.ts",
+          "packages/test-utils/package.json"
+        ]
+      },
+      "measurement": {
+        "samples": 10,
+        "failed": 0,
+        "serial": true,
+        "pairs": 5,
+        "recordedAt": "2026-10-21T17:48:10.050Z",
+        "imageId": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99"
+      },
+      "scope": "Opt-in throwaway fixture only; no default test or CI adoption. Local lifecycle savings do not establish hosted CI savings.",
+      "round": "round3",
+      "logEvidence": {
+        "round3-regressions-green": {
+          "file": "round3-regressions-green.log",
+          "sha256": "cde9eb6c78a2457996f871c0858581076d9c520df97dafa3f7cd50aa2805c5af"
+        },
+        "round3-measurement": {
+          "file": "round3-measurement.log",
+          "sha256": "c386febc2e204e48c2fc664ed5653ea352f7887536cad1e620895667870fcf96"
+        },
+        "round3-original-redis": {
+          "file": "round3-original-redis.log",
+          "sha256": "01369498016bb58b7885277768acadb4d2297257847c2cf76a469ecaf78ff76f"
+        },
+        "round3-final-ci": {
+          "file": "round3-final-ci.log",
+          "sha256": "e30f247875e205d792be00efaad7823f173ebd9c51ac5d88e34517050b96cc71"
+        }
+      }
     }
   ],
-  "round": "round3",
+  "round": "round4",
   "logEvidence": {
-    "round3-regressions-green": {
-      "file": "round3-regressions-green.log",
-      "sha256": "cde9eb6c78a2457996f871c0858581076d9c520df97dafa3f7cd50aa2805c5af"
+    "round4-regressions-green": {
+      "file": "round4-regressions-green.log",
+      "sha256": "5f34ec42a54b5472a1a1181e9b1dd3da3e5fa09cf57abf50757c0a3f76a0d534",
+      "resultFile": "round4-regressions-green-result.json",
+      "resultSha256": "7cf0d0ce8cb4056dc4b6d497fd9ac68411adee42cb3192a9ecafe1a4cf44a874"
     },
-    "round3-measurement": {
-      "file": "round3-measurement.log",
-      "sha256": "c386febc2e204e48c2fc664ed5653ea352f7887536cad1e620895667870fcf96"
+    "round4-measurement": {
+      "file": "round4-measurement.log",
+      "sha256": "003062ff21f567ee3cd7ab2660d95141f4c950dab1f45ef8e4fac055adaa686c",
+      "resultFile": "round4-measurement-result.json",
+      "resultSha256": "bb13753e98657cf706a35be04042845c884695ce727b1b98f2e9e7689df4d6f4"
     },
-    "round3-original-redis": {
-      "file": "round3-original-redis.log",
-      "sha256": "01369498016bb58b7885277768acadb4d2297257847c2cf76a469ecaf78ff76f"
+    "round4-original-redis": {
+      "file": "round4-original-redis.log",
+      "sha256": "c74efb3906f9e3dfebf9e2c40eee8facfc597b142b9ef775e94cae076e405211",
+      "resultFile": "round4-original-redis-result.json",
+      "resultSha256": "7115bfe71ca33f86ae7a758c5bca0d23f10ca871a709d19cd93cf755ad84e350"
     },
-    "round3-final-ci": {
-      "file": "round3-final-ci.log",
-      "sha256": "e30f247875e205d792be00efaad7823f173ebd9c51ac5d88e34517050b96cc71"
+    "round4-final-ci": {
+      "file": "round4-final-ci.log",
+      "sha256": "6f7be467c5b808b6c24c59358e6d8da1cb3142d840f93d6144ad1a12f74b6c71",
+      "resultFile": "round4-final-ci-result.json",
+      "resultSha256": "f391084acc17aa010697fd8e3e0ce6f45420310b60d95cdc1fc90ada99c70050"
+    }
+  },
+  "measurementHistory": [
+    {
+      "verifiedSourceCommit": "2ac99ddb7406a8c17a693a8fa0e1470640d5ae67",
+      "sourceSha256": "2b7d0157aa3d2b45d290c89bad0aa9676219ec183caa968934d2cc958f8dce30",
+      "publicationCommit": "2a663d7d52a5e42aaf57ad92f68402788c1253be",
+      "recordedAt": "2026-10-21T17:48:10.050Z",
+      "imageId": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+      "settings": {
+        "image": "redis:7-alpine",
+        "workers": 1,
+        "concurrency": 1,
+        "coverage": false,
+        "retries": 0,
+        "schedule": "five cases serially; alternate baseline/pilot and pilot/baseline",
+        "pairs": 5
+      },
+      "rawSamplesSha256": "182d9f114f379a8c2c91ecd2c70999fd3467ea450ec1679a2eea0ca7c9cd30e2",
+      "rawSamplesPath": "packages/test-utils/prototype-redis/evidence/samples.json",
+      "summary": {
+        "baseline": {
+          "samples": 5,
+          "failures": 0,
+          "elapsedMs": 2982.6518350000006,
+          "elapsedWithoutVerificationMs": 2643.1723699999966,
+          "metrics": {
+            "startAttempts": 5,
+            "starts": 5,
+            "stopAttempts": 5,
+            "stops": 5,
+            "startupReadinessMs": 504.39128099999834,
+            "clientSetupMs": 5.547547999998642,
+            "bodyMs": 1035.9323170000007,
+            "scopedCleanupMs": 1.9867249999970227,
+            "verificationMs": 355.2477940000008,
+            "containerCleanupMs": 1094.8456970000007,
+            "clientsClosed": 6,
+            "containersRemoved": 5
+          }
+        },
+        "pilot": {
+          "samples": 5,
+          "failures": 0,
+          "elapsedMs": 1427.0093699999998,
+          "elapsedWithoutVerificationMs": 1350.7546939999993,
+          "metrics": {
+            "startAttempts": 1,
+            "starts": 1,
+            "stopAttempts": 1,
+            "stops": 1,
+            "startupReadinessMs": 97.475907,
+            "clientSetupMs": 3.7822380000015983,
+            "bodyMs": 1026.263132,
+            "scopedCleanupMs": 1.7434979999961797,
+            "verificationMs": 77.77641700000095,
+            "containerCleanupMs": 228.10819900000024,
+            "clientsClosed": 6,
+            "containersRemoved": 1
+          }
+        },
+        "pairs": [
+          {
+            "pair": 1,
+            "order": [
+              "baseline",
+              "pilot"
+            ],
+            "baselineMs": 3082.613895,
+            "pilotMs": 1427.0093699999998,
+            "savingsMs": 1655.6045250000002
+          },
+          {
+            "pair": 2,
+            "order": [
+              "pilot",
+              "baseline"
+            ],
+            "baselineMs": 2944.3257219999996,
+            "pilotMs": 1439.744318,
+            "savingsMs": 1504.5814039999996
+          },
+          {
+            "pair": 3,
+            "order": [
+              "baseline",
+              "pilot"
+            ],
+            "baselineMs": 3008.3510609999994,
+            "pilotMs": 1422.2823150000004,
+            "savingsMs": 1586.068745999999
+          },
+          {
+            "pair": 4,
+            "order": [
+              "pilot",
+              "baseline"
+            ],
+            "baselineMs": 2904.9093810000013,
+            "pilotMs": 1437.8672100000003,
+            "savingsMs": 1467.042171000001
+          },
+          {
+            "pair": 5,
+            "order": [
+              "baseline",
+              "pilot"
+            ],
+            "baselineMs": 2982.6518350000006,
+            "pilotMs": 1422.6770670000005,
+            "savingsMs": 1559.974768
+          }
+        ],
+        "elapsedMs": {
+          "savingsMs": 1555.6424650000008,
+          "reductionPercent": 52.156354514639496
+        },
+        "elapsedWithoutVerificationMs": {
+          "savingsMs": 1292.4176759999973,
+          "reductionPercent": 48.89645831157046
+        },
+        "verifiedSourceCommit": "2ac99ddb7406a8c17a693a8fa0e1470640d5ae67",
+        "sourceSha256": "2b7d0157aa3d2b45d290c89bad0aa9676219ec183caa968934d2cc958f8dce30"
+      },
+      "note": "Historical measurements of the earlier retirement implementation with six user clients. Compare baseline and pilot within each source version; these totals do not measure the speed of the retirement fixes."
+    }
+  ],
+  "caseRetirementRegressions": {
+    "beforeCommit": "2a663d7d52a5e42aaf57ad92f68402788c1253be",
+    "fixedBy": "4872ad2081a42986c5f27c362ed582ddb872e8c8",
+    "reviewCommentIds": [
+      4340272249,
+      4340272257,
+      4340272262
+    ],
+    "ownershipAndSubscribeBefore": {
+      "failed": 3,
+      "evidence": {
+        "result": {
+          "label": "round4-retirement-red",
+          "command": [
+            "make",
+            "prototype-redis",
+            "ARGS=retirement.test.ts subscription-retirement.test.ts"
+          ],
+          "status": 2,
+          "elapsedSeconds": 6.947866422007792
+        },
+        "logSha256": "42f753fddbcab470f53eb766250ea9959db9b0ad3a3e76c84ea829ac5cbbc246",
+        "resultSha256": "3b058669542a033881729d73b9fb120e45a25c3e8b4cb69ed10ccd7df65c3b11"
+      },
+      "seam": "Real Redis verifies disconnected-client exact key deletion, detached raw SET retirement, and suppressed delivery/rejection after subscription completion is held beyond case closure."
+    },
+    "expiredDeadlineBefore": {
+      "failed": 2,
+      "evidence": {
+        "result": {
+          "label": "round4-budget-red",
+          "command": [
+            "make",
+            "prototype-redis",
+            "ARGS=expired-budget.test.ts"
+          ],
+          "status": 2,
+          "elapsedSeconds": 4.725345754995942
+        },
+        "logSha256": "c5126b957e5ad67e4dca5263bfc353d2e729b221e10abaa036531e6adf329777",
+        "resultSha256": "3e584d85a78ddf3cdd5912c057edfa6fc79a2188150a377ef1cf3563369703aa"
+      },
+      "seam": "Stateful Redis adapter advances one shared deadline with two and 32 subscriptions; checks no later graceful commands and cancellation of every user connection."
+    },
+    "delayedConnectBefore": {
+      "failed": 1,
+      "evidence": {
+        "result": {
+          "label": "round4-delayed-connect-red",
+          "command": [
+            "make",
+            "prototype-redis",
+            "ARGS=delayed-connect-red-control.test.ts"
+          ],
+          "status": 2,
+          "elapsedSeconds": 7.0160102549998555
+        },
+        "logSha256": "317752eb953b6bb987bbdbdf2886ac015f90493f50df22e7a9356db7fa4d9581",
+        "resultSha256": "eb371b7906fd2d9b8bd76c08d98a4ff4b614ea7b4cb871012aa661384fc7a4dd"
+      },
+      "seam": "Published fixture imported by a temporary control test. A real TCP proxy delays Redis socket assignment and checks that case retirement closes the transport before and after release."
+    },
+    "after": {
+      "commit": "4872ad2081a42986c5f27c362ed582ddb872e8c8",
+      "regressionTests": 26,
+      "failed": 0
     }
   }
 }

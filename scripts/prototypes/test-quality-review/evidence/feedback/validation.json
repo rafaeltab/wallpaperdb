@@ -1,0 +1,16 @@
+{
+  "validatedExecutableCommit": "22946793",
+  "prototypeControlsPassed": 8,
+  "originalFinalReportReplay": "passed",
+  "feedbackReportReplay": "passed",
+  "workspaceCheck": "make check PACKAGE=scripts passed",
+  "fullCi": {
+    "command": "flock -w 1 /tmp/wallpaperdb-perf-validation.lock timeout 900 make ci",
+    "exitCode": 0,
+    "tasksPassed": 96,
+    "elapsedSeconds": 341,
+    "nonE2eCoverageReportsMerged": 24,
+    "e2eIncluded": false
+  },
+  "scope": "Opt-in prototype and context controls only; production tests and repository-wide blocking policy remain unchanged."
+}

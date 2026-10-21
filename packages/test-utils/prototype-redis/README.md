@@ -51,7 +51,9 @@ flowchart LR
   end
 ```
 
-[fixture.ts](fixture.ts) contains the sample owner. Case cleanup attempts every release even if another release fails. Group teardown checks key absence, subscription counts, and named Redis clients before stopping the container, then checks Docker for container removal. Shared cases must never call `withRedisAutoCleanup()`, which executes `FLUSHALL`.
+[fixture.ts](fixture.ts) contains the sample owner. Case cleanup attempts every release even if another release fails. One deadline covers each case's unsubscribe, key deletion, and client closure. Group shutdown has a shared deadline for pending cases and Redis verification. A stalled graceful QUIT ends with forced disconnection. A pending-case timeout aborts fixture access and forces existing clients closed.
+
+On normal completion, group teardown checks key absence, subscription counts, and named Redis clients before stopping the container, then checks Docker for container removal. A failed teardown preserves its errors and still attempts container removal; it does not count that removal as proof that the Redis audit passed. Shared cases must never call `withRedisAutoCleanup()`, which executes `FLUSHALL`.
 
 Creation/readiness, custom image/configuration, network/alias, endpoints, destruction, and pre-setup/error contracts retain their independent fixtures in the original suite. OpenSearch, network restoration, Ryuk regressions, and Docker endpoint portability are outside this pilot.
 
@@ -59,13 +61,15 @@ Creation/readiness, custom image/configuration, network/alias, endpoints, destru
 
 [comparison.test.ts](comparison.test.ts) demonstrates independent execution, reordered cases, overlapping ownership, and cleanup after an intentional assertion failure. The overlapping survivor must keep its data and subscription after the failed case releases its own resources. Cleanup checks run before container teardown so stopping Redis cannot hide a leak.
 
+[shutdown.test.ts](shutdown.test.ts) covers a stuck callback, late resource acquisition, and real Redis sockets stalled during QUIT, DEL, unsubscribe, or observer verification. These cases must report failure and remove their container within the test deadline.
+
 The comparison uses one warmup group and five alternating baseline/pilot pairs. Each pair runs the five operations serially. Both approaches use the same cached image, one worker, concurrency one, disabled coverage, and zero retries. The unchanged original suite is separate validation and retains its existing configuration.
 
 Each measurement run retains raw JSON in a private `/tmp/wallpaperdb-redis-prototype-*/samples.json` file, including failed samples. The test emits its path; Vitest may suppress successful console output. Startup/readiness, client setup, operation body, scoped cleanup, verification, container cleanup, and total elapsed time are separate measurements. Expected lifecycle counts per successful sample are five starts/stops for baseline and one start/stop for pilot.
 
 Total elapsed time includes verification. `elapsedWithoutVerificationMs` subtracts the measured Redis and Docker audit time, since baseline audits five groups and pilot audits one. Client setup measures the command client; the pub/sub subscriber connects inside the operation body in both modes. Overlap and failure demonstrations are separate from the serial timing samples.
 
-The [raw samples](evidence/samples.json) and [derived summary](evidence/summary.json) record five alternating pairs on a local Linux Docker host with Node 22.22.3. Every sample passed. The cached image ID stayed `sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99` throughout. The recorded source hash matches the runnable files committed in `d2790ee1ae45813b4dadde453e35875d8bd76a10`; measurement preceded that commit. The rebase added only a skill-documentation change, so the measured samples remain applicable.
+The [raw samples](evidence/samples.json) and [derived summary](evidence/summary.json) record a fresh run after the teardown fixes, measured at `2026-10-21T17:02:04.954Z` on a local Linux Docker host with Node 22.22.3. Both baseline and pilot used the fixed code at `3b117d1deb18a8b50534c21228ca7bd977db136d`. Every sample passed. The cached image ID before and after measurement was `sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99`. The recorded source hash `570ad27a1bd1595bf84254f768966a94004c7867b5115b5ad1d29244d2cfbe36` matches the committed runnable files. These timings compare container ownership within that version of the code.
 
 Medians per five-case sample, in milliseconds:
 
@@ -73,32 +77,34 @@ Medians per five-case sample, in milliseconds:
 | --- | --- | --- |
 | Observed starts / stops / removed containers | 5 / 5 / 5 | 1 / 1 / 1 |
 | Closed case clients | 6 | 6 |
-| Startup/readiness | 562.45 | 104.98 |
-| Command client setup | 5.69 | 3.76 |
-| Operation body | 1026.16 | 1028.27 |
-| Scoped case cleanup | 1.25 | 1.80 |
-| Container cleanup | 1224.63 | 259.89 |
-| Redis/Docker verification | 345.73 | 78.29 |
-| Total elapsed | 3189.42 | 1487.44 |
-| Elapsed excluding verification | 2827.10 | 1406.89 |
+| Startup/readiness | 500.69 | 94.43 |
+| Command client setup | 5.21 | 4.27 |
+| Operation body | 1030.24 | 1025.52 |
+| Scoped case cleanup | 1.64 | 2.01 |
+| Container cleanup | 1097.00 | 232.82 |
+| Redis/Docker verification | 338.80 | 75.99 |
+| Total elapsed | 2969.02 | 1433.00 |
+| Elapsed excluding verification | 2632.50 | 1357.32 |
 | Failed samples / retained samples | 0 / 5 | 0 / 5 |
 
-The median total decreased by 1701.98 ms, or 53.36%. Excluding verification, it decreased by 1420.21 ms, or 50.24%. These are differences between medians; the raw record preserves every pair and its order. The operation body still costs about one second, mostly the specified expiration check.
+The pilot's median total was 1536.02 ms lower, or 51.73%. Excluding verification, it was 1275.18 ms lower, or 48.44%. These are differences between medians; the raw record preserves every pair and its order. The operation body still costs about one second, mostly the specified expiration check.
 
 | Pair | Order | Baseline total, ms | Pilot total, ms |
 | --- | --- | --- | --- |
-| 1 | Baseline, pilot | 3197.81 | 1458.64 |
-| 2 | Pilot, baseline | 3223.59 | 1492.85 |
-| 3 | Baseline, pilot | 3160.94 | 1487.85 |
-| 4 | Pilot, baseline | 3189.42 | 1487.44 |
-| 5 | Baseline, pilot | 3132.16 | 1472.34 |
+| 1 | Baseline, pilot | 2939.48 | 1441.62 |
+| 2 | Pilot, baseline | 2969.02 | 1430.73 |
+| 3 | Baseline, pilot | 2959.90 | 1433.00 |
+| 4 | Pilot, baseline | 3025.81 | 1429.33 |
+| 5 | Baseline, pilot | 3007.77 | 1454.47 |
 
-Runtime validation passed all nine opt-in tests, an independently selected hash case, and the unchanged original suite with 12 passes and its two existing network-related skips. Both local `make ci` runs passed all 96 tasks. The post-rebase run passed in 249 seconds. See the [validation record](evidence/validation.json). This Docker fixture has no browser UI; its runtime evidence is command output and Redis/Docker assertions.
+Runtime validation after the teardown fixes passed all 14 opt-in tests and the unchanged original suite with 12 passes and its two existing network-related skips. Final local `make ci` passed all 96 tasks in 253 seconds. See the [validation record](evidence/validation.json) for validation provenance. This Docker fixture has no browser UI; its runtime evidence is command output and Redis/Docker assertions.
 
 ## Risks and recommendation
 
 Shared Redis makes a global command, unscoped key deletion, leaked subscription, or container failure affect other cases. The prototype adds ownership bookkeeping and cleanup verification to constrain those risks. Its evidence covers these five operation cases, not all Redis tests or hosted CI.
 
-The experiment has 212 lines of fixture code, 48 lines of shared operations, 71 lines of correctness demonstrations, 104 lines of measurement code, and 15 lines of runner configuration. The fixture needs a group owner, case registration, exact resource tracking, and `finally` cleanup. That cost needs review alongside the saved container lifecycles.
+An arbitrary JavaScript callback can continue running after the fixture stops waiting for it. Shutdown blocks later fixture resource acquisition and reopening of retained fixture clients, then closes existing clients and removes the container. The fixture cannot cancel unrelated work started by a callback.
+
+The experiment has 338 lines of fixture code, 48 lines of shared operations, 71 lines of isolation demonstrations, 99 lines of shutdown demonstrations, 104 lines of measurement code, and 15 lines of runner configuration. The fixture needs a group owner, case registration, exact resource tracking, cancellation guards, and `finally` cleanup. That cost needs review alongside the saved container lifecycles.
 
 Keep the draft opt-in for lifecycle and API review. The measurements support further evaluation of reuse for these five cases. Adoption requires a separate decision. Local savings do not establish a shorter PR wait time or show that the whole hosted container-test phase can be removed. The issue's hosted sample measured a 125.1-second container phase inside a 154-second job, already shorter than the 480-second main job; the whole phase is not removable lifecycle overhead.

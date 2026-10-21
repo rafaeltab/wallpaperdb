@@ -1,26 +1,18 @@
 {
-  "initialValidation": [
+  "validation": [
     {
-      "label": "prototype",
+      "event": "completed",
+      "label": "prototype-final",
       "command": [
         "make",
         "prototype-redis"
       ],
       "status": 0,
-      "elapsedSeconds": 34.51212459098315
+      "elapsedSeconds": 37.88053247099742
     },
     {
-      "label": "independent-hashes",
-      "command": [
-        "make",
-        "prototype-redis",
-        "ARGS=-t \"independent hashes\""
-      ],
-      "status": 0,
-      "elapsedSeconds": 4.326596288010478
-    },
-    {
-      "label": "original-redis",
+      "event": "completed",
+      "label": "original-redis-final",
       "command": [
         "make",
         "test-focused",
@@ -28,42 +20,37 @@
         "ARGS=tests/redis.test.ts"
       ],
       "status": 0,
-      "elapsedSeconds": 6.84848496702034
+      "elapsedSeconds": 7.5356145199912135
     },
     {
-      "label": "make-ci",
+      "event": "completed",
+      "label": "final-ci",
       "command": [
         "make",
         "ci"
       ],
       "status": 0,
-      "elapsedSeconds": 318.7481334939948
+      "elapsedSeconds": 253.94858492698404
     }
   ],
-  "postRebaseCi": {
+  "localCi": {
     "command": [
       "make",
       "ci"
     ],
     "status": 0,
-    "reportedSeconds": 249,
+    "reportedSeconds": 253,
     "successfulTasks": 96,
-    "head": "d2790ee1ae45813b4dadde453e35875d8bd76a10",
-    "base": "9d1dec6b85084bf14c3249c900aaf8bb3e4f3e52"
+    "head": "3b117d1deb18a8b50534c21228ca7bd977db136d"
   },
   "sourceIdentity": {
-    "sourceSha256": "2a541481c044c6dace2ff3f915be60c1fae9871efedcad2c1c519d1e03be40d8",
-    "verifiedCommit": "d2790ee1ae45813b4dadde453e35875d8bd76a10",
-    "originalCodeCommit": "1ad72ccb7c440a55a7c605f3128edf9caf156cc6",
-    "runnableTreeUnchangedAfterRestack": true,
-    "reusedSamplesAfterDocumentationOnlyRebase": true
+    "sourceSha256": "570ad27a1bd1595bf84254f768966a94004c7867b5115b5ad1d29244d2cfbe36",
+    "verifiedCommit": "3b117d1deb18a8b50534c21228ca7bd977db136d",
+    "remeasuredAfterTeardownFixes": true,
+    "baselineAndPilotUseSameSource": true
   },
   "prototypeTestResult": {
-    "passed": 9,
-    "failed": 0
-  },
-  "selectedHashesResult": {
-    "passed": 1,
+    "passed": 14,
     "failed": 0
   },
   "originalRedisResult": {
@@ -71,13 +58,38 @@
     "skipped": 2,
     "failed": 0
   },
-  "unchangedPaths": [
-    ".github",
-    "turbo.json",
-    "packages/test-utils/tests",
-    "packages/test-utils/src",
-    "packages/test-utils/vitest.config.ts",
-    "packages/test-utils/package.json"
-  ],
-  "browserEvidence": "No browser UI. CLI and Redis/Docker assertions validate the fixture."
+  "shutdownRegressions": {
+    "stuckCaseBefore": {
+      "commit": "3df121986e6c68942f77555a9cea3ed38431e6d5",
+      "failed": 1
+    },
+    "pausedRedisBefore": {
+      "commit": "e261edb90337a4c248fa014b8f52a904c4fbb3dd",
+      "failed": 4
+    },
+    "after": {
+      "commit": "3b117d1deb18a8b50534c21228ca7bd977db136d",
+      "passed": 13,
+      "failed": 0
+    }
+  },
+  "unchangedSincePublishedPrototype": {
+    "commit": "3df121986e6c68942f77555a9cea3ed38431e6d5",
+    "paths": [
+      ".github",
+      "turbo.json",
+      "Makefile",
+      "packages/test-utils/tests",
+      "packages/test-utils/src",
+      "packages/test-utils/vitest.config.ts",
+      "packages/test-utils/package.json"
+    ]
+  },
+  "measurement": {
+    "samples": 10,
+    "failed": 0,
+    "serial": true,
+    "pairs": 5
+  },
+  "scope": "Opt-in throwaway fixture only; no default test or CI adoption. Local lifecycle savings do not establish hosted CI savings."
 }

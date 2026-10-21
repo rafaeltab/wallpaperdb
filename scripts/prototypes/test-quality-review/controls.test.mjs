@@ -1,6 +1,87 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { validateReview, summarize } from "./protocol.mjs";
+
+test("offline corpus controls execute green and the live runner requires explicit opt-in", () => {
+	const cli = fileURLToPath(new URL("./cli.mjs", import.meta.url));
+	const offline = spawnSync(process.execPath, [cli, "controls"], {
+		encoding: "utf8",
+		timeout: 30000,
+	});
+	assert.equal(offline.status, 0, offline.stderr + offline.stdout);
+	assert.match(offline.stdout, /seed suites passed/);
+	const denied = spawnSync(process.execPath, [cli, "run"], {
+		encoding: "utf8",
+		timeout: 5000,
+	});
+	assert.notEqual(denied.status, 0);
+	assert.match(denied.stderr, /--live/);
+});
+
+test("live runner records usage and rejects bad model citations through its public CLI", () => {
+	const dir = mkdtempSync(join(tmpdir(), "review-control-"));
+	try {
+		const fake = join(dir, "fake-codex");
+		writeFileSync(
+			fake,
+			`#!/usr/bin/env node\nconst fs=require('node:fs'); const a=process.argv.slice(2); if(a.includes('--version')){console.log('fixture 1');process.exit(0);} fs.writeFileSync(a[a.indexOf('-o')+1],process.env.FIXTURE_REVIEW); console.log(JSON.stringify({type:'turn.completed',usage:{input_tokens:10,cached_input_tokens:0,output_tokens:2}}));`,
+			{ mode: 0o700 },
+		);
+		const cli = fileURLToPath(new URL("./cli.mjs", import.meta.url));
+		const bundle = join(dir, "packet.json");
+		writeFileSync(bundle, JSON.stringify(packet));
+		for (const [name, reply, success] of [
+			["valid", { findings: [finding] }, true],
+			[
+				"invalid",
+				{
+					findings: [
+						{ ...finding, test: { ...finding.test, quote: "invented" } },
+					],
+				},
+				false,
+			],
+		]) {
+			const output = join(dir, name);
+			const r = spawnSync(
+				process.execPath,
+				[
+					cli,
+					"run",
+					"--live",
+					"--packet",
+					bundle,
+					"--out",
+					output,
+					"--repeats",
+					"1",
+				],
+				{
+					encoding: "utf8",
+					timeout: 10000,
+					env: {
+						...process.env,
+						REVIEW_CODEX_BIN: fake,
+						FIXTURE_REVIEW: JSON.stringify(reply),
+					},
+				},
+			);
+			assert.equal(r.status === 0, success, r.stderr);
+			const saved = JSON.parse(
+				readFileSync(join(output, "run-1.json"), "utf8"),
+			);
+			assert.equal(saved.valid, success);
+			assert.equal(saved.usage.input_tokens, 10);
+		}
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
 
 const packet = {
 	cases: [

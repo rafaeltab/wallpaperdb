@@ -62,7 +62,9 @@ export function validateReview(review, packet) {
 				throw new Error(`Missing ${key}`);
 		for (const key of ["test", "support"]) {
 			const cite = f[key];
-			const file = c.files.find((item) => item.path === cite?.path);
+			const file = [...c.files, ...(packet.standards ?? [])].find(
+				(item) => item.path === cite?.path,
+			);
 			if (
 				!file ||
 				!Number.isInteger(cite.line) ||
@@ -72,7 +74,9 @@ export function validateReview(review, packet) {
 				!file.text.split("\n")[cite.line - 1]?.includes(cite.quote) ||
 				(key === "test" && !["test", "helper"].includes(file.role)) ||
 				(key === "support" &&
-					!["requirement", "production", "standard"].includes(file.role))
+					!["requirement", "production", "standard", "helper"].includes(
+						file.role,
+					))
 			)
 				throw new Error(`Unsupported ${key} citation`);
 		}

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Docker from 'dockerode';
 import { createClient, type RedisClientType } from 'redis';
+import { getContainerRuntimeClient } from 'testcontainers';
 import { createDefaultTesterBuilder, DockerTesterBuilder, RedisTesterBuilder } from '../src/index';
 
 export const image = 'redis:7-alpine';
@@ -94,11 +95,29 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
     metrics.startupReadinessMs += performance.now() - startup;
   }
   const id = tester.redis.config.container.getId();
+  const lifecycleDocker = (await getContainerRuntimeClient()).container.dockerode;
   const clients: RedisClientType[] = [];
   const keys = new Set<string>();
   const channels = new Set<string>();
   const pending = new Set<Promise<void>>();
   let closing = false;
+
+  async function dockerRequest<T>(
+    action: string,
+    deadline: number,
+    operation: (signal: AbortSignal) => Promise<T>
+  ) {
+    const cancellation = new AbortController();
+    const timer = setTimeout(() => cancellation.abort(), remaining(deadline));
+    try {
+      return await operation(cancellation.signal);
+    } catch (error) {
+      const outcome = cancellation.signal.aborted ? 'timed out' : 'failed';
+      throw new Error(`Docker ${action} ${outcome} for owned container ${id}`, { cause: error });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   async function connect(name: string, owned: RedisClientType[], assertOpen: () => void) {
     assertOpen();
@@ -241,6 +260,8 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
     async close() {
       closing = true;
       const deadline = performance.now() + shutdownTimeoutMs;
+      // One aggregate bound, with Docker time reserved after the Redis window.
+      const dockerDeadline = deadline + 5000;
       const verification = performance.now();
       let observer: RedisClientType | undefined;
       const errors: unknown[] = [];
@@ -323,19 +344,34 @@ export async function createGroup(metrics = timing(), shutdownTimeoutMs = 3000) 
       metrics.verificationMs += performance.now() - verification;
       const start = performance.now();
       metrics.stopAttempts++;
+      const container = lifecycleDocker.getContainer(id);
       try {
-        await tester.destroy();
+        // This prototype owns only Redis. Abort the actual HTTP request, not just its wait.
+        await dockerRequest('stop', dockerDeadline - 2500, (signal) =>
+          container.stop({ t: 0, abortSignal: signal })
+        );
         metrics.stops++;
       } catch (error) {
         errors.push(error);
-      } finally {
-        metrics.containerCleanupMs += performance.now() - start;
       }
+      try {
+        // Reserve the final 500 ms for verification, even when stopping fails.
+        await dockerRequest('remove', dockerDeadline - 500, (signal) => {
+          const options = { force: true, v: true, abortSignal: signal };
+          return container.remove(options);
+        });
+      } catch (error) {
+        errors.push(error);
+      }
+      metrics.containerCleanupMs += performance.now() - start;
       const removalCheck = performance.now();
       try {
+        const containers = await dockerRequest('list', dockerDeadline, (signal) =>
+          lifecycleDocker.listContainers({ all: true, abortSignal: signal })
+        );
         assert.ok(
-          !(await docker.listContainers({ all: true })).some((container) => container.Id === id),
-          'owned container still exists'
+          !containers.some((container) => container.Id === id),
+          `owned container ${id} still exists`
         );
         metrics.containersRemoved++;
       } catch (error) {

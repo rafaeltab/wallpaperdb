@@ -1344,6 +1344,12 @@ importers:
       '@types/node':
         specifier: ^26.0.1
         version: 26.0.1
+      '@wallpaperdb/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
+      effect:
+        specifier: 4.0.0-rc.115
+        version: 4.0.0-rc.115
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

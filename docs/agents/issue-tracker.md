@@ -45,6 +45,14 @@ Implementation starts with `In Progress`, including explicitly requested work on
 
 Update only the selected issue's item. Creating child tickets does not authorize changing their parent's status. Track each stack ticket when its own implementation starts and reaches review; leave unstarted siblings at their existing status. Close the parent only after all tickets have landed and the complete spec is validated.
 
+### Selecting issues for PR fixes
+
+Use the issue explicitly selected by the user when provided. For a PR-only request, read the authenticated PR's `closingIssuesReferences` and body with [gh pr view](https://cli.github.com/manual/gh_pr_view). Closing references identify linked tickets; body references also supply candidates for stack PRs targeting another branch. Read candidate issues with [gh issue view](https://cli.github.com/manual/gh_issue_view), verify their repository and full URL, and match their acceptance criteria to the PR diff and requested fixes.
+
+Select the issue that owns the fixes before substantive edits or project-status writes. If several tickets remain plausible or the references conflict, ask the user to select the issue while continuing independent feedback investigation. A PR without an associated repository issue has no issue status to update.
+
+Record the selected issue's full URL in the review or babysitting ledger and use that same selection for `In Progress` and the later `In Review` transition. On resume, revalidate the selection against current PR links and issue state; a changed or ambiguous association needs resolution before dependent work continues. Apply the open-state and reopening gate above to the selected issue.
+
 ### CLI and verification
 
 Use the named-field syntax in [gh project item-edit](https://cli.github.com/manual/gh_project_item-edit). It is supported by the installed CLI. Set `ISSUE_URL` to the selected issue's verified URL before these commands:

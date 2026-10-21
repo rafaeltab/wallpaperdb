@@ -4,7 +4,7 @@ Use the connected GitHub tools when they expose the required operation, or `gh a
 
 ## Discover all selected feedback
 
-`gh pr view <pr> --json number,url,headRefName,headRefOid,headRepository,headRepositoryOwner,baseRefName,isCrossRepository` identifies the target and its actual head repository. A fork PR's branch must be fetched and pushed through its head repository.
+`gh pr view <pr> --json number,url,body,closingIssuesReferences,headRefName,headRefOid,headRepository,headRepositoryOwner,baseRefName,isCrossRepository` identifies the target, its actual head repository, and issue-selection candidates. Select the owning issue through the [shared policy](../../../../docs/agents/issue-tracker.md#selecting-issues-for-pr-fixes) before lifecycle writes. A fork PR's branch must be fetched and pushed through its head repository.
 
 Use the PR's `reviewThreads` GraphQL connection for thread IDs, `isResolved`, `isOutdated`, `viewerCanResolve`, and each thread's `comments` connection. Retain comment `id`, `url`, `body`, author, and timestamps. Fetch every page of both connections. Advancing the outer thread cursor does not paginate the comments inside each thread. Query review summaries and PR conversation comments as well, using GraphQL connections or these REST lists:
 

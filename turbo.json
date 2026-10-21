@@ -2,7 +2,6 @@
     "$schema": "https://turbo.build/schema.json",
     "globalPassThroughEnv": [
         "GITHUB_ACTIONS",
-        "CI_RUNTIME_PROFILE",
         "COMPOSE_PROJECT_NAME"
     ],
     "globalDependencies": [
@@ -91,11 +90,6 @@
         },
         "test": {
             "cache": true,
-            "env": ["CI_RUNTIME_PROFILE"],
-            "outputs": [
-                "test-results/ci-runtime-all-*.jsonl",
-                "test-results/ci-runtime-vitest-all.json"
-            ],
             "inputs": [
                 "src/**",
                 "test/**",
@@ -109,14 +103,11 @@
         },
         "test:unit": {
             "cache": true,
-            "env": ["CI_RUNTIME_PROFILE"],
             "inputs": [
                 "$TURBO_DEFAULT$"
             ],
             "outputs": [
-                "coverage/unit/**",
-                "test-results/ci-runtime-unit-*.jsonl",
-                "test-results/ci-runtime-vitest-unit.json"
+                "coverage/unit/**"
             ],
             "dependsOn": [
                 "^build"
@@ -124,14 +115,11 @@
         },
         "test:integration": {
             "cache": true,
-            "env": ["CI_RUNTIME_PROFILE"],
             "inputs": [
                 "$TURBO_DEFAULT$"
             ],
             "outputs": [
-                "coverage/integration/**",
-                "test-results/ci-runtime-integration-*.jsonl",
-                "test-results/ci-runtime-vitest.json"
+                "coverage/integration/**"
             ],
             "dependsOn": [
                 "^build"

@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
 	closeSync,
@@ -178,6 +178,48 @@ function lock(fd) {
 	);
 }
 
+async function waitForLock(fd, timeoutMs, signal, reportProgress) {
+	return await new Promise((resolve, reject) => {
+		const child = spawn(
+			"flock",
+			["-E", "75", "-w", String(timeoutMs / 1000), "3"],
+			{
+				stdio: ["ignore", "ignore", "pipe", fd],
+				signal,
+			},
+		);
+		let stderr = "";
+		let progressFailure;
+		const ticker = setInterval(() => {
+			try {
+				reportProgress();
+			} catch (error) {
+				progressFailure = error;
+				child.kill("SIGTERM");
+			}
+		}, 5000);
+		child.stderr.on("data", (data) => {
+			stderr = (stderr + data).slice(0, 4096);
+		});
+		child.once("error", (error) => {
+			clearInterval(ticker);
+			reject(error);
+		});
+		child.once("close", (status, termination) => {
+			clearInterval(ticker);
+			if (progressFailure) reject(progressFailure);
+			else if (status === 0) resolve(true);
+			else if (status === 75) resolve(false);
+			else
+				reject(
+					new Error(
+						`Docker host lock failed: ${stderr || termination || status}`,
+					),
+				);
+		});
+	});
+}
+
 export async function acquireDockerLease({
 	file = defaultDockerLock,
 	timeoutSeconds = "900",
@@ -248,6 +290,13 @@ export async function acquireDockerLease({
 			`Waiting for Docker host lock ${file} (deadline ${timeoutSeconds}s)...`,
 		);
 		let lastReport = 0;
+		function reportBusy(queue = entries(directory, true)) {
+			const owner = queue.find((entry) => entry.state === "running");
+			report(
+				`Docker host lock busy; owner: ${owner ? `${owner.label} (${owner.workspace}, pid ${owner.pid})` : "unregistered flock user"}; ${queue.filter((entry) => entry.state === "waiting").length} waiting; ${Math.ceil(Math.max(0, deadline - Date.now()) / 1000)}s remaining.`,
+			);
+			lastReport = Date.now();
+		}
 		while (true) {
 			signal?.throwIfAborted();
 			const remaining = deadline - Date.now();
@@ -257,7 +306,18 @@ export async function acquireDockerLease({
 					{ status: 75 },
 				);
 			const queue = entries(directory, true);
-			if (queue[0]?.name === name && lock(fd)) {
+			if (queue[0]?.name === name) {
+				let acquired = lock(fd);
+				if (!acquired) {
+					reportBusy(queue);
+					acquired = await waitForLock(fd, remaining, signal, reportBusy);
+				}
+				signal?.throwIfAborted();
+				if (!acquired)
+					throw Object.assign(
+						new Error("Docker host lock timed out before execution."),
+						{ status: 75 },
+					);
 				verifyLock(file, fd);
 				record.state = "running";
 				record.startedAt = new Date().toISOString();
@@ -269,11 +329,7 @@ export async function acquireDockerLease({
 				return { descriptor: fd, file, waitedMs, release };
 			}
 			if (Date.now() - lastReport >= 5000) {
-				const owner = queue.find((entry) => entry.state === "running");
-				report(
-					`Docker host lock busy; owner: ${owner ? `${owner.label} (${owner.workspace}, pid ${owner.pid})` : "unregistered flock user"}; ${queue.filter((entry) => entry.state === "waiting").length} waiting; ${Math.ceil(remaining / 1000)}s remaining.`,
-				);
-				lastReport = Date.now();
+				reportBusy(queue);
 			}
 			await delay(Math.min(100, remaining), undefined, { signal });
 		}

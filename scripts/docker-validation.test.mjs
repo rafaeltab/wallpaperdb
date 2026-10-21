@@ -100,6 +100,25 @@ async function until(check, details = () => "") {
 	}
 }
 
+function blockedOnFlock(pid) {
+	return new RegExp(`->\\s+FLOCK\\s+ADVISORY\\s+WRITE\\s+${pid}\\s`).test(
+		readFileSync("/proc/locks", "utf8"),
+	);
+}
+
+function hasBlockedFlockChild(pid) {
+	try {
+		return readFileSync(`/proc/${pid}/task/${pid}/children`, "utf8")
+			.trim()
+			.split(/\s+/)
+			.filter(Boolean)
+			.some(blockedOnFlock);
+	} catch (error) {
+		if (error.code === "ENOENT") return false;
+		throw error;
+	}
+}
+
 test("Docker validation exposes the owner and executes waiting work in admission order", async (t) => {
 	const f = fixture(t);
 	const owner = f.start(
@@ -200,6 +219,7 @@ test("a later blocking flock user cannot repeatedly overtake the queue head", as
 		"require('node:fs').appendFileSync('order', 'queued\\n')",
 	);
 	await until(() => f.status().includes("waiting: queued"));
+	await until(() => hasBlockedFlockChild(queued.pid), queued.output);
 	const legacy = spawn(
 		"flock",
 		[
@@ -213,11 +233,7 @@ test("a later blocking flock user cannot repeatedly overtake the queue head", as
 	);
 	t.after(() => legacy.kill("SIGTERM"));
 	const legacyDone = new Promise((resolve) => legacy.once("close", resolve));
-	await until(() =>
-		new RegExp(`->\\s+FLOCK\\s+ADVISORY\\s+WRITE\\s+${legacy.pid}\\s`).test(
-			readFileSync("/proc/locks", "utf8"),
-		),
-	);
+	await until(() => blockedOnFlock(legacy.pid));
 	owner.stdin.end();
 	const result = await queued.done;
 	assert.equal(result.status, 0, result.output);
@@ -249,6 +265,7 @@ test("a queue head waiting on a legacy lock cancels without waiting for its dead
 		{ DOCKER_VALIDATION_TIMEOUT: "60" },
 	);
 	await until(() => f.status().includes("waiting: cancelled"));
+	await until(() => hasBlockedFlockChild(queued.pid), queued.output);
 	let result;
 	queued.done.then((value) => {
 		result = value;

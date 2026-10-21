@@ -15,13 +15,16 @@ describe("measureTestPhase", { concurrency: false }, () => {
 	let directory;
 	let previousDirectory;
 	let previousProfiling;
+	let previousLifecycle;
 
 	beforeEach(() => {
 		previousDirectory = process.cwd();
 		previousProfiling = process.env.CI_RUNTIME_PROFILE;
+		previousLifecycle = process.env.npm_lifecycle_event;
 		directory = mkdtempSync(join(tmpdir(), "wallpaperdb-runtime-profile-"));
 		process.chdir(directory);
 		delete process.env.CI_RUNTIME_PROFILE;
+		delete process.env.npm_lifecycle_event;
 	});
 
 	afterEach(() => {
@@ -29,6 +32,8 @@ describe("measureTestPhase", { concurrency: false }, () => {
 		process.chdir(previousDirectory);
 		if (previousProfiling === undefined) delete process.env.CI_RUNTIME_PROFILE;
 		else process.env.CI_RUNTIME_PROFILE = previousProfiling;
+		if (previousLifecycle === undefined) delete process.env.npm_lifecycle_event;
+		else process.env.npm_lifecycle_event = previousLifecycle;
 		rmSync(directory, { recursive: true, force: true });
 	});
 
@@ -66,7 +71,7 @@ describe("measureTestPhase", { concurrency: false }, () => {
 		);
 
 		const records = readFileSync(
-			join(directory, "test-results", `ci-runtime-${process.pid}.jsonl`),
+			join(directory, "test-results", `ci-runtime-all-${process.pid}.jsonl`),
 			"utf8",
 		)
 			.trim()
@@ -85,6 +90,21 @@ describe("measureTestPhase", { concurrency: false }, () => {
 			assert.ok(record.durationMs >= 0);
 		}
 	});
+
+	for (const [event, phase] of [
+		["test:unit", "unit"],
+		["test:integration", "integration"],
+		[undefined, "all"],
+	]) {
+		it(`owns ${phase} evidence separately for lifecycle ${event}`, async () => {
+			process.env.CI_RUNTIME_PROFILE = "true";
+			if (event !== undefined) process.env.npm_lifecycle_event = event;
+			await measureTestPhase("fixture.phase", async () => "retained");
+			assert.deepEqual(readdirSync(join(directory, "test-results")), [
+				`ci-runtime-${phase}-${process.pid}.jsonl`,
+			]);
+		});
+	}
 
 	it("preserves results and errors when the profile output cannot be created", async () => {
 		const warning = mock.method(console, "warn", () => {});

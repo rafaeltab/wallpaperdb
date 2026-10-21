@@ -16,6 +16,12 @@ export async function measureTestPhase<T>(
 	operation: () => Promise<T>,
 ): Promise<T> {
 	if (process.env.CI_RUNTIME_PROFILE !== "true") return operation();
+	const selection =
+		process.env.npm_lifecycle_event === "test:unit"
+			? "unit"
+			: process.env.npm_lifecycle_event === "test:integration"
+				? "integration"
+				: "all";
 	const startedAt = new Date().toISOString();
 	const started = performance.now();
 	let status: "passed" | "failed" = "passed";
@@ -30,7 +36,7 @@ export async function measureTestPhase<T>(
 			const directory = join(process.cwd(), "test-results");
 			mkdirSync(directory, { recursive: true });
 			appendFileSync(
-				join(directory, `ci-runtime-${process.pid}.jsonl`),
+				join(directory, `ci-runtime-${selection}-${process.pid}.jsonl`),
 				`${JSON.stringify({
 					phase,
 					startedAt,

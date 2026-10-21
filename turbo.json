@@ -91,6 +91,11 @@
         },
         "test": {
             "cache": true,
+            "env": ["CI_RUNTIME_PROFILE"],
+            "outputs": [
+                "test-results/ci-runtime-all-*.jsonl",
+                "test-results/ci-runtime-vitest-all.json"
+            ],
             "inputs": [
                 "src/**",
                 "test/**",
@@ -104,11 +109,14 @@
         },
         "test:unit": {
             "cache": true,
+            "env": ["CI_RUNTIME_PROFILE"],
             "inputs": [
                 "$TURBO_DEFAULT$"
             ],
             "outputs": [
-                "coverage/unit/**"
+                "coverage/unit/**",
+                "test-results/ci-runtime-unit-*.jsonl",
+                "test-results/ci-runtime-vitest-unit.json"
             ],
             "dependsOn": [
                 "^build"
@@ -116,11 +124,14 @@
         },
         "test:integration": {
             "cache": true,
+            "env": ["CI_RUNTIME_PROFILE"],
             "inputs": [
                 "$TURBO_DEFAULT$"
             ],
             "outputs": [
-                "coverage/integration/**"
+                "coverage/integration/**",
+                "test-results/ci-runtime-integration-*.jsonl",
+                "test-results/ci-runtime-vitest.json"
             ],
             "dependsOn": [
                 "^build"

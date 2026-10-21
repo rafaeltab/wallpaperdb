@@ -1012,10 +1012,13 @@ test("hosted browser and container selections enforce failures using their exter
 		"utf8",
 	);
 	assert.match(workflow, /pull_request:/);
-	assert.match(workflow, /run: make test-e2e PACKAGE=web-e2e/);
 	assert.match(
 		workflow,
-		/run: make test-e2e TURBO_FLAGS='--filter=!@wallpaperdb\/web-e2e'/,
+		/run: node scripts\/ci-runtime\.mjs browser-e2e -- make test-e2e PACKAGE=web-e2e/,
+	);
+	assert.match(
+		workflow,
+		/run: node scripts\/ci-runtime\.mjs container-e2e -- make test-e2e TURBO_FLAGS='--filter=!@wallpaperdb\/web-e2e'/,
 	);
 	assert.doesNotMatch(workflow, /continue-on-error/);
 });

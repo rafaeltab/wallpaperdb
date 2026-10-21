@@ -3,7 +3,7 @@ name: grilling
 description: Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases.
 ---
 
-For planning tied to an existing GitHub issue, follow [issue claiming](../../../docs/agents/issue-tracker.md#claiming-an-issue) and the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) to verify `Planning` when the interview starts. After the user confirms the shared understanding and the agreed plan is recorded in the issue, verify `Planned`. An unfinished interview stays in `Planning`; a conversation without an issue has no status to update.
+For planning tied to an existing GitHub issue, follow [issue claiming](../../../docs/agents/issue-tracker.md#claiming-an-issue) and the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle), including its reopening gate, to verify `OPEN` before setting `Planning` when the interview starts. After the user confirms the shared understanding and the agreed plan is recorded in the issue, verify `Planned`. An unfinished interview stays in `Planning`; a conversation without an issue has no status to update.
 
 Interview the user relentlessly until you reach a shared understanding. Map this as a **design tree**: every decision branches into the decisions that hang off it.
 

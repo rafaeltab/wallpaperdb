@@ -24,7 +24,11 @@
         "$TURBO_ROOT$/packages/*/src/**"
       ]
     },
+    "test": {
+      "env": ["GITHUB_ACTIONS"]
+    },
     "test:integration": {
+      "env": ["GITHUB_ACTIONS"],
       "inputs": ["src/**", "test/**", "vitest.config.ts", "package.json", "drizzle/**"]
     }
   }

@@ -50,6 +50,23 @@ test("Vitest async assertions and poll require handling through imported and loc
 	);
 });
 
+test("awaited conditional branches handle assertions", () => {
+	assert.deepEqual(
+		lint(
+			"import { expect } from 'vitest'; const flag = true; await (flag ? expect(Promise.resolve(1)).resolves.toBe(1) : expect(Promise.resolve(2)).resolves.toBe(2));",
+		),
+		[],
+	);
+});
+
+test("nested Promise.all arrays do not handle assertions", () => {
+	assert.ok(
+		lint(
+			"import { expect } from 'vitest'; await Promise.all([[expect(Promise.resolve(1)).resolves.toBe(1)]]);",
+		).some((d) => d.message.includes("async assertion")),
+	);
+});
+
 test("an unhandled then or finally does not handle async assertions", () => {
 	for (const suffix of [
 		".then(() => {})",

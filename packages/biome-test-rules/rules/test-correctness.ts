@@ -299,6 +299,30 @@ function handled(
 	const parent = node.parent;
 	if (!parent) return false;
 	switch (parent.kind) {
+		case "JS_CONDITIONAL_EXPRESSION":
+			return (
+				parent.test?.text !== node.text &&
+				handled(parent, model, seen, allowVoid)
+			);
+		case "JS_ASSIGNMENT_EXPRESSION": {
+			if (
+				parent.left?.kind !== "JS_IDENTIFIER_ASSIGNMENT" ||
+				parent.operatorToken !== "="
+			)
+				return false;
+			const binding = model.binding(parent.left);
+			if (!binding) return false;
+			const key = `${binding.syntax().text}:${binding.scope().syntax().text}`;
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return binding.allReads().some((reference) => {
+				const expression = reference.syntax().parent;
+				return (
+					expression?.kind === "JS_IDENTIFIER_EXPRESSION" &&
+					handled(expression, model, seen, allowVoid)
+				);
+			});
+		}
 		case "JS_UNARY_EXPRESSION":
 			return allowVoid && parent.operatorToken === "void";
 		case "JS_AWAIT_EXPRESSION":
@@ -343,6 +367,7 @@ function handled(
 		case "JS_CALL_ARGUMENT_LIST":
 		case "JS_CALL_ARGUMENTS": {
 			let call: AnyJsAstNode | undefined = parent;
+			let arrays = 0;
 			while (
 				call &&
 				[
@@ -351,9 +376,32 @@ function handled(
 					"JS_CALL_ARGUMENT_LIST",
 					"JS_CALL_ARGUMENTS",
 				].includes(call.kind)
-			)
+			) {
+				if (call.kind === "JS_ARRAY_EXPRESSION") arrays++;
 				call = call.parent;
+			}
+			if (
+				arrays === 0 &&
+				call?.kind === "JS_CALL_EXPRESSION" &&
+				resolveApi(call.callee, model)?.name === "expect"
+			) {
+				let result: AnyJsAstNode = call;
+				while (
+					result.parent?.kind === "JS_STATIC_MEMBER_EXPRESSION" ||
+					result.parent?.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
+				) {
+					result = result.parent;
+					if (result.parent?.kind === "JS_CALL_EXPRESSION")
+						result = result.parent;
+				}
+				if (result.kind === "JS_CALL_EXPRESSION") {
+					const api = resolveApi(result.callee, model);
+					if (api?.members.some((m) => ["resolves", "rejects"].includes(m)))
+						return handled(result, model, seen, allowVoid);
+				}
+			}
 			return (
+				arrays === 1 &&
 				call?.kind === "JS_CALL_EXPRESSION" &&
 				/^Promise\.(all|allSettled|race|any)$/.test(call.callee?.text ?? "") &&
 				handled(call, model, seen, allowVoid)

@@ -35,8 +35,10 @@ export const sharpTransformerLayer = (limits: {
       const run = (
         body: AssetBody,
         options: ResizeOptions & { mimeType: string; inspect?: boolean }
-      ) =>
-        Effect.gen(function* () {
+      ) => {
+        const operation = options.inspect ? 'inspect_image' : 'resize';
+        const metricPrefix = options.inspect ? 'media.image_inspection' : 'media.resize';
+        return Effect.gen(function* () {
           if (workers.size >= (limits.maxConcurrent ?? 4)) {
             body.close();
             return yield* Effect.fail(
@@ -88,7 +90,7 @@ export const sharpTransformerLayer = (limits: {
                 body.close();
                 if (code === 0) output.end();
                 else {
-                  recordCounter('media.resize.pipeline.errors', 1, { error_type: 'Error' });
+                  recordCounter(`${metricPrefix}.pipeline.errors`, 1, { error_type: 'Error' });
                   output.destroy(new Error('Image encoding failed'));
                 }
                 const knownReasons = [
@@ -123,10 +125,16 @@ export const sharpTransformerLayer = (limits: {
               output.destroy(error);
               stop();
             });
-            recordHistogram('media.resize.setup_duration_ms', Date.now() - start, {
-              'resize.fit_mode': options.fit,
-              'image.format': options.mimeType.split('/')[1],
-            });
+            recordHistogram(
+              `${metricPrefix}.setup_duration_ms`,
+              Date.now() - start,
+              options.inspect
+                ? {}
+                : {
+                    'resize.fit_mode': options.fit,
+                    'image.format': options.mimeType.split('/')[1],
+                  }
+            );
             return { body: byteStream(output), closed, stop };
           });
           yield* Effect.promise(() => result.closed).pipe(
@@ -139,33 +147,40 @@ export const sharpTransformerLayer = (limits: {
             Effect.flatMap((exit) =>
               exit.code === 0
                 ? Effect.void
-                : Effect.fail(new DeliveryUnavailable({ operation: 'resize', cause: exit }))
+                : Effect.fail(new DeliveryUnavailable({ operation, cause: exit }))
             ),
-            Effect.withSpan('media.resize', {
-              attributes: {
-                'resize.width': options.width,
-                'resize.height': options.height,
-                'resize.fit_mode': options.fit,
-                'file.mime_type': options.mimeType,
-              },
+            Effect.withSpan(metricPrefix, {
+              attributes: options.inspect
+                ? {}
+                : {
+                    'resize.width': options.width,
+                    'resize.height': options.height,
+                    'resize.fit_mode': options.fit,
+                    'file.mime_type': options.mimeType,
+                  },
             }),
             Effect.catchTag('DeliveryUnavailable', (error) =>
-              Effect.logError('Media resize failed', {
-                operation: error.operation,
-                diagnostic: error.cause,
-              })
+              options.inspect
+                ? Effect.void
+                : Effect.logError('Media resize failed', {
+                    operation: error.operation,
+                    diagnostic: error.cause,
+                  })
             ),
             Effect.forkIn(scope)
           );
           return result;
         }).pipe(
           Effect.tapError((error) =>
-            Effect.logError('Media resize admission failed', {
-              operation: error.operation,
-              cause: error.cause,
-            })
+            options.inspect
+              ? Effect.void
+              : Effect.logError('Media resize admission failed', {
+                  operation: error.operation,
+                  cause: error.cause,
+                })
           )
         );
+      };
       return ImageTransformer.of({
         resize: (body, options) => run(body, options).pipe(Effect.map((result) => result.body)),
         inspect: (body) =>
@@ -192,6 +207,12 @@ export const sharpTransformerLayer = (limits: {
                         requiresOrientation: z.boolean(),
                       })
                       .parse(JSON.parse(Buffer.concat(chunks).toString()));
+                  } catch (cause) {
+                    // Inspection owns failure reporting. Retain the worker's bounded
+                    // diagnostic without also reporting it as a resize failure.
+                    result.stop();
+                    const worker = await result.closed;
+                    throw new Error('Image inspection failed', { cause: { cause, worker } });
                   } finally {
                     signal.removeEventListener('abort', abort);
                   }

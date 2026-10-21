@@ -14,6 +14,7 @@ import {
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { createInterface } from "node:readline";
+import { stripVTControlCharacters } from "node:util";
 
 const [phase, separator, command, ...args] = process.argv.slice(2);
 if (!phase || !/^[a-z0-9_-]+$/i.test(phase) || separator !== "--" || !command) {
@@ -27,18 +28,27 @@ const directory = "test-results/ci-runtime";
 mkdirSync(directory, { recursive: true });
 const output = join(directory, `${phase}-${Date.now()}-${process.pid}.jsonl`);
 const started = performance.now();
+let evidenceFailed = false;
 
 function record(type, data) {
-	appendFileSync(
-		output,
-		`${JSON.stringify({
-			type,
-			phase,
-			timestamp: new Date().toISOString(),
-			elapsedMs: performance.now() - started,
-			...data,
-		})}\n`,
-	);
+	if (evidenceFailed) return;
+	try {
+		appendFileSync(
+			output,
+			`${JSON.stringify({
+				type,
+				phase,
+				timestamp: new Date().toISOString(),
+				elapsedMs: performance.now() - started,
+				...data,
+			})}\n`,
+		);
+	} catch (error) {
+		evidenceFailed = true;
+		console.error(
+			`ci-runtime: evidence write failed (${error.code}); command result is preserved.`,
+		);
+	}
 }
 
 function sample() {
@@ -85,7 +95,7 @@ function observeDocker(kind, args) {
 		lines.on("line", (line) => {
 			let data = line;
 			try {
-				data = JSON.parse(line);
+				data = JSON.parse(stripVTControlCharacters(line));
 			} catch {
 				/* Diagnostics need not be JSON. */
 			}
@@ -152,9 +162,15 @@ record("finish", {
 	observerResourceUsage: process.resourceUsage(),
 });
 if (process.env.GITHUB_STEP_SUMMARY) {
-	appendFileSync(
-		process.env.GITHUB_STEP_SUMMARY,
-		`- ${phase}: ${(durationMs / 1000).toFixed(3)} s, exit ${exitCode}.\n`,
-	);
+	try {
+		appendFileSync(
+			process.env.GITHUB_STEP_SUMMARY,
+			`- ${phase}: ${(durationMs / 1000).toFixed(3)} s, exit ${exitCode}.\n`,
+		);
+	} catch (error) {
+		console.error(
+			`ci-runtime: summary write failed (${error.code}); command result is preserved.`,
+		);
+	}
 }
 process.exitCode = exitCode;

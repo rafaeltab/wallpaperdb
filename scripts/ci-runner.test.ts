@@ -1,5 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+	cpSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -10,6 +17,10 @@ function runCi(force: string, failingStage: string) {
 	const directory = mkdtempSync(join(tmpdir(), "wallpaperdb-ci-test-"));
 	try {
 		writeFileSync(join(directory, "Makefile"), makefile);
+		mkdirSync(join(directory, "scripts/lib"), { recursive: true });
+		for (const name of ["docker-validation.mjs", "lib/docker-queue.mjs"]) {
+			cpSync(new URL(name, import.meta.url), join(directory, "scripts", name));
+		}
 		writeFileSync(
 			join(directory, "turbo"),
 			`#!/bin/sh
@@ -48,6 +59,7 @@ test coverage != "$CI_TEST_FAILURE"
 					MAKEFLAGS: "",
 					MFLAGS: "",
 					CI_TEST_LOG: log,
+					DOCKER_VALIDATION_LOCK_FILE: join(directory, "host.lock"),
 					CI_TEST_FAILURE: failingStage,
 				},
 			},

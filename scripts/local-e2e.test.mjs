@@ -105,6 +105,11 @@ function fixture(t) {
 	const root = mkdtempSync(join(tmpdir(), "wallpaperdb-local-e2e-"));
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	mkdirSync(join(root, "scripts"));
+	mkdirSync(join(root, "scripts/lib"));
+	copyFileSync(
+		join(repository, "scripts/lib/docker-queue.mjs"),
+		join(root, "scripts/lib/docker-queue.mjs"),
+	);
 	copyFileSync(join(repository, "Makefile"), join(root, "Makefile"));
 	for (const file of ["local-e2e.sh", "local-e2e.mjs"]) {
 		try {

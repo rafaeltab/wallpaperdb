@@ -47,6 +47,15 @@ function plannedTask(target, workspace, taskName) {
 	return task;
 }
 
+test("Compose image plans and prebuilt startup are explicit opt-ins", () => {
+	assert.match(output("apps-build", "ARGS=--print"), / build --print\s*$/);
+	assert.match(
+		output("apps-start", "ARGS=--no-build"),
+		/ up -d --no-build\s*$/,
+	);
+	assert.match(output("apps-start"), / up -d --build\s*$/);
+});
+
 test("workspace actions support optional package scoping", () => {
 	assert.match(output("build"), /run build(?!.*--filter)/);
 	assert.match(

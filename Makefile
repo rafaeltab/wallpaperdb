@@ -159,13 +159,13 @@ infra-logs: ## Follow infrastructure logs
 	@$(INFRA_COMPOSE) --profile '*' logs -f
 
 apps-start: ## Build and start app containers (optional SERVICE)
-	@$(APPS_COMPOSE) up -d --build $(SERVICE)
+	@$(APPS_COMPOSE) up -d $(if $(strip $(ARGS)),$(ARGS),--build) $(SERVICE)
 
 apps-stop: ## Stop apps; tear down app stack when SERVICE is omitted
 	@$(APPS_COMPOSE) $(if $(SERVICE),stop $(SERVICE),down)
 
 apps-build: ## Build development app images (optional SERVICE)
-	@$(APPS_COMPOSE) build $(SERVICE)
+	@$(APPS_COMPOSE) build $(ARGS) $(SERVICE)
 
 apps-logs: ## Follow app logs (optional SERVICE)
 	@$(APPS_COMPOSE) logs -f $(SERVICE)

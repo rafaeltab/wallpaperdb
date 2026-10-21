@@ -1,0 +1,23 @@
+{
+	"name": "@wallpaperdb/biome-test-rules",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./config": "./test-correctness.json"
+	},
+	"scripts": {
+		"format": "biome format --write .",
+		"lint": "biome lint .",
+		"test:unit": "node --test test/*.test.mjs",
+		"check-types": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.2",
+		"@biomejs/runtime": "2.6.2",
+		"@types/node": "^26.0.1",
+		"typescript": "^5.7.2",
+		"vitest": "5.0.2",
+		"@playwright/test": "^1.55.1"
+	}
+}

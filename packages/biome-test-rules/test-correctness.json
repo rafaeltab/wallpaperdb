@@ -1,0 +1,9 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
+	"linter": {
+		"rules": {
+			"recommended": false
+		}
+	},
+	"plugins": ["./rules/test-correctness.ts"]
+}

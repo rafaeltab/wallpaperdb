@@ -34,7 +34,12 @@ function resolveApi(
 		case "JS_STATIC_MEMBER_EXPRESSION":
 		case "JS_COMPUTED_MEMBER_EXPRESSION": {
 			const api = resolveApi(node.object, model, seen);
-			const member = literal(node.member?.text);
+			const member =
+				node.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
+					? node.member?.kind === "JS_STRING_LITERAL_EXPRESSION"
+						? literal(node.member.text)
+						: undefined
+					: literal(node.member?.text);
 			if (!api || !member) return undefined;
 			return api.name === "*"
 				? { ...api, name: member }
@@ -107,7 +112,12 @@ export const validExpect = defineRule({
 				expression.kind === "JS_STATIC_MEMBER_EXPRESSION" ||
 				expression.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
 			) {
-				matcher = literal(expression.member?.text);
+				matcher =
+					expression.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
+						? expression.member?.kind === "JS_STRING_LITERAL_EXPRESSION"
+							? literal(expression.member.text)
+							: "<computed matcher>"
+						: literal(expression.member?.text);
 				expression = expression.parent;
 			} else break;
 		}
@@ -159,7 +169,9 @@ function hasRetry(
 				return (
 					literal(
 						name?.kind === "JS_COMPUTED_MEMBER_NAME"
-							? name.expression?.text
+							? name.expression?.kind === "JS_STRING_LITERAL_EXPRESSION"
+								? name.expression.text
+								: undefined
 							: name?.text,
 					) === "retry"
 				);

@@ -42,9 +42,6 @@ jobs:
           E2E_BASE_TEST_EMAIL: ${{ secrets.E2E_BASE_TEST_EMAIL }}
           E2E_BASE_TEST_PASSWORD: ${{ secrets.E2E_BASE_TEST_PASSWORD }}
 
-      - name: Install turbo
-        run: pnpm add -g turbo
-
       - name: Set up Vercel Remote Cache
         if: env.USE_VERCEL_CACHE == 'true'
         uses: vercel/setup-turborepo-remote-cache-action@v1.1.0

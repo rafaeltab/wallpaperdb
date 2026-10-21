@@ -1,0 +1,10 @@
+[
+	{
+		"code": "empty-run-permitted",
+		"target": "@wallpaperdb/web-e2e#test:e2e",
+		"owner": "@zero-two-rafaeltab",
+		"issue": "https://github.com/rafaeltab/wallpaperdb/issues/417",
+		"reason": "Temporary pilot baseline for the existing Playwright flag while removal is evaluated. This exception does not permit an empty expected suite or stale execution report.",
+		"expires": "2026-11-04"
+	}
+]

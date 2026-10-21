@@ -33,6 +33,17 @@ export function evaluate(
 			);
 		if (suite.role === "expected" && !suite.files.length)
 			add("empty-suite", suite.id, "Expected suite discovers no test files");
+		for (const project of suite.expectedProjects ?? []) {
+			if (
+				project.role === "expected" &&
+				!suite.files.some((key) => key.startsWith(`${project.name}::`))
+			)
+				add(
+					"empty-suite",
+					`${suite.id}/${project.name}`,
+					"Expected project discovers no test files",
+				);
+		}
 		for (const file of suite.files) {
 			if (!suite.ciFiles.includes(file))
 				add(
@@ -68,6 +79,7 @@ export function evaluate(
 	const allowed = [];
 	const valid = [];
 	const codes = new Set([
+		"empty-run-permitted",
 		"focused",
 		"disabled",
 		"undiscovered",

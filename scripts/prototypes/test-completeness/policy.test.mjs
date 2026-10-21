@@ -24,6 +24,20 @@ const baseline = () => ({
 const codes = (input, exceptions = []) =>
 	evaluate(input, exceptions, "2026-10-21").failures.map((f) => f.code);
 
+test("empty expected projects fail even when a sibling has tests; setup-only projects pass", () => {
+	const input = baseline();
+	input.suites[0].expectedProjects = [
+		{ name: "unit", role: "expected" },
+		{ name: "missing", role: "expected" },
+		{ name: "setup-only", role: "setup" },
+	];
+	const result = evaluate(input);
+	assert.deepEqual(
+		result.failures.map((f) => [f.code, f.target]),
+		[["empty-suite", "unit/missing"]],
+	);
+});
+
 test("valid tests, helpers, fixtures, JavaScript, setup-only suites and explicit selections pass", () => {
 	const input = baseline();
 	input.files.push(

@@ -65,6 +65,7 @@ function runComposeDown(projectName, composeFile, removeVolumes) {
 		"docker compose",
 		`-p "${projectName}"`,
 		`-f "${composeFile}"`,
+		"--profile '*'",
 		"down",
 		volumesFlag,
 		"--remove-orphans",

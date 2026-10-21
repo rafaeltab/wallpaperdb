@@ -49,7 +49,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 
 .PHONY: help install dev stop build test test-unit test-integration test-e2e test-focused \
         format lint lint-fix check-types check run \
-        infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
+        infra-start infra-start-admin infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
         coverage-summary crap check-crap \
         worktree-remove ci clean
@@ -122,7 +122,7 @@ run: ## Run a package.json script (requires PACKAGE and SCRIPT; optional ARGS)
 	@pnpm --filter @wallpaperdb/$(PACKAGE) run $(SCRIPT) $(ARGS)
 
 infra-start: ## Start infrastructure
-	@$(INFRA_COMPOSE) up -d
+	@$(INFRA_COMPOSE) $(INFRA_PROFILES) up -d
 	@echo ""
 	@echo "Infrastructure started. Project: $(COMPOSE_PROJECT_NAME)"
 	@echo ""
@@ -137,22 +137,26 @@ infra-start: ## Start infrastructure
 	@echo ""
 	@echo "Admin UIs available via Caddy ingress at http://localhost:$(INGRESS_PORT)"
 	@echo "  Grafana:             /grafana"
-	@echo "  pgAdmin:              /pgadmin"
-	@echo "  OpenSearch Dashboards: /opensearch-dashboards"
+	@echo "  pgAdmin and OpenSearch Dashboards: make infra-start-admin"
 	@echo "  NATS Monitoring:     /nats"
 
+infra-start-admin: ## Start infrastructure including pgAdmin and OpenSearch Dashboards
+	@$(MAKE) infra-start INFRA_PROFILES='--profile admin'
+	@echo "  pgAdmin:              /pgadmin"
+	@echo "  OpenSearch Dashboards: /opensearch-dashboards"
+
 infra-stop: ## Stop infrastructure
-	@$(INFRA_COMPOSE) down
+	@$(INFRA_COMPOSE) --profile '*' down
 
 infra-reset: ## Delete infrastructure data after confirmation
 	@echo "WARNING: This will delete all data for project $(COMPOSE_PROJECT_NAME)!"
 	@read -p "Are you sure? (yes/no): " REPLY && \
 		[ "$$REPLY" = "yes" ] || { echo "Reset cancelled."; exit 1; }
-	@$(INFRA_COMPOSE) down -v
+	@$(INFRA_COMPOSE) --profile '*' down -v
 	@echo "Infrastructure reset complete!"
 
 infra-logs: ## Follow infrastructure logs
-	@$(INFRA_COMPOSE) logs -f
+	@$(INFRA_COMPOSE) --profile '*' logs -f
 
 apps-start: ## Build and start app containers (optional SERVICE)
 	@$(APPS_COMPOSE) up -d --build $(SERVICE)

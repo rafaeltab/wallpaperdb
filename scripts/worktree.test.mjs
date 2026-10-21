@@ -248,6 +248,7 @@ function assertComposeDown(dockerLog, projectName, removeVolumes) {
 		);
 		assert.equal(args.includes("--volumes"), removeVolumes);
 		assert.ok(args.includes("--remove-orphans"));
+		assert.equal(args[args.indexOf("--profile") + 1], "*");
 	}
 }
 

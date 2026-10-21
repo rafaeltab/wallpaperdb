@@ -363,6 +363,7 @@ async function preflightBrowser() {
 		...process.env,
 		...worktree,
 		COMPOSE_PROJECT_NAME: project,
+		COMPOSE_PROFILES: "",
 	});
 	const portKeys = [
 		"INGRESS_PORT",

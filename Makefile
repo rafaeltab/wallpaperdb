@@ -122,7 +122,7 @@ run: ## Run a package.json script (requires PACKAGE and SCRIPT; optional ARGS)
 	@pnpm --filter @wallpaperdb/$(PACKAGE) run $(SCRIPT) $(ARGS)
 
 infra-start: ## Start infrastructure
-	@COMPOSE_PROFILES='' $(INFRA_COMPOSE) $(INFRA_PROFILES) up -d
+	@COMPOSE_PROFILES='' $(INFRA_COMPOSE) $(INFRA_PROFILES) up -d $(ARGS)
 	@echo ""
 	@echo "Infrastructure started. Project: $(COMPOSE_PROJECT_NAME)"
 	@echo ""

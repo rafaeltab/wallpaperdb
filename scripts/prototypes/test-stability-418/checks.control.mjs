@@ -39,6 +39,7 @@ test("scanner exposes its semantic and alias limitations", () => {
 });
 
 test("recovered retries fail while clean and unavailable diagnostics differ", () => {
+	assert.equal(retryFailure([{ result: { state: "skipped" } }]), false);
 	assert.equal(retryFailure([{ retryCount: 0 }]), false);
 	assert.equal(retryFailure([{ retryCount: 1 }]), true);
 	assert.throws(() => retryFailure([{}]), /Missing retry diagnostics/);

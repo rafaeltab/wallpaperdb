@@ -9,6 +9,15 @@
         "packages/test-logger/src/**"
     ],
     "tasks": {
+        "@wallpaperdb/scripts#prototype:stability": {
+            "cache": false,
+            "dependsOn": ["@wallpaperdb/vitest-config#build", "@wallpaperdb/profile-markdown#build"],
+            "outputs": []
+        },
+        "@wallpaperdb/scripts#prototype:stability:test": {
+            "cache": false,
+            "outputs": []
+        },
         "start": {
             "cache": false,
             "persistent": true

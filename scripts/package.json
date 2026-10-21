@@ -9,7 +9,7 @@
 	},
 	"scripts": {
 		"prototype:stability": "node prototypes/test-stability-418/run.mjs",
-		"prototype:stability:test": "node --test prototypes/test-stability-418/checks.test.mjs",
+		"prototype:stability:test": "node --test prototypes/test-stability-418/checks.control.mjs",
 		"prototype:stability:format": "biome format --write prototypes/test-stability-418",
 		"format": "biome format --write .",
 		"lint": "biome lint .",

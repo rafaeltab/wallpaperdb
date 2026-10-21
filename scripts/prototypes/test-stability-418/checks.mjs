@@ -48,6 +48,7 @@ export function scanDelays(source) {
 }
 
 export function retryFailure(results) {
+	results = results.filter((result) => result.result?.state !== "skipped");
 	if (results.some((result) => !Number.isInteger(result.retryCount))) {
 		throw new Error("Missing retry diagnostics");
 	}

@@ -229,3 +229,41 @@ test("killing a coordinator keeps the host locked until its surviving command ex
 	const result = await next.done;
 	assert.equal(result.status, 0, result.output);
 });
+
+for (const inherit of [true, false]) {
+	test(`interruption kills a surviving descendant after its parent exits, inherited lock=${inherit}`, async (t) => {
+		let pid;
+		t.after(() => {
+			if (pid) {
+				try {
+					process.kill(pid, "SIGKILL");
+				} catch {}
+			}
+		});
+		const f = fixture(t);
+		const grandchild =
+			"process.on('SIGTERM', () => {}); require('node:fs').writeFileSync('descendant', String(process.pid)); setInterval(() => {}, 1000)";
+		const owner = f.start(
+			"tree",
+			`require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}], { stdio: ['ignore','ignore','ignore'${inherit ? ",3" : ""}] }); process.on('SIGTERM', () => process.exit(0)); process.stdin.resume()`,
+		);
+		await until(() => existsSync(join(f.root, "descendant")));
+		pid = Number(readFileSync(join(f.root, "descendant"), "utf8"));
+		owner.kill("SIGTERM");
+		assert.equal((await owner.done).status, 143);
+		await until(() => {
+			try {
+				const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+				return stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z ");
+			} catch (error) {
+				if (error.code === "ENOENT") return true;
+				throw error;
+			}
+		});
+		assert.equal(
+			spawnSync("flock", ["-n", f.env.DOCKER_VALIDATION_LOCK_FILE, "true"])
+				.status,
+			0,
+		);
+	});
+}

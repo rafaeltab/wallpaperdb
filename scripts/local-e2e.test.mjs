@@ -244,6 +244,8 @@ if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && p
 		"FORCE",
 		"TURBO_FLAGS",
 		"COMPOSE_PROJECT_NAME",
+		"DOCKER_VALIDATION_LOCK_FILE",
+		"DOCKER_VALIDATION_TIMEOUT",
 	])
 		delete env[key];
 	const args = [

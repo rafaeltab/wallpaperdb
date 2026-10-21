@@ -20,7 +20,7 @@ export function prepare(destination) {
 		"docs/coding-standards/application-and-domain.md",
 		"docs/coding-standards/adapters.md",
 	].map((p) => file(p, "standard"));
-	const issues = [237, 174].map((number) =>
+	const issues = [237, 174, 338, 170, 122].map((number) =>
 		JSON.parse(
 			execFileSync(
 				"gh",
@@ -104,6 +104,31 @@ export function prepare(destination) {
 			"Review the source-analysis tooling tests. Public feature imports, pure core dependencies, and cycles are the intended externally observable outputs of this analyzer. Source text fixtures and diagnostics are its public inputs/outputs. Issue 237 is related feature-interface context, not its original specification.",
 		),
 	];
+	cases[0].files.push(requirement(issues[2]), requirement(issues[3]));
+	cases[0].scope +=
+		" Issues 338 and 170 supply the originating picture-selection and alias requirements. Other editor, backend and browser outcomes belong to their own suites.";
+	cases[1].files.push(requirement(issues[4]));
+	const productionCommit = git(
+		"log",
+		"-1",
+		"--format=%H",
+		base,
+		"--",
+		"apps/gateway/src/cursors/index.ts",
+	).trim();
+	cases[1].files.push(
+		textFile(
+			"production-change.diff",
+			"change",
+			git(
+				"show",
+				productionCommit,
+				"--format=fuller",
+				"--",
+				"apps/gateway/src/cursors/index.ts",
+			),
+		),
+	);
 	const production = `export function poll(status, writing) { return !writing && ['pending', 'retrying'].includes(status) ? 5000 : false; }
 export function mayWrite(loaded, previous, active) { return loaded && previous === active; }
 export function save(value, port) { if (!value.trim()) return {tag:'Invalid'}; port.write(value.trim()); return {tag:'Saved'}; }

@@ -120,7 +120,8 @@ export function summarize(runs, judgments, truth = []) {
 		actionable,
 		falsePositives: human.length - actionable,
 		humanPrecision: human.length ? actionable / human.length : null,
-		thresholdValidated: human.length >= 50 && actionable / human.length >= 0.95,
+		// This curated packet is not a representative sample of 50 independent findings.
+		thresholdValidated: false,
 		pending: unique.size - human.length,
 		pairwiseJaccard: pairs,
 		seedDetection: truth

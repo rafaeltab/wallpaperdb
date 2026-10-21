@@ -1,0 +1,358 @@
+{
+  "repeat": 1,
+  "elapsedMs": 53105,
+  "valid": true,
+  "usage": {
+    "input_tokens": 39679,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 2116,
+    "reasoning_output_tokens": 280
+  },
+  "findings": [
+    {
+      "caseId": "C01",
+      "category": "missing-outcome",
+      "title": "Alias actions are not distinguished by their expected dialog outcomes",
+      "test": {
+        "path": "apps/web/test/features/profile-management.test.ts",
+        "line": 15,
+        "quote": "for(const action of ['schedule','keep','reactivate'] as const) expect(aliasChangeDialog({...command,action},'current').description).toContain('@old');"
+      },
+      "support": {
+        "path": "apps/web/src/features/profile-management/aliases.ts",
+        "line": 9,
+        "quote": "button: 'Keep alias',"
+      },
+      "failure": "Returning the expire dialog for schedule, keep, and reactivate would pass: every description still contains @old. The suite therefore does not protect the distinct action presented for confirmation.",
+      "correction": "Use explicit expected titles, buttons, and distinguishing description content for each action."
+    },
+    {
+      "caseId": "C01",
+      "category": "mixed-scenarios",
+      "title": "Polling and owner clearing share an unrelated test",
+      "test": {
+        "path": "apps/web/test/features/profile-management.test.ts",
+        "line": 29,
+        "quote": "it('pauses import polling during writes and purges only resolved session transitions', () => {"
+      },
+      "support": {
+        "path": "apps/web/src/features/profile-management/index.ts",
+        "line": 8,
+        "quote": "export { pictureSelection, pictureImportPollInterval, shouldClearOwnerProfile } from './pictures';"
+      },
+      "failure": "A polling assertion failure prevents the owner-transition checks from running, coupling diagnosis of two independently exported policies.",
+      "correction": "Give polling intervals and owner clearing separate tests."
+    },
+    {
+      "caseId": "C02",
+      "category": "missing-outcome",
+      "title": "HMAC compatibility lacks an independent successful fixture",
+      "test": {
+        "path": "apps/gateway/test/cursor.service.unit.test.ts",
+        "line": 24,
+        "quote": "expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'Decoded', values: [42, 'wlpr_a'] });"
+      },
+      "support": {
+        "path": "apps/gateway/src/cursors/index.ts",
+        "line": 32,
+        "quote": "crypto.createHmac('sha256', config.secret).update(payload).digest('hex');"
+      },
+      "failure": "Encode and decode could both use a different key-dependent 64-character signing calculation and still pass. Independently signed fixtures are only expected to fail, so they do not establish compatibility with valid HMAC-SHA256 cursors.",
+      "correction": "Decode a valid cursor constructed by the independent signing helper, and verify an encoded signature against an independently calculated HMAC."
+    },
+    {
+      "caseId": "C05",
+      "category": "missing-outcome",
+      "title": "Blank-input rejection and port isolation are untested",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 4,
+        "quote": "test('save accepts'"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "Blank input returns Invalid and never calls write."
+      },
+      "failure": "An implementation that writes an empty trimmed value and returns Saved for blank input passes the supplied test.",
+      "correction": "Add a blank-input case asserting Invalid and an empty write-call record."
+    },
+    {
+      "caseId": "C06",
+      "category": "self-derived",
+      "title": "Pending interval is compared with itself",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 4,
+        "quote": "const expected=poll('pending',false); assert.equal(poll('pending',false),expected);"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "Pending and retrying poll at 5000ms unless writing."
+      },
+      "failure": "Any deterministic incorrect interval for idle pending status passes because production supplies both actual and expected values.",
+      "correction": "Assert the independently specified value 5000 directly."
+    },
+    {
+      "caseId": "C07",
+      "category": "private-detail",
+      "title": "Editor test asserts private storage instead of public value",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 4,
+        "quote": "assert.equal(editor._draft,'new');"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "Editor.set updates the public value property. Private storage representation may change without breaking clients."
+      },
+      "failure": "Renaming storage breaks this test despite preserved client behavior, while a broken public getter can pass.",
+      "correction": "Assert editor.value after calling set."
+    },
+    {
+      "caseId": "C08",
+      "category": "hidden-helper",
+      "title": "Opaque scenario names hide polling inputs and outcomes",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 5,
+        "quote": "for(const scenario of ['one','two','three','four','five','six']) check(scenario);"
+      },
+      "support": {
+        "path": "helper.mjs",
+        "line": 5,
+        "quote": "const [status,writing,expected]=cases[scenario]; assert.equal(poll(status,writing),expected);"
+      },
+      "failure": "The caller cannot explain which status, write state, or expected interval each scenario checks without opening the helper's lookup table.",
+      "correction": "Declare explicit status, writing, and expected tuples at the caller and pass them to the helper."
+    },
+    {
+      "caseId": "C09",
+      "category": "mixed-scenarios",
+      "title": "Independent polling and ownership policies share one test",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 4,
+        "quote": "test('polls and protects sessions'"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "Polling and session ownership are independent policies."
+      },
+      "failure": "A polling failure stops all ownership assertions, making ownership verification depend on an unrelated policy passing.",
+      "correction": "Split the polling and session-ownership assertions into separately named tests."
+    },
+    {
+      "caseId": "C11",
+      "category": "wide-matrix",
+      "title": "Identity wrapper repeats the complete polling matrix",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 7,
+        "quote": "for(const [s,w,expected] of matrix) test('screen '+s+w,()=>assert.equal(screen.poll(s,w),expected));"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "A higher-level identity wrapper adds no translation, synchronization or browser risk."
+      },
+      "failure": "Every policy change produces duplicate test failures and maintenance at a boundary that exercises no additional behavior.",
+      "correction": "Keep the complete matrix at poll's public boundary and remove its repetition through screen.poll."
+    },
+    {
+      "caseId": "C12",
+      "category": "optional-nesting",
+      "title": "Optional: flatten the hierarchy around one interval assertion",
+      "test": {
+        "path": "case.test.mjs",
+        "line": 5,
+        "quote": "describe('poll',()=>describe('pending',()=>describe('idle',()=>describe('interval',()=>{"
+      },
+      "support": {
+        "path": "requirement.md",
+        "line": 1,
+        "quote": "Nesting and snapshot size are optional advisory observations only; no numerical limit is repository policy."
+      },
+      "failure": "Understanding this single scenario requires assembling its meaning across four suite labels and the generic test name 'is fixed'; the hierarchy supplies no shared setup.",
+      "correction": "Optionally replace the hierarchy with one descriptive test such as 'pending polls every 5000ms while idle'."
+    }
+  ],
+  "candidateReview": {
+    "findings": [
+      {
+        "caseId": "C01",
+        "category": "missing-outcome",
+        "title": "Alias actions are not distinguished by their expected dialog outcomes",
+        "test": {
+          "path": "apps/web/test/features/profile-management.test.ts",
+          "line": 15,
+          "quote": "for(const action of ['schedule','keep','reactivate'] as const) expect(aliasChangeDialog({...command,action},'current').description).toContain('@old');"
+        },
+        "support": {
+          "path": "apps/web/src/features/profile-management/aliases.ts",
+          "line": 9,
+          "quote": "button: 'Keep alias',"
+        },
+        "failure": "Returning the expire dialog for schedule, keep, and reactivate would pass: every description still contains @old. The suite therefore does not protect the distinct action presented for confirmation.",
+        "correction": "Use explicit expected titles, buttons, and distinguishing description content for each action."
+      },
+      {
+        "caseId": "C01",
+        "category": "mixed-scenarios",
+        "title": "Polling and owner clearing share an unrelated test",
+        "test": {
+          "path": "apps/web/test/features/profile-management.test.ts",
+          "line": 29,
+          "quote": "it('pauses import polling during writes and purges only resolved session transitions', () => {"
+        },
+        "support": {
+          "path": "apps/web/src/features/profile-management/index.ts",
+          "line": 8,
+          "quote": "export { pictureSelection, pictureImportPollInterval, shouldClearOwnerProfile } from './pictures';"
+        },
+        "failure": "A polling assertion failure prevents the owner-transition checks from running, coupling diagnosis of two independently exported policies.",
+        "correction": "Give polling intervals and owner clearing separate tests."
+      },
+      {
+        "caseId": "C02",
+        "category": "missing-outcome",
+        "title": "HMAC compatibility lacks an independent successful fixture",
+        "test": {
+          "path": "apps/gateway/test/cursor.service.unit.test.ts",
+          "line": 24,
+          "quote": "expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'Decoded', values: [42, 'wlpr_a'] });"
+        },
+        "support": {
+          "path": "apps/gateway/src/cursors/index.ts",
+          "line": 32,
+          "quote": "crypto.createHmac('sha256', config.secret).update(payload).digest('hex');"
+        },
+        "failure": "Encode and decode could both use a different key-dependent 64-character signing calculation and still pass. Independently signed fixtures are only expected to fail, so they do not establish compatibility with valid HMAC-SHA256 cursors.",
+        "correction": "Decode a valid cursor constructed by the independent signing helper, and verify an encoded signature against an independently calculated HMAC."
+      },
+      {
+        "caseId": "C05",
+        "category": "missing-outcome",
+        "title": "Blank-input rejection and port isolation are untested",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "test('save accepts'"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Blank input returns Invalid and never calls write."
+        },
+        "failure": "An implementation that writes an empty trimmed value and returns Saved for blank input passes the supplied test.",
+        "correction": "Add a blank-input case asserting Invalid and an empty write-call record."
+      },
+      {
+        "caseId": "C06",
+        "category": "self-derived",
+        "title": "Pending interval is compared with itself",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "const expected=poll('pending',false); assert.equal(poll('pending',false),expected);"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Pending and retrying poll at 5000ms unless writing."
+        },
+        "failure": "Any deterministic incorrect interval for idle pending status passes because production supplies both actual and expected values.",
+        "correction": "Assert the independently specified value 5000 directly."
+      },
+      {
+        "caseId": "C07",
+        "category": "private-detail",
+        "title": "Editor test asserts private storage instead of public value",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "assert.equal(editor._draft,'new');"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Editor.set updates the public value property. Private storage representation may change without breaking clients."
+        },
+        "failure": "Renaming storage breaks this test despite preserved client behavior, while a broken public getter can pass.",
+        "correction": "Assert editor.value after calling set."
+      },
+      {
+        "caseId": "C08",
+        "category": "hidden-helper",
+        "title": "Opaque scenario names hide polling inputs and outcomes",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 5,
+          "quote": "for(const scenario of ['one','two','three','four','five','six']) check(scenario);"
+        },
+        "support": {
+          "path": "helper.mjs",
+          "line": 5,
+          "quote": "const [status,writing,expected]=cases[scenario]; assert.equal(poll(status,writing),expected);"
+        },
+        "failure": "The caller cannot explain which status, write state, or expected interval each scenario checks without opening the helper's lookup table.",
+        "correction": "Declare explicit status, writing, and expected tuples at the caller and pass them to the helper."
+      },
+      {
+        "caseId": "C09",
+        "category": "mixed-scenarios",
+        "title": "Independent polling and ownership policies share one test",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 4,
+          "quote": "test('polls and protects sessions'"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Polling and session ownership are independent policies."
+        },
+        "failure": "A polling failure stops all ownership assertions, making ownership verification depend on an unrelated policy passing.",
+        "correction": "Split the polling and session-ownership assertions into separately named tests."
+      },
+      {
+        "caseId": "C11",
+        "category": "wide-matrix",
+        "title": "Identity wrapper repeats the complete polling matrix",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 7,
+          "quote": "for(const [s,w,expected] of matrix) test('screen '+s+w,()=>assert.equal(screen.poll(s,w),expected));"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "A higher-level identity wrapper adds no translation, synchronization or browser risk."
+        },
+        "failure": "Every policy change produces duplicate test failures and maintenance at a boundary that exercises no additional behavior.",
+        "correction": "Keep the complete matrix at poll's public boundary and remove its repetition through screen.poll."
+      },
+      {
+        "caseId": "C12",
+        "category": "optional-nesting",
+        "title": "Optional: flatten the hierarchy around one interval assertion",
+        "test": {
+          "path": "case.test.mjs",
+          "line": 5,
+          "quote": "describe('poll',()=>describe('pending',()=>describe('idle',()=>describe('interval',()=>{"
+        },
+        "support": {
+          "path": "requirement.md",
+          "line": 1,
+          "quote": "Nesting and snapshot size are optional advisory observations only; no numerical limit is repository policy."
+        },
+        "failure": "Understanding this single scenario requires assembling its meaning across four suite labels and the generic test name 'is fixed'; the hierarchy supplies no shared setup.",
+        "correction": "Optionally replace the hierarchy with one descriptive test such as 'pending polls every 5000ms while idle'."
+      }
+    ]
+  }
+}

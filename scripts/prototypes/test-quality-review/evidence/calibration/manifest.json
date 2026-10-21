@@ -1,0 +1,14 @@
+{
+  "prototype": 420,
+  "model": "gpt-6.1-sol",
+  "effort": "low",
+  "cli": "codex-cli 0.162.1",
+  "repeats": 3,
+  "packetSha256": "d152320a1d98e80847ac032195332842df0be8e89c5b941a0167c4f9d22e289e",
+  "promptSha256": "4c6b36031a6229c1ca64f80ecccb7ccb82ad0d2be9e0fe18e2f27378cd6e35e8",
+  "schemaSha256": "1f03de4e491322dbc8190e8a70b8d28eb1d9c334c0824be5e51a72d85ca2277e",
+  "startedAt": "2026-10-21T10:39:20.619Z",
+  "timeoutMs": 180000,
+  "maxOutputBytes": 2097152,
+  "billing": "CLI subscription usage; no per-run invoice or USD rate exposed. Report tokens, not a fabricated dollar price."
+}

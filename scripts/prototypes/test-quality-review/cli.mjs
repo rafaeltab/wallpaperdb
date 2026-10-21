@@ -212,6 +212,9 @@ try {
 			.filter((p) => /^run-\d+\.json$/.test(p))
 			.sort()
 			.map((p) => load(join(out, p)));
+		const manifest = load(join(out, "manifest.json"));
+		if (runs.length !== manifest.repeats)
+			throw new Error("Evaluation still incomplete");
 		if (!runs.length || runs.some((r) => !r.valid))
 			throw new Error("Report requires completed valid reviews");
 		const judgments = load(

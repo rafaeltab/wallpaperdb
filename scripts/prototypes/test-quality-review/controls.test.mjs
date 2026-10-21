@@ -77,6 +77,19 @@ test("live runner records usage and rejects bad model citations through its publ
 			);
 			assert.equal(saved.valid, success);
 			assert.equal(saved.usage.input_tokens, 10);
+			if (success) {
+				const manifest = join(output, "manifest.json");
+				const data = JSON.parse(readFileSync(manifest, "utf8"));
+				data.repeats = 2;
+				writeFileSync(manifest, JSON.stringify(data));
+				const report = spawnSync(
+					process.execPath,
+					[cli, "report", "--out", output],
+					{ encoding: "utf8", timeout: 5000 },
+				);
+				assert.notEqual(report.status, 0);
+				assert.match(report.stderr, /incomplete/);
+			}
 		}
 	} finally {
 		rmSync(dir, { recursive: true, force: true });

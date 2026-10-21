@@ -1,5 +1,5 @@
 import { Resolver, type LookupAddress } from "node:dns";
-import { readFileSync } from "node:fs";
+import { readFileSync, write } from "node:fs";
 import type { Agent } from "node:http";
 import { isIP, Socket, type LookupFunction } from "node:net";
 import type { Duplex } from "node:stream";
@@ -13,6 +13,27 @@ export const telemetryBatchOptions = {
   maxExportBatchSize: 64,
   exportTimeoutMillis: telemetryExportTimeoutMillis,
 };
+
+// Share one in-flight diagnostic across transports. Drop output rather than queue
+// more filesystem work if stderr stalls. The callback owns no transport resources.
+let diagnosticPending = false;
+
+function writeDiagnostic(message: string): void {
+  if (diagnosticPending) return;
+  try {
+    if (process.stderr.writableNeedDrain || process.stderr.destroyed) return;
+    diagnosticPending = true;
+    // Borrow stderr's descriptor without using its shared Writable. Asynchronous
+    // failures stay in this callback; application stream errors keep their owner.
+    // Never close the descriptor, retry partial output, or report write failures.
+    write(process.stderr.fd, message, () => {
+      diagnosticPending = false;
+    });
+  } catch {
+    diagnosticPending = false;
+    // Diagnostic output cannot prevent exporter completion or application cleanup.
+  }
+}
 
 function hostsFile(): Map<string, LookupAddress[]> {
   const hosts = new Map<string, LookupAddress[]>();
@@ -74,15 +95,9 @@ export class TelemetryExportTransport {
       this.nextDiagnostic = Date.now() + 30_000;
       // Never send exporter failures back through the telemetry logger. No endpoint,
       // credentials, payload, collector response or vendor error reaches stderr.
-      try {
-        if (!process.stderr.writableNeedDrain && !process.stderr.destroyed) {
-          process.stderr.write(
-            `telemetry export ${success ? "recovered" : "unavailable"}; bounded best-effort export\n`
-          );
-        }
-      } catch {
-        // Diagnostic output cannot prevent exporter completion or application cleanup.
-      }
+      writeDiagnostic(
+        `telemetry export ${success ? "recovered" : "unavailable"}; bounded best-effort export\n`
+      );
       if (success) this.unavailable = false;
     }
   }

@@ -1,5 +1,8 @@
+import * as fs from "node:fs";
 import { expect, it, vi } from "vitest";
 import { TelemetryExportTransport } from "../src/telemetry/index.js";
+
+vi.mock("node:fs", { spy: true });
 
 it("reports recovery only after every failing exporter recovers", async () => {
   const transport = new TelemetryExportTransport();
@@ -21,14 +24,18 @@ it("reports recovery only after every failing exporter recovers", async () => {
   const metrics = signal();
   metrics.recover();
   const now = vi.spyOn(Date, "now").mockReturnValue(100_000);
-  const write = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  const write = vi.spyOn(fs, "write").mockImplementation((_fd, message, callback) => {
+    callback(null, Buffer.byteLength(message), message);
+  });
   const completed = vi.fn();
   try {
     traces.exporter.export([], completed);
     logs.exporter.export([], completed);
     expect(write).toHaveBeenCalledTimes(1);
     expect(write).toHaveBeenLastCalledWith(
-      "telemetry export unavailable; bounded best-effort export\n"
+      process.stderr.fd,
+      "telemetry export unavailable; bounded best-effort export\n",
+      expect.any(Function)
     );
     now.mockReturnValue(130_001);
     metrics.exporter.export([], completed);
@@ -39,7 +46,9 @@ it("reports recovery only after every failing exporter recovers", async () => {
     logs.exporter.export([], completed);
     expect(write).toHaveBeenCalledTimes(2);
     expect(write).toHaveBeenLastCalledWith(
-      "telemetry export recovered; bounded best-effort export\n"
+      process.stderr.fd,
+      "telemetry export recovered; bounded best-effort export\n",
+      expect.any(Function)
     );
     expect(completed).toHaveBeenCalledTimes(5);
   } finally {
@@ -57,7 +66,7 @@ it("preserves export completion when the local diagnostic output throws", async 
     },
   });
   const completion = vi.fn();
-  const write = vi.spyOn(process.stderr, "write").mockImplementation(() => {
+  const write = vi.spyOn(fs, "write").mockImplementation(() => {
     throw new Error("Local diagnostic output unavailable");
   });
   try {
@@ -77,7 +86,7 @@ it("does not add diagnostic output while stderr is backpressured", async () => {
     },
   });
   const draining = vi.spyOn(process.stderr, "writableNeedDrain", "get").mockReturnValue(true);
-  const write = vi.spyOn(process.stderr, "write").mockReturnValue(false);
+  const write = vi.spyOn(fs, "write").mockImplementation(() => undefined);
   try {
     exporter.export([], () => undefined);
     expect(write).not.toHaveBeenCalled();

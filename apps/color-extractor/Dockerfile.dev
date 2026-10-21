@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.20
+
 # Development Dockerfile for @wallpaperdb/color-extractor
 #
 # Build context: repo root (pass -f apps/color-extractor/Dockerfile.dev to docker build)
@@ -17,13 +19,22 @@ RUN corepack enable && corepack prepare pnpm@10.18.3 --activate
 
 WORKDIR /app
 
-# Copy the entire monorepo (build context is repo root)
-COPY . .
+# Preserve workspace paths, lifecycle inputs, and local executable targets.
+COPY --parents package.json pnpm-lock.yaml pnpm-workspace.yaml \
+    apps/*/package.json packages/*/package.json experiments/*/package.json \
+    infra/package.json scripts/package.json ./
+COPY --parents apps/docs/source.config.ts apps/docs/content \
+    scripts/check-architecture.mjs scripts/crap.mts \
+    scripts/setup-worktree.mjs scripts/lib/worktree-project.mjs \
+    scripts/lib/env-pipeline.mjs ./
 
 # Install all workspace dependencies and record the lockfile hash so the
 # entrypoint can detect changes and re-install when the lockfile is synced.
 RUN pnpm install --frozen-lockfile && \
     sha256sum pnpm-lock.yaml | cut -d' ' -f1 > .pnpm-lockfile-hash
+
+# Application edits reuse the dependency installation above.
+COPY . .
 
 # Install the shared entrypoint script
 RUN cp scripts/entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh

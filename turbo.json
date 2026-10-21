@@ -236,13 +236,7 @@
             "dependsOn": ["^build"],
             "inputs": [
                 "$TURBO_DEFAULT$",
-                "$TURBO_ROOT$/Makefile",
-                "$TURBO_ROOT$/turbo.json",
-                "$TURBO_ROOT$/pnpm-workspace.yaml",
-                "$TURBO_ROOT$/package.json",
                 "$TURBO_ROOT$/pnpm-lock.yaml",
-                "$TURBO_ROOT$/packages/profile-markdown/src/**",
-                "$TURBO_ROOT$/packages/profile-markdown/package.json",
                 "$TURBO_ROOT$/apps/web-e2e/fixtures/profile-*.png"
             ],
             "outputs": ["coverage/integration/**"]

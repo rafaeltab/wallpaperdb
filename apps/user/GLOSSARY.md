@@ -16,6 +16,12 @@ _Avoid_: User, account
 The immutable Clerk user ID that identifies a Profile and matches the `userId` recorded on its wallpapers.
 _Avoid_: Internal user ID, Clerk ID mapping
 
+**Profile picture**:
+The custom image accepted for a Profile, represented by a Media Asset whose identity remains stable across complete Source-set replacement. A generated avatar represents the absence of a custom picture and needs no Media Asset.
+
+**Profile picture removal**:
+The Profile's transition to having no custom picture, accompanied by a durable request to delete its former Media Asset. It completes independently of Media's deletion; a later custom picture has a new Asset identity.
+
 **Handle**:
 A unique, changeable identifier for a Profile that provides its human-readable URL slug.
 _Avoid_: Username, display name

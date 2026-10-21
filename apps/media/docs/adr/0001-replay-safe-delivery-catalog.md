@@ -1,5 +1,7 @@
 # Replay-safe delivery catalog
 
+Target amendment: [ADR 0012](../../../../docs/adr/0012-own-stable-assets-and-immutable-sources-in-media.md) replaces immutable wallpaper targets with mutable Asset membership containing immutable Sources, and transfers source-byte lifecycle to Media. [ADR 0011](../../../../docs/adr/0011-unlink-profile-pictures-before-asynchronous-media-deletion.md) replaces synchronous User origin authorization. Producer-owned source deletion and read-only source credentials below describe the existing implementation. Preserve durable acceptance, replay safety, outbox and recovery obligations. The clean rebuild requires no legacy-row reconciliation.
+
 Media uses application-owned Effect ports for delivery and atomic catalog acceptance. PostgreSQL commits occurrence acceptance, catalog state, target acceptance, and availability publication intent in one transaction. The outbox publishes with stable CloudEvent and NATS message identities, then records completion after PubAck. PostgreSQL and JetStream are independent resources; an ambiguous publish may repeat the same occurrence.
 
 The catalog is immutable for wallpaper targets. A later occurrence cannot overwrite an original or an existing variant. Variants can precede their parents, so their rows do not require a parent foreign key; the publisher waits until the parent exists. Profile heads advance by producer version, while late picture metadata remains useful. Picture origin authorization retains the exception in `docs/adr/0004-authorize-profile-picture-delivery-at-origin.md`.

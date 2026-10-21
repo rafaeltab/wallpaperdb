@@ -1,6 +1,6 @@
 # Process temporary HDR Profile picture sources in Media
 
-Status: accepted. Implementation boundaries remain with [rendition specification planning](https://github.com/rafaeltab/wallpaperdb/issues/259).
+Status: partially superseded for the target architecture by [ADR 0012](0012-own-stable-assets-and-immutable-sources-in-media.md). Media retains and validates the processed cropped output as the immutable Source of a stable Asset, replacing the output return through Web, User-owned storage and the exclusion of processed output from Media's catalog. Native HDR processing remains in Media; raw editor inputs remain private and temporary. The text below records the earlier ownership/transfer decision. Product requirements and final implementation planning remain with [#270](https://github.com/rafaeltab/wallpaperdb/issues/270#issuecomment-5902621514) and [#259](https://github.com/rafaeltab/wallpaperdb/issues/259).
 
 Media owns native processing of temporary HDR Profile picture sources. Web selects the crop, sends the source and crop settings to Media, receives the processed image, and uploads that image to User. Media retains neither the conversion input nor its output and does not register them in its delivery catalog. User validates the processed upload against its effective picture policy and owns the resulting immutable Asset and Profile transition. Compliant HDR uploads pass through User without another re-encode; noncanonical HDR uploads are rejected.
 

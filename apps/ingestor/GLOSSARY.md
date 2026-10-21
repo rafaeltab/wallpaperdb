@@ -1,6 +1,14 @@
 # Wallpaper Ingestion
 
-Ingestion accepts an authenticated Profile's wallpaper bytes and owns the durable progress from acceptance to an acknowledged upload announcement. A wallpaper's owner is the authenticated Profile ID; multipart fields cannot assign ownership.
+The existing Ingestion implementation accepts an authenticated Profile's wallpaper bytes and owns progress through an acknowledged upload announcement; ownership comes from the authenticated Profile ID. The [accepted target](../../docs/adr/0012-own-stable-assets-and-immutable-sources-in-media.md) transfers byte acceptance/storage/lifecycle to Media while this context retains Wallpaper identity and domain workflow; the existing terms and policy below describe the implementation being replaced.
+
+## Accepted target language
+
+**Wallpaper**:
+A contribution identified independently of its associated Media Asset. This context owns its existence, publication and contributor facts, while Media owns its immutable Sources and delivery capabilities.
+
+**Wallpaper Asset reference**:
+The confirmed Media Asset ID associated with a Wallpaper, distinct from the Wallpaper ID. The Wallpaper ID can be supplied as an opaque Application reference during Media creation without becoming the Asset identity.
 
 ## Language
 

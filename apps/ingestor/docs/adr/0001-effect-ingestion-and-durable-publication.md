@@ -2,6 +2,8 @@
 
 Status: accepted
 
+Target amendment: [ADR 0012](../../../../docs/adr/0012-own-stable-assets-and-immutable-sources-in-media.md) moves byte inspection/admission, storage and Source lifecycle to Media. This context keeps Wallpaper identity and its durable creation/reference/publication workflow. Preserve application-owned ports, distinct identities, outbox/replay guarantees and finite recovery. The producer-byte reservation/layout and historical migration protocol below describe the existing implementation; the selected clean rebuild requires no legacy transfer.
+
 The former ingestor mixed authentication, HTTP errors, SQL, storage clients, and event publication in TSyringe services. Recovery held database transactions open while calling storage and NATS; retries generated new event identities, and incomplete upload records could not recover non-JPEG assets reliably.
 
 The `Ingestion` driving port owns upload and recovery decisions. Its dependencies are application-owned Effect services for content inspection, immutable assets, occurrence identities, publication, and persistence. Composition builds scoped Layers once per application. Normal rejections are explicit values; technical failures use `IngestionUnavailable` with an opaque diagnostic cause. Infrastructure types and lifecycle management remain in adapters.

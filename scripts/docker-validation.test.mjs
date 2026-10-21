@@ -177,6 +177,90 @@ test("validation coordinates with legacy flock users without replacing the lock"
 	assert.equal(result.status, 0, result.output);
 });
 
+test("a later blocking flock user cannot repeatedly overtake the queue head", async (t) => {
+	const f = fixture(t);
+	const owner = spawn(
+		"flock",
+		[
+			f.env.DOCKER_VALIDATION_LOCK_FILE,
+			process.execPath,
+			"-e",
+			"require('node:fs').writeFileSync(process.argv[1], ''); process.stdin.resume()",
+			join(f.root, "owner"),
+		],
+		{ stdio: ["pipe", "ignore", "ignore"] },
+	);
+	t.after(() => {
+		owner.stdin.end();
+		owner.kill("SIGTERM");
+	});
+	await until(() => existsSync(join(f.root, "owner")));
+	const queued = f.start(
+		"queued",
+		"require('node:fs').appendFileSync('order', 'queued\\n')",
+	);
+	await until(() => f.status().includes("waiting: queued"));
+	const legacy = spawn(
+		"flock",
+		[
+			f.env.DOCKER_VALIDATION_LOCK_FILE,
+			process.execPath,
+			"-e",
+			"require('node:fs').appendFileSync(process.argv[1], 'legacy\\n')",
+			join(f.root, "order"),
+		],
+		{ stdio: "ignore" },
+	);
+	t.after(() => legacy.kill("SIGTERM"));
+	const legacyDone = new Promise((resolve) => legacy.once("close", resolve));
+	await until(() =>
+		new RegExp(`->\\s+FLOCK\\s+ADVISORY\\s+WRITE\\s+${legacy.pid}\\s`).test(
+			readFileSync("/proc/locks", "utf8"),
+		),
+	);
+	owner.stdin.end();
+	const result = await queued.done;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(await legacyDone, 0);
+	assert.equal(readFileSync(join(f.root, "order"), "utf8"), "queued\nlegacy\n");
+});
+
+test("a queue head waiting on a legacy lock cancels without waiting for its deadline", async (t) => {
+	const f = fixture(t);
+	const owner = spawn(
+		"flock",
+		[
+			f.env.DOCKER_VALIDATION_LOCK_FILE,
+			process.execPath,
+			"-e",
+			"require('node:fs').writeFileSync(process.argv[1], ''); process.stdin.resume()",
+			join(f.root, "owner"),
+		],
+		{ stdio: ["pipe", "ignore", "ignore"] },
+	);
+	t.after(() => {
+		owner.stdin.end();
+		owner.kill("SIGTERM");
+	});
+	await until(() => existsSync(join(f.root, "owner")));
+	const queued = f.start(
+		"cancelled",
+		"require('node:fs').writeFileSync('wrong', '')",
+		{ DOCKER_VALIDATION_TIMEOUT: "60" },
+	);
+	await until(() => f.status().includes("waiting: cancelled"));
+	let result;
+	queued.done.then((value) => {
+		result = value;
+	});
+	queued.kill("SIGTERM");
+	await until(() => result !== undefined);
+	assert.equal(result.status, 143, result.output);
+	assert.equal(existsSync(join(f.root, "wrong")), false);
+	owner.stdin.end();
+	assert.equal((await f.start("next", "process.exit(0)").done).status, 0);
+});
+
 test("a killed waiter leaves no permanent queue blockage", async (t) => {
 	const f = fixture(t);
 	const owner = f.start(

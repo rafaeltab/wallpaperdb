@@ -41,7 +41,14 @@ The migration prepares legacy reservations and outbox recovery metadata in one t
 
 The workspace, Compose service, telemetry service name and public delivery prefix are now `asset`. Gateway uses `ASSET_SERVICE_URL`, `ASSET_PUBLIC_BASE_URL` and `ASSET_PUBLIC_PATH`; Web uses `VITE_ASSET_URL`. Existing `/media` URLs have no redirect. Regenerate worktree configuration with `make install`; update custom deployments and saved client URLs to `/asset`.
 
-Before upgrading an existing development stack, stop its old `media` application container using the previous checkout's `make apps-stop SERVICE=media`. Keep the same Compose project and infrastructure volumes, regenerate configuration, then start the renamed application with `make apps-start SERVICE=asset`. Do not reset infrastructure, purge streams or recreate consumers for this rename. The recovery procedure below applies only when startup reports an older consumer's exhausted delivery limit.
+Upgrade an existing development stack in the same worktree and Compose project:
+
+1. Before switching revisions, run `make apps-stop` with no `SERVICE` selector using the previous checkout. This removes all application containers, including old Media, Gateway, Web, User and Caddy. The separate infrastructure stack, external network and persistent volumes remain in place.
+2. Switch to the renamed revision and run `make install` to regenerate application environments. Keep the existing `.worktree` project identity and infrastructure volumes.
+3. Run `make apps-start` with no `SERVICE` selector. This builds and recreates all applications from the updated checkout. Gateway and Web load their new Asset configuration, User loads its updated code, and a fresh Caddy process loads `/asset` routing to `asset:3003`.
+4. Check `/asset/ready`, request an existing wallpaper through `/asset/wallpapers/<id>`, and request a resized rendition. Verify Gateway returns `/asset` delivery URLs and Web loads them. Compare catalog state and consumer acknowledgement floors with the values recorded before stopping the applications.
+
+Starting only `SERVICE=asset` is insufficient because it leaves callers and Caddy running their previous code or configuration. Do not reset infrastructure, purge streams or recreate consumers for this rename. The recovery procedure below applies only when startup reports an older consumer's exhausted delivery limit.
 
 Persistent identities deliberately retain their earlier names:
 

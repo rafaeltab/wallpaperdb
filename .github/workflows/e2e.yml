@@ -59,11 +59,44 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter @wallpaperdb/web-e2e exec playwright install --with-deps chromium
 
+      - name: Set up Docker builder
+        uses: docker/setup-buildx-action@v4
+        with:
+          driver: docker-container
+
+      - name: Prepare Compose image build plan
+        run: make apps-build ARGS=--print > "$RUNNER_TEMP/app-images.json"
+
+      - name: Build and load application images
+        uses: docker/bake-action@v7
+        with:
+          source: .
+          files: ${{ runner.temp }}/app-images.json
+          load: true
+          # Each service owns a scope. A cache outage must not fail a correct build.
+          set: |
+            ingestor.cache-from=type=gha,version=2,scope=browser-e2e-ingestor,timeout=60s
+            ingestor.cache-to=type=gha,version=2,scope=browser-e2e-ingestor,mode=max,ignore-error=true,timeout=60s
+            asset.cache-from=type=gha,version=2,scope=browser-e2e-asset,timeout=60s
+            asset.cache-to=type=gha,version=2,scope=browser-e2e-asset,mode=max,ignore-error=true,timeout=60s
+            gateway.cache-from=type=gha,version=2,scope=browser-e2e-gateway,timeout=60s
+            gateway.cache-to=type=gha,version=2,scope=browser-e2e-gateway,mode=max,ignore-error=true,timeout=60s
+            variant-generator.cache-from=type=gha,version=2,scope=browser-e2e-variant-generator,timeout=60s
+            variant-generator.cache-to=type=gha,version=2,scope=browser-e2e-variant-generator,mode=max,ignore-error=true,timeout=60s
+            color-extractor.cache-from=type=gha,version=2,scope=browser-e2e-color-extractor,timeout=60s
+            color-extractor.cache-to=type=gha,version=2,scope=browser-e2e-color-extractor,mode=max,ignore-error=true,timeout=60s
+            tags.cache-from=type=gha,version=2,scope=browser-e2e-tags,timeout=60s
+            tags.cache-to=type=gha,version=2,scope=browser-e2e-tags,mode=max,ignore-error=true,timeout=60s
+            user.cache-from=type=gha,version=2,scope=browser-e2e-user,timeout=60s
+            user.cache-to=type=gha,version=2,scope=browser-e2e-user,mode=max,ignore-error=true,timeout=60s
+            web.cache-from=type=gha,version=2,scope=browser-e2e-web,timeout=60s
+            web.cache-to=type=gha,version=2,scope=browser-e2e-web,mode=max,ignore-error=true,timeout=60s
+
       - name: Start infrastructure
         run: make infra-start
 
       - name: Start application stack for browser E2E
-        run: make apps-start
+        run: make apps-start ARGS=--no-build
 
       - name: Run E2E tests
         run: make test-e2e PACKAGE=web-e2e

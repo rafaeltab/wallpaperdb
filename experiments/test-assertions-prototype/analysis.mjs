@@ -8,6 +8,13 @@ const blockingRules = new Set([
 ]);
 
 export function summarize(report, repo) {
+	const nativeExceptionWorks =
+		report.runtime.nativeException.tests.some(
+			(test) => test.name === "native-valid" && test.status === "passed",
+		) &&
+		report.runtime.nativeException.tests.some(
+			(test) => test.name === "native-invalid" && test.status === "failed",
+		);
 	const detectors = {
 		"Vitest defaults": (row) => row.baseline === "failed",
 		"Vitest requireAssertions": (row) => row.enforced === "failed",
@@ -25,9 +32,10 @@ export function summarize(report, repo) {
 			row.eslint.includes("prototype/no-swallowed-assertion"),
 		"Prototype matcher tautologies": (row) =>
 			row.eslint.includes("prototype/no-obvious-tautology"),
-		// The native-assert control is an explicit compatibility exception here only.
+		// Count the compatibility exception only after its valid/invalid runtime pair works.
 		"Proposed blockers with native-assert exception": (row) =>
-			(row.enforced === "failed" && row.id !== "node-assert") ||
+			(row.enforced === "failed" &&
+				!(row.id === "node-assert" && nativeExceptionWorks)) ||
 			row.biome.includes("lint/suspicious/noSelfCompare") ||
 			row.eslint.some((rule) => blockingRules.has(rule)),
 		"All checks including advisories": (row) =>

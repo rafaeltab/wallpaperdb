@@ -4,7 +4,7 @@ This opt-in tooling experiment answers [#415](https://github.com/rafaeltab/wallp
 
 ## What it evaluates
 
-The executable controls distinguish supported detections, false positives, and known misses. The full experiment also exercises the existing Profiles capability suite and two frontend suites, including their helper and setup code. It classifies reviewed findings and compares three alternating baseline/enforced runtime samples.
+The executable controls distinguish supported detections, false positives, and known misses. A separate native-assert compatibility project checks both passing and failing native assertions with Vitest assertion counting disabled. The full experiment also exercises the existing Profiles capability suite and two frontend suites, including their helper and setup code. It classifies reviewed findings and compares three alternating baseline/enforced runtime samples.
 
 Biome uses the repository's pinned release. Targeted ESLint rules cover matcher validation and imported Promise types. Two small prototype rules investigate inline swallowed assertions and obvious matcher tautologies. Conditional warnings are measured separately. The evaluation deliberately preserves failures that these checks cannot detect. Mutation testing belongs to another prototype.
 

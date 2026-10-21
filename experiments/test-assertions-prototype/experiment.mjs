@@ -61,6 +61,7 @@ function runtime(config, cwd, artifact, requireAssertions, filters = []) {
 			"--maxWorkers=1",
 			"--no-file-parallelism",
 			"--reporter=json",
+			`--reporter=${path.join(here, "unhandled-reporter.mjs")}`,
 			"--outputFile",
 			output,
 			...filters,
@@ -68,7 +69,10 @@ function runtime(config, cwd, artifact, requireAssertions, filters = []) {
 		cwd,
 		`${artifact}.log`,
 		[0, 1],
-		{ ASSERTIONS_415_REQUIRE: String(requireAssertions) },
+		{
+			ASSERTIONS_415_REQUIRE: String(requireAssertions),
+			ASSERTIONS_415_ERRORS: `${artifact}.unhandled.json`,
+		},
 	);
 	const result = read(output);
 	assert.equal(
@@ -77,7 +81,7 @@ function runtime(config, cwd, artifact, requireAssertions, filters = []) {
 		"Empty Vitest run is not evidence",
 	);
 	assert.deepEqual(
-		result.unhandledErrors ?? [],
+		read(`${artifact}.unhandled.json`),
 		[],
 		"Unexpected unhandled errors",
 	);
@@ -196,6 +200,23 @@ export async function runExperiment({ controlsOnly }) {
 			path.join(artifacts, "controls-enforced"),
 			true,
 		);
+		const nativeDir = path.join(scratch, "native-assert");
+		fs.mkdirSync(nativeDir);
+		write(
+			path.join(nativeDir, "native.test.ts"),
+			`import { it } from 'vitest';\nimport assert from 'node:assert/strict';\nit('native-valid', () => assert.equal('Ada'.length, 3));\nit('native-invalid', () => assert.equal('Ada'.length, 5));\n`,
+		);
+		const nativeConfig = path.join(scratch, "native.config.ts");
+		write(
+			nativeConfig,
+			`export default {test:{name:'native-assert-compatibility',include:[${JSON.stringify(`${nativeDir}/*.test.ts`)}],expect:{requireAssertions:false}}};\n`,
+		);
+		const nativeException = runtime(
+			nativeConfig,
+			here,
+			path.join(artifacts, "native-compatibility"),
+			true,
+		);
 		// Type-aware lint needs real files and an explicit project, not lintText guesses.
 		const realFiles = [
 			"apps/user/test/profile-capability.unit.test.ts",
@@ -263,7 +284,7 @@ export async function runExperiment({ controlsOnly }) {
 			},
 			artifacts,
 			controls: rows,
-			runtime: { baseline, enforced },
+			runtime: { baseline, enforced, nativeException },
 			static: { biome, eslint },
 			real: [],
 		};

@@ -50,6 +50,23 @@ for (const suite of report.real) {
 		assert.equal(run.status, 0, `${suite.workspace}: repository tests failed`);
 }
 assert.equal(
+	report.runtime.nativeException?.count,
+	2,
+	"Missing native-assert compatibility controls",
+);
+assert.equal(
+	report.runtime.nativeException.tests.find(
+		(test) => test.name === "native-valid",
+	)?.status,
+	"passed",
+);
+assert.equal(
+	report.runtime.nativeException.tests.find(
+		(test) => test.name === "native-invalid",
+	)?.status,
+	"failed",
+);
+assert.equal(
 	report.static.biome.diagnostics.filter(
 		(item) =>
 			item.file.endsWith("/helpers.ts") &&

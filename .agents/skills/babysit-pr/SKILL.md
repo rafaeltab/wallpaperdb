@@ -65,7 +65,7 @@ Use the [official Codex GitHub review documentation](https://developers.openai.c
 | Code review | `@codex review` |
 | Security review | `@codex security review` |
 
-For each missing clean result on the current comparison, if no review of that kind is running or pending and no request for that round is already recorded, post its trigger as a separate comment with the full head SHA, base ref, and base SHA. Use [github-markdown-bodies](../github-markdown-bodies/SKILL.md). Record the review kind, comparison, feedback batch, and request URL so later wakes do not duplicate it. Track automatic runs separately for each kind. Handling feedback without a push can require a fresh round of the affected review. Escalate an ignored request, stalled review, or unavailable integration with its last known status rather than repeatedly requesting it.
+For each missing clean result on the current comparison, if no review of that kind is running or pending and no request for that round is already recorded, post its trigger as a separate comment with the full head SHA, base ref, and base SHA. Use [github-markdown-bodies](../github-markdown-bodies/SKILL.md). Record the review kind, comparison, feedback batch, and request URL so later wakes do not duplicate it. Track automatic runs separately for each kind. Handling feedback without a push can require a fresh round of the affected review. For pending or running reviews, apply [review timeout and recovery](references/review-recovery.md). It defines the completion budget, one permitted recovery request per kind and comparison, retained retry counts, and the watcher deadline limitation. Escalate unavailable integrations and exhausted recovery attempts with their last known status.
 
 ## 5. Monitor until the gates hold
 
@@ -77,7 +77,7 @@ Use [T3's linked-PR documentation](https://github.com/pingdotgg/t3code/blob/main
 
 Before yielding, verify that outstanding gates have a supported completion wake. T3 documents successful required-check completion, but does not guarantee a wake for successful optional checks. If only applicable optional checks remain pending, use a host-supported completion wake when available and permitted by the runtime; otherwise report that monitoring gap as a blocker. Keep the all-applicable-checks gate intact and use polling only under the watcher-unavailable fallback above.
 
-There is no fixed deadline while runs are progressing. Investigate evidence of stalled or missing CI and review runs, and return an actionable blocker when progress needs the user. A closed or merged PR ends babysitting. Perform the handoff cleanup below, then report its actual state and which gates were verified.
+CI has no fixed deadline while progressing. Review rounds use the completion budget in [review recovery](references/review-recovery.md). Investigate stalled or missing CI, and return an actionable blocker when progress needs the user. A closed or merged PR ends babysitting. Perform the handoff cleanup below, then report its actual state and which gates were verified.
 
 ## 6. Verify and hand back
 

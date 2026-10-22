@@ -77,6 +77,8 @@ function apiMember(api: Api, member: string): Api | undefined {
 		return member === "expect" ? { ...api, name: "expect" } : undefined;
 	if (api.name === "<nodeContext>") {
 		if (member === "test") return { ...api, name: "test" };
+		if (["before", "after", "beforeEach", "afterEach"].includes(member))
+			return { ...api, name: member, members: [] };
 		return ["skip", "todo"].includes(member)
 			? { ...api, name: "test", members: [member] }
 			: undefined;

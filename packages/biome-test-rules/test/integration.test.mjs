@@ -43,6 +43,19 @@ function isolatedRepository() {
 		".gitignore",
 	])
 		copyFileSync(join(repository, name), join(directory, name));
+	// Newer Makefiles enter the locked toolchain before workspace tasks. Keep
+	// this fixture usable on both sides of that independently landed change.
+	for (const name of [
+		"mise.toml",
+		"mise.lock",
+		".npmrc",
+		"scripts/mise-shell.sh",
+		"scripts/toolchain.mjs",
+	]) {
+		if (!existsSync(join(repository, name))) continue;
+		mkdirSync(dirname(join(directory, name)), { recursive: true });
+		copyFileSync(join(repository, name), join(directory, name));
+	}
 	symlinkSync(
 		join(repository, "node_modules"),
 		join(directory, "node_modules"),
@@ -96,6 +109,22 @@ function gitFixture(directory, args) {
 	assert.equal(result.status, 0, result.stderr);
 }
 
+function makeEnvironment(directory) {
+	return {
+		...process.env,
+		MAKEFLAGS: "",
+		MFLAGS: "",
+		MAKELEVEL: "0",
+		// This is the reviewed configuration copied into our own temporary fixture.
+		MISE_TRUSTED_CONFIG_PATHS: [
+			process.env.MISE_TRUSTED_CONFIG_PATHS,
+			directory,
+		]
+			.filter(Boolean)
+			.join(":"),
+	};
+}
+
 function makeLint(directory, workspace, force = true) {
 	const filter = workspace === "root" ? "//" : `@wallpaperdb/${workspace}`;
 	// The fixture owns configuration and sources, while dependency builds are
@@ -111,7 +140,7 @@ function makeLint(directory, workspace, force = true) {
 			cwd: directory,
 			encoding: "utf8",
 			timeout: 30_000,
-			env: { ...process.env, MAKEFLAGS: "", MFLAGS: "", MAKELEVEL: "0" },
+			env: makeEnvironment(directory),
 		},
 	);
 	assert.equal(result.error, undefined);
@@ -119,7 +148,7 @@ function makeLint(directory, workspace, force = true) {
 }
 
 function makeRuleTests(directory) {
-	const env = { ...process.env, MAKEFLAGS: "", MFLAGS: "", MAKELEVEL: "0" };
+	const env = makeEnvironment(directory);
 	delete env.NODE_TEST_CONTEXT;
 	const result = spawnSync(
 		"make",
@@ -174,11 +203,8 @@ test('executes measured source', () => assert.equal(measured(), 42));`,
 		assert.ok(unmeasured, "unloaded maintained rules must remain visible");
 		assert.ok(Object.values(unmeasured.s).every((hits) => hits === 0));
 		const env = {
-			...process.env,
+			...makeEnvironment(directory),
 			PACKAGE: "biome-test-rules",
-			MAKEFLAGS: "",
-			MFLAGS: "",
-			MAKELEVEL: "0",
 		};
 		delete env.NODE_TEST_CONTEXT;
 		const runCollector = (mode) =>
@@ -423,6 +449,14 @@ test("rule-test cache tracks copied configuration and ignore policy", async (con
 		"infra/biome.json",
 		".gitignore",
 		"crap.config.mts",
+		// Present after the independent locked-toolchain change lands.
+		...[
+			"mise.toml",
+			"mise.lock",
+			".npmrc",
+			"scripts/mise-shell.sh",
+			"scripts/toolchain.mjs",
+		].filter((path) => existsSync(join(repository, path))),
 	])
 		await context.test(path, () => {
 			const directory = isolatedRepository();
@@ -435,15 +469,23 @@ test("rule-test cache tracks copied configuration and ignore policy", async (con
 				const config = join(directory, path);
 				writeFileSync(
 					config,
-					path === "crap.config.mts"
+					path.endsWith(".mjs") || path === "crap.config.mts"
 						? readFileSync(config, "utf8") + "\n// Collector policy changed.\n"
-						: path === ".gitignore"
+						: [
+									"mise.toml",
+									"mise.lock",
+									".npmrc",
+									"scripts/mise-shell.sh",
+								].includes(path)
 							? readFileSync(config, "utf8") +
-								"\napps/docs/src/ignored.test.ts\n"
-							: JSON.stringify({
-									files: { includes: ["*.json"] },
-									linter: { rules: { preset: "none" } },
-								}),
+								"\n# Fixture toolchain policy changed.\n"
+							: path === ".gitignore"
+								? readFileSync(config, "utf8") +
+									"\napps/docs/src/ignored.test.ts\n"
+								: JSON.stringify({
+										files: { includes: ["*.json"] },
+										linter: { rules: { preset: "none" } },
+									}),
 				);
 				gitFixture(directory, ["add", "--", path]);
 				makeRuleTests(directory);

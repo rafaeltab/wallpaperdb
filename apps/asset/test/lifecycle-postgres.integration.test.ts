@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Effect, ManagedRuntime } from 'effect';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import {
   LifecycleStore,
   ResultOutbox,
@@ -45,6 +45,9 @@ afterAll(async () => {
   await runtime?.dispose();
   await pool?.end();
   await container?.stop();
+});
+beforeEach(async () => {
+  await pool.query('TRUNCATE owned_assets, asset_commands, asset_result_outbox');
 });
 it('atomically assigns one identity through concurrent replay, preserves application scoping and records conflict results', async () => {
   await runtime.runPromise(
@@ -96,4 +99,34 @@ it('atomically assigns one identity through concurrent replay, preserves applica
       expect(fresh.assetId).not.toBe(results[0]?.assetId);
     })
   );
+});
+
+it('stops result publication after a durable finite budget and requires deliberate recovery', async () => {
+  await runtime.runPromise(LifecycleStore.use((store) => store.accept(input)));
+  let lastId = '';
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    let claimed: readonly import('../src/capabilities/lifecycle/index.js').ResultPublication[] = [];
+    await expect
+      .poll(
+        async () => {
+          claimed = await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)));
+          return claimed.length;
+        },
+        { timeout: 1000 }
+      )
+      .toBe(1);
+    const publication = claimed[0];
+    if (!publication) throw new Error('Missing publication');
+    lastId = publication.id;
+    expect(publication.attempts).toBe(attempt);
+    await runtime.runPromise(ResultOutbox.use((outbox) => outbox.failed(publication)));
+  }
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toEqual([]);
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.pendingAlerts(10)))).toEqual([
+    { id: lastId, applicationId: 'user' },
+  ]);
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.recover(lastId)))).toBe(true);
+  expect(
+    (await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1))))[0]?.attempts
+  ).toBe(1);
 });

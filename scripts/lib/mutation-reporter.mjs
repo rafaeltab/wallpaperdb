@@ -1,6 +1,8 @@
 import { readFileSync, writeFileSync, renameSync } from "node:fs";
 import { relative } from "node:path";
 import { mutationId } from "./mutation-results.mjs";
+import { strykerPlugins as vitestPlugins } from "@stryker-mutator/vitest-runner";
+import { timeMutationRunner } from "./mutation-timings.mjs";
 
 const atomic = (file, value) => {
 	if (!file) return;
@@ -21,14 +23,19 @@ class ProgressReporter {
 		deferred: 0,
 	};
 	runIds = new Set();
+	planningStart;
 	save() {
 		atomic(process.env.WALLPAPERDB_MUTATION_PROGRESS, this.progress);
 	}
 	onDryRunCompleted() {
+		this.planningStart = performance.now();
 		this.progress.startupAndCoverageSeconds =
 			(performance.now() - this.start) / 1000;
 	}
 	onMutationTestingPlanReady({ mutantPlans }) {
+		if (this.planningStart !== undefined)
+			this.progress.incrementalAnalysisAndSelectionSeconds =
+				(performance.now() - this.planningStart) / 1000;
 		try {
 			const gatePath = process.env.WALLPAPERDB_MUTATION_GATE;
 			const gate = gatePath
@@ -97,7 +104,19 @@ class ProgressReporter {
 		this.save();
 	}
 }
+const vitestFactory = vitestPlugins.find(
+	(plugin) => plugin.kind === "TestRunner" && plugin.name === "vitest",
+).factory;
+function timedVitestFactory(...args) {
+	return timeMutationRunner(vitestFactory(...args));
+}
+timedVitestFactory.inject = vitestFactory.inject;
 export const strykerPlugins = [
+	{
+		kind: "TestRunner",
+		name: "checkpoint-vitest",
+		factory: timedVitestFactory,
+	},
 	{
 		kind: "Reporter",
 		name: "checkpoint-progress",

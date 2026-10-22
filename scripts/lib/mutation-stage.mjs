@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { runBounded } from "./mutation-process.mjs";
 import { FixtureCleanupError, redisFixture } from "./mutation-fixture.mjs";
+import { readMutationTimings } from "./mutation-timings.mjs";
 import {
 	mutationContext,
 	restoreBaseline,
@@ -45,6 +46,7 @@ export async function runStage({
 	const cwd = join(root, workspace);
 	const contextConfig = { ...config, sourceFiles };
 	const context = mutationContext(root, workspace, suite, contextConfig);
+	const reuseStart = performance.now();
 	const baseline = restoreBaseline(context);
 	const executionBaseline = restoreBaseline(context, { forExecution: true });
 	mkdirSync(output, { recursive: true });
@@ -56,11 +58,13 @@ export async function runStage({
 	const initial = existsSync(incrementalFile)
 		? readFileSync(incrementalFile, "utf8")
 		: null;
+	const checkpointReuseSeconds = (performance.now() - reuseStart) / 1000;
 	const complete = join(run, "complete"),
 		progress = join(run, "progress.json");
 	const plan = join(run, "plan.json"),
 		gate = join(run, "gate.json");
 	const fixtureFailure = join(run, "fixture-failure.json");
+	const runnerTimings = join(run, "runner-timings.jsonl");
 	if (unit)
 		writeFileSync(
 			gate,
@@ -71,7 +75,7 @@ export async function runStage({
 			),
 		);
 	const options = {
-		testRunner: "vitest",
+		testRunner: "checkpoint-vitest",
 		plugins: [
 			import.meta.resolve("@stryker-mutator/vitest-runner"),
 			new URL("./mutation-reporter.mjs", import.meta.url).href,
@@ -99,6 +103,7 @@ export async function runStage({
 		errors: 0,
 		baselineRestored: Boolean(baseline),
 		checkpointSaved: false,
+		checkpointReuseSeconds,
 		run,
 	};
 	let report;
@@ -142,6 +147,7 @@ export async function runStage({
 					...process.env,
 					...fixture?.env,
 					WALLPAPERDB_MUTATION_PROGRESS: progress,
+					WALLPAPERDB_MUTATION_TIMINGS: runnerTimings,
 					WALLPAPERDB_MUTATION_PLAN: plan,
 					WALLPAPERDB_MUTATION_GATE: unit ? gate : "",
 					WALLPAPERDB_MUTATION_FAILURE_FILE: fixtureFailure,
@@ -268,6 +274,7 @@ export async function runStage({
 			};
 		}
 		if (sandbox) rmSync(sandbox, { recursive: true, force: true });
+		Object.assign(summary, readMutationTimings(runnerTimings));
 		writeFileSync(join(run, "summary.json"), JSON.stringify(summary, null, 2));
 		for (const name of [
 			"summary.json",

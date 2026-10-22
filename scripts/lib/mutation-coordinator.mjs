@@ -453,7 +453,8 @@ export async function coordinate() {
 				if (cancelled) summary.outcome = "cancelled";
 				else if (!jobs.some((job) => job.mutate.length))
 					summary.outcome = "no-changes";
-				else if (!summary.selectedScopeComplete) summary.outcome = "incomplete";
+				else if (!preparationReady || !summary.selectedScopeComplete)
+					summary.outcome = "incomplete";
 			}
 			summary.scheduling = scheduling;
 			try {

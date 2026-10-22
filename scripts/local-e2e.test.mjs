@@ -225,6 +225,13 @@ if (args.includes('ps') && args.some(x => x.startsWith('label=')) && process.env
 if (args.includes('build') && process.env.TEST_BUILD_EXIT) process.exit(Number(process.env.TEST_BUILD_EXIT));
 if (args.includes('run') && process.env.TEST_MOUNT_EXIT) process.exit(Number(process.env.TEST_MOUNT_EXIT));
 if (args.includes('up') && process.env.TEST_UP_EXIT) process.exit(Number(process.env.TEST_UP_EXIT));
+if (args.includes('up') && args.includes('infra/docker-compose.yml') && process.env.TEST_COLD_INFRA && args.includes('--wait')) {
+  if (process.env.TEST_INFRA_UNHEALTHY) { console.error('Required infrastructure did not become healthy'); process.exit(24); }
+  fs.writeFileSync('infra-health-ready', 'healthy');
+}
+if (args.includes('up') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_COLD_INFRA && !fs.existsSync('infra-health-ready')) {
+  console.error('Application cannot inspect its not-yet-listening infrastructure'); process.exit(24);
+}
 if (args.includes('up') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_BROWSER_FIXTURE) {
   const start = () => {
     console.log('Application fixture starting');
@@ -541,6 +548,58 @@ test("browser command fixtures await observable startup even when startup takes 
 			.calls()
 			.some((call) => call[0] === "turbo" && !call.includes("--dry=json")),
 	);
+});
+
+test("cold infrastructure becomes healthy within the startup budget before dependent browser apps start", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_COLD_INFRA = "1";
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.equal(result.status, 0, result.stderr);
+	const calls = f.calls();
+	const infrastructure = calls.findIndex(
+		(call) => call.includes("up") && call.includes("infra/docker-compose.yml"),
+	);
+	const applications = calls.findIndex(
+		(call) =>
+			call.includes("up") && call.includes("infra/docker-compose.apps.yml"),
+	);
+	assert.ok(infrastructure >= 0 && applications > infrastructure);
+	const timeout = Number(
+		calls[infrastructure][calls[infrastructure].indexOf("--wait-timeout") + 1],
+	);
+	assert.ok(timeout > 0 && timeout <= Number(f.env.E2E_READY_TIMEOUT));
+});
+
+test("unhealthy required infrastructure prevents app and browser execution and releases the owned stack", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_COLD_INFRA = "1";
+	f.env.TEST_INFRA_UNHEALTHY = "1";
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /phase "infrastructure startup" failed, exit 24/);
+	const calls = f.calls();
+	assert.ok(
+		!calls.some(
+			(call) =>
+				call.includes("up") && call.includes("infra/docker-compose.apps.yml"),
+		),
+	);
+	assert.ok(
+		!calls.some((call) => call[0] === "turbo" && !call.includes("--dry=json")),
+	);
+	assert.equal(
+		calls.filter((call) => call.includes("down") && call.includes("--volumes"))
+			.length,
+		2,
+	);
+	assert.equal(
+		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		0,
+	);
+	const directory = result.stdout.match(
+		/E2E diagnostics retained at (\S+)\./,
+	)[1];
+	t.after(() => rmSync(directory, { recursive: true, force: true }));
 });
 
 function failRunLog(f, line) {

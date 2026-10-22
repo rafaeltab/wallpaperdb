@@ -12,6 +12,7 @@ import Redis from 'ioredis';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestHttpApp, EmptyCatalogue, httpConfig } from './unit/http-fixture.js';
+import { mutationRedisEndpoint } from './mutation-redis-endpoint.js';
 import { admissionTelemetryLayer } from '../src/adapters/admission-telemetry/index.js';
 import { redisQuotaLayer } from '../src/adapters/redis/index.js';
 import {
@@ -26,8 +27,8 @@ import {
 let container: StartedTestContainer | undefined;
 let redisPort: number;
 beforeAll(async () => {
-  if (process.env.WALLPAPERDB_MUTATION_REDIS_PORT) {
-    redisPort = Number(process.env.WALLPAPERDB_MUTATION_REDIS_PORT);
+  if (mutationRedisEndpoint.port !== undefined) {
+    redisPort = mutationRedisEndpoint.port;
   } else {
     container = await new GenericContainer('redis:7-alpine').withExposedPorts(6379).start();
     redisPort = container.getMappedPort(6379);

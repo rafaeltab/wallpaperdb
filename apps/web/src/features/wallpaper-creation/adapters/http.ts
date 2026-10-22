@@ -62,6 +62,27 @@ const json = (body: unknown) => ({
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
+export async function uploadPolicy(
+  signal: AbortSignal
+): Promise<{ maxBytes: number; maxPixels: number; maxAxis: number }> {
+  const value = object(
+    await (await request(`${assetUrl}/asset-types/wallpaper/policy`, { signal })).json()
+  );
+  const admission = object(object(value.policy).admission);
+  const positive = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+  if (
+    !positive(admission.maxBytes) ||
+    !positive(admission.maxPixels) ||
+    !positive(admission.maxAxis)
+  )
+    throw new Error('Invalid Asset upload policy');
+  return {
+    maxBytes: admission.maxBytes,
+    maxPixels: admission.maxPixels,
+    maxAxis: admission.maxAxis,
+  };
+}
 export function browserCreationApi(): CreationApi<File> {
   return {
     candidateStatus: async (asset, id, signal) =>
@@ -90,19 +111,7 @@ export function browserCreationApi(): CreationApi<File> {
           await request(`${wallpaperUrl}/wallpapers/${encodeURIComponent(id)}`, { signal })
         ).json()
       ),
-    policy: async (signal) => {
-      const value = object(
-        await (await request(`${assetUrl}/asset-types/wallpaper/policy`, { signal })).json()
-      );
-      const admission = object(object(value.policy).admission);
-      if (
-        typeof admission.maxBytes !== 'number' ||
-        !Number.isSafeInteger(admission.maxBytes) ||
-        admission.maxBytes <= 0
-      )
-        throw new Error('Invalid Asset upload policy');
-      return { maxBytes: admission.maxBytes };
-    },
+    policy: uploadPolicy,
     candidate: async (asset, key, signal) =>
       candidate(
         await (
@@ -162,7 +171,6 @@ export function browserCreationApi(): CreationApi<File> {
         }, 1000);
         signal.addEventListener('abort', abort, { once: true });
       }),
-    newId: () => crypto.randomUUID(),
   };
 }
 export async function recentCreations(signal?: AbortSignal): Promise<readonly WallpaperStatus[]> {

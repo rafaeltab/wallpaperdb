@@ -46,7 +46,6 @@ export interface CreationApi<TFile> {
     signal: AbortSignal
   ) => Promise<CandidateStatus>;
   readonly wait: (signal: AbortSignal) => Promise<void>;
-  readonly newId: () => string;
 }
 export type CreationOutcome = {
   readonly kind: 'published' | 'pending';

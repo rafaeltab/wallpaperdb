@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 export interface UploadDropZoneProps {
   onFilesSelected: (files: File[]) => void;
   maxFiles?: number;
+  maxBytes?: number;
   disabled?: boolean;
   label?: string;
   description?: string;
@@ -15,9 +16,10 @@ export interface UploadDropZoneProps {
 export function UploadDropZone({
   onFilesSelected,
   maxFiles,
+  maxBytes,
   disabled = false,
   label,
-  description = 'Still JPEG, PNG, and WebP images. Up to 50 MiB, 100,000,000 pixels total, and 20,000 pixels per axis.',
+  description,
   className,
 }: UploadDropZoneProps) {
   const [isDragActive, setIsDragActive] = useState(false);
@@ -28,12 +30,12 @@ export function UploadDropZone({
     (fileList: FileList | null) => {
       if (!fileList || fileList.length === 0) return;
 
-      const { files, rejectionMessage } = acceptedUploads(Array.from(fileList), maxFiles);
+      const { files, rejectionMessage } = acceptedUploads(Array.from(fileList), maxFiles, maxBytes);
       setRejectionMessage(rejectionMessage);
 
       if (files.length > 0) onFilesSelected(files);
     },
-    [maxFiles, onFilesSelected]
+    [maxFiles, maxBytes, onFilesSelected]
   );
 
   const handleInputChange = useCallback(
@@ -118,7 +120,10 @@ export function UploadDropZone({
                 {isDragActive ? 'Drop files here' : 'Click to upload or drag and drop'}
               </p>
             )}
-            {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+            <p className="text-xs text-muted-foreground mt-1">
+              {description ??
+                `Still JPEG, PNG, and WebP images.${maxBytes === undefined ? '' : ` Up to ${maxBytes / (1024 * 1024)} MiB.`}`}
+            </p>
           </div>
         </div>
       </button>

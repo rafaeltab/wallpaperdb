@@ -1,3 +1,4 @@
+import {UploadDropZone} from '@/components/upload/upload-drop-zone';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -8,6 +9,7 @@ import { UploadPage } from '@/routes/upload';
 import {uploadWallpaperWithDetails,type UploadResult} from '@/lib/api/wallpaper';
 vi.mock('@/lib/api/wallpaper',()=>({uploadWallpaperWithDetails:vi.fn()}));
 
+vi.mock('@/components/upload/upload-admission',()=>({WallpaperUploadSelection:(props:React.ComponentProps<typeof UploadDropZone>)=><UploadDropZone {...props}/>}));
 vi.mock('@/components/upload/recent-creations',()=>({RecentCreations:()=>null}));
 
 vi.mock('@/components/upload-auth-gate', () => ({

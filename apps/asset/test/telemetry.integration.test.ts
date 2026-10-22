@@ -148,6 +148,17 @@ describe('Production telemetry composition', () => {
           }),
         })
       );
+      expect(exportedMetrics).toContainEqual(
+        expect.objectContaining({
+          name: 'asset.dependency.healthy',
+          gauge: expect.objectContaining({ dataPoints: expect.any(Array) }),
+        })
+      );
+      expect(exportedMetrics).toContainEqual(
+        expect.objectContaining({
+          name: 'asset.dependency.observed_at_seconds',
+        })
+      );
       const spans: unknown[] = [];
       for (const body of exported.get('/v1/traces') ?? []) {
         JSON.parse(body, (key, value: unknown) => {

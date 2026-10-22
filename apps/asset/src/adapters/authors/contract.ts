@@ -11,3 +11,10 @@ export class AuthorAuthentication extends Context.Service<
     ) => Effect.Effect<Owner | null, AuthorAuthenticationFailure>;
   }
 >()('asset/authors/Authentication') {}
+
+export class AuthorAuthenticationHealth extends Context.Service<
+  AuthorAuthenticationHealth,
+  {
+    readonly check: () => Effect.Effect<boolean>;
+  }
+>()('asset/authors/Health') {}

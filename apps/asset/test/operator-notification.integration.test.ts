@@ -49,11 +49,17 @@ it('delivers durable operator notices to the configured HTTP destination and qua
     pass: 'operator-secret',
   });
   await provisionAssetBroker(operator, authority, 'user');
+  const wallpaperOperator = await connect({
+    servers: url,
+    user: 'asset-operator_wallpaper',
+    pass: 'operator-secret',
+  });
+  await provisionAssetBroker(wallpaperOperator, authority, 'wallpaper');
   const runtime = ManagedRuntime.make(
     operatorWebhookLayer({
       url,
       credential: authority.broker.service,
-      applications: { user: authority.applications.user! },
+      applications: authority.applications,
       target: { url: `http://127.0.0.1:${address.port}/events`, token: 'operator-inbox-token' },
       ...authority.delivery,
     })
@@ -84,11 +90,36 @@ it('delivers durable operator notices to the configured HTTP destination and qua
     const stored = await manager.streams.getMessage('ASSET_QUARANTINE', { seq: 1 });
     expect(JSON.parse(stored.string()).type).toBe('asset.notification.quarantined');
     status = 200;
-    await recoverQuarantine(operator, authority, 'user', 1);
+    await wallpaperOperator
+      .jetstream()
+      .publish('asset.operator.notifications', JSON.stringify({ ...notice, id: 'c'.repeat(64) }));
     await expect.poll(() => received.length, { timeout: 3000 }).toBe(2);
+    expect(
+      await runtime.runPromise(OperatorNotificationHealth.use((service) => service.check()))
+    ).toBe(false);
+    await recoverQuarantine(operator, authority, 'user', 1);
+    await expect.poll(() => received.length, { timeout: 3000 }).toBe(3);
+    expect(
+      await runtime.runPromise(OperatorNotificationHealth.use((service) => service.check()))
+    ).toBe(true);
+    await manager.consumers.delete('ASSET_OPERATIONS', 'operator_notifications');
+    await expect
+      .poll(
+        () => runtime.runPromise(OperatorNotificationHealth.use((service) => service.check())),
+        { timeout: 3000 }
+      )
+      .toBe(false);
+    await wallpaperOperator
+      .jetstream()
+      .publish('asset.operator.notifications', JSON.stringify({ ...notice, id: 'd'.repeat(64) }));
+    await expect.poll(() => received.length, { timeout: 3000 }).toBe(4);
+    expect(
+      await runtime.runPromise(OperatorNotificationHealth.use((service) => service.check()))
+    ).toBe(false);
   } finally {
     await runtime.dispose();
     await operator.close();
+    await wallpaperOperator.close();
     await container.stop();
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

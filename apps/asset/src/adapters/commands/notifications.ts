@@ -110,7 +110,7 @@ export function operatorWebhookLayer(options: NotificationOptions) {
   return Layer.effect(
     OperatorNotificationHealth,
     Effect.gen(function* () {
-      const healthy = yield* Ref.make(true);
+      const health: Array<Ref.Ref<boolean>> = [];
       const accepting = yield* Ref.make(true);
       const connections: NatsConnection[] = [];
       const stops: Array<() => void> = [];
@@ -134,12 +134,15 @@ export function operatorWebhookLayer(options: NotificationOptions) {
             )
         );
         connections.push(connection);
+        const healthy = yield* Ref.make(true);
+        const alive = yield* Ref.make(true);
+        health.push(healthy, alive);
         const consumer = yield* operation('get-notification-consumer', () =>
           connection.jetstream().consumers.get('ASSET_OPERATIONS', 'operator_notifications')
         );
         const messages = yield* Effect.acquireRelease(
           operation('consume-notifications', () =>
-            consumer.consume({ max_messages: 1, expires: 1000 })
+            consumer.consume({ max_messages: 1, expires: 1000, abort_on_missing_resource: true })
           ),
           (messages) => Effect.sync(() => messages.stop())
         );
@@ -171,6 +174,7 @@ export function operatorWebhookLayer(options: NotificationOptions) {
             Effect.catchCause((cause) =>
               Cause.hasInterrupts(cause) ? Effect.void : Ref.set(healthy, false)
             ),
+            Effect.ensuring(Ref.set(alive, false)),
             Effect.forkScoped
           )
         );
@@ -195,9 +199,10 @@ export function operatorWebhookLayer(options: NotificationOptions) {
       );
       return {
         check: () =>
-          Ref.get(healthy).pipe(
+          Effect.all(health.map(Ref.get)).pipe(
             Effect.map(
-              (value) => value && connections.every((connection) => !connection.isClosed())
+              (values) =>
+                values.every(Boolean) && connections.every((connection) => !connection.isClosed())
             )
           ),
       };

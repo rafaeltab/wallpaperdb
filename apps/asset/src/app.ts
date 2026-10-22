@@ -21,7 +21,8 @@ import type { Config } from './config.js';
 import { deliveryLayer } from './capabilities/delivery/index.js';
 import { createHttpApp } from './http/index.js';
 import { tracingLayer } from './runtime.js';
-import { clerkAuthorLayer } from './adapters/authors/index.js';
+import { monitorLayer } from './monitor.js';
+import { clerkAuthorLayer, AuthorAuthenticationHealth } from './adapters/authors/index.js';
 import { lifecyclePostgresLayer } from './adapters/lifecycle/index.js';
 import { lifecycleLayer } from './capabilities/lifecycle/index.js';
 import {
@@ -33,13 +34,16 @@ import {
 
 class AuthorityHealth extends Context.Service<
   AuthorityHealth,
-  { readonly check: () => Effect.Effect<boolean> }
+  { readonly check: () => Effect.Effect<boolean>; readonly identity: () => Effect.Effect<boolean> }
 >()('asset/composition/AuthorityHealth') {}
 function authorityComposition(config: Config) {
   const authority = config.authority;
   if (!authority)
     return {
-      operations: Layer.succeed(AuthorityHealth, { check: () => Effect.succeed(true) }),
+      operations: Layer.succeed(AuthorityHealth, {
+        check: () => Effect.succeed(true),
+        identity: () => Effect.succeed(true),
+      }),
       authors: undefined,
     };
   const persistence = lifecyclePostgresLayer({
@@ -66,23 +70,23 @@ function authorityComposition(config: Config) {
     ...commandOptions,
     target: authority.operatorNotification,
   });
+  const authentication = clerkAuthorLayer(Object.values(authority.identityProviders));
   const operations = Layer.effect(
     AuthorityHealth,
     Effect.gen(function* () {
       const command = yield* ProtectedCommandHealth;
       const notification = yield* OperatorNotificationHealth;
+      const identity = yield* AuthorAuthenticationHealth;
       return {
+        identity: identity.check,
         check: () =>
           Effect.all([command.check(), notification.check()]).pipe(
             Effect.map((values) => values.every(Boolean))
           ),
       };
     })
-  ).pipe(Layer.provide(Layer.merge(commands, notifications)));
-  const authors = Layer.merge(
-    lifecycle,
-    clerkAuthorLayer(Object.values(authority.identityProviders))
-  );
+  ).pipe(Layer.provide(Layer.mergeAll(commands, notifications, authentication)));
+  const authors = Layer.merge(lifecycle, authentication);
   return { operations, authors };
 }
 
@@ -149,6 +153,7 @@ export function assetLayer(
         inspect: () =>
           Effect.all(
             {
+              ...(config.authority ? { identity: protectedAuthority.identity() } : {}),
               database: database.check,
               s3: storage
                 .check()
@@ -171,8 +176,11 @@ export function assetLayer(
   ).pipe(
     Layer.provide(Layer.mergeAll(catalog, assets, events, consumers, outbox, authority.operations))
   );
-  return Layer.merge(delivery, availabilityLayer.pipe(Layer.provide(probe))).pipe(
+  const services = Layer.merge(delivery, availabilityLayer.pipe(Layer.provide(probe))).pipe(
     Layer.provideMerge(tracingLayer)
+  );
+  return monitorLayer({ telemetryEnabled: Boolean(config.otelEndpoint) }).pipe(
+    Layer.provideMerge(services)
   );
 }
 export function createApp(config: Config, options: AppOptions = {}): Promise<FastifyInstance> {

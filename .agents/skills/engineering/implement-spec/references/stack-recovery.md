@@ -2,7 +2,7 @@
 
 ## Restack ticket worktrees
 
-Before rewriting history, record every layer's old parent SHA, local head, reviewed/validated commits, and last verified published remote tip. Inspect `git worktree list --porcelain` and the recorded T3 threads to identify each owning checkout. Wait for active ticket implementation or review work to finish before changing its source. Require that owning worktree to be clean.
+Before rewriting history, record every layer's old parent SHA, local head, reviewed/validated commits, and last verified published remote tip. Inspect [Git's worktree inventory](https://git-scm.com/docs/git-worktree) with `git worktree list --porcelain` and the recorded T3 threads to identify each owning checkout. Wait for active ticket implementation or review work to finish before changing its source. Require that owning worktree to be clean.
 
 Process layers bottom to top through their owning ticket threads, one at a time. Transplant only a layer's own commits using [Git's rebase --onto procedure](https://git-scm.com/docs/git-rebase#_transplanting_a_topic_branch_with_onto):
 

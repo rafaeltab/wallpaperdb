@@ -97,3 +97,33 @@ it('derives application authority only from the protected route and keeps comman
     },
   });
 });
+
+it('keeps malformed business payload identity stable across CloudEvent occurrences and object key order', () => {
+  const first = decodeAssetCommand(
+    [route],
+    route.subject,
+    Buffer.from(JSON.stringify({ ...envelope, data: { ...envelope.data, extra: true } }))
+  );
+  const second = decodeAssetCommand(
+    [route],
+    route.subject,
+    Buffer.from(
+      JSON.stringify({
+        ...envelope,
+        id: 'different-occurrence',
+        correlationid: 'different-workflow',
+        data: {
+          extra: true,
+          ownerSubject: 'owner-1',
+          assetType: 'picture',
+          applicationReference: 'reference-1',
+          commandId: 'command-1',
+        },
+      })
+    )
+  );
+  if (first.kind !== 'command' || second.kind !== 'command')
+    throw new Error('Expected correlatable malformed commands');
+  expect(second.command).toEqual(first.command);
+  expect(second.context).not.toEqual(first.context);
+});

@@ -63,7 +63,7 @@ function isolatedRepository() {
 		join(repository, rules, "test-correctness.json"),
 		join(directory, rules, "test-correctness.json"),
 	);
-	cpSync(join(repository, rules, "rules"), join(directory, rules, "rules"), {
+	cpSync(join(repository, rules, "src"), join(directory, rules, "src"), {
 		recursive: true,
 	});
 	const git = spawnSync("git", ["init", "--quiet", directory], {
@@ -118,6 +118,8 @@ function makeLint(directory, workspace, force = true) {
 }
 
 function makeRuleTests(directory) {
+	const env = { ...process.env, MAKEFLAGS: "", MFLAGS: "", MAKELEVEL: "0" };
+	delete env.NODE_TEST_CONTEXT;
 	const result = spawnSync(
 		"make",
 		[
@@ -129,12 +131,111 @@ function makeRuleTests(directory) {
 			cwd: directory,
 			encoding: "utf8",
 			timeout: 30_000,
-			env: { ...process.env, MAKEFLAGS: "", MFLAGS: "", MAKELEVEL: "0" },
+			env,
 		},
 	);
 	assert.equal(result.status, 0, result.stdout + result.stderr);
 	return result.stdout + result.stderr;
 }
+
+test("unit coverage combines with the CRAP JavaScript rule inventory", () => {
+	const directory = isolatedRepository();
+	try {
+		const workspace = join(directory, "packages/biome-test-rules");
+		mkdirSync(join(workspace, "src"), { recursive: true });
+		mkdirSync(join(workspace, "test"));
+		writeFileSync(
+			join(workspace, "src/measurement.js"),
+			"export function measured() {\n  return 42;\n}\n",
+		);
+		writeFileSync(
+			join(workspace, "test/coverage.test.mjs"),
+			`import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { measured } from '../src/measurement.js';
+test('executes measured source', () => assert.equal(measured(), 42));`,
+		);
+		copyFileSync(
+			join(repository, "scripts/crap.mts"),
+			join(directory, "scripts/crap.mts"),
+		);
+		copyFileSync(
+			join(repository, "crap.config.mts"),
+			join(directory, "crap.config.mts"),
+		);
+		gitFixture(directory, ["add", "--", "."]);
+		makeRuleTests(directory);
+		const reportPath = join(workspace, "coverage/unit/coverage-final.json");
+		assert.ok(
+			existsSync(reportPath),
+			"unit task must produce the collector's Istanbul report",
+		);
+		const coverage = JSON.parse(readFileSync(reportPath, "utf8"));
+		const measured = coverage[join(workspace, "src/measurement.js")];
+		assert.ok(Object.values(measured.f).some((hits) => hits > 0));
+		const unmeasured = coverage[join(workspace, "src/syntax.js")];
+		assert.ok(unmeasured, "unloaded maintained rules must remain visible");
+		assert.ok(Object.values(unmeasured.s).every((hits) => hits === 0));
+		const env = {
+			...process.env,
+			PACKAGE: "biome-test-rules",
+			MAKEFLAGS: "",
+			MFLAGS: "",
+			MAKELEVEL: "0",
+		};
+		delete env.NODE_TEST_CONTEXT;
+		const runCollector = (mode) =>
+			spawnSync(
+				join(repository, "scripts/node_modules/.bin/tsx"),
+				[join(directory, "scripts/crap.mts"), mode],
+				{
+					cwd: directory,
+					encoding: "utf8",
+					timeout: 60_000,
+					env: { ...env, CRAP_THRESHOLD: "0" },
+				},
+			);
+		const report = runCollector("report");
+		assert.equal(report.status, 0, report.stdout + report.stderr);
+		for (const file of [
+			"syntax.js",
+			"scope.js",
+			"port.js",
+			"retry.js",
+			"ported/valid-expect.js",
+			"ported/valid-expect-in-promise.js",
+			"ported/require-awaited-expect-poll.js",
+		])
+			assert.ok(
+				report.stdout.includes(`src/${file}`),
+				`missing ${file}: ${report.stdout}`,
+			);
+		assert.match(
+			report.stdout,
+			/0\.00%\tpackages\/biome-test-rules\/src\/syntax\.js:/,
+		);
+		assert.match(
+			report.stdout,
+			/100\.00%\tpackages\/biome-test-rules\/src\/measurement\.js:/,
+		);
+		const check = runCollector("check");
+		assert.notEqual(
+			check.status,
+			0,
+			"unmeasured rules must not silently pass a zero threshold",
+		);
+		assert.match(
+			check.stdout + check.stderr,
+			/CRAP: \d+ of \d+ functions exceed 0\./,
+		);
+		assert.doesNotMatch(
+			check.stdout + check.stderr,
+			/ENOENT|No in-scope source|Cannot combine coverage/,
+		);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});
 
 function installRuleTestCounter(directory) {
 	const workspace = join(directory, "packages/biome-test-rules");
@@ -197,12 +298,12 @@ test("root lint cache changes when the shared rules or configuration changes", (
 				'import { expect } from "vitest"; expect(1).toBe(1);',
 			);
 			const policy = join(directory, "packages/biome-test-rules");
-			const rule = join(policy, "rules/correctness.ts");
+			const rule = join(policy, "src/correctness.ts");
 			const stricter = readFileSync(rule, "utf8").replace(
 				"maxArgs: 2",
 				"maxArgs: 2, minArgs: 2",
 			);
-			writeFileSync(join(policy, "rules/stricter.ts"), stricter);
+			writeFileSync(join(policy, "src/stricter.ts"), stricter);
 			assert.equal(makeLint(directory, "root", false).status, 0);
 			assert.match(makeLint(directory, "root", false).output, /cache hit/);
 			if (changed === "rules") writeFileSync(rule, stricter);
@@ -211,8 +312,8 @@ test("root lint cache changes when the shared rules or configuration changes", (
 				writeFileSync(
 					configPath,
 					readFileSync(configPath, "utf8").replace(
-						"rules/correctness.ts",
-						"rules/stricter.ts",
+						"src/correctness.ts",
+						"src/stricter.ts",
 					),
 				);
 			}

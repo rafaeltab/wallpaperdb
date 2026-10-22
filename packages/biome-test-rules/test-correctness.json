@@ -2,7 +2,7 @@
 	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
 	"plugins": [
 		{
-			"path": "./rules/correctness.ts",
+			"path": "./src/correctness.ts",
 			"resolutionKind": "config",
 			"includes": [
 				"**/*.{test,spec}.{js,mjs,ts,tsx}",

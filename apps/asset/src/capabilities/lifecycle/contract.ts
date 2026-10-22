@@ -74,6 +74,15 @@ export interface ResultPublication {
  * through ambiguous publication and restart. Failure increments a durable finite
  * attempt counter; exhausted work remains inspectable until operator recovery. */
 export interface ResultOutboxPort {
+  readonly pendingAlerts: (
+    limit: number
+  ) => Effect.Effect<
+    readonly { readonly id: string; readonly applicationId: string }[],
+    LifecycleFailure
+  >;
+  readonly alerted: (id: string) => Effect.Effect<void, LifecycleFailure>;
+  /** Only trusted operator composition exposes deliberate recovery. Replaying a command does not reset exhausted publication attempts. */
+  readonly recover: (id: string) => Effect.Effect<boolean, LifecycleFailure>;
   readonly claim: (limit: number) => Effect.Effect<readonly ResultPublication[], LifecycleFailure>;
   readonly published: (publication: ResultPublication) => Effect.Effect<void, LifecycleFailure>;
   readonly failed: (publication: ResultPublication) => Effect.Effect<void, LifecycleFailure>;

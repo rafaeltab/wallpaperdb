@@ -1,6 +1,6 @@
 # Stack publication and recovery
 
-Follow the shared [PR history policy](../../../../../CONTRIBUTING.md#pull-request-history). Preserve published history and external work; obtain authorization before rewriting published commits. A trunk advance alone does not require restacking.
+Follow the shared [PR history policy](../../../../../CONTRIBUTING.md#pull-request-history) for conflict checks and base advances. Preserve published history and external work; obtain authorization before rewriting published commits.
 
 ## Publishing
 
@@ -13,9 +13,3 @@ Register native membership with [gh stack link](https://github.com/github/gh-sta
 Record old parent boundaries before changing refs. Wait for active work to finish and require clean owning worktrees. Rebase each layer in its ticket's worktree, bottom to top, using [rebase --onto](https://git-scm.com/docs/git-rebase#_transplanting_a_topic_branch_with_onto) to move only that layer's commits onto its new parent.
 
 Refresh issue evidence after rewrites. Keep required validation for the resulting tree; reuse validation only when the tested tree and required context remain identical. Assess layer and complete-spec review applicability under the shared [review evidence policy](../../../../../CONTRIBUTING.md#review-evidence) before dispatching fresh reviews. Retain equivalent evidence with its original provenance, and review material or unresolved changes and their interactions through the affected $do-work and complete-spec reviewers. Republish with explicit leases and verify targets and native membership.
-
-## Combined validation
-
-When current `main` is not an ancestor of the top commit, validate their combined tree in a disposable worktree using a temporary integration commit. Record both input commits and the tested tree. Preserve the published stack; integration conflicts block readiness until resolved, validated, and reviewed under the history policy.
-
-Initialize that checkout with [`make install`](../../../../../CONTRIBUTING.md#set-up-a-checkout) before validation and follow [worktree teardown](../../../../../CONTRIBUTING.md#stop-or-remove-a-worktree) on every exit.

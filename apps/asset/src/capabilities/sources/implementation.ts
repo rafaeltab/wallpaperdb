@@ -200,7 +200,7 @@ export function sourcesLayer(configuration: {
               };
             },
             catch: (cause) => new SourceFailure({ operation: 'receive-bytes', cause }),
-          });
+          }).pipe(Effect.onInterrupt(() => Effect.sync(bytes.cancel)));
           if (!input) return reject('encoded-size-limit');
           const uploadedAt = yield* Clock.currentTimeMillis;
           const reserved = yield* candidate(owner, assetId, id, (_state, found) => {

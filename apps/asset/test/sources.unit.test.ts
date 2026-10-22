@@ -102,9 +102,12 @@ it('keeps private bytes outside membership until immutable preparation and first
             owner,
             'asset_1',
             id,
-            (async function* () {
-              yield new Uint8Array([1, 2, 3, 4]);
-            })()
+            Object.assign(
+              (async function* () {
+                yield new Uint8Array([1, 2, 3, 4]);
+              })(),
+              { cancel: () => {} }
+            )
           )
         )
       )

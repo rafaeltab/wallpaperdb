@@ -1,6 +1,6 @@
 ---
 name: testing
-description: Repository test planning, spec testing sections, test seam selection, execution, and infrastructure troubleshooting. Use when deciding where behavior belongs or running tests.
+description: Repository test planning, defect verification, test seam selection, execution, and infrastructure troubleshooting. Use when planning tests, verifying fixes, or running tests.
 ---
 
 # Testing
@@ -17,6 +17,16 @@ Use [shared testing principles](../../../../docs/coding-standards/project-organi
 Keep capability decisions in capability tests. Test protocol translation and infrastructure behavior in adapter tests. Add [composition tests](../../../../docs/coding-standards/composition-and-operations.md#testing) when wiring or composition introduces a distinct risk.
 
 Use `make help` to discover commands. To run a focused test, use `make test-focused PACKAGE=<workspace> ARGS='<file or filter>'`; it builds dependencies and runs tests serially. `make coverage-summary` reads existing coverage, so run the relevant coverage-producing tests first.
+
+## Verify defect fixes
+
+Apply this guidance to implementation defects, review feedback, and automated repairs, including CI fixes.
+
+1. Establish the reported failure before changing the implementation with a reproduction or focused behavioral check when practical. For non-executable claims, compare with the authoritative requirement or other concrete evidence. Record any reproduction limit and the evidence used instead.
+2. Identify the supported behavior and accepted scope boundaries from requirements, existing contracts, and affected callers. Inspect those callers before adapting them. Distinguish a regression introduced by the change from an inherited limitation or a proposed new requirement.
+3. Select verification at the narrowest public boundary that owns the behavior using [test seam guidance](#choose-test-seams) and the applicable [testing standards](../../../../CODING_STANDARDS.md). Reuse existing suites and exercise actual integration entry points when integration is the risk. Scale additional checks to the change; existing coverage can suffice, and low-impact edits do not each require a mirrored test or paired examples.
+4. When a fix narrows accepted inputs, changes classification, or adds a restriction, cover both the reported defect case and a closely related valid case. Check that the valid case works before and after the fix and that the defect case changes as intended. If the proposed fix rejects a supported caller, repair the false positive or incorrect restriction rather than rewriting the valid caller to accommodate it.
+5. Report the evidence, checks and their results, preserved behavior, and remaining limits. State what the checks establish without claiming broader correctness.
 
 ## Container failures
 

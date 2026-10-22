@@ -73,6 +73,36 @@ describe('dependency probe with PostgreSQL and NATS', () => {
     await expect.poll(natsConnections).toMatchObject({ num_connections: 0 });
   });
 
+  it('authenticates with the percent-encoded credentials from its configured broker URL', async () => {
+    const user = 'wallpaper-client';
+    const password = 'broker-private-marker:/@%';
+    const protectedBroker = await createNatsContainer({
+      enableJetStream: false,
+      additionalArgs: ['--user', user, '--pass', password],
+    });
+    const url = new URL(protectedBroker.getConnectionUrl());
+    url.username = encodeURIComponent(user);
+    url.password = encodeURIComponent(password);
+    const runtime = ManagedRuntime.make(
+      dependencyProbeLayer({
+        databaseUrl: databaseUrl(),
+        natsUrl: url.toString(),
+        serviceName: 'wallpaper-authenticated-broker-test',
+        otelHealthy: true,
+      })
+    );
+    try {
+      expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual({
+        database: true,
+        nats: true,
+        otel: true,
+      });
+    } finally {
+      await runtime.dispose();
+      await protectedBroker.stop();
+    }
+  });
+
   it('marks a stalled broker unavailable and closes the outstanding network work', async () => {
     const address = new URL(nats.getConnectionUrl());
     const proxy = await databaseProxy(address.hostname, Number(address.port));

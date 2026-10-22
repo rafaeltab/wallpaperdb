@@ -28,6 +28,8 @@ function status(input: unknown): WallpaperStatus {
     assetId: v.assetId,
     sourceId: v.sourceId,
     state,
+    ...(typeof v.candidateId === 'string' ? { candidateId: v.candidateId } : {}),
+    ...(v.attentionRequired === true ? { attentionRequired: true } : {}),
   };
 }
 function candidate(input: unknown): CandidateStatus {
@@ -166,17 +168,43 @@ export function browserCreationApi(): CreationApi<File> {
 export async function recentCreations(signal?: AbortSignal): Promise<readonly WallpaperStatus[]> {
   const value = object(await (await request(`${wallpaperUrl}/wallpapers`, { signal })).json());
   if (!Array.isArray(value.wallpapers)) throw new Error('Invalid Wallpaper list');
-  return value.wallpapers.map(status);
+  const wallpapers = value.wallpapers.map(status);
+  const result: WallpaperStatus[] = [];
+  // Keep progress lookups bounded while Asset retains authority for candidate facts.
+  for (const wallpaper of wallpapers) {
+    if (wallpaper.state !== 'accepting-source' || !wallpaper.assetId || !wallpaper.candidateId) {
+      result.push(wallpaper);
+      continue;
+    }
+    try {
+      const current = candidate(
+        await (
+          await request(
+            `${assetUrl}/assets/${encodeURIComponent(wallpaper.assetId)}/source-candidates/${encodeURIComponent(wallpaper.candidateId)}`,
+            { signal }
+          )
+        ).json()
+      );
+      result.push({ ...wallpaper, candidateStatus: current.status });
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      result.push({ ...wallpaper, candidateStatus: 'unavailable' });
+    }
+  }
+  return result;
 }
-export async function downloadOriginal(wallpaper: WallpaperStatus) {
+export async function downloadOriginal(wallpaper: WallpaperStatus, signal: AbortSignal) {
   if (!wallpaper.assetId || !wallpaper.sourceId) return;
   const response = await request(
-    `${assetUrl}/assets/${encodeURIComponent(wallpaper.assetId)}/sources/${encodeURIComponent(wallpaper.sourceId)}/original`
+    `${assetUrl}/assets/${encodeURIComponent(wallpaper.assetId)}/sources/${encodeURIComponent(wallpaper.sourceId)}/original`,
+    { signal }
   );
   const filename =
     /filename="([A-Za-z0-9_.-]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ??
     wallpaper.sourceId;
-  const url = URL.createObjectURL(await response.blob());
+  const blob = await response.blob();
+  signal.throwIfAborted();
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = filename;

@@ -13,6 +13,7 @@ const publicAdapters = new Set([
   'public-profile/adapters/routes.ts',
   'request-admission/adapters/graphql.ts',
   'upload-queue/adapters/browser.ts',
+  'wallpaper-creation/adapters/http.ts',
   'wallpaper-details/adapters/download.ts',
   'wallpaper-details/adapters/react.ts',
   'wallpaper-details/adapters/share.ts',

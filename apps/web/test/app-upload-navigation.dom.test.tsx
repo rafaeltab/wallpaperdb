@@ -38,7 +38,7 @@ describe('App upload notification navigation', () => {
     });
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      if (url.endsWith('/upload')) return new Promise<Response>(() => {});
+      if (url.endsWith('/asset-types/wallpaper/policy')) return new Promise<Response>(() => {});
       const body = url.endsWith('/profile/me/ensure') ? {
         id: 'user_navigation',
         handle: 'navigation-user',

@@ -3,8 +3,11 @@ name: PR history
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, edited, ready_for_review]
-  push:
-    branches: ['**']
+  workflow_run:
+    workflows: [CI]
+    types: [requested, completed]
+  schedule:
+    - cron: '7,22,37,52 * * * *'
 
 permissions:
   contents: read
@@ -18,29 +21,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'pull_request_target' && github.sha || github.event.repository.default_branch }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: Check whether the trusted policy is installed
-        id: policy
-        run: |
-          if [ -f .github/workflows/pr-history.yml ]; then
-            echo 'installed=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'installed=false' >> "$GITHUB_OUTPUT"
-            echo 'History validation activates after this workflow reaches the default branch.'
-          fi
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Revalidate submitted history against the current base
-        if: steps.policy.outputs.installed == 'true' && github.event_name == 'pull_request_target'
+        if: github.event_name == 'pull_request_target'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node scripts/check-pr-history-status.mjs "$PR_NUMBER"
-      - name: Revalidate open PRs after their base advances
-        if: steps.policy.outputs.installed == 'true' && github.event_name == 'push'
+      - name: Reconcile all open PRs against their live bases
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          HISTORY_BASE: ${{ github.ref_name }}
         run: node scripts/check-pr-history-status.mjs

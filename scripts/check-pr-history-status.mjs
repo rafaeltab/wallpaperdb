@@ -103,11 +103,10 @@ try {
 	if (
 		!/^[\w.-]+\/[\w.-]+$/.test(repository ?? "") ||
 		extra.length ||
-		(number && !/^[1-9]\d*$/.test(number)) ||
-		(!number && !baseRef)
+		(number && !/^[1-9]\d*$/.test(number))
 	)
 		throw new Error(
-			"Set GITHUB_REPOSITORY and provide a PR number or HISTORY_BASE",
+			"Set GITHUB_REPOSITORY and optionally provide a PR number or HISTORY_BASE",
 		);
 	if (number) check(Number(number), true);
 	else {
@@ -115,7 +114,7 @@ try {
 			"api",
 			"--paginate",
 			"--slurp",
-			`repos/${repository}/pulls?state=open&base=${encodeURIComponent(baseRef)}&per_page=100`,
+			`repos/${repository}/pulls?state=open${baseRef ? `&base=${encodeURIComponent(baseRef)}` : ""}&per_page=100`,
 		]);
 		if (listed.status !== 0)
 			throw new Error(listed.stderr || "Could not list open PRs");

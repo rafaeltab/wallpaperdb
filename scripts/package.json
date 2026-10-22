@@ -11,6 +11,7 @@
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:docker-queue": "cd .. && node --test scripts/docker-validation.test.mjs",
+		"test:toolchain": "cd .. && node --test scripts/toolchain.test.mjs",
 		"test:pr-history": "cd .. && node --test scripts/pr-history.test.mjs",
 		"test:pr-history-status": "cd .. && node --test scripts/pr-history-status.test.mjs",
 		"check:pr-history": "node check-pr-history.mjs",

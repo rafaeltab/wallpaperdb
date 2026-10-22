@@ -1,0 +1,44 @@
+min_version = "2026.10.17"
+
+[settings]
+lockfile = true
+
+# Exact versions are intentional. Regenerate mise.lock when changing them.
+[tools]
+node = "22.22.3"
+pnpm = "10.18.3"
+python = "3.13.17" # node-gyp fallback builds
+"conda:git" = "2.53.0"
+"conda:make" = "4.4.1"
+gh = "2.103.0" # issue/project operations and PR attachments
+jq = "1.8.2"
+ripgrep = "15.2.0"
+"github:nats-io/natscli" = "0.5.0"
+docker-cli = "29.1.3"
+"github:docker/compose" = { version = "2.40.3", bin = "docker-compose" }
+"github:docker/buildx" = { version = "0.37.1", bin = "docker-buildx" }
+agent-browser = "0.39.1"
+ffmpeg = "9.0.2" # PR recording conversion
+
+# Host/bootstrap boundaries from the repository-wide inventory:
+# - mise itself, a POSIX shell, curl/CA certificates and archive extraction bootstrap
+#   the manager. Host Make/Git can enter the checkout; recipes use managed tools.
+# - Linux procfs, util-linux flock, bash, coreutils, awk, sed, grep, find, tar and
+#   the OS loader/libc are the base OS contract of scripts and the Docker queue.
+# - Docker daemon/socket, kernel namespaces, permissions and credential helpers
+#   are host services. Managed clients below do not start or replace the daemon.
+# - C/C++ compiler, linker, libc headers and Python build headers are host ABI
+#   inputs for optional node-gyp builds, not portable standalone executables.
+# - Playwright and its Chromium revision, Turbo, TypeScript, tsx, Vitest, Biome,
+#   Sharp/libvips, Drizzle, Vite, Next, Storybook and other JS CLIs belong to pnpm
+#   manifests/lockfile. Browser shared libraries/fonts come from the host OS.
+# - Alpine container runtimes, apk build tools, Corepack and service CLIs
+#   (psql, redis-cli, nats-box, curl) stay owned by Dockerfiles/Compose images.
+# - GitHub Actions, cache/Codecov/Docker actions, Clerk/GitHub credentials, T3/MCP
+#   and agent-provider installations are supplied by their host/service. This
+#   project must not replace a running agent or install account credentials.
+
+[env]
+# Docker discovers plugins through host-global config, not PATH. Dispatch the
+# repository's compose/buildx invocations to mise without editing that config.
+_.path = ["{{ config_root }}/scripts/toolchain-bin"]

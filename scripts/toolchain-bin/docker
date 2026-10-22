@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+case "${1:-}" in
+  compose) shift; exec docker-compose "$@" ;;
+  buildx) shift; exec docker-buildx "$@" ;;
+  *) exec "$(mise where docker-cli)/docker/docker" "$@" ;;
+esac

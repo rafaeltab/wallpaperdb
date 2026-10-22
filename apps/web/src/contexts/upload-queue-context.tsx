@@ -26,7 +26,13 @@ type BrowserUploadQueue = ReturnType<typeof createBrowserUploadQueue>;
 type UploadQueueContextValue = ReturnType<BrowserUploadQueue['getSnapshot']> &
   Pick<
     BrowserUploadQueue,
-    'addFiles' | 'clearCompleted' | 'retryFailed' | 'cancelAll' | 'stopQueue' | 'resumeQueue'
+    | 'addFiles'
+    | 'clearCompleted'
+    | 'resumeConfirming'
+    | 'retryFailed'
+    | 'cancelAll'
+    | 'stopQueue'
+    | 'resumeQueue'
   >;
 
 const UploadQueueContext = createContext<UploadQueueContextValue | undefined>(undefined);
@@ -41,6 +47,7 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
     addFiles: queue.addFiles,
     clearCompleted: queue.clearCompleted,
     retryFailed: queue.retryFailed,
+    resumeConfirming: queue.resumeConfirming,
     cancelAll: queue.cancelAll,
     stopQueue: queue.stopQueue,
     resumeQueue: queue.resumeQueue,

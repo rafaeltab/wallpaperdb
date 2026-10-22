@@ -36,9 +36,11 @@ describe('App upload notification navigation', () => {
       unobserve() {}
       disconnect() {}
     });
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request,options?:RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      if (url.endsWith('/asset-types/wallpaper/policy')) return new Promise<Response>(() => {});
+      if(url.endsWith('/asset-types/wallpaper/policy'))return new Response(JSON.stringify({policy:{admission:{maxBytes:52428800,maxPixels:100000000,maxAxis:20000}}}),{headers:{'content-type':'application/json'}});
+      if(url.endsWith('/wallpapers')&&options?.method==='POST')return new Promise<Response>(()=>{});
+      if(url.endsWith('/wallpapers'))return new Response(JSON.stringify({wallpapers:[]}),{headers:{'content-type':'application/json'}});
       const body = url.endsWith('/profile/me/ensure') ? {
         id: 'user_navigation',
         handle: 'navigation-user',
@@ -58,6 +60,7 @@ describe('App upload notification navigation', () => {
     render(<App />);
 
     await screen.findByText('Upload Wallpapers');
+    await waitFor(()=>expect(screen.getByTestId('file-input')).not.toBeDisabled());
     await user.upload(screen.getByTestId('file-input'), new File(['picture'], 'wallpaper.jpg', { type: 'image/jpeg' }));
     const notifications = screen.getByRole('region', { name: /Notifications/ });
     await within(notifications).findByText('Uploading 0/1 files');

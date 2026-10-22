@@ -359,3 +359,25 @@ test("immediately invoked bound helpers require their own result consumer", () =
 		[],
 	);
 });
+
+test("bound assertion helpers follow direct callback and immutable binding consumers", () => {
+	const prelude =
+		"import { expect } from 'vitest'; const values = [1]; const check = () => expect(Promise.resolve(1)).resolves.toBe(1); ";
+	for (const source of [
+		"values.forEach(check.bind(null));",
+		"const bound = check.bind(null); bound();",
+		"const bound = check.bind(null); bound(); await bound();",
+	])
+		assert.ok(
+			lint(prelude + source).some((d) => d.message.includes("async assertion")),
+			source,
+		);
+	for (const source of [
+		"await Promise.all(values.map(check.bind(null)));",
+		"const bound = check.bind(null); await bound();",
+		"const bound = check.bind(null); const alias = bound; await alias();",
+		"check.bind(null); await check();",
+		"const unused = check.bind(null); await check();",
+	])
+		assert.deepEqual(lint(prelude + source), [], source);
+});

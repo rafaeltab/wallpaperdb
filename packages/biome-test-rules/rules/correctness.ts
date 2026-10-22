@@ -555,11 +555,15 @@ function callbackResultHandled(
 			return handled(invocation, model, seen, allowVoid);
 		if (
 			parent.member?.text === "bind" &&
-			invocation?.kind === "JS_CALL_EXPRESSION" &&
-			invocation.parent?.kind === "JS_CALL_EXPRESSION" &&
-			invocation.parent.callee?.kind === "JS_CALL_EXPRESSION"
-		)
-			return handled(invocation.parent, model, seen, allowVoid);
+			invocation?.kind === "JS_CALL_EXPRESSION"
+		) {
+			// Binding creates a function, not an assertion promise. An unused bound
+			// value is inert; otherwise inspect its existing local consumers.
+			return (
+				invocation.parent?.kind === "JS_EXPRESSION_STATEMENT" ||
+				callbackResultHandled(invocation, model, seen, allowVoid)
+			);
+		}
 		return true;
 	}
 	if (parent?.kind === "JS_PARENTHESIZED_EXPRESSION")

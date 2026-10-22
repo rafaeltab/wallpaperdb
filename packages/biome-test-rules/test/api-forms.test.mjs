@@ -22,3 +22,34 @@ test("static template API members retain assertion and registration identity", (
 	])
 		assert.deepEqual(lint(source), [], source);
 });
+
+test("Vitest TODO options mark actual registrations unfinished", () => {
+	for (const source of [
+		"it('case', { todo: true }, () => {});",
+		"it.concurrent('case', { todo: true }, () => {});",
+		"it('case', () => {}, { todo: true });",
+		"it.each([1])('case', { todo: true }, () => {});",
+		"it.for([1])('case', { todo: true }, () => {});",
+		"const options = { [`todo`]: true }; it('case', options, () => {});",
+		"it('case', enabled ? { todo: true } : {}, () => {});",
+	])
+		assert.ok(
+			lint("import { it } from 'vitest'; " + source).some((d) =>
+				d.message.includes("unfinished"),
+			),
+			source,
+		);
+	for (const source of [
+		"import { it } from 'vitest'; it('case', { todo: false }, () => {});",
+		"import { it } from 'vitest'; const disabled = false; it('case', { todo: disabled }, () => {});",
+		"import { it } from 'vitest'; it('case', { todo: (false as const) }, () => {});",
+		"import { it } from 'vitest'; it('case', { todo: undefined }, () => {});",
+		"import { it } from 'vitest'; it.each([{ todo: true }])('case', () => {});",
+		"import { it } from 'vitest'; it.for([{ todo: true }])('case', () => {});",
+		"import { it } from 'vitest'; const rows = it.each([{ todo: true }]); rows('case', () => {});",
+		"import { it } from 'vitest'; it.extend({ todo: true })('case', () => {});",
+		"import { it } from 'vitest'; function run(it) { it('case', { todo: true }, () => {}); }",
+		"const application = (name, options, fn) => fn(); application('case', { todo: true }, () => {});",
+	])
+		assert.deepEqual(lint(source), [], source);
+});

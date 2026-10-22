@@ -286,6 +286,7 @@ describe('RedisTesterBuilder', { concurrent: true }, () => {
     try {
       await tester.setup();
 
+      expect(tester.redis.config.endpoints.networked).toBe(`redis://${customAlias}:6379`);
       const result = await tester.redis.config.container.exec([
         'redis-cli',
         '-u',

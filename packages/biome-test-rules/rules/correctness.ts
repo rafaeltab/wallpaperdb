@@ -439,7 +439,7 @@ function hasOption(
 					(name?.kind === "JS_COMPUTED_MEMBER_NAME"
 						? staticComputedKey(name.expression)
 						: literal(name?.text)) === option &&
-					(option !== "todo" ||
+					(option === "retry" ||
 						!definitelyFalsy(
 							member.kind === "JS_PROPERTY_OBJECT_MEMBER"
 								? member.value
@@ -476,6 +476,16 @@ export const noTestRetries = defineRule({
 	},
 });
 
+function registrationOptions(node: AnyJsAstNode, api: Api): readonly AnyJsAstNode[] {
+	const args =
+		node.kind === "JS_CALL_EXPRESSION" ? (node.arguments?.args ?? []) : [];
+	if (api.source === "node:test") return api.members.length === 0 ? args : [];
+	return ["vitest", "@effect/vitest", "global"].includes(api.source) &&
+		!api.pendingFactory
+		? args.slice(1, 3)
+		: [];
+}
+
 export const noTodoTests = defineRule({
 	query: semantic("JS_CALL_EXPRESSION"),
 	run(node, context) {
@@ -485,17 +495,16 @@ export const noTodoTests = defineRule({
 			api &&
 			["it", "test", "describe", "suite"].includes(api.name) &&
 			(api.members.includes("todo") ||
+				registrationOptions(node, api).some((arg) =>
+					hasOption(arg, context.model, "todo"),
+				) ||
 				(api.source === "node:test" && api.members.length === 0
-					? !potentialCallback(args.at(-1), context.model) ||
-						args.some((arg) => hasOption(arg, context.model, "todo"))
+					? !potentialCallback(args.at(-1), context.model)
 					: ["vitest", "@effect/vitest", "global"].includes(api.source)
 						? !api.pendingFactory &&
-							(!args
+							!args
 								.slice(1, 3)
-								.some((arg) => potentialCallback(arg, context.model)) ||
-								args
-									.slice(1, 3)
-									.some((arg) => hasOption(arg, context.model, "todo")))
+								.some((arg) => potentialCallback(arg, context.model))
 						: args.length < 2 && api.members.length === 0))
 		) {
 			registerDiagnostic(
@@ -511,11 +520,20 @@ export const noAliasedTestModifiers = defineRule({
 	query: semantic("JS_CALL_EXPRESSION"),
 	run(node, context) {
 		const api = resolveApi(node.callee, context.model);
-		if (
-			!api ||
-			!["it", "test", "describe", "suite"].includes(api.name) ||
-			!api.members.some((member) => ["only", "skip"].includes(member))
-		)
+		if (!api || !["it", "test", "describe", "suite"].includes(api.name)) return;
+		for (const argument of registrationOptions(node, api)) {
+			if (
+				["skip", "only"].some((flag) =>
+					hasOption(argument, context.model, flag),
+				)
+			)
+				registerDiagnostic(
+					argument,
+					"error",
+					"Do not focus or disable tests through registration options.",
+				);
+		}
+		if (!api.members.some((member) => ["only", "skip"].includes(member)))
 			return;
 		const callee = node.callee;
 		// Biome's built-ins cover direct registrations, including their existing

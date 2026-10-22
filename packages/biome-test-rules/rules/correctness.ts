@@ -577,7 +577,7 @@ function potentialCallback(
 		return potentialCallback(node.expression, model, seen);
 	if (node.kind === "JS_IDENTIFIER_EXPRESSION" && node.name) {
 		const binding = model.binding(node.name);
-		if (!binding) return node.text !== "undefined";
+		if (!binding) return !["undefined", "NaN", "Infinity"].includes(node.text);
 		const declaration = binding.syntax();
 		const key = `${declaration.text}:${binding.scope().syntax().text}`;
 		if (seen.has(key)) return false;
@@ -588,8 +588,7 @@ function potentialCallback(
 				return potentialCallback(value, model, seen);
 		}
 	}
-	if (node.kind === "JS_UNARY_EXPRESSION" && node.operatorToken === "void")
-		return false;
+	if (node.kind === "JS_TEMPLATE_EXPRESSION") return !!node.tag;
 	// Unknown imported/parameter bindings may be legitimate handlers. Reject
 	// provably non-callable values without inventing cross-module type inference.
 	return ![
@@ -597,6 +596,12 @@ function potentialCallback(
 		"JS_BOOLEAN_LITERAL_EXPRESSION",
 		"JS_NUMBER_LITERAL_EXPRESSION",
 		"JS_STRING_LITERAL_EXPRESSION",
+		"JS_BIGINT_LITERAL_EXPRESSION",
+		"JS_REGEX_LITERAL_EXPRESSION",
+		"JS_UNARY_EXPRESSION",
+		"JS_BINARY_EXPRESSION",
+		"JS_PRE_UPDATE_EXPRESSION",
+		"JS_POST_UPDATE_EXPRESSION",
 		"JS_OBJECT_EXPRESSION",
 		"JS_ARRAY_EXPRESSION",
 	].includes(node.kind);

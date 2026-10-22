@@ -452,3 +452,34 @@ test("stored assertions retain valid cancellation, finally and conditional retur
 	])
 		assert.deepEqual(lint(prelude + source), [], source);
 });
+
+test("obviously non-callable rejection handlers do not consume assertions", () => {
+	for (const handler of [
+		"NaN",
+		"Infinity",
+		"/ignored/",
+		"1n",
+		"`text`",
+		"+1",
+		"typeof handler",
+		"1 + 1",
+	])
+		assert.ok(
+			lint(
+				`import { expect } from 'vitest'; expect(Promise.resolve(1)).resolves.toBe(2).catch(${handler});`,
+				{},
+				"example.test.mjs",
+			).some((d) => d.message.includes("Await or return")),
+			handler,
+		);
+	for (const source of [
+		"const NaN = () => {}; expect(Promise.resolve(1)).resolves.toBe(1).catch(NaN);",
+		"const Infinity = () => {}; expect(Promise.resolve(1)).resolves.toBe(1).catch(Infinity);",
+		"const tag = () => () => {}; expect(Promise.resolve(1)).resolves.toBe(1).catch(tag`handler`);",
+	])
+		assert.deepEqual(
+			lint("import { expect } from 'vitest'; " + source),
+			[],
+			source,
+		);
+});

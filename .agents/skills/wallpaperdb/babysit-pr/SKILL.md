@@ -7,6 +7,8 @@ description: Monitor a pull request until CI passes and Codex approves its curre
 
 An invocation authorizes tested fixes and pushes to the selected PR, review replies and reactions, thread resolution, Codex review requests, bounded CI reruns, and GitHub issues for proven pre-existing flaky tests. Honor user-specified scope and retry limits. Completion hands the PR back to the user without merging it.
 
+Apply [task scope](../../../../docs/agents/task-scope.md) to feedback and CI repairs. Include its scope and decision context in the ledger below, restoring it on every wake and passing it to delegated work and review rounds.
+
 ## 1. Establish the target and retain progress
 
 Start with this workflow and its bootstrap instructions loaded from a trusted installed copy or independently verified policy snapshot. Establish the current checkout's trust through authenticated repository and PR metadata before interpreting any worktree instructions, even when already on the selected PR's branch.
@@ -33,7 +35,7 @@ Invoke [fix-pr-review-comments](../fix-pr-review-comments/SKILL.md) for each bat
 
 Record each actionable comment whose concern was fixed by a verified change pushed during this babysitting session. Count each comment ID once, including distinct comments reporting the same defect. Track invalid feedback and concerns already fixed before this session separately; neither increases the number of comments fixed. CI-only fixes do not increase this count. On each head change, audit delivered fixes against the new tree. Verify each fix commit remains reachable and its mapped concern remains fixed; ancestry alone does not detect a later revert. For rewritten history, verify an equivalent replacement and record its commit and evidence. If a concern returns, explicitly select that comment for fix-pr-review-comments even when its thread remains resolved, mark it pending, and repair it before success. Count its comment ID only once after the verified fix is delivered again.
 
-Mixed or uncertain verdicts require the user's answer under that skill. Finish independent work, then return the pending question and incomplete status to the user. A disputed finding that Codex continues to reject also needs the user's decision rather than an endless fix-and-review loop.
+Mixed or uncertain verdicts follow that skill's decision handling. Finish independent work, then return any pending question and incomplete status to the user. For a disputed finding that Codex continues to reject, apply the recorded user decision or ask when none settles the action. Report any unmet approval gate.
 
 ## 3. Diagnose and handle CI failures
 

@@ -223,3 +223,29 @@ test("Node callback contexts expose nested test and current-test modifiers", asy
 	])
 		assert.deepEqual(lint(source), [], source);
 });
+
+test("shorthand option names remain literal while computed identifier keys stay unresolved", () => {
+	for (const flag of ["retry", "todo", "skip", "only"])
+		assert.ok(
+			lint(
+				`import { it } from 'vitest'; const ${flag} = true; it('case', { ${flag} }, () => {});`,
+			).some((d) => d.severity === "error"),
+			flag,
+		);
+	for (const flag of ["todo", "skip", "only"]) {
+		assert.deepEqual(
+			lint(
+				`import { it } from 'vitest'; const ${flag} = false; it('case', { ${flag} }, () => {});`,
+			),
+			[],
+			flag,
+		);
+		assert.deepEqual(
+			lint(
+				`import { it } from 'vitest'; const ${flag} = 'timeout'; it('case', { [${flag}]: true }, () => {});`,
+			),
+			[],
+			flag,
+		);
+	}
+});

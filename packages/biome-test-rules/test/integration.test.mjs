@@ -73,7 +73,7 @@ function isolatedRepository() {
 	return directory;
 }
 
-function makeLint(directory, workspace) {
+function makeLint(directory, workspace, force = true) {
 	const filter = workspace === "root" ? "//" : `@wallpaperdb/${workspace}`;
 	// The fixture owns configuration and sources, while dependency builds are
 	// validated by repository CI. Run the actual Make/Turbo lint task in isolation.
@@ -82,7 +82,7 @@ function makeLint(directory, workspace) {
 		[
 			"lint",
 			`PACKAGE=${workspace}`,
-			`TURBO_FLAGS=--filter=${filter} --only --force`,
+			`TURBO_FLAGS=--filter=${filter} --only${force ? " --force" : ""}`,
 		],
 		{
 			cwd: directory,
@@ -94,6 +94,45 @@ function makeLint(directory, workspace) {
 	assert.equal(result.error, undefined);
 	return { status: result.status, output: result.stdout + result.stderr };
 }
+
+test("root lint cache changes when the shared rules or configuration changes", () => {
+	for (const changed of ["rules", "configuration"]) {
+		const directory = isolatedRepository();
+		try {
+			const fixture = join(directory, "test/cache.test.ts");
+			mkdirSync(dirname(fixture), { recursive: true });
+			writeFileSync(
+				fixture,
+				'import { expect } from "vitest"; expect(1).toBe(1);',
+			);
+			const policy = join(directory, "packages/biome-test-rules");
+			const rule = join(policy, "rules/correctness.ts");
+			const stricter = readFileSync(rule, "utf8").replace(
+				"count < 1",
+				"count < 2",
+			);
+			writeFileSync(join(policy, "rules/stricter.ts"), stricter);
+			assert.equal(makeLint(directory, "root", false).status, 0);
+			assert.match(makeLint(directory, "root", false).output, /cache hit/);
+			if (changed === "rules") writeFileSync(rule, stricter);
+			else {
+				const configPath = join(policy, "test-correctness.json");
+				writeFileSync(
+					configPath,
+					readFileSync(configPath, "utf8").replace(
+						"rules/correctness.ts",
+						"rules/stricter.ts",
+					),
+				);
+			}
+			const result = makeLint(directory, "root", false);
+			assert.notEqual(result.status, 0, `${changed}: ${result.output}`);
+			assert.match(result.output, /Complete the assertion/);
+		} finally {
+			rmSync(directory, { recursive: true, force: true });
+		}
+	}
+});
 
 function sourceTestDirectory(path) {
 	if (!existsSync(path)) return undefined;

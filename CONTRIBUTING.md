@@ -4,13 +4,23 @@ Start with the [coding guidelines](CODING_STANDARDS.md) for the work you are cha
 
 ## Set up a checkout
 
-Use Node.js 22.12.0 or later on the 22.x line and the pnpm version pinned in [package.json](package.json). You also need Docker with [Buildx](https://docs.docker.com/build/install-buildx/) and Compose watch support, and Git 2.38 or later for the history check's [merge simulation](https://git-scm.com/docs/git-merge-tree/2.38.0.html).
+The authoritative tool inventory, exact versions, and host boundaries are in [mise.toml](mise.toml). [mise.lock](mise.lock) locks download checksums and Conda dependencies. The validated host is Linux x86-64 with glibc, Docker Engine access, procfs and `flock`. Full local validation requires Linux because the shared Docker queue reads procfs. Other platforms are not locked or validated; do not infer support from a backend's download availability.
+
+Bootstrap [mise](https://mise.jdx.dev/getting-started.html) at the configuration's minimum version, with host Git, Make, a POSIX shell, CA certificates and download/archive utilities available. Review the configuration before trusting it. The managed toolchain includes Git and Make after bootstrap; Docker's daemon, permissions, credential helpers and native compiler/OS dependencies remain host responsibilities. Mise does not install credentials or change the daemon.
 
 ```sh
 git clone https://github.com/rafaeltab/wallpaperdb.git
 cd wallpaperdb
+mise trust
 make install
+make toolchain
 ```
+
+Make recipes enter `mise exec` automatically, including non-interactive agent commands. For direct CLI work, use `mise exec -- <command>` from the checkout or [activate mise in your shell](https://mise.jdx.dev/cli/activate.html). Shell activation alone is not required for Make. Run `make toolchain` to print and check the executables and versions actually selected. Missing tools fail before workspace tasks start; rerun `make install` after a toolchain change. A new linked worktree needs its own trust decision and installation.
+
+Keep exact tool requests and the generated lockfile together. To upgrade, edit [mise.toml](mise.toml), run `mise lock --platform linux-x64`, then validate `make install`, `make toolchain`, and the affected tasks. Installation uses `--locked`; it rejects missing platform entries instead of silently resolving them. Local mise overrides are unsupported for the shared toolchain. The default Node pin matches the application images. The broader runtime compatibility contract remains [package.json's engines](package.json); a development pin does not narrow it. The pnpm `packageManager` declaration must match mise and is checked before Make recipes; pnpm's automatic manager switching is disabled in [.npmrc](.npmrc).
+
+Package-owned CLIs and Chromium remain installed through pnpm and the workspaces' Playwright versions. Use the browser installation commands below; Playwright's `--with-deps` may need host package-manager privileges to install shared libraries and fonts. Agent-browser's own browser download is separate: `mise exec -- agent-browser install` uses its pinned CLI. Docker Compose and Buildx are dispatched to mise-managed binaries for repository commands without editing the user's Docker configuration. Container runtime images and Alpine build dependencies remain declared in Dockerfiles and Compose. Container pnpm bootstraps read the root manifest rather than maintaining another version pin.
 
 Installation assigns an isolated worktree slot and generates `.worktree`, `infra/.env`, and application `.env` files. It also creates `~/.config/wallpaperdb/secrets.env`, or uses `$XDG_CONFIG_HOME/wallpaperdb/secrets.env` when set. The legacy `secret.env` filename is still accepted.
 

@@ -44,47 +44,58 @@ try {
 			}
 		}
 	}
-	if (!process.argv.includes("--pins")) {
-		const tools = JSON.parse(command("mise", ["ls", "--current", "--json"]));
-		const checks = [
-			["node", "node", ["--version"]],
-			["pnpm", "pnpm", ["--version"]],
-			["python", "python", ["--version"]],
-			["conda:git", "git", ["--version"]],
-			["conda:make", "make", ["--version"]],
-			["gh", "gh", ["--version"]],
-			["jq", "jq", ["--version"]],
-			["ripgrep", "rg", ["--version"]],
-			["github:nats-io/natscli", "nats", ["--version"]],
-			["docker-cli", "docker", ["--version"]],
-			["github:docker/compose", "docker", ["compose", "version"]],
-			["github:docker/buildx", "docker", ["buildx", "version"]],
-			["agent-browser", "agent-browser", ["--version"]],
-			["ffmpeg", "ffmpeg", ["-version"]],
-		];
-		for (const [name, program, args] of checks) {
-			const selected = tools[name]?.[0];
-			if (
-				!selected?.installed ||
-				resolve(selected.source.path) !== resolve("mise.toml")
-			) {
-				throw new Error(
-					`${name} must be installed from this checkout's mise.toml. Run make install.`,
-				);
-			}
-			const output = command(program, args).split("\n")[0];
-			if (!output.includes(selected.version))
-				throw new Error(
-					`${program} selected ${output}; expected ${selected.version}. Use mise exec -- make toolchain.`,
-				);
-			const executable = command("sh", [
-				"-c",
-				'command -v "$1"',
-				"sh",
-				program,
-			]);
-			console.log(`${output}\n  ${executable}`);
+	const tools = JSON.parse(command("mise", ["ls", "--current", "--json"]));
+	const checks = [
+		["node", "node", ["--version"]],
+		["pnpm", "pnpm", ["--version"]],
+		["python", "python", ["--version"]],
+		["conda:git", "git", ["--version"]],
+		["conda:make", "make", ["--version"]],
+		["gh", "gh", ["--version"]],
+		["jq", "jq", ["--version"]],
+		["ripgrep", "rg", ["--version"]],
+		["github:nats-io/natscli", "nats", ["--version"]],
+		["docker-cli", "docker", ["--version"]],
+		["github:docker/compose", "docker", ["compose", "version"]],
+		["github:docker/buildx", "docker", ["buildx", "version"]],
+		["agent-browser", "agent-browser", ["--version"]],
+		["ffmpeg", "ffmpeg", ["-version"]],
+	];
+	for (const [name, program, args] of checks) {
+		const selected = tools[name]?.[0];
+		if (
+			!selected?.installed ||
+			resolve(selected.source.path) !== resolve("mise.toml")
+		) {
+			throw new Error(
+				`${name} must be installed from this checkout's mise.toml. Run make install.`,
+			);
 		}
+		if (process.argv.includes("--pins")) continue;
+		const output = command(program, args).split("\n")[0];
+		if (!output.includes(selected.version))
+			throw new Error(
+				`${program} selected ${output}; expected ${selected.version}. Use mise exec -- make toolchain.`,
+			);
+		const executable = command("sh", [
+			"-c",
+			'command -v "$1"',
+			"sh",
+			name === "github:docker/compose"
+				? "docker-compose"
+				: name === "github:docker/buildx"
+					? "docker-buildx"
+					: program,
+		]);
+		const expectedPath =
+			name === "docker-cli"
+				? resolve("scripts/toolchain-bin/docker")
+				: `${selected.install_path}/`;
+		if (!executable.startsWith(expectedPath))
+			throw new Error(
+				`${program} resolved outside the managed toolchain: ${executable}`,
+			);
+		console.log(`${output}\n  ${executable}`);
 	}
 } catch (error) {
 	console.error(`Toolchain check failed: ${error.message}`);

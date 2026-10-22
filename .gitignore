@@ -2,6 +2,8 @@
 node_modules
 .pnpm-store
 .repos/
+mise.local.toml
+mise.local.lock
 
 # Ignore any local state left by the removed Sandcastle runner.
 .sandcastle/

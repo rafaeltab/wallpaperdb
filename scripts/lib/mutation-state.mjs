@@ -239,8 +239,23 @@ export function validateReport(report) {
 				throw new Error("Surviving mutation ran zero tests");
 		}
 	}
-	for (const file of Object.values(report.testFiles))
+	for (const file of Object.values(report.testFiles)) {
 		if (!Array.isArray(file.tests)) throw new Error("Missing test results");
+		for (const test of file.tests) {
+			if (
+				typeof test?.id !== "string" ||
+				typeof test.name !== "string" ||
+				(test.location !== undefined &&
+					(!isPosition(test.location?.start) ||
+						(test.location.end !== undefined &&
+							(!isPosition(test.location.end) ||
+								test.location.end.line < test.location.start.line ||
+								(test.location.end.line === test.location.start.line &&
+									test.location.end.column < test.location.start.column)))))
+			)
+				throw new Error("Invalid test identity");
+		}
+	}
 }
 export function validateBaseline(state) {
 	if (

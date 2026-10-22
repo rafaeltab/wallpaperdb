@@ -50,6 +50,16 @@ type Decoded =
       readonly command: Command;
       readonly context: CommandContext;
     };
+function canonicalPayload(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalPayload);
+  if (value !== null && typeof value === 'object')
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([key, entry]) => [key, canonicalPayload(entry)])
+    );
+  return value;
+}
 /** Only a route from trusted composition can select application authority. */
 export function decodeAssetCommand(
   routes: readonly CommandRoute[],
@@ -104,7 +114,9 @@ export function decodeAssetCommand(
       operation: route.operation,
       ...identifiers.data,
       invalid: true,
-      payloadIdentity: createHash('sha256').update(data).digest('hex'),
+      payloadIdentity: createHash('sha256')
+        .update(JSON.stringify(canonicalPayload(value.data)))
+        .digest('hex'),
     },
   };
 }

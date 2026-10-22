@@ -85,3 +85,30 @@ test("identifier escapes retain retry names and initializer binding identity", (
 	])
 		assert.deepEqual(diagnostics(source, "test-policy/no-retries"), [], source);
 });
+
+test("quoted ESM imported names retain pinned registration and assertion identity", () => {
+	assert.equal(
+		diagnostics(
+			"import { 'it' as scenario } from 'vitest'; scenario('case', { retry: 3 }, () => {});",
+			"test-policy/no-retries",
+		).length,
+		1,
+	);
+	assert.equal(
+		diagnostics(
+			"import { 'expect' as check } from 'vitest'; check(1);",
+			"valid-expect",
+		).length,
+		1,
+	);
+	for (const source of [
+		"import { 'it' as scenario } from 'vitest'; scenario('case', { timeout: 3 }, () => {});",
+		"import { 'it' as scenario } from 'application'; scenario('case', { retry: 3 }, () => {});",
+		"import { 'expect' as check } from 'vitest'; check(1).toBe(1);",
+	])
+		assert.deepEqual(
+			lint(source).filter((d) => d.category === "plugin"),
+			[],
+			source,
+		);
+});

@@ -1,0 +1,21 @@
+{
+  "suites": {
+    "unit": {
+      "vitest": {
+        "configFile": "vitest.mutation.unit.config.ts",
+        "related": false
+      }
+    },
+    "integration": {
+      "sourceRoots": ["src/adapters/redis/", "src/capabilities/admission/"],
+      "vitest": {
+        "configFile": "vitest.mutation.config.ts",
+        "related": false
+      },
+      "timeoutMS": 10000,
+      "fixture": "redis-owned-reuse",
+      "fixtureImage": "redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+      "environmentKeys": ["MUTATION_REDIS_ISOLATED", "MUTATION_REDIS_RESET_FAILURE"]
+    }
+  }
+}

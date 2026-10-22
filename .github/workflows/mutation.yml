@@ -1,0 +1,172 @@
+name: Mutation pilot
+
+on:
+  pull_request:
+    paths-ignore: ['**/*.md']
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      scope:
+        type: choice
+        options: [all, changed]
+        default: all
+      suite:
+        description: Stages to execute; integration keeps compatible unit evidence
+        type: choice
+        options: [all, unit, integration]
+        default: all
+      budget:
+        description: Aggregate mutation execution seconds, at most 3600
+        type: number
+        default: 3600
+      package:
+        description: Optional comma-separated workspace basenames for bounded diagnostics
+        type: string
+      quantum:
+        description: Maximum seconds per stage visit
+        type: number
+        default: 120
+      files:
+        description: Optional comma-separated workspace-relative source files for acceptance exercises
+        type: string
+      import_run:
+        description: Explicit same-repository checkpoint run ID for acceptance continuation
+        type: string
+      isolated_redis:
+        description: Compare the Redis pilot with isolated per-mutation containers
+        type: boolean
+        default: false
+      reset_failure:
+        description: Inject a Redis reset failure to verify diagnostics and owned cleanup
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: mutation-pilot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  mutation:
+    name: Advisory mutation pilot
+    runs-on: ubuntu-latest
+    # Setup, execution, remote transfer, upload and cleanup have finite deadlines.
+    # Budget expiry stops the coordinator before upload's separate deadline.
+    timeout-minutes: 110
+    env:
+      SCOPE: ${{ github.event_name == 'pull_request' && 'changed' || inputs.scope || 'all' }}
+      SELECT_SUITE: ${{ inputs.suite || 'all' }}
+      BUDGET: ${{ github.event_name == 'pull_request' && '900' || inputs.budget || '3600' }}
+      QUANTUM: ${{ inputs.quantum || '120' }}
+      SELECT_PACKAGE: ${{ inputs.package }}
+      SELECT_FILES: ${{ inputs.files }}
+      IMPORT_RUN: ${{ inputs.import_run }}
+      MUTATION_REDIS_ISOLATED: ${{ inputs.isolated_redis && '1' || '0' }}
+      RESET_FAILURE_INPUT: ${{ inputs.reset_failure }}
+    steps:
+      - uses: actions/checkout@v4
+        timeout-minutes: 2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+        timeout-minutes: 2
+      - uses: actions/setup-node@v4
+        timeout-minutes: 3
+        with:
+          node-version: '22.22.3'
+          cache: pnpm
+      - name: Install and build
+        timeout-minutes: 15
+        run: |
+          make install
+          make build
+      - name: Import explicitly selected acceptance checkpoint
+        if: github.event_name != 'pull_request' && inputs.import_run != ''
+        timeout-minutes: 2
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$IMPORT_RUN" =~ ^[0-9]+$ ]] || exit 1
+          gh run download "$IMPORT_RUN" --name mutation-checkpoint --dir /tmp/mutation-import
+      - name: Run bounded advisory analysis
+        timeout-minutes: 63
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
+          EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.event_name != 'pull_request' && github.token || '' }}
+        run: |
+          [[ "$BUDGET" =~ ^[0-9]+$ ]] && (( BUDGET >= 1 && BUDGET <= 3600 )) || exit 1
+          [[ "$QUANTUM" =~ ^[0-9]+$ ]] && (( QUANTUM >= 1 && QUANTUM <= 600 )) || exit 1
+          case "$SCOPE" in all|changed) ;; *) exit 1 ;; esac
+          [[ "$BASE" =~ ^([a-f0-9]{40}|origin/main)$ ]] || exit 1
+          args=(--scope "$SCOPE" --base "$BASE" --budget "$BUDGET" --quantum "$QUANTUM")
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            unset GH_TOKEN GITHUB_TOKEN
+            args+=(--offline)
+          fi
+          case "$SELECT_SUITE" in
+            all) ;;
+            unit|integration) args+=(--suite "$SELECT_SUITE") ;;
+            *) exit 1 ;;
+          esac
+          if [[ -n "$SELECT_PACKAGE" ]]; then
+            [[ "$SELECT_PACKAGE" =~ ^[a-z0-9-]+(,[a-z0-9-]+)*$ ]] || exit 1
+            args+=(--package "$SELECT_PACKAGE")
+          fi
+          if [[ -n "$SELECT_FILES" ]]; then
+            [[ "$SELECT_FILES" =~ ^src/[A-Za-z0-9_./,@+-]+$ ]] || exit 1
+            args+=(--files "$SELECT_FILES")
+          fi
+          if [[ -n "$IMPORT_RUN" ]]; then args+=(--baseline /tmp/mutation-import/checkpoint.json --offline); fi
+          if [[ "$RESET_FAILURE_INPUT" == true ]]; then export MUTATION_REDIS_RESET_FAILURE=1; fi
+          # Every forwarded value above is one validated shell word. Make owns
+          # dependency preparation and invokes the uncached coordinator directly.
+          set +e
+          make test-mutation ARGS="${args[*]}"
+          status=$?
+          set -e
+          report=reports/mutation/summary.json
+          if [[ ! -f "$report" ]]; then exit 1; fi
+          jq '{runtime, runtimeDiagnostics}' "$report"
+          jq -r '"Mutation outcome: **\(.outcome)**\n\nProcessed \(.processed)/\(.total) discovered mutations. Full eligible baseline complete: \(.fullBaselineComplete). Selected scope complete: \(.selectedScopeComplete). Checkpoint saved: \(.checkpointSaved).\n\nExecution elapsed: \(.elapsedSeconds) seconds. Remote state: \(.remote).\n\nUndiscovered files, pending results and errors remain explicit in the JSON report. This pilot is advisory."' "$report" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.stages[] | "- \(.workspace)/\(.suite): \(.outcome), \(.executed) executed, \(.reused // 0) reused, \(.selectedTests // 0) coverage-selected test invocations, \(.elapsedSeconds)s; fixture \(.fixture // {})"' "$report" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '"\nInput identity: `\(.inputIdentity)`; scope: \(.scope). Full eligible mutation count: \(.fullEligibleTotal // "unknown until all source files are discovered").\n", (.workspaces[] | "- \(.workspace): \(.processed)/\(.total) discovered mutations processed; score \(.mutationScore // "unavailable")%; errors \(.errors); pending \(.pending); all eligible sources discovered: \(.discovered).")' "$report" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '"\nExclusions and limitations:\n", (.inventory.workspaces | to_entries[] | select(.value.decision == "excluded" or .value.limitations) | "- \(.key): \(.value.reason // .value.limitations.reason) Follow-up: \(.value.followUp // .value.limitations.followUp)")' "$report" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$status" == 2 ]] && [[ "$(jq -r .outcome "$report")" == incomplete ]]; then
+            echo '::warning::Mutation analysis incomplete. Progress was saved for continuation; this pilot is advisory.'
+            exit 0
+          fi
+          exit "$status"
+      - name: Save cumulative checkpoint
+        if: always()
+        timeout-minutes: 3
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-checkpoint
+          path: reports/mutation/checkpoint.json
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Save mutation reports and diagnostics
+        if: always()
+        timeout-minutes: 3
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-results
+          path: |
+            reports/mutation/summary.json
+            apps/*/reports/mutation/*/summary.json
+            apps/*/reports/mutation/*/mutation.json
+            apps/*/reports/mutation/*/mutation.html
+            packages/*/reports/mutation/*/summary.json
+            packages/*/reports/mutation/*/mutation.json
+            packages/*/reports/mutation/*/mutation.html
+          if-no-files-found: warn
+          retention-days: 30

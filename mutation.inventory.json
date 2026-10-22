@@ -1,0 +1,188 @@
+{
+  "version": 1,
+  "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445",
+  "workspaces": {
+    ".": {
+      "decision": "excluded",
+      "reason": "Repository orchestration uses Node test runner and spawned tools; native Vitest does not instrument those subprocesses.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "scripts": {
+      "decision": "excluded",
+      "reason": "Most tooling behavioral tests use node:test and subprocesses; no validated mutation activation across them.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "infra": {
+      "decision": "excluded",
+      "reason": "Configuration and shell provisioning; native TypeScript mutations do not instrument the shell implementation.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "apps/color-extractor": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "S3, NATS and image-worker fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
+    },
+    "apps/docs": {
+      "decision": "excluded",
+      "reason": "No maintained mutation-compatible behavioral suite.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "apps/gateway": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit",
+        "integration"
+      ],
+      "limitations": {
+        "reason": "Integration uses the Redis adapter contract and its composed admission scenario. Search, NATS and subprocess fixtures need separate activation/reset validation.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
+    },
+    "apps/ingestor": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "PostgreSQL, S3 and NATS fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
+    },
+    "apps/asset": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "PostgreSQL, S3/SeaweedFS and NATS fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
+    },
+    "apps/tags": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "PostgreSQL and NATS fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
+    },
+    "apps/user": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "PostgreSQL, S3 and picture-worker fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
+    },
+    "apps/variant-generator": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "S3, NATS and image-worker fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
+    },
+    "apps/web": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "Only the Node project is enabled. jsdom and real browser execution require a known active mutation before support is claimed.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
+    },
+    "apps/web-e2e": {
+      "decision": "excluded",
+      "reason": "No maintained mutation-compatible behavioral suite.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "packages/auth": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ]
+    },
+    "packages/core": {
+      "decision": "excluded",
+      "reason": "The unit database health probe opens an unowned localhost:59999 PostgreSQL endpoint. Control this external input before enabling mutations. Integration container ownership/reset and subprocess activation also remain unvalidated.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "packages/crap-typescript-core": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ]
+    },
+    "packages/events": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ]
+    },
+    "packages/profile-markdown": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ]
+    },
+    "packages/react-muuri": {
+      "decision": "excluded",
+      "reason": "Browser and jsdom execution need a known active mutation verified with native runner and framework plugins before support is claimed.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "packages/test-logger": {
+      "decision": "excluded",
+      "reason": "No maintained mutation-compatible behavioral suite.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "packages/test-utils": {
+      "decision": "excluded",
+      "reason": "Container fixture implementation requires separate multi-family isolation and activation validation; ordinary E2E coverage is insufficient.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "packages/testcontainers": {
+      "decision": "excluded",
+      "reason": "Container/reaper suites include child processes whose mutation activation is unvalidated.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "packages/url-ipv4-resolver": {
+      "decision": "excluded",
+      "reason": "The resolver suite uses live DNS for example.com; deterministic resolver inputs must be validated before repeated mutation execution.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "packages/vitest-config": {
+      "decision": "excluded",
+      "reason": "Shared configuration only; invalidate all dependent suites instead of claiming a standalone score.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "experiments/cosine_color_accuracy": {
+      "decision": "excluded",
+      "reason": "No maintained mutation-compatible behavioral suite.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    }
+  }
+}

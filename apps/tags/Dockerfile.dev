@@ -20,6 +20,8 @@ COPY --parents apps/docs/source.config.ts apps/docs/content \
     scripts/setup-worktree.mjs scripts/lib/worktree-project.mjs \
     scripts/lib/env-pipeline.mjs ./
 
+COPY patches/ ./patches/
+
 RUN pnpm install --frozen-lockfile && \
     sha256sum pnpm-lock.yaml | cut -d' ' -f1 > .pnpm-lockfile-hash
 

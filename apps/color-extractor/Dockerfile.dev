@@ -29,6 +29,8 @@ COPY --parents apps/docs/source.config.ts apps/docs/content \
     scripts/setup-worktree.mjs scripts/lib/worktree-project.mjs \
     scripts/lib/env-pipeline.mjs ./
 
+COPY patches/ ./patches/
+
 # Install all workspace dependencies and record the lockfile hash so the
 # entrypoint can detect changes and re-install when the lockfile is synced.
 RUN pnpm install --frozen-lockfile && \

@@ -12,3 +12,6 @@ onlyBuiltDependencies:
   - protobufjs
   - sharp
   - ssh2
+
+patchedDependencies:
+  "@stryker-mutator/vitest-runner@10.0.0": patches/stryker-vitest-10.0.0.patch

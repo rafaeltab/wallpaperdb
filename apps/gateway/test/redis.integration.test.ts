@@ -23,14 +23,20 @@ import {
   QuotaUsage,
 } from '../src/capabilities/admission/index.js';
 
-let container: StartedTestContainer;
+let container: StartedTestContainer | undefined;
+let redisPort: number;
 beforeAll(async () => {
-  container = await new GenericContainer('redis:7-alpine').withExposedPorts(6379).start();
+  if (process.env.WALLPAPERDB_MUTATION_REDIS_PORT) {
+    redisPort = Number(process.env.WALLPAPERDB_MUTATION_REDIS_PORT);
+  } else {
+    container = await new GenericContainer('redis:7-alpine').withExposedPorts(6379).start();
+    redisPort = container.getMappedPort(6379);
+  }
 });
 afterAll(async () => {
   await container?.stop();
 });
-async function distributed(port = container.getMappedPort(6379), enabled = true) {
+async function distributed(port = redisPort, enabled = true) {
   const runtime = ManagedRuntime.make(
     redisQuotaLayer({ redisEnabled: enabled, redisHost: '127.0.0.1', redisPort: port })
   );
@@ -91,7 +97,7 @@ async function proxy() {
     }
     sockets.add(socket);
     connections += 1;
-    const upstream = connect(container.getMappedPort(6379), '127.0.0.1');
+    const upstream = connect(redisPort, '127.0.0.1');
     socket.on('data', (chunk) => {
       evals += chunk.toString().split('\r\neval\r\n').length - 1;
       upstream.write(chunk);
@@ -153,7 +159,7 @@ describe('quota storage contract', () => {
   it('atomically counts charged points and distinct charged identities across replicas', async () => {
     const a = await distributed();
     const b = await distributed();
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     try {
       await control.del(
         'graphql:quota:usage',
@@ -188,7 +194,7 @@ describe('quota storage contract', () => {
   });
   it('discards previous-minute usage, including when idle, and starts a fresh distinct estimate', async () => {
     const adapter = await distributed();
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     try {
       const [seconds] = await control.time();
       const previousMinute = Math.floor(Number(seconds) / 60) * 60 - 60;
@@ -213,7 +219,7 @@ describe('quota storage contract', () => {
   });
   it('keeps admitted cost charged when telemetry storage fails and marks the mean unavailable', async () => {
     const adapter = await distributed();
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     try {
       await Effect.runPromise(adapter.quota.take('usage-corruption', 1000, 60000000, 100));
       await control.del('graphql:quota:usage:ips');
@@ -253,7 +259,7 @@ describe('quota storage contract', () => {
   });
   it('refills continuously and denies weighted reservations without debiting the balance', async () => {
     const adapter = await distributed();
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     try {
       expect(
         await Effect.runPromise(adapter.quota.take('weighted-refill', 1000, 100000, 800))
@@ -332,7 +338,7 @@ describe('quota storage contract', () => {
   it('reports local saturation while Redis remains healthy and completes held commands normally', async () => {
     const bridge = await proxy();
     const adapter = await distributed(bridge.port);
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     const observed = observeQuotaMetrics();
     let pending: Promise<Array<AdmissionResult | QuotaUnavailable>> | undefined;
     try {
@@ -380,7 +386,7 @@ describe('quota storage contract', () => {
   it('keeps cancelled commands bounded without disconnecting shared quota enforcement', async () => {
     const bridge = await proxy();
     const adapter = await distributed(bridge.port);
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     const observed = observeQuotaMetrics();
     const controller = new AbortController();
     let pending: Promise<unknown> | undefined;
@@ -432,7 +438,7 @@ describe('quota storage contract', () => {
   });
   it('distinguishes a failed Redis command from unavailable storage', async () => {
     const adapter = await distributed();
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     const observed = observeQuotaMetrics();
     try {
       await control.lpush('graphql:quota:wrong-type', 'invalid-quota-storage');
@@ -451,7 +457,7 @@ describe('quota storage contract', () => {
   });
   it('handles corrupt quota state and recovers', async () => {
     const adapter = await distributed();
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     const observed = observeQuotaMetrics();
     try {
       // Corrupt stored state must fail admission storage rather than invent a balance.
@@ -483,7 +489,7 @@ describe('quota storage contract', () => {
   });
   it('leaves denied windows unchanged and resets after expiry', async () => {
     const adapter = await distributed();
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     try {
       expect(await Effect.runPromise(adapter.quota.take('window', 1, 60000, 1))).toMatchObject({
         _tag: 'Allowed',
@@ -555,7 +561,7 @@ describe('quota storage contract', () => {
   it('bounds stalled socket work, never replays ambiguous commands, and releases the socket on scope closure', async () => {
     const bridge = await proxy();
     const adapter = await distributed(bridge.port);
-    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const control = new Redis({ host: '127.0.0.1', port: redisPort });
     try {
       bridge.stall();
       const decisions = await Effect.runPromise(

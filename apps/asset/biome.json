@@ -49,7 +49,7 @@
     }
   },
   "files": {
-    "includes": ["src/**/*.ts", "test/**/*.ts", "*.ts", "*.json"]
+    "includes": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "*.ts", "*.json"]
   },
   "root": false,
   "extends": "//"

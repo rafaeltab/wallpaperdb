@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect';
+import { Context, Effect, Layer } from 'effect';
 import type { FastifyInstance } from 'fastify';
 import {
   AssetHealth,
@@ -21,6 +21,70 @@ import type { Config } from './config.js';
 import { deliveryLayer } from './capabilities/delivery/index.js';
 import { createHttpApp } from './http/index.js';
 import { tracingLayer } from './runtime.js';
+import { clerkAuthorLayer } from './adapters/authors/index.js';
+import { lifecyclePostgresLayer } from './adapters/lifecycle/index.js';
+import { lifecycleLayer } from './capabilities/lifecycle/index.js';
+import {
+  protectedCommandsLayer,
+  ProtectedCommandHealth,
+  operatorWebhookLayer,
+  OperatorNotificationHealth,
+} from './adapters/commands/index.js';
+
+class AuthorityHealth extends Context.Service<
+  AuthorityHealth,
+  { readonly check: () => Effect.Effect<boolean> }
+>()('asset/composition/AuthorityHealth') {}
+function authorityComposition(config: Config) {
+  const authority = config.authority;
+  if (!authority)
+    return {
+      operations: Layer.succeed(AuthorityHealth, { check: () => Effect.succeed(true) }),
+      authors: undefined,
+    };
+  const persistence = lifecyclePostgresLayer({
+    databaseUrl: config.databaseUrl,
+    revision: authority.identity,
+    ...authority.delivery,
+    leaseMs: 30000,
+  });
+  const lifecycle = lifecycleLayer({
+    revision: authority.identity,
+    applications: authority.applications,
+  }).pipe(Layer.provide(persistence));
+  const commandOptions = {
+    url: config.natsUrl,
+    credential: authority.broker.service,
+    applications: authority.applications,
+    maxAckPending: authority.broker.maxAckPending,
+    ...authority.delivery,
+  };
+  const commands = protectedCommandsLayer(commandOptions).pipe(
+    Layer.provide(Layer.merge(lifecycle, persistence))
+  );
+  const notifications = operatorWebhookLayer({
+    ...commandOptions,
+    target: authority.operatorNotification,
+  });
+  const operations = Layer.effect(
+    AuthorityHealth,
+    Effect.gen(function* () {
+      const command = yield* ProtectedCommandHealth;
+      const notification = yield* OperatorNotificationHealth;
+      return {
+        check: () =>
+          Effect.all([command.check(), notification.check()]).pipe(
+            Effect.map((values) => values.every(Boolean))
+          ),
+      };
+    })
+  ).pipe(Layer.provide(Layer.merge(commands, notifications)));
+  const authors = Layer.merge(
+    lifecycle,
+    clerkAuthorLayer(Object.values(authority.identityProviders))
+  );
+  return { operations, authors };
+}
 
 interface AppOptions {
   readonly logger?: boolean;
@@ -28,7 +92,11 @@ interface AppOptions {
   readonly otelHealthy?: boolean;
   readonly shutdownTimeoutMs?: number;
 }
-export function assetLayer(config: Config, options: AppOptions = {}) {
+export function assetLayer(
+  config: Config,
+  options: AppOptions = {},
+  authority = authorityComposition(config)
+) {
   const catalog = CatalogPostgresLayer({
     databaseUrl: config.databaseUrl,
     assetBuckets: { wallpapers: config.s3Bucket, profilePictures: config.profilePictureBucket },
@@ -76,6 +144,7 @@ export function assetLayer(config: Config, options: AppOptions = {}) {
       const broker = yield* EventsHealth;
       const consumer = yield* ConsumerHealth;
       const publisher = yield* OutboxHealth;
+      const protectedAuthority = yield* AuthorityHealth;
       return AvailabilityProbe.of({
         inspect: () =>
           Effect.all(
@@ -88,24 +157,29 @@ export function assetLayer(config: Config, options: AppOptions = {}) {
                   Effect.match({ onSuccess: () => true, onFailure: () => false })
                 ),
               nats: broker.check(),
-              consumer: Effect.all([consumer.check(), publisher.check()]).pipe(
-                Effect.map((checks) => checks.every(Boolean))
-              ),
+              consumer: Effect.all([
+                consumer.check(),
+                publisher.check(),
+                protectedAuthority.check(),
+              ]).pipe(Effect.map((checks) => checks.every(Boolean))),
               otel: Effect.succeed(!config.otelEndpoint || options.otelHealthy === true),
             },
             { concurrency: 'unbounded' }
           ),
       });
     })
-  ).pipe(Layer.provide(Layer.mergeAll(catalog, assets, events, consumers, outbox)));
+  ).pipe(
+    Layer.provide(Layer.mergeAll(catalog, assets, events, consumers, outbox, authority.operations))
+  );
   return Layer.merge(delivery, availabilityLayer.pipe(Layer.provide(probe))).pipe(
     Layer.provideMerge(tracingLayer)
   );
 }
 export function createApp(config: Config, options: AppOptions = {}): Promise<FastifyInstance> {
+  const authority = authorityComposition(config);
   return createHttpApp(
     { nodeEnv: config.nodeEnv, port: config.port },
-    assetLayer(config, options),
-    options
+    assetLayer(config, options, authority),
+    { ...options, authorServices: authority.authors }
   );
 }

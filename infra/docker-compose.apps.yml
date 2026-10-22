@@ -46,6 +46,9 @@ services:
       dockerfile: apps/asset/Dockerfile.dev
     environment:
       RUN_DB_MIGRATE: "true"
+      RUN_ASSET_BOOTSTRAP: "true"
+    volumes:
+      - ../apps/asset/.authority.json:/app/apps/asset/.authority.json:ro
     env_file:
       - path: ../apps/asset/.env
         required: false

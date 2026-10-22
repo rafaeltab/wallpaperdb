@@ -189,6 +189,28 @@ export function activateLifecycle(databaseUrl: string, revision: string) {
     })
   );
 }
+/** Development bootstrap never replaces an already active configuration. */
+export function initializeLifecycle(databaseUrl: string, revision: string) {
+  return Effect.scoped(
+    Effect.gen(function* () {
+      const pool = yield* poolResource(databaseUrl);
+      yield* operation('initialize-configuration', (signal) =>
+        connection(pool, signal, (db) =>
+          db.transaction(async (tx) => {
+            await tx.insert(assetConfiguration).values({ id: 1, revision }).onConflictDoNothing();
+            const [active] = await tx
+              .select()
+              .from(assetConfiguration)
+              .where(eq(assetConfiguration.id, 1))
+              .for('share');
+            if (active?.revision !== revision)
+              throw new Error('Explicitly activate the new Asset configuration before startup');
+          })
+        )
+      );
+    })
+  );
+}
 export function lifecyclePostgresLayer(options: PostgresOptions) {
   return Layer.effectContext(
     Effect.gen(function* () {

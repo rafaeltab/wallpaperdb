@@ -9,7 +9,11 @@ import {
   ResultOutbox,
   type Acceptance,
 } from '../src/capabilities/lifecycle/index.js';
-import { activateLifecycle, lifecyclePostgresLayer } from '../src/adapters/lifecycle/index.js';
+import {
+  activateLifecycle,
+  initializeLifecycle,
+  lifecyclePostgresLayer,
+} from '../src/adapters/lifecycle/index.js';
 
 let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
 let pool: Pool;
@@ -129,4 +133,20 @@ it('stops result publication after a durable finite budget and requires delibera
   expect(
     (await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1))))[0]?.attempts
   ).toBe(1);
+});
+
+it('initializes only once and fences stale acceptance after explicit configuration activation', async () => {
+  await Effect.runPromise(initializeLifecycle(container.getConnectionUri(), 'revision-1'));
+  await expect(
+    Effect.runPromise(initializeLifecycle(container.getConnectionUri(), 'other-revision'))
+  ).rejects.toThrow();
+  try {
+    await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-2'));
+    await expect(
+      runtime.runPromise(LifecycleStore.use((store) => store.accept(input)))
+    ).rejects.toThrow();
+    expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toEqual([]);
+  } finally {
+    await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-1'));
+  }
 });

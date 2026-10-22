@@ -600,6 +600,11 @@ function handled(
 	const parent = node.parent;
 	if (!parent) return false;
 	switch (parent.kind) {
+		case "JS_LOGICAL_EXPRESSION":
+			return (
+				parent.right?.text === node.text &&
+				handled(parent, model, seen, allowVoid)
+			);
 		case "JS_CONDITIONAL_EXPRESSION":
 			return (
 				parent.test?.text !== node.text &&

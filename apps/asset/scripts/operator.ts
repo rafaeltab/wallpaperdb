@@ -14,6 +14,8 @@ import {
   lifecyclePostgresLayer,
 } from '../src/adapters/lifecycle/index.js';
 import { provisionAssetBroker, recoverQuarantine } from '../src/adapters/commands/index.js';
+import { sourcePostgresLayer } from '../src/adapters/sources/index.js';
+import { SourceAcceptanceOutbox } from '../src/capabilities/sources/index.js';
 import { ResultOutbox } from '../src/capabilities/lifecycle/index.js';
 
 async function usingConnection<A>(
@@ -64,10 +66,11 @@ export async function runOperator(args: readonly string[]) {
       'quarantine',
       'recover',
       'recover-result',
+      'recover-source-confirmation',
     ].includes(mode ?? '')
   )
     throw new Error(
-      'Select bootstrap, provision, activate, create, quarantine, recover or recover-result'
+      'Select bootstrap, provision, activate, create, quarantine, recover, recover-result or recover-source-confirmation'
     );
   const authority = readAuthority(
     values['authority-file'] ?? process.env.ASSET_AUTHORITY_FILE ?? './.authority.json'
@@ -97,6 +100,23 @@ export async function runOperator(args: readonly string[]) {
     if (!databaseUrl) throw new Error('DATABASE_URL required');
     await Effect.runPromise(activateLifecycle(databaseUrl, authority.identity));
     return { outcome: 'activated', configuration: authority.identity };
+  }
+  if (mode === 'recover-source-confirmation') {
+    if (!databaseUrl || !values.id || !/^source-accepted:source_[a-f0-9-]{36}$/.test(values.id))
+      throw new Error('DATABASE_URL and Source confirmation occurrence ID required');
+    const id = values.id;
+    const runtime = ManagedRuntime.make(
+      sourcePostgresLayer({ databaseUrl, ...authority.delivery, leaseMs: 30000 })
+    );
+    try {
+      return {
+        recovered: await runtime.runPromise(
+          SourceAcceptanceOutbox.use((outbox) => outbox.recover(id))
+        ),
+      };
+    } finally {
+      await runtime.dispose();
+    }
   }
   if (mode === 'recover-result') {
     if (!databaseUrl || !values.id || !/^[a-f0-9]{64}$/.test(values.id))
@@ -158,7 +178,12 @@ export async function runOperator(args: readonly string[]) {
         while (Date.now() < deadline) {
           const message = await results.next({ expires: 5000 });
           if (!message) continue;
-          const result = AssetCommandResultSchema.parse(message.json<{ data: unknown }>().data);
+          const envelope = message.json<{ type: string; data: unknown }>();
+          if (envelope.type !== 'asset.command.result') {
+            message.nak(1000);
+            continue;
+          }
+          const result = AssetCommandResultSchema.parse(envelope.data);
           if (result.commandId === data.commandId) {
             message.ack();
             await connection.flush();

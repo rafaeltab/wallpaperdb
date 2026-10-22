@@ -302,8 +302,8 @@
                 "$TURBO_ROOT$/infra/package.json",
                 "$TURBO_ROOT$/apps/*/{test,tests,specs}/**",
                 "$TURBO_ROOT$/packages/*/{test,tests,specs}/**",
-                "$TURBO_ROOT$/apps/*/src/**/*.{test,spec}.{ts,tsx}",
-                "$TURBO_ROOT$/packages/*/src/**/*.{test,spec}.{ts,tsx}"
+                "$TURBO_ROOT$/apps/*/src/**/*.{test,spec}.{ts,tsx,js,jsx,mjs}",
+                "$TURBO_ROOT$/packages/*/src/**/*.{test,spec}.{ts,tsx,js,jsx,mjs}"
             ],
             "outputs": []
         }

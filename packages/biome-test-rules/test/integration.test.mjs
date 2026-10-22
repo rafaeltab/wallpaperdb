@@ -70,7 +70,29 @@ function isolatedRepository() {
 		encoding: "utf8",
 	});
 	assert.equal(git.status, 0, git.stderr);
+	gitFixture(directory, ["add", "--", "."]);
+	gitFixture(directory, [
+		"-c",
+		"user.name=Biome regression",
+		"-c",
+		"user.email=biome@example.invalid",
+		"-c",
+		"core.hooksPath=/dev/null",
+		"-c",
+		"commit.gpgsign=false",
+		"commit",
+		"--quiet",
+		"-m",
+		"Fixture baseline",
+	]);
 	return directory;
+}
+
+function gitFixture(directory, args) {
+	const result = spawnSync("git", ["-C", directory, ...args], {
+		encoding: "utf8",
+	});
+	assert.equal(result.status, 0, result.stderr);
 }
 
 function makeLint(directory, workspace, force = true) {
@@ -94,6 +116,70 @@ function makeLint(directory, workspace, force = true) {
 	assert.equal(result.error, undefined);
 	return { status: result.status, output: result.stdout + result.stderr };
 }
+
+function makeRuleTests(directory) {
+	const result = spawnSync(
+		"make",
+		[
+			"test-unit",
+			"PACKAGE=biome-test-rules",
+			"TURBO_FLAGS=--filter=@wallpaperdb/biome-test-rules --only",
+		],
+		{
+			cwd: directory,
+			encoding: "utf8",
+			timeout: 30_000,
+			env: { ...process.env, MAKEFLAGS: "", MFLAGS: "", MAKELEVEL: "0" },
+		},
+	);
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	return result.stdout + result.stderr;
+}
+
+test("rule-test cache reruns for staged and untracked discovered source tests", () => {
+	const directory = isolatedRepository();
+	try {
+		const workspace = join(directory, "packages/biome-test-rules");
+		mkdirSync(join(workspace, "test"));
+		mkdirSync(join(workspace, ".turbo"));
+		const count = join(workspace, ".turbo/executions");
+		writeFileSync(
+			join(workspace, "test/cache.test.mjs"),
+			`import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { test } from 'node:test';
+test('records actual execution', () => {
+  const path = '.turbo/executions';
+  const previous = existsSync(path) ? Number(readFileSync(path, 'utf8')) : 0;
+  writeFileSync(path, String(previous + 1));
+});`,
+		);
+		gitFixture(directory, ["add", "--", "."]);
+		makeRuleTests(directory);
+		assert.equal(readFileSync(count, "utf8"), "1");
+		assert.match(makeRuleTests(directory), /cache hit/);
+		assert.equal(readFileSync(count, "utf8"), "1");
+		let executions = 1;
+		for (const extension of ["ts", "js", "mjs"])
+			for (const staged of [true, false]) {
+				const fixture = join(
+					directory,
+					`apps/docs/src/cache-${staged}.test.${extension}`,
+				);
+				mkdirSync(dirname(fixture), { recursive: true });
+				writeFileSync(fixture, "export const value = 1;");
+				if (staged)
+					gitFixture(directory, ["add", "--", relative(directory, fixture)]);
+				makeRuleTests(directory);
+				assert.equal(
+					readFileSync(count, "utf8"),
+					String(++executions),
+					`${extension}, ${staged ? "staged" : "untracked"}`,
+				);
+			}
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});
 
 test("root lint cache changes when the shared rules or configuration changes", () => {
 	for (const changed of ["rules", "configuration"]) {

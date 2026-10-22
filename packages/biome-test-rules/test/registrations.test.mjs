@@ -186,3 +186,17 @@ test("Node TODO options inspect locally visible alternatives", () => {
 		[],
 	);
 });
+
+test("Node TODO option keys include no-substitution templates", () => {
+	assert.ok(
+		lint(
+			"import { test } from 'node:test'; test('case', { [`todo`]: true }, () => {});",
+		).some((d) => d.message.includes("unfinished")),
+	);
+	assert.deepEqual(
+		lint(
+			"import { test } from 'node:test'; test('case', { [`todo`]: false }, () => {});",
+		),
+		[],
+	);
+});

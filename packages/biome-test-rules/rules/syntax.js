@@ -223,8 +223,12 @@ export function syntaxTree(root) {
 				break;
 			case "JS_METHOD_OBJECT_MEMBER":
 			case "JS_GETTER_OBJECT_MEMBER":
-			case "JS_SETTER_OBJECT_MEMBER": {
-				node.type = "Property";
+			case "JS_SETTER_OBJECT_MEMBER":
+			case "JS_CONSTRUCTOR_CLASS_MEMBER":
+			case "JS_METHOD_CLASS_MEMBER": {
+				node.type = native.kind.endsWith("_CLASS_MEMBER")
+					? "MethodDefinition"
+					: "Property";
 				node.computed = native.name?.kind === "JS_COMPUTED_MEMBER_NAME";
 				node.key = child(native.name);
 				const fn = {
@@ -238,6 +242,7 @@ export function syntaxTree(root) {
 				fn.async = !!native.asyncToken;
 				fn.params = list(
 					native.parameters?.items ??
+						native.parameters?.parameters ??
 						(native.parameter ? [native.parameter] : []),
 				);
 				fn.body = child(native.body);

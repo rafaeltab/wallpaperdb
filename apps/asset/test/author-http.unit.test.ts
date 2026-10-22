@@ -1,8 +1,11 @@
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
-import { AuthorAuthentication } from '../src/adapters/authors/index.js';
-import { Lifecycle } from '../src/capabilities/lifecycle/index.js';
+import {
+  AuthorAuthentication,
+  AuthorAuthenticationFailure,
+} from '../src/adapters/authors/index.js';
+import { Lifecycle, LifecycleFailure } from '../src/capabilities/lifecycle/index.js';
 import { AssetDelivery } from '../src/capabilities/delivery/index.js';
 import { Availability } from '../src/capabilities/availability/index.js';
 
@@ -78,6 +81,53 @@ it('authenticates Owner inspection and translates unavailable Assets without rev
         })
       ).statusCode
     ).toBe(404);
+  } finally {
+    await app.close();
+  }
+});
+
+it.each([
+  'authentication',
+  'persistence',
+] as const)('translates typed %s failure into safe503 Problem Details', async (failure) => {
+  const cause = new Error('private provider endpoint and database credentials');
+  const services = Layer.merge(
+    Layer.succeed(AssetDelivery, {
+      wallpaper: () => Effect.die('unused'),
+      picture: () => Effect.die('unused'),
+    }),
+    Layer.succeed(Availability, {
+      health: () => Effect.die('unused'),
+      ready: () => Effect.die('unused'),
+    })
+  );
+  const authorServices = Layer.merge(
+    Layer.succeed(AuthorAuthentication, {
+      verify: () =>
+        failure === 'authentication'
+          ? Effect.fail(new AuthorAuthenticationFailure({ cause }))
+          : Effect.succeed({ namespace: 'clerk', subject: 'owner' }),
+    }),
+    Layer.succeed(Lifecycle, {
+      command: () => Effect.die('unused'),
+      inspect: () => Effect.fail(new LifecycleFailure({ operation: 'find', cause })),
+    })
+  );
+  const app = await createHttpApp({ nodeEnv: 'test', port: 0 }, services, { authorServices });
+  try {
+    const response = await app.inject({
+      url: '/assets/asset_one/sources',
+      headers: { authorization: 'Bearer test-token' },
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.json()).toEqual({
+      type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/service-unavailable.md',
+      title: 'Service unavailable',
+      status: 503,
+    });
+    expect(response.body).not.toContain(cause.message);
   } finally {
     await app.close();
   }

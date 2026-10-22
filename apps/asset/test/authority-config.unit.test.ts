@@ -5,6 +5,12 @@ describe('trusted Asset authority file', () => {
   it('computes order-independent non-secret configuration identity and rejects unsafe routing', () => {
     const raw = authorityFixture();
     const parsed = parseAuthority(raw);
+    expect(
+      parseAuthority({
+        ...raw,
+        operatorNotification: { ...raw.operatorNotification, token: 'another-token' },
+      }).identity
+    ).toBe(parsed.identity);
     expect(parsed.applications.wallpaper?.createSubject).toBe('asset.commands.wallpaper.create');
     expect(parsed.applications.user?.resultSubject).toBe('asset.results.user');
     expect(parseAuthority({ ...raw, assetTypes: { picture: {}, wallpaper: {} } }).identity).toBe(

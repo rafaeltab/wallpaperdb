@@ -183,18 +183,16 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
     const connection = connections.get(alert.applicationId);
     if (!connection) return false;
     yield* broker('notify-result-quarantine', () =>
-      connection
-        .jetstream()
-        .publish(
-          'asset.operator.notifications',
-          JSON.stringify({
-            id: alert.id,
-            kind: 'result-quarantine',
-            subject: `asset.results.${alert.applicationId}`,
-            reason: 'exhausted',
-          }),
-          { msgID: `result-notification:${alert.id}`, timeout: 5000 }
-        )
+      connection.jetstream().publish(
+        'asset.operator.notifications',
+        JSON.stringify({
+          id: alert.id,
+          kind: 'result-quarantine',
+          subject: `asset.results.${alert.applicationId}`,
+          reason: 'exhausted',
+        }),
+        { msgID: `result-notification:${alert.id}`, timeout: 5000 }
+      )
     );
     yield* outbox.alerted(alert.id);
   }

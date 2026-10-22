@@ -196,3 +196,30 @@ test("Node named modifier exports retain their native test identity", () => {
 			assert.deepEqual(lint(source), [], source);
 	}
 });
+
+test("Node callback contexts expose nested test and current-test modifiers", async (context) => {
+	assert.equal(typeof context.test, "function");
+	assert.equal(typeof context.skip, "function");
+	assert.equal(typeof context.todo, "function");
+	await context.test("runtime child callback control", () => {});
+	for (const source of [
+		"test('parent', async t => { await t.test('unfinished'); });",
+		"test('parent', t => { t.skip('disabled'); });",
+		"test('parent', t => { t.todo('unfinished'); });",
+		"test(async t => { await t.test('unfinished', {}); });",
+		"test('parent', async t => { const child = t.test; await child('unfinished'); });",
+	])
+		assert.ok(
+			lint("import { test } from 'node:test'; " + source).some(
+				(d) => d.severity === "error",
+			),
+			source,
+		);
+	for (const source of [
+		"import { test } from 'node:test'; test('parent', async t => { await t.test('complete', () => {}); });",
+		"import { test } from 'node:test'; test('parent', async t => { await t.test('complete', { skip: false }, () => {}); });",
+		"import { test } from 'node:test'; test('parent', t => { function run(t) { t.skip('application'); } });",
+		"import { test } from 'other-library'; test('parent', t => { t.todo('application'); });",
+	])
+		assert.deepEqual(lint(source), [], source);
+});

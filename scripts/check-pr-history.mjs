@@ -36,7 +36,7 @@ try {
 			"PR contents already match its base after applying the branch. Verify whether the work has landed instead of reporting it merge-ready.",
 		);
 	console.log(
-		"PR history is linear and its contents differ from the base. Verify GitHub rebaseable status before handoff.",
+		"PR history is linear, has no merge conflicts, and its contents differ from the base.",
 	);
 } catch (error) {
 	console.error(error.message);

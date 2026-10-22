@@ -4,7 +4,7 @@ Start with the [coding guidelines](CODING_STANDARDS.md) for the work you are cha
 
 ## Set up a checkout
 
-Use Node.js 22.12.0 or later on the 22.x line and the pnpm version pinned in [package.json](package.json). You also need Docker with [Buildx](https://docs.docker.com/build/install-buildx/) and Compose watch support, and Git with worktree support.
+Use Node.js 22.12.0 or later on the 22.x line and the pnpm version pinned in [package.json](package.json). You also need Docker with [Buildx](https://docs.docker.com/build/install-buildx/) and Compose watch support, and Git 2.38 or later for the history check's [merge simulation](https://git-scm.com/docs/git-merge-tree/2.38.0.html).
 
 ```sh
 git clone https://github.com/rafaeltab/wallpaperdb.git
@@ -67,7 +67,7 @@ For other scripts use `make run PACKAGE=<workspace> SCRIPT=<script>`. `PACKAGE` 
 
 ## Pull request history
 
-This repository uses rebase merging. Check each PR layer against its actual base with `make run PACKAGE=scripts SCRIPT=check:pr-history ARGS='<base> <head>'` before publishing. The [history check](scripts/check-pr-history.mjs) rejects merge commits in the PR, contents already identical to its base, and branches whose patches have all landed on the base. The [PR history workflow](.github/workflows/pr-history.yml) runs the default branch's trusted validator for all PRs, including documentation changes. It fetches comparison commits as Git data and never executes the submitted tree. A base advance alone does not require rewriting an existing PR.
+This repository uses rebase merging. Check each PR layer against its actual base with `make run PACKAGE=scripts SCRIPT=check:pr-history ARGS='<base> <head>'` before publishing. The [history check](scripts/check-pr-history.mjs) rejects merge commits in the PR and branches that would add no contents to the current base. A patch reverted on the base can be reapplied. The [PR history workflow](.github/workflows/pr-history.yml) runs the default branch's trusted validator for all PRs, including documentation changes. It fetches comparison commits as Git data and never executes the submitted tree. A base advance alone does not require rewriting an existing PR.
 
 Preserve published commits while making review fixes, and keep additional commits linear. Resolve base conflicts by preparing a linear rebase, rather than merging the base into the PR. Rewriting published history still needs explicit user authorization; prepare and validate the proposed resolution before requesting it. After an authorized rewrite, use an explicit expected-head lease, rerun affected validation, and obtain fresh reviews for the new comparison. A PR with pre-existing merge commits remains incomplete until its history is resolved.
 

@@ -1,8 +1,12 @@
 import { OwnerValueSchema } from '@wallpaperdb/events/schemas';
-import { Effect, Layer } from 'effect';
-import { createRemoteJWKSet, decodeJwt, errors, jwtVerify } from 'jose';
+import { Context, Effect, Layer } from 'effect';
+import { createRemoteJWKSet, customFetch, decodeJwt, errors, jwtVerify } from 'jose';
 import type { IdentityProvider } from '../../authority.js';
-import { AuthorAuthentication, AuthorAuthenticationFailure } from './contract.js';
+import {
+  AuthorAuthentication,
+  AuthorAuthenticationFailure,
+  AuthorAuthenticationHealth,
+} from './contract.js';
 
 const rejected = (cause: unknown) =>
   cause instanceof errors.JWTExpired ||
@@ -15,17 +19,30 @@ const rejected = (cause: unknown) =>
 /** Remote keys are shared per configured issuer. jose bounds each underlying key
  * request; no author request can choose the issuer, key endpoint or namespace. */
 export function clerkAuthorLayer(providers: readonly IdentityProvider[]) {
-  return Layer.sync(AuthorAuthentication, () => {
+  return Layer.syncContext(() => {
+    const contactHealth = new Map(providers.map((provider) => [provider.issuer, true]));
     const configured = new Map(
       providers.map((provider) => [
         provider.issuer,
         {
           provider,
-          keys: createRemoteJWKSet(new URL(provider.jwksUrl), { timeoutDuration: 5000 }),
+          keys: createRemoteJWKSet(new URL(provider.jwksUrl), {
+            timeoutDuration: 5000,
+            [customFetch]: async (...args) => {
+              try {
+                const response = await fetch(...args);
+                contactHealth.set(provider.issuer, response.ok);
+                return response;
+              } catch (cause) {
+                contactHealth.set(provider.issuer, false);
+                throw cause;
+              }
+            },
+          }),
         },
       ])
     );
-    return AuthorAuthentication.of({
+    const authentication = AuthorAuthentication.of({
       verify: (authorization) =>
         Effect.tryPromise({
           try: async () => {
@@ -66,6 +83,7 @@ export function clerkAuthorLayer(providers: readonly IdentityProvider[]) {
                 : null;
             } catch (cause) {
               if (rejected(cause)) return null;
+              contactHealth.set(provider.issuer, false);
               throw cause;
             }
           },
@@ -75,5 +93,10 @@ export function clerkAuthorLayer(providers: readonly IdentityProvider[]) {
           Effect.withSpan('asset.authors.verify')
         ),
     });
+    return Context.make(AuthorAuthentication, authentication).pipe(
+      Context.add(AuthorAuthenticationHealth, {
+        check: () => Effect.sync(() => [...contactHealth.values()].every(Boolean)),
+      })
+    );
   });
 }

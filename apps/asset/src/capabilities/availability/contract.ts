@@ -6,6 +6,7 @@ export interface DependencyHealth {
   readonly consumer: boolean;
   readonly nats: boolean;
   readonly otel: boolean;
+  readonly identity?: boolean;
 }
 
 /** Inspects every required dependency with a bounded deadline; technical failures

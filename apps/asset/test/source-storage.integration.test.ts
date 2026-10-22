@@ -157,3 +157,45 @@ it('preserves canonical animated SDR WebP timing and rejects HDR declarations th
     await runtime.dispose();
   }
 });
+
+it('rejects an ISO gain-map APP2 declaration without relying on APP1 or MPF metadata', async () => {
+  const s3 = tester.getS3();
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: s3.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'source-private',
+    })
+  );
+  const jpeg = await sharp({ create: { width: 3, height: 2, channels: 3, background: 'green' } })
+    .jpeg()
+    .toBuffer();
+  const header = Buffer.from('urn:iso:std:iso:ts:21496:-1\0');
+  const marker = Buffer.alloc(4);
+  marker[0] = 0xff;
+  marker[1] = 0xe2;
+  marker.writeUInt16BE(header.length + 2, 2);
+  const fixture = Buffer.concat([jpeg.subarray(0, 2), marker, header, jpeg.subarray(2)]);
+  try {
+    await runtime.runPromise(
+      SourceBytes.use((bytes) =>
+        bytes.put(
+          'candidate_iso_declaration',
+          fixture,
+          createHash('sha256').update(fixture).digest('hex')
+        )
+      )
+    );
+    expect(
+      await runtime.runPromise(
+        MandatoryInspection.use((inspector) =>
+          inspector.inspect('candidate_iso_declaration', initialSourcePolicies.wallpaper)
+        )
+      )
+    ).toEqual({ kind: 'rejected', reason: 'unsupported-source-model' });
+  } finally {
+    await runtime.dispose();
+  }
+});

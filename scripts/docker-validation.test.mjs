@@ -39,14 +39,34 @@ test("Make automatically coordinates CI and integration, and provides queue stat
 function fixture(t) {
 	const root = mkdtempSync(join(tmpdir(), "wallpaperdb-docker-queue-test-"));
 	const children = [];
-	t.after(async () => {
-		for (const child of children) {
-			child.stdin.end();
-			child.kill("SIGTERM");
+	function closedWithin(child, milliseconds) {
+		return new Promise((resolve) => {
+			const deadline = setTimeout(() => resolve(false), milliseconds);
+			child.done.then(() => {
+				clearTimeout(deadline);
+				resolve(true);
+			});
+		});
+	}
+	async function cleanup() {
+		try {
+			await Promise.all(
+				children.map(async (child) => {
+					child.stdin.end();
+					child.kill("SIGTERM");
+					if (await closedWithin(child, 1000)) return;
+					child.kill("SIGKILL");
+					assert.ok(
+						await closedWithin(child, 2000),
+						`fixture child ${child.pid} did not close after SIGKILL`,
+					);
+				}),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
 		}
-		await Promise.all(children.map((child) => child.done));
-		rmSync(root, { recursive: true, force: true });
-	});
+	}
+	t.after(cleanup);
 	const env = {
 		...process.env,
 		DOCKER_VALIDATION_LOCK_FILE: join(root, "host.lock"),
@@ -87,8 +107,27 @@ function fixture(t) {
 		assert.equal(result.status, 0, result.stderr);
 		return result.stdout;
 	}
-	return { root, env, start, status };
+	return { root, env, start, status, cleanup };
 }
+
+test("fixture teardown kills a coordinator that cannot process SIGTERM", async (t) => {
+	const f = fixture(t);
+	const child = f.start(
+		"stopped",
+		"require('node:fs').writeFileSync('started', ''); process.stdin.resume()",
+	);
+	await until(() => existsSync(join(f.root, "started")));
+	child.kill("SIGSTOP");
+	const rescue = setTimeout(() => child.kill("SIGCONT"), 3000);
+	try {
+		await f.cleanup();
+		assert.equal((await child.done).signal, "SIGKILL");
+		assert.equal(existsSync(f.root), false);
+	} finally {
+		clearTimeout(rescue);
+		child.kill("SIGCONT");
+	}
+});
 
 async function until(check, details = () => "") {
 	const deadline = Date.now() + 5000;

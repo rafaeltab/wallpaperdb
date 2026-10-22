@@ -47,7 +47,7 @@ export const isMutationSource = (file) =>
 	file !== "src/routeTree.gen.ts";
 const isTest = (file) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
 export const isMutationToolInput = (file) =>
-	/^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|turbo\.json)$/.test(
+	/^(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|\.npmrc|turbo\.json|mise\.(?:toml|lock))$/.test(
 		file,
 	) ||
 	file.startsWith("patches/") ||

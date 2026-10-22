@@ -28,9 +28,12 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: jdx/mise-action@v5
         with:
-          node-version: '22'
+          version: '2026.10.17'
+          install_args: --locked
+      - name: Verify effective tools
+        run: make toolchain
       - name: Revalidate submitted history against the current base
         if: github.event_name == 'pull_request_target'
         env:

@@ -46,6 +46,7 @@ test coverage != "$CI_TEST_FAILURE"
 			[
 				"--no-print-directory",
 				"ci",
+				"SHELL=/bin/sh", // Isolate CI-stage failures from toolchain selection.
 				`FORCE=${force}`,
 				`TURBO=${join(directory, "turbo")}`,
 			],

@@ -22,17 +22,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Install locked project tools
+        uses: jdx/mise-action@v5
         with:
-          node-version: ">=22.12.0 <23"
-          cache: "pnpm"
+          version: '2026.10.17'
+          install_args: --locked
+
+      - name: Verify effective tools
+        run: make toolchain
 
       - name: Install dependencies
-        run: pnpm install
+        run: make install
         env:
           CURSOR_SECRET: ${{ secrets.CURSOR_SECRET }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}

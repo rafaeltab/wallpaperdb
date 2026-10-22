@@ -201,11 +201,12 @@ export async function createHttpApp<E, EAuthor = never, ESource = never>(
           ? [/^https?:\/\/localhost:\d+$/, /^https?:\/\/127\.0\.0\.1:\d+$/]
           : false,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Correlation-ID'],
       credentials: true,
     });
     await registerOpenAPI(app, {
       title: 'WallpaperDB Asset API',
+      securitySchemes: { ownerSession: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
       version: '1.0.0',
       description: 'Delivers original and resized wallpapers and current Profile pictures.',
       servers:

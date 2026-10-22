@@ -1,5 +1,9 @@
 import { generateFiles } from "fumadocs-openapi";
-import { assetOpenApi, ingestorOpenApi, wallpaperOpenApi } from "../src/lib/openapi.ts";
+import {
+  assetOpenApi,
+  ingestorOpenApi,
+  wallpaperOpenApi,
+} from "../src/lib/openapi.ts";
 
 void generateFiles({
   input: ingestorOpenApi,
@@ -17,4 +21,8 @@ void generateFiles({
   includeDescription: true,
 });
 
-void generateFiles({input:wallpaperOpenApi,output:'./content/docs/openapi/wallpaper',includeDescription:true});
+void generateFiles({
+  input: wallpaperOpenApi,
+  output: "./content/docs/openapi/wallpaper",
+  includeDescription: true,
+});

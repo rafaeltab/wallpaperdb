@@ -10,10 +10,11 @@ const IngestorApiPage = createAPIPage(ingestorOpenApi, {
   client,
 });
 
-const WallpaperApiPage=createAPIPage(wallpaperOpenApi,{client});
+const WallpaperApiPage = createAPIPage(wallpaperOpenApi, { client });
 
 export const APIPage = (props: ApiPageProps) => {
-  if(props.document.toString().includes("wallpaper"))return WallpaperApiPage(props);
+  if (props.document.toString().includes("wallpaper"))
+    return WallpaperApiPage(props);
   if (props.document.toString().includes("asset")) return AssetApiPage(props);
   return IngestorApiPage(props);
 };

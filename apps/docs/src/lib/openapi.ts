@@ -10,4 +10,6 @@ export const assetOpenApi = createOpenAPI({
   input: ["../asset/swagger.json"],
 });
 
-export const wallpaperOpenApi=createOpenAPI({input:['../wallpaper/swagger.json']});
+export const wallpaperOpenApi = createOpenAPI({
+  input: ["../wallpaper/swagger.json"],
+});

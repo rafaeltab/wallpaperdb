@@ -11,6 +11,8 @@ test("Vitest task-local expect rejects incomplete assertions through destructure
 		"import { it } from 'vitest'; it.concurrent.for([1])('checks', (value, { expect }) => { expect(value); });",
 		"import * as v from 'vitest'; v.test.for([1])('checks', (value, { expect: check }) => { check(value); });",
 		"import { it } from 'vitest'; it('checks', context => { context.expect(1); });",
+		"import { it } from 'vitest'; it('checks', context => { const { expect } = context; expect(1); });",
+		"import { it } from 'vitest'; it.for([1])('checks', (value, context) => { const { expect: check } = context; check(value); });",
 		"import { expect } from '@effect/vitest'; expect(1);",
 	])
 		assert.ok(
@@ -24,6 +26,26 @@ test("task-local async assertions are recognized before a trailing timeout", () 
 		lint(
 			"import { it } from 'vitest'; it('checks', ({ expect }) => { expect.poll(() => 1).toBe(1); }, 1000);",
 		).some((d) => d.message.includes("async assertion")),
+	);
+});
+
+test("inner task-context destructuring retains async assertion identity", () => {
+	assert.ok(
+		lint(
+			"import { it } from 'vitest'; it('case', context => { const { expect: check } = context; check(Promise.resolve(1)).resolves.toBe(1); });",
+		).some((d) => d.message.includes("async assertion")),
+	);
+	assert.deepEqual(
+		lint(
+			"import { it } from 'vitest'; it('case', async context => { const { expect: check } = context; await check(Promise.resolve(1)).resolves.toBe(1); });",
+		),
+		[],
+	);
+	assert.deepEqual(
+		lint(
+			"const context = { expect(value) {} }; const { expect } = context; expect(1);",
+		),
+		[],
 	);
 });
 

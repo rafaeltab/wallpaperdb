@@ -39,6 +39,8 @@ function taskContextApi(
 				n.kind === "JS_FUNCTION_EXPRESSION",
 		);
 	if (!fn || !("parameters" in fn) || !fn.parameters) return undefined;
+	if (!parameter && declaration.parent?.kind !== "JS_ARROW_FUNCTION_EXPRESSION")
+		return undefined;
 	const call = fn.parent?.parent?.parent;
 	if (
 		call?.kind !== "JS_CALL_EXPRESSION" ||
@@ -190,6 +192,8 @@ function resolveApi(
 							? literal(parent.member.text)
 							: undefined;
 				if (!api || !member) return undefined;
+				if (api.name === "<context>")
+					return member === "expect" ? { ...api, name: "expect" } : undefined;
 				return api.name === "*"
 					? { ...api, name: member }
 					: { ...api, members: [...api.members, member] };

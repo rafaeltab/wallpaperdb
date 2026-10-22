@@ -275,8 +275,25 @@ test("catalogue pixels survive delivery, filtering and accessible details", asyn
   await expect(page.getByRole("slider", { name: "Percentage" })).toHaveValue(
     "40",
   );
+  const filterToggle = page.getByRole("button", {
+    name: "Toggle filters",
+    exact: true,
+  });
+  const showFilters = async () => {
+    if ((await filterToggle.getAttribute("aria-pressed")) === "false")
+      await filterToggle.click();
+    await expect(
+      page.getByRole("button", { name: "Add color or feature", exact: true }),
+    ).toBeVisible();
+  };
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(editor).not.toBeVisible();
+  await showFilters();
   await page.getByRole("button", { name: "Remove Dark", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Remove Dark", exact: true }),
+  ).not.toBeVisible();
+  await showFilters();
   const cleared = page.waitForResponse((response) => {
     if (
       !response.url().endsWith("/gateway/graphql") ||
@@ -303,6 +320,7 @@ test("catalogue pixels survive delivery, filtering and accessible details", asyn
   expect((await clearedResponse.json()).errors).toBeUndefined();
   await expect(page).not.toHaveURL(/colors?=/);
   await expect(page).toHaveURL(new RegExp(`profileId=${owner.id}`));
+  await showFilters();
   await expect(
     page.getByRole("button", { name: "PNG", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");

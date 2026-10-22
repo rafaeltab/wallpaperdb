@@ -280,6 +280,23 @@ export function validateBaseline(state) {
 		new Date(state.createdAt).toISOString() !== state.createdAt
 	)
 		throw new Error("Invalid checkpoint creation timestamp");
+	const discovery = state.discovery;
+	if (
+		discovery !== undefined &&
+		(!discovery ||
+			!Array.isArray(discovery.files) ||
+			!Array.isArray(discovery.selected) ||
+			[...discovery.files, ...discovery.selected].some(
+				(file) =>
+					typeof file !== "string" ||
+					!isMutationSource(file) ||
+					file.includes("\\") ||
+					file.includes("\0") ||
+					file.split("/").some((part) => ["", ".", ".."].includes(part)),
+			) ||
+			discovery.selected.some((file) => !discovery.files.includes(file)))
+	)
+		throw new Error("Invalid checkpoint discovery");
 	validateReport(state.report);
 }
 export function mutantCount(report) {
@@ -291,7 +308,6 @@ export function publishBaseline(
 	report,
 	{ complete = false, discovery, provenance } = {},
 ) {
-	validateReport(report);
 	const portable = structuredClone(report);
 	delete portable.config;
 	delete portable.projectRoot;
@@ -310,6 +326,7 @@ export function publishBaseline(
 		createdAt: new Date().toISOString(),
 		report: portable,
 	};
+	validateBaseline(envelope);
 	mkdirSync(context.cacheDirectory, { recursive: true });
 	const file = join(
 		context.cacheDirectory,

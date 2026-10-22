@@ -553,6 +553,13 @@ function callbackResultHandled(
 			invocation?.kind === "JS_CALL_EXPRESSION"
 		)
 			return handled(invocation, model, seen, allowVoid);
+		if (
+			parent.member?.text === "bind" &&
+			invocation?.kind === "JS_CALL_EXPRESSION" &&
+			invocation.parent?.kind === "JS_CALL_EXPRESSION" &&
+			invocation.parent.callee?.kind === "JS_CALL_EXPRESSION"
+		)
+			return handled(invocation.parent, model, seen, allowVoid);
 		return true;
 	}
 	if (parent?.kind === "JS_PARENTHESIZED_EXPRESSION")

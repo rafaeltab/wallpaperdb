@@ -345,3 +345,17 @@ test("equal logical operand text cannot hide a discarded assertion promise", () 
 		[],
 	);
 });
+
+test("immediately invoked bound helpers require their own result consumer", () => {
+	const prelude =
+		"import { expect } from 'vitest'; const check = () => expect(Promise.resolve(1)).resolves.toBe(1); ";
+	assert.ok(
+		lint(prelude + "check.bind(null)(); await check();").some((d) =>
+			d.message.includes("async assertion"),
+		),
+	);
+	assert.deepEqual(
+		lint(prelude + "await check.bind(null)(); await check();"),
+		[],
+	);
+});

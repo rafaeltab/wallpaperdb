@@ -180,9 +180,7 @@ function resolveApi(
 			const api = resolveApi(node.object, model, seen);
 			const member =
 				node.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
-					? node.member?.kind === "JS_STRING_LITERAL_EXPRESSION"
-						? literal(node.member.text)
-						: undefined
+					? staticComputedKey(node.member)
 					: literal(node.member?.text);
 			if (!api || !member) return undefined;
 			return apiMember(api, member);
@@ -287,9 +285,7 @@ export const validExpect = defineRule({
 			) {
 				matcher =
 					expression.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
-						? expression.member?.kind === "JS_STRING_LITERAL_EXPRESSION"
-							? literal(expression.member.text)
-							: "<computed matcher>"
+						? (staticComputedKey(expression.member) ?? "<computed matcher>")
 						: literal(expression.member?.text);
 				expression = expression.parent;
 			} else break;
@@ -356,7 +352,7 @@ function definitelyFalsy(
 	return ["false", "null", "0", "''", '""'].includes(node.text);
 }
 
-function computedOptionKey(node: AnyJsAstNode | undefined): string | undefined {
+function staticComputedKey(node: AnyJsAstNode | undefined): string | undefined {
 	if (node?.kind === "JS_STRING_LITERAL_EXPRESSION") return literal(node.text);
 	if (
 		node?.kind === "JS_TEMPLATE_EXPRESSION" &&
@@ -431,7 +427,7 @@ function hasOption(
 				const name = member.name;
 				return (
 					(name?.kind === "JS_COMPUTED_MEMBER_NAME"
-						? computedOptionKey(name.expression)
+						? staticComputedKey(name.expression)
 						: literal(name?.text)) === option &&
 					(option !== "todo" ||
 						!definitelyFalsy(

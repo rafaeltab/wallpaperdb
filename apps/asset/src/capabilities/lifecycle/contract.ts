@@ -77,7 +77,11 @@ export interface ResultOutboxPort {
   readonly pendingAlerts: (
     limit: number
   ) => Effect.Effect<
-    readonly { readonly id: string; readonly applicationId: string }[],
+    readonly {
+      readonly id: string;
+      readonly applicationId: string;
+      readonly context: CommandContext;
+    }[],
     LifecycleFailure
   >;
   readonly alerted: (id: string) => Effect.Effect<void, LifecycleFailure>;

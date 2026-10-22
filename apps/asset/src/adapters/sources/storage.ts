@@ -26,6 +26,15 @@ const factsSchema = z.object({
   height: z.number().int().positive(),
   digest: z.string().regex(/^[a-f0-9]{64}$/),
   byteLength: z.number().int().positive(),
+  hasAlpha: z.boolean().optional(),
+  orientation: z.number().int().min(1).max(8).optional(),
+  animation: z
+    .object({
+      frames: z.number().int().min(2),
+      loop: z.number().int().min(0).max(65535),
+      delaysMs: z.array(z.number().int().min(0).max(16777215)),
+    })
+    .optional(),
 });
 interface Options {
   readonly endpoint: string;

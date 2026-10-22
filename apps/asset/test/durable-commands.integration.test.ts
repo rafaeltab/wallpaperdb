@@ -291,6 +291,8 @@ it('durably quarantines the largest accepted raw envelope after finite dependenc
     specversion: '1.0',
     id: 'bounded-quarantine',
     source: 'https://example.test/application',
+    correlationid: 'quarantine-workflow',
+    traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
     type: 'asset.command.create',
     time: '2026-10-22T00:00:00.000Z',
     datacontenttype: 'application/json',
@@ -317,6 +319,14 @@ it('durably quarantines the largest accepted raw envelope after finite dependenc
     expect(Buffer.from(record.data.encoded, 'base64')).toEqual(bytes);
     expect(stored.data.byteLength).toBeGreaterThan(16384);
     expect((await manager.streams.info('ASSET_OPERATIONS')).state.messages).toBe(1);
+    const notice = JSON.parse(
+      (await manager.streams.getMessage('ASSET_OPERATIONS', { seq: 1 })).string()
+    );
+    expect(notice.context).toEqual({
+      occurrence: { source: 'https://example.test/application', id: 'bounded-quarantine' },
+      correlationId: 'quarantine-workflow',
+      traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
+    });
     expect(
       (
         await pool.query(

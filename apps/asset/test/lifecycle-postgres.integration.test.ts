@@ -127,7 +127,7 @@ it('stops result publication after a durable finite budget and requires delibera
   }
   expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toEqual([]);
   expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.pendingAlerts(10)))).toEqual([
-    { id: lastId, applicationId: 'user' },
+    { id: lastId, applicationId: 'user', context: input.context },
   ]);
   expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.recover(lastId)))).toBe(true);
   expect(

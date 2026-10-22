@@ -68,7 +68,8 @@ const routesFor = (options: ProtectedCommandOptions): readonly CommandRoute[] =>
 const quarantine = Effect.fn('asset.commands.quarantine')(function* (
   connection: NatsConnection,
   message: JsMsg,
-  reason: 'invalid' | 'exhausted'
+  reason: 'invalid' | 'exhausted',
+  context?: CommandContext
 ) {
   const id = createHash('sha256')
     .update(JSON.stringify([message.info.stream, message.info.streamSequence]))
@@ -80,6 +81,12 @@ const quarantine = Effect.fn('asset.commands.quarantine')(function* (
     type: 'asset.command.quarantined',
     time: new Date(message.info.timestampNanos / 1_000_000).toISOString(),
     datacontenttype: 'application/json',
+    ...(context?.traceparent ? { traceparent: context.traceparent } : {}),
+    ...(context?.tracestate ? { tracestate: context.tracestate } : {}),
+    ...(context?.correlationId ? { correlationid: context.correlationId } : {}),
+    ...(context
+      ? { causationid: context.occurrence.id, causationsource: context.occurrence.source }
+      : {}),
     data: {
       subject: message.subject,
       stream: message.info.stream,
@@ -101,12 +108,18 @@ const quarantine = Effect.fn('asset.commands.quarantine')(function* (
       .jetstream()
       .publish(
         'asset.operator.notifications',
-        JSON.stringify({ id, kind: 'command-quarantine', subject: message.subject, reason }),
+        JSON.stringify({
+          id,
+          kind: 'command-quarantine',
+          subject: message.subject,
+          reason,
+          ...(context ? { context } : {}),
+        }),
         { msgID: `notification:${id}`, timeout: 5000 }
       )
   );
 });
-function workflow<A extends string, E, R>(
+export function observeWorkflow<A extends string, E, R>(
   name: string,
   context: CommandContext | undefined,
   attributes: Readonly<Record<string, string | number>>,
@@ -170,7 +183,7 @@ function processCommand(
         }
       : {}),
   };
-  return workflow(
+  return observeWorkflow(
     'asset.commands.consume',
     input.kind === 'command' ? input.context : undefined,
     attributes,
@@ -193,7 +206,7 @@ function processCommand(
         return result.outcome;
       }
       if (message.info.deliveryCount >= options.maxAttempts) {
-        yield* quarantine(connection, message, 'exhausted');
+        yield* quarantine(connection, message, 'exhausted', input.context);
         message.ack();
         return 'quarantined';
       }
@@ -209,7 +222,7 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
   const publications = yield* outbox.claim(1);
   let healthy = true;
   for (const publication of publications) {
-    const succeeded = yield* workflow(
+    const succeeded = yield* observeWorkflow(
       'asset.commands.publish-result',
       publication.context,
       {
@@ -262,19 +275,36 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
   for (const alert of alerts) {
     const connection = connections.get(alert.applicationId);
     if (!connection) return false;
-    yield* broker('notify-result-quarantine', () =>
-      connection.jetstream().publish(
-        'asset.operator.notifications',
-        JSON.stringify({
-          id: alert.id,
-          kind: 'result-quarantine',
-          subject: `asset.results.${alert.applicationId}`,
-          reason: 'exhausted',
-        }),
-        { msgID: `result-notification:${alert.id}`, timeout: 5000 }
-      )
+    yield* observeWorkflow(
+      'asset.commands.notify-result-quarantine',
+      alert.context,
+      {
+        'event.id': alert.id,
+        'event.causation_id': alert.context.occurrence.id,
+        'event.causation_source': alert.context.occurrence.source,
+        'application.id': alert.applicationId,
+        ...(alert.context.correlationId
+          ? { 'event.correlation_id': alert.context.correlationId }
+          : {}),
+      },
+      Effect.gen(function* () {
+        yield* broker('notify-result-quarantine', () =>
+          connection.jetstream().publish(
+            'asset.operator.notifications',
+            JSON.stringify({
+              id: alert.id,
+              kind: 'result-quarantine',
+              subject: `asset.results.${alert.applicationId}`,
+              reason: 'exhausted',
+              context: alert.context,
+            }),
+            { msgID: `result-notification:${alert.id}`, timeout: 5000 }
+          )
+        );
+        yield* outbox.alerted(alert.id);
+        return 'notified';
+      })
     );
-    yield* outbox.alerted(alert.id);
   }
   return healthy;
 });

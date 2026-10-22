@@ -356,6 +356,19 @@ function definitelyFalsy(
 	return ["false", "null", "0", "''", '""'].includes(node.text);
 }
 
+function computedOptionKey(node: AnyJsAstNode | undefined): string | undefined {
+	if (node?.kind === "JS_STRING_LITERAL_EXPRESSION") return literal(node.text);
+	if (
+		node?.kind === "JS_TEMPLATE_EXPRESSION" &&
+		!node.tag &&
+		node.elements.every(
+			(element) => element.kind === "JS_TEMPLATE_CHUNK_ELEMENT",
+		)
+	)
+		return node.elements.map((element) => element.text).join("");
+	return undefined;
+}
+
 function hasOption(
 	node: AnyJsAstNode | undefined,
 	model: SemanticModel,
@@ -417,13 +430,9 @@ function hasOption(
 				if (!("name" in member)) return false;
 				const name = member.name;
 				return (
-					literal(
-						name?.kind === "JS_COMPUTED_MEMBER_NAME"
-							? name.expression?.kind === "JS_STRING_LITERAL_EXPRESSION"
-								? name.expression.text
-								: undefined
-							: name?.text,
-					) === option &&
+					(name?.kind === "JS_COMPUTED_MEMBER_NAME"
+						? computedOptionKey(name.expression)
+						: literal(name?.text)) === option &&
 					(option !== "todo" ||
 						!definitelyFalsy(
 							member.kind === "JS_PROPERTY_OBJECT_MEMBER"

@@ -125,3 +125,18 @@ test("retry checks inspect locally visible option alternatives", () => {
 			options,
 		);
 });
+
+test("retry option keys accept static templates without treating dynamic keys as literals", () => {
+	assert.ok(
+		lint(
+			"import { it } from 'vitest'; it('case', { [`retry`]: 3 }, () => {});",
+		).some((d) => d.message.includes("retry policy")),
+	);
+	for (const source of [
+		"import { it } from 'vitest'; it('case', { [`timeout`]: 100 }, () => {});",
+		"import { it } from 'vitest'; it('case', { [`'retry'`]: 3 }, () => {});",
+		"import { it } from 'vitest'; const retry = 'timeout'; it('case', { [`${retry}`]: 100 }, () => {});",
+		"import { it } from 'vitest'; const key = () => 'timeout'; it('case', { [key`retry`]: 100 }, () => {});",
+	])
+		assert.deepEqual(lint(source), [], source);
+});

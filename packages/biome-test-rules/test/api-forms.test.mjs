@@ -99,3 +99,37 @@ test("namespace Node default members share the native test function", () => {
 	])
 		assert.deepEqual(lint(source), [], source);
 });
+
+test("registration options reject focus and disable flags without treating row data as options", () => {
+	for (const flag of ["skip", "only"]) {
+		for (const source of [
+			`import { it } from 'vitest'; it('case', { ${flag}: true }, () => {});`,
+			`import { it as scenario } from 'vitest'; scenario.concurrent('case', () => {}, { ${flag}: true });`,
+			`import { it } from 'vitest'; it.each([1])('case', { ${flag}: true }, () => {});`,
+			`import { it } from 'vitest'; it.for([1])('case', { ${flag}: true }, () => {});`,
+			`import { describe } from 'vitest'; describe('case', { ${flag}: true }, () => {});`,
+			`import { it } from '@effect/vitest'; const options = { ${flag}: true }; it('case', options, () => {});`,
+			`import { test } from 'node:test'; test('case', { ${flag}: true }, () => {});`,
+			`import { default as scenario } from 'node:test'; scenario({ ${flag}: true }, () => {});`,
+			`import * as nodeTest from 'node:test'; nodeTest.default('case', enabled ? { ${flag}: true } : {}, () => {});`,
+		])
+			assert.ok(
+				lint(source).some((d) => d.message.includes("registration options")),
+				source,
+			);
+		for (const source of [
+			`import { it } from 'vitest'; it('case', { ${flag}: false }, () => {});`,
+			`import { test } from 'node:test'; test('case', { ${flag}: (false as const) }, () => {});`,
+			`import { it } from 'vitest'; const disabled = false; it('case', { ${flag}: disabled }, () => {});`,
+			`import { test } from 'node:test'; test('case', { ${flag}: undefined }, () => {});`,
+			`import { it } from 'vitest'; it.each([{ ${flag}: true }])('case', () => {});`,
+			`import { it } from 'vitest'; it.for([{ ${flag}: true }])('case', () => {});`,
+			`import { it } from 'vitest'; const rows = it.each([{ ${flag}: true }]); rows('case', () => {});`,
+			`import { it } from 'vitest'; it.extend({ ${flag}: true })('case', () => {});`,
+			`import { it } from 'vitest'; function run(it) { it('application', { ${flag}: true }, () => {}); }`,
+			`import { it } from 'other-library'; it('application', { ${flag}: true }, () => {});`,
+			`const application = (name, options, fn) => fn(); application('case', { ${flag}: true }, () => {});`,
+		])
+			assert.deepEqual(lint(source), [], source);
+	}
+});

@@ -40,6 +40,7 @@ export async function runStage({
 	output,
 	shouldCancel = () => false,
 }) {
+	const start = performance.now();
 	const cwd = join(root, workspace);
 	const contextConfig = { ...config, sourceFiles };
 	const context = mutationContext(root, workspace, suite, contextConfig);
@@ -90,7 +91,6 @@ export async function runStage({
 		timeoutFactor: 1.5,
 	};
 	writeFileSync(join(run, "stryker.json"), JSON.stringify(options));
-	const start = performance.now();
 	const summary = {
 		workspace,
 		suite,

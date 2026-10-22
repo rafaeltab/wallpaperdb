@@ -170,6 +170,30 @@ test("awaited conditional branches handle assertions", () => {
 	);
 });
 
+test("logical result operands inherit await or return handling", () => {
+	const prelude = "import { expect } from 'vitest'; const enabled = true; ";
+	for (const operator of ["&&", "||", "??"]) {
+		const expression = `(enabled ${operator} expect(Promise.resolve(1)).resolves.toBe(1))`;
+		assert.deepEqual(lint(`${prelude} await ${expression};`), [], operator);
+		assert.deepEqual(
+			lint(`${prelude} function check() { return ${expression}; }`),
+			[],
+			operator,
+		);
+		assert.ok(
+			lint(`${prelude} ${expression};`).some((d) =>
+				d.message.includes("async assertion"),
+			),
+			operator,
+		);
+	}
+	assert.ok(
+		lint(
+			`${prelude} await (expect(Promise.resolve(1)).resolves.toBe(1) && enabled);`,
+		).some((d) => d.message.includes("async assertion")),
+	);
+});
+
 test("nested Promise.all arrays do not handle assertions", () => {
 	assert.ok(
 		lint(

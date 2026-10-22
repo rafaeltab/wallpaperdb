@@ -28,6 +28,8 @@ test("binding checks fill focused and disabled registration gaps in the built-in
 		"import { it as scenario } from 'vitest'; scenario.only('case', () => {});",
 		"import * as v from 'vitest'; v.test.skip('case', () => {});",
 		"import { it } from 'vitest'; const local = it; local.only('case', () => {});",
+		"import { it } from 'vitest'; const { skip: disabled } = it; disabled('case', () => {});",
+		"import { it } from 'vitest'; let focused; focused = it.only; focused('case', () => {});",
 		"import { test } from 'node:test'; test.todo('unfinished');",
 		"import scenario from 'node:test'; scenario.todo('unfinished');",
 	])
@@ -41,6 +43,17 @@ test("binding checks fill focused and disabled registration gaps in the built-in
 		),
 		[],
 	);
+});
+
+test("test API alias analysis stops at reassignment and unrelated shadowing", () => {
+	for (const source of [
+		"import { it } from 'vitest'; let local = it; local = request; local('case', { retry: 3 }, () => {});",
+		"import { it } from 'vitest'; let local; local = it.only; local = request; local('case', () => {});",
+		"import { it } from 'vitest'; const { skip: disabled } = it; function run(disabled) { disabled('case', () => {}); }",
+		"const it = { skip() {} }; const { skip: disabled } = it; disabled('case', () => {});",
+		"import { it } from 'vitest'; let local; if (condition) local = it.only; local('case', () => {});",
+	])
+		assert.deepEqual(lint(source), [], source);
 });
 
 test("unfinished todo registrations fail including aliases", () => {

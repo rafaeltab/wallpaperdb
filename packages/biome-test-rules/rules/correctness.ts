@@ -129,8 +129,71 @@ function resolveApi(
 			const parent = declaration.parent;
 			const contextApi = taskContextApi(declaration, model, seen);
 			if (contextApi) return contextApi;
-			if (parent?.kind === "JS_VARIABLE_DECLARATOR")
-				return resolveApi(parent.initializer?.expression, model, seen);
+			const writes = binding.allWrites();
+			if (parent?.kind === "JS_VARIABLE_DECLARATOR") {
+				if (writes.length === 0)
+					return resolveApi(parent.initializer?.expression, model, seen);
+				if (parent.initializer || writes.length !== 1) return undefined;
+				const assignment = writes[0]?.syntax().parent;
+				if (
+					assignment?.kind !== "JS_ASSIGNMENT_EXPRESSION" ||
+					assignment.operatorToken !== "=" ||
+					assignment.parent?.kind !== "JS_EXPRESSION_STATEMENT"
+				)
+					return undefined;
+				const statement = assignment.parent;
+				const list = statement.parent;
+				if (
+					!list ||
+					!["JS_MODULE_ITEM_LIST", "JS_STATEMENT_LIST"].includes(list.kind)
+				)
+					return undefined;
+				const use = node
+					.ancestors()
+					.find(
+						(ancestor) =>
+							ancestor.parent?.kind === list.kind &&
+							ancestor.parent.text === list.text,
+					);
+				const siblings = list.children();
+				// Follow only a unique, preceding assignment in this statement list.
+				// Conditional writes, nested consumers and repeated writes need flow analysis.
+				if (
+					!use ||
+					siblings.filter((s) => s.text === statement.text).length !== 1 ||
+					siblings.filter((s) => s.text === use.text).length !== 1 ||
+					siblings.findIndex((s) => s.text === statement.text) >=
+						siblings.findIndex((s) => s.text === use.text)
+				)
+					return undefined;
+				return resolveApi(assignment.right, model, seen);
+			}
+			if (writes.length !== 0) return undefined;
+			if (
+				parent?.kind === "JS_OBJECT_BINDING_PATTERN_PROPERTY" ||
+				parent?.kind === "JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY"
+			) {
+				const declarator = declaration
+					.ancestors()
+					.find((ancestor) => ancestor.kind === "JS_VARIABLE_DECLARATOR");
+				if (
+					declarator?.kind !== "JS_VARIABLE_DECLARATOR" ||
+					declarator.id?.kind !== "JS_OBJECT_BINDING_PATTERN" ||
+					parent.init
+				)
+					return undefined;
+				const api = resolveApi(declarator.initializer?.expression, model, seen);
+				const member =
+					parent.kind === "JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY"
+						? declaration.text
+						: parent.member?.kind === "JS_LITERAL_MEMBER_NAME"
+							? literal(parent.member.text)
+							: undefined;
+				if (!api || !member) return undefined;
+				return api.name === "*"
+					? { ...api, name: member }
+					: { ...api, members: [...api.members, member] };
+			}
 			const clause = declaration
 				.ancestors()
 				.find((n) =>

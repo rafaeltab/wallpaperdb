@@ -67,11 +67,15 @@ if (args.includes('POST')) {
   fs.appendFileSync('statuses.jsonl', JSON.stringify({endpoint: args.find(x => x.includes('/statuses/')), ...body}) + '\\n');
   console.log('{}');
 } else if (args.includes('--slurp')) console.log(JSON.stringify([[pr]]));
+else if (args.some(x => x.includes('/git/ref/heads/'))) console.log(JSON.stringify({object: {sha: process.env.TEST_FORCE_BASE || (fs.existsSync('current-base') ? fs.readFileSync('current-base', 'utf8') : pr.base.sha)}}));
 else {
   const reads = fs.existsSync('reads') ? Number(fs.readFileSync('reads', 'utf8')) + 1 : 1;
   fs.writeFileSync('reads', String(reads));
   if (reads >= 2 && process.env.TEST_CLOSE_DURING_CHECK) pr.state = 'closed';
-  if (reads >= 2 && process.env.TEST_ADVANCED_BASE) pr.base.sha = process.env.TEST_ADVANCED_BASE;
+  if (reads >= 2 && process.env.TEST_ADVANCED_BASE) {
+    pr.base.sha = process.env.TEST_ADVANCED_BASE;
+    fs.writeFileSync('current-base', pr.base.sha);
+  }
   console.log(JSON.stringify(pr));
 }
 `,
@@ -165,6 +169,21 @@ test("a changed base is rechecked before publishing a final result", (t) => {
 			.statuses()
 			.at(-1)
 			.description.includes(f.env.TEST_ADVANCED_BASE.slice(0, 12)),
+	);
+});
+
+test("the live base ref overrides a stale SHA in PR metadata", (t) => {
+	const f = fixture(t);
+	f.git("-c", "commit.gpgSign=false", "cherry-pick", "-x", f.head);
+	f.env.TEST_FORCE_BASE = f.git("rev-parse", "main");
+	const result = f.run("1");
+	assert.notEqual(result.status, 0);
+	assert.equal(f.statuses().at(-1).state, "failure");
+	assert.ok(
+		f
+			.statuses()
+			.at(-1)
+			.description.includes(f.env.TEST_FORCE_BASE.slice(0, 12)),
 	);
 });
 

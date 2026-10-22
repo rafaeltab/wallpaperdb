@@ -49,9 +49,21 @@ function status(pr, state, detail) {
 	});
 }
 
+function currentPullRequest(number) {
+	const pr = api(`repos/${repository}/pulls/${number}`);
+	if (pr.state === "open") {
+		const base = api(
+			`repos/${repository}/git/ref/heads/${encodeURIComponent(pr.base.ref)}`,
+		);
+		pr.base.sha = base.object.sha;
+		validate(pr);
+	}
+	return pr;
+}
+
 function check(number, failRun = false) {
 	for (let attempt = 0; attempt < 3; attempt++) {
-		const pr = api(`repos/${repository}/pulls/${number}`);
+		const pr = currentPullRequest(number);
 		if (pr.state !== "open" || (baseRef && pr.base.ref !== baseRef)) return;
 		validate(pr);
 		status(pr, "pending", "checking branch history");
@@ -66,7 +78,7 @@ function check(number, failRun = false) {
 		if (fetched.status !== 0) result = fetched;
 		else
 			result = command(process.execPath, [checker, pr.base.sha, pr.head.sha]);
-		const current = api(`repos/${repository}/pulls/${number}`);
+		const current = currentPullRequest(number);
 		if (current.state !== "open") return;
 		if (comparison(current) !== comparison(pr)) continue;
 		status(

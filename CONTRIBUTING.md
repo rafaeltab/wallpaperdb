@@ -73,7 +73,7 @@ Preserve published commits while making review fixes, and keep additional commit
 
 Before reporting a PR ready for the user to merge, read GitHub's authenticated `rebaseable` status for the current head and base, in addition to checks and reviews. `mergeable: true` alone is insufficient. Refresh an unknown result; if it stays unknown or false, report that limitation instead of declaring readiness. When the branch's contents already landed, verify the landing and report that outcome. Native stack readiness remains required for every stacked layer.
 
-The history workflow rechecks open PRs on base-branch pushes and publishes `PR history #<number>` on each submitted head, with the compared base SHA in its description. Treat the status for the selected PR as applicable validation. Immediately before a ready-to-merge handoff, fetch the current head and actual base from authenticated PR metadata and rerun the history checker from the trusted default-branch policy snapshot. A historical green check does not establish readiness after the base advances.
+The history workflow rechecks open PRs on base-branch pushes and publishes `PR history #<number>` on each submitted head, with the compared base SHA in its description. Treat the status for the selected PR as applicable validation. Resolve the base branch through GitHub's authenticated Git reference API; a PR response can retain an older base SHA. Immediately before a ready-to-merge handoff, fetch the current head and live base and rerun the history checker from the trusted default-branch policy snapshot. A historical green check does not establish readiness after the base advances.
 
 ## Stop or remove a worktree
 

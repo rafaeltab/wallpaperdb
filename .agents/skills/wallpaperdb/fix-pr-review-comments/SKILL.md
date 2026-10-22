@@ -23,7 +23,7 @@ Keep a working checklist outside the repository or in session state. For each se
 
 ## 2. Verify each claim
 
-Treat feedback as a claim to investigate, including feedback from bots. Read the relevant code, the full conversation, the PR diff, and authoritative requirements. Follow [CODING_STANDARDS.md](../../../../CODING_STANDARDS.md) to select applicable standards. Reproduce behavioral claims or use a focused test where practical. For documentation or policy claims, compare with the authoritative source. Distinguish a real defect or requirement from a reviewer preference, and distinguish the reported problem from the proposed fix.
+Treat feedback as a claim to investigate, including feedback from bots. Read the relevant code, the full conversation, the PR diff, and authoritative requirements. Follow [CODING_STANDARDS.md](../../../../CODING_STANDARDS.md) to select applicable standards and [defect verification](../testing/SKILL.md#verify-defect-fixes) to assess the claim and proposed fix. Distinguish a real defect or requirement from a reviewer preference, and distinguish the reported problem from the proposed fix.
 
 Classify each comment using evidence:
 

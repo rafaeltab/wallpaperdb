@@ -1,11 +1,13 @@
 ---
 name: development-principles
-description: Core development principles for this repository: TDD, incremental changes, documentation, migration strategy, and command execution policy. Use when starting any implementation task, making code changes, refactoring, or running build/test commands.
+description: "Core development principles for this repository: TDD, incremental changes, documentation, migration strategy, and command execution policy. Use when starting any implementation task, making code changes, refactoring, or running build/test commands."
 ---
 
 # Development Principles
 
 ## Test-First Development (TDD)
+
+For defect fixes, follow [defect verification](../testing/SKILL.md#verify-defect-fixes).
 
 - **Write tests before implementation** — every change must have a corresponding test
 - Tests validate the change works; implementation follows the test

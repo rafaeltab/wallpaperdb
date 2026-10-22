@@ -225,6 +225,16 @@ if (args.includes('ps') && args.some(x => x.startsWith('label=')) && process.env
 if (args.includes('build') && process.env.TEST_BUILD_EXIT) process.exit(Number(process.env.TEST_BUILD_EXIT));
 if (args.includes('run') && process.env.TEST_MOUNT_EXIT) process.exit(Number(process.env.TEST_MOUNT_EXIT));
 if (args.includes('up') && process.env.TEST_UP_EXIT) process.exit(Number(process.env.TEST_UP_EXIT));
+if (args.includes('up') && args.includes('infra/docker-compose.yml') && args.includes('--wait') && process.env.TEST_FAST_ONE_SHOT && !args.includes('postgres')) {
+  console.error('One-shot nats-setup exited successfully before the running/healthy poll'); process.exit(24);
+}
+if (args.includes('run') && args.includes('nats-setup')) {
+  if (process.env.TEST_NATS_SETUP_EXIT) process.exit(Number(process.env.TEST_NATS_SETUP_EXIT));
+  fs.writeFileSync('nats-setup-complete', 'complete');
+}
+if (args.includes('up') && args.includes('infra/docker-compose.apps.yml') && process.env.TEST_FAST_ONE_SHOT && !fs.existsSync('nats-setup-complete')) {
+  console.error('Required NATS stream setup did not complete'); process.exit(24);
+}
 if (args.includes('up') && args.includes('infra/docker-compose.yml') && process.env.TEST_COLD_INFRA && args.includes('--wait')) {
   if (process.env.TEST_INFRA_UNHEALTHY) { console.error('Required infrastructure did not become healthy'); process.exit(24); }
   fs.writeFileSync('infra-health-ready', 'healthy');
@@ -577,6 +587,57 @@ test("unhealthy required infrastructure prevents app and browser execution and r
 	const result = await f.runAsync("PACKAGE=web-e2e");
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /phase "infrastructure startup" failed, exit 24/);
+	const calls = f.calls();
+	assert.ok(
+		!calls.some(
+			(call) =>
+				call.includes("up") && call.includes("infra/docker-compose.apps.yml"),
+		),
+	);
+	assert.ok(
+		!calls.some((call) => call[0] === "turbo" && !call.includes("--dry=json")),
+	);
+	assert.equal(
+		calls.filter((call) => call.includes("down") && call.includes("--volumes"))
+			.length,
+		2,
+	);
+	assert.equal(
+		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		0,
+	);
+	const directory = result.stdout.match(
+		/E2E diagnostics retained at (\S+)\./,
+	)[1];
+	t.after(() => rmSync(directory, { recursive: true, force: true }));
+});
+
+test("a successfully completed one-shot does not fail long-running infrastructure readiness", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_FAST_ONE_SHOT = "1";
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.equal(result.status, 0, result.stderr);
+	const calls = f.calls();
+	const initialization = calls.filter((call) => call.includes("nats-setup"));
+	assert.equal(initialization.length, 1);
+	assert.ok(
+		initialization[0].includes("run") && initialization[0].includes("--rm"),
+	);
+	const setup = calls.indexOf(initialization[0]);
+	const applications = calls.findIndex(
+		(call) =>
+			call.includes("up") && call.includes("infra/docker-compose.apps.yml"),
+	);
+	assert.ok(applications > setup);
+});
+
+test("failed one-shot setup preserves its failure and cleans up without starting browser apps", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_FAST_ONE_SHOT = "1";
+	f.env.TEST_NATS_SETUP_EXIT = "28";
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /phase "infrastructure startup" failed, exit 28/);
 	const calls = f.calls();
 	assert.ok(
 		!calls.some(

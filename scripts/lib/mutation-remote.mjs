@@ -1,4 +1,5 @@
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
 import {
 	mkdtempSync,
 	existsSync,
@@ -11,28 +12,25 @@ import { join } from "node:path";
 import { importBaseline } from "./mutation-state.mjs";
 import { importCheckpoint } from "./mutation-checkpoint.mjs";
 
-function trustedRuns(gh, branch) {
-	const events = ["schedule", "workflow_dispatch", "push"];
-	const runs = events.flatMap((event) =>
-		JSON.parse(
-			gh(
-				"run",
-				"list",
-				"--workflow",
-				"mutation.yml",
-				"--branch",
-				branch,
-				"--status",
-				"success",
-				"--event",
-				event,
-				"--limit",
-				"5",
-				"--json",
-				"databaseId,event,createdAt",
-			),
-		),
-	);
+const execFileAsync = promisify(execFile);
+const events = ["schedule", "workflow_dispatch", "push"];
+const runListArgs = (branch, event) => [
+	"run",
+	"list",
+	"--workflow",
+	"mutation.yml",
+	"--branch",
+	branch,
+	"--status",
+	"success",
+	"--event",
+	event,
+	"--limit",
+	"5",
+	"--json",
+	"databaseId,event,createdAt",
+];
+function newestTrustedRuns(runs) {
 	return [
 		...new Map(
 			runs
@@ -47,36 +45,64 @@ function trustedRuns(gh, branch) {
 		)
 		.slice(0, 5);
 }
+function trustedRuns(gh, branch) {
+	return newestTrustedRuns(
+		events.flatMap((event) => JSON.parse(gh(...runListArgs(branch, event)))),
+	);
+}
 
 /** One repository artifact transfer, with an aggregate deadline outside execution. */
 export async function downloadCheckpoint(
 	root,
 	jobs,
 	invocationDeadline = Infinity,
+	signal,
 ) {
 	const temp = mkdtempSync(join(tmpdir(), "mutation-repository-download-"));
 	const deadline = Math.min(performance.now() + 45_000, invocationDeadline);
 	const importedStages = new Set();
 	let scheduling;
 	let validArtifact = false;
-	const gh = (...args) =>
-		execFileSync("gh", args, {
+	const gh = async (...args) => {
+		signal?.throwIfAborted();
+		if (performance.now() >= deadline)
+			throw new Error("Checkpoint transfer deadline expired");
+		const request = execFileAsync("gh", args, {
 			cwd: root,
 			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
+			signal,
+			killSignal: "SIGKILL",
 			timeout: Math.max(
 				1,
 				Math.min(10_000, Math.floor(deadline - performance.now())),
 			),
 		});
+		// Abort can reject before the child is reaped and its pipes are closed.
+		const closed = new Promise((resolve) =>
+			request.child.once("close", resolve),
+		);
+		try {
+			return (await request).stdout;
+		} finally {
+			await closed;
+		}
+	};
 	try {
-		const repo = JSON.parse(gh("repo", "view", "--json", "defaultBranchRef"));
-		const runs = trustedRuns(gh, repo.defaultBranchRef.name);
-		for (const run of runs) {
-			if (performance.now() >= deadline) break;
+		const repo = JSON.parse(
+			await gh("repo", "view", "--json", "defaultBranchRef"),
+		);
+		const runs = [];
+		for (const event of events)
+			runs.push(
+				...JSON.parse(
+					await gh(...runListArgs(repo.defaultBranchRef.name, event)),
+				),
+			);
+		for (const run of newestTrustedRuns(runs)) {
+			if (performance.now() >= deadline || signal?.aborted) break;
 			try {
 				const dir = join(temp, String(run.databaseId));
-				gh(
+				await gh(
 					"run",
 					"download",
 					String(run.databaseId),
@@ -105,6 +131,7 @@ export async function downloadCheckpoint(
 		rmSync(temp, { recursive: true, force: true });
 	}
 	if (validArtifact) return { importedStages: importedStages.size, scheduling };
+	if (signal?.aborted) return false;
 	console.warn(
 		"No valid default-branch checkpoint available within 45 seconds; bounded cold fallback",
 	);

@@ -530,6 +530,32 @@ function callbackResultHandled(
 	const call = parent.parent?.parent;
 	if (call?.kind !== "JS_CALL_EXPRESSION") return false;
 	const api = resolveApi(call.callee, model);
+	if (api?.name === "expect" && api.members.at(-1) === "poll") {
+		let result: AnyJsAstNode = call;
+		while (
+			result.parent?.kind === "JS_STATIC_MEMBER_EXPRESSION" ||
+			result.parent?.kind === "JS_COMPUTED_MEMBER_EXPRESSION"
+		) {
+			result = result.parent;
+			if (result.parent?.kind === "JS_CALL_EXPRESSION") result = result.parent;
+		}
+		return (
+			result.kind === "JS_CALL_EXPRESSION" &&
+			result.text !== call.text &&
+			handled(result, model, seen, allowVoid)
+		);
+	}
+	if (
+		api &&
+		((api.source === "effect" &&
+			api.name === "Effect" &&
+			api.members.length === 1 &&
+			["promise", "tryPromise"].includes(api.members[0] ?? "")) ||
+			(api.source === "effect/Effect" &&
+				api.members.length === 0 &&
+				["promise", "tryPromise"].includes(api.name)))
+	)
+		return true;
 	if (api && ["it", "test", "describe", "suite"].includes(api.name))
 		return true;
 	if (

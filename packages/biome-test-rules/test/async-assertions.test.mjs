@@ -100,6 +100,24 @@ test("Vitest awaits concise lifecycle callbacks through import aliases", () => {
 		);
 });
 
+test("known Effect and Vitest polling consumers await callback promises", () => {
+	for (const source of [
+		"import { expect } from 'vitest'; import { Effect } from 'effect'; Effect.promise(() => expect(Promise.resolve(1)).resolves.toBe(1));",
+		"import { expect } from 'vitest'; import { promise as consume } from 'effect/Effect'; consume(() => expect(Promise.resolve(1)).resolves.toBe(1));",
+		"import { expect } from 'vitest'; import { Effect } from 'effect'; await expect.poll(() => Effect.runPromise(Effect.succeed(1))).toBe(1);",
+	])
+		assert.deepEqual(lint(source), [], source);
+	for (const source of [
+		"import { expect } from 'vitest'; const Effect = { promise(callback) {} }; Effect.promise(() => expect(Promise.resolve(1)).resolves.toBe(1));",
+		"import { expect } from 'vitest'; import { Effect } from 'effect'; function run(Effect) { Effect.promise(() => expect(Promise.resolve(1)).resolves.toBe(1)); }",
+		"import { expect } from 'vitest'; import { Effect } from 'effect'; expect.poll(() => Effect.runPromise(Effect.succeed(1))).toBe(1);",
+	])
+		assert.ok(
+			lint(source).some((d) => d.severity === "error"),
+			source,
+		);
+});
+
 test("awaited conditional branches handle assertions", () => {
 	assert.deepEqual(
 		lint(

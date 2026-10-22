@@ -572,6 +572,21 @@ function potentialCallback(
 	].includes(node.kind);
 }
 
+function isFirstArgument(call: AnyJsAstNode, value: AnyJsAstNode): boolean {
+	if (call.kind !== "JS_CALL_EXPRESSION") return false;
+	const args = call.arguments?.args ?? [];
+	const matches = (argument: AnyJsAstNode) =>
+		argument.kind === value.kind && argument.text === value.text;
+	// Fresh equal call/array operands cannot be distinguished by native handle
+	// identity. An ambiguous match must not bless a separate ignored argument.
+	return (
+		!!args[0] &&
+		matches(args[0]) &&
+		(value.kind === "JS_IDENTIFIER_EXPRESSION" ||
+			args.filter(matches).length === 1)
+	);
+}
+
 function isPromiseAggregate(node: AnyJsAstNode, model: SemanticModel): boolean {
 	if (node.kind !== "JS_CALL_EXPRESSION") return false;
 	const callee = node.callee;
@@ -697,7 +712,7 @@ function callbackResultHandled(
 		return (
 			aggregate?.kind === "JS_CALL_EXPRESSION" &&
 			isPromiseAggregate(aggregate, model) &&
-			aggregate.arguments?.args[0]?.text === call.text &&
+			isFirstArgument(aggregate, call) &&
 			handled(aggregate, model, seen, allowVoid)
 		);
 	}
@@ -820,6 +835,8 @@ function handled(
 		case "JS_CALL_ARGUMENT_LIST":
 		case "JS_CALL_ARGUMENTS": {
 			let call: AnyJsAstNode | undefined = parent;
+			let child = node;
+			let argument: AnyJsAstNode | undefined;
 			let arrays = 0;
 			while (
 				call &&
@@ -831,11 +848,15 @@ function handled(
 				].includes(call.kind)
 			) {
 				if (call.kind === "JS_ARRAY_EXPRESSION") arrays++;
+				if (call.kind === "JS_CALL_ARGUMENT_LIST") argument = child;
+				child = call;
 				call = call.parent;
 			}
 			if (
 				arrays === 0 &&
 				call?.kind === "JS_CALL_EXPRESSION" &&
+				!!argument &&
+				isFirstArgument(call, argument) &&
 				resolveApi(call.callee, model)?.name === "expect"
 			) {
 				let result: AnyJsAstNode = call;
@@ -856,6 +877,8 @@ function handled(
 			return (
 				arrays === 1 &&
 				call?.kind === "JS_CALL_EXPRESSION" &&
+				!!argument &&
+				isFirstArgument(call, argument) &&
 				isPromiseAggregate(call, model) &&
 				handled(call, model, seen, allowVoid)
 			);

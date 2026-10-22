@@ -414,3 +414,29 @@ test("only the native global Promise consumes aggregate assertion inputs", () =>
 		).some((d) => d.message.includes("async assertion")),
 	);
 });
+
+test("aggregate and expect consumers only handle promises in their first argument", () => {
+	const assertion = "expect(new Promise(() => {})).resolves.toBe(1)";
+	const prelude = "import { expect } from 'vitest'; ";
+	for (const source of [
+		`await Promise.all([], [${assertion}]);`,
+		`await Promise.all([], [1].map(() => ${assertion}));`,
+		`await expect(Promise.resolve(1), ${assertion}).resolves.toBe(1);`,
+		`await Promise.all([${assertion}], [${assertion}]);`,
+	])
+		assert.ok(
+			lint(prelude + source).some((d) => d.message.includes("async assertion")),
+			source,
+		);
+	assert.deepEqual(
+		lint(prelude + `await Promise.all([${assertion}], []);`),
+		[],
+	);
+	assert.deepEqual(
+		lint(
+			prelude +
+				`await expect(${assertion}, 'reason').resolves.toBeUndefined();`,
+		),
+		[],
+	);
+});

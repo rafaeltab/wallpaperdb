@@ -123,3 +123,18 @@ test("ordinary Effect work remains consumable by every standard promise aggregat
 			aggregate,
 		);
 });
+
+test("Effect promises in ignored aggregate or assertion reason arguments stay unhandled", () => {
+	const work = "Effect.runPromise(Effect.succeed(1))";
+	const prelude =
+		"import { Effect } from 'effect'; import { expect } from 'vitest'; ";
+	for (const source of [
+		`await Promise.all([], [${work}]);`,
+		`await expect(Promise.resolve(1), ${work}).resolves.toBe(1);`,
+	])
+		assert.ok(
+			lint(prelude + source).some((d) => d.message.includes("Effect promise")),
+			source,
+		);
+	assert.deepEqual(lint(prelude + `await Promise.all([${work}], []);`), []);
+});

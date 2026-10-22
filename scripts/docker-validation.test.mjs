@@ -52,18 +52,37 @@ function fixture(t) {
 	}
 	async function cleanup() {
 		try {
-			await Promise.all(
+			const results = await Promise.allSettled(
 				children.map(async (child) => {
 					child.stdin.end();
 					child.kill("SIGTERM");
 					if (await closedWithin(child, 1000)) return;
+					if (existsSync(child.workloadFile)) {
+						const pid = Number(readFileSync(child.workloadFile, "utf8"));
+						assert.ok(Number.isSafeInteger(pid) && pid > 1);
+						try {
+							process.kill(-pid, "SIGKILL");
+						} catch (error) {
+							if (error.code !== "ESRCH") throw error;
+						}
+					}
 					child.kill("SIGKILL");
+					const closed = await closedWithin(child, 2000);
+					if (!closed)
+						for (const stream of [child.stdin, child.stdout, child.stderr])
+							stream.destroy();
 					assert.ok(
-						await closedWithin(child, 2000),
+						closed,
 						`fixture child ${child.pid} did not close after SIGKILL`,
 					);
 				}),
 			);
+			const failures = results.filter((result) => result.status === "rejected");
+			if (failures.length)
+				throw new AggregateError(
+					failures.map((result) => result.reason),
+					"Fixture teardown failed",
+				);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -75,9 +94,18 @@ function fixture(t) {
 		DOCKER_VALIDATION_TIMEOUT: "5",
 	};
 	function start(label, code, options = {}) {
+		const workloadFile = join(root, `workload-${children.length}.pid`);
 		const child = spawn(
 			process.execPath,
-			[runner, "--label", label, "--", process.execPath, "-e", code],
+			[
+				runner,
+				"--label",
+				label,
+				"--",
+				process.execPath,
+				"-e",
+				`require('node:fs').writeFileSync(${JSON.stringify(workloadFile)}, String(process.pid)); ${code}`,
+			],
 			{
 				cwd: root,
 				env: { ...env, ...options },
@@ -98,6 +126,7 @@ function fixture(t) {
 			);
 		});
 		children.push(child);
+		child.workloadFile = workloadFile;
 		child.output = () => output;
 		return child;
 	}
@@ -113,17 +142,36 @@ function fixture(t) {
 }
 
 test("fixture teardown kills a coordinator that cannot process SIGTERM", async (t) => {
+	let workloadPid;
+	t.after(() => {
+		if (!workloadPid) return;
+		try {
+			process.kill(-workloadPid, "SIGKILL");
+		} catch (error) {
+			if (error.code !== "ESRCH") throw error;
+		}
+	});
 	const f = fixture(t);
 	const child = f.start(
 		"stopped",
-		"require('node:fs').writeFileSync('started', ''); process.stdin.resume()",
+		"process.on('SIGTERM', () => {}); process.stdin.resume(); setInterval(() => {}, 1000); require('node:fs').writeFileSync('started', '')",
 	);
 	await until(() => existsSync(join(f.root, "started")));
+	workloadPid = Number(readFileSync(child.workloadFile, "utf8"));
 	child.kill("SIGSTOP");
 	const rescue = setTimeout(() => child.kill("SIGCONT"), 3000);
 	try {
 		await f.cleanup();
 		assert.equal((await child.done).signal, "SIGKILL");
+		await until(() => {
+			try {
+				const stat = readFileSync(`/proc/${workloadPid}/stat`, "utf8");
+				return stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z ");
+			} catch (error) {
+				if (error.code === "ENOENT") return true;
+				throw error;
+			}
+		});
 		assert.equal(existsSync(f.root), false);
 	} finally {
 		clearTimeout(rescue);

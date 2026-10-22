@@ -225,6 +225,8 @@ export function syntaxTree(root) {
 			case "JS_GETTER_OBJECT_MEMBER":
 			case "JS_SETTER_OBJECT_MEMBER":
 			case "JS_CONSTRUCTOR_CLASS_MEMBER":
+			case "JS_GETTER_CLASS_MEMBER":
+			case "JS_SETTER_CLASS_MEMBER":
 			case "JS_METHOD_CLASS_MEMBER": {
 				node.type = native.kind.endsWith("_CLASS_MEMBER")
 					? "MethodDefinition"

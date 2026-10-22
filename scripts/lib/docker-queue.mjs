@@ -246,7 +246,14 @@ export async function acquireDockerLease({
 		if (!/^\d+$/.test(inherited) || Number(inherited) < 3)
 			throw new Error("Invalid inherited Docker lease descriptor.");
 		const descriptor = Number(inherited);
-		verifyLock(file, descriptor);
+		try {
+			verifyLock(file, descriptor);
+		} catch (error) {
+			throw new Error(
+				`Cannot reuse inherited Docker lock descriptor ${descriptor}. The launcher may have closed or replaced it. Forward WALLPAPERDB_DOCKER_LEASE_FD through every launcher, or run the coordinated Make target directly. ${error.message}`,
+				{ cause: error },
+			);
+		}
 		if (!lock(descriptor))
 			throw new Error(
 				"Inherited Docker lease does not own the selected host lock.",

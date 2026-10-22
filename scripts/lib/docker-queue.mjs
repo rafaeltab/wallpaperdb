@@ -21,7 +21,9 @@ export const defaultDockerLock = "/tmp/wallpaperdb-perf-validation.lock";
 function identity(pid) {
 	try {
 		const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-		return `${readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim()}:${stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19]}`;
+		const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+		if (fields[0] === "Z") return null;
+		return `${readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim()}:${fields[19]}`;
 	} catch (error) {
 		if (error.code === "ENOENT" || error.code === "ESRCH") return null;
 		throw error;

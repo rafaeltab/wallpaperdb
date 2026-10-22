@@ -76,6 +76,30 @@ test("concise assertion callbacks require a consumer that handles their result",
 		assert.deepEqual(lint(prelude + expression), [], expression);
 });
 
+test("Vitest awaits concise lifecycle callbacks through import aliases", () => {
+	for (const hook of ["beforeEach", "beforeAll", "afterEach", "afterAll"]) {
+		for (const imports of [
+			`import { expect, ${hook} as lifecycle } from 'vitest';`,
+			`import { expect } from 'vitest'; import * as v from 'vitest'; const lifecycle = v.${hook};`,
+		])
+			assert.deepEqual(
+				lint(
+					`${imports} lifecycle(() => expect(Promise.resolve(1)).resolves.toBe(1));`,
+				),
+				[],
+				hook,
+			);
+	}
+	for (const source of [
+		"import { expect, beforeEach } from 'vitest'; function run(beforeEach) { beforeEach(() => expect(Promise.resolve(1)).resolves.toBe(1)); }",
+		"import { expect } from 'vitest'; import { beforeEach } from 'other-library'; beforeEach(() => expect(Promise.resolve(1)).resolves.toBe(1));",
+	])
+		assert.ok(
+			lint(source).some((d) => d.message.includes("async assertion")),
+			source,
+		);
+});
+
 test("awaited conditional branches handle assertions", () => {
 	assert.deepEqual(
 		lint(

@@ -25,7 +25,6 @@
 			"linter": {
 				"rules": {
 					"nursery": {
-						"noFloatingPromises": "error",
 						"noJsRestrictedProperties": {
 							"level": "error",
 							"options": {
@@ -63,11 +62,17 @@
 			}
 		},
 		{
-			"includes": ["**/specs/**/*.{spec,setup}.ts"],
+			"includes": [
+				"**/*.{test,spec}.{ts,tsx}",
+				"**/{test,tests,specs}/**/*.{ts,tsx}",
+				"!**/node_modules/**",
+				"!**/{dist,build,coverage,.next,.output}/**",
+				"!**/test/fixtures/crap/**"
+			],
 			"linter": {
 				"rules": {
-					"correctness": {
-						"noPlaywrightMissingAwait": "error"
+					"nursery": {
+						"noFloatingPromises": "error"
 					}
 				}
 			}

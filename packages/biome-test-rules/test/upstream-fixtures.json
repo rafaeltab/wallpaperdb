@@ -1,0 +1,1777 @@
+{
+	"valid-expect": {
+		"source": "https://github.com/vitest-dev/eslint-plugin-vitest/blob/aad57d121647efe764463c37414a8cd67ec9cf92/tests/valid-expect.test.ts",
+		"exclusions": [
+			{
+				"line": 207,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'test(\"valid-expect\", () => { expect(2).not.toBe(2); });',\n      options: [{ asyncMatchers: ['toRejectWith'] }],\n    }"
+			},
+			{
+				"line": 211,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'test(\"valid-expect\", () => { expect(Promise.reject(2)).toRejectWith(2); });',\n      options: [{ asyncMatchers: ['toResolveWith'] }],\n    }"
+			},
+			{
+				"line": 215,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'test(\"valid-expect\", async () => { await expect(Promise.resolve(2)).toResolve(); });',\n      options: [{ asyncMatchers: ['toResolveWith'] }],\n    }"
+			},
+			{
+				"line": 219,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'test(\"valid-expect\", async () => { expect(Promise.resolve(2)).toResolve(); });',\n      options: [{ asyncMatchers: ['toResolveWith'] }],\n    }"
+			},
+			{
+				"line": 223,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf().returns.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 231,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf().branded.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 239,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf().asserts.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 247,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf().constructorParameters.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 255,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf().parameters.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 263,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf().thisParameter.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 271,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf().guards.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 279,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf().instance.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 287,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf().items.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 295,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf(Promise.resolve(1)).resolves.toEqualTypeOf<number>();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 303,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `expectTypeOf(Promise.resolve({ a: 1 })).resolves.not.toEqualTypeOf<string>();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
+			},
+			{
+				"line": 336,
+				"reason": "upstream default maxArgs 1 expectation; configured maxArgs is 2",
+				"fixture": "{\n      code: 'expect.soft(1, 2).toBe(2);',\n      errors: [{ messageId: 'tooManyArgs' }],\n    }"
+			},
+			{
+				"line": 383,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");',\n      options: [{ maxArgs: 2, minArgs: 2 }],\n      errors: [\n        {\n          endColumn: 40,\n          column: 29,\n          messageId: 'tooManyArgs',\n          data: {\n            s: 's',\n            amount: 2,\n          },\n        },\n      ],\n    }"
+			},
+			{
+				"line": 398,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");',\n      options: [{ maxArgs: 2, minArgs: 1 }],\n      errors: [\n        {\n          endColumn: 40,\n          column: 29,\n          messageId: 'tooManyArgs',\n          data: {\n            s: 's',\n            amount: 2,\n          },\n        },\n      ],\n    }"
+			},
+			{
+				"line": 413,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'expect(\"something\").toEqual(\"something\");',\n      options: [{ minArgs: 2 }],\n      errors: [\n        {\n          endColumn: 8,\n          column: 7,\n          messageId: 'notEnoughArgs',\n          data: {\n            s: 's',\n            amount: 2,\n          },\n        },\n      ],\n    }"
+			},
+			{
+				"line": 428,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'expect(\"something\", \"else\").toEqual(\"something\");',\n      options: [{ maxArgs: 1, minArgs: 3 }],\n      errors: [\n        {\n          endColumn: 8,\n          column: 7,\n          messageId: 'notEnoughArgs',\n          data: {\n            s: 's',\n            amount: 3,\n          },\n        },\n      ],\n    }"
+			},
+			{
+				"line": 444,
+				"reason": "upstream default maxArgs 1 expectation; configured maxArgs is 2",
+				"fixture": "{\n      code: 'expect(\"something\", true).toEqual(\"something\");',\n      errors: [\n        {\n          endColumn: 26,\n          column: 21,\n          messageId: 'tooManyArgs',\n        },\n      ],\n    }"
+			},
+			{
+				"line": 454,
+				"reason": "upstream default maxArgs 1 expectation; configured maxArgs is 2",
+				"fixture": "{\n      code: 'expect(\"something\", 12).toEqual(\"something\");',\n      errors: [\n        {\n          endColumn: 24,\n          column: 21,\n          messageId: 'tooManyArgs',\n        },\n      ],\n    }"
+			},
+			{
+				"line": 464,
+				"reason": "upstream default maxArgs 1 expectation; configured maxArgs is 2",
+				"fixture": "{\n      code: 'expect(\"something\", {}).toEqual(\"something\");',\n      errors: [\n        {\n          endColumn: 24,\n          column: 21,\n          messageId: 'tooManyArgs',\n        },\n      ],\n    }"
+			},
+			{
+				"line": 474,
+				"reason": "upstream default maxArgs 1 expectation; configured maxArgs is 2",
+				"fixture": "{\n      code: 'expect(\"something\", []).toEqual(\"something\");',\n      errors: [\n        {\n          endColumn: 24,\n          column: 21,\n          messageId: 'tooManyArgs',\n        },\n      ],\n    }"
+			},
+			{
+				"line": 486,
+				"reason": "upstream default maxArgs 1 expectation; configured maxArgs is 2",
+				"fixture": "{\n      code: `const message = \"message\";\n      expect(1, message).toBe(2);`,\n      errors: [\n        {\n          endColumn: 25,\n          column: 17,\n          messageId: 'tooManyArgs',\n        },\n      ],\n    }"
+			},
+			{
+				"line": 583,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: 'expectTypeOf(value).to.toMatchTypeOf();',\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n      errors: [{ messageId: 'modifierUnknown' }],\n    }"
+			},
+			{
+				"line": 618,
+				"reason": "upstream default maxArgs 1 expectation; configured maxArgs is 2",
+				"fixture": "{\n      code: 'expect(value, badSecondArg).to.be.a(\"string\");',\n      errors: [\n        {\n          messageId: 'tooManyArgs',\n        },\n      ],\n    }"
+			},
+			{
+				"line": 686,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'expect(Promise.resolve(2)).resolves.toBeDefined();',\n      options: [{ alwaysAwait: true }],\n      errors: [\n        {\n          column: 1,\n          endColumn: 50,\n          messageId: 'asyncMustBeAwaited',\n        },\n      ],\n    }"
+			},
+			{
+				"line": 882,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'test(\"valid-expect\", () => { expect(Promise.reject(2)).toRejectWith(2); });',\n      output:\n        'test(\"valid-expect\", async () => { await expect(Promise.reject(2)).toRejectWith(2); });',\n      options: [{ asyncMatchers: ['toRejectWith'] }],\n      errors: [\n        {\n          messageId: 'asyncMustBeAwaited',\n          data: { orReturned: ' or returned' },\n          column: 30,\n        },\n      ],\n    }"
+			},
+			{
+				"line": 895,
+				"reason": "different rule options",
+				"fixture": "{\n      code: 'test(\"valid-expect\", () => { expect(Promise.reject(2)).rejects.toBe(2); });',\n      output:\n        'test(\"valid-expect\", async () => { await expect(Promise.reject(2)).rejects.toBe(2); });',\n      options: [{ asyncMatchers: ['toRejectWith'] }],\n      errors: [\n        {\n          messageId: 'asyncMustBeAwaited',\n          data: { orReturned: ' or returned' },\n          column: 30,\n        },\n      ],\n    }"
+			},
+			{
+				"line": 961,
+				"reason": "different rule options",
+				"fixture": "{\n      code: `\n       test(\"valid-expect\", async () => {\n      expect(Promise.resolve(2)).resolves.not.toBeDefined();\n      return expect(Promise.resolve(1)).rejects.toBeDefined();\n       });\n     `,\n      output: `\n       test(\"valid-expect\", async () => {\n      await expect(Promise.resolve(2)).resolves.not.toBeDefined();\n      await expect(Promise.resolve(1)).rejects.toBeDefined();\n       });\n     `,\n      options: [{ alwaysAwait: true }],\n      errors: [\n        {\n          line: 3,\n          column: 7,\n          endColumn: 60,\n          messageId: 'asyncMustBeAwaited',\n        },\n        {\n          line: 4,\n          column: 14,\n          endColumn: 62,\n          messageId: 'asyncMustBeAwaited',\n        },\n      ],\n    }"
+			},
+			{
+				"line": 1034,
+				"reason": "different rule options",
+				"fixture": "{\n      code: `\n     test(\"valid-expect\", () => {\n       Promise.resolve(expect(Promise.resolve(2)).resolves.not.toBeDefined());\n     });\n      `,\n      output: `\n     test(\"valid-expect\", async () => {\n       await Promise.resolve(expect(Promise.resolve(2)).resolves.not.toBeDefined());\n     });\n      `,\n      options: [{ alwaysAwait: true }],\n      errors: [\n        {\n          line: 3,\n          column: 8,\n          endColumn: 78,\n          messageId: 'promisesWithAsyncAssertionsMustBeAwaited',\n        },\n      ],\n    }"
+			}
+		],
+		"cases": [
+			{
+				"source": "expect.hasAssertions",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.hasAssertions()",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.assert(value)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.assert.isDefined(value)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.assert.exists(value)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.any(String)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.anything()",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.arrayContaining([1])",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.closeTo(1, 2)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.objectContaining({ id: 1 })",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.schemaMatching(schema)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.stringContaining(\"value\")",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.stringMatching(/value/)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.toBeOneOf([1, 2])",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.toSatisfy(value => value > 0)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.not.arrayContaining([1])",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.not.closeTo(1, 2)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.not.objectContaining({ id: 1 })",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.not.schemaMatching(schema)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.not.stringContaining(\"value\")",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.not.stringMatching(/value/)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.not.toBeOneOf([1, 2])",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.not.toSatisfy(value => value > 0)",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.soft(\"something\").toEqual(\"else\");",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.soft(\"something\").not.toEqual(\"else\");",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.poll(() => \"something\").toEqual(\"else\");",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.poll(() => \"something\", { timeout: 500 }).toEqual(\"else\");",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.poll(() => \"something\", { interval: 50, timeout: 500 }).not.toEqual(\"else\");",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.element(element).toBeInTheDocument();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.element(element, { timeout: 500 }).toBeInTheDocument();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect(\"something\").toEqual(\"else\");",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect(true).toBeDefined();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect([1, 2, 3]).toEqual([1, 2, 3]);",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect(undefined).not.toBeDefined();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", () => { return expect(Promise.resolve(2)).resolves.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", () => { return expect(Promise.reject(2)).rejects.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.resolve(2)).not.resolves.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).not.rejects.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", () => { return expect(Promise.resolve(2)).resolves.not.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", () => { return expect(Promise.resolve(2)).rejects.not.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", function () { return expect(Promise.resolve(2)).resolves.not.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", function () { return expect(Promise.resolve(2)).rejects.not.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", function () { return Promise.resolve(expect(Promise.resolve(2)).resolves.not.toBeDefined()); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", function () { return Promise.resolve(expect(Promise.resolve(2)).rejects.not.toBeDefined()); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", () => expect(Promise.resolve(2)).resolves.toBeDefined());",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", () => expect(Promise.reject(2)).rejects.toBeDefined());",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", () => expect(Promise.reject(2)).resolves.not.toBeDefined());",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", () => expect(Promise.reject(2)).rejects.not.toBeDefined());",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).resolves.not.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).rejects.not.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async function () { await expect(Promise.reject(2)).resolves.not.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async function () { await expect(Promise.reject(2)).rejects.not.toBeDefined(); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await Promise.resolve(expect(Promise.reject(2)).rejects.not.toBeDefined()); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await Promise.reject(expect(Promise.reject(2)).rejects.not.toBeDefined()); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await Promise.all([expect(Promise.reject(2)).rejects.not.toBeDefined(), expect(Promise.reject(2)).rejects.not.toBeDefined()]); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await Promise.race([expect(Promise.reject(2)).rejects.not.toBeDefined(), expect(Promise.reject(2)).rejects.not.toBeDefined()]); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await Promise.allSettled([expect(Promise.reject(2)).rejects.not.toBeDefined(), expect(Promise.reject(2)).rejects.not.toBeDefined()]); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await Promise.any([expect(Promise.reject(2)).rejects.not.toBeDefined(), expect(Promise.reject(2)).rejects.not.toBeDefined()]); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { return expect(Promise.reject(2)).resolves.not.toBeDefined().then(() => console.log(\"valid-case\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { return expect(Promise.reject(2)).resolves.not.toBeDefined().then(() => console.log(\"valid-case\")).then(() => console.log(\"another valid case\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { return expect(Promise.reject(2)).resolves.not.toBeDefined().catch(() => console.log(\"valid-case\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { return expect(Promise.reject(2)).resolves.not.toBeDefined().then(() => console.log(\"valid-case\")).catch(() => console.log(\"another valid case\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { return expect(Promise.reject(2)).resolves.not.toBeDefined().then(() => { expect(someMock).toHaveBeenCalledTimes(1); }); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).resolves.not.toBeDefined().then(() => console.log(\"valid-case\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).resolves.not.toBeDefined().then(() => console.log(\"valid-case\")).then(() => console.log(\"another valid case\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).resolves.not.toBeDefined().catch(() => console.log(\"valid-case\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).resolves.not.toBeDefined().then(() => console.log(\"valid-case\")).catch(() => console.log(\"another valid case\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).resolves.not.toBeDefined().then(() => { expect(someMock).toHaveBeenCalledTimes(1); }); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { return expect(Promise.resolve(2)).resolves.not.toBeDefined().finally(() => console.log(\"valid-case\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { return expect(Promise.resolve(2)).resolves.not.toBeDefined().then(() => console.log(\"valid-case\")).finally(() => console.log(\"cleanup\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.resolve(2)).resolves.not.toBeDefined().then(() => console.log(\"valid-case\")).finally(() => console.log(\"cleanup\")).then(() => console.log(\"after\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).rejects.not.toBeDefined().finally(() => console.log(\"cleanup\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.resolve(2)).resolves.not.toBeDefined().finally(() => console.log(\"cleanup\")).catch(() => console.log(\"recover\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.resolve(2)).resolves.not.toBeDefined().finally(() => console.log(\"cleanup 1\")).finally(() => console.log(\"cleanup 2\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.reject(2)).resolves.not.toBeDefined().catch(() => console.log(\"recover\")).finally(() => console.log(\"cleanup\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { await expect(Promise.resolve(2)).resolves.not.toBeDefined().finally(() => console.log(\"cleanup\")); });",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": " test(\"valid-expect\", () => {\n           return expect(functionReturningAPromise()).resolves.toEqual(1).then(() => {\n             return expect(Promise.resolve(2)).resolves.toBe(1);\n           });\n         });\n       ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": " test(\"valid-expect\", () => {\n           return expect(functionReturningAPromise()).resolves.toEqual(1).then(async () => {\n             await expect(Promise.resolve(2)).resolves.toBe(1);\n           });\n         });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": " test(\"valid-expect\", () => {\n           return expect(functionReturningAPromise()).resolves.toEqual(1).then(() => expect(Promise.resolve(2)).resolves.toBe(1));\n         });\n       ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": " expect.extend({\n           toResolve(obj) {\n             return this.isNot\n               ? expect(obj).toBe(true)\n               : expect(obj).resolves.not.toThrow();\n           }\n         });\n       ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": " expect.extend({\n          toResolve(obj) {\n            return this.isNot\n              ? expect(obj).resolves.not.toThrow()\n              : expect(obj).toBe(true);\n          }\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": " expect.extend({\n      toResolve(obj) {\n     return this.isNot\n       ? expect(obj).toBe(true)\n       : anotherCondition\n       ? expect(obj).resolves.not.toThrow()\n       : expect(obj).toBe(false)\n      }\n    });\n     ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect(value, \"message\").toBe(1);",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect(value, `message`).toBe(1);",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "const message = \"message\"; expect(value, `${message}`).toBe(1);",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect(\"foo bar\").to.include(\"foo\");\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect(\"hey\").to.have.property(\"foo\", \"bar\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect(\"hey\").to.be.a(\"string\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect(\"hello\").to.be.a(\"string\").and.contain(\"hell\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect([1, 2, 3]).to.include.members([1, 2])\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect([1, 2, 3]).to.have.lengthOf.above(2)\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect([1, 2, 3]).to.have.lengthOf(3)\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect([1, 2, 3]).to.have.length.above(2)\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect(Foo).itself.to.respondTo(\"bar\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect(\"hello\").to.be.a(\"string\").that.does.not.contain(\"world\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', async () => {\n   await expect(Promise.resolve(\"hello\")).resolves.to.be.a(\"string\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', async () => {\n   await expect(Promise.resolve(\"hello\")).resolves.to.be.a(\"string\").and.contain(\"hell\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   return expect(Promise.resolve(\"hello\")).resolves.to.be.a(\"string\").and.contain(\"hell\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect(\"hello\").not.to.be.an(\"array\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect(\"hello\").to.not.contain(\"world\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect(\"hello\").not.to.contain(\"world\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect({ a: 1 }).to.deep.equal({ a: 1 })\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it('example', () => {\n   expect({ a: 1 }).to.have.any.keys(\"a\", \"b\")\n});\n",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect(1).toBe(2);",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect(1, \"1 !== 2\").toBe(2);",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect.soft().toBe(2);",
+				"valid": false,
+				"messages": ["notEnoughArgs"]
+			},
+			{
+				"source": "expect().toBe(true);",
+				"valid": false,
+				"messages": ["notEnoughArgs"]
+			},
+			{
+				"source": "expect().toEqual(\"something\");",
+				"valid": false,
+				"messages": ["notEnoughArgs"]
+			},
+			{
+				"source": "expect(\"something\");",
+				"valid": false,
+				"messages": ["matcherNotFound"]
+			},
+			{
+				"source": "expect.soft(\"something\");",
+				"valid": false,
+				"messages": ["matcherNotFound"]
+			},
+			{
+				"source": "expect.poll(() => value);",
+				"valid": false,
+				"messages": ["matcherNotFound"]
+			},
+			{
+				"source": "expect.element(element);",
+				"valid": false,
+				"messages": ["matcherNotFound"]
+			},
+			{
+				"source": "expect();",
+				"valid": false,
+				"messages": ["matcherNotFound"]
+			},
+			{
+				"source": "expect(true).toBeDefined;",
+				"valid": false,
+				"messages": ["matcherNotCalled"]
+			},
+			{
+				"source": "expect(true).not.toBeDefined;",
+				"valid": false,
+				"messages": ["matcherNotCalled"]
+			},
+			{
+				"source": "expect(true).nope.toBeDefined;",
+				"valid": false,
+				"messages": ["matcherNotCalled"]
+			},
+			{
+				"source": "expect(true).nope.toBeDefined();",
+				"valid": false,
+				"messages": ["modifierUnknown"]
+			},
+			{
+				"source": "expect(true).not.resolves.toBeDefined();",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "expect(true).not.rejects.toBeDefined();",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "expect(Promise.resolve(1)).to.resolves.toBe(1);",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "expect(Promise.reject(1)).to.rejects.toBe(1);",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "expect(true).not.not.toBeDefined();",
+				"valid": false,
+				"messages": ["modifierUnknown"]
+			},
+			{
+				"source": "expect(true).resolves.not.exactly.toBeDefined();",
+				"valid": false,
+				"messages": ["modifierUnknown"]
+			},
+			{
+				"source": "expect(\"hello\").to.be(\"string\").that.does.not.contain(\"world\");",
+				"valid": false,
+				"messages": ["modifierUnknown"]
+			},
+			{
+				"source": "expect(\"hello\").to.be.a(\"string\").that.foo.not.contain(\"world\");",
+				"valid": false,
+				"messages": ["modifierUnknown"]
+			},
+			{
+				"source": "expect().to.be.a(\"string\");",
+				"valid": false,
+				"messages": ["notEnoughArgs"]
+			},
+			{
+				"source": "expect(true).resolves;",
+				"valid": false,
+				"messages": ["matcherNotFound"]
+			},
+			{
+				"source": "expect(true).rejects;",
+				"valid": false,
+				"messages": ["matcherNotFound"]
+			},
+			{
+				"source": "expect(true).not;",
+				"valid": false,
+				"messages": ["matcherNotFound"]
+			},
+			{
+				"source": "expect(Promise.resolve(2)).resolves.toBeDefined();",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "expect(Promise.resolve(2)).rejects.toBeDefined();",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "expect(Promise.resolve(\"hey\")).resolves.to.be.a(\"string\")",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "expect(Promise.resolve(\"hello\")).resolves.to.be.a(\"string\").and.contain(\"hell\")",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n     expect.extend({\n       toResolve(obj) {\n      this.isNot\n        ? expect(obj).toBe(true)\n        : expect(obj).resolves.not.toThrow();\n       }\n     });\n      ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n     expect.extend({\n       toResolve(obj) {\n      this.isNot\n        ? expect(obj).resolves.not.toThrow()\n        : expect(obj).toBe(true);\n       }\n     });\n      ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "test(\"valid-expect\", () => { expect(Promise.resolve(2)).resolves.toBeDefined(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "test(\"valid-expect\", () => { expect(Promise.resolve(2)).toResolve(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "test(\"valid-expect\", () => { expect(Promise.resolve(2)).toReject(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "test(\"valid-expect\", () => { expect(Promise.resolve(2)).not.toReject(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "test(\"valid-expect\", () => { expect(Promise.resolve(2)).resolves.not.toBeDefined(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "test(\"valid-expect\", () => { expect(Promise.resolve(2)).rejects.toBeDefined(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "test(\"valid-expect\", () => { expect(Promise.resolve(2)).rejects.not.toBeDefined(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { expect(Promise.resolve(2)).resolves.toBeDefined(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { expect(Promise.resolve(2)).resolves.not.toBeDefined(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n       test(\"valid-expect\", async () => {\n      expect(Promise.resolve(2)).resolves.not.toBeDefined();\n      expect(Promise.resolve(1)).rejects.toBeDefined();\n       });\n     ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited", "asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n       test(\"valid-expect\", async () => {\n      await expect(Promise.resolve(2)).resolves.not.toBeDefined();\n      expect(Promise.resolve(1)).rejects.toBeDefined();\n       });\n     ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n       test(\"valid-expect\", async () => {\n      expect(Promise.resolve(2)).resolves.not.toBeDefined();\n      return expect(Promise.resolve(1)).rejects.toBeDefined();\n       });\n     ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n       test(\"valid-expect\", () => {\n      Promise.x(expect(Promise.resolve(2)).resolves.not.toBeDefined());\n       });\n     ",
+				"valid": false,
+				"messages": ["promisesWithAsyncAssertionsMustBeAwaited"]
+			},
+			{
+				"source": "\n     test(\"valid-expect\", () => {\n      Promise.all([\n        expect(Promise.resolve(2)).resolves.not.toBeDefined(),\n        expect(Promise.resolve(3)).resolves.not.toBeDefined(),\n      ]);\n       });\n       ",
+				"valid": false,
+				"messages": ["promisesWithAsyncAssertionsMustBeAwaited"]
+			},
+			{
+				"source": "\n     test(\"valid-expect\", () => {\n      Promise.x([\n        expect(Promise.resolve(2)).resolves.not.toBeDefined(),\n        expect(Promise.resolve(3)).resolves.not.toBeDefined(),\n      ]);\n       });",
+				"valid": false,
+				"messages": ["promisesWithAsyncAssertionsMustBeAwaited"]
+			},
+			{
+				"source": "\n       test(\"valid-expect\", () => {\n      const assertions = [\n        expect(Promise.resolve(2)).resolves.not.toBeDefined(),\n        expect(Promise.resolve(3)).resolves.not.toBeDefined(),\n      ]\n       });\n     ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited", "asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n     test(\"valid-expect\", () => {\n       const assertions = [\n      expect(Promise.resolve(2)).toResolve(),\n      expect(Promise.resolve(3)).toReject(),\n       ]\n     });\n      ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited", "asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n       test(\"valid-expect\", () => {\n      const assertions = [\n        expect(Promise.resolve(2)).not.toResolve(),\n        expect(Promise.resolve(3)).resolves.toReject(),\n      ]\n       });\n     ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited", "asyncMustBeAwaited"]
+			},
+			{
+				"source": "expect(Promise.resolve(2)).resolves.toBe;",
+				"valid": false,
+				"messages": ["matcherNotCalled"]
+			},
+			{
+				"source": "\n       test(\"valid-expect\", () => {\n      return expect(functionReturningAPromise()).resolves.toEqual(1).then(() => {\n        expect(Promise.resolve(2)).resolves.toBe(1);\n      });\n       });\n     ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n       test(\"valid-expect\", () => {\n      return expect(functionReturningAPromise()).resolves.toEqual(1).then(async () => {\n        await expect(Promise.resolve(2)).resolves.toBe(1);\n        expect(Promise.resolve(4)).resolves.toBe(4);\n      });\n       });\n     ",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "\n       test(\"valid-expect\", async () => {\n      await expect(Promise.resolve(1));\n       });\n     ",
+				"valid": false,
+				"messages": ["matcherNotFound"]
+			},
+			{
+				"source": "test(\"valid-expect\", async () => { expect(Promise.resolve(2)).resolves.not.toBeDefined().finally(() => console.log(\"cleanup\")); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "expect().toBe(2);",
+				"valid": false,
+				"messages": ["notEnoughArgs"]
+			},
+			{
+				"source": "expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");",
+				"valid": false,
+				"messages": ["tooManyArgs"]
+			},
+			{
+				"source": "test(\"valid-expect\", () => { expect(Promise.resolve(2)).toResolve(); });",
+				"valid": false,
+				"messages": ["asyncMustBeAwaited"]
+			}
+		]
+	},
+	"valid-expect-in-promise": {
+		"source": "https://github.com/vitest-dev/eslint-plugin-vitest/blob/aad57d121647efe764463c37414a8cd67ec9cf92/tests/valid-expect-in-promise.test.ts",
+		"exclusions": [
+			{
+				"line": 1620,
+				"reason": "fixture-specific plugin settings",
+				"fixture": "{\n      code: `\n        promiseThatThis('is valid', async () => {\n          const promise = loadNumber().then(number => {\n            expect(typeof number).toBe('number');\n\n            return number + 1;\n          });\n\n          expect(anotherPromise).resolves.toBe(1);\n        });\n      `,\n      errors: [\n        {\n          messageId: 'expectInFloatingPromise',\n          line: 3,\n          column: 17,\n        },\n      ],\n      settings: { vitest: { globalAliases: { xit: ['promiseThatThis'] } } },\n    }"
+			}
+		],
+		"cases": [
+			{
+				"source": "test('something', () => Promise.resolve().then(() => expect(1).toBe(2)));",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "Promise.resolve().then(() => expect(1).toBe(2))",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "const x = Promise.resolve().then(() => expect(1).toBe(2))",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect(promise).resolves.toBe(1);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect(promise).resolves.not.toBe(2);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect(promise).rejects.toBe(1);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect(promise).rejects.not.toBe(2);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect(await promise).toBeGreaterThan(1);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect(await promise).resolves.toBeGreaterThan(1);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect(1).toBeGreaterThan(await promise);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect.this.that.is(await promise);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        expect(await loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        })).toBeGreaterThan(1);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect([await promise]).toHaveLength(1);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect([,,await promise,,]).toHaveLength(1);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        expect([[await promise]]).toHaveLength(1);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return number + 1;\n        });\n\n        logValue(await promise);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promise = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n\n          return 1;\n        });\n\n        expect.assertions(await promise);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        await loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', () => new Promise((done) => {\n        test()\n          .then(() => {\n            expect(someThing).toEqual(true);\n            done();\n          });\n      }));\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', () => {\n        return new Promise(done => {\n          test().then(() => {\n            expect(someThing).toEqual(true);\n            done();\n          });\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('passes', () => {\n        Promise.resolve().then(() => {\n          grabber.grabSomething();\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('passes', async () => {\n        const grabbing = Promise.resolve().then(() => {\n          grabber.grabSomething();\n        });\n\n        await grabbing;\n\n        expect(grabber.grabbedItems).toHaveLength(1);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      const myFn = () => {\n        Promise.resolve().then(() => {\n          expect(true).toBe(false);\n        });\n      };\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      const myFn = () => {\n        Promise.resolve().then(() => {\n          subject.invokeMethod();\n        });\n      };\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      const myFn = () => {\n        Promise.resolve().then(() => {\n          expect(true).toBe(false);\n        });\n      };\n\n      it('it1', () => {\n        return somePromise.then(() => {\n          expect(someThing).toEqual(true);\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', () => new Promise((done) => {\n        test()\n          .finally(() => {\n            expect(someThing).toEqual(true);\n            done();\n          });\n      }));\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', () => {\n        return somePromise.then(() => {\n          expect(someThing).toEqual(true);\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', () => {\n        return somePromise.finally(() => {\n          expect(someThing).toEqual(true);\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', function() {\n        return somePromise.catch(function() {\n          expect(someThing).toEqual(true);\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      xtest('it1', function() {\n        return somePromise.catch(function() {\n          expect(someThing).toEqual(true);\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', function() {\n        return somePromise.then(function() {\n          doSomeThingButNotExpect();\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', function() {\n        return getSomeThing().getPromise().then(function() {\n          expect(someThing).toEqual(true);\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', function() {\n        return Promise.resolve().then(function() {\n          expect(someThing).toEqual(true);\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', function () {\n        return Promise.resolve().then(function () {\n          /*fulfillment*/\n          expect(someThing).toEqual(true);\n        }, function () {\n          /*rejection*/\n          expect(someThing).toEqual(true);\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', function () {\n        Promise.resolve().then(/*fulfillment*/ function () {\n        }, undefined, /*rejection*/ function () {\n          expect(someThing).toEqual(true)\n        })\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', function () {\n        return Promise.resolve().then(function () {\n          /*fulfillment*/\n        }, function () {\n          /*rejection*/\n          expect(someThing).toEqual(true);\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', function () {\n        return somePromise.then()\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', async () => {\n        await Promise.resolve().then(function () {\n          expect(someThing).toEqual(true)\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', async () => {\n        await somePromise.then(() => {\n          expect(someThing).toEqual(true)\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', async () => {\n        await getSomeThing().getPromise().then(function () {\n          expect(someThing).toEqual(true)\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', () => {\n        return somePromise.then(() => {\n          expect(someThing).toEqual(true);\n        })\n        .then(() => {\n          expect(someThing).toEqual(true);\n        })\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', () => {\n        return somePromise.then(() => {\n          return value;\n        })\n        .then(value => {\n          expect(someThing).toEqual(value);\n        })\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', () => {\n        return somePromise.then(() => {\n          expect(someThing).toEqual(true);\n        })\n        .then(() => {\n          console.log('this is silly');\n        })\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('it1', () => {\n        return somePromise.then(() => {\n          expect(someThing).toEqual(true);\n        })\n        .catch(() => {\n          expect(someThing).toEqual(false);\n        })\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('later return', () => {\n        const promise = something().then(value => {\n          expect(value).toBe('red');\n        });\n\n        return promise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('later return', async () => {\n        const promise = something().then(value => {\n          expect(value).toBe('red');\n        });\n\n        await promise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test.only('later return', () => {\n        const promise = something().then(value => {\n          expect(value).toBe('red');\n        });\n\n        return promise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('that we bailout if destructuring is used', () => {\n        const [promise] = something().then(value => {\n          expect(value).toBe('red');\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('that we bailout if destructuring is used', async () => {\n        const [promise] = await something().then(value => {\n          expect(value).toBe('red');\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('that we bailout if destructuring is used', () => {\n        const [promise] = [\n          something().then(value => {\n            expect(value).toBe('red');\n          })\n        ];\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('that we bailout if destructuring is used', () => {\n        const {promise} = {\n          promise: something().then(value => {\n            expect(value).toBe('red');\n          })\n        };\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('that we bailout in complex cases', () => {\n        promiseSomething({\n          timeout: 500,\n          promise: something().then(value => {\n            expect(value).toBe('red');\n          })\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('shorthand arrow', () =>\n        something().then(value => {\n          expect(() => {\n            value();\n          }).toThrow();\n        })\n      );\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('crawls for files based on patterns', () => {\n        const promise = nodeCrawl({}).then(data => {\n          expect(childProcess.spawn).lastCalledWith('find');\n        });\n        return promise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is a test', async () => {\n        const value = await somePromise().then(response => {\n          expect(response).toHaveProperty('data');\n\n          return response.data;\n        });\n\n        expect(value).toBe('hello world');\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is a test', async () => {\n        return await somePromise().then(response => {\n          expect(response).toHaveProperty('data');\n\n          return response.data;\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is a test', async () => {\n        return somePromise().then(response => {\n          expect(response).toHaveProperty('data');\n\n          return response.data;\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is a test', async () => {\n        await somePromise().then(response => {\n          expect(response).toHaveProperty('data');\n\n          return response.data;\n        });\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it(\n        'test function',\n        () => {\n          return Builder\n            .getPromiseBuilder()\n            .get().build()\n            .then((data) => {\n              expect(data).toEqual('Hi');\n            });\n        }\n      );\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      notATestFunction(\n        'not a test function',\n        () => {\n          Builder\n            .getPromiseBuilder()\n            .get()\n            .build()\n            .then((data) => {\n              expect(data).toEqual('Hi');\n            });\n        }\n      );\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('is valid', async () => {\n        const promiseOne = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n        });\n        const promiseTwo = loadNumber().then(number => {\n          expect(typeof number).toBe('number');\n        });\n\n        await promiseTwo;\n        await promiseOne;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it(\"it1\", () => somePromise.then(() => {\n        expect(someThing).toEqual(true)\n      }))\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "it(\"it1\", () => somePromise.then(() => expect(someThing).toEqual(true)))",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('promise test with done', (done) => {\n        const promise = getPromise();\n        promise.then(() => expect(someThing).toEqual(true));\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it('name of done param does not matter', (nameDoesNotMatter) => {\n        const promise = getPromise();\n        promise.then(() => expect(someThing).toEqual(true));\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it.each([])('name of done param does not matter', (nameDoesNotMatter) => {\n        const promise = getPromise();\n        promise.then(() => expect(someThing).toEqual(true));\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      it.each``('name of done param does not matter', ({}, nameDoesNotMatter) => {\n        const promise = getPromise();\n        promise.then(() => expect(someThing).toEqual(true));\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('valid-expect-in-promise', async () => {\n        const text = await fetch('url')\n            .then(res => res.text())\n            .then(text => text);\n\n        expect(text).toBe('text');\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        }), x = 1;\n\n        await somePromise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let x = 1, somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await somePromise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await somePromise;\n\n        somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await somePromise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await somePromise;\n\n        somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        return somePromise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        {}\n\n        await somePromise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        const somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        {\n          await somePromise;\n        }\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        {\n          await somePromise;\n\n          somePromise = getPromise().then((data) => {\n            expect(data).toEqual('foo');\n          });\n\n          await somePromise;\n        }\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await somePromise;\n\n        {\n          somePromise = getPromise().then((data) => {\n            expect(data).toEqual('foo');\n          });\n\n          await somePromise;\n        }\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        somePromise = somePromise.then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await somePromise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        somePromise = somePromise\n          .then((data) => data)\n          .then((data) => data)\n          .then((data) => {\n            expect(data).toEqual('foo');\n          });\n\n        await somePromise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        somePromise = somePromise\n          .then((data) => data)\n          .then((data) => data)\n\n        await somePromise;\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        let somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await somePromise;\n\n        {\n          somePromise = getPromise().then((data) => {\n            expect(data).toEqual('foo');\n          });\n\n          {\n            await somePromise;\n          }\n        }\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        const somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await Promise.all([somePromise]);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        const somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        return Promise.all([somePromise]);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        const somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        return Promise.resolve(somePromise);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        const somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        return Promise.reject(somePromise);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        const somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await Promise.resolve(somePromise);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('promise test', async function () {\n        const somePromise = getPromise().then((data) => {\n          expect(data).toEqual('foo');\n        });\n\n        await Promise.reject(somePromise);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('later return', async () => {\n        const onePromise = something().then(value => {\n          console.log(value);\n        });\n        const twoPromise = something().then(value => {\n          expect(value).toBe('red');\n        });\n\n        return Promise.all([onePromise, twoPromise]);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n      test('later return', async () => {\n        const onePromise = something().then(value => {\n          console.log(value);\n        });\n        const twoPromise = something().then(value => {\n          expect(value).toBe('red');\n        });\n\n        return Promise.allSettled([onePromise, twoPromise]);\n      });\n    ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        const myFn = () => {\n          Promise.resolve().then(() => {\n            expect(true).toBe(false);\n          });\n        };\n\n        it('it1', () => {\n          somePromise.then(() => {\n            expect(someThing).toEqual(true);\n          });\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', () => {\n          somePromise.then(() => {\n            expect(someThing).toEqual(true);\n          });\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', () => {\n          somePromise.finally(() => {\n            expect(someThing).toEqual(true);\n          });\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n       it('it1', () => {\n         somePromise['then'](() => {\n           expect(someThing).toEqual(true);\n         });\n       });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', function() {\n          getSomeThing().getPromise().then(function() {\n            expect(someThing).toEqual(true);\n          });\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', function() {\n          Promise.resolve().then(function() {\n            expect(someThing).toEqual(true);\n          });\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', function() {\n          somePromise.catch(function() {\n            expect(someThing).toEqual(true)\n          })\n        })\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        xtest('it1', function() {\n          somePromise.catch(function() {\n            expect(someThing).toEqual(true)\n          })\n        })\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', function() {\n          somePromise.then(function() {\n            expect(someThing).toEqual(true)\n          })\n        })\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', function () {\n          Promise.resolve().then(/*fulfillment*/ function () {\n            expect(someThing).toEqual(true);\n          }, /*rejection*/ function () {\n            expect(someThing).toEqual(true);\n          })\n        })\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', function () {\n          Promise.resolve().then(/*fulfillment*/ function () {\n          }, /*rejection*/ function () {\n            expect(someThing).toEqual(true)\n          })\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('test function', () => {\n          Builder.getPromiseBuilder()\n            .get()\n            .build()\n            .then(data => expect(data).toEqual('Hi'));\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('test function', async () => {\n          Builder.getPromiseBuilder()\n            .get()\n            .build()\n            .then(data => expect(data).toEqual('Hi'));\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', () => {\n          somePromise.then(() => {\n            doSomeOperation();\n            expect(someThing).toEqual(true);\n          })\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is a test', () => {\n          somePromise\n            .then(() => {})\n            .then(() => expect(someThing).toEqual(value))\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is a test', () => {\n          somePromise\n            .then(() => expect(someThing).toEqual(value))\n            .then(() => {})\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is a test', () => {\n          somePromise.then(() => {\n            return value;\n          })\n          .then(value => {\n            expect(someThing).toEqual(value);\n          })\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is a test', () => {\n          somePromise.then(() => {\n            expect(someThing).toEqual(true);\n          })\n          .then(() => {\n            console.log('this is silly');\n          })\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is a test', () => {\n          somePromise.then(() => {\n            // return value;\n          })\n          .then(value => {\n            expect(someThing).toEqual(value);\n          })\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is a test', () => {\n          somePromise.then(() => {\n            return value;\n          })\n          .then(value => {\n            expect(someThing).toEqual(value);\n          })\n\n          return anotherPromise.then(() => expect(x).toBe(y));\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is a test', () => {\n          somePromise\n            .then(() => 1)\n            .then(x => x + 1)\n            .catch(() => -1)\n            .then(v => expect(v).toBe(2));\n\n          return anotherPromise.then(() => expect(x).toBe(y));\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is a test', () => {\n          somePromise\n            .then(() => 1)\n            .then(v => expect(v).toBe(2))\n            .then(x => x + 1)\n            .catch(() => -1);\n\n          return anotherPromise.then(() => expect(x).toBe(y));\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('it1', () => {\n          somePromise.finally(() => {\n            doSomeOperation();\n            expect(someThing).toEqual(true);\n          })\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('invalid return', () => {\n          const promise = something().then(value => {\n            const foo = \"foo\";\n            return expect(value).toBe('red');\n          });\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        fit('it1', () => {\n          somePromise.then(() => {\n            doSomeOperation();\n            expect(someThing).toEqual(true);\n          })\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it.skip('it1', () => {\n          somePromise.then(() => {\n            doSomeOperation();\n            expect(someThing).toEqual(true);\n          })\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          promise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          return;\n\n          await promise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          return 1;\n\n          await promise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          return [];\n\n          await promise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          return Promise.all([anotherPromise]);\n\n          await promise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          return {};\n\n          await promise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          return Promise.all([]);\n\n          await promise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          await 1;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          await [];\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          await Promise.all([anotherPromise]);\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          await {};\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          await Promise.all([]);\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          }), x = 1;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('later return', async () => {\n          const x = 1, promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        import { test } from 'vitest';\n\n        test('later return', async () => {\n          const x = 1, promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('promise test', () => {\n          const somePromise = getThatPromise();\n          somePromise.then((data) => {\n            expect(data).toEqual('foo');\n          });\n          expect(somePromise).toBeDefined();\n          return somePromise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('promise test', function () {\n          let somePromise = getThatPromise();\n          somePromise.then((data) => {\n            expect(data).toEqual('foo');\n          });\n          expect(somePromise).toBeDefined();\n          return somePromise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('promise test', async function () {\n          let somePromise = getPromise().then((data) => {\n            expect(data).toEqual('foo');\n          });\n\n          somePromise = null;\n\n          await somePromise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('promise test', async function () {\n          let somePromise = getPromise().then((data) => {\n            expect(data).toEqual('foo');\n          });\n\n          somePromise = getPromise().then((data) => {\n            expect(data).toEqual('foo');\n          });\n\n          await somePromise;\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('promise test', async function () {\n          let somePromise = getPromise().then((data) => {\n            expect(data).toEqual('foo');\n          });\n\n          ({ somePromise } = {})\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('promise test', async function () {\n          let somePromise = getPromise().then((data) => {\n            expect(data).toEqual('foo');\n          });\n\n          {\n            somePromise = getPromise().then((data) => {\n              expect(data).toEqual('foo');\n            });\n\n            await somePromise;\n          }\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('that we error on this destructuring', async () => {\n          [promise] = something().then(value => {\n            expect(value).toBe('red');\n          });\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        test('that we error on this', () => {\n          const promise = something().then(value => {\n            expect(value).toBe('red');\n          });\n\n          log(promise);\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is valid', async () => {\n          const promise = loadNumber().then(number => {\n            expect(typeof number).toBe('number');\n\n            return number + 1;\n          });\n\n          expect(promise).toBeInstanceOf(Promise);\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        it('is valid', async () => {\n          const promise = loadNumber().then(number => {\n            expect(typeof number).toBe('number');\n\n            return number + 1;\n          });\n\n          expect(anotherPromise).resolves.toBe(1);\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			},
+			{
+				"source": "\n        import { it as promiseThatThis } from 'vitest';\n\n        promiseThatThis('is valid', async () => {\n          const promise = loadNumber().then(number => {\n            expect(typeof number).toBe('number');\n\n            return number + 1;\n          });\n\n          expect(anotherPromise).resolves.toBe(1);\n        });\n      ",
+				"valid": false,
+				"messages": ["expectInFloatingPromise"]
+			}
+		]
+	},
+	"require-awaited-expect-poll": {
+		"source": "https://github.com/vitest-dev/eslint-plugin-vitest/blob/aad57d121647efe764463c37414a8cd67ec9cf92/tests/require-awaited-expect-poll.test.ts",
+		"exclusions": [],
+		"cases": [
+			{
+				"source": "\n        test('should pass', async () => {\n          await expect.poll(() => element).toBeInTheDocument();\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should pass', async () => {\n          await expect.element(element).toBeInTheDocument();\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should pass', () => {\n          expect.syncElement(element).toBeInTheDocument();\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should pass', () => {\n          return expect.poll(() => element).toBeInTheDocument();\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should pass', () => {\n          return expect.element(element).toBeInTheDocument();\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should pass', () => {\n          return expect(true).toBe(true);\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should pass', async () => {\n          (sideEffect(), await expect.poll(() => element).toBeInTheDocument());\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should pass', async () => {\n          await (sideEffect(), expect.poll(() => element).toBeInTheDocument());\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should pass', async () => {\n          await (sideEffect(), (sideEffect(), (sideEffect(), expect.poll(() => element).toBeInTheDocument())));\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should pass', () => {\n          return (sideEffect(), expect.poll(() => element).toBeInTheDocument());\n        });\n      ",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "\n        test('should fail', () => {\n          expect.poll(() => element).toBeInTheDocument();\n        });\n      ",
+				"valid": false,
+				"messages": ["notAwaited"]
+			},
+			{
+				"source": "\n        test('should fail', () => {\n          expect.element(element).toBeInTheDocument();\n        });\n      ",
+				"valid": false,
+				"messages": ["notAwaited"]
+			},
+			{
+				"source": "\n        test('should fail', () => {\n          expect['poll'](() => element).toBeInTheDocument();\n        });\n      ",
+				"valid": false,
+				"messages": ["notAwaited"]
+			},
+			{
+				"source": "\n        test('should fail', () => {\n          expect['element'](element).toBeInTheDocument();\n        });\n      ",
+				"valid": false,
+				"messages": ["notAwaited"]
+			},
+			{
+				"source": "\n        test('should fail', () => {\n          (expect.poll(() => element).toBeInTheDocument(), expect(true).toBe(true));\n        });\n      ",
+				"valid": false,
+				"messages": ["notAwaited"]
+			},
+			{
+				"source": "\n        test('should fail', () => {\n          (expect.element(() => element).toBeInTheDocument(), expect(true).toBe(true));\n        });\n      ",
+				"valid": false,
+				"messages": ["notAwaited"]
+			},
+			{
+				"source": "\n        test('should fail', () => {\n          return (expect.poll(() => element).toBeInTheDocument(), expect(true).toBe(true));\n        });\n      ",
+				"valid": false,
+				"messages": ["notAwaited"]
+			}
+		]
+	}
+}

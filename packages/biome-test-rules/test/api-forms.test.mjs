@@ -321,3 +321,34 @@ test("Node skip and TODO string reasons remain flags even when empty", () => {
 		[],
 	);
 });
+
+test("known disabled conditional factories retain skip identity through aliases", () => {
+	for (const source of [
+		"it.skipIf(true)('case', () => {});",
+		"it.runIf(false)('case', () => {});",
+		"const scenario = it.skipIf(true); scenario('case', () => {});",
+		"const scenario = it.runIf(false); scenario('case', () => {});",
+		"const factory = it.skipIf; const scenario = factory(true); scenario('case', () => {});",
+		"const condition = true; const scenario = it.skipIf(condition); scenario('case', () => {});",
+	])
+		assert.ok(
+			lint("import { it } from 'vitest'; " + source).some((d) =>
+				d.message.includes("registration aliases"),
+			),
+			source,
+		);
+	for (const source of [
+		"const scenario = it.skipIf(false); scenario('case', () => {});",
+		"const scenario = it.runIf(true); scenario('case', () => {});",
+		"const scenario = it.skipIf(enabled); scenario('case', () => {});",
+		"const scenario = it.skipIf(false).each([{ skip: true }]); scenario('case', () => {});",
+		"const scenario = it.runIf(true).for([{ only: true }]); scenario('case', () => {});",
+		"const factory = it.skipIf; factory(true);",
+		"function run(it) { const scenario = it.skipIf(true); scenario('application', () => {}); }",
+	])
+		assert.deepEqual(
+			lint("import { it } from 'vitest'; " + source),
+			[],
+			source,
+		);
+});

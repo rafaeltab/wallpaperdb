@@ -44,16 +44,28 @@ export function dependencyProbeLayer(config: DependencyProbeConfig) {
       );
       const nats = yield* Effect.acquireRelease(
         Effect.tryPromise({
-          try: () =>
-            connect({
-              servers: config.natsUrl,
+          try: () => {
+            const url = new URL(config.natsUrl);
+            const credentials =
+              url.username || url.password
+                ? {
+                    user: decodeURIComponent(url.username),
+                    pass: decodeURIComponent(url.password),
+                  }
+                : {};
+            url.username = '';
+            url.password = '';
+            return connect({
+              servers: url.toString(),
+              ...credentials,
               name: config.serviceName,
               timeout: 2000,
               pingInterval: 1000,
               maxPingOut: 2,
               maxReconnectAttempts: 5,
-              ...(new URL(config.natsUrl).protocol === 'tls:' ? { tls: {} } : {}),
-            }),
+              ...(url.protocol === 'tls:' ? { tls: {} } : {}),
+            });
+          },
           catch: (cause) => new DependencyStartupFailure({ cause }),
         }).pipe(
           Effect.tapError((error) =>

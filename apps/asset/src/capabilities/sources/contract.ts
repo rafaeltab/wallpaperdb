@@ -1,5 +1,5 @@
 import { Context, Data, type Effect } from 'effect';
-import type { OwnedAsset, Owner } from '../lifecycle/index.js';
+import type { OwnedAsset, Owner, CommandContext } from '../lifecycle/index.js';
 import type { SourcePolicy } from './policy.js';
 export class SourceFailure extends Data.TaggedError('SourceFailure')<{
   readonly operation: string;
@@ -25,6 +25,7 @@ export interface CandidateIntent {
   readonly operation: SourceOperation;
   readonly expectedSourceSetRevision: string;
   readonly targetSourceId?: string;
+  readonly context?: CommandContext;
 }
 export interface Candidate extends CandidateIntent {
   readonly candidateId: string;
@@ -61,6 +62,7 @@ export interface SourceState {
   candidates: Candidate[];
 }
 export interface SourceConfirmation {
+  readonly context: CommandContext;
   readonly id: string;
   readonly applicationId: string;
   readonly assetId: string;

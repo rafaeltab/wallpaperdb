@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { context as otelContext, propagation } from '@opentelemetry/api';
 import type { IncomingHttpHeaders } from 'node:http';
 import { Readable } from 'node:stream';
 import { Effect } from 'effect';
@@ -30,6 +32,19 @@ const intent = z
     targetSourceId: z.string().min(1).max(256).optional(),
   })
   .strict();
+function requestContext(request: FastifyRequest) {
+  const carrier: Record<string, string> = {};
+  propagation.inject(propagation.extract(otelContext.active(), request.headers), carrier);
+  const correlation = request.headers['x-correlation-id'];
+  return {
+    occurrence: { source: 'https://wallpaperdb/asset/authors', id: randomUUID() },
+    ...(typeof correlation === 'string' && Buffer.byteLength(correlation) <= 256
+      ? { correlationId: correlation }
+      : {}),
+    ...(carrier.traceparent ? { traceparent: carrier.traceparent } : {}),
+    ...(carrier.tracestate ? { tracestate: carrier.tracestate } : {}),
+  };
+}
 function publicCandidate(candidate: Candidate) {
   return {
     candidateId: candidate.candidateId,
@@ -142,7 +157,11 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
         request,
         reply,
         (sources, owner) =>
-          sources.create(owner, request.params.assetId, { ...body.data, idempotencyKey: key.data }),
+          sources.create(owner, request.params.assetId, {
+            ...body.data,
+            idempotencyKey: key.data,
+            context: requestContext(request),
+          }),
         (result) => {
           if (result.kind === 'candidate')
             reply.header(
@@ -218,7 +237,10 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
         request,
         reply,
         (sources, owner) =>
-          sources.accept(owner, request.params.assetId, request.params.candidateId, body.data),
+          sources.accept(owner, request.params.assetId, request.params.candidateId, {
+            ...body.data,
+            context: requestContext(request),
+          }),
         (result) =>
           outcome(
             reply,
@@ -245,7 +267,7 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
           const body = Readable.from(result.bytes);
           const close = () => {
             body.destroy();
-            void execution.run(result.close(), request.headers);
+            void execution.run(result.close(), request.headers).catch(() => undefined);
           };
           reply.raw.once('close', close);
           reply.raw.once('finish', close);

@@ -223,6 +223,33 @@ function taskContextApi(
 		: undefined;
 }
 
+function booleanValue(
+	node: AnyJsAstNode | undefined,
+	model: SemanticModel,
+	seen = new Set<string>(),
+): boolean | undefined {
+	if (!node) return undefined;
+	if (node.kind === "JS_BOOLEAN_LITERAL_EXPRESSION")
+		return node.text === "true";
+	if (
+		[
+			"JS_PARENTHESIZED_EXPRESSION",
+			"TS_AS_EXPRESSION",
+			"TS_SATISFIES_EXPRESSION",
+			"TS_NON_NULL_ASSERTION_EXPRESSION",
+		].includes(node.kind) &&
+		"expression" in node
+	)
+		return booleanValue(node.expression, model, seen);
+	if (node.kind !== "JS_IDENTIFIER_EXPRESSION" || !node.name) return undefined;
+	const binding = model.binding(node.name);
+	if (!binding) return undefined;
+	const key = `${binding.syntax().text}:${binding.scope().syntax().text}`;
+	if (seen.has(key)) return undefined;
+	seen.add(key);
+	return booleanValue(variableValueAt(node, model), model, seen);
+}
+
 function resolveApi(
 	node: AnyJsAstNode | undefined,
 	model: SemanticModel,
@@ -232,6 +259,16 @@ function resolveApi(
 	switch (node.kind) {
 		case "JS_CALL_EXPRESSION": {
 			const api = resolveApi(node.callee, model, seen);
+			const factory = api?.pendingFactory ? api.members.at(-1) : undefined;
+			if (api && (factory === "skipIf" || factory === "runIf")) {
+				const condition = booleanValue(node.arguments?.args[0], model);
+				if (condition !== undefined && condition === (factory === "skipIf"))
+					return {
+						...api,
+						members: [...api.members, "skip"],
+						pendingFactory: false,
+					};
+			}
 			return api ? { ...api, pendingFactory: false } : undefined;
 		}
 		case "JS_TEMPLATE_EXPRESSION": {
@@ -685,7 +722,7 @@ export const noAliasedTestModifiers = defineRule({
 		registerDiagnostic(
 			node,
 			"error",
-			"Do not focus or disable tests through registration aliases.",
+			"Do not focus or disable tests through registration aliases or factories.",
 		);
 	},
 });

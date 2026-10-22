@@ -4,6 +4,8 @@ Use the [coding guidelines index](CODING_STANDARDS.md) to select the authoritati
 
 ## Agent skills
 
+For skill installation, updates, or moves, follow the [skill layout](.agents/skills/README.md).
+
 ### Issue tracker
 
 Issues and specs are tracked in GitHub Issues, with membership and lifecycle status in the WallpaperDB GitHub Project. Read `docs/agents/issue-tracker.md` when creating, planning, implementing, reopening, or reviewing issue work. External pull requests are not a triage surface.
@@ -14,7 +16,7 @@ Use the five canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, 
 
 ### Code factory
 
-For scheduled code-quality discovery and automatic `ready-for-agent` pickup, use [code-factory](.agents/skills/code-factory/SKILL.md).
+For scheduled code-quality discovery and automatic `ready-for-agent` pickup, use [code-factory](.agents/skills/wallpaperdb/code-factory/SKILL.md).
 
 ### Domain docs
 

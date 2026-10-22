@@ -21,7 +21,11 @@ function externalizeExceptWorkspaces() {
 }
 
 await build({
-  entryPoints: { index: 'src/index.ts', 'resize-worker': 'src/adapters/assets/resize-worker.ts' },
+  entryPoints: {
+    index: 'src/index.ts',
+    'resize-worker': 'src/adapters/assets/resize-worker.ts',
+    'inspect-worker': 'src/adapters/sources/inspect-worker.ts',
+  },
   platform: 'node',
   target: ['node22'],
   bundle: true,

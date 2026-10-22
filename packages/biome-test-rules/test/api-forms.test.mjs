@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import * as nodeTest from "node:test";
 import { lint } from "./lint.mjs";
 
 test("static template API members retain assertion and registration identity", () => {
@@ -73,6 +74,28 @@ test("named default Node test imports share the native registration identity", (
 		"import { default as scenario } from 'node:test'; function run(scenario) { scenario('application', {}); }",
 		"import { default as scenario } from 'other-library'; scenario('application', {});",
 		"import { default as scenario } from 'node:test'; import { Effect } from 'effect'; scenario('complete', () => Effect.runPromise(Effect.succeed(1)));",
+	])
+		assert.deepEqual(lint(source), [], source);
+});
+
+test("namespace Node default members share the native test function", () => {
+	assert.equal(nodeTest.default, nodeTest.test);
+	for (const source of [
+		"nodeTest.default('unfinished', {});",
+		"nodeTest.default.todo('unfinished');",
+		"nodeTest.default.skip('case', () => {});",
+		"const scenario = nodeTest.default; scenario('unfinished', {});",
+	])
+		assert.ok(
+			lint("import * as nodeTest from 'node:test'; " + source).length > 0,
+			source,
+		);
+	for (const source of [
+		"import * as nodeTest from 'node:test'; nodeTest.default('complete', () => {});",
+		"import * as nodeTest from 'node:test'; nodeTest.default('complete', { todo: false }, () => {});",
+		"import * as nodeTest from 'node:test'; const scenario = nodeTest.default; scenario('complete', () => {});",
+		"import * as nodeTest from 'node:test'; function run(nodeTest) { nodeTest.default('application', {}); }",
+		"import * as nodeTest from 'other-library'; nodeTest.default('application', {});",
 	])
 		assert.deepEqual(lint(source), [], source);
 });

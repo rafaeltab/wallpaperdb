@@ -186,7 +186,12 @@ export function resultCounts(mutants) {
 		counts[mutant.status] = (counts[mutant.status] ?? 0) + 1;
 	const processed = mutants.filter(isProcessed).length;
 	const scoreDenominator =
-		(counts.Killed ?? 0) + (counts.Survived ?? 0) + (counts.NoCoverage ?? 0);
+		(counts.Killed ?? 0) +
+		(counts.Survived ?? 0) +
+		(counts.NoCoverage ?? 0) +
+		(counts.Timeout ?? 0) +
+		(counts.CompileError ?? 0) +
+		(counts.RuntimeError ?? 0);
 	return {
 		counts,
 		total: mutants.length,

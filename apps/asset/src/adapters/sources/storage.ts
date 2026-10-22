@@ -221,6 +221,7 @@ export function sourceStorageLayer(options: Options) {
                     'unsupported-source-model',
                     'encoded-size-limit',
                     'noncanonical-picture',
+                    'geometry-limit',
                     'invalid-image',
                   ]),
                 })

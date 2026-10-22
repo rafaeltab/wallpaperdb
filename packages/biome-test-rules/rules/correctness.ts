@@ -582,15 +582,11 @@ function potentialCallback(
 		const key = `${declaration.text}:${binding.scope().syntax().text}`;
 		if (seen.has(key)) return false;
 		seen.add(key);
-		if (
-			declaration.parent?.kind === "JS_VARIABLE_DECLARATOR" &&
-			binding.allWrites().length === 0
-		)
-			return potentialCallback(
-				declaration.parent.initializer?.expression,
-				model,
-				seen,
-			);
+		if (declaration.parent?.kind === "JS_VARIABLE_DECLARATOR") {
+			const value = variableValueAt(node, model);
+			if (value || binding.allWrites().length === 0)
+				return potentialCallback(value, model, seen);
+		}
 	}
 	if (node.kind === "JS_UNARY_EXPRESSION" && node.operatorToken === "void")
 		return false;

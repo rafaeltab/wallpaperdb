@@ -480,9 +480,12 @@ export const noTodoTests = defineRule({
 						args.some((arg) => hasOption(arg, context.model, "todo"))
 					: ["vitest", "@effect/vitest", "global"].includes(api.source)
 						? !api.pendingFactory &&
-							!args
+							(!args
 								.slice(1, 3)
-								.some((arg) => potentialCallback(arg, context.model))
+								.some((arg) => potentialCallback(arg, context.model)) ||
+								args
+									.slice(1, 3)
+									.some((arg) => hasOption(arg, context.model, "todo")))
 						: args.length < 2 && api.members.length === 0))
 		) {
 			registerDiagnostic(

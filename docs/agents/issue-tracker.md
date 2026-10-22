@@ -37,7 +37,7 @@ Track repository issues in [WallpaperDB, project 7](https://github.com/users/raf
 | `Released` | Available to all users |
 | `Cancelled` | Will not be picked up |
 
-Planning belongs to grilling before implementation. For an existing issue, verify assignment and set `Planning` when grilling starts. Set `Planned` after the agreed plan is recorded in the issue. Planning without an existing issue has no project item to update. `to-spec` and `to-tickets` publish prepared specs and tickets as `Planned`.
+Use grilling when planning needs human decisions. For an existing issue, verify assignment and set `Planning` when grilling starts. Set `Planned` after the agreed plan is recorded in the issue. Triage can complete planning when evidence, scope, and testable acceptance criteria establish bounded work with no human decisions remaining. Record that outcome and set `Planned`; routine investigation and implementation choices belong to the agent. Work that still needs planning remains `Todo`. Planning without an existing issue has no project item to update. `to-spec` and `to-tickets` publish prepared specs and tickets as `Planned`.
 
 Active work requires an open issue. Read `state` before moving an existing issue to `Planning`, `Planned`, `In Progress`, or `In Review`. For a closed issue, use the user's existing authorization to resume work, or clarify that intent when absent, then follow the [reopening convention](#conventions), explain the recurrence in an issue comment, and verify `OPEN` before changing status. Discussing historical work leaves its closed state and project status unchanged.
 

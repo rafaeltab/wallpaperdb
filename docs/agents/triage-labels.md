@@ -6,13 +6,19 @@ The skills use five canonical triage roles. Each role maps to the same-named Git
 | --- | --- | --- |
 | `needs-triage` | `needs-triage` | Maintainer needs to evaluate this issue |
 | `needs-info` | `needs-info` | Waiting on reporter for more information |
-| `ready-for-agent` | `ready-for-agent` | Fully specified and ready for an AFK agent |
-| `ready-for-human` | `ready-for-human` | Requires human implementation |
+| `ready-for-agent` | `ready-for-agent` | Ready for autonomous implementation, including necessary investigation |
+| `ready-for-human` | `ready-for-human` | Needs maintainer attention or a human decision before an agent can proceed |
 | `wontfix` | `wontfix` | Will not be actioned |
 
 When a skill names a role, use the corresponding GitHub label from this table.
 
-Labels describe triage eligibility and ownership; the GitHub Project's [lifecycle status](issue-tracker.md#project-lifecycle) records progress. A `ready-for-agent` ticket can be `Planned` while its dependencies still block implementation. Apply the issue tracker's dependency rules before starting it.
+Complete triage with exactly one state label. Choose `ready-for-agent` when the evidence, scope, and acceptance criteria let an agent proceed without a human decision. An unknown root cause or implementation detail alone does not require human attention.
+
+The GitHub Project's [lifecycle status](issue-tracker.md#project-lifecycle) records progress. Agent-ready work is `Planned` or later, rather than `Todo`. A `Planned` ticket can still have blocking dependencies; apply the issue tracker's dependency rules before starting it.
+
+## Completion check
+
+Before reporting triage complete, run `make run PACKAGE=scripts SCRIPT=check:triage ARGS='<issue-number-or-url>'`. This read-only check requires exactly one state label and a compatible WallpaperDB status for agent-ready work. Resolve inconsistencies before handoff; the sufficiency of the plan remains a judgment call.
 
 ## Deferred work
 

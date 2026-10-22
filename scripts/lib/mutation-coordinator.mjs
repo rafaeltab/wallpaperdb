@@ -350,7 +350,8 @@ export async function coordinate() {
 			}
 			cursor = (index + 1) % jobs.length;
 			// Subset diagnostics must not reset the next repository-wide visit.
-			if (jobs.length === full.jobs.length) scheduling.cursor = jobs[cursor].id;
+			if (jobs.length === full.jobs.length && !values.files)
+				scheduling.cursor = jobs[cursor].id;
 			if (!job.mutate.length) continue;
 			if (
 				job.suite === "integration" &&
@@ -380,7 +381,8 @@ export async function coordinate() {
 				const visitMs = Math.min(quantumMs, remaining);
 				const graceMs = Math.min(15_000, Math.floor(visitMs / 4));
 				if (visitMs - graceMs < 500) {
-					if (jobs.length === full.jobs.length) scheduling.cursor = job.id;
+					if (jobs.length === full.jobs.length && !values.files)
+						scheduling.cursor = job.id;
 					break;
 				}
 				console.log(

@@ -66,3 +66,25 @@ it('case', async () => {
 			member,
 		);
 });
+
+test("class accessor decorators retain assertions outside the function boundary", () => {
+	for (const member of ["get value() { return 1; }", "set value(value) {}"]) {
+		const source = (assertion) =>
+			`import { expect } from 'vitest'; class Example { @decorate(${assertion}) ${member} }`;
+		assert.equal(
+			lint(source("expect(1)")).filter((d) =>
+				d.message.startsWith("valid-expect:"),
+			).length,
+			1,
+			member,
+		);
+		assert.deepEqual(lint(source("expect(1).toBe(1)")), [], member);
+		assert.deepEqual(
+			lint(
+				`function expect(value) { return value; } class Example { @decorate(expect(1)) ${member} }`,
+			),
+			[],
+			member,
+		);
+	}
+});

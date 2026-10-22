@@ -61,12 +61,19 @@ function fixture(t) {
 		`#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
-const pr = JSON.parse(fs.readFileSync('pr.json', 'utf8'));
+const prs = [JSON.parse(fs.readFileSync('pr.json', 'utf8')), ...(fs.existsSync('extra-pr.json') ? [JSON.parse(fs.readFileSync('extra-pr.json', 'utf8'))] : [])];
+const endpoint = args.at(-1);
+const requested = endpoint.match(/\\/pulls\\/(\\d+)$/);
+const ref = endpoint.match(/\\/git\\/ref\\/heads\\/(.+)$/);
+const pr = prs.find(p => requested ? p.number === Number(requested[1]) : ref ? p.base.ref === decodeURIComponent(ref[1]) : false) || prs[0];
 if (args.includes('POST')) {
   const body = JSON.parse(fs.readFileSync(0, 'utf8'));
   fs.appendFileSync('statuses.jsonl', JSON.stringify({endpoint: args.find(x => x.includes('/statuses/')), ...body}) + '\\n');
   console.log('{}');
-} else if (args.includes('--slurp')) console.log(JSON.stringify([[pr]]));
+} else if (args.includes('--slurp')) {
+  const base = new URL('https://fixture/' + endpoint).searchParams.get('base');
+  console.log(JSON.stringify([prs.filter(p => !base || p.base.ref === base)]));
+}
 else if (args.some(x => x.includes('/git/ref/heads/'))) console.log(JSON.stringify({object: {sha: process.env.TEST_FORCE_BASE || (fs.existsSync('current-base') ? fs.readFileSync('current-base', 'utf8') : pr.base.sha)}}));
 else {
   const reads = fs.existsSync('reads') ? Number(fs.readFileSync('reads', 'utf8')) + 1 : 1;
@@ -120,6 +127,31 @@ test("a base push publishes history status for each open PR comparison", (t) => 
 		f
 			.statuses()[1]
 			.description.includes(f.git("rev-parse", "main").slice(0, 12)),
+	);
+});
+
+test("trusted reconciliation checks open PRs across all base branches", (t) => {
+	const f = fixture(t);
+	delete f.env.HISTORY_BASE;
+	f.git("branch", "stack", "main");
+	writeFileSync(
+		join(f.root, "extra-pr.json"),
+		JSON.stringify({
+			number: 2,
+			state: "open",
+			head: { sha: f.head },
+			base: { ref: "stack", sha: f.git("rev-parse", "stack") },
+		}),
+	);
+	const result = f.run();
+	assert.equal(result.status, 0, result.stderr);
+	assert.deepEqual(
+		f.statuses().map((s) => s.state),
+		["pending", "success", "pending", "success"],
+	);
+	assert.deepEqual(
+		[...new Set(f.statuses().map((s) => s.context))],
+		["PR history #1", "PR history #2"],
 	);
 });
 

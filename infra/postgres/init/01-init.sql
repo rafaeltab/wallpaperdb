@@ -10,6 +10,9 @@ CREATE DATABASE wallpaperdb_media;
 -- Create database for the tags service
 CREATE DATABASE wallpaperdb_tags;
 
+-- Create database for the wallpaper service
+CREATE DATABASE wallpaperdb_wallpaper;
+
 -- Create database for the user service
 CREATE DATABASE wallpaperdb_user;
 
@@ -17,4 +20,5 @@ CREATE DATABASE wallpaperdb_user;
 GRANT ALL PRIVILEGES ON DATABASE wallpaperdb_ingestor TO wallpaperdb;
 GRANT ALL PRIVILEGES ON DATABASE wallpaperdb_media TO wallpaperdb;
 GRANT ALL PRIVILEGES ON DATABASE wallpaperdb_tags TO wallpaperdb;
+GRANT ALL PRIVILEGES ON DATABASE wallpaperdb_wallpaper TO wallpaperdb;
 GRANT ALL PRIVILEGES ON DATABASE wallpaperdb_user TO wallpaperdb;

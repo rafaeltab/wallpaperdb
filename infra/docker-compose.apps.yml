@@ -179,6 +179,33 @@ services:
         - action: rebuild
           path: ../pnpm-lock.yaml
 
+  wallpaper:
+    build:
+      context: ..
+      dockerfile: apps/wallpaper/Dockerfile.dev
+    env_file:
+      - path: ../apps/wallpaper/.env
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3010/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    develop:
+      watch:
+        - action: sync
+          path: ../apps/wallpaper/src
+          target: /app/apps/wallpaper/src
+        - action: sync+restart
+          path: ../packages
+          target: /app/packages
+        - action: sync
+          path: ../apps/wallpaper/package.json
+          target: /app/apps/wallpaper/package.json
+        - action: rebuild
+          path: ../pnpm-lock.yaml
+
   user:
     build:
       context: ..
@@ -259,6 +286,8 @@ services:
       variant-generator:
         condition: service_healthy
       color-extractor:
+        condition: service_healthy
+      wallpaper:
         condition: service_healthy
       tags:
         condition: service_healthy

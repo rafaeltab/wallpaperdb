@@ -426,6 +426,7 @@ async function preflightBrowser() {
 		"user",
 		"web",
 		"tags",
+		"wallpaper",
 		"variant-generator",
 		"color-extractor",
 	]) {

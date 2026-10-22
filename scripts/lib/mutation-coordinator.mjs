@@ -317,8 +317,8 @@ export async function coordinate() {
 				summary.diagnostic =
 					"Dependency preparation ended before mutation stages could start";
 		}
-		// Visit each stage once, deferring cold integration until its selected unit
-		// stage has had a chance to publish evidence in this invocation.
+		// Visit each stage once, deferring integration with incomplete unit evidence
+		// until its selected unit stage can publish progress in this invocation.
 		while (
 			preparationReady &&
 			pending.length &&
@@ -334,11 +334,18 @@ export async function coordinate() {
 				job.suite === "integration" && unitJob
 					? current(unitJob, readBaseline)
 					: null;
+			const unitMutants = [...resultIndex(unit?.report).values()];
+			const unitIncomplete =
+				!unit ||
+				job.mutate.some((file) => !unit.discovery?.selected.includes(file)) ||
+				unitMutants.some(
+					(mutant) => job.mutate.includes(mutant.file) && !isProcessed(mutant),
+				);
 			if (
 				job.mutate.length &&
 				job.suite === "integration" &&
 				unitJob &&
-				!unit
+				unitIncomplete
 			) {
 				const unitIndex = pending.findIndex(
 					(other) => jobs[other].id === unitJob.id,
@@ -357,7 +364,7 @@ export async function coordinate() {
 				job.suite === "integration" &&
 				unitJob &&
 				(!unit ||
-					![...resultIndex(unit.report).values()].some(
+					!unitMutants.some(
 						(m) =>
 							job.mutate.includes(m.file) &&
 							["Survived", "NoCoverage"].includes(m.status),

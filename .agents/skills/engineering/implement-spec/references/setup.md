@@ -6,7 +6,7 @@ Use this before launching ticket threads. Keep repository, branch, thread, workt
 
 Select the remote whose fetch and push URLs resolve to the authenticated target repository. Export [GH_REPO](https://cli.github.com/manual/gh_help_environment) as `HOST/OWNER/REPO` in every coordinator and ticket-thread CLI environment and verify the identity with [gh repo view](https://cli.github.com/manual/gh_repo_view): `gh repo view "<host>/<owner>/<repo>" --json nameWithOwner,url`. Pass the repository explicitly to PR commands and the selected remote to fetch, push, and supported stack commands.
 
-Fetch `main` from that remote and record its full fetched SHA. Use the verified commit as the first worktree's base; local `main` may belong to another worktree or differ from the remote and is not the starting-point authority. Preserve unrelated commits and checkout contents. Require a clean owning worktree before any checkout or rebase; preserve unrelated changes rather than carrying them into ticket work.
+Use [git fetch](https://git-scm.com/docs/git-fetch) to fetch `main` from that remote and record its full fetched SHA. Use the verified commit as the first worktree's base; local `main` may belong to another worktree or differ from the remote and is not the starting-point authority. Preserve unrelated commits and checkout contents. Require a clean owning worktree before any checkout or rebase; preserve unrelated changes rather than carrying them into ticket work.
 
 ## Versions and native stacks
 
@@ -28,6 +28,6 @@ Confirm exact remote absence using `git ls-remote --exit-code --heads "<remote>"
 
 ## T3 orchestration
 
-Discover the live schemas for `t3_thread_launch`, `t3_thread_list`, `t3_thread_read`, `t3_thread_wait`, `t3_thread_send`, and PR linking. Verify worktree launch is supported before beginning a ticket. Inherit project, provider/model, and permission modes; specify the verified parent SHA and new ticket branch in `workspaceStrategy`.
+Use the [T3 orchestration contracts](https://github.com/pingdotgg/t3code/blob/main/docs/orchestration-v2/orchestrator-mcp-server.md#t3_thread_launch) and discover the live schemas for `t3_thread_launch`, `t3_thread_list`, `t3_thread_read`, `t3_thread_wait`, `t3_thread_send`, and PR linking. Verify worktree launch is supported before beginning a ticket. Inherit project, provider/model, and permission modes; specify the verified parent SHA and new ticket branch in `workspaceStrategy`.
 
 When T3 tools are not initially exposed, make the bounded capability discovery attempt and use the supported ACP MCP transport when available. If T3 thread/worktree orchestration remains unavailable, report the missing prerequisite before ticket implementation. The requested output requires T3-bound ticket threads and worktrees.

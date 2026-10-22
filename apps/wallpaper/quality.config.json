@@ -1,3 +1,9 @@
 {
-  "publicModules": ["http", "adapters/dependencies"]
+  "publicModules": [
+    "http",
+    "adapters/dependencies",
+    "adapters/workflow",
+    "adapters/asset-workflow",
+    "adapters/creators"
+  ]
 }

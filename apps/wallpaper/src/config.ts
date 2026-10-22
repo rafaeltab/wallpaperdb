@@ -1,5 +1,6 @@
 import { OtelConfigSchema, ServerConfigSchema } from '@wallpaperdb/core/config';
 import { z } from 'zod';
+import { readWorkflowConfig, type WorkflowConfig } from './workflow-config.js';
 
 function serverUrl(protocols: readonly string[]) {
   return z
@@ -22,12 +23,12 @@ const configSchema = z.object({
   port: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(65535)),
 });
 
-export type Config = z.infer<typeof configSchema>;
+export type Config = z.infer<typeof configSchema> & { readonly workflow?: WorkflowConfig };
 
 export function loadConfig(
   environment: Readonly<Record<string, string | undefined>> = process.env
 ): Config {
-  return configSchema.parse({
+  const parsed = configSchema.parse({
     port: environment.PORT ?? '3010',
     nodeEnv: environment.NODE_ENV ?? 'development',
     databaseUrl: environment.DATABASE_URL,
@@ -35,4 +36,10 @@ export function loadConfig(
     otelEndpoint: environment.OTEL_EXPORTER_OTLP_ENDPOINT,
     otelServiceName: environment.OTEL_SERVICE_NAME ?? 'wallpaper',
   });
+  if (!environment.WALLPAPER_WORKFLOW_FILE) return parsed;
+  try {
+    return { ...parsed, workflow: readWorkflowConfig(environment.WALLPAPER_WORKFLOW_FILE) };
+  } catch {
+    throw new Error('Invalid Wallpaper workflow configuration');
+  }
 }

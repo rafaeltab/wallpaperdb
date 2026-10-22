@@ -6,6 +6,10 @@ Use the [coding guidelines index](CODING_STANDARDS.md) to select the authoritati
 
 For skill installation, updates, or moves, follow the [skill layout](.agents/skills/README.md).
 
+### Task scope
+
+Read [task scope](docs/agents/task-scope.md) when planning, implementing, reviewing, delegating, monitoring, or automatically picking up work, and when resuming any of those workflows.
+
 ### Issue tracker
 
 Issues and specs are tracked in GitHub Issues, with membership and lifecycle status in the WallpaperDB GitHub Project. Read `docs/agents/issue-tracker.md` when creating, planning, implementing, reopening, or reviewing issue work. External pull requests are not a triage surface.

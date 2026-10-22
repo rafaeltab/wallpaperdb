@@ -1,0 +1,92 @@
+name: Mutation pilot (advisory)
+
+# Start on demand. Main-branch runs publish reusable baseline checkpoints;
+# branch runs consume them without replacing the main baseline.
+on:
+  workflow_dispatch:
+    inputs:
+      pilot:
+        description: Workspace and suite
+        type: choice
+        options: [profile-markdown-unit, gateway-redis-integration]
+        default: profile-markdown-unit
+      scope:
+        description: Full baseline or files changed from main
+        type: choice
+        options: [all, changed]
+        default: all
+      budget:
+        description: Mutation budget in seconds (1–3600; excludes dependency setup)
+        type: number
+        default: 3600
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  mutation:
+    name: Advisory ${{ inputs.pilot }}
+    runs-on: ubuntu-latest
+    # Outer safety limit includes install/build and checkpoint shutdown grace.
+    timeout-minutes: 80
+    concurrency:
+      group: mutation-${{ github.ref }}-${{ inputs.pilot }}
+      cancel-in-progress: false
+    env:
+      PACKAGE: ${{ inputs.pilot == 'gateway-redis-integration' && 'gateway' || 'profile-markdown' }}
+      SUITE: ${{ inputs.pilot == 'gateway-redis-integration' && 'integration' || 'unit' }}
+      BUDGET: ${{ inputs.budget }}
+      SCOPE: ${{ inputs.scope }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Exact runtime is part of baseline compatibility, including locally.
+          node-version: '22.22.3'
+          cache: pnpm
+      - name: Install dependencies
+        run: make install
+      - name: Run bounded mutation pilot
+        shell: bash
+        run: |
+          [[ "$BUDGET" =~ ^[0-9]+$ ]] || exit 1
+          case "$SCOPE" in all|changed) ;; *) exit 1 ;; esac
+          set +e
+          make test-mutation PACKAGE="$PACKAGE" ARGS="--suite $SUITE --scope $SCOPE --budget $BUDGET"
+          status=$?
+          set -e
+          if [ "$PACKAGE" = gateway ]; then workspace=apps/gateway; else workspace=packages/profile-markdown; fi
+          report="$workspace/reports/mutation/$SUITE"
+          echo "report=$report" >> "$GITHUB_ENV"
+          if [ ! -f "$report/summary.json" ]; then exit 1; fi
+          outcome=$(jq -r '.outcome' "$report/summary.json")
+          jq -r '"Mutation outcome: **\(.outcome)**\n\nCompleted \(.completed)/\(.total // "unknown") mutations; executed \(.executed) this run. Checkpoint saved: \(.checkpointSaved). Budget: \(.budgetSeconds) seconds."' "$report/summary.json" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$outcome" = budget-exhausted ]; then
+            echo '::warning::Mutation budget exhausted. Results are incomplete; resume from the checkpoint. This pilot is advisory.'
+            exit 0
+          fi
+          exit "$status"
+      - name: Save portable checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-baseline-${{ env.PACKAGE }}-${{ env.SUITE }}
+          path: ${{ env.report }}/checkpoint.json
+          if-no-files-found: ignore
+          retention-days: 90
+      - name: Save mutation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-results-${{ env.PACKAGE }}-${{ env.SUITE }}
+          path: |
+            ${{ env.report }}/summary.json
+            ${{ env.report }}/mutation.json
+            ${{ env.report }}/mutation.html
+          if-no-files-found: ignore
+          retention-days: 30

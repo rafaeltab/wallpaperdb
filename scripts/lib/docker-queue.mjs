@@ -256,7 +256,13 @@ export async function acquireDockerLease({
 				{ cause: error },
 			);
 		}
-		if (!lock(descriptor))
+		// fdinfo reports locks on this open file description without acquiring one.
+		const info = readFileSync(`/proc/self/fdinfo/${descriptor}`, "utf8");
+		if (
+			!/^lock:\s+\d+:\s+FLOCK\s+ADVISORY\s+WRITE\s+\S+\s+\S+\s+0\s+EOF$/m.test(
+				info,
+			)
+		)
 			throw new Error(
 				"Inherited Docker lease does not own the selected host lock.",
 			);

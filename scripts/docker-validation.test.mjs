@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import {
 	mkdtempSync,
+	openSync,
+	closeSync,
 	readFileSync,
 	rmSync,
 	existsSync,
@@ -405,6 +407,40 @@ test("a nested coordinated command borrows its inherited lock instead of waiting
 	);
 	const result = await nested.done;
 	assert.equal(result.status, 19, result.output);
+});
+
+test("an unlocked descriptor for the same inode is rejected without acquiring a lease", (t) => {
+	const f = fixture(t);
+	const fd = openSync(f.env.DOCKER_VALIDATION_LOCK_FILE, "w", 0o600);
+	t.after(() => closeSync(fd));
+	const result = spawnSync(
+		process.execPath,
+		[
+			runner,
+			"--",
+			process.execPath,
+			"-e",
+			"require('node:fs').writeFileSync('wrong', '')",
+		],
+		{
+			cwd: f.root,
+			encoding: "utf8",
+			stdio: ["ignore", "pipe", "pipe", fd],
+			env: {
+				...f.env,
+				WALLPAPERDB_DOCKER_LEASE_FD: "3",
+				WALLPAPERDB_DOCKER_LEASE_FILE: f.env.DOCKER_VALIDATION_LOCK_FILE,
+			},
+		},
+	);
+	assert.equal(result.status, 1, result.stdout + result.stderr);
+	assert.match(result.stderr, /Inherited Docker lease does not own/);
+	assert.equal(existsSync(join(f.root, "wrong")), false);
+	assert.equal(existsSync(`${f.env.DOCKER_VALIDATION_LOCK_FILE}.queue`), false);
+	assert.doesNotMatch(
+		readFileSync(`/proc/self/fdinfo/${fd}`, "utf8"),
+		/^lock:/m,
+	);
 });
 
 test("a nested launcher that drops the descriptor fails clearly before execution", async (t) => {

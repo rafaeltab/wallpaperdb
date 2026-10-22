@@ -4,7 +4,7 @@ import { createDefaultTesterBuilder, DockerTesterBuilder } from "../src/index";
 
 const docker = new Docker();
 
-describe.skip(
+describe(
     "DockerTesterBuilder",
     { concurrent: true },
     () => {
@@ -14,14 +14,18 @@ describe.skip(
                 .build();
 
             // Act
-            const tester = await new Tester().withNetwork().setup();
-            const networkName = tester.docker.network?.getName();
-            const existingNetworks = await docker.listNetworks();
+            const tester = new Tester().withNetwork();
+            try {
+                await tester.setup();
+                const networkName = tester.docker.network?.getName();
+                const existingNetworks = await docker.listNetworks();
 
-            // Assert
-            expect(existingNetworks.map((x) => x.Name)).toContain(networkName);
+                // Assert
+                expect(existingNetworks.map((x) => x.Name)).toContain(networkName);
 
-            await tester.destroy();
+            } finally {
+                await tester.destroy();
+            }
         });
 
         it("should remove network on destroy", async () => {
@@ -30,21 +34,28 @@ describe.skip(
                 .build();
 
             // Setup
-            const tester = await new Tester().withNetwork().setup();
-            const networkName = tester.docker.network?.getName();
+            const tester = new Tester().withNetwork();
+            let destroyed = false;
+            try {
+                await tester.setup();
+                const networkName = tester.docker.network?.getName();
 
-            // Verify network exists
-            const networksBeforeDestroy = await docker.listNetworks();
-            expect(networksBeforeDestroy.map((x) => x.Name)).toContain(networkName);
+                // Verify network exists
+                const networksBeforeDestroy = await docker.listNetworks();
+                expect(networksBeforeDestroy.map((x) => x.Name)).toContain(networkName);
 
-            // Destroy
-            await tester.destroy();
+                // Destroy
+                await tester.destroy();
+                destroyed = true;
 
-            // Verify network is removed
-            const networksAfterDestroy = await docker.listNetworks();
-            expect(networksAfterDestroy.map((x) => x.Name)).not.toContain(
-                networkName,
-            );
+                // Verify network is removed
+                const networksAfterDestroy = await docker.listNetworks();
+                expect(networksAfterDestroy.map((x) => x.Name)).not.toContain(
+                    networkName,
+                );
+            } finally {
+                if (!destroyed) await tester.destroy();
+            }
         });
 
         it("should have undefined network before setup", () => {
@@ -62,24 +73,32 @@ describe.skip(
                 .build();
 
             // Create two separate testers
-            const tester1 = await new Tester().withNetwork().setup();
-            const tester2 = await new Tester().withNetwork().setup();
+            const tester1 = new Tester().withNetwork();
+            try {
+                await tester1.setup();
+                const tester2 = new Tester().withNetwork();
+                try {
+                    await tester2.setup();
 
-            const network1Name = tester1.docker.network?.getName();
-            const network2Name = tester2.docker.network?.getName();
+                    const network1Name = tester1.docker.network?.getName();
+                    const network2Name = tester2.docker.network?.getName();
 
-            // Networks should be different
-            expect(network1Name).not.toBe(network2Name);
+                    // Networks should be different
+                    expect(network1Name).not.toBe(network2Name);
 
-            // Both should exist
-            const existingNetworks = await docker.listNetworks();
-            const networkNames = existingNetworks.map((x) => x.Name);
-            expect(networkNames).toContain(network1Name);
-            expect(networkNames).toContain(network2Name);
+                    // Both should exist
+                    const existingNetworks = await docker.listNetworks();
+                    const networkNames = existingNetworks.map((x) => x.Name);
+                    expect(networkNames).toContain(network1Name);
+                    expect(networkNames).toContain(network2Name);
 
-            // Cleanup
-            await tester1.destroy();
-            await tester2.destroy();
+                    // Cleanup
+                } finally {
+                    await tester2.destroy();
+                }
+            } finally {
+                await tester1.destroy();
+            }
         });
 
         it("should handle setup without network", async () => {
@@ -88,12 +107,16 @@ describe.skip(
                 .build();
 
             // Setup without calling withNetwork()
-            const tester = await new Tester().setup();
+            const tester = new Tester();
+            try {
+                await tester.setup();
 
-            // Network should be undefined
-            expect(tester.docker.network).toBeUndefined();
+                // Network should be undefined
+                expect(tester.docker.network).toBeUndefined();
 
-            await tester.destroy();
+            } finally {
+                await tester.destroy();
+            }
         });
     },
 );

@@ -8,5 +8,5 @@
 		"skipLibCheck": true,
 		"allowJs": true
 	},
-	"include": ["rules/**/*.ts", "rules/**/*.js"]
+	"include": ["src/**/*.ts", "src/**/*.js"]
 }

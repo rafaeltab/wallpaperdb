@@ -54,7 +54,7 @@
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/biome.json",
                 "$TURBO_ROOT$/packages/biome-test-rules/test-correctness.json",
-                "$TURBO_ROOT$/packages/biome-test-rules/rules/**"
+                "$TURBO_ROOT$/packages/biome-test-rules/src/**"
             ]
         },
         "lint:architecture": {
@@ -90,7 +90,7 @@
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/biome.json",
                 "$TURBO_ROOT$/packages/biome-test-rules/test-correctness.json",
-                "$TURBO_ROOT$/packages/biome-test-rules/rules/**"
+                "$TURBO_ROOT$/packages/biome-test-rules/src/**"
             ]
         },
         "format": {
@@ -279,7 +279,7 @@
                 "test/**",
                 "biome.json",
                 "packages/biome-test-rules/test-correctness.json",
-                "packages/biome-test-rules/rules/**",
+                "packages/biome-test-rules/src/**",
                 "package.json",
                 "pnpm-lock.yaml"
             ],
@@ -308,7 +308,9 @@
                 "$TURBO_ROOT$/apps/*/src/**/*.{test,spec}.{ts,tsx,js,jsx,mjs}",
                 "$TURBO_ROOT$/packages/*/src/**/*.{test,spec}.{ts,tsx,js,jsx,mjs}"
             ],
-            "outputs": []
+            "outputs": [
+                "coverage/unit/**"
+            ]
         }
     }
 }

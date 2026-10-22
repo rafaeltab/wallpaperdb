@@ -9,13 +9,27 @@
 	"scripts": {
 		"format": "biome format --write .",
 		"lint": "biome lint .",
-		"test:unit": "node --test",
+		"test:unit": "c8 node --test",
 		"check-types": "tsc --noEmit"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.6.2",
 		"@biomejs/runtime": "2.6.2",
 		"@types/node": "^26.0.1",
-		"typescript": "^5.7.2"
+		"typescript": "^5.7.2",
+		"c8": "10.1.3"
+	},
+	"c8": {
+		"all": true,
+		"include": [
+			"src/**/*.js",
+			"src/**/*.ts"
+		],
+		"reporter": [
+			"json",
+			"lcov"
+		],
+		"reports-dir": "coverage/unit",
+		"temp-directory": ".turbo/c8"
 	}
 }

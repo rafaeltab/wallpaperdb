@@ -56,7 +56,7 @@ function literal(text: string | undefined): string | undefined {
 	if (!text) return undefined;
 	return /^(['"])[\s\S]*\1$/.test(text)
 		? decodeEscapes(text.slice(1, -1))
-		: text;
+		: decodeEscapes(text);
 }
 
 function importedApi(source: string, name: string): Api {

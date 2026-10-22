@@ -378,6 +378,38 @@ function hasOption(
 			seen.add(key);
 			return hasOption(variableValueAt(node, model), model, option, seen);
 		}
+		case "JS_CONDITIONAL_EXPRESSION":
+			return (
+				hasOption(node.consequent, model, option, new Set(seen)) ||
+				hasOption(node.alternate, model, option, new Set(seen))
+			);
+		case "JS_LOGICAL_EXPRESSION": {
+			let left = node.left;
+			while (
+				left &&
+				[
+					"JS_PARENTHESIZED_EXPRESSION",
+					"TS_AS_EXPRESSION",
+					"TS_SATISFIES_EXPRESSION",
+					"TS_NON_NULL_ASSERTION_EXPRESSION",
+				].includes(left.kind) &&
+				"expression" in left
+			)
+				left = left.expression;
+			if (node.operatorToken === "&&")
+				return (
+					!definitelyFalsy(left, model) &&
+					hasOption(node.right, model, option, seen)
+				);
+			// Literal option objects are truthy and non-nullish. Their keys used as
+			// an && condition are not returned options, and ||/?? cannot reach the RHS.
+			if (left?.kind === "JS_OBJECT_EXPRESSION")
+				return hasOption(left, model, option, seen);
+			return (
+				hasOption(left, model, option, new Set(seen)) ||
+				hasOption(node.right, model, option, new Set(seen))
+			);
+		}
 		case "JS_OBJECT_EXPRESSION":
 			return node.members.some((member) => {
 				if (member.kind === "JS_SPREAD")

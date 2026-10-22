@@ -165,3 +165,24 @@ test("modified Vitest registrations require a callback without rejecting API fac
 		[],
 	);
 });
+
+test("Node TODO options inspect locally visible alternatives", () => {
+	for (const options of [
+		"enabled ? { todo: true } : {}",
+		"enabled ? {} : { todo: true }",
+		"enabled && { todo: true }",
+		"maybe ?? { todo: true }",
+	])
+		assert.ok(
+			lint(
+				`import { test } from 'node:test'; test('case', ${options}, () => {});`,
+			).some((d) => d.message.includes("unfinished")),
+			options,
+		);
+	assert.deepEqual(
+		lint(
+			"import { test } from 'node:test'; test('case', enabled ? { todo: false } : {}, () => {});",
+		),
+		[],
+	);
+});

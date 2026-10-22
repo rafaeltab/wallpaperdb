@@ -19,7 +19,7 @@ test("Vitest async assertions and poll require handling through imported and loc
 		for (const handled of [
 			`await ${expression};`,
 			`function check() { return ${expression}; }`,
-			`const check = () => (${expression});`,
+			`const check = () => (${expression}); await check();`,
 			`${expression}.catch(() => {});`,
 			`${expression}.then(() => {}, () => {});`,
 			`const pending = ${expression}; await pending;`,
@@ -48,6 +48,32 @@ test("Vitest async assertions and poll require handling through imported and loc
 		),
 		[],
 	);
+});
+
+test("concise assertion callbacks require a consumer that handles their result", () => {
+	const assertion = "expect(Promise.resolve(1)).resolves.toBe(1)";
+	const prelude = "import { expect, it } from 'vitest'; const values = [1]; ";
+	for (const expression of [
+		`values.forEach(() => ${assertion});`,
+		`values.map(() => ${assertion});`,
+		`await values.map(() => ${assertion});`,
+		`const check = () => ${assertion}; check();`,
+	])
+		assert.ok(
+			lint(prelude + expression).some((d) =>
+				d.message.includes("async assertion"),
+			),
+			expression,
+		);
+	for (const expression of [
+		`it('checks', () => ${assertion});`,
+		`await Promise.all(values.map(() => ${assertion}));`,
+		`await Promise.resolve().then(() => ${assertion});`,
+		`const check = () => ${assertion}; await check();`,
+		`const check = () => ${assertion}; it('checks', check);`,
+		`await (() => ${assertion})();`,
+	])
+		assert.deepEqual(lint(prelude + expression), [], expression);
 });
 
 test("awaited conditional branches handle assertions", () => {

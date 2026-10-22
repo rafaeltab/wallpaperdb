@@ -2,6 +2,8 @@
 
 The skills use five canonical triage roles. Each role maps to the same-named GitHub label in this repository.
 
+When triaging an issue, follow the [triage workflow](../../.agents/skills/engineering/triage/SKILL.md), including its agent-brief guidance.
+
 | Canonical role | GitHub label | Meaning |
 | --- | --- | --- |
 | `needs-triage` | `needs-triage` | Maintainer needs to evaluate this issue |
@@ -15,10 +17,6 @@ When a skill names a role, use the corresponding GitHub label from this table.
 Complete triage with exactly one state label. Choose `ready-for-agent` when the evidence, scope, and acceptance criteria let an agent proceed without a human decision. An unknown root cause or implementation detail alone does not require human attention.
 
 The GitHub Project's [lifecycle status](issue-tracker.md#project-lifecycle) records progress. Agent-ready work is `Planned` or later, rather than `Todo`. A `Planned` ticket can still have blocking dependencies; apply the issue tracker's dependency rules before starting it.
-
-## Completion check
-
-Before reporting triage complete, run `make run PACKAGE=scripts SCRIPT=check:triage ARGS='<issue-number-or-url>'`. This read-only check requires exactly one state label and a compatible WallpaperDB status for agent-ready work. Resolve inconsistencies before handoff; the sufficiency of the plan remains a judgment call.
 
 ## Deferred work
 

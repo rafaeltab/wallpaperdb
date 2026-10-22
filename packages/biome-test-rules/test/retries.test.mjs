@@ -76,3 +76,22 @@ test("retry checks allow application options and test data and terminate alias c
 	])
 		assert.deepEqual(lint(source), [], source);
 });
+
+test("registration options use an unambiguous preceding assignment", () => {
+	for (const declaration of [
+		"let options; options = { retry: 3 };",
+		"let options = {}; options = { retry: 3 };",
+	])
+		assert.ok(
+			lint(
+				`import { it } from 'vitest'; ${declaration} it('case', options, () => {});`,
+			).some((d) => d.message.includes("retry policy")),
+			declaration,
+		);
+	assert.deepEqual(
+		lint(
+			"import { it } from 'vitest'; let options = { retry: 3 }; options = {}; it('case', options, () => {});",
+		),
+		[],
+	);
+});

@@ -23,6 +23,58 @@ function literal(text: string | undefined): string | undefined {
 	return /^(['"]).*\1$/.test(text) ? text.slice(1, -1) : text;
 }
 
+function statementPosition(node: AnyJsAstNode) {
+	const statement = node
+		.ancestors()
+		.find((ancestor) =>
+			["JS_MODULE_ITEM_LIST", "JS_STATEMENT_LIST"].includes(
+				ancestor.parent?.kind ?? "",
+			),
+		);
+	const list = statement?.parent;
+	if (!statement || !list) return undefined;
+	const siblings = list.children();
+	if (siblings.filter((s) => s.text === statement.text).length !== 1)
+		return undefined;
+	return { list, index: siblings.findIndex((s) => s.text === statement.text) };
+}
+
+function variableValueAt(node: AnyJsAstNode, model: SemanticModel) {
+	if (node.kind !== "JS_IDENTIFIER_EXPRESSION" || !node.name) return undefined;
+	const binding = model.binding(node.name);
+	const declaration = binding?.syntax().parent;
+	if (!binding || declaration?.kind !== "JS_VARIABLE_DECLARATOR")
+		return undefined;
+	const writes = binding.allWrites();
+	if (writes.length === 0) return declaration.initializer?.expression;
+	if (writes.length !== 1) return undefined;
+	const assignment = writes[0]?.syntax().parent;
+	if (
+		assignment?.kind !== "JS_ASSIGNMENT_EXPRESSION" ||
+		assignment.operatorToken !== "=" ||
+		assignment.parent?.kind !== "JS_EXPRESSION_STATEMENT" ||
+		!["JS_MODULE_ITEM_LIST", "JS_STATEMENT_LIST"].includes(
+			assignment.parent.parent?.kind ?? "",
+		)
+	)
+		return undefined;
+	const assigned = statementPosition(assignment);
+	const used = statementPosition(node);
+	// Resolve one straight-line write in the same statement list. Conditional,
+	// nested or repeated writes need flow analysis and remain unresolved.
+	if (
+		!assigned ||
+		!used ||
+		assigned.list.kind !== used.list.kind ||
+		assigned.list.text !== used.list.text ||
+		assigned.index === used.index
+	)
+		return undefined;
+	return assigned.index < used.index
+		? assignment.right
+		: declaration.initializer?.expression;
+}
+
 function taskContextApi(
 	declaration: AnyJsAstNode,
 	model: SemanticModel,
@@ -132,44 +184,8 @@ function resolveApi(
 			const contextApi = taskContextApi(declaration, model, seen);
 			if (contextApi) return contextApi;
 			const writes = binding.allWrites();
-			if (parent?.kind === "JS_VARIABLE_DECLARATOR") {
-				if (writes.length === 0)
-					return resolveApi(parent.initializer?.expression, model, seen);
-				if (parent.initializer || writes.length !== 1) return undefined;
-				const assignment = writes[0]?.syntax().parent;
-				if (
-					assignment?.kind !== "JS_ASSIGNMENT_EXPRESSION" ||
-					assignment.operatorToken !== "=" ||
-					assignment.parent?.kind !== "JS_EXPRESSION_STATEMENT"
-				)
-					return undefined;
-				const statement = assignment.parent;
-				const list = statement.parent;
-				if (
-					!list ||
-					!["JS_MODULE_ITEM_LIST", "JS_STATEMENT_LIST"].includes(list.kind)
-				)
-					return undefined;
-				const use = node
-					.ancestors()
-					.find(
-						(ancestor) =>
-							ancestor.parent?.kind === list.kind &&
-							ancestor.parent.text === list.text,
-					);
-				const siblings = list.children();
-				// Follow only a unique, preceding assignment in this statement list.
-				// Conditional writes, nested consumers and repeated writes need flow analysis.
-				if (
-					!use ||
-					siblings.filter((s) => s.text === statement.text).length !== 1 ||
-					siblings.filter((s) => s.text === use.text).length !== 1 ||
-					siblings.findIndex((s) => s.text === statement.text) >=
-						siblings.findIndex((s) => s.text === use.text)
-				)
-					return undefined;
-				return resolveApi(assignment.right, model, seen);
-			}
+			if (parent?.kind === "JS_VARIABLE_DECLARATOR")
+				return resolveApi(variableValueAt(node, model), model, seen);
 			if (writes.length !== 0) return undefined;
 			if (
 				parent?.kind === "JS_OBJECT_BINDING_PATTERN_PROPERTY" ||
@@ -344,11 +360,7 @@ function hasOption(
 			const key = `${binding.syntax().text}:${binding.scope().syntax().text}`;
 			if (seen.has(key)) return false;
 			seen.add(key);
-			const parent = binding.syntax().parent;
-			return (
-				parent?.kind === "JS_VARIABLE_DECLARATOR" &&
-				hasOption(parent.initializer?.expression, model, option, seen)
-			);
+			return hasOption(variableValueAt(node, model), model, option, seen);
 		}
 		case "JS_OBJECT_EXPRESSION":
 			return node.members.some((member) => {

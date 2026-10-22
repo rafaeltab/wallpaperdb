@@ -53,3 +53,26 @@ test("Vitest TODO options mark actual registrations unfinished", () => {
 	])
 		assert.deepEqual(lint(source), [], source);
 });
+
+test("named default Node test imports share the native registration identity", () => {
+	for (const source of [
+		"scenario('unfinished', {});",
+		"scenario.todo('unfinished');",
+		"scenario.skip('case', () => {});",
+		"scenario.only('case', () => {});",
+		"scenario('case', { todo: true }, () => {});",
+	])
+		assert.ok(
+			lint("import { default as scenario } from 'node:test'; " + source)
+				.length > 0,
+			source,
+		);
+	for (const source of [
+		"import { default as scenario } from 'node:test'; scenario('complete', () => {});",
+		"import { default as scenario } from 'node:test'; scenario('complete', { todo: false }, () => {});",
+		"import { default as scenario } from 'node:test'; function run(scenario) { scenario('application', {}); }",
+		"import { default as scenario } from 'other-library'; scenario('application', {});",
+		"import { default as scenario } from 'node:test'; import { Effect } from 'effect'; scenario('complete', () => Effect.runPromise(Effect.succeed(1)));",
+	])
+		assert.deepEqual(lint(source), [], source);
+});

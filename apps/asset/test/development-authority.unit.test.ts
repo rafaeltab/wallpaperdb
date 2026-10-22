@@ -49,5 +49,8 @@ it('selects the configured development Clerk issuer from the explicit domain or 
     developmentIssuer({ CLERK_DOMAIN: 'explicit.clerk.accounts.dev', CLERK_PUBLISHABLE_KEY: key })
   ).toBe('https://explicit.clerk.accounts.dev');
   expect(developmentIssuer({})).toBe('https://unconfigured.clerk.accounts.dev');
+  expect(
+    developmentIssuer({ CLERK_PUBLISHABLE_KEY: 'replace_with_valid_clerk_publishable_key' })
+  ).toBe('https://unconfigured.clerk.accounts.dev');
   expect(() => developmentIssuer({ CLERK_PUBLISHABLE_KEY: 'invalid' })).toThrow();
 });

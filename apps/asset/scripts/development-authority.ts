@@ -8,7 +8,11 @@ import { renderBrokerConfiguration } from '../src/adapters/commands/index.js';
 
 export function developmentIssuer(environment: Readonly<Record<string, string | undefined>>) {
   let domain = environment.CLERK_DOMAIN?.trim();
-  if (!domain && environment.CLERK_PUBLISHABLE_KEY) {
+  if (
+    !domain &&
+    environment.CLERK_PUBLISHABLE_KEY &&
+    environment.CLERK_PUBLISHABLE_KEY !== 'replace_with_valid_clerk_publishable_key'
+  ) {
     const key = /^pk_(?:test|live)_([A-Za-z0-9+/=_-]+)$/.exec(environment.CLERK_PUBLISHABLE_KEY);
     if (!key?.[1]) throw new Error('Invalid configured Clerk publishable key');
     const decoded = Buffer.from(key[1], 'base64').toString('utf8');

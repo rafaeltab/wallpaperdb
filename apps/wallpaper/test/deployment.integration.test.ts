@@ -1,19 +1,25 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
+import { AckPolicy, connect, StorageType } from 'nats';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { dependencyProxy } from './fixtures/dependency-proxy.js';
 
-describe('deployed Wallpaper service skeleton', () => {
+describe('deployed Wallpaper service', () => {
   let postgres: StartedTestContainer;
-  let nats: StartedNatsContainer;
+  let nats: StartedTestContainer;
   let directory: string;
   const proxies: Array<Awaited<ReturnType<typeof dependencyProxy>>> = [];
   const services: Array<ReturnType<typeof startArtifact>> = [];
+  const databaseUrl = () =>
+    `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`;
+  const brokerUrl = () => `nats://${nats.getHost()}:${nats.getMappedPort(4222)}`;
 
   beforeAll(async () => {
     await import('../esbuild.config.js');
@@ -23,7 +29,81 @@ describe('deployed Wallpaper service skeleton', () => {
       .withExposedPorts(5432)
       .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
       .start();
-    nats = await createNatsContainer({ enableJetStream: false });
+    const pool = new Pool({ connectionString: databaseUrl() });
+    try {
+      await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+    } finally {
+      await pool.end();
+    }
+    nats = await new GenericContainer('nats:2.10-alpine')
+      .withCopyContentToContainer([
+        {
+          target: '/configuration.json',
+          content: JSON.stringify({
+            port: 4222,
+            http: 8222,
+            jetstream: { store_dir: '/data' },
+            no_auth_user: 'legacy',
+            accounts: {
+              LEGACY: { jetstream: 'enabled', users: [{ user: 'legacy', password: '' }] },
+              ASSET_WALLPAPER: {
+                jetstream: 'enabled',
+                users: [
+                  { user: 'operator', password: 'operator-test' },
+                  { user: 'wallpaper-client', password: 'application-test' },
+                ],
+              },
+            },
+          }),
+        },
+      ])
+      .withCommand(['-c', '/configuration.json'])
+      .withExposedPorts(4222, 8222)
+      .withWaitStrategy(Wait.forHttp('/healthz', 8222))
+      .start();
+    const operator = await connect({
+      servers: brokerUrl(),
+      user: 'operator',
+      pass: 'operator-test',
+    });
+    try {
+      const manager = await operator.jetstreamManager();
+      await manager.streams.add({
+        name: 'ASSET_RESULTS',
+        subjects: ['asset.results.wallpaper'],
+        storage: StorageType.File,
+      });
+      await manager.consumers.add('ASSET_RESULTS', {
+        durable_name: 'results_wallpaper',
+        filter_subject: 'asset.results.wallpaper',
+        ack_policy: AckPolicy.Explicit,
+      });
+    } finally {
+      await operator.close();
+    }
+    await writeFile(
+      join(directory, 'workflow.json'),
+      JSON.stringify({
+        ownerNamespace: 'test-authors',
+        credential: { user: 'wallpaper-client', password: 'application-test' },
+        identityProviders: [
+          {
+            issuer: 'https://identity.example.test',
+            jwksUrl: 'https://identity.example.test/.well-known/jwks.json',
+            ownerNamespace: 'test-authors',
+            audience: [],
+            authorizedParties: [],
+            requireAuthorizedParty: false,
+          },
+        ],
+        operatorNotification: { url: 'http://127.0.0.1:1/events', token: 'test' },
+        maxAttempts: 3,
+        retryDelayMs: 100,
+        pollMs: 50,
+        shutdownTimeoutMs: 3000,
+      }),
+      { mode: 0o600 }
+    );
   });
 
   afterEach(async () => {
@@ -46,19 +126,19 @@ describe('deployed Wallpaper service skeleton', () => {
   });
 
   const connections = async () => {
-    const response = await fetch(
-      `http://${nats.getHost()}:${nats.getContainer().getMappedPort(8222)}/connz`,
-      { signal: AbortSignal.timeout(1000) }
-    );
+    const response = await fetch(`http://${nats.getHost()}:${nats.getMappedPort(8222)}/connz`, {
+      signal: AbortSignal.timeout(1000),
+    });
     return response.json();
   };
 
-  it('serves operational endpoints and releases its broker session on SIGTERM', async () => {
+  it('serves operational endpoints and releases all broker sessions on SIGTERM', async () => {
     const port = await availablePort();
     const service = startArtifact(directory, {
       PORT: String(port),
-      DATABASE_URL: `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`,
-      NATS_URL: nats.getConnectionUrl(),
+      DATABASE_URL: databaseUrl(),
+      NATS_URL: brokerUrl(),
+      WALLPAPER_WORKFLOW_FILE: join(directory, 'workflow.json'),
     });
     const url = `http://127.0.0.1:${port}`;
     try {
@@ -80,7 +160,7 @@ describe('deployed Wallpaper service skeleton', () => {
       const wallpaper = await fetch(`${url}/wallpaper`, { signal: AbortSignal.timeout(1000) });
       expect(wallpaper.status).toBe(404);
       await wallpaper.arrayBuffer();
-      await expect.poll(connections).toMatchObject({ num_connections: 1 });
+      await expect.poll(connections).toMatchObject({ num_connections: 3 });
       service.child.kill('SIGTERM');
       expect(await service.waitForExit()).toEqual({ code: 0, signal: null });
       await expect.poll(connections).toMatchObject({ num_connections: 0 });
@@ -165,8 +245,8 @@ describe('deployed Wallpaper service skeleton', () => {
     const port = await availablePort();
     const service = startArtifact(directory, {
       PORT: String(port),
-      DATABASE_URL: `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`,
-      NATS_URL: nats.getConnectionUrl(),
+      DATABASE_URL: databaseUrl(),
+      NATS_URL: brokerUrl(),
       // Enum validation includes this input in its raw diagnostic. Only NODE_ENV is malformed.
       NODE_ENV: 'https://wallpaper:private-configuration-marker@database.example/wallpaper',
     });

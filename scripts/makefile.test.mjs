@@ -118,6 +118,7 @@ test("shared tooling is invoked through the scripts workspace", () => {
 		"ingestor",
 		"asset",
 		"tags",
+		"wallpaper",
 		"user",
 		"gateway",
 		"color-extractor",

@@ -105,7 +105,7 @@ async function main() {
 	mkdirSync(output, { recursive: true });
 	// Each invocation has private input/output files, even in the same worktree.
 	const run = mkdtempSync(join(output, "run-"));
-	const sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
+	let sandbox;
 	let scope = values.scope,
 		mutate = sourceFiles;
 	if (scope === "changed") {
@@ -191,6 +191,7 @@ async function main() {
 			: null;
 		const progress = join(run, "progress.json"),
 			complete = join(run, "complete");
+		sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
 		const options = {
 			testRunner: "vitest",
 			plugins: [
@@ -281,7 +282,7 @@ async function main() {
 		summary.outcome = "failed";
 		throw error;
 	} finally {
-		rmSync(sandbox, { recursive: true, force: true });
+		if (sandbox) rmSync(sandbox, { recursive: true, force: true });
 		writeFileSync(join(run, "summary.json"), JSON.stringify(summary, null, 2));
 		// Stable paths are presentation/artifact outputs only, never cache inputs.
 		for (const name of [

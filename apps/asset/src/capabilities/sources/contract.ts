@@ -196,3 +196,22 @@ export interface SourcesPort {
   >;
 }
 export class Sources extends Context.Service<Sources, SourcesPort>()('asset/sources/Sources') {}
+export interface SourcePublication {
+  readonly confirmation: SourceConfirmation;
+  readonly id: string;
+  readonly leaseId: string;
+  readonly occurredAt: string;
+  readonly attempts: number;
+}
+export interface SourceAcceptanceOutboxPort {
+  readonly claim: (limit: number) => Effect.Effect<readonly SourcePublication[], SourceFailure>;
+  readonly published: (publication: SourcePublication) => Effect.Effect<void, SourceFailure>;
+  readonly failed: (publication: SourcePublication) => Effect.Effect<void, SourceFailure>;
+  readonly pendingAlerts: () => Effect.Effect<readonly SourceConfirmation[], SourceFailure>;
+  readonly alerted: (id: string) => Effect.Effect<void, SourceFailure>;
+  readonly recover: (id: string) => Effect.Effect<boolean, SourceFailure>;
+}
+export class SourceAcceptanceOutbox extends Context.Service<
+  SourceAcceptanceOutbox,
+  SourceAcceptanceOutboxPort
+>()('asset/sources/AcceptanceOutbox') {}

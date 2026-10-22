@@ -10,4 +10,4 @@ After a partial landing, fetch `main` from the selected remote, rebase the remai
 
 After any partial landing, record which PRs landed and the remaining layers' old parent boundaries. Follow [restacking and evidence refresh](stack-recovery.md#restacking), then [publish and preserve complete native membership](stack-recovery.md#publishing).
 
-Follow the [issue landing policy](../../../../docs/agents/issue-tracker.md#relationships): verify closing links when retargeting a layer to `main`, then issue closure and project status after verified landing. Report failed automation.
+Follow the [issue landing policy](../../../../../docs/agents/issue-tracker.md#relationships): verify closing links when retargeting a layer to `main`, then issue closure and project status after verified landing. Report failed automation.

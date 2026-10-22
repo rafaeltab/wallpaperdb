@@ -97,9 +97,18 @@ export function parseAuthority(input: unknown) {
         resultSubject: `asset.results.${id}`,
         resultConsumer: `results_${id}`,
         inboxPrefix: `_ASSET_INBOX.${id}`,
+        account: `ASSET_${id}`,
+        serviceUser: `${parsed.broker.service.user}_${id}`,
+        operatorUser: `${parsed.broker.operator.user}_${id}`,
       },
     ])
   );
+  for (const application of Object.values(applications)) {
+    for (const user of [application.serviceUser, application.operatorUser]) {
+      if (users.has(user)) throw new Error('Derived broker users must be unique');
+      users.add(user);
+    }
+  }
   const effective = {
     ...parsed,
     broker: {

@@ -299,3 +299,28 @@ test("handled reads must consume the original mutable assertion promise", () => 
 	])
 		assert.deepEqual(lint(prelude + source), [], source);
 });
+
+test("aggregate consumption preserves baseline semantics without proving failure propagation", () => {
+	for (const aggregate of ["all", "allSettled", "race", "any"]) {
+		const prelude = "import { expect } from 'vitest'; ";
+		const assertion = "expect(Promise.resolve(1)).resolves.toBe(2)";
+		assert.deepEqual(
+			lint(`${prelude} await Promise.${aggregate}([${assertion}]);`),
+			[],
+			aggregate,
+		);
+		assert.deepEqual(
+			lint(
+				`${prelude} await Promise.${aggregate}([1].map(() => ${assertion}));`,
+			),
+			[],
+			aggregate,
+		);
+		assert.ok(
+			lint(`${prelude} Promise.${aggregate}([${assertion}]);`).some((d) =>
+				d.message.includes("async assertion"),
+			),
+			aggregate,
+		);
+	}
+});

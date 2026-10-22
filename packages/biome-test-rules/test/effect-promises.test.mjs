@@ -112,3 +112,14 @@ test("Effect promise reads follow the same direct assignment boundary", () => {
 		[],
 	);
 });
+
+test("ordinary Effect work remains consumable by every standard promise aggregate", () => {
+	for (const aggregate of ["all", "allSettled", "race", "any"])
+		assert.deepEqual(
+			lint(
+				`import { Effect } from 'effect'; await Promise.${aggregate}([Effect.runPromise(Effect.succeed(1))]);`,
+			),
+			[],
+			aggregate,
+		);
+});

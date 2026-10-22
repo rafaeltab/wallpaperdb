@@ -154,3 +154,26 @@ test("computed destructuring preserves static API and task-local assertion ident
 	])
 		assert.deepEqual(lint(source), [], source);
 });
+
+test("unique direct callback assignments distinguish options from real handlers", () => {
+	for (const source of [
+		"import { test } from 'node:test'; let body; body = {}; test('unfinished', body);",
+		"import { it } from 'vitest'; let body; body = {}; it('unfinished', body);",
+		"import { test } from 'node:test'; let body = () => {}; body = {}; test('unfinished', body);",
+	])
+		assert.ok(
+			lint(source).some((d) => d.message.includes("unfinished")),
+			source,
+		);
+	for (const source of [
+		"import { test } from 'node:test'; let body; body = () => {}; test('complete', body);",
+		"import { it } from 'vitest'; let body = {}; body = () => {}; it('complete', body);",
+		"import { test } from 'node:test'; let body = () => {}; test('complete', body); body = {};",
+		"import { test } from 'node:test'; import { body } from './helper'; test('complete', body);",
+	])
+		assert.deepEqual(
+			lint(source, { "helper.ts": "export function body() {}" }),
+			[],
+			source,
+		);
+});

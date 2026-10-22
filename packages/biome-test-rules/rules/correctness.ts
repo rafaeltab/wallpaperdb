@@ -250,7 +250,13 @@ function resolveApi(
 						: parent?.kind === "JS_NAMED_IMPORT_SPECIFIER"
 							? literal(parent.name?.text)
 							: declaration.text;
-			return name ? { source, name, members: [] } : undefined;
+			return name
+				? {
+						source,
+						name: source === "node:test" && name === "default" ? "test" : name,
+						members: [],
+					}
+				: undefined;
 		}
 		default:
 			return undefined;

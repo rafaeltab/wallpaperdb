@@ -11,6 +11,15 @@ function staticTemplateValue(node) {
 	return node.elements.map((e) => e.text).join("");
 }
 
+function importedName(node) {
+	return (
+		staticTemplateValue(node) ??
+		(/^["']/.test(node.text)
+			? stringValue(node.text)
+			: identifierValue(node.text))
+	);
+}
+
 export const getScope = (context, node) => context.model.scope(node.native);
 
 export function definition(context, identifier) {
@@ -36,7 +45,7 @@ export function definition(context, identifier) {
 						? "ImportNamespaceSpecifier"
 						: "ImportSpecifier",
 				imported: {
-					name: identifierValue(native.parent?.name?.text ?? native.text),
+					name: importedName(native.parent?.name ?? native),
 				},
 			},
 		};
@@ -122,7 +131,7 @@ export function resolveScope(scope, identifier) {
 			if (clause.typeToken === "type") return "local";
 			return {
 				source: stringValue(clause.source.text),
-				imported: identifierValue(parent.name.text),
+				imported: importedName(parent.name),
 				local: identifier,
 			};
 		}
@@ -187,11 +196,7 @@ export function resolveScope(scope, identifier) {
 			)
 				return {
 					source: templateSource ?? stringValue(source.text),
-					imported:
-						staticTemplateValue(key) ??
-						(key.kind === "JS_LITERAL_MEMBER_NAME" && /^["']/.test(key.text)
-							? stringValue(key.text)
-							: identifierValue(key.text)),
+					imported: importedName(key),
 					local: identifier,
 				};
 		}

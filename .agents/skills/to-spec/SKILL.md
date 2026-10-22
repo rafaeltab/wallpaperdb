@@ -16,7 +16,11 @@ The issue tracker and triage label vocabulary should have been provided to you. 
 
 Check with the user that the proposed seams match their expectations after applying that guidance.
 
-3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` triage label - no need for additional triage. Follow the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) to verify project membership and `Planned` after publishing.
+3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `spec` GitHub label.
+
+   Until `to-tickets` has completed the spec's ticket breakdown, apply `ready-for-human` and remove any `ready-for-agent` label. A spec is eligible for `ready-for-agent` only after that breakdown is complete.
+
+   Follow the [project lifecycle](../../../docs/agents/issue-tracker.md#project-lifecycle) to verify project membership and `Planned` after publishing.
 
 <spec-template>
 

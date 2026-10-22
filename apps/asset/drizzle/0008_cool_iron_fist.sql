@@ -1,0 +1,1 @@
+ALTER TABLE "asset_result_outbox" ADD COLUMN "context" jsonb NOT NULL;

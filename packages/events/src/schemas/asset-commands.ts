@@ -10,7 +10,10 @@ const utf8 = (maximum: number) =>
     );
 export const AssetIdentifierSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 export const OwnerValueSchema = utf8(256);
-const correlation = { commandId: utf8(128), applicationReference: utf8(256) };
+const correlation = {
+  commandId: utf8(128),
+  applicationReference: z.string().refine((value) => new TextEncoder().encode(value).length <= 256),
+};
 export const CreateAssetSchema = z
   .object({ ...correlation, assetType: AssetIdentifierSchema, ownerSubject: OwnerValueSchema })
   .strict();

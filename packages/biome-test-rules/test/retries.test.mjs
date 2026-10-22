@@ -28,6 +28,8 @@ test("Vitest retry overrides are rejected through registration and options alias
 		"const local = it.each([1]);",
 		"const local = checks.test;",
 		"const group = checks; const local = group.it;",
+		"const { it: local } = checks;",
+		"let local; local = it;",
 	])
 		assert.ok(
 			lint(`${prelude} ${alias} local('case', { retry: 2 }, check);`).some(

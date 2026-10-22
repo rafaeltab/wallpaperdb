@@ -466,3 +466,20 @@ it('includes the configured byte, displayed-axis and pixel boundaries without br
     await tooLarge.close();
   }
 });
+it('rechecks the activated operation policy atomically for a retained ready candidate', async () => {
+  const f = fixture();
+  try {
+    const id = await create(f, 'revoked-add');
+    await upload(f, id);
+    f.activate({ ...initialSourcePolicies.wallpaper, operations: ['replace-one'] })();
+    expect(await f.call((s) => s.accept(owner, 'asset_one', id, intent))).toEqual({
+      kind: 'rejected',
+      reason: 'unsupported-operation',
+    });
+    expect(f.state.sources).toEqual([]);
+    expect(f.state.sourceSetRevision).toBe('0');
+    expect(f.confirmations).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});

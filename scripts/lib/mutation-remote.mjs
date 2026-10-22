@@ -58,11 +58,31 @@ export async function downloadCheckpoint(
 	invocationDeadline = Infinity,
 	signal,
 ) {
-	const temp = mkdtempSync(join(tmpdir(), "mutation-repository-download-"));
-	const deadline = Math.min(performance.now() + 45_000, invocationDeadline);
 	const importedStages = new Set();
 	let scheduling;
 	let validArtifact = false;
+	await visitCheckpoints(root, invocationDeadline, signal, (file) => {
+		const imported = importCheckpoint(root, jobs, file);
+		validArtifact = true;
+		if (imported.importedStages && !scheduling)
+			scheduling = imported.scheduling;
+		for (const job of jobs)
+			if (imported.stages[job.id]?.key === job.context.key)
+				importedStages.add(job.id);
+		// Keep searching for compatible stages omitted by a newer artifact.
+		return false;
+	});
+	if (validArtifact) return { importedStages: importedStages.size, scheduling };
+	if (signal?.aborted) return false;
+	console.warn(
+		"No valid default-branch checkpoint available within 45 seconds; bounded cold fallback",
+	);
+	return false;
+}
+
+async function visitCheckpoints(root, invocationDeadline, signal, visit) {
+	const temp = mkdtempSync(join(tmpdir(), "mutation-repository-download-"));
+	const deadline = Math.min(performance.now() + 45_000, invocationDeadline);
 	const gh = async (...args) => {
 		signal?.throwIfAborted();
 		if (performance.now() >= deadline)
@@ -111,16 +131,7 @@ export async function downloadCheckpoint(
 					"--dir",
 					dir,
 				);
-				const file = join(dir, "checkpoint.json");
-				const imported = importCheckpoint(root, jobs, file);
-				validArtifact = true;
-				if (imported.importedStages && !scheduling)
-					scheduling = imported.scheduling;
-				for (const job of jobs)
-					if (imported.stages[job.id]?.key === job.context.key)
-						importedStages.add(job.id);
-				// A newer artifact may omit a stage or contain a different fixture
-				// variant. Import all compatible snapshots in this bounded search.
+				if (visit(join(dir, "checkpoint.json"))) return true;
 			} catch {
 				/* Expired, missing or invalid artifacts do not prevent a bounded cold run. */
 			}
@@ -130,12 +141,38 @@ export async function downloadCheckpoint(
 	} finally {
 		rmSync(temp, { recursive: true, force: true });
 	}
-	if (validArtifact) return { importedStages: importedStages.size, scheduling };
-	if (signal?.aborted) return false;
-	console.warn(
-		"No valid default-branch checkpoint available within 45 seconds; bounded cold fallback",
-	);
 	return false;
+}
+
+function importStandalone(context, file) {
+	if (!existsSync(file)) return false;
+	const checkpoint = JSON.parse(readFileSync(file, "utf8"));
+	const stage = checkpoint.stages
+		? checkpoint.stages[`${context.workspace}:${context.suite}`]
+		: checkpoint;
+	if (!stage) return false;
+	// Accept both the cumulative repository envelope and standalone snapshots.
+	const selected = `${file}.stage.json`;
+	writeFileSync(selected, JSON.stringify(stage));
+	return importBaseline(context, selected);
+}
+
+export async function downloadBaselineCancellable(
+	context,
+	invocationDeadline = Infinity,
+	signal,
+) {
+	const imported = await visitCheckpoints(
+		context.root,
+		invocationDeadline,
+		signal,
+		(file) => importStandalone(context, file),
+	);
+	if (!imported && !signal?.aborted)
+		console.warn(
+			"No compatible CI baseline available. Continuing with local state; --offline skips GitHub.",
+		);
+	return imported;
 }
 
 /** Only successful default-branch runs may seed another checkout. */
@@ -172,19 +209,8 @@ export function downloadBaseline(context, invocationDeadline = Infinity) {
 					"--dir",
 					dir,
 				);
-				const file = join(dir, "checkpoint.json");
-				if (existsSync(file)) {
-					const checkpoint = JSON.parse(readFileSync(file, "utf8"));
-					const stage = checkpoint.stages
-						? checkpoint.stages[`${context.workspace}:${context.suite}`]
-						: checkpoint;
-					if (!stage) continue;
-					// Standalone checkpoints remain importable alongside the cumulative
-					// repository envelope published by the maintained workflow.
-					const selected = join(dir, "stage.json");
-					writeFileSync(selected, JSON.stringify(stage));
-					if (importBaseline(context, selected)) return true;
-				}
+				if (importStandalone(context, join(dir, "checkpoint.json")))
+					return true;
 			} catch {
 				/* Expired or missing artifact. Try the next successful run. */
 			}

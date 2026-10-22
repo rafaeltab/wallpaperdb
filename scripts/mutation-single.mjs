@@ -22,7 +22,7 @@ import {
 	importBaseline,
 } from "./lib/mutation-state.mjs";
 import { runBounded } from "./lib/mutation-process.mjs";
-import { downloadBaseline } from "./lib/mutation-remote.mjs";
+import { downloadBaselineCancellable } from "./lib/mutation-remote.mjs";
 
 const json = (file) => JSON.parse(readFileSync(file, "utf8"));
 async function main() {
@@ -159,6 +159,14 @@ async function main() {
 		baselineRestored: false,
 		checkpointSaved: false,
 	};
+	let cancelled = false;
+	const cancellation = new AbortController();
+	const cancel = () => {
+		cancelled = true;
+		cancellation.abort();
+	};
+	process.on("SIGINT", cancel);
+	process.on("SIGTERM", cancel);
 	try {
 		if (values.baseline && !importBaseline(context, resolve(values.baseline)))
 			throw new Error("Baseline is incompatible with this workspace/toolchain");
@@ -168,7 +176,11 @@ async function main() {
 			!values.offline &&
 			(mutate.length || config.environmentKeys?.length)
 		) {
-			downloadBaseline(context, executionDeadline);
+			await downloadBaselineCancellable(
+				context,
+				executionDeadline,
+				cancellation.signal,
+			);
 			baseline = restoreBaseline(context, { forExecution: true });
 		}
 		// Remote transfer is finished before application tests inherit the environment.
@@ -178,131 +190,168 @@ async function main() {
 			scope = summary.scope = "all";
 			mutate = sourceFiles;
 		}
-		if (mutate.length === 0) {
+		await new Promise((resolve) => setImmediate(resolve));
+		if (cancelled) {
+			summary.outcome = "cancelled";
+		} else if (mutate.length === 0) {
 			summary.outcome = "no-changes";
 			console.log(
 				"No mutation sources selected. This does not establish a full baseline.",
 			);
-			return 0;
-		}
-		summary.baselineRestored = Boolean(baseline);
-		const incrementalFile = join(run, "incremental.json");
-		if (baseline)
-			writeFileSync(incrementalFile, JSON.stringify(baseline.report));
-		const initialReport = existsSync(incrementalFile)
-			? readFileSync(incrementalFile, "utf8")
-			: null;
-		const progress = join(run, "progress.json"),
-			complete = join(run, "complete");
-		sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
-		const options = {
-			testRunner: "vitest",
-			plugins: [
-				import.meta.resolve("@stryker-mutator/vitest-runner"),
-				new URL("./lib/mutation-reporter.mjs", import.meta.url).href,
-			],
-			vitest: config.vitest,
-			mutate,
-			coverageAnalysis: "perTest",
-			concurrency: 1,
-			incremental: true,
-			incrementalFile,
-			tempDirName: sandbox,
-			ignorePatterns: ["/reports", "/coverage", "/dist"],
-			reporters: [
-				"progress-append-only",
-				"html",
-				"json",
-				"checkpoint-progress",
-			],
-			htmlReporter: { fileName: join(run, "mutation.html") },
-			jsonReporter: { fileName: join(run, "mutation.json") },
-			thresholds: { high: 80, low: 60, break: null },
-			timeoutMS: config.timeoutMS ?? 5000,
-			timeoutFactor: 1.5,
-		};
-		const configFile = join(run, "stryker.json");
-		writeFileSync(configFile, JSON.stringify(options));
-		const remaining = executionDeadline - performance.now();
-		const graceMs = Math.min(15_000, Math.max(0, Math.floor(remaining / 4)));
-		const result =
-			remaining - graceMs < 500
-				? { outcome: "budget-exhausted" }
-				: await runBounded(
-						process.execPath,
-						[
-							fileURLToPath(new URL("./mutation-worker.mjs", import.meta.url)),
-							configFile,
-							complete,
-						],
-						{
-							cwd,
-							budgetMs: remaining - graceMs,
-							graceMs,
-							env: { ...process.env, WALLPAPERDB_MUTATION_PROGRESS: progress },
-						},
-					);
-		summary.elapsedSeconds =
-			Math.round((performance.now() - invocationStart) / 100) / 10;
-		Object.assign(
-			summary,
-			existsSync(progress) ? json(progress) : { total: null },
-		);
-		summary.outcome = result.outcome;
-		if (
-			summary.errors ||
-			(result.outcome === "completed" && !existsSync(complete))
-		)
-			summary.outcome = "failed";
-		const after = mutationContext(root, workspace, values.suite, contextConfig);
-		const unchanged =
-			after.key === context.key && after.inputDigest === context.inputDigest;
-		if (!unchanged) {
-			summary.outcome = "failed";
-			console.error(
-				"Inputs changed during the run; checkpoint will not be published.",
+		} else {
+			summary.baselineRestored = Boolean(baseline);
+			const incrementalFile = join(run, "incremental.json");
+			if (baseline)
+				writeFileSync(incrementalFile, JSON.stringify(baseline.report));
+			const initialReport = existsSync(incrementalFile)
+				? readFileSync(incrementalFile, "utf8")
+				: null;
+			const progress = join(run, "progress.json"),
+				complete = join(run, "complete");
+			sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
+			const options = {
+				testRunner: "vitest",
+				plugins: [
+					import.meta.resolve("@stryker-mutator/vitest-runner"),
+					new URL("./lib/mutation-reporter.mjs", import.meta.url).href,
+				],
+				vitest: config.vitest,
+				mutate,
+				coverageAnalysis: "perTest",
+				concurrency: 1,
+				incremental: true,
+				incrementalFile,
+				tempDirName: sandbox,
+				ignorePatterns: ["/reports", "/coverage", "/dist"],
+				reporters: [
+					"progress-append-only",
+					"html",
+					"json",
+					"checkpoint-progress",
+				],
+				htmlReporter: { fileName: join(run, "mutation.html") },
+				jsonReporter: { fileName: join(run, "mutation.json") },
+				thresholds: { high: 80, low: 60, break: null },
+				timeoutMS: config.timeoutMS ?? 5000,
+				timeoutFactor: 1.5,
+			};
+			const configFile = join(run, "stryker.json");
+			writeFileSync(configFile, JSON.stringify(options));
+			const remaining = executionDeadline - performance.now();
+			const graceMs = Math.min(15_000, Math.max(0, Math.floor(remaining / 4)));
+			const result =
+				remaining - graceMs < 500
+					? { outcome: "budget-exhausted" }
+					: await runBounded(
+							process.execPath,
+							[
+								fileURLToPath(
+									new URL("./mutation-worker.mjs", import.meta.url),
+								),
+								configFile,
+								complete,
+							],
+							{
+								cwd,
+								budgetMs: remaining - graceMs,
+								graceMs,
+								env: {
+									...process.env,
+									WALLPAPERDB_MUTATION_PROGRESS: progress,
+								},
+							},
+						);
+			summary.elapsedSeconds =
+				Math.round((performance.now() - invocationStart) / 100) / 10;
+			Object.assign(
+				summary,
+				existsSync(progress) ? json(progress) : { total: null },
 			);
+			summary.outcome = result.outcome;
+			if (
+				summary.errors ||
+				(result.outcome === "completed" && !existsSync(complete))
+			)
+				summary.outcome = "failed";
+			const after = mutationContext(
+				root,
+				workspace,
+				values.suite,
+				contextConfig,
+			);
+			const unchanged =
+				after.key === context.key && after.inputDigest === context.inputDigest;
+			if (!unchanged) {
+				summary.outcome = "failed";
+				console.error(
+					"Inputs changed during the run; checkpoint will not be published.",
+				);
+			}
+			const updated =
+				existsSync(incrementalFile) &&
+				(existsSync(complete) ||
+					readFileSync(incrementalFile, "utf8") !== initialReport);
+			if (unchanged && updated && summary.outcome !== "failed") {
+				const checkpoint = publishBaseline(context, json(incrementalFile), {
+					complete: scope === "all" && summary.outcome === "completed",
+				});
+				copyFileSync(checkpoint, join(run, "checkpoint.json"));
+				summary.checkpointSaved = true;
+			}
 		}
-		const updated =
-			existsSync(incrementalFile) &&
-			(existsSync(complete) ||
-				readFileSync(incrementalFile, "utf8") !== initialReport);
-		if (unchanged && updated && summary.outcome !== "failed") {
-			const checkpoint = publishBaseline(context, json(incrementalFile), {
-				complete: scope === "all" && summary.outcome === "completed",
-			});
-			copyFileSync(checkpoint, join(run, "checkpoint.json"));
-			summary.checkpointSaved = true;
-		}
-		return summary.outcome === "completed"
-			? 0
-			: summary.outcome === "budget-exhausted"
-				? 2
-				: summary.outcome === "cancelled"
-					? 130
-					: 1;
 	} catch (error) {
 		summary.outcome = "failed";
 		throw error;
 	} finally {
-		if (sandbox) rmSync(sandbox, { recursive: true, force: true });
-		writeFileSync(join(run, "summary.json"), JSON.stringify(summary, null, 2));
-		// Stable paths are presentation/artifact outputs only, never cache inputs.
-		for (const name of [
-			"summary.json",
-			"checkpoint.json",
-			"mutation.json",
-			"mutation.html",
-		]) {
-			const file = join(run, name),
-				destination = join(output, name);
-			if (existsSync(file)) copyFileSync(file, destination);
-			else rmSync(destination, { force: true });
+		delete process.env.GH_TOKEN;
+		delete process.env.GITHUB_TOKEN;
+		try {
+			if (sandbox) rmSync(sandbox, { recursive: true, force: true });
+			await new Promise((resolve) => setImmediate(resolve));
+			if (cancelled && summary.outcome !== "failed")
+				summary.outcome = "cancelled";
+			summary.elapsedSeconds =
+				Math.round((performance.now() - invocationStart) / 100) / 10;
+			writeFileSync(
+				join(run, "summary.json"),
+				JSON.stringify(summary, null, 2),
+			);
+			// Stable paths are presentation/artifact outputs only, never cache inputs.
+			for (const name of [
+				"summary.json",
+				"checkpoint.json",
+				"mutation.json",
+				"mutation.html",
+			]) {
+				const file = join(run, name),
+					destination = join(output, name);
+				if (existsSync(file)) copyFileSync(file, destination);
+				else rmSync(destination, { force: true });
+			}
+			await new Promise((resolve) => setImmediate(resolve));
+			if (cancelled && !["failed", "cancelled"].includes(summary.outcome)) {
+				summary.outcome = "cancelled";
+				writeFileSync(
+					join(run, "summary.json"),
+					JSON.stringify(summary, null, 2),
+				);
+				copyFileSync(join(run, "summary.json"), join(output, "summary.json"));
+			}
+			console.log(
+				`Mutation ${summary.outcome}: ${summary.completed}/${summary.total ?? "?"} results, ${summary.executed} executed; checkpoint ${summary.checkpointSaved ? "saved" : "not saved"}.`,
+			);
+		} finally {
+			process.removeListener("SIGINT", cancel);
+			process.removeListener("SIGTERM", cancel);
 		}
-		console.log(
-			`Mutation ${summary.outcome}: ${summary.completed}/${summary.total ?? "?"} results, ${summary.executed} executed; checkpoint ${summary.checkpointSaved ? "saved" : "not saved"}.`,
-		);
 	}
+	return ["completed", "no-changes"].includes(summary.outcome)
+		? 0
+		: summary.outcome === "budget-exhausted"
+			? 2
+			: summary.outcome === "cancelled"
+				? 130
+				: 1;
 }
 try {
 	process.exitCode = await main();

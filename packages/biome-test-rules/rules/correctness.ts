@@ -23,9 +23,40 @@ const testSources = new Set([
 	"node:test",
 ]);
 
+function decodeEscapes(text: string): string {
+	// The public CST API exposes raw tokens, not cooked strings. Decode only
+	// JavaScript string/template escapes; never evaluate source text.
+	return text.replace(
+		/\\(?:u\{[\da-fA-F]+\}|u[\da-fA-F]{4}|x[\da-fA-F]{2}|\r\n|[\s\S])/g,
+		(escape) => {
+			const value = escape.slice(1);
+			if (value.startsWith("u") || value.startsWith("x")) {
+				const digits = value.startsWith("u{")
+					? value.slice(2, -1)
+					: value.slice(1);
+				const code = Number.parseInt(digits, 16);
+				return code <= 0x10ffff ? String.fromCodePoint(code) : escape;
+			}
+			if (["\n", "\r", "\r\n", "\u2028", "\u2029"].includes(value)) return "";
+			const controls: Record<string, string> = {
+				"0": "\0",
+				b: "\b",
+				f: "\f",
+				n: "\n",
+				r: "\r",
+				t: "\t",
+				v: "\v",
+			};
+			return controls[value] ?? value;
+		},
+	);
+}
+
 function literal(text: string | undefined): string | undefined {
 	if (!text) return undefined;
-	return /^(['"]).*\1$/.test(text) ? text.slice(1, -1) : text;
+	return /^(['"])[\s\S]*\1$/.test(text)
+		? decodeEscapes(text.slice(1, -1))
+		: text;
 }
 
 function apiName(source: string, name: string): string {
@@ -369,7 +400,7 @@ function staticComputedKey(node: AnyJsAstNode | undefined): string | undefined {
 			(element) => element.kind === "JS_TEMPLATE_CHUNK_ELEMENT",
 		)
 	)
-		return node.elements.map((element) => element.text).join("");
+		return decodeEscapes(node.elements.map((element) => element.text).join(""));
 	return undefined;
 }
 

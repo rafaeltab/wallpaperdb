@@ -440,3 +440,15 @@ test("aggregate and expect consumers only handle promises in their first argumen
 		[],
 	);
 });
+
+test("stored assertions retain valid cancellation, finally and conditional return handling", () => {
+	const prelude =
+		"import { expect } from 'vitest'; const controller = new AbortController(); ";
+	const assertion = "expect(Promise.reject(1)).rejects.toBe(1)";
+	for (const source of [
+		`const rejected = ${assertion}; controller.abort(); await rejected;`,
+		`const rejected = ${assertion}; try { controller.abort(); } finally { await rejected; }`,
+		`async function check(flag) { const rejected = ${assertion}; if (flag) return rejected; else return rejected; }`,
+	])
+		assert.deepEqual(lint(prelude + source), [], source);
+});

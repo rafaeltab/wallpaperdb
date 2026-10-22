@@ -1,4 +1,4 @@
-import { initialSourcePolicies } from '../../src/capabilities/sources/policy.js';
+import { initialSourcePolicies } from '../../src/capabilities/sources/index.js';
 export const authorityFixture = () => ({
   revision: 'test-1',
   operatorNotification: {

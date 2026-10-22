@@ -1,4 +1,4 @@
-import { initialSourcePolicies } from '../src/capabilities/sources/policy.js';
+import { initialSourcePolicies } from '../src/capabilities/sources/index.js';
 import { randomBytes } from 'node:crypto';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

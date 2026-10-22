@@ -81,7 +81,7 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
         if (
           kind === 'VP8X' &&
           (size !== 10 ||
-            (bytes[payload]! & ~0x12) !== 0 ||
+            (bytes.readUInt8(payload) & ~0x12) !== 0 ||
             bytes[payload + 1] !== 0 ||
             bytes[payload + 2] !== 0 ||
             bytes[payload + 3] !== 0)
@@ -89,7 +89,7 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
           throw new Error('noncanonical-picture');
         if (kind === 'ANIM' && size !== 6) invalid();
         if (kind === 'ANMF') {
-          if (size < 16 || (bytes[payload + 15]! & ~3) !== 0) invalid();
+          if (size < 16 || (bytes.readUInt8(payload + 15) & ~3) !== 0) invalid();
           chunks(payload + 16, payload + size, true);
         }
         offset = next;

@@ -5,7 +5,7 @@ import { Sources } from '../src/capabilities/sources/index.js';
 import { AuthorAuthentication } from '../src/adapters/authors/index.js';
 import { AssetDelivery } from '../src/capabilities/delivery/index.js';
 import { Availability } from '../src/capabilities/availability/index.js';
-import { initialSourcePolicies } from '../src/capabilities/sources/policy.js';
+import { initialSourcePolicies } from '../src/capabilities/sources/index.js';
 it('authenticates byte-free discovery and preserves candidate intent/revision/idempotency on author routes', async () => {
   const calls: unknown[] = [];
   const app = await createHttpApp(
@@ -105,6 +105,87 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
     });
     expect(malformed.statusCode).toBe(400);
   } finally {
+    await app.close();
+  }
+});
+it('closes the exact original stream when the browser cancels the response', async () => {
+  const { get } = await import('node:http');
+  let closed = false,
+    returned = false;
+  let release!: () => void;
+  const stalled = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const stream = (async function* () {
+    try {
+      yield new Uint8Array([1, 2, 3, 4]);
+      await stalled;
+    } finally {
+      returned = true;
+    }
+  })();
+  const app = await createHttpApp(
+    { nodeEnv: 'test', port: 3003 },
+    Layer.merge(
+      Layer.succeed(Availability, {
+        health: () => Effect.die('unused'),
+        ready: () => Effect.die('unused'),
+      }),
+      Layer.succeed(AssetDelivery, {
+        wallpaper: () => Effect.die('unused'),
+        picture: () => Effect.die('unused'),
+      })
+    ),
+    {
+      sourceServices: Layer.merge(
+        Layer.succeed(AuthorAuthentication, {
+          verify: () => Effect.succeed({ namespace: 'clerk', subject: 'owner' }),
+        }),
+        Layer.succeed(Sources, {
+          policy: () => Effect.die('unused'),
+          list: () => Effect.die('unused'),
+          create: () => Effect.die('unused'),
+          status: () => Effect.die('unused'),
+          cancel: () => Effect.die('unused'),
+          upload: () => Effect.die('unused'),
+          accept: () => Effect.die('unused'),
+          original: () =>
+            Effect.succeed({
+              kind: 'original',
+              facts: {
+                model: 'sdr-png',
+                mimeType: 'image/png',
+                byteLength: 1048576,
+                digest: 'a'.repeat(64),
+                width: 512,
+                height: 512,
+              },
+              bytes: stream,
+              close: () =>
+                Effect.sync(() => {
+                  closed = true;
+                  release();
+                }),
+            }),
+        })
+      ),
+    }
+  );
+  try {
+    const address = await app.listen({ host: '127.0.0.1', port: 0 });
+    await new Promise<void>((resolve, reject) => {
+      const request = get(`${address}/assets/asset_one/sources/source_one/original`, (response) => {
+        response.once('data', () => {
+          response.destroy();
+          resolve();
+        });
+        response.once('error', () => {});
+      });
+      request.once('error', reject);
+    });
+    await expect.poll(() => closed && returned).toBe(true);
+  } finally {
+    release();
     await app.close();
   }
 });

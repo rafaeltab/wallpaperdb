@@ -9,7 +9,7 @@ import sharp from 'sharp';
 import { beforeAll, afterAll, expect, it } from 'vitest';
 import { sourceStorageLayer } from '../src/adapters/sources/index.js';
 import { SourceBytes, MandatoryInspection } from '../src/capabilities/sources/index.js';
-import { initialSourcePolicies } from '../src/capabilities/sources/policy.js';
+import { initialSourcePolicies } from '../src/capabilities/sources/index.js';
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).build();
 const tester = new Tester().withS3().withS3Bucket('source-private');
 beforeAll(() => tester.setup(), 60000);
@@ -37,7 +37,15 @@ it('conditionally stores one exact identity, verifies mandatory actual facts and
         yield* storage.put('candidate_1', bytes, digest);
         yield* storage.put('candidate_1', bytes, digest);
         expect(
-          yield* Effect.exit(storage.put('candidate_1', new Uint8Array([9, 8, 7]), 'b'.repeat(64)))
+          yield* Effect.exit(
+            storage.put(
+              'candidate_1',
+              new Uint8Array([9, 8, 7]),
+              createHash('sha256')
+                .update(new Uint8Array([9, 8, 7]))
+                .digest('hex')
+            )
+          )
         ).toMatchObject({ _tag: 'Failure' });
         const inspected = yield* inspector.inspect('candidate_1', initialSourcePolicies.wallpaper);
         expect(inspected).toMatchObject({
@@ -158,6 +166,85 @@ it('preserves canonical animated SDR WebP timing and rejects HDR declarations th
   }
 });
 
+it('reconciles a lost successful conditional-write response against authoritative immutable metadata', async () => {
+  const { createServer, request } = await import('node:http');
+  const s3 = tester.getS3();
+  const target = new URL(s3.endpoints.fromHost);
+  let lost = false;
+  const proxy = createServer((incoming, outgoing) => {
+    const forwarded = request(
+      {
+        hostname: target.hostname,
+        port: target.port,
+        path: incoming.url,
+        method: incoming.method,
+        headers: incoming.headers,
+      },
+      (response) => {
+        if (incoming.method === 'PUT' && !lost && response.statusCode === 200) {
+          lost = true;
+          response.resume();
+          response.once('end', () => outgoing.destroy());
+        } else {
+          outgoing.writeHead(response.statusCode ?? 502, response.headers);
+          response.pipe(outgoing);
+        }
+      }
+    );
+    forwarded.on('error', () => outgoing.destroy());
+    incoming.pipe(forwarded);
+  });
+  await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+  const address = proxy.address();
+  if (!address || typeof address === 'string') throw new Error('Missing proxy address');
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: `http://127.0.0.1:${address.port}`,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'source-private',
+    })
+  );
+  const png = await sharp({ create: { width: 2, height: 3, channels: 3, background: 'blue' } })
+    .png()
+    .toBuffer();
+  try {
+    const digest = createHash('sha256').update(png).digest('hex');
+    await runtime.runPromise(
+      SourceBytes.use((bytes) => bytes.put('candidate_lost_response', png, digest))
+    );
+    expect(lost).toBe(true);
+    const inspected = await runtime.runPromise(
+      MandatoryInspection.use((inspector) =>
+        inspector.inspect('candidate_lost_response', initialSourcePolicies.wallpaper)
+      )
+    );
+    expect(inspected).toMatchObject({ kind: 'verified', facts: { digest, width: 2, height: 3 } });
+    if (inspected.kind !== 'verified') throw new Error('Expected verified bytes');
+    await runtime.runPromise(
+      SourceBytes.use((bytes) =>
+        bytes.prepare(
+          'candidate_lost_response',
+          'source_lost_response',
+          'asset_ambiguous',
+          inspected.facts
+        )
+      )
+    );
+    const original = await runtime.runPromise(
+      SourceBytes.use((bytes) => bytes.read('source_lost_response', 'asset_ambiguous'))
+    );
+    const chunks = [];
+    for await (const chunk of original.bytes) chunks.push(chunk);
+    await runtime.runPromise(original.close());
+    expect(Buffer.concat(chunks)).toEqual(png);
+  } finally {
+    await runtime.dispose();
+    proxy.closeAllConnections();
+    await new Promise<void>((resolve) => proxy.close(() => resolve()));
+  }
+});
 it('rejects an ISO gain-map APP2 declaration without relying on APP1 or MPF metadata', async () => {
   const s3 = tester.getS3();
   const runtime = ManagedRuntime.make(

@@ -112,7 +112,7 @@ export interface LifecyclePolicy {
 export interface AssetInspection {
   readonly assetId: string;
   readonly assetType: string;
-  readonly sources: readonly import('../sources/index.js').AcceptedSource[];
+  readonly sources: readonly { readonly sourceId: string }[];
   readonly defaultSourceId: string | null;
   readonly sourceSetRevision: string;
   readonly deliveryRevision?: string;

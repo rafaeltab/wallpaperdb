@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
-import { Sources } from '../sources/index.js';
-import { Lifecycle, LifecycleFailure } from './contract.js';
+import { Sources } from './capabilities/sources/index.js';
+import { Lifecycle, LifecycleFailure } from './capabilities/lifecycle/index.js';
 /** Creation remains generic; owned inspection uses the Source capability's current membership. */
 export const lifecycleSourceInspectionLayer = Layer.effect(
   Lifecycle,

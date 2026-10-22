@@ -61,6 +61,7 @@ it('commits immutable metadata, revisions, first provenance and one logical outb
     );
     if (created.outcome !== 'created') throw new Error('Expected Asset');
     const confirmation: SourceConfirmation = {
+      context: { occurrence: { source: 'https://test/author', id: 'accept-one' } },
       id: 'source-accepted:source_1',
       applicationId: 'wallpaper',
       assetId: created.assetId,

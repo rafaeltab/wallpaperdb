@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect';
+import { Clock, Effect, Layer } from 'effect';
 import type { Owner } from '../lifecycle/index.js';
 import {
   Sources,
@@ -121,6 +121,12 @@ export function sourcesLayer(configuration: {
               (typeof input.targetSourceId === 'string' && input.targetSourceId.length > 0)
           )
             return reject('malformed-candidate');
+          const now = yield* Clock.currentTimeMillis;
+          const candidateId = `candidate_${crypto.randomUUID()}`;
+          const sourceId = `source_${crypto.randomUUID()}`;
+          const context = input.context ?? {
+            occurrence: { source: 'https://wallpaperdb/asset/authors', id: crypto.randomUUID() },
+          };
           return yield* modify(owner, assetId, configuration.revision, (state) => {
             const old = state.candidates.find((c) => c.idempotencyKey === input.idempotencyKey);
             if (old) return sameIntent(old, input) ? result(old) : reject('idempotency-conflict');
@@ -136,17 +142,18 @@ export function sourcesLayer(configuration: {
               state.candidates.filter(
                 (c) =>
                   !['accepted', 'rejected', 'cancelled'].includes(c.status) &&
-                  Date.parse(c.expiresAt) > Date.now()
+                  Date.parse(c.expiresAt) > now
               ).length >= policy.maxCandidates
             )
               return reject('candidate-count-limit');
             const created: Candidate = {
               ...input,
-              candidateId: `candidate_${crypto.randomUUID()}`,
-              sourceId: `source_${crypto.randomUUID()}`,
+              candidateId,
+              sourceId,
+              context,
               status: 'awaiting-bytes',
-              expiresAt: new Date(Date.now() + policy.retention.candidateMs).toISOString(),
-              orphanExpiresAt: new Date(Date.now() + policy.retention.candidateMs).toISOString(),
+              expiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
+              orphanExpiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
               layout: 'asset-layout-1',
             };
             state.candidates.push(created);
@@ -195,6 +202,7 @@ export function sourcesLayer(configuration: {
             catch: (cause) => new SourceFailure({ operation: 'receive-bytes', cause }),
           });
           if (!input) return reject('encoded-size-limit');
+          const uploadedAt = yield* Clock.currentTimeMillis;
           const reserved = yield* candidate(owner, assetId, id, (_state, found) => {
             if (found.digest && found.digest !== input.digest)
               return reject('byte-digest-conflict');
@@ -205,7 +213,7 @@ export function sourcesLayer(configuration: {
               found.status === 'rejected'
             )
               return result(found);
-            if (Date.parse(found.expiresAt) <= Date.now()) {
+            if (Date.parse(found.expiresAt) <= uploadedAt) {
               found.status = 'rejected';
               found.reason = 'candidate-expired';
               return result(found);
@@ -250,6 +258,11 @@ export function sourcesLayer(configuration: {
           const found = ready.candidate;
           if (found.status !== 'ready' || !found.facts) return reject('candidate-not-ready');
           yield* storage.prepare(id, found.sourceId, assetId, found.facts);
+          const now = yield* Clock.currentTimeMillis;
+          const context = intent.context ??
+            found.context ?? {
+              occurrence: { source: 'https://wallpaperdb/asset/authors', id: crypto.randomUUID() },
+            };
           return yield* store.transact<SourceOutcome>(assetId, configuration.revision, (state) => {
             if (!owns(owner, state)) return { state, result: unavailable };
             const current = state.candidates.find((c) => c.candidateId === id);
@@ -260,7 +273,7 @@ export function sourcesLayer(configuration: {
             const policy = configuration.types[state.asset.assetType];
             const reason = !policy
               ? 'unsupported-type'
-              : Date.parse(current.expiresAt) <= Date.now()
+              : Date.parse(current.expiresAt) <= now
                 ? 'candidate-expired'
                 : policyRejection(current.facts, policy);
             if (reason) {
@@ -287,6 +300,7 @@ export function sourcesLayer(configuration: {
               state,
               result: result(current),
               confirmation: {
+                context,
                 id: `source-accepted:${current.sourceId}`,
                 applicationId: state.asset.applicationId,
                 assetId,

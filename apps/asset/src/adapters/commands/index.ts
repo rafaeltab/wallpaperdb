@@ -8,3 +8,4 @@ export {
   CommandBrokerFailure,
   type ProtectedCommandOptions,
 } from './runtime.js';
+export { observeWorkflow } from './runtime.js';

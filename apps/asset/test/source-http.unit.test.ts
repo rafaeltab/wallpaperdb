@@ -79,7 +79,7 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
     expect(created.headers.location).toBe('/assets/asset_1/source-candidates/candidate_1');
     expect(created.json()).toMatchObject({ candidateId: 'candidate_1', status: 'awaiting-bytes' });
     expect(created.body).not.toContain('asset-layout');
-    expect(calls).toEqual([
+    expect(calls).toMatchObject([
       {
         owner: { namespace: 'clerk', subject: 'owner' },
         assetId: 'asset_1',

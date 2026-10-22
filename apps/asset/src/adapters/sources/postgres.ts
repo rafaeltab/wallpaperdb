@@ -125,14 +125,12 @@ export function sourcePostgresLayer(options: Options) {
                   )
                     throw new Error('Immutable Source conflict');
                   if (!existing)
-                    await tx
-                      .insert(immutableSources)
-                      .values({
-                        id: source.sourceId,
-                        assetId,
-                        facts: source.facts,
-                        layout: source.layout,
-                      });
+                    await tx.insert(immutableSources).values({
+                      id: source.sourceId,
+                      assetId,
+                      facts: source.facts,
+                      layout: source.layout,
+                    });
                 }
                 await tx
                   .insert(assetSourceState)

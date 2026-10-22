@@ -2,7 +2,7 @@
   "suites": {
     "unit": {
       "vitest": {
-        "configFile": "vitest.config.ts",
+        "configFile": "vitest.mutation.config.ts",
         "related": false
       }
     }

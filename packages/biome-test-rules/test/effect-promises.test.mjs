@@ -138,3 +138,49 @@ test("Effect promises in ignored aggregate or assertion reason arguments stay un
 		);
 	assert.deepEqual(lint(prelude + `await Promise.all([${work}], []);`), []);
 });
+
+test("Node task-local lifecycle methods consume concise callback promises", async (context) => {
+	const events = [];
+	await context.test("runtime hook ordering", async (child) => {
+		for (const hook of ["before", "beforeEach", "afterEach", "after"])
+			child[hook](async () => {
+				await Promise.resolve();
+				events.push(hook);
+			});
+		await child.test("runtime child", () => {
+			events.push("body");
+		});
+	});
+	assert.deepEqual(events, [
+		"before",
+		"beforeEach",
+		"body",
+		"afterEach",
+		"after",
+	]);
+
+	for (const hook of ["before", "after", "beforeEach", "afterEach"]) {
+		assert.equal(typeof context[hook], "function");
+		for (const promise of [
+			"Effect.runPromise(Effect.succeed(1))",
+			"expect(Promise.resolve(1)).resolves.toBe(1)",
+		])
+			assert.deepEqual(
+				lint(
+					`import { test } from 'node:test'; import { Effect } from 'effect'; import { expect } from 'vitest'; test('case', t => { const hooks = t; hooks.${hook}(() => ${promise}); });`,
+				),
+				[],
+				`${hook}: ${promise}`,
+			);
+	}
+	assert.ok(
+		lint(
+			"import { test } from 'node:test'; import { Effect } from 'effect'; test('case', t => { function run(t) { t.before(() => Effect.runPromise(Effect.succeed(1))); } });",
+		).some((d) => d.message.includes("Effect promise")),
+	);
+	assert.ok(
+		lint(
+			"import { test } from 'other-library'; import { Effect } from 'effect'; test('case', t => { t.before(() => Effect.runPromise(Effect.succeed(1))); });",
+		).some((d) => d.message.includes("Effect promise")),
+	);
+});

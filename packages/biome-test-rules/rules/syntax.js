@@ -1,27 +1,34 @@
 // ESTree-shaped syntax views for the pinned rule algorithms. This is not a parser:
 // Biome supplies every source node. Views have stable identity within one traversal.
 export function stringValue(text) {
-	return text
-		.slice(1, -1)
-		.replace(
-			/\\(?:u\{[\da-fA-F]+\}|u[\da-fA-F]{4}|x[\da-fA-F]{2}|\r\n|[\s\S])/g,
-			(sequence) => {
-				const value = sequence.slice(1);
-				if (value.startsWith("u") || value.startsWith("x")) {
-					const digits = value.startsWith("u{")
-						? value.slice(2, -1)
-						: value.slice(1);
-					const code = Number.parseInt(digits, 16);
-					return code <= 0x10ffff ? String.fromCodePoint(code) : sequence;
-				}
-				if (["\n", "\r", "\r\n"].includes(value)) return "";
-				return (
-					{ n: "\n", r: "\r", t: "\t", b: "\b", f: "\f", v: "\v", 0: "\0" }[
-						value
-					] ?? value
-				);
-			},
-		);
+	return decodeEscapes(text.slice(1, -1));
+}
+
+// ESTree Identifier.name is decoded; native token text retains source escapes.
+export function identifierValue(text) {
+	return decodeEscapes(text);
+}
+
+function decodeEscapes(text) {
+	return text.replace(
+		/\\(?:u\{[\da-fA-F]+\}|u[\da-fA-F]{4}|x[\da-fA-F]{2}|\r\n|[\s\S])/g,
+		(sequence) => {
+			const value = sequence.slice(1);
+			if (value.startsWith("u") || value.startsWith("x")) {
+				const digits = value.startsWith("u{")
+					? value.slice(2, -1)
+					: value.slice(1);
+				const code = Number.parseInt(digits, 16);
+				return code <= 0x10ffff ? String.fromCodePoint(code) : sequence;
+			}
+			if (["\n", "\r", "\r\n"].includes(value)) return "";
+			return (
+				{ n: "\n", r: "\r", t: "\t", b: "\b", f: "\f", v: "\v", 0: "\0" }[
+					value
+				] ?? value
+			);
+		},
+	);
 }
 
 export function syntaxTree(root) {
@@ -64,19 +71,19 @@ export function syntaxTree(root) {
 				return child(native.expression ?? native.assignment);
 			case "JS_IDENTIFIER_EXPRESSION":
 				node.type = "Identifier";
-				node.name = native.name?.text ?? native.text;
+				node.name = identifierValue(native.name?.text ?? native.text);
 				node.native = native.name ?? native;
 				break;
 			case "JS_IDENTIFIER_BINDING":
 			case "JS_REFERENCE_IDENTIFIER":
 			case "JS_IDENTIFIER_ASSIGNMENT":
 				node.type = "Identifier";
-				node.name = native.text;
+				node.name = identifierValue(native.text);
 				break;
 			case "JS_LITERAL_MEMBER_NAME":
 				node.type = /^["']/.test(native.text) ? "Literal" : "Identifier";
 				if (node.type === "Literal") node.value = stringValue(native.text);
-				else node.name = native.text;
+				else node.name = identifierValue(native.text);
 				break;
 			case "JS_STRING_LITERAL_EXPRESSION":
 				node.type = "Literal";
@@ -113,7 +120,7 @@ export function syntaxTree(root) {
 				break;
 			case "JS_NAME":
 				node.type = "Identifier";
-				node.name = native.text;
+				node.name = identifierValue(native.text);
 				break;
 			case "JS_AWAIT_EXPRESSION":
 			case "JS_UNARY_EXPRESSION":

@@ -1,4 +1,4 @@
-import { stringValue } from "./syntax.js";
+import { identifierValue, stringValue } from "./syntax.js";
 
 export const getScope = (context, node) => context.model.scope(node.native);
 
@@ -24,7 +24,9 @@ export function definition(context, identifier) {
 					native.parent?.kind === "JS_NAMESPACE_IMPORT_SPECIFIER"
 						? "ImportNamespaceSpecifier"
 						: "ImportSpecifier",
-				imported: { name: native.parent?.name?.text ?? native.text },
+				imported: {
+					name: identifierValue(native.parent?.name?.text ?? native.text),
+				},
 			},
 		};
 	const scope = binding.scope().syntax();
@@ -33,7 +35,7 @@ export function definition(context, identifier) {
 	const variable = context.nodes.find(
 		(n) =>
 			n.type === "VariableDeclarator" &&
-			n.id?.name === native.text &&
+			n.id?.name === identifierValue(native.text) &&
 			n.native.text === native.parent?.text &&
 			n.range[0] >= owner.range[0] &&
 			n.range[1] <= owner.range[1],
@@ -72,7 +74,11 @@ export function resolveScope(scope, identifier) {
 					"JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY",
 				].includes(p.kind),
 			);
-			if ((first?.member?.text ?? first?.identifier?.text) === identifier)
+			if (
+				identifierValue(
+					first?.member?.text ?? first?.identifier?.text ?? "",
+				) === identifier
+			)
 				return "testContext";
 			const named = params
 				.map((p) => p.binding ?? p)
@@ -91,7 +97,9 @@ export function resolveScope(scope, identifier) {
 				named &&
 				call?.kind === "JS_CALL_EXPRESSION" &&
 				call.callee?.kind === "JS_IDENTIFIER_EXPRESSION" &&
-				["it", "test", "fit", "xit", "xtest"].includes(call?.callee?.text)
+				["it", "test", "fit", "xit", "xtest"].includes(
+					identifierValue(call.callee.text),
+				)
 			)
 				return "testContext";
 		}
@@ -103,7 +111,7 @@ export function resolveScope(scope, identifier) {
 			if (clause.typeToken === "type") return "local";
 			return {
 				source: stringValue(clause.source.text),
-				imported: parent.name.text,
+				imported: identifierValue(parent.name.text),
 				local: identifier,
 			};
 		}
@@ -121,9 +129,11 @@ export function resolveScope(scope, identifier) {
 		if (
 			init?.kind === "JS_CALL_EXPRESSION" &&
 			init.callee?.kind === "JS_STATIC_MEMBER_EXPRESSION" &&
-			init.callee.member?.text === "extend"
+			identifierValue(init.callee.member?.text ?? "") === "extend"
 		) {
-			const root = init.callee.object?.text.split(".")[0];
+			const root = identifierValue(
+				init.callee.object?.text.split(".")[0] ?? "",
+			);
 			if (root && root !== identifier) {
 				const base = resolveScope(current, root);
 				if (
@@ -174,7 +184,7 @@ export function resolveScope(scope, identifier) {
 					imported:
 						key.kind === "JS_LITERAL_MEMBER_NAME" && /^["']/.test(key.text)
 							? stringValue(key.text)
-							: key.text,
+							: identifierValue(key.text),
 					local: identifier,
 				};
 		}

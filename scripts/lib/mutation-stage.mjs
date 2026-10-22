@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { runBounded } from "./mutation-process.mjs";
-import { redisFixture } from "./mutation-fixture.mjs";
+import { FixtureCleanupError, redisFixture } from "./mutation-fixture.mjs";
 import {
 	mutationContext,
 	restoreBaseline,
@@ -238,9 +238,12 @@ export async function runStage({
 				"Startup/coverage collection exhausted this slice without executing mutations";
 		return { summary, report, context };
 	} catch (error) {
+		const cleanupFailed = error instanceof FixtureCleanupError;
+		if (cleanupFailed) summary.cleanupError = error.message;
 		if (
-			shouldCancel() ||
-			(!workerStarted && performance.now() >= start + budgetMs)
+			!cleanupFailed &&
+			(shouldCancel() ||
+				(!workerStarted && performance.now() >= start + budgetMs))
 		) {
 			summary.outcome = shouldCancel() ? "cancelled" : "budget-exhausted";
 			summary.diagnostic = `Fixture/startup ended without mutation progress: ${error.message}`;

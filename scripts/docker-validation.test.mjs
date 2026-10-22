@@ -304,6 +304,58 @@ test("a killed waiter leaves no permanent queue blockage", async (t) => {
 	assert.equal((await next.done).status, 0);
 });
 
+test("an unreaped zombie waiter does not block later validation", async (t) => {
+	const f = fixture(t);
+	const owner = f.start(
+		"owner",
+		"require('node:fs').writeFileSync('started', ''); process.stdin.resume()",
+	);
+	await until(() => existsSync(join(f.root, "started")));
+	const supervisor = spawn(
+		process.execPath,
+		[
+			"-e",
+			`
+const fs = require('node:fs');
+const child = require('node:child_process').spawn(process.execPath, [${JSON.stringify(runner)}, '--label', 'zombie', '--', process.execPath, '-e', "require('node:fs').writeFileSync('wrong', '')"], {stdio: 'ignore'});
+fs.writeFileSync('waiter.pid', String(child.pid));
+const deadline = Date.now() + 15000;
+const barrier = new Int32Array(new SharedArrayBuffer(4));
+while (!fs.existsSync('reap-child') && Date.now() < deadline) Atomics.wait(barrier, 0, 0, 20);
+`,
+		],
+		{ cwd: f.root, env: f.env, stdio: "ignore" },
+	);
+	const supervisorDone = new Promise((resolve) =>
+		supervisor.once("close", resolve),
+	);
+	let pid;
+	try {
+		await until(() => existsSync(join(f.root, "waiter.pid")));
+		pid = Number(readFileSync(join(f.root, "waiter.pid"), "utf8"));
+		await until(() => f.status().includes("waiting: zombie"));
+		process.kill(pid, "SIGKILL");
+		await until(() => {
+			const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+			return stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z ");
+		});
+		const next = f.start("next", "process.exit(0)");
+		owner.stdin.end();
+		assert.equal((await owner.done).status, 0);
+		const result = await next.done;
+		assert.equal(result.status, 0, result.output);
+		assert.equal(existsSync(join(f.root, "wrong")), false);
+	} finally {
+		if (pid) {
+			try {
+				process.kill(pid, "SIGKILL");
+			} catch {}
+		}
+		writeFileSync(join(f.root, "reap-child"), "");
+		await supervisorDone;
+	}
+});
+
 test("a nested coordinated command borrows its inherited lock instead of waiting on itself", async (t) => {
 	const f = fixture(t);
 	const nested = f.start(

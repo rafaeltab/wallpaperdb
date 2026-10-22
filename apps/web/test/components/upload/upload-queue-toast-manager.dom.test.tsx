@@ -57,6 +57,23 @@ function renderQueue() {
   return render(<QueueApp />);
 }
 
+function controlToastTimers() {
+  vi.useFakeTimers({
+    toFake: [
+      'Date',
+      'setTimeout',
+      'clearTimeout',
+      'setInterval',
+      'clearInterval',
+      'requestAnimationFrame',
+      'cancelAnimationFrame',
+    ],
+  });
+  // RTL's default async wrapper waits on a zero-delay timer and only advances
+  // Jest timers. Keep user-event's async work inside act with Vitest timers.
+  configure({ asyncWrapper: async (callback) => act(callback) });
+}
+
 async function finishToastExit() {
   // Sonner publishes dismissals over two animation frames, then starts its exit timer.
   await act(async () => {
@@ -137,20 +154,36 @@ describe('UploadQueueToastManager', () => {
   });
 
   it('keeps a new upload when the previous completion toast is dismissed', async () => {
-    const user = userEvent.setup();
+    controlToastTimers();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTimeAsync });
+    let completeUpload: ((result: UploadResult) => void) | undefined;
     vi.mocked(uploadWallpaperWithDetails).mockImplementationOnce(
-      () => new Promise((resolve) => setTimeout(() => resolve(uploaded), 50))
+      () =>
+        new Promise((resolve) => {
+          completeUpload = resolve;
+        })
     );
     renderQueue();
 
     await user.click(screen.getByRole('button', { name: 'Add upload' }));
-    // Upload completion reaches the shared toast asynchronously, even for a fast API.
-    const dismiss = await screen.findByRole('button', { name: 'Dismiss' });
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByText('Uploading 0/1 files')).toBeInTheDocument();
+    await act(async () => completeUpload?.(uploaded));
+    // React publishes the completed queue first; Sonner renders it on its next timer.
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByText('Upload complete')).toBeInTheDocument();
+    const dismiss = screen.getByRole('button', { name: 'Dismiss' });
     const previousToast = dismiss.closest('[data-sonner-toast]');
     expect(previousToast).toBeInTheDocument();
     await user.click(dismiss);
     await user.click(screen.getByRole('button', { name: 'Add upload' }));
-    await waitFor(() => expect(previousToast).not.toBeInTheDocument());
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(previousToast).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
+    expect(screen.getByText('Uploading 0/1 files')).toBeInTheDocument();
+
+    await finishToastExit();
+    expect(previousToast).not.toBeInTheDocument();
 
     expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('1');
     expect(screen.getByText('Uploading 0/1 files')).toBeInTheDocument();
@@ -231,22 +264,7 @@ describe('UploadQueueToastManager', () => {
   });
 
   describe('completion expiry', () => {
-    beforeEach(() => {
-      vi.useFakeTimers({
-        toFake: [
-          'Date',
-          'setTimeout',
-          'clearTimeout',
-          'setInterval',
-          'clearInterval',
-          'requestAnimationFrame',
-          'cancelAnimationFrame',
-        ],
-      });
-      // RTL's default async wrapper waits on a zero-delay timer and only advances
-      // Jest timers. Keep user-event's async work inside act with Vitest timers.
-      configure({ asyncWrapper: async (callback) => act(callback) });
-    });
+    beforeEach(controlToastTimers);
 
     it('automatically clears successful uploads after five seconds', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTimeAsync });

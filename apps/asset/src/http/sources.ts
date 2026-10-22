@@ -212,7 +212,11 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
             owner,
             request.params.assetId,
             request.params.candidateId,
-            body.iterator({ destroyOnReturn: false })
+            Object.assign(body.iterator({ destroyOnReturn: false }), {
+              cancel: () => {
+                body.destroy();
+              },
+            })
           ),
         (result) => {
           if (!body.readableEnded) {

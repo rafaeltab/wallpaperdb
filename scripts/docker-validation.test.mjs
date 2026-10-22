@@ -344,6 +344,8 @@ while (!fs.existsSync('reap-child') && Date.now() < deadline) Atomics.wait(barri
 		assert.equal((await owner.done).status, 0);
 		const result = await next.done;
 		assert.equal(result.status, 0, result.output);
+		const zombie = readFileSync(`/proc/${pid}/stat`, "utf8");
+		assert.match(zombie.slice(zombie.lastIndexOf(")") + 2), /^Z /);
 		assert.equal(existsSync(join(f.root, "wrong")), false);
 	} finally {
 		if (pid) {

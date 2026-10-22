@@ -25,7 +25,34 @@
 			"linter": {
 				"rules": {
 					"nursery": {
-						"noFloatingPromises": "error"
+						"noFloatingPromises": "error",
+						"noJsRestrictedProperties": {
+							"level": "error",
+							"options": {
+								"entries": [
+									{
+										"object": "it",
+										"property": "todo",
+										"message": "Track unfinished tests in an issue rather than a passing placeholder."
+									},
+									{
+										"object": "test",
+										"property": "todo",
+										"message": "Track unfinished tests in an issue rather than a passing placeholder."
+									},
+									{
+										"object": "describe",
+										"property": "todo",
+										"message": "Track unfinished tests in an issue rather than a passing placeholder."
+									},
+									{
+										"object": "suite",
+										"property": "todo",
+										"message": "Track unfinished tests in an issue rather than a passing placeholder."
+									}
+								]
+							}
+						}
 					},
 					"suspicious": {
 						"noFocusedTests": "error",

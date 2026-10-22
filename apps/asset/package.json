@@ -27,7 +27,8 @@
     "format:files": "biome format --write",
     "dev:configure": "tsx scripts/development-authority.ts",
     "authority:bootstrap": "tsx scripts/operator.ts bootstrap",
-    "authority:operator": "tsx scripts/operator.ts"
+    "authority:operator": "tsx scripts/operator.ts",
+    "proof:clerk": "tsx scripts/clerk-proof.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.709.0",

@@ -171,6 +171,9 @@ async function main() {
 			downloadBaseline(context, executionDeadline);
 			baseline = restoreBaseline(context, { forExecution: true });
 		}
+		// Remote transfer is finished before application tests inherit the environment.
+		delete process.env.GH_TOKEN;
+		delete process.env.GITHUB_TOKEN;
 		if (config.environmentKeys?.length && !baseline) {
 			scope = summary.scope = "all";
 			mutate = sourceFiles;

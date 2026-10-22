@@ -3,9 +3,13 @@ name: PR history
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, edited, ready_for_review]
+  push:
+    branches: ['**']
 
 permissions:
   contents: read
+  pull-requests: read
+  statuses: write
 
 jobs:
   history:
@@ -14,20 +18,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event_name == 'pull_request_target' && github.sha || github.event.repository.default_branch }}
           fetch-depth: 0
+      - name: Check whether the trusted policy is installed
+        id: policy
+        run: |
+          if [ -f .github/workflows/pr-history.yml ]; then
+            echo 'installed=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'installed=false' >> "$GITHUB_OUTPUT"
+            echo 'History validation activates after this workflow reaches the default branch.'
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Fetch comparison commits as data
+      - name: Revalidate submitted history against the current base
+        if: steps.policy.outputs.installed == 'true' && github.event_name == 'pull_request_target'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
-          git fetch --no-tags origin "$BASE_SHA" "$HEAD_SHA"
-      - name: Reject merge commits and already-landed contents
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/check-pr-history-status.mjs "$PR_NUMBER"
+      - name: Revalidate open PRs after their base advances
+        if: steps.policy.outputs.installed == 'true' && github.event_name == 'push'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node scripts/check-pr-history.mjs "$BASE_SHA" "$HEAD_SHA"
+          GH_TOKEN: ${{ github.token }}
+          HISTORY_BASE: ${{ github.ref_name }}
+        run: node scripts/check-pr-history-status.mjs

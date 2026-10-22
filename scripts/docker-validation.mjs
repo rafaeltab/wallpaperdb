@@ -31,6 +31,16 @@ for (const signal of ["SIGHUP", "SIGINT", "SIGTERM"]) {
 				} catch {}
 				resolve();
 			}, 5000);
+			child.once("close", () => {
+				try {
+					process.kill(-child.pid, 0);
+				} catch (error) {
+					if (error.code === "ESRCH") {
+						clearTimeout(killer);
+						resolve();
+					}
+				}
+			});
 		});
 	});
 }

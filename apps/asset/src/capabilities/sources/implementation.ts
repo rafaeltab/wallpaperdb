@@ -84,16 +84,16 @@ export function sourcesLayer(configuration: {
           return found ? change(state, found) : unavailable;
         });
       return Sources.of({
-        policy: (owner, type) =>
-          Effect.succeed(
-            validOwner(owner) && Object.hasOwn(configuration.types, type)
-              ? {
-                  kind: 'policy',
-                  policy: configuration.types[type]!,
-                  revision: configuration.revision,
-                }
+        policy: (owner, type) => {
+          const selected = Object.hasOwn(configuration.types, type)
+            ? configuration.types[type]
+            : undefined;
+          return Effect.succeed(
+            validOwner(owner) && selected
+              ? { kind: 'policy', policy: selected, revision: configuration.revision }
               : unavailable
-          ),
+          );
+        },
         list: (owner, assetId) =>
           store.transact(assetId, null, (state) => ({
             state,
@@ -271,9 +271,9 @@ export function sourcesLayer(configuration: {
             if (current.status !== 'ready' || !current.facts)
               return { state, result: reject('candidate-not-ready') };
             const policy = configuration.types[state.asset.assetType];
-            const reason = !policy
-              ? 'unsupported-type'
-              : Date.parse(current.expiresAt) <= now
+            if (!policy) return { state, result: reject('unsupported-type') };
+            const reason =
+              Date.parse(current.expiresAt) <= now
                 ? 'candidate-expired'
                 : policyRejection(current.facts, policy);
             if (reason) {
@@ -283,7 +283,7 @@ export function sourcesLayer(configuration: {
             }
             if (state.sourceSetRevision !== intent.expectedSourceSetRevision)
               return { state, result: reject('source-set-conflict') };
-            if (state.sources.length >= policy!.maxActiveSources || state.sources.length > 0)
+            if (state.sources.length >= policy.maxActiveSources || state.sources.length > 0)
               return { state, result: reject('source-count-limit') };
             state.sources.push({
               sourceId: current.sourceId,

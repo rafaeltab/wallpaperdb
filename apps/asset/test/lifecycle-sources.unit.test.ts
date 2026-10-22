@@ -1,6 +1,7 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
-import { Lifecycle, lifecycleSourceInspectionLayer } from '../src/capabilities/lifecycle/index.js';
+import { Lifecycle } from '../src/capabilities/lifecycle/index.js';
+import { lifecycleSourceInspectionLayer } from '../src/source-lifecycle.js';
 import { Sources } from '../src/capabilities/sources/index.js';
 it('composes owned Asset inspection with accepted Source membership rather than an empty snapshot', async () => {
   const owner = { namespace: 'clerk', subject: 'owner' };

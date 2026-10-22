@@ -13,7 +13,7 @@ import {
   type SourceFacts,
   type SourcesPort,
 } from '../src/capabilities/sources/index.js';
-import { initialSourcePolicies, type SourcePolicy } from '../src/capabilities/sources/policy.js';
+import { initialSourcePolicies, type SourcePolicy } from '../src/capabilities/sources/index.js';
 const owner = { namespace: 'clerk', subject: 'owner' };
 const intent = { operation: 'add' as const, expectedSourceSetRevision: '0' };
 function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
@@ -73,14 +73,18 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
         prepare().pipe(
           Effect.andThen(
             Effect.sync(() => {
-              stored.set(sourceId, stored.get(candidateId)!);
+              const bytes = stored.get(candidateId);
+              if (!bytes) throw new Error('Missing candidate');
+              stored.set(sourceId, bytes);
             })
           )
         ),
       read: (sourceId) =>
         Effect.succeed({
           bytes: (async function* () {
-            yield stored.get(sourceId)!;
+            const bytes = stored.get(sourceId);
+            if (!bytes) throw new Error('Missing Source');
+            yield bytes;
           })(),
           close: () => Effect.void,
         }),
@@ -94,7 +98,9 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
       )
     ),
   ];
-  let current = runtimes[0]!;
+  const initialRuntime = runtimes[0];
+  if (!initialRuntime) throw new Error('Missing runtime');
+  let current = initialRuntime;
   return {
     call: <A, E>(f: (s: SourcesPort) => Effect.Effect<A, E>, signal?: AbortSignal) =>
       current.runPromise(Sources.use(f), { signal }),
@@ -417,5 +423,46 @@ it('closes a stalled upload when its owning request is interrupted', async () =>
   } finally {
     if (!closed && unblock) unblock({ done: true, value: undefined });
     await f.close();
+  }
+});
+it('includes the configured byte, displayed-axis and pixel boundaries without broadening source models', async () => {
+  const f = fixture({
+    ...initialSourcePolicies.wallpaper,
+    admission: { ...initialSourcePolicies.wallpaper.admission, maxBytes: 4 },
+  });
+  try {
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width: 20000,
+          height: 5000,
+          byteLength: 4,
+          digest: 'ignored',
+          model: 'sdr-png',
+          mimeType: 'image/png',
+        },
+      })
+    );
+    const id = await create(f, 'inclusive');
+    expect(await upload(f, id)).toMatchObject({ candidate: { status: 'ready' } });
+    expect(await f.call((s) => s.accept(owner, 'asset_one', id, intent))).toMatchObject({
+      candidate: { status: 'accepted' },
+    });
+  } finally {
+    await f.close();
+  }
+  const tooLarge = fixture({
+    ...initialSourcePolicies.wallpaper,
+    admission: { ...initialSourcePolicies.wallpaper.admission, maxBytes: 4 },
+  });
+  try {
+    expect(await upload(tooLarge, await create(tooLarge, 'oversize'), [1, 2, 3, 4, 5])).toEqual({
+      kind: 'rejected',
+      reason: 'encoded-size-limit',
+    });
+    expect(tooLarge.state.sources).toEqual([]);
+  } finally {
+    await tooLarge.close();
   }
 });

@@ -18,4 +18,3 @@ export {
   type CommandContext,
 } from './contract.js';
 export { lifecycleLayer } from './implementation.js';
-export { lifecycleSourceInspectionLayer } from './sources.js';

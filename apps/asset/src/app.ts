@@ -24,7 +24,7 @@ import { tracingLayer } from './runtime.js';
 import { monitorLayer } from './monitor.js';
 import { clerkAuthorLayer, AuthorAuthenticationHealth } from './adapters/authors/index.js';
 import { lifecyclePostgresLayer } from './adapters/lifecycle/index.js';
-import { lifecycleLayer, lifecycleSourceInspectionLayer } from './capabilities/lifecycle/index.js';
+import { lifecycleLayer } from './capabilities/lifecycle/index.js';
 import {
   protectedCommandsLayer,
   ProtectedCommandHealth,
@@ -32,6 +32,7 @@ import {
   OperatorNotificationHealth,
 } from './adapters/commands/index.js';
 
+import { lifecycleSourceInspectionLayer } from './source-lifecycle.js';
 import { sourcesLayer } from './capabilities/sources/index.js';
 import {
   sourcePostgresLayer,

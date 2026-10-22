@@ -18,7 +18,7 @@ const event = {
 };
 const encode = (input: unknown) => new TextEncoder().encode(JSON.stringify(input));
 it('translates protected result confirmations without allowing envelope identity substitution', () => {
-  expect(decodeConfirmation(encode(event))).toEqual({
+  expect(decodeConfirmation(encode(event))).toMatchObject({
     kind: 'created',
     result: {
       wallpaperId: 'wallpaper-1',
@@ -55,7 +55,7 @@ it('requires source confirmation to carry a bounded first-Source correlation', (
       initialAnalysisSourceId: 'source-1',
     },
   };
-  expect(decodeConfirmation(encode(source))).toEqual({
+  expect(decodeConfirmation(encode(source))).toMatchObject({
     kind: 'source',
     confirmation: {
       assetId: 'asset-1',
@@ -74,4 +74,23 @@ it('requires source confirmation to carry a bounded first-Source correlation', (
     decodeConfirmation(encode({ ...source, data: { ...source.data, assetType: 'picture' } }))
   ).toEqual({ kind: 'invalid' });
   expect(decodeConfirmation(new Uint8Array(16385))).toEqual({ kind: 'invalid' });
+});
+it('retains creation confirmation identity and trace context for its asynchronous transition', () => {
+  const traceparent = '00-11111111111111111111111111111111-2222222222222222-01';
+  const decoded = decodeConfirmation(
+    encode({ ...event, traceparent, tracestate: 'vendor=retained', correlationid: 'wallpaper-1' })
+  );
+  expect(decoded).toMatchObject({
+    kind: 'created',
+    context: {
+      id: 'result-1',
+      source: 'https://wallpaperdb/asset',
+      type: 'asset.command.result',
+      causationid: 'creation-1',
+      causationsource: 'https://wallpaperdb/wallpaper',
+      correlationid: 'wallpaper-1',
+      traceparent,
+      tracestate: 'vendor=retained',
+    },
+  });
 });

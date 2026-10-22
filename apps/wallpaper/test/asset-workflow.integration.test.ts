@@ -1,6 +1,8 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
+import { core } from '@opentelemetry/sdk-node';
+import { propagation } from '@opentelemetry/api';
 import { GenericContainer, Wait } from 'testcontainers';
 import { AckPolicy, connect, RetentionPolicy, DiscardPolicy, StorageType } from 'nats';
 import { expect, it } from 'vitest';
@@ -12,6 +14,7 @@ import {
 } from '../src/capabilities/creation/index.js';
 import { assetWorkflowLayer } from '../src/adapters/asset-workflow/index.js';
 it('uses protected application credentials, persists publication acknowledgements and resumes its durable result consumer', async () => {
+  propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
   const configuration = {
     port: 4222,
     http: 8222,
@@ -54,6 +57,8 @@ it('uses protected application credentials, persists publication acknowledgement
   const operator = await connect({ servers: url, user: 'operator', pass: 'operator-test' });
   const legacy = await connect({ servers: url });
   const calls: unknown[] = [];
+  const publicationTraces: string[] = [];
+  const confirmationTraces: string[] = [];
   const completed: string[] = [];
   const notices: unknown[] = [];
   let alerted = false;
@@ -74,6 +79,7 @@ it('uses protected application credentials, persists publication acknowledgement
   let runtime: ManagedRuntime.ManagedRuntime<WorkflowHealth | Creation, unknown> | undefined;
   const event = {
     specversion: '1.0',
+    traceparent: '00-11111111111111111111111111111111-2222222222222222-01',
     id: 'creation-event',
     source: 'https://wallpaperdb/wallpaper',
     type: 'asset.command.create',
@@ -124,9 +130,11 @@ it('uses protected application credentials, persists publication acknowledgement
         return records;
       }),
     complete: (p) =>
-      Effect.sync(() => {
+      Effect.gen(function* () {
+        const span = yield* Effect.currentSpan;
+        publicationTraces.push(span.traceId);
         completed.push(p.id);
-      }),
+      }).pipe(Effect.orDie),
     failed: () => Effect.die('Unexpected publication failure'),
     quarantine: () => Effect.die('Unexpected quarantine'),
     recover: () => Effect.succeed(false),
@@ -149,13 +157,27 @@ it('uses protected application credentials, persists publication acknowledgement
     assetResult: (result) =>
       Effect.sync(() => {
         calls.push(result);
-        return 'applied';
-      }),
+        return 'applied' as const;
+      }).pipe(
+        Effect.tap(() =>
+          Effect.currentSpan.pipe(
+            Effect.tap((span) => Effect.sync(() => confirmationTraces.push(span.traceId))),
+            Effect.orDie
+          )
+        )
+      ),
     sourceAccepted: (confirmation) =>
       Effect.sync(() => {
         calls.push(confirmation);
-        return 'applied';
-      }),
+        return 'applied' as const;
+      }).pipe(
+        Effect.tap(() =>
+          Effect.currentSpan.pipe(
+            Effect.tap((span) => Effect.sync(() => confirmationTraces.push(span.traceId))),
+            Effect.orDie
+          )
+        )
+      ),
   });
   const options = {
     natsUrl: url,
@@ -264,6 +286,14 @@ it('uses protected application credentials, persists publication acknowledgement
     };
     await operator.jetstream().publish('asset.results.wallpaper', JSON.stringify(source));
     await expect.poll(() => calls).toHaveLength(2);
+    expect(publicationTraces).toEqual([
+      '11111111111111111111111111111111',
+      '11111111111111111111111111111111',
+    ]);
+    expect(confirmationTraces).toEqual([
+      '11111111111111111111111111111111',
+      '11111111111111111111111111111111',
+    ]);
     expect(calls[1]).toMatchObject({
       assetId: 'asset-1',
       candidateId: 'candidate-1',
@@ -283,5 +313,6 @@ it('uses protected application credentials, persists publication acknowledgement
     inbox.closeAllConnections();
     await new Promise<void>((resolve) => inbox.close(() => resolve()));
     await container.stop();
+    propagation.disable();
   }
 });

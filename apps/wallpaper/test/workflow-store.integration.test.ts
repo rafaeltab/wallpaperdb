@@ -86,8 +86,17 @@ it('quarantines finite failed publication attempts across restart and recovers t
     const first = (await runtime.runPromise(WorkflowDelivery.use((s) => s.claim())))[0];
     if (!first) throw new Error('No claim');
     await runtime.runPromise(WorkflowDelivery.use((s) => s.failed(first)));
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    const second = (await runtime.runPromise(WorkflowDelivery.use((s) => s.claim())))[0];
+    let claims: readonly import('../src/capabilities/creation/index.js').WorkflowPublication[] = [];
+    await expect
+      .poll(
+        async () => {
+          claims = await runtime.runPromise(WorkflowDelivery.use((s) => s.claim()));
+          return claims.length;
+        },
+        { timeout: 1000 }
+      )
+      .toBe(1);
+    const second = claims[0];
     if (!second) throw new Error('No retry claim');
     expect(second.id).toBe(first.id);
     expect(second.event).toEqual(first.event);

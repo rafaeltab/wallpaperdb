@@ -118,6 +118,25 @@ test("known Effect and Vitest polling consumers await callback promises", () => 
 		);
 });
 
+test("unknown custom consumers require explicit local assertion handling", () => {
+	const prelude =
+		"import { expect } from 'vitest'; async function custom(check) { await check(); } ";
+	assert.ok(
+		lint(
+			`${prelude} await custom(() => expect(Promise.resolve(1)).resolves.toBe(1));`,
+		).some((d) => d.message.includes("async assertion")),
+	);
+	for (const callback of [
+		"async () => { await expect(Promise.resolve(1)).resolves.toBe(1); }",
+		"() => { return expect(Promise.resolve(1)).resolves.toBe(1); }",
+	])
+		assert.deepEqual(
+			lint(`${prelude} await custom(${callback});`),
+			[],
+			callback,
+		);
+});
+
 test("awaited conditional branches handle assertions", () => {
 	assert.deepEqual(
 		lint(

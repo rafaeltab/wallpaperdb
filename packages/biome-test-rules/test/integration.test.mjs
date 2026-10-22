@@ -39,6 +39,7 @@ function isolatedRepository() {
 		"pnpm-lock.yaml",
 		"turbo.json",
 		"biome.json",
+		"crap.config.mts",
 		".gitignore",
 	])
 		copyFileSync(join(repository, name), join(directory, name));
@@ -158,10 +159,6 @@ test('executes measured source', () => assert.equal(measured(), 42));`,
 		copyFileSync(
 			join(repository, "scripts/crap.mts"),
 			join(directory, "scripts/crap.mts"),
-		);
-		copyFileSync(
-			join(repository, "crap.config.mts"),
-			join(directory, "crap.config.mts"),
 		);
 		gitFixture(directory, ["add", "--", "."]);
 		makeRuleTests(directory);
@@ -420,8 +417,13 @@ test("ordinary lint ignores generated sources and deliberately invalid CRAP fixt
 	}
 });
 
-test("rule-test cache tracks every copied infrastructure config and ignore policy", async (context) => {
-	for (const path of ["scripts/biome.json", "infra/biome.json", ".gitignore"])
+test("rule-test cache tracks copied configuration and ignore policy", async (context) => {
+	for (const path of [
+		"scripts/biome.json",
+		"infra/biome.json",
+		".gitignore",
+		"crap.config.mts",
+	])
 		await context.test(path, () => {
 			const directory = isolatedRepository();
 			try {
@@ -433,12 +435,15 @@ test("rule-test cache tracks every copied infrastructure config and ignore polic
 				const config = join(directory, path);
 				writeFileSync(
 					config,
-					path === ".gitignore"
-						? readFileSync(config, "utf8") + "\napps/docs/src/ignored.test.ts\n"
-						: JSON.stringify({
-								files: { includes: ["*.json"] },
-								linter: { rules: { preset: "none" } },
-							}),
+					path === "crap.config.mts"
+						? readFileSync(config, "utf8") + "\n// Collector policy changed.\n"
+						: path === ".gitignore"
+							? readFileSync(config, "utf8") +
+								"\napps/docs/src/ignored.test.ts\n"
+							: JSON.stringify({
+									files: { includes: ["*.json"] },
+									linter: { rules: { preset: "none" } },
+								}),
 				);
 				gitFixture(directory, ["add", "--", path]);
 				makeRuleTests(directory);

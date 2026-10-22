@@ -288,6 +288,7 @@
         "@wallpaperdb/biome-test-rules#test:unit": {
             "inputs": [
                 "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/crap.config.mts",
                 "$TURBO_ROOT$/Makefile",
                 "$TURBO_ROOT$/biome.json",
                 "$TURBO_ROOT$/.gitignore",

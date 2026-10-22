@@ -42,7 +42,7 @@ function taskContextApi(
 	const call = fn.parent?.parent?.parent;
 	if (
 		call?.kind !== "JS_CALL_EXPRESSION" ||
-		call.arguments?.args.at(-1)?.text !== fn.text
+		!call.arguments?.args.slice(1, 3).some((arg) => arg.text === fn.text)
 	)
 		return undefined;
 	const registration = resolveApi(call.callee, model, seen);

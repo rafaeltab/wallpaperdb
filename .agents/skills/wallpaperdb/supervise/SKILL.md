@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 Supervise independent T3 conversations in WallpaperDB until their assignments are verified or cannot reasonably progress without the user. The supervised workers are ordinary top-level threads. Subagents may help verify their results.
 
+Apply [task scope](../../../../docs/agents/task-scope.md) when assigning work, answering worker questions, and judging results. Include its scope and decision context in the work record and worker and verification briefs, restoring it on resume.
+
 ## Establish the work
 
 Use the user's requested task boundaries, such as one thread per issue or bullet. Recover each assignment from the user's request, linked issue, and existing conversation. Judge completion against that assignment using your judgment; explain what was achieved in the final summary rather than requiring a separate acceptance-criteria exercise at startup.

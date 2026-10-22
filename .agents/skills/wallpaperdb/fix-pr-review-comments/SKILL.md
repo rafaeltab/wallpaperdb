@@ -7,6 +7,8 @@ description: Verify and handle feedback on a selected GitHub pull request, make 
 
 An invocation authorizes pushing tested fixes to the selected PR, posting replies and reactions, and resolving handled review threads. Honor any narrower scope or permissions the user supplies.
 
+Apply [task scope](../../../../docs/agents/task-scope.md) when evaluating feedback, assigning fixes, and restoring prior decisions.
+
 ## 1. Collect the feedback
 
 Identify the repository and PR from the request or current branch. Ask when the target is ambiguous. Fetch the PR head and work on its branch, preserving unrelated local changes. Register the PR with the current thread when a PR-linking tool is available.
@@ -27,12 +29,12 @@ Classify each comment using evidence:
 
 | Verdict | Required handling | Reaction |
 | --- | --- | --- |
-| Valid | Fix the verified concern, or verify an existing fix. Explain the outcome and verification. | Thumbs up |
+| Valid | Fix the verified concern within the authorized scope, or verify an existing fix. Apply task scope to proposed expansions and explain their disposition. | Thumbs up after verified delivery |
 | Invalid | Explain why the claim does not apply, citing concrete code, requirements, or reproduction results. | Thumbs down |
 | Mixed | Explain which claims are valid and invalid, then ask the user how to proceed. | None |
 | Uncertain | Explain what remains unknown and ask the user for the decision or missing information. | None while uncertain |
 
-Ask about every mixed or uncertain verdict before taking dependent action. Continue independent work while waiting. Do not infer invalidity from inability to reproduce, or treat silence as an answer. A user decision can settle the requested action without proving a factual claim. Keep that distinction in the reply. A mixed comment receives no reaction even after clarification.
+For every mixed or uncertain verdict, use an existing user decision that settles the action or ask before taking dependent action. Continue independent work while waiting. Do not infer invalidity from inability to reproduce, or treat silence as an answer. A user decision can settle the requested action without proving a factual claim. Keep that distinction in the reply. A mixed comment receives no reaction even after clarification.
 
 The verification step is complete when every selected claim has either an evidence-backed verdict or a specific pending question for the user.
 

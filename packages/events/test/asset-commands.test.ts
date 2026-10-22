@@ -10,6 +10,7 @@ describe("generic Asset commands", () => {
   };
   it("bounds opaque UTF-8 fields and excludes authority supplied by the body", () => {
     expect(CreateAssetSchema.parse(create)).toEqual(create);
+    expect(CreateAssetSchema.safeParse({ ...create, applicationReference: "" }).success).toBe(true);
     expect(CreateAssetSchema.safeParse({ ...create, ownerNamespace: "other" }).success).toBe(false);
     expect(
       CreateAssetSchema.safeParse({ ...create, applicationReference: "é".repeat(129) }).success

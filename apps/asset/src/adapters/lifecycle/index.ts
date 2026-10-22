@@ -151,6 +151,7 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
         commandId: input.correlation.commandId,
         payloadDigest: digest,
         result: outcome,
+        context: input.context,
       })
       .onConflictDoNothing();
     return outcome;
@@ -253,6 +254,7 @@ export function lifecyclePostgresLayer(options: PostgresOptions) {
                   .where(eq(assetResultOutbox.id, row.id));
                 claimed.push({
                   id: row.id,
+                  context: row.context,
                   leaseId,
                   applicationId: row.applicationId,
                   result: result(row.result),

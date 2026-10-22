@@ -175,6 +175,9 @@ export const assetResultOutbox = pgTable(
   'asset_result_outbox',
   {
     id: text('id').primaryKey(),
+    context: jsonb('context')
+      .notNull()
+      .$type<import('../capabilities/lifecycle/index.js').CommandContext>(),
     applicationId: text('application_id').notNull(),
     commandId: text('command_id').notNull(),
     payloadDigest: text('payload_digest').notNull(),

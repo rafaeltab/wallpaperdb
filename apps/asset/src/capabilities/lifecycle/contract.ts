@@ -12,6 +12,11 @@ export type Command = Correlation &
   (
     | { readonly operation: 'create'; readonly assetType: string; readonly ownerSubject: string }
     | { readonly operation: 'delete'; readonly assetId: string }
+    | {
+        readonly operation: 'create' | 'delete';
+        readonly invalid: true;
+        readonly payloadIdentity: string;
+      }
   );
 export type Rejection =
   | 'malformed-command'
@@ -35,6 +40,7 @@ export class LifecycleFailure extends Data.TaggedError('LifecycleFailure')<{
   readonly cause: unknown;
 }> {}
 export interface Acceptance {
+  readonly context: CommandContext;
   readonly revision: string;
   readonly applicationId: string;
   readonly canonical: string;
@@ -56,6 +62,7 @@ export class LifecycleStore extends Context.Service<LifecycleStore, LifecycleSto
   'asset/lifecycle/Store'
 ) {}
 export interface ResultPublication {
+  readonly context: CommandContext;
   readonly id: string;
   readonly leaseId: string;
   readonly applicationId: string;
@@ -97,7 +104,8 @@ export interface AssetInspection {
 export interface LifecyclePort {
   readonly command: (
     applicationId: string,
-    command: Command
+    command: Command,
+    context: CommandContext
   ) => Effect.Effect<CommandResult, LifecycleFailure>;
   readonly inspect: (
     owner: Owner,
@@ -106,6 +114,12 @@ export interface LifecyclePort {
     { readonly kind: 'found'; readonly asset: AssetInspection } | { readonly kind: 'unavailable' },
     LifecycleFailure
   >;
+}
+export interface CommandContext {
+  readonly occurrence: { readonly source: string; readonly id: string };
+  readonly correlationId?: string;
+  readonly traceparent?: string;
+  readonly tracestate?: string;
 }
 export class Lifecycle extends Context.Service<Lifecycle, LifecyclePort>()(
   'asset/lifecycle/Lifecycle'

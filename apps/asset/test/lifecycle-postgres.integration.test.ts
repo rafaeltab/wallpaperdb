@@ -15,6 +15,7 @@ let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
 let pool: Pool;
 let runtime: ManagedRuntime.ManagedRuntime<LifecycleStore | ResultOutbox, unknown>;
 const input: Acceptance = {
+  context: { occurrence: { source: 'https://test/app', id: 'occurrence-1' } },
   revision: 'revision-1',
   applicationId: 'user',
   canonical: '["create","one"]',

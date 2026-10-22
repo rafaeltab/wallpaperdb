@@ -8,6 +8,14 @@ import {
 } from './contract.js';
 
 function canonical(command: Command) {
+  if ('invalid' in command)
+    return JSON.stringify([
+      command.operation,
+      'malformed',
+      command.payloadIdentity,
+      command.commandId,
+      command.applicationReference,
+    ]);
   return command.operation === 'create'
     ? JSON.stringify([
         command.operation,
@@ -29,12 +37,13 @@ export function lifecycleLayer(policy: LifecyclePolicy) {
     Effect.gen(function* () {
       const store = yield* LifecycleStore;
       return Lifecycle.of({
-        command: Effect.fn('asset.lifecycle.command')(function* (applicationId, command) {
+        command: Effect.fn('asset.lifecycle.command')(function* (applicationId, command, context) {
           const application = Object.hasOwn(policy.applications, applicationId)
             ? policy.applications[applicationId]
             : undefined;
           let decision: Acceptance['decision'];
-          if (
+          if ('invalid' in command) decision = { kind: 'reject', reason: 'malformed-command' };
+          else if (
             !application?.allowedOperations.includes(command.operation) ||
             command.operation === 'delete'
           )
@@ -48,6 +57,7 @@ export function lifecycleLayer(policy: LifecyclePolicy) {
               owner: { namespace: application.ownerNamespace, subject: command.ownerSubject },
             };
           return yield* store.accept({
+            context,
             revision: policy.revision,
             applicationId,
             canonical: canonical(command),

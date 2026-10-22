@@ -1,4 +1,8 @@
 import { Context, Data, type Effect } from 'effect';
+export interface WorkflowTrace {
+  readonly traceparent?: string;
+  readonly tracestate?: string;
+}
 export interface Creator {
   readonly namespace: string;
   readonly subject: string;
@@ -16,6 +20,7 @@ export interface SourceIntent {
   readonly intentId: string;
 }
 export interface Wallpaper {
+  attentionRequired?: boolean;
   readonly id: string;
   readonly owner: Creator;
   readonly key: string;
@@ -36,6 +41,7 @@ export interface Publication {
   readonly initialAnalysisSourceId: string;
   readonly contributorId: string;
   readonly causationId: string;
+  readonly trace?: WorkflowTrace;
 }
 export class WorkflowFailure extends Data.TaggedError('WorkflowFailure')<{
   readonly operation: string;
@@ -57,10 +63,11 @@ export interface SourceAcceptance extends SourceIntent {
   readonly defaultSourceId: string;
   readonly initialAnalysisSourceId: string;
   readonly occurrenceId: string;
+  readonly trace?: WorkflowTrace;
 }
 export interface CreationPort {
   readonly list: (owner: Creator) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
-  readonly begin: (owner: Creator, key: string) => Effect.Effect<WallpaperOutcome, WorkflowFailure>;
+  readonly begin: (owner: Creator, key: string, trace?:WorkflowTrace) => Effect.Effect<WallpaperOutcome, WorkflowFailure>;
   readonly get: (owner: Creator, id: string) => Effect.Effect<WallpaperOutcome, WorkflowFailure>;
   readonly expectSource: (
     owner: Creator,
@@ -84,7 +91,7 @@ export class Creation extends Context.Service<Creation, CreationPort>()(
  * together, including through an ambiguous commit. Asset identity is globally unique. */
 export interface WorkflowStorePort {
   readonly list: (owner: Creator) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
-  readonly begin: (owner: Creator, key: string) => Effect.Effect<Wallpaper, WorkflowFailure>;
+  readonly begin: (owner: Creator, key: string, trace?:WorkflowTrace) => Effect.Effect<Wallpaper, WorkflowFailure>;
   readonly change: <A>(
     selector: { readonly kind: 'wallpaper' | 'asset'; readonly id: string },
     transition: (wallpaper: Wallpaper | null) => {
@@ -110,13 +117,28 @@ export interface WorkflowPublication {
  * Exhausted attempts remain quarantined with their original identity, never reset
  * by an HTTP retry. Recovery is available only to trusted operator composition. */
 export interface WorkflowDeliveryPort {
+  readonly alerts: () => Effect.Effect<
+    readonly {
+      readonly id: string;
+      readonly scope: 'outbox' | 'confirmation';
+      readonly reason: 'invalid' | 'exhausted';
+    }[],
+    WorkflowFailure
+  >;
+  readonly alerted: (
+    id: string,
+    scope: 'outbox' | 'confirmation'
+  ) => Effect.Effect<void, WorkflowFailure>;
+  readonly retainedConfirmation: (id: string) => Effect.Effect<string | null, WorkflowFailure>;
+  readonly confirmationRecovered: (id: string) => Effect.Effect<void, WorkflowFailure>;
   readonly claim: () => Effect.Effect<readonly WorkflowPublication[], WorkflowFailure>;
   readonly complete: (publication: WorkflowPublication) => Effect.Effect<void, WorkflowFailure>;
   readonly failed: (publication: WorkflowPublication) => Effect.Effect<void, WorkflowFailure>;
   readonly quarantine: (
     id: string,
     payload: string,
-    reason: string
+    reason: string,
+    target?: { readonly kind: 'wallpaper' | 'asset'; readonly id: string }
   ) => Effect.Effect<void, WorkflowFailure>;
   readonly recover: (id: string) => Effect.Effect<boolean, WorkflowFailure>;
 }

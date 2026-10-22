@@ -67,6 +67,14 @@ export function decodeConfirmation(bytes: Uint8Array): Confirmation {
       initialAnalysisSourceId: data.data.initialAnalysisSourceId,
       intentId: event.correlationid,
       occurrenceId: event.id,
+      ...(event.traceparent
+        ? {
+            trace: {
+              traceparent: event.traceparent,
+              ...(event.tracestate ? { tracestate: event.tracestate } : {}),
+            },
+          }
+        : {}),
     },
   };
 }

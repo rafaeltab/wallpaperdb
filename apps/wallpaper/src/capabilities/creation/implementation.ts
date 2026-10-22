@@ -18,12 +18,12 @@ export function creationLayer(ownerNamespace: string) {
       return Creation.of({
         list: (owner) =>
           owner.namespace === ownerNamespace ? store.list(owner) : Effect.succeed([]),
-        begin: (owner, key) =>
+        begin: (owner, key, trace) =>
           owner.namespace !== ownerNamespace
             ? Effect.succeed({ kind: 'forbidden' })
             : !/^[\x21-\x7e]{1,128}$/.test(key)
               ? Effect.succeed({ kind: 'conflict' })
-              : store.begin(owner, key).pipe(
+              : store.begin(owner, key, trace).pipe(
                   Effect.map((wallpaper) => ({ kind: 'wallpaper' as const, wallpaper })),
                   Effect.withSpan('wallpaper.creation.begin')
                 ),
@@ -60,6 +60,7 @@ export function creationLayer(ownerNamespace: string) {
                   (result.outcome === 'created' && !result.assetId)
                 )
                   return { wallpaper, result: 'ignored' };
+                wallpaper.attentionRequired = false;
                 wallpaper.state = result.outcome === 'created' ? 'awaiting-source' : 'failed';
                 wallpaper.assetId = result.outcome === 'created' ? result.assetId : null;
                 return { wallpaper, result: 'applied' };
@@ -80,6 +81,7 @@ export function creationLayer(ownerNamespace: string) {
                   confirmation.sourceId !== confirmation.initialAnalysisSourceId
                 )
                   return { wallpaper, result: 'ignored' };
+                wallpaper.attentionRequired = false;
                 wallpaper.state = 'published';
                 wallpaper.sourceId = confirmation.sourceId;
                 wallpaper.initialAnalysisSourceId = confirmation.initialAnalysisSourceId;
@@ -94,6 +96,7 @@ export function creationLayer(ownerNamespace: string) {
                     sourceId: confirmation.sourceId,
                     initialAnalysisSourceId: confirmation.initialAnalysisSourceId,
                     causationId: confirmation.occurrenceId,
+                    ...(confirmation.trace ? { trace: confirmation.trace } : {}),
                   },
                 };
               }

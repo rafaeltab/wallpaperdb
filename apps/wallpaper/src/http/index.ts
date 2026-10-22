@@ -192,7 +192,8 @@ export async function createHttpApp<E>(
     await registerOpenAPI(app, {
       title: 'WallpaperDB Wallpaper API',
       version: '1.0.0',
-      description: 'Wallpaper service shell. Only operational endpoints are exposed today.',
+      description: 'Authenticated Wallpaper creation, first Source progress and operational status.',
+      securitySchemes:{ownerSession:{type:'http',scheme:'bearer',bearerFormat:'JWT'}},
       servers:
         config.nodeEnv === 'production'
           ? undefined

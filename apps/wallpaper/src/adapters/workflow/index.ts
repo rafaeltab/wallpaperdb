@@ -1,6 +1,7 @@
+import { WallpaperPublishedSchema } from '@wallpaperdb/events/schemas';
 import { randomUUID, createHash } from 'node:crypto';
 import { Context, Effect, Layer } from 'effect';
-import { and, eq, lte, or, sql } from 'drizzle-orm';
+import { and, eq, lte, or, sql, isNull } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import {
@@ -67,7 +68,7 @@ export function workflowPostgresLayer(options: Options) {
               .limit(100);
             return rows.map((row) => row.state);
           }),
-        begin: (owner, key) =>
+        begin: (owner, key, trace) =>
           query('begin', () =>
             db.transaction(async (tx) => {
               const id = `wlp_${randomUUID()}`;
@@ -110,6 +111,7 @@ export function workflowPostgresLayer(options: Options) {
                     time: createdAt,
                     datacontenttype: 'application/json',
                     correlationid: id,
+                    ...trace,
                     data: {
                       commandId: wallpaper.commandId,
                       applicationReference: id,
@@ -171,13 +173,14 @@ export function workflowPostgresLayer(options: Options) {
                         correlationid: changed.wallpaper.id,
                         causationid: data.causationId,
                         causationsource: 'https://wallpaperdb/asset',
-                        data: {
+                        ...data.trace,
+                        data: WallpaperPublishedSchema.parse({
                           wallpaperId: data.wallpaperId,
                           contributorId: data.contributorId,
                           assetId: data.assetId,
                           firstSourceId: data.sourceId,
                           initialAnalysisSourceId: data.initialAnalysisSourceId,
-                        },
+                        }),
                       },
                     })
                     .onConflictDoNothing();
@@ -188,6 +191,67 @@ export function workflowPostgresLayer(options: Options) {
           ),
       };
       const delivery: WorkflowDeliveryPort = {
+        alerts: () =>
+          query('alerts', async () => {
+            const outbox = await db
+              .select({ id: workflowOutbox.id })
+              .from(workflowOutbox)
+              .where(
+                and(eq(workflowOutbox.status, 'quarantined'), isNull(workflowOutbox.notifiedAt))
+              )
+              .limit(10);
+            const inbox = await db
+              .select({ id: workflowQuarantine.id, reason: workflowQuarantine.reason })
+              .from(workflowQuarantine)
+              .where(
+                and(isNull(workflowQuarantine.notifiedAt), isNull(workflowQuarantine.recoveredAt))
+              )
+              .limit(10);
+            return [
+              ...outbox.map((row) => ({
+                id: row.id,
+                scope: 'outbox' as const,
+                reason: 'exhausted' as const,
+              })),
+              ...inbox.map((row) => ({
+                id: row.id,
+                scope: 'confirmation' as const,
+                reason:
+                  row.reason === 'invalid-confirmation'
+                    ? ('invalid' as const)
+                    : ('exhausted' as const),
+              })),
+            ];
+          }),
+        alerted: (id, scope) =>
+          query('alerted', async () => {
+            if (scope === 'outbox')
+              await db
+                .update(workflowOutbox)
+                .set({ notifiedAt: new Date() })
+                .where(eq(workflowOutbox.id, id));
+            else
+              await db
+                .update(workflowQuarantine)
+                .set({ notifiedAt: new Date() })
+                .where(eq(workflowQuarantine.id, id));
+          }),
+        retainedConfirmation: (id) =>
+          query('retained-confirmation', async () => {
+            const rows = await db
+              .select({ payload: workflowQuarantine.payload })
+              .from(workflowQuarantine)
+              .where(and(eq(workflowQuarantine.id, id), isNull(workflowQuarantine.recoveredAt)));
+            return rows[0]?.payload ?? null;
+          }),
+        confirmationRecovered: (id) =>
+          query('confirmation-recovered', async () => {
+            await db
+              .update(workflowQuarantine)
+              .set({ recoveredAt: new Date() })
+              .where(eq(workflowQuarantine.id, id));
+          }),
+
         claim: () =>
           query('claim', () =>
             db.transaction(async (tx) => {
@@ -247,43 +311,62 @@ export function workflowPostgresLayer(options: Options) {
                 })
                 .where(and(eq(workflowOutbox.id, p.id), eq(workflowOutbox.leaseId, p.leaseId)))
                 .returning();
-              if (exhausted && changed.length && p.destination === 'asset-create') {
+              if (exhausted && changed.length) {
                 const rows = await tx
                   .select()
                   .from(wallpaperIntents)
                   .where(eq(wallpaperIntents.id, p.wallpaperId))
                   .for('update');
                 const w = rows[0]?.state;
-                // A timeout may have stored the command. Keep the creation intent alive so a
-                // late, matching confirmation can still complete it after deliberate recovery.
                 if (w)
                   await tx
-                    .insert(workflowQuarantine)
-                    .values({
-                      id: `outbox:${p.id}`,
-                      payload: JSON.stringify(p.event),
-                      reason: 'publication-exhausted',
-                    })
-                    .onConflictDoNothing();
+                    .update(wallpaperIntents)
+                    .set({ state: { ...w, attentionRequired: true } })
+                    .where(eq(wallpaperIntents.id, w.id));
               }
             })
           ),
-        quarantine: (id, payload, reason) =>
-          query('quarantine', async () => {
-            await db
-              .insert(workflowQuarantine)
-              .values({
-                id: createHash('sha256').update(id).digest('hex'),
-                payload: payload.slice(0, 16384),
-                reason,
-              })
-              .onConflictDoNothing();
-          }),
+        quarantine: (id, payload, reason, target) =>
+          query('quarantine', () =>
+            db.transaction(async (tx) => {
+              await tx
+                .insert(workflowQuarantine)
+                .values({
+                  id: createHash('sha256').update(id).digest('hex'),
+                  payload: payload.slice(0, 16384),
+                  reason,
+                })
+                .onConflictDoNothing();
+              if (target) {
+                const rows = await tx
+                  .select()
+                  .from(wallpaperIntents)
+                  .where(
+                    target.kind === 'wallpaper'
+                      ? eq(wallpaperIntents.id, target.id)
+                      : eq(wallpaperIntents.assetId, target.id)
+                  )
+                  .for('update');
+                const w = rows[0]?.state;
+                if (w)
+                  await tx
+                    .update(wallpaperIntents)
+                    .set({ state: { ...w, attentionRequired: true } })
+                    .where(eq(wallpaperIntents.id, w.id));
+              }
+            })
+          ),
         recover: (id) =>
           query('recover', async () => {
             const rows = await db
               .update(workflowOutbox)
-              .set({ status: 'pending', attempts: 0, availableAt: new Date(), leaseId: null })
+              .set({
+                status: 'pending',
+                attempts: 0,
+                availableAt: new Date(),
+                leaseId: null,
+                notifiedAt: null,
+              })
               .where(and(eq(workflowOutbox.id, id), eq(workflowOutbox.status, 'quarantined')))
               .returning({ id: workflowOutbox.id });
             return rows.length === 1;

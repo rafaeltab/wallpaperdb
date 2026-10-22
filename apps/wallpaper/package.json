@@ -21,7 +21,9 @@
     "format:files": "biome format --write",
     "test:unit": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "operator": "tsx scripts/operator.ts",
+    "gen:swagger": "tsx src/gen_swagger.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { decodeConfirmation } from '../src/adapters/asset-workflow/translation.js';
+import { decodeConfirmation } from '../src/adapters/asset-workflow/index.js';
 const event = {
   specversion: '1.0',
   id: 'result-1',

@@ -7,7 +7,7 @@ import {
   CreatorAuthentication,
   WorkflowFailure,
 } from '../src/capabilities/creation/index.js';
-import { registerCreationHttp } from '../src/http/creation.js';
+import { registerCreationHttp } from '../src/http/index.js';
 it('uses verified Creator identity, returns durable progress and hides private workflow fields', async () => {
   const calls: unknown[] = [];
   const services = Layer.merge(

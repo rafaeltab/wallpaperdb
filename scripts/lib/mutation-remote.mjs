@@ -11,6 +11,43 @@ import { join } from "node:path";
 import { importBaseline } from "./mutation-state.mjs";
 import { importCheckpoint } from "./mutation-checkpoint.mjs";
 
+function trustedRuns(gh, branch) {
+	const events = ["schedule", "workflow_dispatch", "push"];
+	const runs = events.flatMap((event) =>
+		JSON.parse(
+			gh(
+				"run",
+				"list",
+				"--workflow",
+				"mutation.yml",
+				"--branch",
+				branch,
+				"--status",
+				"success",
+				"--event",
+				event,
+				"--limit",
+				"5",
+				"--json",
+				"databaseId,event,createdAt",
+			),
+		),
+	);
+	return [
+		...new Map(
+			runs
+				.filter((run) => events.includes(run.event))
+				.map((run) => [run.databaseId, run]),
+		).values(),
+	]
+		.sort(
+			(a, b) =>
+				(b.createdAt ?? "").localeCompare(a.createdAt ?? "") ||
+				b.databaseId - a.databaseId,
+		)
+		.slice(0, 5);
+}
+
 /** One repository artifact transfer, with an aggregate deadline outside execution. */
 export async function downloadCheckpoint(
 	root,
@@ -34,25 +71,8 @@ export async function downloadCheckpoint(
 		});
 	try {
 		const repo = JSON.parse(gh("repo", "view", "--json", "defaultBranchRef"));
-		const runs = JSON.parse(
-			gh(
-				"run",
-				"list",
-				"--workflow",
-				"mutation.yml",
-				"--branch",
-				repo.defaultBranchRef.name,
-				"--status",
-				"success",
-				"--limit",
-				"5",
-				"--json",
-				"databaseId,event",
-			),
-		);
-		for (const run of runs.filter((run) =>
-			["schedule", "workflow_dispatch", "push"].includes(run.event),
-		)) {
+		const runs = trustedRuns(gh, repo.defaultBranchRef.name);
+		for (const run of runs) {
 			if (performance.now() >= deadline) break;
 			try {
 				const dir = join(temp, String(run.databaseId));
@@ -111,25 +131,8 @@ export function downloadBaseline(context, invocationDeadline = Infinity) {
 	try {
 		const branch = JSON.parse(gh("repo", "view", "--json", "defaultBranchRef"))
 			.defaultBranchRef.name;
-		const runs = JSON.parse(
-			gh(
-				"run",
-				"list",
-				"--workflow",
-				"mutation.yml",
-				"--branch",
-				branch,
-				"--status",
-				"success",
-				"--limit",
-				"5",
-				"--json",
-				"databaseId,event",
-			),
-		);
-		for (const run of runs.filter((r) =>
-			["workflow_dispatch", "push", "schedule"].includes(r.event),
-		)) {
+		const runs = trustedRuns(gh, branch);
+		for (const run of runs) {
 			if (performance.now() >= deadline) break;
 			const dir = join(temp, String(run.databaseId));
 			try {

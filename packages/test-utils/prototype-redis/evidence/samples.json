@@ -1,0 +1,251 @@
+{
+  "recordedAt": "2026-10-21T18:32:07.912Z",
+  "checkoutCommit": "4872ad2081a42986c5f27c362ed582ddb872e8c8",
+  "sourceSha256": "89c60508244fd8d87b48a02d30da573e5c0abbf66b05f1c99f68173b3cc3f47b",
+  "host": {
+    "node": "v22.22.3",
+    "platform": "linux",
+    "kernel": "7.0.0-38-generic",
+    "cpus": 32
+  },
+  "settings": {
+    "image": "redis:7-alpine",
+    "workers": 1,
+    "concurrency": 1,
+    "coverage": false,
+    "retries": 0,
+    "schedule": "five cases serially; alternate baseline/pilot and pilot/baseline",
+    "pairs": 5
+  },
+  "warmup": {
+    "startAttempts": 1,
+    "starts": 1,
+    "stopAttempts": 1,
+    "stops": 1,
+    "startupReadinessMs": 148.89077799999995,
+    "clientSetupMs": 0,
+    "bodyMs": 0,
+    "scopedCleanupMs": 0,
+    "verificationMs": 73.88193100000001,
+    "containerCleanupMs": 222.96474,
+    "clientsClosed": 0,
+    "containersRemoved": 1
+  },
+  "imageId": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+  "imageDigests": [
+    "redis@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99"
+  ],
+  "imageIdAfter": "sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99",
+  "samples": [
+    {
+      "pair": 1,
+      "mode": "baseline",
+      "status": "passed",
+      "elapsedMs": 2950.3961179999997,
+      "elapsedWithoutVerificationMs": 2592.946459,
+      "metrics": {
+        "startAttempts": 5,
+        "starts": 5,
+        "stopAttempts": 5,
+        "stops": 5,
+        "startupReadinessMs": 461.64634300000023,
+        "clientSetupMs": 6.0169810000005555,
+        "bodyMs": 1033.067216,
+        "scopedCleanupMs": 12.03881000000024,
+        "verificationMs": 357.44965899999966,
+        "containerCleanupMs": 1079.194743,
+        "clientsClosed": 11,
+        "containersRemoved": 5
+      }
+    },
+    {
+      "pair": 1,
+      "mode": "pilot",
+      "status": "passed",
+      "elapsedMs": 1423.0473029999994,
+      "elapsedWithoutVerificationMs": 1346.906085999999,
+      "metrics": {
+        "startAttempts": 1,
+        "starts": 1,
+        "stopAttempts": 1,
+        "stops": 1,
+        "startupReadinessMs": 88.93773099999999,
+        "clientSetupMs": 3.2746649999999136,
+        "bodyMs": 1024.5944190000005,
+        "scopedCleanupMs": 10.510788999999932,
+        "verificationMs": 76.14121700000032,
+        "containerCleanupMs": 219.2725190000001,
+        "clientsClosed": 11,
+        "containersRemoved": 1
+      }
+    },
+    {
+      "pair": 2,
+      "mode": "pilot",
+      "status": "passed",
+      "elapsedMs": 1466.8211680000004,
+      "elapsedWithoutVerificationMs": 1386.7200780000003,
+      "metrics": {
+        "startAttempts": 1,
+        "starts": 1,
+        "stopAttempts": 1,
+        "stops": 1,
+        "startupReadinessMs": 98.30629200000021,
+        "clientSetupMs": 3.622067999999672,
+        "bodyMs": 1042.4019420000004,
+        "scopedCleanupMs": 8.591589999999087,
+        "verificationMs": 80.10109000000011,
+        "containerCleanupMs": 233.56328200000007,
+        "clientsClosed": 11,
+        "containersRemoved": 1
+      }
+    },
+    {
+      "pair": 2,
+      "mode": "baseline",
+      "status": "passed",
+      "elapsedMs": 2976.064157,
+      "elapsedWithoutVerificationMs": 2628.1879839999974,
+      "metrics": {
+        "startAttempts": 5,
+        "starts": 5,
+        "stopAttempts": 5,
+        "stops": 5,
+        "startupReadinessMs": 484.65254900000036,
+        "clientSetupMs": 5.3957930000005945,
+        "bodyMs": 1029.666913,
+        "scopedCleanupMs": 8.046595000000707,
+        "verificationMs": 347.8761730000024,
+        "containerCleanupMs": 1099.7499529999986,
+        "clientsClosed": 11,
+        "containersRemoved": 5
+      }
+    },
+    {
+      "pair": 3,
+      "mode": "baseline",
+      "status": "passed",
+      "elapsedMs": 2951.5406999999996,
+      "elapsedWithoutVerificationMs": 2610.2638309999984,
+      "metrics": {
+        "startAttempts": 5,
+        "starts": 5,
+        "stopAttempts": 5,
+        "stops": 5,
+        "startupReadinessMs": 488.60782599999766,
+        "clientSetupMs": 6.077122999999119,
+        "bodyMs": 1028.5135670000018,
+        "scopedCleanupMs": 8.152866000000358,
+        "verificationMs": 341.27686900000117,
+        "containerCleanupMs": 1078.4509070000004,
+        "clientsClosed": 11,
+        "containersRemoved": 5
+      }
+    },
+    {
+      "pair": 3,
+      "mode": "pilot",
+      "status": "passed",
+      "elapsedMs": 1428.2099080000007,
+      "elapsedWithoutVerificationMs": 1346.5712880000028,
+      "metrics": {
+        "startAttempts": 1,
+        "starts": 1,
+        "stopAttempts": 1,
+        "stops": 1,
+        "startupReadinessMs": 75.74280800000088,
+        "clientSetupMs": 3.4121350000004895,
+        "bodyMs": 1040.081549999999,
+        "scopedCleanupMs": 7.8335450000013225,
+        "verificationMs": 81.6386199999979,
+        "containerCleanupMs": 219.2816359999997,
+        "clientsClosed": 11,
+        "containersRemoved": 1
+      }
+    },
+    {
+      "pair": 4,
+      "mode": "pilot",
+      "status": "passed",
+      "elapsedMs": 1453.1082509999997,
+      "elapsedWithoutVerificationMs": 1372.699262,
+      "metrics": {
+        "startAttempts": 1,
+        "starts": 1,
+        "stopAttempts": 1,
+        "stops": 1,
+        "startupReadinessMs": 106.29346600000099,
+        "clientSetupMs": 3.403266999999687,
+        "bodyMs": 1028.258536999998,
+        "scopedCleanupMs": 8.937291000003825,
+        "verificationMs": 80.40898899999956,
+        "containerCleanupMs": 225.5932300000004,
+        "clientsClosed": 11,
+        "containersRemoved": 1
+      }
+    },
+    {
+      "pair": 4,
+      "mode": "baseline",
+      "status": "passed",
+      "elapsedMs": 2982.8644010000007,
+      "elapsedWithoutVerificationMs": 2629.770079,
+      "metrics": {
+        "startAttempts": 5,
+        "starts": 5,
+        "stopAttempts": 5,
+        "stops": 5,
+        "startupReadinessMs": 493.3421830000043,
+        "clientSetupMs": 6.865765999997166,
+        "bodyMs": 1038.3723290000034,
+        "scopedCleanupMs": 8.139300999997431,
+        "verificationMs": 353.09432200000083,
+        "containerCleanupMs": 1082.644017999999,
+        "clientsClosed": 11,
+        "containersRemoved": 5
+      }
+    },
+    {
+      "pair": 5,
+      "mode": "baseline",
+      "status": "passed",
+      "elapsedMs": 3000.601823000001,
+      "elapsedWithoutVerificationMs": 2648.632668000002,
+      "metrics": {
+        "startAttempts": 5,
+        "starts": 5,
+        "stopAttempts": 5,
+        "stops": 5,
+        "startupReadinessMs": 475.75410199999897,
+        "clientSetupMs": 5.4249650000092515,
+        "bodyMs": 1037.6735539999972,
+        "scopedCleanupMs": 7.38274800000363,
+        "verificationMs": 351.96915499999886,
+        "containerCleanupMs": 1121.9938150000016,
+        "clientsClosed": 11,
+        "containersRemoved": 5
+      }
+    },
+    {
+      "pair": 5,
+      "mode": "pilot",
+      "status": "passed",
+      "elapsedMs": 1451.5581469999997,
+      "elapsedWithoutVerificationMs": 1374.0532669999957,
+      "metrics": {
+        "startAttempts": 1,
+        "starts": 1,
+        "stopAttempts": 1,
+        "stops": 1,
+        "startupReadinessMs": 99.65722200000164,
+        "clientSetupMs": 2.828095000004396,
+        "bodyMs": 1040.8611269999928,
+        "scopedCleanupMs": 6.591900999992504,
+        "verificationMs": 77.50488000000405,
+        "containerCleanupMs": 223.91818200000125,
+        "clientsClosed": 11,
+        "containersRemoved": 1
+      }
+    }
+  ]
+}

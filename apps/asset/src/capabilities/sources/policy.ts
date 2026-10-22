@@ -36,7 +36,7 @@ export const initialSourcePolicies = {
       maxPixels: 262144,
       maxAxis: 512,
       squareSize: 512,
-      sourceModels: ['sdr-webp'],
+      sourceModels: ['sdr-webp', 'animated-sdr-webp'],
     },
     retention: { evidenceMs: 2592000000, candidateMs: 86400000 },
     temporaryInput: { maxBytes: 52428800, abandonedMs: 86400000 },

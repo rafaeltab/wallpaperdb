@@ -4,6 +4,8 @@ import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
 import { Pool } from 'pg';
+import { logs, SeverityNumber } from '@opentelemetry/api-logs';
+import { observeWorkflow } from '../commands/index.js';
 import {
   SourceStore,
   SourceAcceptanceOutbox,
@@ -37,7 +39,15 @@ export function sourcePostgresLayer(options: Options) {
             connectionTimeoutMillis: 5000,
             statement_timeout: 10000,
           });
-          pool.on('error', () => {});
+          pool.on('error', (cause) =>
+            logs
+              .getLogger('asset.sources')
+              .emit({
+                severityNumber: SeverityNumber.ERROR,
+                body: 'Idle Source database connection failed',
+                attributes: { 'error.type': cause.name, 'error.message': cause.message },
+              })
+          );
           return pool;
         }),
         (pool) => Effect.promise(() => pool.end())
@@ -256,24 +266,51 @@ export function sourcePostgresLayer(options: Options) {
               .where(eq(sourceAcceptanceOutbox.id, id));
           }),
         recover: (id) =>
-          run('recover', async (db) => {
-            const rows = await db
-              .update(sourceAcceptanceOutbox)
-              .set({
-                status: 'pending',
-                attempts: 0,
-                availableAt: new Date(),
-                leaseId: null,
-                notifiedAt: null,
+          Effect.gen(function* () {
+            const confirmation = yield* run('inspect-recovery', async (db) => {
+              const [row] = await db
+                .select()
+                .from(sourceAcceptanceOutbox)
+                .where(eq(sourceAcceptanceOutbox.id, id));
+              return row?.confirmation;
+            });
+            if (!confirmation) return false;
+            const recovered = yield* observeWorkflow(
+              'asset.sources.recover-confirmation',
+              confirmation.context,
+              {
+                'event.id': id,
+                'event.source': 'https://wallpaperdb/asset',
+                'event.type': 'asset.source.accepted',
+                'event.causation_id': confirmation.context.occurrence.id,
+                'asset.id': confirmation.assetId,
+                'candidate.id': confirmation.candidateId,
+                'application.id': confirmation.applicationId,
+                ...(confirmation.context.correlationId
+                  ? { 'event.correlation_id': confirmation.context.correlationId }
+                  : {}),
+              },
+              run('recover', async (db) => {
+                const rows = await db
+                  .update(sourceAcceptanceOutbox)
+                  .set({
+                    status: 'pending',
+                    attempts: 0,
+                    availableAt: new Date(),
+                    leaseId: null,
+                    notifiedAt: null,
+                  })
+                  .where(
+                    and(
+                      eq(sourceAcceptanceOutbox.id, id),
+                      eq(sourceAcceptanceOutbox.status, 'quarantined')
+                    )
+                  )
+                  .returning({ id: sourceAcceptanceOutbox.id });
+                return rows.length === 1 ? 'recovered' : 'unavailable';
               })
-              .where(
-                and(
-                  eq(sourceAcceptanceOutbox.id, id),
-                  eq(sourceAcceptanceOutbox.status, 'quarantined')
-                )
-              )
-              .returning({ id: sourceAcceptanceOutbox.id });
-            return rows.length === 1;
+            );
+            return recovered === 'recovered';
           }),
       };
       return Context.make(SourceStore, store).pipe(Context.add(SourceAcceptanceOutbox, outbox));

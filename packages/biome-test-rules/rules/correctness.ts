@@ -483,6 +483,12 @@ function callbackResultHandled(
 	const api = resolveApi(call.callee, model);
 	if (api && ["it", "test", "describe", "suite"].includes(api.name))
 		return true;
+	if (
+		api &&
+		["vitest", "@effect/vitest", "node:test"].includes(api.source) &&
+		["beforeEach", "beforeAll", "afterEach", "afterAll"].includes(api.name)
+	)
+		return true;
 	const callee = call.callee;
 	if (callee?.kind !== "JS_STATIC_MEMBER_EXPRESSION") return false;
 	if (["then", "catch", "finally"].includes(callee.member?.text ?? ""))

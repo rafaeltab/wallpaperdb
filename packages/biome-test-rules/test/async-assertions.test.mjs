@@ -192,6 +192,14 @@ test("logical result operands inherit await or return handling", () => {
 			`${prelude} await (expect(Promise.resolve(1)).resolves.toBe(1) && enabled);`,
 		).some((d) => d.message.includes("async assertion")),
 	);
+	for (const operator of ["||", "??"])
+		assert.deepEqual(
+			lint(
+				`${prelude} await (expect(Promise.resolve(1)).resolves.toBe(1) ${operator} enabled);`,
+			),
+			[],
+			operator,
+		);
 });
 
 test("nested Promise.all arrays do not handle assertions", () => {

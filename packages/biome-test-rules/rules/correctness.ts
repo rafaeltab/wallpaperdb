@@ -602,7 +602,9 @@ function handled(
 	switch (parent.kind) {
 		case "JS_LOGICAL_EXPRESSION":
 			return (
-				parent.right?.text === node.text &&
+				(parent.right?.text === node.text ||
+					parent.operatorToken === "||" ||
+					parent.operatorToken === "??") &&
 				handled(parent, model, seen, allowVoid)
 			);
 		case "JS_CONDITIONAL_EXPRESSION":

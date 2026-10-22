@@ -30,14 +30,10 @@ try {
 		throw new Error(
 			`PR history contains merge commits. This repository uses rebase merging; resolve the branch history before publication.\n${merges}`,
 		);
-	if (
-		!git("diff", "--name-only", base, head, "--") ||
-		!git("cherry", base, head)
-			.split("\n")
-			.some((patch) => patch.startsWith("+ "))
-	)
+	const mergedTree = git("merge-tree", "--write-tree", base, head);
+	if (!git("diff", "--name-only", `${base}^{tree}`, mergedTree, "--"))
 		throw new Error(
-			"PR contents already match its base, or its patches have already landed. Verify whether the work has landed instead of reporting it merge-ready.",
+			"PR contents already match its base after applying the branch. Verify whether the work has landed instead of reporting it merge-ready.",
 		);
 	console.log(
 		"PR history is linear and its contents differ from the base. Verify GitHub rebaseable status before handoff.",

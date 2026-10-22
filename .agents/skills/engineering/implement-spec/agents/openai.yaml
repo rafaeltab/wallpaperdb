@@ -1,5 +1,5 @@
 interface:
   display_name: "Implement Spec"
-  short_description: "Implement spec tickets sequentially as a GitHub PR stack."
+  short_description: "Run ticket threads in separate worktrees, stack PRs, and review the spec."
 policy:
   allow_implicit_invocation: false

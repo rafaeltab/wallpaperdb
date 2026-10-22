@@ -36,6 +36,7 @@ export interface ProtectedCommandOptions {
   readonly retryDelayMs: number;
   readonly pollMs: number;
   readonly shutdownTimeoutMs: number;
+  readonly maxAckPending: number;
 }
 function broker<A>(operation: string, run: () => Promise<A>) {
   return Effect.tryPromise({

@@ -91,8 +91,8 @@ export async function provisionAssetBroker(
       retention: RetentionPolicy.Limits,
       discard: DiscardPolicy.New,
       max_age: 0,
-      max_msgs: -1,
-      max_bytes: -1,
+      max_msgs: authority.broker.streams[name].maxMessages,
+      max_bytes: authority.broker.streams[name].maxBytes,
       max_msg_size: name === 'ASSET_QUARANTINE' ? 65536 : 16384,
       duplicate_window: 120_000_000_000,
     };
@@ -127,7 +127,7 @@ export async function provisionAssetBroker(
         ack_policy: AckPolicy.Explicit,
         max_deliver: -1,
         ack_wait: 30_000_000_000,
-        max_ack_pending: 1,
+        max_ack_pending: authority.broker.maxAckPending,
         max_batch: 1,
         max_expires: 30_000_000_000,
       };

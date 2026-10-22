@@ -6,6 +6,12 @@ import { z } from 'zod';
 const credential = z
   .object({ user: AssetIdentifierSchema, password: z.string().min(1), revision: OwnerValueSchema })
   .strict();
+const streamBudget = z
+  .object({
+    maxBytes: z.number().int().min(65536).max(Number.MAX_SAFE_INTEGER),
+    maxMessages: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
 const httpsUrl = z
   .string()
   .url()
@@ -28,7 +34,21 @@ const provider = z
 const schema = z
   .object({
     revision: OwnerValueSchema,
-    broker: z.object({ service: credential, operator: credential }).strict(),
+    broker: z
+      .object({
+        service: credential,
+        operator: credential,
+        maxAckPending: z.number().int().min(2).max(10000),
+        streams: z
+          .object({
+            ASSET_COMMANDS: streamBudget,
+            ASSET_RESULTS: streamBudget,
+            ASSET_QUARANTINE: streamBudget,
+            ASSET_OPERATIONS: streamBudget,
+          })
+          .strict(),
+      })
+      .strict(),
     applications: z.record(
       AssetIdentifierSchema,
       z
@@ -112,6 +132,7 @@ export function parseAuthority(input: unknown) {
   const effective = {
     ...parsed,
     broker: {
+      ...parsed.broker,
       service: { user: parsed.broker.service.user, revision: parsed.broker.service.revision },
       operator: { user: parsed.broker.operator.user, revision: parsed.broker.operator.revision },
     },

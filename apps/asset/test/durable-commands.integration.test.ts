@@ -41,6 +41,7 @@ function start() {
       url,
       credential: authority.broker.service,
       applications: authority.applications,
+      maxAckPending: authority.broker.maxAckPending,
       ...authority.delivery,
     }).pipe(Layer.provideMerge(lifecycle), Layer.provide(persistence))
   );

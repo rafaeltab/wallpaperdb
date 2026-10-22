@@ -6,6 +6,32 @@ import { parse } from 'dotenv';
 import { parseAuthority } from '../src/authority.js';
 import { renderBrokerConfiguration } from '../src/adapters/commands/index.js';
 
+export function developmentIssuer(environment: Readonly<Record<string, string | undefined>>) {
+  let domain = environment.CLERK_DOMAIN?.trim();
+  if (!domain && environment.CLERK_PUBLISHABLE_KEY) {
+    const key = /^pk_(?:test|live)_([A-Za-z0-9+/=_-]+)$/.exec(environment.CLERK_PUBLISHABLE_KEY);
+    if (!key?.[1]) throw new Error('Invalid configured Clerk publishable key');
+    const decoded = Buffer.from(key[1], 'base64').toString('utf8');
+    if (!decoded.endsWith('$')) throw new Error('Invalid configured Clerk publishable key');
+    domain = decoded.slice(0, -1);
+  }
+  const issuer = new URL(
+    domain?.startsWith('https://')
+      ? domain
+      : `https://${domain || 'unconfigured.clerk.accounts.dev'}`
+  );
+  if (
+    issuer.protocol !== 'https:' ||
+    issuer.username ||
+    issuer.password ||
+    issuer.port ||
+    issuer.pathname !== '/' ||
+    issuer.search ||
+    issuer.hash
+  )
+    throw new Error('Clerk issuer must be an HTTPS origin');
+  return issuer.origin;
+}
 const secret = () => randomBytes(32).toString('hex');
 const credential = (user: string) => ({ user, password: secret(), revision: '1' });
 export async function configureDevelopment(
@@ -93,12 +119,11 @@ export async function configureDevelopment(
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const root = resolve('../..');
   const environment = parse(await readFile(join(root, 'apps/user/.env'), 'utf8'));
-  const domain = environment.CLERK_DOMAIN?.trim() || 'unconfigured.clerk.accounts.dev';
   const worktree = await readFile(join(root, '.worktree'), 'utf8');
   const port = /^INGRESS_PORT\s*[:?]?=\s*(\d+)/m.exec(worktree)?.[1];
   if (!port) throw new Error('Run worktree setup before generating Asset authority');
   const identity = await configureDevelopment(root, {
-    issuer: new URL(domain.startsWith('https://') ? domain : `https://${domain}`).origin,
+    issuer: developmentIssuer(environment),
     ingress: `http://localhost:${port}`,
   });
   process.stdout.write(`Asset development authority ready: ${identity}\n`);

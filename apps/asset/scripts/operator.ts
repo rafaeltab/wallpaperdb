@@ -134,21 +134,19 @@ export async function runOperator(args: readonly string[]) {
         const results = await connection
           .jetstream()
           .consumers.get('ASSET_RESULTS', application.resultConsumer);
-        await connection
-          .jetstream()
-          .publish(
-            application.createSubject,
-            JSON.stringify({
-              specversion: '1.0',
-              id: randomUUID(),
-              source: `https://wallpaperdb/applications/${application.id}`,
-              type: 'asset.command.create',
-              time: new Date().toISOString(),
-              datacontenttype: 'application/json',
-              data,
-            }),
-            { timeout: 5000 }
-          );
+        await connection.jetstream().publish(
+          application.createSubject,
+          JSON.stringify({
+            specversion: '1.0',
+            id: randomUUID(),
+            source: `https://wallpaperdb/applications/${application.id}`,
+            type: 'asset.command.create',
+            time: new Date().toISOString(),
+            datacontenttype: 'application/json',
+            data,
+          }),
+          { timeout: 5000 }
+        );
         const deadline = Date.now() + 10000;
         while (Date.now() < deadline) {
           const message = await results.next({ expires: 5000 });

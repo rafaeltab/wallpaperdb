@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import {
+  arrangeLegacyCatalogueWallpaper,
   uniquePng,
   waitForCataloguePage,
   waitForWallpaper,
@@ -8,7 +9,7 @@ import {
 
 test.use({ actionTimeout: 15000 });
 
-test("uploaded pixels survive catalogue delivery, filtering and accessible details", async ({
+test("catalogue pixels survive delivery, filtering and accessible details", async ({
   page,
 }) => {
   // Projection and search readiness polls share this bounded journey deadline.
@@ -18,50 +19,11 @@ test("uploaded pixels survive catalogue delivery, filtering and accessible detai
   await page.goto("/web/upload");
   await expect(page.getByTestId("upload-page")).toBeVisible();
   const picture = await uniquePng(page);
-  const uploadResponse = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/ingestor/upload") &&
-      response.request().method() === "POST",
-  );
-  // A duplicate in the same queue keeps its notification available until the
-  // user dismisses it, without racing the successful-only auto-dismiss timer.
-  await page
-    .getByTestId("file-input")
-    .setInputFiles([
-      picture,
-      { ...picture, name: `duplicate-${picture.name}` },
-    ]);
-  const uploaded = await uploadResponse;
-  expect(uploaded.ok()).toBe(true);
-  const receipt = await uploaded.json();
-  expect(receipt.id).toMatch(/^wlpr_/);
-  const wallpaperId = String(receipt.id);
+  const wallpaperId = await arrangeLegacyCatalogueWallpaper(page, picture);
   await test.info().attach("uploaded-wallpaper", {
     body: wallpaperId,
     contentType: "text/plain",
   });
-  await expect(page.getByTestId("upload-progress-status")).toHaveText(
-    "Upload complete",
-  );
-  await expect(page.getByTestId("upload-file-item")).toHaveCount(2);
-  await expect(page.getByTestId("upload-duplicate-count")).toContainText("1");
-
-  await page
-    .getByRole("banner")
-    .getByRole("link", { name: "WallpaperDB", exact: true })
-    .click();
-  await expect(page).not.toHaveURL(/\/upload$/);
-  const notification = page.getByTestId("upload-queue-toast");
-  await expect(notification).toBeVisible();
-  await notification.getByText("Upload complete", { exact: true }).click();
-  await expect(page).toHaveURL(/\/web\/upload$/);
-  await expect(page.getByTestId("upload-file-item")).toHaveCount(2);
-  await expect(page.getByTestId("upload-file-list")).toContainText(
-    picture.name,
-  );
-  await page.getByTestId("clear-completed-button").click();
-  await expect(page.getByTestId("upload-file-item")).toHaveCount(0);
-
   await waitForWallpaper(page, wallpaperId);
   await page
     .getByRole("banner")

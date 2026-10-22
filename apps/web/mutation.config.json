@@ -1,0 +1,11 @@
+{
+  "suites": {
+    "unit": {
+      "externalInputs": ["apps/web-e2e/fixtures/profile-small.png"],
+      "vitest": {
+        "configFile": "vitest.mutation.config.ts",
+        "related": false
+      }
+    }
+  }
+}

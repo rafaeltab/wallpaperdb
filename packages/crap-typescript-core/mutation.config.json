@@ -1,0 +1,10 @@
+{
+  "suites": {
+    "unit": {
+      "vitest": {
+        "configFile": "vitest.mutation.config.ts",
+        "related": false
+      }
+    }
+  }
+}

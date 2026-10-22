@@ -125,19 +125,17 @@ export function sourceConfirmationsLayer(options: Options) {
                 Effect.gen(function* () {
                   const id = createHash('sha256').update(confirmation.id).digest('hex');
                   yield* broker('notify-quarantine', () =>
-                    connection
-                      .jetstream()
-                      .publish(
-                        'asset.operator.notifications',
-                        JSON.stringify({
-                          id,
-                          kind: 'source-confirmation-quarantine',
-                          subject: `asset.results.${confirmation.applicationId}`,
-                          reason: 'exhausted',
-                          context: confirmation.context,
-                        }),
-                        { msgID: `source-notification:${id}`, timeout: 5000 }
-                      )
+                    connection.jetstream().publish(
+                      'asset.operator.notifications',
+                      JSON.stringify({
+                        id,
+                        kind: 'source-confirmation-quarantine',
+                        subject: `asset.results.${confirmation.applicationId}`,
+                        reason: 'exhausted',
+                        context: confirmation.context,
+                      }),
+                      { msgID: `source-notification:${id}`, timeout: 5000 }
+                    )
                   );
                   yield* outbox.alerted(confirmation.id);
                   return 'notified';

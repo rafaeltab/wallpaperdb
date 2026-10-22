@@ -94,7 +94,8 @@ export async function provisionAssetBroker(
       max_age: 0,
       max_msgs: authority.broker.streams[name].maxMessages,
       max_bytes: authority.broker.streams[name].maxBytes,
-      max_msg_size: name === 'ASSET_QUARANTINE' ? 65536 : 16384,
+      // JetStream counts protocol headers as well as the bounded command body.
+      max_msg_size: name === 'ASSET_QUARANTINE' ? 65536 : name === commands ? 16384 + 1024 : 16384,
       duplicate_window: 120_000_000_000,
     };
     const existing = await manager.streams.info(name).catch((error: unknown) => {

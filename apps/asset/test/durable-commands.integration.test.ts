@@ -16,8 +16,15 @@ import {
   provisionAssetBroker,
   protectedCommandsLayer,
   ProtectedCommandHealth,
+  encodeAssetResult,
+  recoverQuarantine,
 } from '../src/adapters/commands/index.js';
-import { Lifecycle, lifecycleLayer } from '../src/capabilities/lifecycle/index.js';
+import {
+  Lifecycle,
+  LifecycleStore,
+  ResultOutbox,
+  lifecycleLayer,
+} from '../src/capabilities/lifecycle/index.js';
 import { authorityFixture } from './fixtures/authority.js';
 import { runOperator } from '../scripts/operator.js';
 
@@ -206,4 +213,136 @@ it('creates durably over protected NATS, returns its assigned empty Asset, and r
     assetId: null,
   });
   conflict?.ack();
+});
+
+it('reclaims an ambiguous real broker publication after process restart with the same occurrence and bytes', async () => {
+  await runtime.dispose();
+  const persistence = () =>
+    ManagedRuntime.make(
+      lifecyclePostgresLayer({
+        databaseUrl: postgres.getConnectionUri(),
+        revision: authority.identity,
+        ...authority.delivery,
+        leaseMs: 1000,
+      })
+    );
+  let storeRuntime = persistence();
+  try {
+    await storeRuntime.runPromise(
+      LifecycleStore.use((store) =>
+        store.accept({
+          revision: authority.identity,
+          applicationId: 'user',
+          canonical: '["create","ambiguous"]',
+          correlation: { commandId: 'ambiguous-publication', applicationReference: '' },
+          context: {
+            occurrence: { source: 'https://example.test/application', id: 'ambiguous-1' },
+          },
+          decision: {
+            kind: 'create',
+            assetType: 'picture',
+            owner: { namespace: 'clerk-test', subject: 'ambiguous-owner' },
+          },
+        })
+      )
+    );
+    const first = (await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1))))[0];
+    if (!first) throw new Error('Missing committed publication');
+    const encoded = encodeAssetResult(first);
+    const initial = await operator
+      .jetstream()
+      .publish(encoded.subject, JSON.stringify(encoded.event), { msgID: first.id });
+    expect(initial.duplicate).toBe(false);
+    // The broker committed, but the process stopped before recording local completion.
+    await storeRuntime.dispose();
+    storeRuntime = persistence();
+    let reclaimed: typeof first | undefined;
+    await expect
+      .poll(
+        async () => {
+          reclaimed = (
+            await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))
+          )[0];
+          return reclaimed?.id;
+        },
+        { timeout: 3000 }
+      )
+      .toBe(first.id);
+    if (!reclaimed) throw new Error('Missing reclaimed publication');
+    expect(encodeAssetResult(reclaimed)).toEqual(encoded);
+    const retry = await operator
+      .jetstream()
+      .publish(encoded.subject, JSON.stringify(encoded.event), { msgID: reclaimed.id });
+    expect(retry.duplicate).toBe(true);
+    expect(retry.seq).toBe(initial.seq);
+    await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.published(reclaimed!)));
+    expect(await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toEqual(
+      []
+    );
+  } finally {
+    await storeRuntime.dispose();
+  }
+  runtime = start();
+  await runtime.runPromise(ProtectedCommandHealth);
+});
+
+it('durably quarantines the largest accepted raw envelope after finite dependency failures and recovers deliberately', async () => {
+  const event = JSON.stringify({
+    specversion: '1.0',
+    id: 'bounded-quarantine',
+    source: 'https://example.test/application',
+    type: 'asset.command.create',
+    time: '2026-10-22T00:00:00.000Z',
+    datacontenttype: 'application/json',
+    data: {
+      commandId: 'bounded-quarantine',
+      applicationReference: '',
+      assetType: 'picture',
+      ownerSubject: 'bounded-owner',
+    },
+  });
+  const bytes = Buffer.from(event + ' '.repeat(16384 - Buffer.byteLength(event)));
+  const manager = await operator.jetstreamManager();
+  await Effect.runPromise(activateLifecycle(postgres.getConnectionUri(), 'temporarily-inactive'));
+  try {
+    await application.jetstream().publish('asset.commands.user.create', bytes);
+    await expect
+      .poll(async () => (await manager.streams.info('ASSET_QUARANTINE')).state.messages, {
+        timeout: 5000,
+      })
+      .toBe(1);
+    const stored = await manager.streams.getMessage('ASSET_QUARANTINE', { seq: 1 });
+    const record = JSON.parse(stored.string());
+    expect(record.data).toMatchObject({ reason: 'exhausted', attempts: 3 });
+    expect(Buffer.from(record.data.encoded, 'base64')).toEqual(bytes);
+    expect(stored.data.byteLength).toBeGreaterThan(16384);
+    expect((await manager.streams.info('ASSET_OPERATIONS')).state.messages).toBe(1);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS count FROM asset_commands WHERE command_id='bounded-quarantine'"
+        )
+      ).rows[0].count
+    ).toBe(0);
+  } finally {
+    await Effect.runPromise(activateLifecycle(postgres.getConnectionUri(), authority.identity));
+  }
+  await recoverQuarantine(operator, authority, 'user', 1);
+  const recoveredSequence = (await manager.streams.info('ASSET_COMMANDS')).state.last_seq;
+  expect(
+    Buffer.from(
+      (await manager.streams.getMessage('ASSET_COMMANDS', { seq: recoveredSequence })).data
+    )
+  ).toEqual(bytes);
+  await expect
+    .poll(
+      async () =>
+        (
+          await pool.query(
+            "SELECT count(*)::int AS count FROM asset_commands WHERE command_id='bounded-quarantine'"
+          )
+        ).rows[0].count,
+      { timeout: 3000 }
+    )
+    .toBe(1);
 });

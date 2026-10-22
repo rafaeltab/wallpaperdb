@@ -150,3 +150,24 @@ it('initializes only once and fences stale acceptance after explicit configurati
     await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-1'));
   }
 });
+
+it('rolls back Asset and command acceptance when the outbox write fails, then safely retries', async () => {
+  await pool.query(
+    'ALTER TABLE asset_result_outbox ADD CONSTRAINT proof_outbox_failure CHECK (false) NOT VALID'
+  );
+  try {
+    await expect(
+      runtime.runPromise(LifecycleStore.use((store) => store.accept(input)))
+    ).rejects.toThrow();
+    for (const table of ['owned_assets', 'asset_commands', 'asset_result_outbox'])
+      expect((await pool.query(`SELECT count(*)::int AS count FROM ${table}`)).rows[0].count).toBe(
+        0
+      );
+  } finally {
+    await pool.query('ALTER TABLE asset_result_outbox DROP CONSTRAINT proof_outbox_failure');
+  }
+  expect(
+    await runtime.runPromise(LifecycleStore.use((store) => store.accept(input)))
+  ).toMatchObject({ outcome: 'created' });
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toHaveLength(1);
+});

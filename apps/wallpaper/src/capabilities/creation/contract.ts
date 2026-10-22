@@ -3,6 +3,14 @@ export interface Creator {
   readonly namespace: string;
   readonly subject: string;
 }
+export class CreatorAuthentication extends Context.Service<
+  CreatorAuthentication,
+  {
+    readonly verify: (
+      authorization: string | undefined
+    ) => Effect.Effect<Creator | null, WorkflowFailure>;
+  }
+>()('wallpaper/creation/Authentication') {}
 export interface SourceIntent {
   readonly candidateId: string;
   readonly intentId: string;
@@ -86,4 +94,30 @@ export interface WorkflowStorePort {
 }
 export class WorkflowStore extends Context.Service<WorkflowStore, WorkflowStorePort>()(
   'wallpaper/creation/Store'
+) {}
+
+export interface WorkflowPublication {
+  readonly id: string;
+  readonly wallpaperId: string;
+  readonly destination: string;
+  readonly event: Readonly<Record<string, unknown>>;
+  readonly leaseId: string;
+  readonly attempts: number;
+}
+/** Leased claims survive restart. Publication is complete only after broker PubAck.
+ * Exhausted attempts remain quarantined with their original identity, never reset
+ * by an HTTP retry. Recovery is available only to trusted operator composition. */
+export interface WorkflowDeliveryPort {
+  readonly claim: () => Effect.Effect<readonly WorkflowPublication[], WorkflowFailure>;
+  readonly complete: (publication: WorkflowPublication) => Effect.Effect<void, WorkflowFailure>;
+  readonly failed: (publication: WorkflowPublication) => Effect.Effect<void, WorkflowFailure>;
+  readonly quarantine: (
+    id: string,
+    payload: string,
+    reason: string
+  ) => Effect.Effect<void, WorkflowFailure>;
+  readonly recover: (id: string) => Effect.Effect<boolean, WorkflowFailure>;
+}
+export class WorkflowDelivery extends Context.Service<WorkflowDelivery, WorkflowDeliveryPort>()(
+  'wallpaper/creation/Delivery'
 ) {}

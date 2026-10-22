@@ -17,3 +17,5 @@ Refresh issue evidence after rewrites. Reuse validation only for an identical tr
 ## Combined validation
 
 When current `main` is not an ancestor of the top commit, validate their combined tree in a disposable worktree using a temporary integration commit. Record both input commits and the tested tree. Preserve the published stack; integration conflicts block readiness until resolved, validated, and reviewed under the history policy.
+
+Initialize that checkout with [`make install`](../../../../../CONTRIBUTING.md#set-up-a-checkout) before validation and follow [worktree teardown](../../../../../CONTRIBUTING.md#stop-or-remove-a-worktree) on every exit.

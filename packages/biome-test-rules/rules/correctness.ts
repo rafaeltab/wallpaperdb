@@ -505,6 +505,23 @@ function callbackResultHandled(
 	allowVoid: boolean,
 ): boolean {
 	const parent = node.parent;
+	if (
+		parent?.kind === "JS_UNARY_EXPRESSION" &&
+		["typeof", "void"].includes(parent.operatorToken ?? "")
+	)
+		return true;
+	if (
+		parent?.kind === "JS_STATIC_MEMBER_EXPRESSION" &&
+		parent.object?.text === node.text
+	) {
+		const invocation = parent.parent;
+		if (
+			["call", "apply"].includes(parent.member?.text ?? "") &&
+			invocation?.kind === "JS_CALL_EXPRESSION"
+		)
+			return handled(invocation, model, seen, allowVoid);
+		return true;
+	}
 	if (parent?.kind === "JS_PARENTHESIZED_EXPRESSION")
 		return callbackResultHandled(parent, model, seen, allowVoid);
 	if (
@@ -522,11 +539,11 @@ function callbackResultHandled(
 		const key = `callback:${binding.syntax().text}:${binding.scope().syntax().text}`;
 		if (seen.has(key)) return false;
 		seen.add(key);
-		return binding.allReads().some((read) => {
+		return binding.allReads().every((read) => {
 			const expression = read.syntax().parent;
 			return (
-				expression?.kind === "JS_IDENTIFIER_EXPRESSION" &&
-				callbackResultHandled(expression, model, seen, allowVoid)
+				expression?.kind !== "JS_IDENTIFIER_EXPRESSION" ||
+				callbackResultHandled(expression, model, new Set(seen), allowVoid)
 			);
 		});
 	}

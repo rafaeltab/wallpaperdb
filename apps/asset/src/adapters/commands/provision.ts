@@ -24,6 +24,7 @@ export function renderBrokerConfiguration(authority: Authority): string {
           (stream) => `$JS.API.STREAM.INFO.${stream}`
         ),
         ...consumerOperations(commands, `commands_${application.id}`),
+        ...consumerOperations('ASSET_OPERATIONS', 'operator_notifications'),
         `$JS.API.CONSUMER.INFO.${results}.${application.resultConsumer}`,
         application.resultSubject,
         'asset.quarantine',

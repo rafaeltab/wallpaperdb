@@ -1,5 +1,10 @@
 export const authorityFixture = () => ({
   revision: 'test-1',
+  operatorNotification: {
+    url: 'http://asset-operator-inbox:3012/events',
+    token: 'operator-inbox-token',
+    revision: '1',
+  },
   broker: {
     maxAckPending: 32,
     streams: {

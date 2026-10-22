@@ -272,6 +272,8 @@ export function sourcesLayer(configuration: {
               return { state, result: reject('candidate-not-ready') };
             const policy = configuration.types[state.asset.assetType];
             if (!policy) return { state, result: reject('unsupported-type') };
+            if (!policy.operations.includes(current.operation))
+              return { state, result: reject('unsupported-operation') };
             const reason =
               Date.parse(current.expiresAt) <= now
                 ? 'candidate-expired'

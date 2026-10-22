@@ -48,7 +48,7 @@ export async function runStage({
 	const executionBaseline = restoreBaseline(context, { forExecution: true });
 	mkdirSync(output, { recursive: true });
 	const run = mkdtempSync(join(output, "run-"));
-	const sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
+	let sandbox;
 	const incrementalFile = join(run, "incremental.json");
 	if (executionBaseline)
 		writeFileSync(incrementalFile, JSON.stringify(executionBaseline.report));
@@ -81,7 +81,6 @@ export async function runStage({
 		concurrency: 1,
 		incremental: true,
 		incrementalFile,
-		tempDirName: sandbox,
 		ignorePatterns: ["/reports", "/coverage", "/dist"],
 		reporters: ["checkpoint-progress", "progress-append-only", "html", "json"],
 		htmlReporter: { fileName: join(run, "mutation.html") },
@@ -90,7 +89,6 @@ export async function runStage({
 		timeoutMS: config.timeoutMS ?? 5000,
 		timeoutFactor: 1.5,
 	};
-	writeFileSync(join(run, "stryker.json"), JSON.stringify(options));
 	const summary = {
 		workspace,
 		suite,
@@ -106,6 +104,9 @@ export async function runStage({
 	let fixture;
 	let workerStarted = false;
 	try {
+		sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
+		options.tempDirName = sandbox;
+		writeFileSync(join(run, "stryker.json"), JSON.stringify(options));
 		if (config.fixture === "redis-owned-reuse")
 			fixture = await redisFixture(
 				cwd,
@@ -261,7 +262,7 @@ export async function runStage({
 				...fixture.timings,
 			};
 		}
-		rmSync(sandbox, { recursive: true, force: true });
+		if (sandbox) rmSync(sandbox, { recursive: true, force: true });
 		writeFileSync(join(run, "summary.json"), JSON.stringify(summary, null, 2));
 		for (const name of [
 			"summary.json",

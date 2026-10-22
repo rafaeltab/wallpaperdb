@@ -210,9 +210,10 @@ export const validExpect = defineRule({
 	},
 });
 
-function hasRetry(
+function hasOption(
 	node: AnyJsAstNode | undefined,
 	model: SemanticModel,
+	option = "retry",
 	seen = new Set<string>(),
 ): boolean {
 	if (!node) return false;
@@ -221,7 +222,7 @@ function hasRetry(
 		case "TS_AS_EXPRESSION":
 		case "TS_SATISFIES_EXPRESSION":
 		case "TS_NON_NULL_ASSERTION_EXPRESSION":
-			return hasRetry(node.expression, model, seen);
+			return hasOption(node.expression, model, option, seen);
 		case "JS_IDENTIFIER_EXPRESSION": {
 			if (!node.name) return false;
 			const binding = model.binding(node.name);
@@ -232,13 +233,13 @@ function hasRetry(
 			const parent = binding.syntax().parent;
 			return (
 				parent?.kind === "JS_VARIABLE_DECLARATOR" &&
-				hasRetry(parent.initializer?.expression, model, seen)
+				hasOption(parent.initializer?.expression, model, option, seen)
 			);
 		}
 		case "JS_OBJECT_EXPRESSION":
 			return node.members.some((member) => {
 				if (member.kind === "JS_SPREAD")
-					return hasRetry(member.argument, model, seen);
+					return hasOption(member.argument, model, option, seen);
 				if (!("name" in member)) return false;
 				const name = member.name;
 				return (
@@ -248,7 +249,14 @@ function hasRetry(
 								? name.expression.text
 								: undefined
 							: name?.text,
-					) === "retry"
+					) === option &&
+					(option !== "todo" ||
+						!(
+							member.kind === "JS_PROPERTY_OBJECT_MEMBER" &&
+							["false", "null", "undefined", "0", "''", '""'].includes(
+								member.value?.text ?? "",
+							)
+						))
 				);
 			});
 		default:
@@ -267,7 +275,7 @@ export const noTestRetries = defineRule({
 		)
 			return;
 		for (const argument of node.arguments?.args.slice(1) ?? []) {
-			if (hasRetry(argument, context.model))
+			if (hasOption(argument, context.model))
 				registerDiagnostic(
 					argument,
 					"error",
@@ -281,11 +289,15 @@ export const noTodoTests = defineRule({
 	query: semantic("JS_CALL_EXPRESSION"),
 	run(node, context) {
 		const api = resolveApi(node.callee, context.model);
+		const args = node.arguments?.args ?? [];
 		if (
 			api &&
 			["it", "test", "describe", "suite"].includes(api.name) &&
 			(api.members.includes("todo") ||
-				((node.arguments?.args.length ?? 0) < 2 && api.members.length === 0))
+				(api.source === "node:test" && api.members.length === 0
+					? !potentialCallback(args.at(-1), context.model) ||
+						args.some((arg) => hasOption(arg, context.model, "todo"))
+					: args.length < 2 && api.members.length === 0))
 		) {
 			registerDiagnostic(
 				node,
@@ -323,7 +335,7 @@ export const noAliasedTestModifiers = defineRule({
 	},
 });
 
-function rejectionHandler(
+function potentialCallback(
 	node: AnyJsAstNode | undefined,
 	model: SemanticModel,
 	seen = new Set<string>(),
@@ -338,7 +350,7 @@ function rejectionHandler(
 		].includes(node.kind) &&
 		"expression" in node
 	)
-		return rejectionHandler(node.expression, model, seen);
+		return potentialCallback(node.expression, model, seen);
 	if (node.kind === "JS_IDENTIFIER_EXPRESSION" && node.name) {
 		const binding = model.binding(node.name);
 		if (!binding) return node.text !== "undefined";
@@ -350,7 +362,7 @@ function rejectionHandler(
 			declaration.parent?.kind === "JS_VARIABLE_DECLARATOR" &&
 			binding.allWrites().length === 0
 		)
-			return rejectionHandler(
+			return potentialCallback(
 				declaration.parent.initializer?.expression,
 				model,
 				seen,
@@ -418,9 +430,12 @@ function handled(
 			const call = parent.parent;
 			if (call?.kind !== "JS_CALL_EXPRESSION") return false;
 			const args = call.arguments?.args;
-			if (parent.member?.text === "catch" && rejectionHandler(args?.[0], model))
+			if (
+				parent.member?.text === "catch" &&
+				potentialCallback(args?.[0], model)
+			)
 				return true;
-			if (parent.member?.text === "then" && rejectionHandler(args?.[1], model))
+			if (parent.member?.text === "then" && potentialCallback(args?.[1], model))
 				return true;
 			return handled(call, model, seen, allowVoid);
 		}

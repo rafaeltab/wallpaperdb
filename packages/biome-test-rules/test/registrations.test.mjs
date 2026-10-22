@@ -70,3 +70,27 @@ test("precise issue-linked built-in exceptions stay supported", () => {
 		[],
 	);
 });
+
+test("Node placeholders require a callback and reject native todo options", () => {
+	for (const source of [
+		"import { test } from 'node:test'; test('unfinished', {});",
+		"import { test } from 'node:test'; test('unfinished', { todo: true }, () => {});",
+		"import { test } from 'node:test'; const options = { todo: 'later' }; test('unfinished', options, () => {});",
+	])
+		assert.ok(
+			lint(source).some((d) => d.message.includes("unfinished")),
+			source,
+		);
+	for (const source of [
+		"import { test } from 'node:test'; test('complete', () => {});",
+		"import { test } from 'node:test'; test(() => {});",
+		"import { test } from 'node:test'; test('complete', { todo: false }, () => {});",
+		"import { test } from 'node:test'; const callback = () => {}; test('complete', {}, callback);",
+		"import { test } from 'node:test'; import { callback } from './helper'; test('complete', callback);",
+	])
+		assert.deepEqual(
+			lint(source, { "helper.ts": "export function callback() {}" }),
+			[],
+			source,
+		);
+});

@@ -5,6 +5,10 @@ import { type ReactNode, StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { UploadQueueProvider } from '@/contexts/upload-queue-context';
 import { UploadPage } from '@/routes/upload';
+import {uploadWallpaperWithDetails,type UploadResult} from '@/lib/api/wallpaper';
+vi.mock('@/lib/api/wallpaper',()=>({uploadWallpaperWithDetails:vi.fn()}));
+
+vi.mock('@/components/upload/recent-creations',()=>({RecentCreations:()=>null}));
 
 vi.mock('@/components/upload-auth-gate', () => ({
   UploadAuthGate: ({ children }: { children: ReactNode }) => children,
@@ -25,16 +29,10 @@ const response = {
 
 function setup() {
   const requests: {
-    resolve: (response: Response) => void;
+    resolve: (response: UploadResult) => void;
     signal: AbortSignal | null | undefined;
   }[] = [];
-  vi.stubGlobal(
-    'fetch',
-    (_input: unknown, options: RequestInit) =>
-      new Promise<Response>((resolve) => {
-        requests.push({ resolve, signal: options.signal });
-      })
-  );
+  vi.mocked(uploadWallpaperWithDetails).mockImplementation((_file,_key,signal)=>new Promise<UploadResult>(resolve=>{requests.push({resolve,signal});}));
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const rendered = render(
     <StrictMode>
@@ -54,12 +52,7 @@ async function finish(
   body = response
 ) {
   await act(async () => {
-    request.resolve(
-      new Response(JSON.stringify(body), {
-        status,
-        headers: { 'content-type': 'application/json' },
-      })
-    );
+    request.resolve({success:status===200,isDuplicate:false,response:body});
   });
 }
 
@@ -100,7 +93,7 @@ describe('upload queue React connection', () => {
     await waitFor(() => expect(requests).toHaveLength(1));
     await act(async () => {
       requests[0].resolve(
-        new Response(JSON.stringify({ detail: 'Service unavailable' }), { status: 503 })
+        {success:false,isDuplicate:false,error:{type:'server',message:'Service unavailable'}}
       );
     });
     expect(await screen.findByText('Service unavailable')).toBeInTheDocument();
@@ -141,10 +134,7 @@ describe('upload queue browser clock connection', () => {
     expect(requests).toHaveLength(1);
     await act(async () => {
       requests[0].resolve(
-        new Response(JSON.stringify({ detail: 'Slow down' }), {
-          status: 429,
-          headers: { 'Retry-After': '5' },
-        })
+        {success:false,isDuplicate:false,error:{type:'rate_limit',message:'Slow down',retryAfter:5}}
       );
     });
     expect(screen.getByTestId('upload-progress-status')).toHaveTextContent('Paused');

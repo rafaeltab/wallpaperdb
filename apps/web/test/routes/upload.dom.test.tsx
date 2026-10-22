@@ -16,6 +16,8 @@ vi.mock('sonner', () => ({
   },
 }));
 
+vi.mock('@/components/upload/recent-creations',()=>({RecentCreations:()=>null}));
+
 vi.mock('@/components/upload-auth-gate', () => ({
   UploadAuthGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));

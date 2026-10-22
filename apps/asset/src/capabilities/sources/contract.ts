@@ -136,6 +136,10 @@ export class MandatoryInspection extends Context.Service<
   MandatoryInspection,
   MandatoryInspectionPort
 >()('asset/sources/MandatoryInspection') {}
+/** A driving stream owns cancellation of a blocked next() and its transport resources. */
+export interface SourceUpload extends AsyncIterable<Uint8Array> {
+  readonly cancel: () => void;
+}
 export interface SourcesPort {
   readonly policy: (
     owner: Owner,
@@ -181,7 +185,7 @@ export interface SourcesPort {
     owner: Owner,
     assetId: string,
     candidateId: string,
-    bytes: AsyncIterable<Uint8Array>
+    bytes: SourceUpload
   ) => Effect.Effect<SourceOutcome, SourceFailure>;
   readonly accept: (
     owner: Owner,

@@ -13,9 +13,12 @@ describe('trusted Asset authority file', () => {
     ).toBe(parsed.identity);
     expect(parsed.applications.wallpaper?.createSubject).toBe('asset.commands.wallpaper.create');
     expect(parsed.applications.user?.resultSubject).toBe('asset.results.user');
-    expect(parseAuthority({ ...raw, assetTypes: { picture: {}, wallpaper: {} } }).identity).toBe(
-      parsed.identity
-    );
+    expect(
+      parseAuthority({
+        ...raw,
+        assetTypes: { picture: raw.assetTypes.picture, wallpaper: raw.assetTypes.wallpaper },
+      }).identity
+    ).toBe(parsed.identity);
     expect(
       parseAuthority({
         ...raw,

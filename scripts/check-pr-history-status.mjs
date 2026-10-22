@@ -119,8 +119,13 @@ try {
 		if (listed.status !== 0)
 			throw new Error(listed.stderr || "Could not list open PRs");
 		for (const pr of JSON.parse(listed.stdout).flat()) {
-			validate(pr);
-			check(pr.number);
+			try {
+				validate(pr);
+				check(pr.number);
+			} catch (error) {
+				console.error(`PR #${pr?.number ?? "unknown"}: ${error.message}`);
+				process.exitCode = 1;
+			}
 		}
 	}
 } catch (error) {

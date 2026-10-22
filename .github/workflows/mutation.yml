@@ -74,13 +74,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: pnpm/action-setup@v4
-        timeout-minutes: 2
-      - uses: actions/setup-node@v4
-        timeout-minutes: 3
+      - name: Install locked project tools
+        uses: jdx/mise-action@v5
+        timeout-minutes: 5
         with:
-          node-version: '22.22.3'
-          cache: pnpm
+          version: '2026.10.17'
+          install_args: --locked
+          github_token: ${{ github.event_name != 'pull_request' && github.token || '' }}
+          persist_github_token: false
+      - name: Verify effective tools
+        timeout-minutes: 2
+        run: make toolchain
       - name: Install and build
         timeout-minutes: 15
         run: |
@@ -89,7 +93,7 @@ jobs:
       - name: Import explicitly selected acceptance checkpoint
         if: github.event_name != 'pull_request' && inputs.import_run != ''
         timeout-minutes: 2
-        shell: bash
+        shell: mise exec -- bash --noprofile --norc -eo pipefail {0}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -107,7 +111,7 @@ jobs:
           gh run download "$IMPORT_RUN" --repo "$GITHUB_REPOSITORY" --name mutation-checkpoint --dir /tmp/mutation-import
       - name: Run bounded advisory analysis
         timeout-minutes: 63
-        shell: bash
+        shell: mise exec -- bash --noprofile --norc -eo pipefail {0}
         env:
           BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
           EVENT_NAME: ${{ github.event_name }}

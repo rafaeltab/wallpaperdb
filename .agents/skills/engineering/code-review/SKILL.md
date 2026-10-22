@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\"."
+description: "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs required reviews in separate sub-agents and reports both axes side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\"."
 ---
 
 Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
@@ -8,7 +8,7 @@ Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 - **Standards**: does the code conform to this repo's documented coding standards?
 - **Spec**: does the code faithfully implement the originating issue / spec?
 
-Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings.
+Each axis requiring fresh review runs in a separate sub-agent. When both are needed, run them in parallel, then aggregate their findings alongside any retained evidence.
 
 Apply [task scope](../../../../docs/agents/task-scope.md) when preparing both sub-agent briefs and interpreting their findings. Include the agreed scope, relevant user decisions, and pending proposals in each brief, including repeated rounds.
 
@@ -61,7 +61,9 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.
 - **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
-### 4. Spawn both sub-agents in parallel
+### 4. Dispatch axes requiring fresh review
+
+Use the applicability decisions from step 1. Spawn one sub-agent per axis requiring fresh review, in parallel when both are needed. On repeated reviews, skip axes whose retained evidence applies. If neither needs fresh review, proceed to step 5 with the retained evidence.
 
 **Standards sub-agent prompt** should include:
 
@@ -79,7 +81,7 @@ If the spec is missing, skip the Spec sub-agent and note this in the final repor
 
 ### 5. Aggregate
 
-Present the two reports under `## Standards` and `## Spec` headings, verbatim or lightly cleaned. Do **not** merge or rerank findings, because the two axes are deliberately separate (see _Why two axes_).
+Report both axes under `## Standards` and `## Spec` headings. For a newly reviewed axis, present its report verbatim or lightly cleaned. For a skipped axis, identify the retained result, actual reviewed comparison, and applicability assessment for the current comparison; summarize its outcome without claiming a new review. Mark a missing-spec axis as skipped. Do **not** merge or rerank findings, because the two axes are deliberately separate (see _Why two axes_).
 
 End with a one-line summary: total findings per axis, and the worst issue _within each axis_ (if any). Don't pick a single winner across axes: that's the reranking the separation exists to prevent.
 

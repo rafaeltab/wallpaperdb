@@ -28,14 +28,14 @@ function decodeEscapes(text: string): string {
 	// JavaScript string/template escapes; never evaluate source text.
 	return text.replace(
 		/\\(?:u\{[\da-fA-F]+\}|u[\da-fA-F]{4}|x[\da-fA-F]{2}|\r\n|[\s\S])/g,
-		(escape) => {
-			const value = escape.slice(1);
+		(sequence) => {
+			const value = sequence.slice(1);
 			if (value.startsWith("u") || value.startsWith("x")) {
 				const digits = value.startsWith("u{")
 					? value.slice(2, -1)
 					: value.slice(1);
 				const code = Number.parseInt(digits, 16);
-				return code <= 0x10ffff ? String.fromCodePoint(code) : escape;
+				return code <= 0x10ffff ? String.fromCodePoint(code) : sequence;
 			}
 			if (["\n", "\r", "\r\n", "\u2028", "\u2029"].includes(value)) return "";
 			const controls: Record<string, string> = {

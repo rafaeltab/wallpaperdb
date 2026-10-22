@@ -46,7 +46,7 @@ The bottom PR targets `main`; every later PR targets the preceding ticket's bran
 
 Apply the ancestry, merge-commit, and validation checks in [do-work](../../wallpaperdb/do-work/SKILL.md#6-open-a-pr). The coordinator retains each layer's branch, worktree, thread ID, expected parent, reviewed/validated commits, and last verified published tip outside the repository. Keep published-tip expectations separate from remote-tracking refs; a new branch expects absence. Pass the current records to each ticket thread before publication or repair.
 
-Before every push, compare all active stack branches' actual remote heads with those expectations. Preserve and inspect external work on any mismatch before restacking, review, validation, or another push. Publish each validated branch using an explicit expected-value lease:
+Before every push, compare all active stack branches' actual remote heads with those expectations. Preserve and inspect external work on any mismatch before restacking, review, validation, or another push. Publish each validated branch using [Git's explicit expected-value lease](https://git-scm.com/docs/git-push#Documentation/git-push.txt---force-with-leaseltrefnamegtltexpectgt):
 
 ```sh
 git push --force-with-lease="refs/heads/<ticket-branch>:<recorded-remote-tip>" "<remote>" "refs/heads/<ticket-branch>:refs/heads/<ticket-branch>"
@@ -54,7 +54,7 @@ git push --force-with-lease="refs/heads/<ticket-branch>:<recorded-remote-tip>" "
 
 Use an empty expected tip for a new branch. Read back the remote head and update the published-tip record only when it matches the tested commit. On lease rejection, inspect and preserve the changed remote state before retrying. Publish changed layers bottom to top and retain successful tips after a partial failure.
 
-Create each draft PR with `gh pr create`, an explicit repository, base, head, title, and body file. Verify an existing PR's identity before using `gh pr edit` for its target or body. For initial native registration, use `gh stack link --base main "<bottom-pr-url>" ... "<top-pr-url>"` in stack order with verified URLs. This links existing PRs without pushing branches or initializing a shared local stack catalog. For additions or restacks, follow [native membership preservation](references/stack-recovery.md#preserve-native-membership), including merged members. Verify native membership and readiness after linking; PR mergeability alone is insufficient.
+Create each draft PR with [gh pr create](https://cli.github.com/manual/gh_pr_create), an explicit repository, base, head, title, and body file. Verify an existing PR's identity before using [gh pr edit](https://cli.github.com/manual/gh_pr_edit) for its target or body. For initial native registration, use `gh stack link --base main "<bottom-pr-url>" ... "<top-pr-url>"` in stack order with verified URLs. The pinned [link implementation](https://github.com/github/gh-stack/blob/v0.2.1/cmd/link.go) accepts verified PR URLs without pushing branches or initializing a shared local stack catalog. For additions or restacks, follow [native membership preservation](references/stack-recovery.md#preserve-native-membership), including merged members. Verify native membership and readiness after linking; PR mergeability alone is insufficient.
 
 ## Rebasing and landing
 

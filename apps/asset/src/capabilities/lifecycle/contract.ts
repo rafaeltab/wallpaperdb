@@ -57,6 +57,7 @@ export class LifecycleStore extends Context.Service<LifecycleStore, LifecycleSto
 ) {}
 export interface ResultPublication {
   readonly id: string;
+  readonly leaseId: string;
   readonly applicationId: string;
   readonly result: CommandResult;
   readonly occurredAt: string;
@@ -67,8 +68,8 @@ export interface ResultPublication {
  * attempt counter; exhausted work remains inspectable until operator recovery. */
 export interface ResultOutboxPort {
   readonly claim: (limit: number) => Effect.Effect<readonly ResultPublication[], LifecycleFailure>;
-  readonly published: (id: string) => Effect.Effect<void, LifecycleFailure>;
-  readonly failed: (id: string) => Effect.Effect<void, LifecycleFailure>;
+  readonly published: (publication: ResultPublication) => Effect.Effect<void, LifecycleFailure>;
+  readonly failed: (publication: ResultPublication) => Effect.Effect<void, LifecycleFailure>;
 }
 export class ResultOutbox extends Context.Service<ResultOutbox, ResultOutboxPort>()(
   'asset/lifecycle/ResultOutbox'

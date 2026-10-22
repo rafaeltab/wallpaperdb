@@ -84,7 +84,7 @@ it('creates a stable empty Asset whose inspection requires both Owner parts', as
             assetType: 'wallpaper',
           })
         ).toMatchObject({ outcome: 'rejected', reason: 'unsupported-type' });
-        expect(yield* service.command('other-app', command)).toMatchObject({
+        expect(yield* service.command('constructor', command)).toMatchObject({
           outcome: 'rejected',
           reason: 'forbidden-operation',
         });

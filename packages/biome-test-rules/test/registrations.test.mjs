@@ -112,3 +112,17 @@ test("Node placeholders require a callback and reject native todo options", () =
 			source,
 		);
 });
+
+test("Node TODO options follow a single direct assignment", () => {
+	assert.ok(
+		lint(
+			"import { test } from 'node:test'; let options; options = { todo: true }; test('case', options, () => {});",
+		).some((d) => d.message.includes("unfinished")),
+	);
+	assert.deepEqual(
+		lint(
+			"import { test } from 'node:test'; let options = { todo: true }; options = { todo: false }; test('case', options, () => {});",
+		),
+		[],
+	);
+});

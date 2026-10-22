@@ -38,3 +38,27 @@ test("an unrelated nested function parameter is not a test callback context", ()
 		1,
 	);
 });
+
+test("static template import sources retain the pinned raw module value", () => {
+	for (const loader of ["require", "await import"]) {
+		const declaration = `const { expect: check } = ${loader}(\`vitest\`);`;
+		assert.equal(
+			diagnostics(`${declaration} check(1);`, "valid-expect").length,
+			1,
+			loader,
+		);
+		assert.deepEqual(
+			diagnostics(`${declaration} check(1).toBe(1);`, "valid-expect"),
+			[],
+		);
+		for (const source of ["`application`", "`vi${name}`", "`vi\\u0074est`"])
+			assert.deepEqual(
+				diagnostics(
+					`const { expect: check } = ${loader}(${source}); check(1);`,
+					"valid-expect",
+				),
+				[],
+				source,
+			);
+	}
+});

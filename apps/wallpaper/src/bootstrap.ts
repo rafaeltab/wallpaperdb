@@ -14,6 +14,10 @@ export const wallpaperProgram = Effect.gen(function* () {
     try: () => loadConfig(),
     catch: () => new ConfigurationFailure({ message: 'Invalid wallpaper configuration' }),
   });
+  if (!config.workflow)
+    yield* Effect.fail(
+      new ConfigurationFailure({ message: 'Wallpaper workflow configuration is required' })
+    );
   const telemetry = yield* initializeOtel(config);
   const { startWallpaper } = yield* Effect.tryPromise(() => import('./server.js'));
   const server = yield* startWallpaper(config, { otelHealthy: telemetry._tag === 'Started' });

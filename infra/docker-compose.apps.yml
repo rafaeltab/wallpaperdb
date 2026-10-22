@@ -189,6 +189,9 @@ services:
     env_file:
       - path: ../apps/wallpaper/.env
         required: false
+    depends_on:
+      asset:
+        condition: service_healthy
     environment:
       RUN_DB_MIGRATE: "true"
     volumes:

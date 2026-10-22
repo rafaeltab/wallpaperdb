@@ -127,13 +127,32 @@ export async function configureDevelopment(
   const brokerPath = join(root, 'infra/nats/.generated.conf');
   await writeFile(brokerPath, renderBrokerConfiguration(authority), { mode: 0o600 });
   await chmod(brokerPath, 0o600);
-  const application=authority.applications.wallpaper;
-  const selected=application?.credentials[0];
-  if(!application||!selected)throw new Error('Wallpaper application credential is required');
-  const workflowPath=join(root,'apps/wallpaper/.workflow.json');
-  await mkdir(join(root,'apps/wallpaper'),{recursive:true});
-  await writeFile(workflowPath,JSON.stringify({ownerNamespace:application.ownerNamespace,credential:{user:selected.user,password:selected.password},identityProviders:Object.values(authority.identityProviders).filter(provider=>provider.ownerNamespace===application.ownerNamespace).map(({adapter:_adapter,tokenProfile:_profile,...provider})=>provider),...authority.delivery},null,2)+'\n',{mode:0o600});
-  await chmod(workflowPath,0o600);
+  const application = authority.applications.wallpaper;
+  const selected = application?.credentials[0];
+  if (!application || !selected) throw new Error('Wallpaper application credential is required');
+  const workflowPath = join(root, 'apps/wallpaper/.workflow.json');
+  await mkdir(join(root, 'apps/wallpaper'), { recursive: true });
+  await writeFile(
+    workflowPath,
+    JSON.stringify(
+      {
+        operatorNotification: {
+          url: authority.operatorNotification.url,
+          token: authority.operatorNotification.token,
+        },
+        ownerNamespace: application.ownerNamespace,
+        credential: { user: selected.user, password: selected.password },
+        identityProviders: Object.values(authority.identityProviders)
+          .filter((provider) => provider.ownerNamespace === application.ownerNamespace)
+          .map(({ adapter: _adapter, tokenProfile: _profile, ...provider }) => provider),
+        ...authority.delivery,
+      },
+      null,
+      2
+    ) + '\n',
+    { mode: 0o600 }
+  );
+  await chmod(workflowPath, 0o600);
   return authority.identity;
 }
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {

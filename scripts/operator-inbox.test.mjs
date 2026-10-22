@@ -6,7 +6,11 @@ import { join } from "node:path";
 import test from "node:test";
 import { createOperatorInbox } from "./operator-inbox.mjs";
 
-for (const kind of ["result-quarantine", "source-confirmation-quarantine"])
+for (const kind of [
+	"result-quarantine",
+	"source-confirmation-quarantine",
+	"wallpaper-workflow-quarantine",
+])
 	test(`${kind} receipts require credentials, survive restart and deduplicate delivery`, async () => {
 		const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));
 		let server;

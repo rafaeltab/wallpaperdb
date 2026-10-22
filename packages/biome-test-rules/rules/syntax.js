@@ -301,13 +301,18 @@ export function syntaxTree(root) {
 					node.type = "TaggedTemplateExpression";
 					node.tag = child(native.tag);
 				} else node.type = "TemplateLiteral";
-				node.quasis = native.elements
-					.filter((e) => e.kind === "JS_TEMPLATE_CHUNK_ELEMENT")
-					.map((e) => ({ value: { raw: e.text } }));
-				if (node.quasis.length === 0) node.quasis = [{ value: { raw: "" } }];
-				node.expressions = list(
-					native.elements.filter((e) => e.kind !== "JS_TEMPLATE_CHUNK_ELEMENT"),
-				);
+				// ESTree keeps one quasi on each side of every interpolation,
+				// including empty boundaries omitted from Biome's chunk elements.
+				node.quasis = [{ value: { raw: "" } }];
+				node.expressions = [];
+				for (const element of native.elements) {
+					if (element.kind === "JS_TEMPLATE_CHUNK_ELEMENT")
+						node.quasis.at(-1).value.raw += element.text;
+					else {
+						node.expressions.push(child(element.expression ?? element));
+						node.quasis.push({ value: { raw: "" } });
+					}
+				}
 				break;
 			}
 			case "TS_AS_EXPRESSION":

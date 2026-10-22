@@ -184,7 +184,7 @@ export function resolveScope(scope, identifier) {
 					? initializer.argument
 					: initializer?.kind === "JS_CALL_EXPRESSION" &&
 							initializer.callee?.kind === "JS_IDENTIFIER_EXPRESSION" &&
-							initializer.callee.text === "require"
+							identifierValue(initializer.callee.text) === "require"
 						? initializer
 						: undefined;
 			const source = imported?.arguments?.args[0];

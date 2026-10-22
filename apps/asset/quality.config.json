@@ -5,6 +5,7 @@
     "adapters/catalog",
     "adapters/events",
     "adapters/lifecycle",
-    "adapters/commands"
+    "adapters/commands",
+    "adapters/authors"
   ]
 }

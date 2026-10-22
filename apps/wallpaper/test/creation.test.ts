@@ -113,3 +113,79 @@ it('keeps Wallpaper identity separate from its confirmed Asset and publishes its
     await s.close();
   }
 });
+
+it('fences changed source intents, unrelated Assets and stale creation confirmations', async () => {
+  const s = setup();
+  try {
+    const result = await s.run((c) => c.begin(owner, 'intent-fences'));
+    if (result.kind !== 'wallpaper') throw new Error('Expected Wallpaper');
+    const w = result.wallpaper;
+    const created = {
+      wallpaperId: w.id,
+      commandId: w.commandId,
+      creationEventId: w.creationEventId,
+      outcome: 'created' as const,
+      assetId: 'asset-1',
+    };
+    expect(await s.run((c) => c.assetResult({ ...created, creationEventId: 'stale' }))).toBe(
+      'ignored'
+    );
+    expect(await s.run((c) => c.assetResult(created))).toBe('applied');
+    expect(await s.run((c) => c.assetResult({ ...created, assetId: 'unrelated' }))).toBe('ignored');
+    expect(
+      await s.run((c) =>
+        c.expectSource({ ...owner, subject: 'attacker' }, w.id, {
+          candidateId: 'candidate-1',
+          intentId: 'intent-1',
+        })
+      )
+    ).toEqual({ kind: 'unavailable' });
+    await s.run((c) =>
+      c.expectSource(owner, w.id, { candidateId: 'candidate-1', intentId: 'intent-1' })
+    );
+    await s.run((c) =>
+      c.expectSource(owner, w.id, { candidateId: 'candidate-2', intentId: 'intent-2' })
+    );
+    const accepted = {
+      assetId: 'asset-1',
+      candidateId: 'candidate-1',
+      intentId: 'intent-1',
+      sourceId: 'source-1',
+      defaultSourceId: 'source-1',
+      initialAnalysisSourceId: 'source-1',
+      occurrenceId: 'event-1',
+    };
+    expect(await s.run((c) => c.sourceAccepted(accepted))).toBe('ignored');
+    expect(
+      await s.run((c) =>
+        c.sourceAccepted({
+          ...accepted,
+          assetId: 'unrelated',
+          candidateId: 'candidate-2',
+          intentId: 'intent-2',
+        })
+      )
+    ).toBe('ignored');
+    expect(s.events).toEqual([]);
+    expect(
+      await s.run((c) =>
+        c.sourceAccepted({ ...accepted, candidateId: 'candidate-2', intentId: 'intent-2' })
+      )
+    ).toBe('applied');
+  } finally {
+    await s.close();
+  }
+});
+
+it('rejects a non-printable or unbounded creation key at the capability boundary', async () => {
+  const s = setup();
+  try {
+    expect(await s.run((c) => c.begin(owner, 'bad\nkey'))).toEqual({ kind: 'conflict' });
+    expect(await s.run((c) => c.begin(owner, 'x'.repeat(129)))).toEqual({ kind: 'conflict' });
+    expect(await s.run((c) => c.begin({ ...owner, namespace: 'other' }, 'valid'))).toEqual({
+      kind: 'forbidden',
+    });
+  } finally {
+    await s.close();
+  }
+});

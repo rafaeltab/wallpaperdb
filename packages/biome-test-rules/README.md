@@ -10,6 +10,8 @@ The shared policy uses Biome's built-in focus, skip, self-comparison, floating-p
 
 The regression tests run the actual Biome CLI with the exported configuration. Keep invalid examples in those tests so ordinary repository linting does not discover them as test sources.
 
+The [shared policy](./test-correctness.json) targets ESM and TypeScript tests, matching the inherited test inventory. Adding CommonJS test sources requires extending discovery and binding support together; `.cjs` tests and `require()` test API bindings are outside the current policy.
+
 ## Maintenance
 
 The CLI and runtime versions are pinned together because Biome's JavaScript plugin API is a developer preview. Check the [upstream plugin documentation](https://biomejs.dev/linter/plugins/) and run the regression suite when upgrading either dependency.

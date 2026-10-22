@@ -127,3 +127,13 @@ it('keeps malformed business payload identity stable across CloudEvent occurrenc
   expect(second.command).toEqual(first.command);
   expect(second.context).not.toEqual(first.context);
 });
+
+it('safely rejects excessive JSON nesting within the accepted raw-body bound', () => {
+  const head = JSON.stringify({ ...envelope, data: { ...envelope.data, nested: null } });
+  const bytes = Buffer.from(
+    head.replace('"nested":null', '"nested":' + '['.repeat(3000) + '0' + ']'.repeat(3000))
+  );
+  expect(bytes.byteLength).toBeLessThan(16384);
+  expect(() => decodeAssetCommand([route], route.subject, bytes)).not.toThrow();
+  expect(decodeAssetCommand([route], route.subject, bytes)).toEqual({ kind: 'invalid' });
+});

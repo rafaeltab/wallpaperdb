@@ -50,6 +50,17 @@ type Decoded =
       readonly command: Command;
       readonly context: CommandContext;
     };
+/** Bound traversal before recursive canonicalization, including malformed data. */
+function boundedNesting(input: unknown): boolean {
+  const pending: Array<{ value: unknown; depth: number }> = [{ value: input, depth: 0 }];
+  while (pending.length) {
+    const entry = pending.pop();
+    if (!entry || entry.value === null || typeof entry.value !== 'object') continue;
+    if (entry.depth >= 64) return false;
+    for (const value of Object.values(entry.value)) pending.push({ value, depth: entry.depth + 1 });
+  }
+  return true;
+}
 function canonicalPayload(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalPayload);
   if (value !== null && typeof value === 'object')
@@ -75,6 +86,7 @@ export function decodeAssetCommand(
   } catch {
     return { kind: 'invalid' };
   }
+  if (!boundedNesting(input)) return { kind: 'invalid' };
   const parsed = envelope.safeParse(input);
   if (!parsed.success || parsed.data.type !== `asset.command.${route.operation}`)
     return { kind: 'invalid' };

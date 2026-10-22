@@ -25,7 +25,11 @@ function isNotice(value) {
 		typeof value === "object" &&
 		/^[a-f0-9]{64}$/.test(value.id) &&
 		/^[A-Za-z0-9_-]{1,64}$/.test(value.applicationId) &&
-		["command-quarantine", "result-quarantine"].includes(value.kind) &&
+		[
+			"command-quarantine",
+			"result-quarantine",
+			"source-confirmation-quarantine",
+		].includes(value.kind) &&
 		typeof value.subject === "string" &&
 		value.subject.length <= 256 &&
 		["invalid", "exhausted"].includes(value.reason)

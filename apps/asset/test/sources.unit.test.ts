@@ -9,7 +9,7 @@ import {
   type SourceState,
   type SourceStorePort,
 } from '../src/capabilities/sources/index.js';
-import { initialSourcePolicies } from '../src/capabilities/sources/policy.js';
+import { initialSourcePolicies } from '../src/capabilities/sources/index.js';
 
 it('keeps private bytes outside membership until immutable preparation and first acceptance commit', async () => {
   let state: SourceState = {
@@ -57,7 +57,9 @@ it('keeps private bytes outside membership until immutable preparation and first
             read: (sourceId) =>
               Effect.succeed({
                 bytes: (async function* () {
-                  yield objects.get(sourceId)!;
+                  const bytes = objects.get(sourceId);
+                  if (!bytes) throw new Error('Missing Source');
+                  yield bytes;
                 })(),
                 close: () => Effect.void,
               }),

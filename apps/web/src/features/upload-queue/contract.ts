@@ -1,6 +1,12 @@
 export const MAX_FILES_PER_BATCH = 200;
 
-export type FileStatus = 'pending' | 'uploading' | 'success' | 'failed' | 'duplicate';
+export type FileStatus =
+  | 'pending'
+  | 'uploading'
+  | 'confirming'
+  | 'success'
+  | 'failed'
+  | 'duplicate';
 export type UploadErrorType = 'rate_limit' | 'validation' | 'server' | 'network';
 
 export interface UploadError {
@@ -11,18 +17,21 @@ export interface UploadError {
 
 export interface UploadResponse {
   wallpaperId: string;
-  userId: string;
+  userId?: string;
+  assetId?: string | null;
+  sourceId?: string | null;
   uploadState: string;
-  fileType: string;
-  mimeType: string;
-  fileSizeBytes: number;
-  width: number;
-  height: number;
-  aspectRatio: number;
-  uploadedAt: string;
+  fileType?: string;
+  mimeType?: string;
+  fileSizeBytes?: number;
+  width?: number;
+  height?: number;
+  aspectRatio?: number;
+  uploadedAt?: string;
 }
 
 export interface UploadResult {
+  pending?: boolean;
   success: boolean;
   isDuplicate: boolean;
   response?: UploadResponse;

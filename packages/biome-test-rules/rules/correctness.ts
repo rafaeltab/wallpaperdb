@@ -28,10 +28,14 @@ function literal(text: string | undefined): string | undefined {
 	return /^(['"]).*\1$/.test(text) ? text.slice(1, -1) : text;
 }
 
+function apiName(source: string, name: string): string {
+	return source === "node:test" && name === "default" ? "test" : name;
+}
+
 function apiMember(api: Api, member: string): Api | undefined {
 	if (api.name === "<context>")
 		return member === "expect" ? { ...api, name: "expect" } : undefined;
-	if (api.name === "*") return { ...api, name: member };
+	if (api.name === "*") return { ...api, name: apiName(api.source, member) };
 	return {
 		...api,
 		members: [...api.members, member],
@@ -253,7 +257,7 @@ function resolveApi(
 			return name
 				? {
 						source,
-						name: source === "node:test" && name === "default" ? "test" : name,
+						name: apiName(source, name),
 						members: [],
 					}
 				: undefined;

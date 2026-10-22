@@ -153,7 +153,7 @@ function taskContextApi(
 		return { source: registration.source, name: "expect", members: [] };
 	if (
 		parent?.kind === "JS_OBJECT_BINDING_PATTERN_PROPERTY" &&
-		literal(parent.member?.text) === "expect"
+		staticMemberName(parent.member) === "expect"
 	)
 		return { source: registration.source, name: "expect", members: [] };
 	return undefined;
@@ -226,9 +226,7 @@ function resolveApi(
 				const member =
 					parent.kind === "JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY"
 						? declaration.text
-						: parent.member?.kind === "JS_LITERAL_MEMBER_NAME"
-							? literal(parent.member.text)
-							: undefined;
+						: staticMemberName(parent.member);
 				if (!api || !member) return undefined;
 				return apiMember(api, member);
 			}
@@ -375,6 +373,14 @@ function staticComputedKey(node: AnyJsAstNode | undefined): string | undefined {
 	return undefined;
 }
 
+function staticMemberName(node: AnyJsAstNode | undefined): string | undefined {
+	if (node?.kind === "JS_COMPUTED_MEMBER_NAME")
+		return staticComputedKey(node.expression);
+	return node?.kind === "JS_LITERAL_MEMBER_NAME"
+		? literal(node.text)
+		: undefined;
+}
+
 function hasOption(
 	node: AnyJsAstNode | undefined,
 	model: SemanticModel,
@@ -436,9 +442,7 @@ function hasOption(
 				if (!("name" in member)) return false;
 				const name = member.name;
 				return (
-					(name?.kind === "JS_COMPUTED_MEMBER_NAME"
-						? staticComputedKey(name.expression)
-						: literal(name?.text)) === option &&
+					staticMemberName(name) === option &&
 					(option === "retry" ||
 						!definitelyFalsy(
 							member.kind === "JS_PROPERTY_OBJECT_MEMBER"
@@ -476,7 +480,10 @@ export const noTestRetries = defineRule({
 	},
 });
 
-function registrationOptions(node: AnyJsAstNode, api: Api): readonly AnyJsAstNode[] {
+function registrationOptions(
+	node: AnyJsAstNode,
+	api: Api,
+): readonly AnyJsAstNode[] {
 	const args =
 		node.kind === "JS_CALL_EXPRESSION" ? (node.arguments?.args ?? []) : [];
 	if (api.source === "node:test") return api.members.length === 0 ? args : [];

@@ -133,3 +133,24 @@ test("registration options reject focus and disable flags without treating row d
 			assert.deepEqual(lint(source), [], source);
 	}
 });
+
+test("computed destructuring preserves static API and task-local assertion identities", () => {
+	for (const source of [
+		"import { it } from 'vitest'; const { ['skip']: disabled } = it; disabled('case', () => {});",
+		"import { it } from 'vitest'; const { [`only`]: focused } = it; focused('case', () => {});",
+		"import { it } from 'vitest'; const { ['todo']: unfinished } = it; unfinished('case');",
+		"import { it } from 'vitest'; it('case', ({ ['expect']: check }) => { check(1); });",
+		"import { it } from 'vitest'; it('case', context => { const { [`expect`]: check } = context; check(1); });",
+	])
+		assert.ok(
+			lint(source).some((d) => d.severity === "error"),
+			source,
+		);
+	for (const source of [
+		"import { it } from 'vitest'; it('case', ({ [`expect`]: check }) => { check(1).toBe(1); });",
+		"import { it } from 'vitest'; const key = 'each'; const { [key]: skip } = it; skip([1]);",
+		"import { it } from 'other-library'; const { ['skip']: disabled } = it; disabled('case', () => {});",
+		"import { it } from 'vitest'; const { ['skip']: disabled } = it; function run(disabled) { disabled('case', () => {}); }",
+	])
+		assert.deepEqual(lint(source), [], source);
+});

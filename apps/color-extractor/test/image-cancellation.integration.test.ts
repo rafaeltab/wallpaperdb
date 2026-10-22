@@ -99,7 +99,9 @@ describe('Image storage request ownership', () => {
           }),
           { signal: controller.signal }
         );
-        const rejected = expect(operation).rejects.toBeDefined();
+        const rejected = (async () => {
+          await expect(operation).rejects.toBeDefined();
+        })();
         await requested;
         controller.abort();
         await rejected;

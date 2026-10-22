@@ -245,7 +245,9 @@ it.each(['worker', 'fallback'])('cancels an observed pending fitting job and rel
     }
     const crop = initialPictureCrop(source);
     const processing = source.process(crop, { ...policy, maxOutputBytes: 1 }, controller.signal);
-    const rejected = expect(processing).rejects.toMatchObject({ name: 'AbortError' });
+    const rejected = (async () => {
+      await expect(processing).rejects.toMatchObject({ name: 'AbortError' });
+    })();
     await started;
     controller.abort();
     releaseEncode();

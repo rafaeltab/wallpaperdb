@@ -235,6 +235,13 @@ export function validateReport(report) {
 					mutant.location.end.column < mutant.location.start.column)
 			)
 				throw new Error("Invalid mutant identity");
+			for (const references of [mutant.coveredBy, mutant.killedBy])
+				if (
+					references !== undefined &&
+					(!Array.isArray(references) ||
+						references.some((id) => typeof id !== "string"))
+				)
+					throw new Error("Invalid mutant test references");
 			if (mutant.status === "Survived" && mutant.testsCompleted === 0)
 				throw new Error("Surviving mutation ran zero tests");
 		}

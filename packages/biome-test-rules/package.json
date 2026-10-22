@@ -16,10 +16,6 @@
 		"@biomejs/biome": "2.6.2",
 		"@biomejs/runtime": "2.6.2",
 		"@types/node": "^26.0.1",
-		"typescript": "^5.7.2",
-		"vitest": "5.0.2",
-		"@playwright/test": "^1.55.1",
-		"@wallpaperdb/test-utils": "workspace:*",
-		"effect": "4.0.0-rc.115"
+		"typescript": "^5.7.2"
 	}
 }

@@ -126,3 +126,42 @@ test("Node TODO options follow a single direct assignment", () => {
 		[],
 	);
 });
+
+test("modified Vitest registrations require a callback without rejecting API factories", () => {
+	for (const source of [
+		"it.concurrent('unfinished');",
+		"it('unfinished', { timeout: 1000 });",
+		"it.concurrent('unfinished', { timeout: 1000 });",
+		"it.each([1])('unfinished');",
+		"const factory = it.each; const cases = factory([1]); cases('unfinished');",
+	])
+		assert.ok(
+			lint("import { it } from 'vitest'; " + source).some((d) =>
+				d.message.includes("unfinished"),
+			),
+			source,
+		);
+	for (const source of [
+		"it.concurrent('complete', () => {}, 1000);",
+		"it('complete', { timeout: 1000 }, () => {});",
+		"const rows = it.each([1]); rows('complete', () => {});",
+		"const factory = it.for; const rows = factory([1]); rows('complete', () => {});",
+		"const extended = it.extend({ value: 1 }); extended('complete', () => {});",
+		"it.each([1]); it.for([1]);",
+		"const condition = it.skipIf(false); condition('complete', () => {});",
+		"const condition = it.runIf(true); condition('complete', () => {});",
+	])
+		assert.ok(
+			!lint("import { it } from 'vitest'; " + source).some((d) =>
+				d.message.includes("unfinished"),
+			),
+			source,
+		);
+	assert.deepEqual(
+		lint(
+			"import { it } from 'vitest'; import { callback } from './helper'; it.concurrent('complete', callback, 1000);",
+			{ "helper.ts": "export function callback() {}" },
+		),
+		[],
+	);
+});

@@ -6,7 +6,12 @@ import {
 	semantic,
 } from "@biomejs/runtime/plugin";
 
-type Api = { source: string; name: string; members: string[] };
+type Api = {
+	source: string;
+	name: string;
+	members: string[];
+	pendingFactory?: boolean;
+};
 const testNames = new Set(["expect", "it", "test", "describe", "suite"]);
 const testSources = new Set([
 	"vitest",
@@ -21,6 +26,21 @@ const testSources = new Set([
 function literal(text: string | undefined): string | undefined {
 	if (!text) return undefined;
 	return /^(['"]).*\1$/.test(text) ? text.slice(1, -1) : text;
+}
+
+function apiMember(api: Api, member: string): Api | undefined {
+	if (api.name === "<context>")
+		return member === "expect" ? { ...api, name: "expect" } : undefined;
+	if (api.name === "*") return { ...api, name: member };
+	return {
+		...api,
+		members: [...api.members, member],
+		pendingFactory:
+			api.pendingFactory ||
+			(["vitest", "@effect/vitest", "global"].includes(api.source) &&
+				["it", "test", "describe", "suite"].includes(api.name) &&
+				["each", "for", "extend", "skipIf", "runIf"].includes(member)),
+	};
 }
 
 function statementPosition(node: AnyJsAstNode) {
@@ -142,10 +162,14 @@ function resolveApi(
 ): Api | undefined {
 	if (!node) return undefined;
 	switch (node.kind) {
-		case "JS_CALL_EXPRESSION":
-			return resolveApi(node.callee, model, seen);
-		case "JS_TEMPLATE_EXPRESSION":
-			return resolveApi(node.tag, model, seen);
+		case "JS_CALL_EXPRESSION": {
+			const api = resolveApi(node.callee, model, seen);
+			return api ? { ...api, pendingFactory: false } : undefined;
+		}
+		case "JS_TEMPLATE_EXPRESSION": {
+			const api = resolveApi(node.tag, model, seen);
+			return api ? { ...api, pendingFactory: false } : undefined;
+		}
 		case "JS_PARENTHESIZED_EXPRESSION":
 		case "TS_AS_EXPRESSION":
 		case "TS_SATISFIES_EXPRESSION":
@@ -161,11 +185,7 @@ function resolveApi(
 						: undefined
 					: literal(node.member?.text);
 			if (!api || !member) return undefined;
-			if (api.name === "<context>")
-				return member === "expect" ? { ...api, name: "expect" } : undefined;
-			return api.name === "*"
-				? { ...api, name: member }
-				: { ...api, members: [...api.members, member] };
+			return apiMember(api, member);
 		}
 		case "JS_IDENTIFIER_EXPRESSION": {
 			if (!node.name) return undefined;
@@ -208,11 +228,7 @@ function resolveApi(
 							? literal(parent.member.text)
 							: undefined;
 				if (!api || !member) return undefined;
-				if (api.name === "<context>")
-					return member === "expect" ? { ...api, name: "expect" } : undefined;
-				return api.name === "*"
-					? { ...api, name: member }
-					: { ...api, members: [...api.members, member] };
+				return apiMember(api, member);
 			}
 			const clause = declaration
 				.ancestors()
@@ -425,7 +441,12 @@ export const noTodoTests = defineRule({
 				(api.source === "node:test" && api.members.length === 0
 					? !potentialCallback(args.at(-1), context.model) ||
 						args.some((arg) => hasOption(arg, context.model, "todo"))
-					: args.length < 2 && api.members.length === 0))
+					: ["vitest", "@effect/vitest", "global"].includes(api.source)
+						? !api.pendingFactory &&
+							!args
+								.slice(1, 3)
+								.some((arg) => potentialCallback(arg, context.model))
+						: args.length < 2 && api.members.length === 0))
 		) {
 			registerDiagnostic(
 				node,

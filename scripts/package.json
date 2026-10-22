@@ -12,6 +12,7 @@
 		"lint": "biome lint .",
 		"test:docker-queue": "cd .. && node --test scripts/docker-validation.test.mjs",
 		"test:pr-history": "cd .. && node --test scripts/pr-history.test.mjs",
+		"test:pr-history-status": "cd .. && node --test scripts/pr-history-status.test.mjs",
 		"check:pr-history": "node check-pr-history.mjs",
 		"test:unit": "cd .. && node --test scripts/*.test.mjs scripts/lib/*.test.mjs && scripts/node_modules/.bin/vitest run scripts/ci-runner.test.ts scripts/lib/env-pipeline.test.ts --maxWorkers=1 --no-file-parallelism",
 		"check-types": "tsc --project tsconfig.json"

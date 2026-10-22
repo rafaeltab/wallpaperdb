@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { AssetCommandResultSchema } from '@wallpaperdb/events/schemas';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
-import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, lte, isNull, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
 import { Pool } from 'pg';
@@ -225,6 +225,41 @@ export function lifecyclePostgresLayer(options: PostgresOptions) {
           eq(assetResultOutbox.status, 'publishing')
         );
       const outbox: ResultOutboxPort = {
+        pendingAlerts: (limit) =>
+          run('pending-result-alerts', (db) =>
+            db
+              .select({ id: assetResultOutbox.id, applicationId: assetResultOutbox.applicationId })
+              .from(assetResultOutbox)
+              .where(
+                and(
+                  eq(assetResultOutbox.status, 'quarantined'),
+                  isNull(assetResultOutbox.notifiedAt)
+                )
+              )
+              .limit(Math.max(1, Math.min(limit, 100)))
+          ),
+        alerted: (id) =>
+          run('confirm-result-alert', async (db) => {
+            await db
+              .update(assetResultOutbox)
+              .set({ notifiedAt: new Date() })
+              .where(eq(assetResultOutbox.id, id));
+          }),
+        recover: (id) =>
+          run('recover-result', async (db) => {
+            const rows = await db
+              .update(assetResultOutbox)
+              .set({
+                status: 'pending',
+                attempts: 0,
+                availableAt: new Date(),
+                leaseId: null,
+                notifiedAt: null,
+              })
+              .where(and(eq(assetResultOutbox.id, id), eq(assetResultOutbox.status, 'quarantined')))
+              .returning({ id: assetResultOutbox.id });
+            return rows.length === 1;
+          }),
         claim: (limit) =>
           run('claim-results', (db) =>
             db.transaction(async (tx) => {

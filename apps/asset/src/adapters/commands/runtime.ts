@@ -178,6 +178,26 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
     );
     healthy = healthy && succeeded;
   }
+  const alerts = yield* outbox.pendingAlerts(1);
+  for (const alert of alerts) {
+    const connection = connections.get(alert.applicationId);
+    if (!connection) return false;
+    yield* broker('notify-result-quarantine', () =>
+      connection
+        .jetstream()
+        .publish(
+          'asset.operator.notifications',
+          JSON.stringify({
+            id: alert.id,
+            kind: 'result-quarantine',
+            subject: `asset.results.${alert.applicationId}`,
+            reason: 'exhausted',
+          }),
+          { msgID: `result-notification:${alert.id}`, timeout: 5000 }
+        )
+    );
+    yield* outbox.alerted(alert.id);
+  }
   return healthy;
 });
 export function protectedCommandsLayer(

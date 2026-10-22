@@ -73,6 +73,7 @@ appendFileSync(new URL('./environment.jsonl', import.meta.url), JSON.stringify({
 		"make",
 		[
 			"--no-print-directory",
+			"SHELL=/bin/sh",
 			"test-e2e",
 			"GITHUB_ACTIONS=true",
 			`TURBO=${join(repository, "node_modules/.bin/turbo")}`,
@@ -261,6 +262,7 @@ if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && p
 		delete env[key];
 	const args = [
 		"--no-print-directory",
+		"SHELL=/bin/sh",
 		"test-e2e",
 		`TURBO=${join(root, "turbo")}`,
 	];

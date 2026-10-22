@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 function command(program, args) {
@@ -23,6 +23,26 @@ try {
 	const manifest = JSON.parse(readFileSync("package.json", "utf8"));
 	if (manifest.packageManager !== `pnpm@${pnpm}`) {
 		throw new Error(`packageManager must equal pnpm@${pnpm} from mise.toml.`);
+	}
+	const node = command("mise", [
+		"config",
+		"get",
+		"--file",
+		"mise.toml",
+		"tools.node",
+	]);
+	for (const app of existsSync("apps") ? readdirSync("apps") : []) {
+		for (const filename of ["Dockerfile", "Dockerfile.dev"]) {
+			const path = `apps/${app}/${filename}`;
+			if (!existsSync(path)) continue;
+			const source = readFileSync(path, "utf8");
+			for (const match of source.matchAll(/^FROM node:([^\s]+)/gm)) {
+				if (match[1] !== `${node}-alpine`)
+					throw new Error(
+						`${path} must use Node ${node}-alpine from mise.toml.`,
+					);
+			}
+		}
 	}
 	if (!process.argv.includes("--pins")) {
 		const tools = JSON.parse(command("mise", ["ls", "--current", "--json"]));

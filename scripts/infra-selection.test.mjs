@@ -41,11 +41,15 @@ process.exit(result.status ?? 1);
 		MAKELEVEL: "0",
 	};
 	delete env.INFRA_PROFILES;
-	const result = spawnSync("make", ["--no-print-directory", target], {
-		encoding: "utf8",
-		env,
-		timeout: 15_000,
-	});
+	const result = spawnSync(
+		"make",
+		["--no-print-directory", target, "SHELL=/bin/sh"],
+		{
+			encoding: "utf8",
+			env,
+			timeout: 15_000,
+		},
+	);
 	assert.equal(result.status, 0, result.stdout + result.stderr);
 	return readFileSync(selected, "utf8").trim().split("\n").sort();
 }

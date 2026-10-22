@@ -31,17 +31,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Install locked project tools
+        uses: jdx/mise-action@v5
         with:
-          node-version: ">=22.12.0 <23"
-          cache: "pnpm"
+          version: '2026.10.17'
+          install_args: --locked
+
+      - name: Verify effective tools
+        run: make toolchain
 
       - name: Install dependencies
-        run: pnpm install
+        run: make install
 
       - name: Set up Vercel Remote Cache
         if: env.USE_VERCEL_CACHE == 'true'
@@ -57,7 +57,7 @@ jobs:
         run: make build
 
       - name: Install Playwright browsers
-        run: pnpm --filter @wallpaperdb/web-e2e exec playwright install --with-deps chromium
+        run: make run PACKAGE=web-e2e SCRIPT=test:browser:install
 
       - name: Set up Docker image store
         uses: docker/setup-docker-action@v5
@@ -75,7 +75,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
         with:
           driver: docker
-          version: latest
+          version: v0.37.1
 
       - name: Prepare Compose image build plan
         run: make apps-build ARGS=--print > "$RUNNER_TEMP/app-images.json"
@@ -159,17 +159,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Install locked project tools
+        uses: jdx/mise-action@v5
         with:
-          node-version: ">=22.12.0 <23"
-          cache: "pnpm"
+          version: '2026.10.17'
+          install_args: --locked
+
+      - name: Verify effective tools
+        run: make toolchain
 
       - name: Install dependencies
-        run: pnpm install
+        run: make install
 
       - name: Set up Vercel Remote Cache
         if: env.USE_VERCEL_CACHE == 'true'

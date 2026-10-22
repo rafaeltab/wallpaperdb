@@ -23,61 +23,6 @@
 				"fixture": "{\n      code: 'test(\"valid-expect\", async () => { expect(Promise.resolve(2)).toResolve(); });',\n      options: [{ asyncMatchers: ['toResolveWith'] }],\n    }"
 			},
 			{
-				"line": 223,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf().returns.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 231,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf().branded.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 239,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf().asserts.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 247,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf().constructorParameters.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 255,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf().parameters.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 263,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf().thisParameter.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 271,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf().guards.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 279,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf().instance.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 287,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf().items.toMatchTypeOf();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 295,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf(Promise.resolve(1)).resolves.toEqualTypeOf<number>();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
-				"line": 303,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: `expectTypeOf(Promise.resolve({ a: 1 })).resolves.not.toEqualTypeOf<string>();`,\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n    }"
-			},
-			{
 				"line": 336,
 				"reason": "upstream default maxArgs 1 expectation; configured maxArgs is 2",
 				"fixture": "{\n      code: 'expect.soft(1, 2).toBe(2);',\n      errors: [{ messageId: 'tooManyArgs' }],\n    }"
@@ -86,11 +31,6 @@
 				"line": 383,
 				"reason": "different rule options",
 				"fixture": "{\n      code: 'expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");',\n      options: [{ maxArgs: 2, minArgs: 2 }],\n      errors: [\n        {\n          endColumn: 40,\n          column: 29,\n          messageId: 'tooManyArgs',\n          data: {\n            s: 's',\n            amount: 2,\n          },\n        },\n      ],\n    }"
-			},
-			{
-				"line": 398,
-				"reason": "different rule options",
-				"fixture": "{\n      code: 'expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");',\n      options: [{ maxArgs: 2, minArgs: 1 }],\n      errors: [\n        {\n          endColumn: 40,\n          column: 29,\n          messageId: 'tooManyArgs',\n          data: {\n            s: 's',\n            amount: 2,\n          },\n        },\n      ],\n    }"
 			},
 			{
 				"line": 413,
@@ -126,11 +66,6 @@
 				"line": 486,
 				"reason": "upstream default maxArgs 1 expectation; configured maxArgs is 2",
 				"fixture": "{\n      code: `const message = \"message\";\n      expect(1, message).toBe(2);`,\n      errors: [\n        {\n          endColumn: 25,\n          column: 17,\n          messageId: 'tooManyArgs',\n        },\n      ],\n    }"
-			},
-			{
-				"line": 583,
-				"reason": "fixture-specific plugin settings",
-				"fixture": "{\n      code: 'expectTypeOf(value).to.toMatchTypeOf();',\n      settings: {\n        vitest: {\n          typecheck: true,\n        },\n      },\n      errors: [{ messageId: 'modifierUnknown' }],\n    }"
 			},
 			{
 				"line": 618,
@@ -968,6 +903,71 @@
 				"source": "test(\"valid-expect\", () => { expect(Promise.resolve(2)).toResolve(); });",
 				"valid": false,
 				"messages": ["asyncMustBeAwaited"]
+			},
+			{
+				"source": "expectTypeOf().returns.toMatchTypeOf();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf().branded.toMatchTypeOf();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf().asserts.toMatchTypeOf();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf().constructorParameters.toMatchTypeOf();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf().parameters.toMatchTypeOf();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf().thisParameter.toMatchTypeOf();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf().guards.toMatchTypeOf();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf().instance.toMatchTypeOf();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf().items.toMatchTypeOf();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf(Promise.resolve(1)).resolves.toEqualTypeOf<number>();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expectTypeOf(Promise.resolve({ a: 1 })).resolves.not.toEqualTypeOf<string>();",
+				"valid": true,
+				"messages": []
+			},
+			{
+				"source": "expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");",
+				"valid": false,
+				"messages": ["tooManyArgs"]
+			},
+			{
+				"source": "expectTypeOf(value).to.toMatchTypeOf();",
+				"valid": false,
+				"messages": ["modifierUnknown"]
 			}
 		]
 	},

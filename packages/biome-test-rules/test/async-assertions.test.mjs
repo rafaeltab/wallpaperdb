@@ -381,3 +381,36 @@ test("bound assertion helpers follow direct callback and immutable binding consu
 	])
 		assert.deepEqual(lint(prelude + source), [], source);
 });
+
+test("only the native global Promise consumes aggregate assertion inputs", () => {
+	const assertion = "expect(globalThis.Promise.resolve(1)).resolves.toBe(1)";
+	for (const aggregate of ["all", "allSettled", "race", "any"]) {
+		for (const consumer of [
+			`await Promise.${aggregate}([${assertion}]);`,
+			`await Promise.${aggregate}([1].map(() => ${assertion}));`,
+		])
+			assert.ok(
+				lint(
+					`import { expect } from 'vitest'; async function run(Promise) { ${consumer} }`,
+				).some((d) => d.message.includes("async assertion")),
+				consumer,
+			);
+		assert.deepEqual(
+			lint(
+				`import { expect } from 'vitest'; await Promise.${aggregate}([${assertion}]);`,
+			),
+			[],
+		);
+	}
+	assert.ok(
+		lint(
+			`import { expect } from 'vitest'; const Promise = { all: () => undefined }; await Promise.all([${assertion}]);`,
+		).some((d) => d.message.includes("async assertion")),
+	);
+	assert.ok(
+		lint(
+			`import { expect } from 'vitest'; import { Promise } from './custom'; await Promise.all([${assertion}]);`,
+			{ "custom.ts": "export const Promise = { all: () => undefined };" },
+		).some((d) => d.message.includes("async assertion")),
+	);
+});

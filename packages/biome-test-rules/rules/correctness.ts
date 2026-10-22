@@ -75,6 +75,12 @@ function importedApi(source: string, name: string): Api {
 function apiMember(api: Api, member: string): Api | undefined {
 	if (api.name === "<context>")
 		return member === "expect" ? { ...api, name: "expect" } : undefined;
+	if (api.name === "<nodeContext>") {
+		if (member === "test") return { ...api, name: "test" };
+		return ["skip", "todo"].includes(member)
+			? { ...api, name: "test", members: [member] }
+			: undefined;
+	}
 	if (api.name === "*") return importedApi(api.source, member);
 	return {
 		...api,
@@ -147,28 +153,35 @@ function taskContextApi(
 	const parameter = declaration
 		.ancestors()
 		.find((n) => n.kind === "JS_FORMAL_PARAMETER");
-	const fn = declaration
-		.ancestors()
-		.find(
-			(n) =>
-				n.kind === "JS_ARROW_FUNCTION_EXPRESSION" ||
-				n.kind === "JS_FUNCTION_EXPRESSION",
-		);
-	if (!fn || !("parameters" in fn) || !fn.parameters) return undefined;
+	// Stop at the nearest parameter-owning function, including declarations and
+	// methods, so a nested function's parameter cannot inherit an outer context.
+	const fn = declaration.ancestors().find((n) => "parameters" in n);
+	if (
+		!fn ||
+		(fn.kind !== "JS_ARROW_FUNCTION_EXPRESSION" &&
+			fn.kind !== "JS_FUNCTION_EXPRESSION") ||
+		!fn.parameters
+	)
+		return undefined;
 	if (!parameter && declaration.parent?.kind !== "JS_ARROW_FUNCTION_EXPRESSION")
 		return undefined;
 	const call = fn.parent?.parent?.parent;
-	if (
-		call?.kind !== "JS_CALL_EXPRESSION" ||
-		!call.arguments?.args.slice(1, 3).some((arg) => arg.text === fn.text)
-	)
-		return undefined;
+	if (call?.kind !== "JS_CALL_EXPRESSION") return undefined;
 	const registration = resolveApi(call.callee, model, seen);
 	if (
 		!registration ||
-		!["vitest", "@effect/vitest", "global"].includes(registration.source) ||
+		!["vitest", "@effect/vitest", "global", "node:test"].includes(
+			registration.source,
+		) ||
 		!["it", "test"].includes(registration.name) ||
 		registration.members.includes("each")
+	)
+		return undefined;
+	const nodeContext = registration.source === "node:test";
+	if (
+		!call.arguments?.args
+			.slice(nodeContext ? 0 : 1, 3)
+			.some((arg) => arg.text === fn.text)
 	)
 		return undefined;
 	const index =
@@ -185,18 +198,27 @@ function taskContextApi(
 		(parameter?.kind === "JS_FORMAL_PARAMETER" &&
 			parameter.binding?.kind === "JS_IDENTIFIER_BINDING")
 	)
-		return { source: registration.source, name: "<context>", members: [] };
-	if (
-		parent?.kind === "JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY" &&
-		declaration.text === "expect"
-	)
-		return { source: registration.source, name: "expect", members: [] };
-	if (
-		parent?.kind === "JS_OBJECT_BINDING_PATTERN_PROPERTY" &&
-		staticMemberName(parent.member) === "expect"
-	)
-		return { source: registration.source, name: "expect", members: [] };
-	return undefined;
+		return {
+			source: registration.source,
+			name: nodeContext ? "<nodeContext>" : "<context>",
+			members: [],
+		};
+	const member =
+		parent?.kind === "JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY"
+			? declaration.text
+			: parent?.kind === "JS_OBJECT_BINDING_PATTERN_PROPERTY"
+				? staticMemberName(parent.member)
+				: undefined;
+	return member
+		? apiMember(
+				{
+					source: registration.source,
+					name: nodeContext ? "<nodeContext>" : "<context>",
+					members: [],
+				},
+				member,
+			)
+		: undefined;
 }
 
 function resolveApi(

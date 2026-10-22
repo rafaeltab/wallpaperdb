@@ -323,6 +323,53 @@ export const noAliasedTestModifiers = defineRule({
 	},
 });
 
+function rejectionHandler(
+	node: AnyJsAstNode | undefined,
+	model: SemanticModel,
+	seen = new Set<string>(),
+): boolean {
+	if (!node) return false;
+	if (
+		[
+			"JS_PARENTHESIZED_EXPRESSION",
+			"TS_AS_EXPRESSION",
+			"TS_SATISFIES_EXPRESSION",
+			"TS_NON_NULL_ASSERTION_EXPRESSION",
+		].includes(node.kind) &&
+		"expression" in node
+	)
+		return rejectionHandler(node.expression, model, seen);
+	if (node.kind === "JS_IDENTIFIER_EXPRESSION" && node.name) {
+		const binding = model.binding(node.name);
+		if (!binding) return node.text !== "undefined";
+		const declaration = binding.syntax();
+		const key = `${declaration.text}:${binding.scope().syntax().text}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		if (
+			declaration.parent?.kind === "JS_VARIABLE_DECLARATOR" &&
+			binding.allWrites().length === 0
+		)
+			return rejectionHandler(
+				declaration.parent.initializer?.expression,
+				model,
+				seen,
+			);
+	}
+	if (node.kind === "JS_UNARY_EXPRESSION" && node.operatorToken === "void")
+		return false;
+	// Unknown imported/parameter bindings may be legitimate handlers. Reject
+	// provably non-callable values without inventing cross-module type inference.
+	return ![
+		"JS_NULL_LITERAL_EXPRESSION",
+		"JS_BOOLEAN_LITERAL_EXPRESSION",
+		"JS_NUMBER_LITERAL_EXPRESSION",
+		"JS_STRING_LITERAL_EXPRESSION",
+		"JS_OBJECT_EXPRESSION",
+		"JS_ARRAY_EXPRESSION",
+	].includes(node.kind);
+}
+
 function handled(
 	node: AnyJsAstNode,
 	model: SemanticModel,
@@ -370,9 +417,11 @@ function handled(
 		case "JS_STATIC_MEMBER_EXPRESSION": {
 			const call = parent.parent;
 			if (call?.kind !== "JS_CALL_EXPRESSION") return false;
-			const count = call.arguments?.args.length ?? 0;
-			if (parent.member?.text === "catch" && count >= 1) return true;
-			if (parent.member?.text === "then" && count >= 2) return true;
+			const args = call.arguments?.args;
+			if (parent.member?.text === "catch" && rejectionHandler(args?.[0], model))
+				return true;
+			if (parent.member?.text === "then" && rejectionHandler(args?.[1], model))
+				return true;
 			return handled(call, model, seen, allowVoid);
 		}
 		case "JS_INITIALIZER_CLAUSE": {

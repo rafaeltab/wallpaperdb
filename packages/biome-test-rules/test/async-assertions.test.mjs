@@ -72,6 +72,10 @@ test("an unhandled then or finally does not handle async assertions", () => {
 		".then(() => {})",
 		".finally(() => {})",
 		".then(() => {}).finally(() => {})",
+		".catch(undefined)",
+		".catch(null)",
+		".then(undefined, undefined)",
+		".then(() => {}, null)",
 	])
 		assert.ok(
 			lint(
@@ -81,6 +85,32 @@ test("an unhandled then or finally does not handle async assertions", () => {
 		);
 	assert.deepEqual(
 		lint("import { expect } from 'vitest'; expect(1).toBe(1);"),
+		[],
+	);
+});
+
+test("rejection handlers may be imported functions and local aliases", () => {
+	for (const [declaration, valid] of [
+		["import { handler } from './handlers';", true],
+		["const handler = () => {};", true],
+		["const handler = null;", false],
+		["const handler = undefined;", false],
+	]) {
+		const source = `import { expect } from 'vitest'; ${declaration} expect.poll(() => 1).toBe(1).catch(handler);`;
+		const diagnostics = lint(source, {
+			"handlers.ts":
+				"export function handler(error: unknown) { console.log(error); }",
+		});
+		assert.equal(
+			diagnostics.some((d) => d.message.includes("async assertion")),
+			!valid,
+			source,
+		);
+	}
+	assert.deepEqual(
+		lint(
+			"import { expect } from 'vitest'; await expect.poll(() => 1).toBe(1).catch(undefined);",
+		),
 		[],
 	);
 });

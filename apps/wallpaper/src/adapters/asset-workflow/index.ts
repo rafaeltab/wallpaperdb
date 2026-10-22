@@ -9,6 +9,7 @@ import {
 } from '../../capabilities/creation/index.js';
 import type { WorkflowConfig } from '../../workflow-config.js';
 import { decodeConfirmation } from './translation.js';
+import { observeWorkflow } from './observation.js';
 interface Options extends WorkflowConfig {
   readonly natsUrl: string;
 }
@@ -108,17 +109,30 @@ export function assetWorkflowLayer(options: Options) {
               p.destination === 'asset-create'
                 ? 'asset.commands.wallpaper.create'
                 : 'wallpaper.published';
-            const stored = yield* attempt('publish', () =>
-              connection.jetstream().publish(subject, JSON.stringify(p.event), {
-                msgID: `https://wallpaperdb/wallpaper#${p.id}`,
-                timeout: 2000,
+            yield* observeWorkflow(
+              'wallpaper.workflow.publish',
+              p.event,
+              {
+                'wallpaper.id': p.wallpaperId,
+                'event.subject': subject,
+                'event.consumer': 'wallpaper-workflow-outbox',
+                'event.delivery_attempt': p.attempts + 1,
+              },
+              Effect.gen(function* () {
+                const stored = yield* attempt('publish', () =>
+                  connection.jetstream().publish(subject, JSON.stringify(p.event), {
+                    msgID: `https://wallpaperdb/wallpaper#${p.id}`,
+                    timeout: 2000,
+                  })
+                ).pipe(
+                  Effect.as(true),
+                  Effect.catch(() => Effect.succeed(false))
+                );
+                if (stored) yield* delivery.complete(p);
+                else yield* delivery.failed(p);
+                return stored ? 'published' : 'retry-recorded';
               })
-            ).pipe(
-              Effect.as(true),
-              Effect.catch(() => Effect.succeed(false))
             );
-            if (stored) yield* delivery.complete(p);
-            else yield* delivery.failed(p);
           }
           for (const alert of yield* delivery.alerts()) {
             const id = createHash('sha256')
@@ -173,19 +187,42 @@ export function assetWorkflowLayer(options: Options) {
                     new TextDecoder().decode(message.data),
                     'invalid-confirmation'
                   );
-          yield* (
+          const processing =
             message.info.redeliveryCount >= options.maxAttempts
-              ? delivery.quarantine(
-                  identity,
-                  new TextDecoder().decode(message.data),
-                  'confirmation-exhausted',
-                  decoded.kind === 'created'
-                    ? { kind: 'wallpaper', id: decoded.result.wallpaperId }
-                    : decoded.kind === 'source'
-                      ? { kind: 'asset', id: decoded.confirmation.assetId }
-                      : undefined
-                )
-              : operation
+              ? delivery
+                  .quarantine(
+                    identity,
+                    new TextDecoder().decode(message.data),
+                    'confirmation-exhausted',
+                    decoded.kind === 'created'
+                      ? { kind: 'wallpaper', id: decoded.result.wallpaperId }
+                      : decoded.kind === 'source'
+                        ? { kind: 'asset', id: decoded.confirmation.assetId }
+                        : undefined
+                  )
+                  .pipe(Effect.as('quarantined-exhausted'))
+              : operation.pipe(Effect.map((outcome) => outcome ?? 'quarantined-invalid'));
+          yield* observeWorkflow(
+            'wallpaper.workflow.consume-confirmation',
+            decoded.kind === 'invalid' ? undefined : decoded.context,
+            {
+              'event.subject': message.subject,
+              'event.consumer': message.info.consumer,
+              'event.delivery_attempt': message.info.deliveryCount,
+              ...(decoded.kind === 'created'
+                ? {
+                    'wallpaper.id': decoded.result.wallpaperId,
+                    ...(decoded.result.assetId ? { 'asset.id': decoded.result.assetId } : {}),
+                  }
+                : decoded.kind === 'source'
+                  ? {
+                      'asset.id': decoded.confirmation.assetId,
+                      'source.id': decoded.confirmation.sourceId,
+                      'candidate.id': decoded.confirmation.candidateId,
+                    }
+                  : { 'quarantine.id': identity }),
+            },
+            processing
           ).pipe(
             Effect.tap(() => Effect.sync(() => message.ack())),
             Effect.tapError(() => Effect.sync(() => message.nak(options.retryDelayMs)))
@@ -227,3 +264,4 @@ export function assetWorkflowLayer(options: Options) {
 }
 
 export { decodeConfirmation } from './translation.js';
+export { recoverConfirmation } from './recovery.js';

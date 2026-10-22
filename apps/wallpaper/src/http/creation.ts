@@ -20,7 +20,7 @@ const identity = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 const sourceIntent = z.object({ candidateId: identity, intentId: identity }).strict();
 function schemaOptions(schema: z.ZodTypeAny) {
   return {
-    schema: { body: zodToJsonSchema(schema,{$refStrategy:'none'}) },
+    schema: { body: zodToJsonSchema(schema, { $refStrategy: 'none' }) },
     validatorCompiler: () => (value: unknown) => {
       const result = schema.safeParse(value);
       return result.success ? { value: result.data } : { error: new Error('Invalid request') };
@@ -54,7 +54,10 @@ export async function registerCreationHttp<E>(
   options: { readonly monitorWorkflow?: boolean } = {}
 ) {
   const runtime = ManagedRuntime.make(services);
-  app.addHook('onRoute',route=>{if(route.url.startsWith('/wallpapers'))route.schema={tags:['Wallpapers'],security:[{ownerSession:[]}],...route.schema};});
+  app.addHook('onRoute', (route) => {
+    if (route.url.startsWith('/wallpapers'))
+      route.schema = { tags: ['Wallpapers'], security: [{ ownerSession: [] }], ...route.schema };
+  });
   await runtime.runPromise(Creation).catch(async (error) => {
     await runtime.dispose();
     throw error;

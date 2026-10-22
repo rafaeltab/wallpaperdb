@@ -200,3 +200,35 @@ export const assetResultOutbox = pgTable(
     check('asset_result_outbox_attempts', sql`${table.attempts} >= 0`),
   ]
 );
+
+/** One serialization boundary per owned Asset, independent of legacy catalogue rows. */
+export const assetSourceState = pgTable('asset_source_state', {
+  assetId: text('asset_id').primaryKey(),
+  state: jsonb('state').notNull().$type<import('../capabilities/sources/index.js').SourceState>(),
+});
+/** Accepted identities can only be inserted. Conflicting replay never updates facts. */
+export const immutableSources = pgTable(
+  'immutable_sources',
+  {
+    id: text('id').primaryKey(),
+    assetId: text('asset_id').notNull(),
+    facts: jsonb('facts').notNull().$type<import('../capabilities/sources/index.js').SourceFacts>(),
+    layout: text('layout').notNull(),
+  },
+  (table) => [
+    index('immutable_sources_asset').on(table.assetId),
+    check('immutable_sources_layout', sql`${table.layout} = 'asset-layout-1'`),
+  ]
+);
+export const sourceAcceptanceOutbox = pgTable('source_acceptance_outbox', {
+  id: text('id').primaryKey(),
+  confirmation: jsonb('confirmation')
+    .notNull()
+    .$type<import('../capabilities/sources/index.js').SourceConfirmation>(),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  status: text('status').notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+  leaseId: text('lease_id'),
+  notifiedAt: timestamp('notified_at', { withTimezone: true }),
+});

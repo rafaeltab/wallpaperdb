@@ -9,3 +9,5 @@ If a merge queue applies, follow the extension's [queue behavior](https://github
 After a partial landing, fetch `main` from the selected remote, rebase the remaining layers onto their new parents, and update the stack.
 
 After any partial landing, record which PRs landed and the remaining layers' old parent boundaries. Follow [restacking and evidence refresh](stack-recovery.md#restacking), then [publish and preserve complete native membership](stack-recovery.md#publishing).
+
+Follow the [issue landing policy](../../../../docs/agents/issue-tracker.md#relationships): verify closing links when retargeting a layer to `main`, then issue closure and project status after verified landing. Report failed automation.

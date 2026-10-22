@@ -9,13 +9,13 @@ RUN apk update && apk add --no-cache libc6-compat
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
-RUN corepack enable && corepack prepare pnpm@10.18.3 --activate
+COPY package.json ./
+RUN corepack enable && corepack prepare "$(node -p 'require("./package.json").packageManager')" --activate
 
-RUN pnpm install -g turbo@^2
+RUN pnpm install -g "turbo@$(node -p 'require("./package.json").devDependencies.turbo')"
 
 FROM build_base AS pruner
 
-RUN pnpm install -g turbo@^2
 COPY . .
  
 RUN turbo prune @wallpaperdb/user --docker

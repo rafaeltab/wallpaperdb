@@ -107,3 +107,38 @@ test("setup rejects a container Node version that disagrees with mise", () => {
 		rmSync(directory, { recursive: true, force: true });
 	}
 });
+
+test("Make rejects a local override instead of silently changing project tools", () => {
+	const directory = mkdtempSync(join(tmpdir(), "wallpaperdb-toolchain-"));
+	try {
+		mkdirSync(join(directory, "scripts"));
+		for (const file of [
+			"Makefile",
+			"mise.toml",
+			"mise.lock",
+			"package.json",
+			"scripts/mise-shell.sh",
+			"scripts/toolchain.mjs",
+		]) {
+			copyFileSync(file, join(directory, file));
+		}
+		writeFileSync(
+			join(directory, "mise.local.toml"),
+			'[tools]\nnode = "22.22.3"\n',
+		);
+		const result = spawnSync("make", ["build", "PACKAGE=root"], {
+			cwd: directory,
+			encoding: "utf8",
+			env: {
+				...process.env,
+				MAKEFLAGS: "",
+				MFLAGS: "",
+				MISE_TRUSTED_CONFIG_PATHS: directory,
+			},
+		});
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /node.*this checkout's mise.toml/);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});

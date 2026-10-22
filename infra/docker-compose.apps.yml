@@ -189,6 +189,10 @@ services:
     env_file:
       - path: ../apps/wallpaper/.env
         required: false
+    environment:
+      RUN_DB_MIGRATE: "true"
+    volumes:
+      - ../apps/wallpaper/.workflow.json:/app/apps/wallpaper/.workflow.json:ro
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3010/ready || exit 1"]
       interval: 10s

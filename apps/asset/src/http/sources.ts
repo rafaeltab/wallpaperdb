@@ -5,6 +5,7 @@ import { Readable } from 'node:stream';
 import { Effect } from 'effect';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { AuthorAuthentication } from '../adapters/authors/index.js';
 import {
   Sources,
@@ -32,13 +33,25 @@ const intent = z
     targetSourceId: z.string().min(1).max(256).optional(),
   })
   .strict();
+const mutationOptions = {
+  schema: { body: zodToJsonSchema(intent) },
+  // Zod owns this HTTP contract. Avoid AJV coercing numeric revisions or stripping forbidden fields.
+  validatorCompiler: () => (value: unknown) => {
+    const parsed = intent.safeParse(value);
+    return parsed.success
+      ? { value: parsed.data }
+      : { error: new Error('Invalid candidate intent') };
+  },
+};
 function requestContext(request: FastifyRequest) {
   const carrier: Record<string, string> = {};
   propagation.inject(propagation.extract(otelContext.active(), request.headers), carrier);
   const correlation = request.headers['x-correlation-id'];
   return {
     occurrence: { source: 'https://wallpaperdb/asset/authors', id: randomUUID() },
-    ...(typeof correlation === 'string' && Buffer.byteLength(correlation) <= 256
+    ...(typeof correlation === 'string' &&
+    Buffer.byteLength(correlation) > 0 &&
+    Buffer.byteLength(correlation) <= 256
       ? { correlationId: correlation }
       : {}),
     ...(carrier.traceparent ? { traceparent: carrier.traceparent } : {}),
@@ -74,6 +87,10 @@ function outcome(reply: FastifyReply, result: SourceOutcome, success = 200) {
   return reply.code(success).send(publicCandidate(result.candidate));
 }
 export function registerSourceRoutes(app: FastifyInstance, execution: SourceExecution) {
+  app.addHook('onRoute', (route) => {
+    if (route.url.startsWith('/asset-types/') || route.url.startsWith('/assets/'))
+      route.schema = { tags: ['Sources'], security: [{ ownerSession: [] }], ...route.schema };
+  });
   // Returning the raw stream avoids Fastify buffering an entire encoded image.
   app.addContentTypeParser('application/octet-stream', (_request, payload, done) =>
     done(null, payload)
@@ -142,6 +159,7 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
   );
   app.post<{ Params: { assetId: string } }>(
     '/assets/:assetId/source-candidates',
+    mutationOptions,
     (request, reply) => {
       const body = intent.safeParse(request.body);
       const key = z
@@ -230,6 +248,7 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
   );
   app.post<{ Params: { assetId: string; candidateId: string } }>(
     '/assets/:assetId/source-candidates/:candidateId/accept',
+    mutationOptions,
     (request, reply) => {
       const body = intent.safeParse(request.body);
       if (!body.success)

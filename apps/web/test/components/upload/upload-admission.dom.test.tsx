@@ -1,0 +1,21 @@
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {afterEach,expect,it,vi} from 'vitest';
+import {WallpaperUploadSelection} from '@/components/upload/upload-admission';
+vi.mock('@clerk/react',()=>({useAuth:()=>({userId:'creator',isSignedIn:true})}));
+vi.mock('@/lib/auth/token-provider',()=>({getAuthToken:async()=> 'owner-token'}));
+afterEach(()=>{cleanup();vi.unstubAllGlobals();});
+it('refreshes the effective policy, displays its limit and allows an image above the old default',async()=>{
+ let limit=10*1024*1024;const selected=vi.fn();
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({policy:{admission:{maxBytes:limit,maxPixels:100000000,maxAxis:20000}}}),{headers:{'Content-Type':'application/json'}})));
+ const queryClient=new QueryClient({defaultOptions:{queries:{retry:false}}});
+ render(<QueryClientProvider client={queryClient}><WallpaperUploadSelection onFilesSelected={selected}/></QueryClientProvider>);
+ await screen.findByText(/Up to 10 MiB/);
+ const file=new File(['image'],'large.jpg',{type:'image/jpeg'});Object.defineProperty(file,'size',{value:60*1024*1024});
+ fireEvent.change(screen.getByTestId('file-input'),{target:{files:[file]}});
+ expect(selected).not.toHaveBeenCalled();expect(screen.getByRole('alert')).toHaveTextContent('Images must be 10 MiB or smaller.');
+ limit=100*1024*1024;fireEvent.click(screen.getByRole('button',{name:'Refresh upload policy'}));
+ await screen.findByText(/Up to 100 MiB/);await waitFor(()=>expect(screen.getByTestId('file-input')).not.toBeDisabled());
+ fireEvent.change(screen.getByTestId('file-input'),{target:{files:[file]}});
+ expect(selected).toHaveBeenCalledWith([file]);
+});

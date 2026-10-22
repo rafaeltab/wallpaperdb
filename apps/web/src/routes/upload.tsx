@@ -4,7 +4,7 @@ import { AlertCircle, Check, Copy, FileImage, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UploadAuthGate } from '@/components/upload-auth-gate';
 import { UploadActionButtons } from '@/components/upload/upload-action-buttons';
-import { UploadDropZone } from '@/components/upload/upload-drop-zone';
+import { WallpaperUploadSelection } from '@/components/upload/upload-admission';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { MAX_FILES_PER_BATCH, useUploadQueue } from '@/contexts/upload-queue-context';
@@ -50,6 +50,7 @@ export function UploadPage() {
     addFiles,
     clearCompleted,
     retryFailed,
+    resumeConfirming,
     cancelAll,
     stopQueue,
     resumeQueue,
@@ -102,7 +103,7 @@ export function UploadPage() {
           <CardContent className="space-y-6">
             <RecentCreations />
             {/* Drop Zone */}
-            <UploadDropZone
+            <WallpaperUploadSelection
               onFilesSelected={handleFilesSelected}
               maxFiles={MAX_FILES_PER_BATCH - state.files.length}
               disabled={isUploading}
@@ -208,6 +209,8 @@ export function UploadPage() {
 
                 {/* Action Buttons */}
                 <UploadActionButtons
+                  hasConfirming={counts.confirming > 0}
+                  onResumeConfirming={resumeConfirming}
                   isRunning={isRunning}
                   isPaused={state.isPaused}
                   isStopped={state.isStopped}

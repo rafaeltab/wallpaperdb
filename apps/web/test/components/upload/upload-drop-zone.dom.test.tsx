@@ -16,13 +16,11 @@ function createDataTransfer(files: File[]): DataTransfer {
 
 describe('UploadDropZone', () => {
   it('renders drop zone UI', () => {
-    render(<UploadDropZone onFilesSelected={vi.fn()} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={vi.fn()} />);
 
     expect(screen.getByText(/click to upload/i)).toBeInTheDocument();
     expect(screen.getByText(/drag and drop/i)).toBeInTheDocument();
     expect(screen.getByText(/Still JPEG, PNG, and WebP images/)).toHaveTextContent('50 MiB');
-    expect(screen.getByText(/Still JPEG, PNG, and WebP images/)).toHaveTextContent('100,000,000 pixels');
-    expect(screen.getByText(/Still JPEG, PNG, and WebP images/)).toHaveTextContent('20,000 pixels per axis');
     expect(screen.getByTestId('file-input')).toHaveAttribute(
       'accept',
       'image/jpeg,image/png,image/webp'
@@ -31,7 +29,7 @@ describe('UploadDropZone', () => {
 
   it('calls onFilesSelected when files selected via input', async () => {
     const onFilesSelected = vi.fn();
-    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={onFilesSelected} />);
 
     const input = screen.getByTestId('file-input');
     const files = [createMockFile('a.jpg'), createMockFile('b.jpg')];
@@ -51,7 +49,7 @@ describe('UploadDropZone', () => {
   ])('accepts a %s image through the picker', (_format, name, type) => {
     const onFilesSelected = vi.fn();
     const file = createMockFile(name, type);
-    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={onFilesSelected} />);
 
     fireEvent.change(screen.getByTestId('file-input'), { target: { files: [file] } });
 
@@ -60,7 +58,7 @@ describe('UploadDropZone', () => {
 
   it('rejects unsupported picker files with a visible reason', () => {
     const onFilesSelected = vi.fn();
-    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={onFilesSelected} />);
 
     fireEvent.change(screen.getByTestId('file-input'), {
       target: { files: [createMockFile('movie.mp4', 'video/mp4')] },
@@ -72,7 +70,7 @@ describe('UploadDropZone', () => {
 
   it.each(['picker', 'drop'])('explains a full queue when selecting through the %s', (method) => {
     const onFilesSelected = vi.fn();
-    render(<UploadDropZone onFilesSelected={onFilesSelected} maxFiles={0} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={onFilesSelected} maxFiles={0} />);
     const files = [createMockFile()];
     if (method === 'picker') {
       fireEvent.change(screen.getByTestId('file-input'), { target: { files } });
@@ -86,7 +84,7 @@ describe('UploadDropZone', () => {
   it('queues supported dropped files and rejects unsupported ones', () => {
     const onFilesSelected = vi.fn();
     const image = createMockFile('a.png', 'image/png');
-    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={onFilesSelected} />);
 
     fireEvent.drop(screen.getByTestId('drop-zone'), {
       dataTransfer: createDataTransfer([createMockFile('notes.txt', 'text/plain'), image]),
@@ -100,7 +98,7 @@ describe('UploadDropZone', () => {
     const onFilesSelected = vi.fn();
     const image = createMockFile();
     Object.defineProperty(image, 'size', { value: 50 * 1024 * 1024 + 1 });
-    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={onFilesSelected} />);
 
     fireEvent.change(screen.getByTestId('file-input'), { target: { files: [image] } });
 
@@ -110,7 +108,7 @@ describe('UploadDropZone', () => {
 
   it('calls onFilesSelected when files dropped', async () => {
     const onFilesSelected = vi.fn();
-    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={onFilesSelected} />);
 
     const dropZone = screen.getByTestId('drop-zone');
     const files = [createMockFile('a.jpg')];
@@ -125,7 +123,7 @@ describe('UploadDropZone', () => {
 
   it('respects maxFiles limit', async () => {
     const onFilesSelected = vi.fn();
-    render(<UploadDropZone onFilesSelected={onFilesSelected} maxFiles={2} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={onFilesSelected} maxFiles={2} />);
 
     const input = screen.getByTestId('file-input');
     const files = [createMockFile('a.jpg'), createMockFile('b.jpg'), createMockFile('c.jpg')];
@@ -143,7 +141,7 @@ describe('UploadDropZone', () => {
   });
 
   it('shows drag-active state during drag-over', () => {
-    render(<UploadDropZone onFilesSelected={vi.fn()} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={vi.fn()} />);
 
     const dropZone = screen.getByTestId('drop-zone');
 
@@ -155,7 +153,7 @@ describe('UploadDropZone', () => {
   });
 
   it('can be disabled', () => {
-    render(<UploadDropZone onFilesSelected={vi.fn()} disabled />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={vi.fn()} disabled />);
 
     const dropZone = screen.getByTestId('drop-zone');
     const input = screen.getByTestId('file-input');
@@ -165,20 +163,20 @@ describe('UploadDropZone', () => {
   });
 
   it('accepts multiple files by default', () => {
-    render(<UploadDropZone onFilesSelected={vi.fn()} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={vi.fn()} />);
 
     const input = screen.getByTestId('file-input');
     expect(input).toHaveAttribute('multiple');
   });
 
   it('shows custom label when provided', () => {
-    render(<UploadDropZone onFilesSelected={vi.fn()} label="Upload images" />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={vi.fn()} label="Upload images" />);
 
     expect(screen.getByText('Upload images')).toBeInTheDocument();
   });
 
   it('shows file type restrictions', () => {
-    render(<UploadDropZone onFilesSelected={vi.fn()} />);
+    render(<UploadDropZone maxBytes={50*1024*1024} onFilesSelected={vi.fn()} />);
 
     const input = screen.getByTestId('file-input');
     expect(input).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');

@@ -77,9 +77,20 @@ export function resolveScope(scope, identifier) {
 			const named = params
 				.map((p) => p.binding ?? p)
 				.find((p) => p.kind === "JS_IDENTIFIER_BINDING");
-			const call = fn?.ancestors().find((n) => n.kind === "JS_CALL_EXPRESSION");
+			let call = fn?.parent;
+			while (
+				call &&
+				[
+					"JS_CALL_ARGUMENT_LIST",
+					"JS_CALL_ARGUMENTS",
+					"JS_PARENTHESIZED_EXPRESSION",
+				].includes(call.kind)
+			)
+				call = call.parent;
 			if (
 				named &&
+				call?.kind === "JS_CALL_EXPRESSION" &&
+				call.callee?.kind === "JS_IDENTIFIER_EXPRESSION" &&
 				["it", "test", "fit", "xit", "xtest"].includes(call?.callee?.text)
 			)
 				return "testContext";
@@ -122,6 +133,40 @@ export function resolveScope(scope, identifier) {
 				)
 					return { ...base, local: identifier };
 			}
+		}
+		// describeVariableDefAsImport accepts only destructuring from an awaited
+		// import or a require call. Plain initializer aliases remain local.
+		if (
+			[
+				"JS_OBJECT_BINDING_PATTERN_PROPERTY",
+				"JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY",
+			].includes(parent?.kind)
+		) {
+			const declarator = ancestors.find(
+				(n) => n.kind === "JS_VARIABLE_DECLARATOR",
+			);
+			const initializer = declarator?.initializer?.expression;
+			const imported =
+				initializer?.kind === "JS_AWAIT_EXPRESSION" &&
+				initializer.argument?.kind === "JS_IMPORT_CALL_EXPRESSION"
+					? initializer.argument
+					: initializer?.kind === "JS_CALL_EXPRESSION" &&
+							initializer.callee?.kind === "JS_IDENTIFIER_EXPRESSION" &&
+							initializer.callee.text === "require"
+						? initializer
+						: undefined;
+			const source = imported?.arguments?.args[0];
+			let key = parent.member ?? parent.identifier;
+			if (key?.kind === "JS_COMPUTED_MEMBER_NAME") key = key.expression;
+			if (source?.kind === "JS_STRING_LITERAL_EXPRESSION" && key)
+				return {
+					source: stringValue(source.text),
+					imported:
+						key.kind === "JS_LITERAL_MEMBER_NAME" && /^["']/.test(key.text)
+							? stringValue(key.text)
+							: key.text,
+					local: identifier,
+				};
 		}
 		return "local";
 	}

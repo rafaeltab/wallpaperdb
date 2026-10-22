@@ -531,6 +531,19 @@ function potentialCallback(
 	].includes(node.kind);
 }
 
+function isPromiseAggregate(node: AnyJsAstNode, model: SemanticModel): boolean {
+	if (node.kind !== "JS_CALL_EXPRESSION") return false;
+	const callee = node.callee;
+	return (
+		callee?.kind === "JS_STATIC_MEMBER_EXPRESSION" &&
+		callee.object?.kind === "JS_IDENTIFIER_EXPRESSION" &&
+		callee.object.text === "Promise" &&
+		!!callee.object.name &&
+		!model.binding(callee.object.name) &&
+		["all", "allSettled", "race", "any"].includes(callee.member?.text ?? "")
+	);
+}
+
 function callbackResultHandled(
 	node: AnyJsAstNode,
 	model: SemanticModel,
@@ -642,9 +655,7 @@ function callbackResultHandled(
 		const aggregate = call.parent?.parent?.parent;
 		return (
 			aggregate?.kind === "JS_CALL_EXPRESSION" &&
-			/^Promise\.(all|allSettled|race|any)$/.test(
-				aggregate.callee?.text ?? "",
-			) &&
+			isPromiseAggregate(aggregate, model) &&
 			aggregate.arguments?.args[0]?.text === call.text &&
 			handled(aggregate, model, seen, allowVoid)
 		);
@@ -804,7 +815,7 @@ function handled(
 			return (
 				arrays === 1 &&
 				call?.kind === "JS_CALL_EXPRESSION" &&
-				/^Promise\.(all|allSettled|race|any)$/.test(call.callee?.text ?? "") &&
+				isPromiseAggregate(call, model) &&
 				handled(call, model, seen, allowVoid)
 			);
 		}

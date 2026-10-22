@@ -375,6 +375,7 @@ function definitelyFalsy(
 	node: AnyJsAstNode | undefined,
 	model: SemanticModel,
 	seen = new Set<string>(),
+	stringReasons = false,
 ): boolean {
 	if (!node) return false;
 	if (
@@ -386,7 +387,7 @@ function definitelyFalsy(
 		].includes(node.kind) &&
 		"expression" in node
 	)
-		return definitelyFalsy(node.expression, model, seen);
+		return definitelyFalsy(node.expression, model, seen, stringReasons);
 	const identifier =
 		node.kind === "JS_IDENTIFIER_EXPRESSION"
 			? node.name
@@ -411,11 +412,19 @@ function definitelyFalsy(
 		const key = `${declaration.text}:${binding.scope().syntax().text}`;
 		if (seen.has(key)) return false;
 		seen.add(key);
-		return definitelyFalsy(parent.initializer?.expression, model, seen);
+		return definitelyFalsy(
+			parent.initializer?.expression,
+			model,
+			seen,
+			stringReasons,
+		);
 	}
 	if (node.kind === "JS_UNARY_EXPRESSION" && node.operatorToken === "void")
 		return true;
-	return ["false", "null", "0", "''", '""'].includes(node.text);
+	return (
+		["false", "null", "0"].includes(node.text) ||
+		(!stringReasons && staticComputedKey(node) === "")
+	);
 }
 
 function staticComputedKey(node: AnyJsAstNode | undefined): string | undefined {
@@ -449,6 +458,7 @@ function optionStates(
 	model: SemanticModel,
 	option: string,
 	seen = new Set<string>(),
+	stringReasons = false,
 ): number {
 	if (!node) return optionAbsent;
 	switch (node.kind) {
@@ -456,7 +466,7 @@ function optionStates(
 		case "TS_AS_EXPRESSION":
 		case "TS_SATISFIES_EXPRESSION":
 		case "TS_NON_NULL_ASSERTION_EXPRESSION":
-			return optionStates(node.expression, model, option, seen);
+			return optionStates(node.expression, model, option, seen, stringReasons);
 		case "JS_IDENTIFIER_EXPRESSION": {
 			if (!node.name) return optionAbsent;
 			const binding = model.binding(node.name);
@@ -464,12 +474,30 @@ function optionStates(
 			const key = `${binding.syntax().text}:${binding.scope().syntax().text}`;
 			if (seen.has(key)) return optionAbsent;
 			seen.add(key);
-			return optionStates(variableValueAt(node, model), model, option, seen);
+			return optionStates(
+				variableValueAt(node, model),
+				model,
+				option,
+				seen,
+				stringReasons,
+			);
 		}
 		case "JS_CONDITIONAL_EXPRESSION":
 			return (
-				optionStates(node.consequent, model, option, new Set(seen)) |
-				optionStates(node.alternate, model, option, new Set(seen))
+				optionStates(
+					node.consequent,
+					model,
+					option,
+					new Set(seen),
+					stringReasons,
+				) |
+				optionStates(
+					node.alternate,
+					model,
+					option,
+					new Set(seen),
+					stringReasons,
+				)
 			);
 		case "JS_LOGICAL_EXPRESSION": {
 			let left = node.left;
@@ -486,16 +514,22 @@ function optionStates(
 				left = left.expression;
 			if (node.operatorToken === "&&") {
 				if (definitelyFalsy(left, model)) return optionAbsent;
-				const right = optionStates(node.right, model, option, seen);
+				const right = optionStates(
+					node.right,
+					model,
+					option,
+					seen,
+					stringReasons,
+				);
 				return left?.kind === "JS_OBJECT_EXPRESSION" || left?.text === "true"
 					? right
 					: optionAbsent | right;
 			}
 			if (left?.kind === "JS_OBJECT_EXPRESSION")
-				return optionStates(left, model, option, seen);
+				return optionStates(left, model, option, seen, stringReasons);
 			return (
-				optionStates(left, model, option, new Set(seen)) |
-				optionStates(node.right, model, option, new Set(seen))
+				optionStates(left, model, option, new Set(seen), stringReasons) |
+				optionStates(node.right, model, option, new Set(seen), stringReasons)
 			);
 		}
 		case "JS_OBJECT_EXPRESSION": {
@@ -507,6 +541,7 @@ function optionStates(
 						model,
 						option,
 						new Set(seen),
+						stringReasons,
 					);
 					// A spread replaces the previous value only on alternatives where
 					// the property is present. An empty/unknown spread cannot clear it.
@@ -523,7 +558,8 @@ function optionStates(
 								? member.name
 								: undefined;
 					states =
-						option !== "retry" && definitelyFalsy(value, model)
+						option !== "retry" &&
+						definitelyFalsy(value, model, new Set(), stringReasons)
 							? optionDisabled
 							: optionEnabled;
 				}
@@ -539,8 +575,19 @@ function hasOption(
 	node: AnyJsAstNode | undefined,
 	model: SemanticModel,
 	option = "retry",
+	source?: string,
 ): boolean {
-	return (optionStates(node, model, option) & optionEnabled) !== 0;
+	return (
+		(optionStates(
+			node,
+			model,
+			option,
+			new Set(),
+			source === "node:test" && ["skip", "todo"].includes(option),
+		) &
+			optionEnabled) !==
+		0
+	);
 }
 
 export const noTestRetries = defineRule({
@@ -587,7 +634,7 @@ export const noTodoTests = defineRule({
 			["it", "test", "describe", "suite"].includes(api.name) &&
 			(api.members.includes("todo") ||
 				registrationOptions(node, api).some((arg) =>
-					hasOption(arg, context.model, "todo"),
+					hasOption(arg, context.model, "todo", api.source),
 				) ||
 				(api.source === "node:test" && api.members.length === 0
 					? !potentialCallback(args.at(-1), context.model)
@@ -615,7 +662,7 @@ export const noAliasedTestModifiers = defineRule({
 		for (const argument of registrationOptions(node, api)) {
 			if (
 				["skip", "only"].some((flag) =>
-					hasOption(argument, context.model, flag),
+					hasOption(argument, context.model, flag, api.source),
 				)
 			)
 				registerDiagnostic(

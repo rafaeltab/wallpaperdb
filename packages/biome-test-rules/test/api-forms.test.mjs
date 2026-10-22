@@ -291,3 +291,33 @@ test("flag options respect the last known write while retries forbid any overrid
 			options,
 		);
 });
+
+test("Node skip and TODO string reasons remain flags even when empty", () => {
+	for (const flag of ["skip", "todo"]) {
+		for (const value of ["''", '""', "``", "reason"])
+			assert.ok(
+				lint(
+					`import { test } from 'node:test'; const reason = ''; test('case', { ${flag}: ${value} }, () => {});`,
+				).some((d) => d.severity === "error"),
+				`${flag}: ${value}`,
+			);
+		assert.ok(
+			lint(
+				`import { test } from 'node:test'; const ${flag} = ''; test('case', { ${flag} }, () => {});`,
+			).some((d) => d.severity === "error"),
+			flag,
+		);
+		for (const source of [
+			`import { test } from 'node:test'; test('case', { ${flag}: false }, () => {});`,
+			`import { it } from 'vitest'; it('case', { ${flag}: '' }, () => {});`,
+			`import { it } from 'vitest'; it('case', { ${flag}: \`\` }, () => {});`,
+		])
+			assert.deepEqual(lint(source), [], source);
+	}
+	assert.deepEqual(
+		lint(
+			"import { test } from 'node:test'; test('case', { only: false }, () => {});",
+		),
+		[],
+	);
+});

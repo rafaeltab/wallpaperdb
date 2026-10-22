@@ -177,3 +177,22 @@ test("unique direct callback assignments distinguish options from real handlers"
 			source,
 		);
 });
+
+test("Node named modifier exports retain their native test identity", () => {
+	for (const modifier of ["skip", "only", "todo"]) {
+		assert.equal(nodeTest[modifier], nodeTest.test[modifier]);
+		for (const source of [
+			`import { ${modifier} as scenario } from 'node:test'; scenario('case', () => {});`,
+			`import * as nodeTest from 'node:test'; nodeTest.${modifier}('case', () => {});`,
+		])
+			assert.ok(
+				lint(source).some((d) => d.severity === "error"),
+				source,
+			);
+		for (const source of [
+			`import { ${modifier} as scenario } from 'other-library'; scenario('case', () => {});`,
+			`import { ${modifier} as scenario } from 'node:test'; function run(scenario) { scenario('case', () => {}); }`,
+		])
+			assert.deepEqual(lint(source), [], source);
+	}
+});

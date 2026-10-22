@@ -59,14 +59,23 @@ function literal(text: string | undefined): string | undefined {
 		: text;
 }
 
-function apiName(source: string, name: string): string {
-	return source === "node:test" && name === "default" ? "test" : name;
+function importedApi(source: string, name: string): Api {
+	const modifier =
+		source === "node:test" && ["skip", "only", "todo"].includes(name);
+	return {
+		source,
+		name:
+			source === "node:test" && (name === "default" || modifier)
+				? "test"
+				: name,
+		members: modifier ? [name] : [],
+	};
 }
 
 function apiMember(api: Api, member: string): Api | undefined {
 	if (api.name === "<context>")
 		return member === "expect" ? { ...api, name: "expect" } : undefined;
-	if (api.name === "*") return { ...api, name: apiName(api.source, member) };
+	if (api.name === "*") return importedApi(api.source, member);
 	return {
 		...api,
 		members: [...api.members, member],
@@ -283,13 +292,7 @@ function resolveApi(
 						: parent?.kind === "JS_NAMED_IMPORT_SPECIFIER"
 							? literal(parent.name?.text)
 							: declaration.text;
-			return name
-				? {
-						source,
-						name: apiName(source, name),
-						members: [],
-					}
-				: undefined;
+			return name ? importedApi(source, name) : undefined;
 		}
 		default:
 			return undefined;

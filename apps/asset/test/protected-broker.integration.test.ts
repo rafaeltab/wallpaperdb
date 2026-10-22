@@ -24,8 +24,10 @@ beforeAll(async () => {
     .withWaitStrategy(Wait.forLogMessage('Server is ready'))
     .start();
   url = `nats://${container.getHost()}:${container.getMappedPort(4222)}`;
-  const operator = await connection('asset-operator', 'operator-secret');
-  await provisionAssetBroker(operator, authority);
+  for (const application of Object.values(authority.applications)) {
+    const operator = await connection(application.operatorUser, 'operator-secret');
+    await provisionAssetBroker(operator, authority, application.id);
+  }
 });
 afterAll(async () => {
   await Promise.all(connections.map((client) => client.close()));
@@ -34,8 +36,8 @@ afterAll(async () => {
 it('isolates application publication and each filtered result consumer from all alternate ingress and control planes', async () => {
   const user = await connection('user-1', 'user-secret', '_ASSET_INBOX.user');
   const wallpaper = await connection('wallpaper-1', 'wallpaper-secret', '_ASSET_INBOX.wallpaper');
-  const service = await connection('asset-service', 'service-secret', '_ASSET_INBOX.service');
-  const operator = await connection('asset-operator', 'operator-secret');
+  const service = await connection('asset-service_user', 'service-secret', '_ASSET_INBOX.service');
+  const operator = await connection('asset-operator_user', 'operator-secret');
   const legacy = await connection();
   const codec = StringCodec();
   const manager = await operator.jetstreamManager();
@@ -67,7 +69,14 @@ it('isolates application publication and each filtered result consumer from all 
     .catch(() => undefined);
   expect((await manager.streams.info('ASSET_COMMANDS')).state.messages).toBe(1);
   await service.jetstream().publish('asset.results.user', codec.encode('user-result'));
-  await service.jetstream().publish('asset.results.wallpaper', codec.encode('wallpaper-result'));
+  const wallpaperService = await connection(
+    'asset-service_wallpaper',
+    'service-secret',
+    '_ASSET_INBOX.service'
+  );
+  await wallpaperService
+    .jetstream()
+    .publish('asset.results.wallpaper', codec.encode('wallpaper-result'));
   const userResults = await user.jetstream().consumers.get('ASSET_RESULTS', 'results_user');
   const message = await userResults.next({ expires: 1000 });
   expect(message?.string()).toBe('user-result');
@@ -80,4 +89,29 @@ it('isolates application publication and each filtered result consumer from all 
   expect(
     (await manager.consumers.info('ASSET_RESULTS', 'results_user')).config.filter_subject
   ).toBe('asset.results.user');
+});
+
+it('cannot use permitted JetStream APIs to reflect replies into another application or a command subject', async () => {
+  const user = await connection('user-1', 'user-secret', '_ASSET_INBOX.user');
+  const service = await connection('asset-service_user', 'service-secret', '_ASSET_INBOX.service');
+  const operator = await connection('asset-operator_user', 'operator-secret');
+  const manager = await operator.jetstreamManager();
+  const commandCount = (await manager.streams.info('ASSET_COMMANDS')).state.messages;
+  const resultCount = (await manager.streams.info('ASSET_RESULTS')).state.messages;
+  await service.jetstream().publish('asset.results.user', 'private-user-result');
+  user.publish(
+    '$JS.API.CONSUMER.MSG.NEXT.ASSET_RESULTS.results_user',
+    JSON.stringify({ batch: 1, expires: 1000000000 }),
+    { reply: 'asset.results.wallpaper' }
+  );
+  user.publish('$JS.API.CONSUMER.INFO.ASSET_RESULTS.results_user', '{}', {
+    reply: 'asset.commands.wallpaper.create',
+  });
+  await user.flush();
+  await expect
+    .poll(async () => (await manager.streams.info('ASSET_COMMANDS')).state.messages, {
+      timeout: 1500,
+    })
+    .toBe(commandCount);
+  expect((await manager.streams.info('ASSET_RESULTS')).state.messages).toBe(resultCount + 1);
 });

@@ -13,45 +13,47 @@ const consumerOperations = (stream: string, consumer: string) => [
   `$JS.ACK.${stream}.${consumer}.>`,
   `$JS.ACK.*.*.${stream}.${consumer}.>`,
 ];
-/** The legacy account deliberately has no imports/exports with ASSET. Its broker
- * administration cannot create a stream, transform or consumer in this account. */
+/** No account imports/exports exist. Caller-chosen JetStream reply subjects can
+ * bypass publish ACLs within an account, so each application has its own account. */
 export function renderBrokerConfiguration(authority: Authority): string {
-  const servicePermissions = [
-    '$JS.API.INFO',
-    ...[commands, results, 'ASSET_QUARANTINE', 'ASSET_OPERATIONS'].map(
-      (stream) => `$JS.API.STREAM.INFO.${stream}`
-    ),
-    ...Object.keys(authority.applications).flatMap((id) =>
-      consumerOperations(commands, `commands_${id}`)
-    ),
-    'asset.results.*',
-    'asset.quarantine',
-    'asset.operator.notifications',
-  ];
-  const users = [
-    { user: authority.broker.operator.user, password: authority.broker.operator.password },
-    {
-      user: authority.broker.service.user,
-      password: authority.broker.service.password,
-      permissions: permissions(servicePermissions, '_ASSET_INBOX.service'),
-    },
-    ...Object.values(authority.applications).flatMap((application) =>
-      application.credentials.map((credential) => ({
-        user: credential.user,
-        password: credential.password,
-        permissions: permissions(
-          [
-            ...application.allowedOperations.map((operation) =>
-              operation === 'create' ? application.createSubject : application.deleteSubject
-            ),
-            '$JS.API.INFO',
-            ...consumerOperations(results, application.resultConsumer),
-          ],
-          application.inboxPrefix
+  const accounts = Object.fromEntries(
+    Object.values(authority.applications).map((application) => {
+      const servicePermissions = [
+        '$JS.API.INFO',
+        ...[commands, results, 'ASSET_QUARANTINE', 'ASSET_OPERATIONS'].map(
+          (stream) => `$JS.API.STREAM.INFO.${stream}`
         ),
-      }))
-    ),
-  ];
+        ...consumerOperations(commands, `commands_${application.id}`),
+        `$JS.API.CONSUMER.INFO.${results}.${application.resultConsumer}`,
+        application.resultSubject,
+        'asset.quarantine',
+        'asset.operator.notifications',
+      ];
+      const users = [
+        { user: application.operatorUser, password: authority.broker.operator.password },
+        {
+          user: application.serviceUser,
+          password: authority.broker.service.password,
+          permissions: permissions(servicePermissions, '_ASSET_INBOX.service'),
+        },
+        ...application.credentials.map((credential) => ({
+          user: credential.user,
+          password: credential.password,
+          permissions: permissions(
+            [
+              ...application.allowedOperations.map((operation) =>
+                operation === 'create' ? application.createSubject : application.deleteSubject
+              ),
+              '$JS.API.INFO',
+              ...consumerOperations(results, application.resultConsumer),
+            ],
+            application.inboxPrefix
+          ),
+        })),
+      ];
+      return [application.account, { jetstream: 'enabled', users }];
+    })
+  );
   return JSON.stringify({
     port: 4222,
     http: 8222,
@@ -59,7 +61,7 @@ export function renderBrokerConfiguration(authority: Authority): string {
     no_auth_user: 'legacy',
     accounts: {
       LEGACY: { jetstream: 'enabled', users: [{ user: 'legacy', password: '' }] },
-      ASSET: { jetstream: 'enabled', users },
+      ...accounts,
     },
   });
 }
@@ -68,21 +70,17 @@ export function renderBrokerConfiguration(authority: Authority): string {
  * cannot create, update or redirect them. Retention never evicts pending work. */
 export async function provisionAssetBroker(
   connection: NatsConnection,
-  authority: Authority
+  authority: Authority,
+  applicationId: string
 ): Promise<void> {
+  const application = Object.hasOwn(authority.applications, applicationId)
+    ? authority.applications[applicationId]
+    : undefined;
+  if (!application) throw new Error('Unknown configured application');
   const manager = await connection.jetstreamManager();
   for (const [name, subjects] of [
-    [
-      commands,
-      Object.values(authority.applications).flatMap((application) => [
-        application.createSubject,
-        application.deleteSubject,
-      ]),
-    ],
-    [
-      results,
-      Object.values(authority.applications).map((application) => application.resultSubject),
-    ],
+    [commands, [application.createSubject, application.deleteSubject]],
+    [results, [application.resultSubject]],
     ['ASSET_QUARANTINE', ['asset.quarantine']],
     ['ASSET_OPERATIONS', ['asset.operator.notifications']],
   ] as const) {
@@ -95,7 +93,7 @@ export async function provisionAssetBroker(
       max_age: 0,
       max_msgs: -1,
       max_bytes: -1,
-      max_msg_size: 16384,
+      max_msg_size: name === 'ASSET_QUARANTINE' ? 65536 : 16384,
       duplicate_window: 120_000_000_000,
     };
     const existing = await manager.streams.info(name).catch((error: unknown) => {
@@ -118,7 +116,7 @@ export async function provisionAssetBroker(
       await manager.streams.update(name, config);
     }
   }
-  for (const application of Object.values(authority.applications)) {
+  {
     for (const [stream, durable, subject] of [
       [commands, `commands_${application.id}`, `asset.commands.${application.id}.*`],
       [results, application.resultConsumer, application.resultSubject],

@@ -61,9 +61,16 @@ beforeAll(async () => {
   url = `nats://${broker.getHost()}:${broker.getMappedPort(4222)}`;
   operator = await connect({
     servers: url,
-    ...{ user: authority.broker.operator.user, pass: authority.broker.operator.password },
+    ...{ user: 'asset-operator_user', pass: authority.broker.operator.password },
   });
-  await provisionAssetBroker(operator, authority);
+  await provisionAssetBroker(operator, authority, 'user');
+  const wallpaperOperator = await connect({
+    servers: url,
+    user: 'asset-operator_wallpaper',
+    pass: authority.broker.operator.password,
+  });
+  await provisionAssetBroker(wallpaperOperator, authority, 'wallpaper');
+  await wallpaperOperator.close();
   application = await connect({
     servers: url,
     user: 'user-1',
@@ -129,16 +136,14 @@ it('creates durably over protected NATS, returns its assigned empty Asset, and r
   expect(replay?.json<{ data: unknown }>().data).toEqual(created?.data);
   expect(replay?.json<{ id: string }>().id).not.toBe(created?.id);
   replay?.ack();
-  await application
-    .jetstream()
-    .publish(
-      'asset.commands.user.create',
-      JSON.stringify({
-        ...event,
-        id: 'conflict-occurrence-3',
-        data: { ...event.data, ownerSubject: 'attacker' },
-      })
-    );
+  await application.jetstream().publish(
+    'asset.commands.user.create',
+    JSON.stringify({
+      ...event,
+      id: 'conflict-occurrence-3',
+      data: { ...event.data, ownerSubject: 'attacker' },
+    })
+  );
   const conflict = await results.next({ expires: 10000 });
   expect(conflict?.json<{ data: unknown }>().data).toMatchObject({
     outcome: 'rejected',

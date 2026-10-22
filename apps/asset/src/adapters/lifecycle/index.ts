@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { AssetCommandResultSchema } from '@wallpaperdb/events/schemas';
+import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
@@ -67,15 +68,24 @@ async function connection<A>(
 }
 const poolResource = (databaseUrl: string) =>
   Effect.acquireRelease(
-    Effect.sync(
-      () =>
-        new Pool({
-          connectionString: databaseUrl,
-          max: 4,
-          connectionTimeoutMillis: 5000,
-          statement_timeout: 10000,
-        })
-    ),
+    Effect.sync(() => {
+      const pool = new Pool({
+        connectionString: databaseUrl,
+        max: 4,
+        connectionTimeoutMillis: 5000,
+        statement_timeout: 10000,
+      });
+      pool.on('error', (cause) =>
+        logs
+          .getLogger('asset.lifecycle')
+          .emit({
+            severityNumber: SeverityNumber.ERROR,
+            body: 'Idle Asset database connection failed',
+            attributes: { 'error.type': cause.name, 'error.message': cause.message },
+          })
+      );
+      return pool;
+    }),
     (pool) => Effect.promise(() => pool.end())
   );
 function result(input: unknown): CommandResult {

@@ -28,6 +28,7 @@ export interface ProtectedCommandOptions {
         readonly createSubject: string;
         readonly deleteSubject: string;
         readonly resultSubject: string;
+        readonly serviceUser: string;
       }
     >
   >;
@@ -85,12 +86,10 @@ const quarantine = Effect.fn('asset.commands.quarantine')(function* (
     },
   };
   yield* broker('store-quarantine', () =>
-    connection
-      .jetstream()
-      .publish('asset.quarantine', JSON.stringify(event), {
-        msgID: `quarantine:${id}`,
-        timeout: 5000,
-      })
+    connection.jetstream().publish('asset.quarantine', JSON.stringify(event), {
+      msgID: `quarantine:${id}`,
+      timeout: 5000,
+    })
   );
   yield* broker('notify-quarantine', () =>
     connection
@@ -143,22 +142,28 @@ const processCommand = Effect.fn('asset.commands.consume')(function* (
   message.nak(Math.min(30000, options.retryDelayMs * 2 ** (message.info.deliveryCount - 1)));
 });
 const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
-  connection: NatsConnection,
+  connections: ReadonlyMap<string, NatsConnection>,
   outbox: ResultOutboxPort
 ) {
   const publications = yield* outbox.claim(1);
   let healthy = true;
   for (const publication of publications) {
     const succeeded = yield* Effect.gen(function* () {
+      const connection = connections.get(publication.applicationId);
+      if (!connection)
+        return yield* Effect.fail(
+          new CommandBrokerFailure({
+            operation: 'route-result',
+            cause: new Error('No configured application connection'),
+          })
+        );
       const encoded = encodeAssetResult(publication);
       yield* broker('publish-result', () =>
-        connection
-          .jetstream()
-          .publish(encoded.subject, JSON.stringify(encoded.event), {
-            msgID: publication.id,
-            expect: { streamName: 'ASSET_RESULTS' },
-            timeout: 5000,
-          })
+        connection.jetstream().publish(encoded.subject, JSON.stringify(encoded.event), {
+          msgID: publication.id,
+          expect: { streamName: 'ASSET_RESULTS' },
+          timeout: 5000,
+        })
       );
       yield* outbox.published(publication);
     }).pipe(
@@ -182,47 +187,51 @@ export function protectedCommandsLayer(
     Effect.gen(function* () {
       const lifecycle = yield* Lifecycle;
       const outbox = yield* ResultOutbox;
-      const connection = yield* Effect.acquireRelease(
-        broker('connect', () =>
-          connect({
-            servers: options.url,
-            user: options.credential.user,
-            pass: options.credential.password,
-            inboxPrefix: '_ASSET_INBOX.service',
-            timeout: 5000,
-            name: 'asset-authority',
-          })
-        ),
-        (connection) =>
-          broker('drain', () => connection.drain()).pipe(
-            Effect.interruptible,
-            Effect.timeout(options.shutdownTimeoutMs),
-            Effect.catchCause(() => Effect.promise(() => connection.close()))
-          )
-      );
-      const manager = yield* broker('manager', () =>
-        connection.jetstreamManager({ timeout: 5000 })
-      );
-      const stream = yield* broker('verify-stream', () => manager.streams.info('ASSET_COMMANDS'));
-      const routes = routesFor(options);
-      const expected = routes.map((route) => route.subject).sort();
-      if (
-        JSON.stringify([...stream.config.subjects].sort()) !== JSON.stringify(expected) ||
-        stream.config.subject_transform ||
-        stream.config.sources?.length ||
-        stream.config.mirror
-      )
-        return yield* Effect.fail(
-          new CommandBrokerFailure({
-            operation: 'verify-ingress',
-            cause: new Error('Protected command stream does not match configured routes'),
-          })
-        );
       const accepting = yield* Ref.make(true);
       const publishingHealthy = yield* Ref.make(true);
       const workers: Array<Fiber.Fiber<void, unknown>> = [];
       const stops: Array<() => void> = [];
+      const connections = new Map<string, NatsConnection>();
       for (const application of Object.values(options.applications)) {
+        const connection = yield* Effect.acquireRelease(
+          broker('connect', () =>
+            connect({
+              servers: options.url,
+              user: application.serviceUser,
+              pass: options.credential.password,
+              inboxPrefix: '_ASSET_INBOX.service',
+              timeout: 5000,
+              name: 'asset-authority',
+            })
+          ),
+          (connection) =>
+            broker('drain', () => connection.drain()).pipe(
+              Effect.interruptible,
+              Effect.timeout(options.shutdownTimeoutMs),
+              Effect.catchCause(() => Effect.promise(() => connection.close()))
+            )
+        );
+        const manager = yield* broker('manager', () =>
+          connection.jetstreamManager({ timeout: 5000 })
+        );
+        const stream = yield* broker('verify-stream', () => manager.streams.info('ASSET_COMMANDS'));
+        const routes = routesFor({ ...options, applications: { [application.id]: application } });
+        const expected = routes.map((route) => route.subject).sort();
+        if (
+          JSON.stringify([...stream.config.subjects].sort()) !== JSON.stringify(expected) ||
+          stream.config.subject_transform ||
+          stream.config.sources?.length ||
+          stream.config.mirror
+        )
+          return yield* Effect.fail(
+            new CommandBrokerFailure({
+              operation: 'verify-ingress',
+              cause: new Error('Protected command stream does not match configured routes'),
+            })
+          );
+
+        connections.set(application.id, connection);
+
         const durable = `commands_${application.id}`;
         const info = yield* broker('verify-consumer', () =>
           manager.consumers.info('ASSET_COMMANDS', durable)
@@ -281,7 +290,7 @@ export function protectedCommandsLayer(
       workers.push(
         yield* Effect.gen(function* () {
           while (yield* Ref.get(accepting)) {
-            const healthy = yield* dispatch(connection, outbox).pipe(
+            const healthy = yield* dispatch(connections, outbox).pipe(
               Effect.catch((error) =>
                 Effect.logError('Asset result dispatcher unavailable', {
                   operation: error.operation,
@@ -314,7 +323,10 @@ export function protectedCommandsLayer(
       return {
         check: () =>
           Ref.get(publishingHealthy).pipe(
-            Effect.map((healthy) => healthy && !connection.isClosed())
+            Effect.map(
+              (healthy) =>
+                healthy && [...connections.values()].every((connection) => !connection.isClosed())
+            )
           ),
       };
     })

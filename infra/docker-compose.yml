@@ -158,7 +158,7 @@ services:
       - ./.operator-inbox.json:/config/operator-inbox.json:ro
       - asset-operator-receipts:/data
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3012/health"]
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3012/health"]
       interval: 5s
       timeout: 5s
       retries: 5

@@ -54,6 +54,16 @@ jobs:
       - name: Build, lint, and type-check
         run: make check
 
+      - name: Use the public Ubuntu archive
+        run: |
+          # Hosted runners select Azure through this mirror list as well as direct URLs.
+          for source in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+            if [ -f "$source" ]; then
+              sudo sed -i -E 's#(mirror\+file:/etc/apt/apt-mirrors\.txt|https?://azure\.archive\.ubuntu\.com/ubuntu)/?([[:space:]]|$)#https://archive.ubuntu.com/ubuntu/\2#g' "$source"
+              cat "$source"
+            fi
+          done
+
       - name: Install Chromium for browser adapter contracts
         run: make run PACKAGE=web SCRIPT=test:browser:install
 

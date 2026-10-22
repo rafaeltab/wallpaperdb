@@ -39,6 +39,7 @@ export async function runStage({
 	unit,
 	output,
 	shouldCancel = () => false,
+	signal,
 }) {
 	const start = performance.now();
 	const cwd = join(root, workspace);
@@ -113,6 +114,7 @@ export async function runStage({
 				config.fixtureImage,
 				start + budgetMs,
 				Math.max(100, graceMs / 2),
+				signal,
 			);
 		const remaining = budgetMs - (performance.now() - start);
 		if (shouldCancel()) {

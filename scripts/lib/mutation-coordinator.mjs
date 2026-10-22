@@ -264,8 +264,10 @@ export async function coordinate() {
 		return baselines.get(context.key);
 	};
 	let cancelled = false;
+	const cancellation = new AbortController();
 	const cancel = () => {
 		cancelled = true;
+		cancellation.abort();
 	};
 	process.on("SIGINT", cancel);
 	process.on("SIGTERM", cancel);
@@ -358,6 +360,7 @@ export async function coordinate() {
 					root,
 					unit: unit?.report,
 					shouldCancel: () => cancelled,
+					signal: cancellation.signal,
 					budgetMs: visitMs - graceMs,
 					graceMs,
 					output: join(root, job.workspace, "reports/mutation", job.suite),

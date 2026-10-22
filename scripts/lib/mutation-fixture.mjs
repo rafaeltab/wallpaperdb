@@ -1,9 +1,13 @@
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { setTimeout as delay } from "node:timers/promises";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { once } from "node:events";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+
+const execute = promisify(execFile);
 
 /** Physical Redis belongs to this stage, not Vitest's repeated module lifetime. */
 export async function redisFixture(
@@ -11,27 +15,50 @@ export async function redisFixture(
 	image,
 	deadline = performance.now() + 30_000,
 	cleanupMs = 5000,
+	signal,
 ) {
 	if (!/^redis(?::[a-zA-Z0-9_.-]+)?@sha256:[a-f0-9]{64}$/.test(image))
 		throw new Error("Mutation Redis requires an immutable fixtureImage digest");
 	const name = `wallpaperdb-mutation-${randomUUID()}`;
 	let closing = false;
+	const lifetime = new AbortController();
+	const operationSignal = signal
+		? AbortSignal.any([signal, lifetime.signal])
+		: lifetime.signal;
+	const activeCommands = new Set();
 	const remainingMs = () => {
+		operationSignal.throwIfAborted();
 		const remaining = Math.floor(deadline - performance.now());
 		if (remaining <= 0)
 			throw new Error("Mutation Redis stage deadline expired");
 		return remaining;
 	};
-	const docker = (...args) =>
-		execFileSync("docker", args, {
+	const docker = async (...args) => {
+		if (closing && args[0] !== "rm")
+			throw new Error("Owned mutation fixture is closing");
+		const cleanup = closing;
+		const request = execute("docker", args, {
 			encoding: "utf8",
 			timeout: closing
 				? Math.max(1, Math.floor(cleanupMs))
-				: args[0] === "create"
+				: args[0] === "pull"
 					? remainingMs()
 					: Math.min(10_000, remainingMs()),
-			stdio: ["ignore", "pipe", "pipe"],
-		}).trim();
+			signal: cleanup ? undefined : operationSignal,
+			killSignal: "SIGKILL",
+		});
+		// Abort can reject before close. Reap the CLI before owned cleanup starts.
+		const closed = new Promise((resolve) =>
+			request.child.once("close", resolve),
+		);
+		if (!cleanup) activeCommands.add(closed);
+		try {
+			return (await request).stdout.trim();
+		} finally {
+			await closed;
+			activeCommands.delete(closed);
+		}
+	};
 	const timings = {
 		startupSeconds: 0,
 		resets: 0,
@@ -44,9 +71,9 @@ export async function redisFixture(
 	const isolated = process.env.MUTATION_REDIS_ISOLATED === "1";
 	const Redis = createRequire(join(cwd, "package.json"))("ioredis");
 	const create = async (fixedPort = "") => {
-		docker(
+		await docker(
 			"create",
-			"--pull=missing",
+			"--pull=never",
 			"--name",
 			name,
 			"--label",
@@ -55,8 +82,8 @@ export async function redisFixture(
 			`127.0.0.1:${fixedPort}:6379`,
 			image,
 		);
-		docker("start", name);
-		const inspected = JSON.parse(docker("inspect", name))[0];
+		await docker("start", name);
+		const inspected = JSON.parse(await docker("inspect", name))[0];
 		containerIds.add(inspected.Id);
 		const port = Number(
 			inspected.NetworkSettings.Ports["6379/tcp"][0].HostPort,
@@ -72,38 +99,65 @@ export async function redisFixture(
 			enableReadyCheck: false,
 			maxRetriesPerRequest: 0,
 			retryStrategy: () => {
+				if (operationSignal.aborted) return null;
 				const remaining = Math.floor(deadline - performance.now());
 				return remaining > 0 ? Math.min(50, remaining) : null;
 			},
 		});
 		client.on("error", () => {});
 		const timer = setTimeout(() => client.disconnect(), remainingMs());
+		const abortReadiness = () => client.disconnect();
+		operationSignal.addEventListener("abort", abortReadiness, { once: true });
 		try {
-			await client.ping();
-			remainingMs();
+			while (true) {
+				remainingMs();
+				try {
+					await client.ping();
+					remainingMs();
+					break;
+				} catch {
+					await delay(Math.min(50, remainingMs()), undefined, {
+						signal: operationSignal,
+					});
+				}
+			}
 		} finally {
 			clearTimeout(timer);
+			operationSignal.removeEventListener("abort", abortReadiness);
 		}
 		return port;
 	};
 	const abort = new AbortController();
 	const close = async () => {
 		closing = true;
+		lifetime.abort();
 		const start = performance.now();
 		server?.closeAllConnections();
 		if (server?.listening)
 			await new Promise((resolve) => server.close(resolve));
 		client?.disconnect();
+		await Promise.all([...activeCommands]);
 		try {
-			docker("rm", "--force", "--volumes", name);
+			await docker("rm", "--force", "--volumes", name);
 		} catch (error) {
 			if (!error.stderr?.includes("No such container")) throw error;
 		}
 		timings.teardownSeconds = (performance.now() - start) / 1000;
 	};
 	try {
+		try {
+			await docker("image", "inspect", image);
+		} catch (error) {
+			if (!error.stderr?.includes("No such image")) throw error;
+			// Image acquisition cannot leave a late-created container after abort.
+			await docker("pull", image);
+		}
 		const port = await create();
 		server = createServer(async (request, response) => {
+			if (closing) {
+				response.writeHead(503).end("Owned mutation fixture is closing");
+				return;
+			}
 			if (request.method !== "POST" || request.url !== "/reset") {
 				response.writeHead(404).end();
 				return;
@@ -120,7 +174,7 @@ export async function redisFixture(
 					);
 				if (isolated) {
 					client.disconnect();
-					docker("rm", "--force", "--volumes", name);
+					await docker("rm", "--force", "--volumes", name);
 					await create(String(port));
 				} else await client.flushall("SYNC");
 				if ((await client.dbsize()) !== 0)

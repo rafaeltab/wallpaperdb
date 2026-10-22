@@ -382,6 +382,62 @@ function potentialCallback(
 	].includes(node.kind);
 }
 
+function callbackResultHandled(
+	node: AnyJsAstNode,
+	model: SemanticModel,
+	seen: Set<string>,
+	allowVoid: boolean,
+): boolean {
+	const parent = node.parent;
+	if (parent?.kind === "JS_PARENTHESIZED_EXPRESSION")
+		return callbackResultHandled(parent, model, seen, allowVoid);
+	if (
+		parent?.kind === "JS_CALL_EXPRESSION" &&
+		parent.callee?.text === node.text
+	)
+		return handled(parent, model, seen, allowVoid);
+	if (
+		parent?.kind === "JS_INITIALIZER_CLAUSE" &&
+		parent.parent?.kind === "JS_VARIABLE_DECLARATOR" &&
+		parent.parent.id?.kind === "JS_IDENTIFIER_BINDING"
+	) {
+		const binding = model.asBinding(parent.parent.id);
+		if (!binding || binding.allWrites().length !== 0) return false;
+		const key = `callback:${binding.syntax().text}:${binding.scope().syntax().text}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return binding.allReads().some((read) => {
+			const expression = read.syntax().parent;
+			return (
+				expression?.kind === "JS_IDENTIFIER_EXPRESSION" &&
+				callbackResultHandled(expression, model, seen, allowVoid)
+			);
+		});
+	}
+	if (parent?.kind !== "JS_CALL_ARGUMENT_LIST") return false;
+	const call = parent.parent?.parent;
+	if (call?.kind !== "JS_CALL_EXPRESSION") return false;
+	const api = resolveApi(call.callee, model);
+	if (api && ["it", "test", "describe", "suite"].includes(api.name))
+		return true;
+	const callee = call.callee;
+	if (callee?.kind !== "JS_STATIC_MEMBER_EXPRESSION") return false;
+	if (["then", "catch", "finally"].includes(callee.member?.text ?? ""))
+		return handled(call, model, seen, allowVoid);
+	if (callee.member?.text === "map") {
+		const aggregate = call.parent?.parent?.parent;
+		return (
+			aggregate?.kind === "JS_CALL_EXPRESSION" &&
+			/^Promise\.(all|allSettled|race|any)$/.test(
+				aggregate.callee?.text ?? "",
+			) &&
+			aggregate.arguments?.args[0]?.text === call.text &&
+			handled(aggregate, model, seen, allowVoid)
+		);
+	}
+	return false;
+}
+
 function handled(
 	node: AnyJsAstNode,
 	model: SemanticModel,
@@ -419,8 +475,9 @@ function handled(
 			return allowVoid && parent.operatorToken === "void";
 		case "JS_AWAIT_EXPRESSION":
 		case "JS_RETURN_STATEMENT":
-		case "JS_ARROW_FUNCTION_EXPRESSION":
 			return true;
+		case "JS_ARROW_FUNCTION_EXPRESSION":
+			return callbackResultHandled(parent, model, seen, allowVoid);
 		case "JS_PARENTHESIZED_EXPRESSION":
 		case "TS_AS_EXPRESSION":
 		case "TS_SATISFIES_EXPRESSION":

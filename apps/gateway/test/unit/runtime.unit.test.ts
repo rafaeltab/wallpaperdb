@@ -33,7 +33,9 @@ describe('HTTP execution ownership', () => {
         )
       )
     );
-    const rejected = expect(result).rejects.toThrow();
+    const rejected = (async () => {
+      await expect(result).rejects.toThrow();
+    })();
     await Effect.runPromise(Deferred.await(started));
     await runtime.dispose();
     await rejected;
@@ -56,7 +58,9 @@ describe('HTTP execution ownership', () => {
         ),
         { signal: controller.signal }
       );
-      const rejected = expect(pending).rejects.toThrow();
+      const rejected = (async () => {
+        await expect(pending).rejects.toThrow();
+      })();
       controller.abort();
       await rejected;
       expect(cancelled).toBe(true);

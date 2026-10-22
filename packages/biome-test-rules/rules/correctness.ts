@@ -560,8 +560,13 @@ function callbackResultHandled(
 		return true;
 	if (
 		api &&
-		["vitest", "@effect/vitest", "node:test"].includes(api.source) &&
-		["beforeEach", "beforeAll", "afterEach", "afterAll"].includes(api.name)
+		api.members.length === 0 &&
+		((api.source === "node:test" &&
+			["before", "after", "beforeEach", "afterEach"].includes(api.name)) ||
+			(["vitest", "@effect/vitest"].includes(api.source) &&
+				["beforeEach", "beforeAll", "afterEach", "afterAll"].includes(
+					api.name,
+				)))
 	)
 		return true;
 	const callee = call.callee;

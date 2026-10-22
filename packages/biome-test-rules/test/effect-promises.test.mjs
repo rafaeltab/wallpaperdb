@@ -61,3 +61,34 @@ test("Effect promise checks accept synchronous APIs and unrelated or shadowed na
 	])
 		assert.deepEqual(lint(source), [], source);
 });
+
+test("Node lifecycle hooks await promise returns through source-bound aliases", () => {
+	for (const hook of ["before", "after", "beforeEach", "afterEach"]) {
+		assert.deepEqual(
+			lint(
+				`import { Effect } from 'effect'; import { ${hook} } from 'node:test'; ${hook}(() => Effect.runPromise(Effect.succeed(1)));`,
+			),
+			[],
+			hook,
+		);
+		for (const declaration of [
+			`import { ${hook} as lifecycle } from 'node:test';`,
+			`import * as hooks from 'node:test'; const lifecycle = hooks.${hook};`,
+		])
+			assert.deepEqual(
+				lint(
+					`import { Effect } from 'effect'; ${declaration} lifecycle(() => Effect.runPromise(Effect.succeed(1)));`,
+				),
+				[],
+				hook,
+			);
+	}
+	for (const source of [
+		"import { Effect } from 'effect'; import { before } from 'node:test'; function run(before) { before(() => Effect.runPromise(Effect.succeed(1))); }",
+		"import { Effect } from 'effect'; import { after } from 'other-library'; after(() => Effect.runPromise(Effect.succeed(1)));",
+	])
+		assert.ok(
+			lint(source).some((d) => d.message.includes("Effect promise")),
+			source,
+		);
+});

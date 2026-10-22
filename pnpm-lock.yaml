@@ -376,6 +376,9 @@ importers:
       '@wallpaperdb/ingestor':
         specifier: workspace:*
         version: link:../ingestor
+      '@wallpaperdb/wallpaper':
+        specifier: workspace:*
+        version: link:../wallpaper
       postcss:
         specifier: ^8.5.6
         version: 8.5.6

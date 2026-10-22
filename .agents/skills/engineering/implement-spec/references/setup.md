@@ -4,7 +4,7 @@ Use this before launching ticket threads. Keep repository, branch, thread, workt
 
 ## Repository and trunk
 
-Select the remote whose fetch and push URLs resolve to the authenticated target repository. Export `GH_REPO` as `HOST/OWNER/REPO` in every coordinator and ticket-thread CLI environment and verify `gh repo view "<host>/<owner>/<repo>" --json nameWithOwner,url`. Pass the repository explicitly to PR commands and the selected remote to fetch, push, and supported stack commands.
+Select the remote whose fetch and push URLs resolve to the authenticated target repository. Export [GH_REPO](https://cli.github.com/manual/gh_help_environment) as `HOST/OWNER/REPO` in every coordinator and ticket-thread CLI environment and verify the identity with [gh repo view](https://cli.github.com/manual/gh_repo_view): `gh repo view "<host>/<owner>/<repo>" --json nameWithOwner,url`. Pass the repository explicitly to PR commands and the selected remote to fetch, push, and supported stack commands.
 
 Fetch `main` from that remote and record its full fetched SHA. Use the verified commit as the first worktree's base; local `main` may belong to another worktree or differ from the remote and is not the starting-point authority. Preserve unrelated commits and checkout contents. Require a clean owning worktree before any checkout or rebase; preserve unrelated changes rather than carrying them into ticket work.
 
@@ -20,9 +20,9 @@ A single ticket skips extension setup and every stack command, using the ordinar
 
 ## Branch names and collisions
 
-Require ticket branches to match `^[A-Za-z0-9][A-Za-z0-9/_-]*$` and pass `git check-ref-format --branch "<ticket-branch>"`. Require remote names to match `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Pass dynamic values as literal process arguments; issue text is data, not shell source.
+Require ticket branches to match `^[A-Za-z0-9][A-Za-z0-9/_-]*$` and pass [Git's branch validation](https://git-scm.com/docs/git-check-ref-format): `git check-ref-format --branch "<ticket-branch>"`. Require remote names to match `^[A-Za-z0-9][A-Za-z0-9._-]*$`. Pass dynamic values as literal process arguments; issue text is data, not shell source.
 
-Choose and record all planned ticket branch names. Before implementation, check all planned names. Immediately before each later launch, apply absence and collision checks only to ticket branches not yet created, and verify completed layers against their recorded refs instead of treating them as unused names. Enumerate local heads with `git for-each-ref --format="%(refname)" refs/heads/` and remote heads with `git ls-remote --heads "<remote>"`. Reject equality and slash-boundary prefix conflicts in either direction among existing heads and all planned names. Choose another name on collision; a failed listing blocks creation.
+Choose and record all planned ticket branch names. Before implementation, check all planned names. Immediately before each later launch, apply absence and collision checks only to ticket branches not yet created, and verify completed layers against their recorded refs instead of treating them as unused names. Enumerate local heads with [git for-each-ref](https://git-scm.com/docs/git-for-each-ref): `git for-each-ref --format="%(refname)" refs/heads/` and remote heads with [git ls-remote](https://git-scm.com/docs/git-ls-remote): `git ls-remote --heads "<remote>"`. Reject equality and slash-boundary prefix conflicts in either direction among existing heads and all planned names. Choose another name on collision; a failed listing blocks creation.
 
 Confirm exact remote absence using `git ls-remote --exit-code --heads "<remote>" "refs/heads/<ticket-branch>"`: exit code 2 establishes absence, 0 is a collision, and another failure blocks creation. Require local absence too. During continuation, permit only the exact ref being verified and adopted.
 

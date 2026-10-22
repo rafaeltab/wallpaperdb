@@ -98,6 +98,11 @@ test("Node placeholders require a callback and reject native todo options", () =
 		"import { test } from 'node:test'; test('complete', () => {});",
 		"import { test } from 'node:test'; test(() => {});",
 		"import { test } from 'node:test'; test('complete', { todo: false }, () => {});",
+		"import { test } from 'node:test'; test('complete', { todo: (false) }, () => {});",
+		"import { test } from 'node:test'; test('complete', { todo: false as const }, () => {});",
+		"import { test } from 'node:test'; test('complete', { todo: undefined }, () => {});",
+		"import { test } from 'node:test'; const disabled = false; test('complete', { todo: disabled }, () => {});",
+		"import { test } from 'node:test'; const todo = false; test('complete', { todo }, () => {});",
 		"import { test } from 'node:test'; const callback = () => {}; test('complete', {}, callback);",
 		"import { test } from 'node:test'; import { callback } from './helper'; test('complete', callback);",
 	])

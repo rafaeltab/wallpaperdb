@@ -273,6 +273,53 @@ export const validExpect = defineRule({
 	},
 });
 
+function definitelyFalsy(
+	node: AnyJsAstNode | undefined,
+	model: SemanticModel,
+	seen = new Set<string>(),
+): boolean {
+	if (!node) return false;
+	if (
+		[
+			"JS_PARENTHESIZED_EXPRESSION",
+			"TS_AS_EXPRESSION",
+			"TS_SATISFIES_EXPRESSION",
+			"TS_NON_NULL_ASSERTION_EXPRESSION",
+		].includes(node.kind) &&
+		"expression" in node
+	)
+		return definitelyFalsy(node.expression, model, seen);
+	const identifier =
+		node.kind === "JS_IDENTIFIER_EXPRESSION"
+			? node.name
+			: node.kind === "JS_REFERENCE_IDENTIFIER"
+				? node
+				: undefined;
+	if (identifier) {
+		const binding = model.binding(identifier);
+		if (!binding) return node.text === "undefined";
+		const declaration = binding.syntax();
+		const parent = declaration.parent;
+		const variable = declaration
+			.ancestors()
+			.find((n) => n.kind === "JS_VARIABLE_DECLARATION");
+		if (
+			parent?.kind !== "JS_VARIABLE_DECLARATOR" ||
+			variable?.kind !== "JS_VARIABLE_DECLARATION" ||
+			variable.kindToken !== "const" ||
+			binding.allWrites().length !== 0
+		)
+			return false;
+		const key = `${declaration.text}:${binding.scope().syntax().text}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return definitelyFalsy(parent.initializer?.expression, model, seen);
+	}
+	if (node.kind === "JS_UNARY_EXPRESSION" && node.operatorToken === "void")
+		return true;
+	return ["false", "null", "0", "''", '""'].includes(node.text);
+}
+
 function hasOption(
 	node: AnyJsAstNode | undefined,
 	model: SemanticModel,
@@ -314,11 +361,13 @@ function hasOption(
 							: name?.text,
 					) === option &&
 					(option !== "todo" ||
-						!(
-							member.kind === "JS_PROPERTY_OBJECT_MEMBER" &&
-							["false", "null", "undefined", "0", "''", '""'].includes(
-								member.value?.text ?? "",
-							)
+						!definitelyFalsy(
+							member.kind === "JS_PROPERTY_OBJECT_MEMBER"
+								? member.value
+								: member.kind === "JS_SHORTHAND_PROPERTY_OBJECT_MEMBER"
+									? member.name
+									: undefined,
+							model,
 						))
 				);
 			});

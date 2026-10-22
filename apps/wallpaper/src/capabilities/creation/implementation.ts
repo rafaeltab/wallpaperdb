@@ -19,10 +19,12 @@ export function creationLayer(ownerNamespace: string) {
         begin: (owner, key) =>
           owner.namespace !== ownerNamespace
             ? Effect.succeed({ kind: 'forbidden' })
-            : store.begin(owner, key).pipe(
-                Effect.map((wallpaper) => ({ kind: 'wallpaper' as const, wallpaper })),
-                Effect.withSpan('wallpaper.creation.begin')
-              ),
+            : !/^[\x21-\x7e]{1,128}$/.test(key)
+              ? Effect.succeed({ kind: 'conflict' })
+              : store.begin(owner, key).pipe(
+                  Effect.map((wallpaper) => ({ kind: 'wallpaper' as const, wallpaper })),
+                  Effect.withSpan('wallpaper.creation.begin')
+                ),
         get: (owner, id) =>
           store.change<WallpaperOutcome>({ kind: 'wallpaper', id }, (wallpaper) => ({
             wallpaper,

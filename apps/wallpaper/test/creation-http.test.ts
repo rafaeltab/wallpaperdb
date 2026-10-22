@@ -3,6 +3,7 @@ import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
 import {
   Creation,
+  WorkflowHealth,
   CreatorAuthentication,
   WorkflowFailure,
 } from '../src/capabilities/creation/index.js';
@@ -17,6 +18,7 @@ it('uses verified Creator identity, returns durable progress and hides private w
         ),
     }),
     Layer.succeed(Creation, {
+      list: () => Effect.succeed([]),
       begin: (owner, key) => {
         calls.push({ owner, key });
         return Effect.succeed({
@@ -43,7 +45,10 @@ it('uses verified Creator identity, returns durable progress and hides private w
     })
   );
   const app = Fastify();
-  await registerCreationHttp(app, services);
+  await registerCreationHttp(
+    app,
+    services.pipe(Layer.merge(Layer.succeed(WorkflowHealth, { check: () => Effect.succeed(true) })))
+  );
   try {
     expect(
       (
@@ -69,6 +74,9 @@ it('uses verified Creator identity, returns durable progress and hides private w
       sourceId: null,
       createdAt: '2026-10-22T00:00:00.000Z',
     });
+    expect(
+      (await app.inject({ url: '/wallpapers', headers: { authorization: 'Bearer valid' } })).json()
+    ).toEqual({ wallpapers: [] });
     expect(calls).toEqual([
       { owner: { namespace: 'authors', subject: 'creator' }, key: 'request-1' },
     ]);
@@ -111,6 +119,7 @@ it('reports infrastructure failure safely as retryable unavailability', async ()
         verify: () => Effect.succeed({ namespace: 'authors', subject: 'creator' }),
       }),
       Layer.succeed(Creation, {
+        list: () => Effect.succeed([]),
         begin: () =>
           Effect.fail(
             new WorkflowFailure({ operation: 'private-secret', cause: new Error('password') })
@@ -120,7 +129,7 @@ it('reports infrastructure failure safely as retryable unavailability', async ()
         assetResult: () => Effect.succeed('ignored'),
         sourceAccepted: () => Effect.succeed('ignored'),
       })
-    )
+    ).pipe(Layer.merge(Layer.succeed(WorkflowHealth, { check: () => Effect.succeed(true) })))
   );
   try {
     const response = await app.inject({

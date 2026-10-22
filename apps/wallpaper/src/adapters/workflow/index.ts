@@ -1,6 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { Context, Effect, Layer } from 'effect';
-import { and, eq, lte, or } from 'drizzle-orm';
+import { and, eq, lte, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import {
@@ -52,6 +52,21 @@ export function workflowPostgresLayer(options: Options) {
           Effect.withSpan(`wallpaper.persistence.${operation}`)
         );
       const store: WorkflowStorePort = {
+        list: (owner) =>
+          query('list', async () => {
+            const rows = await db
+              .select({ state: wallpaperIntents.state })
+              .from(wallpaperIntents)
+              .where(
+                and(
+                  eq(wallpaperIntents.ownerNamespace, owner.namespace),
+                  eq(wallpaperIntents.contributorId, owner.subject)
+                )
+              )
+              .orderBy(sql`${wallpaperIntents.state}->>'createdAt' desc`)
+              .limit(100);
+            return rows.map((row) => row.state);
+          }),
         begin: (owner, key) =>
           query('begin', () =>
             db.transaction(async (tx) => {
@@ -83,28 +98,26 @@ export function workflowPostgresLayer(options: Options) {
                 .onConflictDoNothing()
                 .returning();
               if (inserted.length) {
-                await tx
-                  .insert(workflowOutbox)
-                  .values({
+                await tx.insert(workflowOutbox).values({
+                  id: creationEventId,
+                  wallpaperId: id,
+                  destination: 'asset-create',
+                  event: {
+                    specversion: '1.0',
                     id: creationEventId,
-                    wallpaperId: id,
-                    destination: 'asset-create',
-                    event: {
-                      specversion: '1.0',
-                      id: creationEventId,
-                      source: 'https://wallpaperdb/wallpaper',
-                      type: 'asset.command.create',
-                      time: createdAt,
-                      datacontenttype: 'application/json',
-                      correlationid: id,
-                      data: {
-                        commandId: wallpaper.commandId,
-                        applicationReference: id,
-                        assetType: 'wallpaper',
-                        ownerSubject: owner.subject,
-                      },
+                    source: 'https://wallpaperdb/wallpaper',
+                    type: 'asset.command.create',
+                    time: createdAt,
+                    datacontenttype: 'application/json',
+                    correlationid: id,
+                    data: {
+                      commandId: wallpaper.commandId,
+                      applicationReference: id,
+                      assetType: 'wallpaper',
+                      ownerSubject: owner.subject,
                     },
-                  });
+                  },
+                });
                 return wallpaper;
               }
               const rows = await tx

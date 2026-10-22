@@ -59,6 +59,7 @@ export interface SourceAcceptance extends SourceIntent {
   readonly occurrenceId: string;
 }
 export interface CreationPort {
+  readonly list: (owner: Creator) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
   readonly begin: (owner: Creator, key: string) => Effect.Effect<WallpaperOutcome, WorkflowFailure>;
   readonly get: (owner: Creator, id: string) => Effect.Effect<WallpaperOutcome, WorkflowFailure>;
   readonly expectSource: (
@@ -82,6 +83,7 @@ export class Creation extends Context.Service<Creation, CreationPort>()(
  * pure callback receives detached values. State and optional publication commit
  * together, including through an ambiguous commit. Asset identity is globally unique. */
 export interface WorkflowStorePort {
+  readonly list: (owner: Creator) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
   readonly begin: (owner: Creator, key: string) => Effect.Effect<Wallpaper, WorkflowFailure>;
   readonly change: <A>(
     selector: { readonly kind: 'wallpaper' | 'asset'; readonly id: string },
@@ -121,3 +123,8 @@ export interface WorkflowDeliveryPort {
 export class WorkflowDelivery extends Context.Service<WorkflowDelivery, WorkflowDeliveryPort>()(
   'wallpaper/creation/Delivery'
 ) {}
+
+export class WorkflowHealth extends Context.Service<
+  WorkflowHealth,
+  { readonly check: () => Effect.Effect<boolean> }
+>()('wallpaper/creation/WorkflowHealth') {}

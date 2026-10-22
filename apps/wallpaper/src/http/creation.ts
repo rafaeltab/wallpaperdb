@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import {
   Creation,
+  WorkflowHealth,
+  type Wallpaper,
   CreatorAuthentication,
   type WallpaperOutcome,
 } from '../capabilities/creation/index.js';
@@ -33,22 +35,37 @@ function respond(reply: FastifyReply, result: WallpaperOutcome, accepted = false
       .type('application/problem+json')
       .send(problem(status, result.kind === 'unavailable' ? 'not-found' : result.kind));
   }
-  const w = result.wallpaper;
-  return reply
-    .code(accepted ? 202 : 200)
-    .send({
-      wallpaperId: w.id,
-      state: w.state,
-      assetId: w.assetId,
-      sourceId: w.sourceId,
-      createdAt: w.createdAt,
-    });
+  return reply.code(accepted ? 202 : 200).send(publicWallpaper(result.wallpaper));
+}
+function publicWallpaper(w: Wallpaper) {
+  return {
+    wallpaperId: w.id,
+    state: w.state,
+    assetId: w.assetId,
+    sourceId: w.sourceId,
+    createdAt: w.createdAt,
+  };
 }
 export async function registerCreationHttp<E>(
   app: FastifyInstance,
-  services: Layer.Layer<Creation | CreatorAuthentication, E>
+  services: Layer.Layer<Creation | CreatorAuthentication | WorkflowHealth, E>,
+  options: { readonly monitorWorkflow?: boolean } = {}
 ) {
   const runtime = ManagedRuntime.make(services);
+  await runtime.runPromise(Creation).catch(async (error) => {
+    await runtime.dispose();
+    throw error;
+  });
+  if (options.monitorWorkflow)
+    app.addHook('onRequest', async (request, reply) => {
+      if (request.url !== '/ready' && request.url !== '/health') return;
+      const healthy = await runtime.runPromise(WorkflowHealth.use((service) => service.check()));
+      if (!healthy)
+        return reply
+          .code(503)
+          .type('application/problem+json')
+          .send(problem(503, 'service-unavailable'));
+    });
   const controllers = new Set<AbortController>();
   let closing: ReturnType<typeof setTimeout> | undefined;
   app.addHook('preClose', async () => {
@@ -104,6 +121,24 @@ export async function registerCreationHttp<E>(
       reply.raw.off('close', abort);
     }
   };
+  app.get('/wallpapers', async (request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    const result = await runtime.runPromise(
+      Effect.gen(function* () {
+        const auth = yield* CreatorAuthentication;
+        const owner = yield* auth.verify(request.headers.authorization);
+        if (!owner) return { kind: 'unauthorized' as const };
+        const c = yield* Creation;
+        return { kind: 'list' as const, wallpapers: yield* c.list(owner) };
+      }).pipe(Effect.catch(() => Effect.succeed({ kind: 'failure' as const })))
+    );
+    if (result.kind === 'list') return { wallpapers: result.wallpapers.map(publicWallpaper) };
+    const status = result.kind === 'unauthorized' ? 401 : 503;
+    return reply
+      .code(status)
+      .type('application/problem+json')
+      .send(problem(status, status === 401 ? 'unauthorized' : 'service-unavailable'));
+  });
   app.post('/wallpapers', schemaOptions(z.object({}).strict()), (request, reply) => {
     const key = z
       .string()

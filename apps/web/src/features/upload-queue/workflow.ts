@@ -221,6 +221,16 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
       }
       publish();
     },
+    resumeConfirming() {
+      state = {
+        ...state,
+        files: state.files.map((file) =>
+          file.status === 'confirming' ? { ...file, status: 'pending' } : file
+        ),
+      };
+      publish();
+      processNext();
+    },
     retryFailed() {
       for (const file of state.files) {
         if (file.status === 'failed') rateLimitRetries.delete(file.id);

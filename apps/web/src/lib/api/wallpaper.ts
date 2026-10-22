@@ -5,7 +5,7 @@ export type { UploadResult } from '@/features/upload-queue';
 /** The queue owns the stable request key and the originating session lifetime. */
 export async function uploadWallpaperWithDetails(
   file: File,
-  key: string,
+  key: string | { readonly wallpaperId: string },
   signal: AbortSignal
 ): Promise<UploadResult> {
   try {
@@ -40,3 +40,6 @@ export async function uploadWallpaperWithDetails(
     };
   }
 }
+
+export const resumeWallpaperWithDetails = (file: File, wallpaperId: string, signal: AbortSignal) =>
+  uploadWallpaperWithDetails(file, { wallpaperId }, signal);

@@ -2,14 +2,17 @@ import type { CreationApi, CreationOutcome, WallpaperStatus } from './contract';
 export async function uploadFirstSource<TFile>(
   api: CreationApi<TFile>,
   file: { readonly value: TFile; readonly size: number },
-  key: string,
+  request: string | { readonly wallpaperId: string },
   signal: AbortSignal
 ): Promise<CreationOutcome> {
   signal.throwIfAborted();
   const policy = await api.policy(signal);
   if (file.size > policy.maxBytes)
     throw new Error('Image exceeds the current Asset upload policy.');
-  let wallpaper = await api.begin(key, signal);
+  let wallpaper =
+    typeof request === 'string'
+      ? await api.begin(request, signal)
+      : await api.status(request.wallpaperId, signal);
   const waitFor = async (predicate: (w: WallpaperStatus) => boolean) => {
     for (let i = 0; i < 30 && !predicate(wallpaper); i++) {
       if (wallpaper.state === 'failed') throw new Error('Wallpaper creation was rejected.');
@@ -22,7 +25,7 @@ export async function uploadFirstSource<TFile>(
   if (!(await waitFor((w) => w.assetId !== null))) return { kind: 'pending', wallpaper };
   const asset = wallpaper.assetId;
   if (!asset) return { kind: 'pending', wallpaper };
-  let candidate = await api.candidate(asset, `${key}-source`, signal);
+  let candidate = await api.candidate(asset, `${wallpaper.wallpaperId}-first-source`, signal);
   for (let i = 0; i < 30 && ['inspecting', 'accepting'].includes(candidate.status); i++) {
     await api.wait(signal);
     candidate = await api.candidateStatus(asset, candidate.candidateId, signal);
@@ -32,7 +35,7 @@ export async function uploadFirstSource<TFile>(
     throw new Error(
       'The retained upload candidate cannot be accepted. Select the file again to start a new creation.'
     );
-  const intent = key;
+  const intent = wallpaper.wallpaperId;
   // Register intent durably before any acceptance can generate its confirmation.
   await api.expectSource(wallpaper.wallpaperId, candidate.candidateId, intent, signal);
   if (candidate.status === 'awaiting-bytes') {

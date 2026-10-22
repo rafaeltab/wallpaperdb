@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { acceptedUploads, queuePresentation } from '@/features/upload-queue';
 it('accepts supported files within size and count limits while explaining rejected entries', () => {
   const files=[{type:'image/png',size:1},{type:'image/gif',size:1},{type:'image/jpeg',size:51*1024*1024},{type:'image/webp',size:1}];
-  expect(acceptedUploads(files,1)).toEqual({files:[files[0]],rejectionMessage:'Only JPEG, PNG, and WebP images are supported. Images must be 50 MiB or smaller.'});
+  expect(acceptedUploads(files,1,50*1024*1024)).toEqual({files:[files[0]],rejectionMessage:'Only JPEG, PNG, and WebP images are supported. Images must be 50 MiB or smaller.'});
   expect(acceptedUploads(files,0).files).toEqual([]);
   expect(acceptedUploads([],2)).toEqual({files:[],rejectionMessage:null});
 });
@@ -13,4 +13,9 @@ it('auto-dismisses only successful settled batches and never stopped, paused or 
   expect(queuePresentation({...state,isPaused:true}).autoDismiss).toBe(false);
   expect(queuePresentation({...state,files:[{status:'duplicate'}]}).autoDismiss).toBe(false);
   expect(queuePresentation({...state,files:[{status:'failed'}]}).autoDismiss).toBe(false);
+});
+it('applies the effective configured byte limit instead of a fixed wallpaper default',()=>{
+ const file={type:'image/jpeg',size:60*1024*1024};
+ expect(acceptedUploads([file],1,100*1024*1024).files).toEqual([file]);
+ expect(acceptedUploads([file],1,10*1024*1024)).toEqual({files:[],rejectionMessage:'Images must be 10 MiB or smaller.'});
 });

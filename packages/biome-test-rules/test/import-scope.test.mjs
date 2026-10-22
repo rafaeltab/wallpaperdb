@@ -62,3 +62,31 @@ test("static template import sources retain the pinned raw module value", () => 
 			);
 	}
 });
+
+test("static template destructuring keys retain upstream imported names", () => {
+	for (const loader of ["require('vitest')", "await import('vitest')"])
+		assert.equal(
+			diagnostics(
+				`const { [\`expect\`]: check } = ${loader}; check(1);`,
+				"valid-expect",
+			).length,
+			1,
+			loader,
+		);
+	for (const key of ["`application`", "`ex${name}`", "`ex\\u0070ect`"])
+		assert.deepEqual(
+			diagnostics(
+				`const { [${key}]: check } = await import('vitest'); check(1);`,
+				"valid-expect",
+			),
+			[],
+			key,
+		);
+	assert.deepEqual(
+		diagnostics(
+			"const { [`expect`]: check } = await import('application'); check(1);",
+			"valid-expect",
+		),
+		[],
+	);
+});

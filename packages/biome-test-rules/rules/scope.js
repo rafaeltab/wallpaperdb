@@ -1,5 +1,16 @@
 import { identifierValue, stringValue } from "./syntax.js";
 
+// The pinned accessor helpers use raw text for no-substitution templates.
+function staticTemplateValue(node) {
+	if (
+		node?.kind !== "JS_TEMPLATE_EXPRESSION" ||
+		node.tag ||
+		!node.elements.every((e) => e.kind === "JS_TEMPLATE_CHUNK_ELEMENT")
+	)
+		return undefined;
+	return node.elements.map((e) => e.text).join("");
+}
+
 export const getScope = (context, node) => context.model.scope(node.native);
 
 export function definition(context, identifier) {
@@ -166,25 +177,21 @@ export function resolveScope(scope, identifier) {
 						? initializer
 						: undefined;
 			const source = imported?.arguments?.args[0];
-			const staticTemplate =
-				source?.kind === "JS_TEMPLATE_EXPRESSION" &&
-				!source.tag &&
-				source.elements.every((e) => e.kind === "JS_TEMPLATE_CHUNK_ELEMENT");
+			const templateSource = staticTemplateValue(source);
 			let key = parent.member ?? parent.identifier;
 			if (key?.kind === "JS_COMPUTED_MEMBER_NAME") key = key.expression;
 			if (
-				(source?.kind === "JS_STRING_LITERAL_EXPRESSION" || staticTemplate) &&
+				(source?.kind === "JS_STRING_LITERAL_EXPRESSION" ||
+					templateSource !== undefined) &&
 				key
 			)
 				return {
-					// The pinned getStringValue uses raw text for template literals.
-					source: staticTemplate
-						? source.elements.map((e) => e.text).join("")
-						: stringValue(source.text),
+					source: templateSource ?? stringValue(source.text),
 					imported:
-						key.kind === "JS_LITERAL_MEMBER_NAME" && /^["']/.test(key.text)
+						staticTemplateValue(key) ??
+						(key.kind === "JS_LITERAL_MEMBER_NAME" && /^["']/.test(key.text)
 							? stringValue(key.text)
-							: identifierValue(key.text),
+							: identifierValue(key.text)),
 					local: identifier,
 				};
 		}

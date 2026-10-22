@@ -363,7 +363,10 @@ export async function coordinate() {
 				const remaining = executionDeadline - performance.now();
 				const visitMs = Math.min(quantumMs, remaining);
 				const graceMs = Math.min(15_000, Math.floor(visitMs / 4));
-				if (visitMs - graceMs < 500) break;
+				if (visitMs - graceMs < 500) {
+					if (jobs.length === full.jobs.length) scheduling.cursor = job.id;
+					break;
+				}
 				console.log(
 					`Mutation stage ${job.id}; ${(visitMs / 1000).toFixed(2)}s slice including ${(graceMs / 1000).toFixed(2)}s shutdown; ${(remaining / 1000).toFixed(1)}s aggregate budget remaining`,
 				);

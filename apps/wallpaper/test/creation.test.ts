@@ -13,6 +13,12 @@ function setup() {
   const records = new Map<string, Wallpaper>();
   const events: Publication[] = [];
   const layer = Layer.succeed(WorkflowStore, {
+    list: (principal) =>
+      Effect.succeed(
+        [...records.values()].filter(
+          (w) => w.owner.namespace === principal.namespace && w.owner.subject === principal.subject
+        )
+      ),
     begin: (principal, key) =>
       Effect.sync(() => {
         const old = [...records.values()].find(

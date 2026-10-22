@@ -432,7 +432,8 @@ function staticComputedKey(node: AnyJsAstNode | undefined): string | undefined {
 function staticMemberName(node: AnyJsAstNode | undefined): string | undefined {
 	if (node?.kind === "JS_COMPUTED_MEMBER_NAME")
 		return staticComputedKey(node.expression);
-	return node?.kind === "JS_LITERAL_MEMBER_NAME"
+	return node?.kind === "JS_LITERAL_MEMBER_NAME" ||
+		node?.kind === "JS_REFERENCE_IDENTIFIER"
 		? literal(node.text)
 		: undefined;
 }

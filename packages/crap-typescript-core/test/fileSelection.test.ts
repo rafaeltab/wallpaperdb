@@ -10,6 +10,7 @@ import {
   isAnalyzableFile
 } from "../src/fileSelection";
 import type * as UtilsModule from "../src/utils";
+import { parseFileMethods } from "../src/parser";
 import { createTempDir, disposeTempDir, initGitRepository, runProcess, writeProjectFiles } from "./testUtils";
 
 const tempDirs: string[] = [];
@@ -22,6 +23,23 @@ afterEach(async () => {
 });
 
 describe("file selection", () => {
+  it("includes maintained JavaScript bodies in the source inventory", async () => {
+    const tempDir = await createTempDir("crap-js-files-");
+    tempDirs.push(tempDir);
+    await writeProjectFiles(tempDir, {
+      "src/rules.js": "export function choose(value) { return value ? 1 : 0; }",
+      "src/rules.test.js": "export const ignored = () => 1;",
+      "src/node_modules/ignored.js": "export const ignored = () => 1;"
+    });
+
+    const files = await expandExplicitPaths(tempDir, ["src"]);
+    expect(files.map((file) => path.relative(tempDir, file).replace(/\\/g, "/"))).toEqual(["src/rules.js"]);
+    const methods = await parseFileMethods(files[0]!);
+    expect(methods.map((method) => ({ name: method.displayName, complexity: method.complexity }))).toEqual([
+      { name: "choose", complexity: 2 }
+    ]);
+  });
+
   it("finds TypeScript files under nested src roots and ignores tests", async () => {
     const tempDir = await createTempDir("crap-files-");
     tempDirs.push(tempDir);

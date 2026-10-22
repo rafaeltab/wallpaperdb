@@ -4,6 +4,7 @@
     "adapters/assets",
     "adapters/catalog",
     "adapters/events",
-    "adapters/lifecycle"
+    "adapters/lifecycle",
+    "adapters/commands"
   ]
 }

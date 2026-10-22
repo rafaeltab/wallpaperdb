@@ -1,39 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseAuthority } from '../src/authority.js';
-export const authorityFixture = () => ({
-  revision: 'test-1',
-  broker: {
-    service: { user: 'asset-service', password: 'service-secret', revision: '1' },
-    operator: { user: 'asset-operator', password: 'operator-secret', revision: '1' },
-  },
-  applications: {
-    wallpaper: {
-      ownerNamespace: 'clerk-test',
-      allowedOperations: ['create'],
-      allowedTypes: ['wallpaper'],
-      credentials: [{ user: 'wallpaper-1', password: 'wallpaper-secret', revision: '1' }],
-    },
-    user: {
-      ownerNamespace: 'clerk-test',
-      allowedOperations: ['create'],
-      allowedTypes: ['picture'],
-      credentials: [{ user: 'user-1', password: 'user-secret', revision: '1' }],
-    },
-  },
-  identityProviders: {
-    clerk: {
-      adapter: 'clerk',
-      ownerNamespace: 'clerk-test',
-      issuer: 'https://example.clerk.accounts.dev',
-      jwksUrl: 'https://example.clerk.accounts.dev/.well-known/jwks.json',
-      tokenProfile: 'session',
-      authorizedParties: ['http://localhost:8000'],
-      audience: [],
-    },
-  },
-  assetTypes: { wallpaper: {}, picture: {} },
-  delivery: { maxAttempts: 3, retryDelayMs: 100, pollMs: 20, shutdownTimeoutMs: 1000 },
-});
+import { authorityFixture } from './fixtures/authority.js';
 describe('trusted Asset authority file', () => {
   it('computes order-independent non-secret configuration identity and rejects unsafe routing', () => {
     const raw = authorityFixture();

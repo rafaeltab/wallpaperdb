@@ -1,3 +1,4 @@
+import { initialSourcePolicies } from '../../src/capabilities/sources/policy.js';
 export const authorityFixture = () => ({
   revision: 'test-1',
   operatorNotification: {
@@ -41,6 +42,6 @@ export const authorityFixture = () => ({
       audience: [],
     },
   },
-  assetTypes: { wallpaper: {}, picture: {} },
+  assetTypes: structuredClone(initialSourcePolicies),
   delivery: { maxAttempts: 3, retryDelayMs: 100, pollMs: 20, shutdownTimeoutMs: 1000 },
 });

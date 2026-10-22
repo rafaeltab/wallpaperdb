@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/react';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { recentCreations, downloadOriginal } from '@/features/wallpaper-creation/adapters/http';
 const labels = {
   'creating-asset': 'Waiting for Asset creation',
@@ -11,6 +11,14 @@ const labels = {
 };
 export function RecentCreations() {
   const { userId, isSignedIn } = useAuth();
+  const active = useRef(new Set<AbortController>());
+  useEffect(
+    () => () => {
+      for (const c of active.current) c.abort();
+      active.current.clear();
+    },
+    [userId]
+  );
   const [error, setError] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ['wallpaper-creations', userId],
@@ -27,7 +35,7 @@ export function RecentCreations() {
       <h2 className="font-semibold">Recent creations</h2>
       <p className="text-sm text-muted-foreground">
         Progress is saved by Wallpaper and remains available after a refresh. Accepted Sources can
-        be downloaded by their owner. Public discovery is a separate workflow.
+        be downloaded by their owner.
       </p>
       {query.isPending && <p>Loading creation progress…</p>}
       {query.isError && (
@@ -46,7 +54,17 @@ export function RecentCreations() {
             className="rounded-lg border p-3 space-y-2"
             data-testid="wallpaper-creation"
           >
-            <p className="font-medium">{labels[w.state]}</p>
+            <p className="font-medium">
+              {w.candidateStatus === 'rejected'
+                ? 'Source upload was rejected. Select the file again to start a new creation.'
+                : w.candidateStatus === 'cancelled'
+                  ? 'Source upload was cancelled.'
+                  : w.candidateStatus === 'unavailable'
+                    ? 'Source progress is temporarily unavailable.'
+                    : w.attentionRequired
+                      ? 'Progress requires operator attention. Your accepted request is retained.'
+                      : labels[w.state]}
+            </p>
             <p className="text-xs break-all text-muted-foreground">{w.wallpaperId}</p>
             {w.state === 'published' && w.sourceId && (
               <button
@@ -54,9 +72,16 @@ export function RecentCreations() {
                 className="text-sm underline"
                 onClick={() => {
                   setError(null);
-                  void downloadOriginal(w).catch(() =>
-                    setError('The accepted Source is temporarily unavailable. Retry the download.')
-                  );
+                  const controller = new AbortController();
+                  active.current.add(controller);
+                  void downloadOriginal(w, controller.signal)
+                    .catch(() => {
+                      if (!controller.signal.aborted)
+                        setError(
+                          'The accepted Source is temporarily unavailable. Retry the download.'
+                        );
+                    })
+                    .finally(() => active.current.delete(controller));
                 }}
               >
                 Download accepted Source

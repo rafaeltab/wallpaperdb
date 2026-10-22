@@ -1,4 +1,4 @@
-import { ClerkProvider } from '@clerk/react';
+import { ClerkProvider, useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
@@ -64,6 +64,11 @@ declare module '@tanstack/react-router' {
   }
 }
 
+function SessionUploadQueue({ children }: { children: React.ReactNode }) {
+  const { userId } = useAuth();
+  return <UploadQueueProvider key={userId ?? 'signed-out'}>{children}</UploadQueueProvider>;
+}
+
 function App() {
   if (!PUBLISHABLE_KEY) {
     return (
@@ -84,11 +89,11 @@ function App() {
         <AuthBridge>
           <ProfileBootstrap />
           <ThemeProvider defaultTheme="system" storageKey="wallpaperdb-theme">
-            <UploadQueueProvider>
+            <SessionUploadQueue>
               <RouterProvider router={router} />
               <Toaster />
               <ReactQueryDevtools initialIsOpen={false} />
-            </UploadQueueProvider>
+            </SessionUploadQueue>
           </ThemeProvider>
         </AuthBridge>
       </QueryClientProvider>

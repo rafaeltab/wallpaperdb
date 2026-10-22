@@ -1,4 +1,6 @@
 export interface WallpaperStatus {
+  readonly candidateId?: string;
+  readonly candidateStatus?: string;
   readonly wallpaperId: string;
   readonly state:
     | 'creating-asset'
@@ -9,6 +11,7 @@ export interface WallpaperStatus {
   readonly assetId: string | null;
   readonly sourceId: string | null;
   readonly createdAt: string;
+  readonly attentionRequired?: boolean;
 }
 export interface CandidateStatus {
   readonly candidateId: string;

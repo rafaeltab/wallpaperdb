@@ -16,12 +16,12 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { UploadQueueToastManager } from '@/components/upload/upload-queue-toast-manager';
 import { UploadQueueProvider, useUploadQueue } from '@/contexts/upload-queue-context';
-import { type UploadResult, uploadWallpaperWithDetails } from '@/lib/api/ingestor';
+import { type UploadResult, uploadWallpaperWithDetails } from '@/lib/api/wallpaper';
 
 const navigate = vi.fn();
 const originalAsyncWrapper = getConfig().asyncWrapper;
 vi.mock('@tanstack/react-router', () => ({ useRouter: () => ({ navigate }) }));
-vi.mock('@/lib/api/ingestor', () => ({ uploadWallpaperWithDetails: vi.fn() }));
+vi.mock('@/lib/api/wallpaper', () => ({ uploadWallpaperWithDetails: vi.fn() }));
 
 function QueueControls() {
   const { addFiles, state, retryFailed } = useUploadQueue();

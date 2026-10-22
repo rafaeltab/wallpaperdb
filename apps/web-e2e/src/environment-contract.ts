@@ -17,6 +17,7 @@ type ServiceContract = {
 const SERVICE_CONTRACTS: ServiceContract[] = [
   { name: "ingestor", routePrefix: "/ingestor" },
   { name: "asset", routePrefix: "/asset" },
+  { name: "wallpaper", routePrefix: "/wallpaper" },
   { name: "gateway", routePrefix: "/gateway" },
   { name: "variant-generator", routePrefix: "/variant-generator" },
   { name: "color-extractor", routePrefix: "/color-extractor" },

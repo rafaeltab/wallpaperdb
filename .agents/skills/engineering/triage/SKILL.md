@@ -32,8 +32,7 @@ Five **state** roles:
 
 - `needs-triage`: maintainer needs to evaluate
 - `needs-info`: waiting on reporter for more information
-- `ready-for-agent`: fully specified, ready for an AFK agent
-- `ready-for-human`: needs human implementation
+- `ready-for-agent` and `ready-for-human`: use the repository's [readiness definitions](../../../../docs/agents/triage-labels.md).
 - `wontfix`: will not be actioned
 
 For a PR, the same states read against the attached code: `ready-for-agent` means a brief is attached and an agent should take the next step on the diff; `ready-for-human` means it's ready for a human to merge.
@@ -73,7 +72,7 @@ Show counts and a one-line summary per item. Let the maintainer pick.
 
 3. **Verify the claim.** Before any grilling, check that the claim holds up. For a bug, reproduce it from the reporter's steps. For a PR, confirm the diff does what it claims: check it out, run the relevant tests or commands. Report what happened: confirmed (with code path), failed, or insufficient detail (a strong `needs-info` signal). A confirmed verification makes a much stronger agent brief.
 
-4. **Grill (if needed).** If the request needs fleshing out, call the Skill tool twice, for "grilling" and "domain-modeling", and grill it into shape a round of questions at a time, sharpening domain terms and updating `GLOSSARY.md`/ADRs inline as decisions land.
+4. **Grill (if needed).** If human decisions remain, call the Skill tool twice, for "grilling" and "domain-modeling", and grill it into shape a round of questions at a time, sharpening domain terms and updating `GLOSSARY.md`/ADRs inline as decisions land. Otherwise, triage can complete planning under the [project lifecycle](../../../../docs/agents/issue-tracker.md#project-lifecycle).
 
 5. **Apply the outcome:**
    - `ready-for-agent`: post an agent brief comment ([AGENT-BRIEF.md](AGENT-BRIEF.md)).
@@ -84,6 +83,8 @@ Show counts and a one-line summary per item. Let the maintainer pick.
      - **Rejected (bug)**: give a polite explanation, then close.
      - **Rejected (enhancement)**: write to `.out-of-scope/`, link to it from a comment, then close ([OUT-OF-SCOPE.md](OUT-OF-SCOPE.md)).
    - `needs-triage`: apply the role. Optional comment if there's partial progress.
+
+6. **Check completion.** Run the repository's [triage completion check](../../../../docs/agents/triage-labels.md#completion-check) after applying the outcome and project status, including quick state overrides.
 
 ## Quick state override
 

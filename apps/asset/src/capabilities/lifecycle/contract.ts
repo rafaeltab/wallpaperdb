@@ -74,9 +74,7 @@ export interface ResultPublication {
  * through ambiguous publication and restart. Failure increments a durable finite
  * attempt counter; exhausted work remains inspectable until operator recovery. */
 export interface ResultOutboxPort {
-  readonly pendingAlerts: (
-    limit: number
-  ) => Effect.Effect<
+  readonly pendingAlerts: (limit: number) => Effect.Effect<
     readonly {
       readonly id: string;
       readonly applicationId: string;
@@ -110,9 +108,10 @@ export interface LifecyclePolicy {
 export interface AssetInspection {
   readonly assetId: string;
   readonly assetType: string;
-  readonly sources: readonly never[];
-  readonly defaultSourceId: null;
-  readonly sourceSetRevision: '0';
+  readonly sources: readonly import('../sources/index.js').AcceptedSource[];
+  readonly defaultSourceId: string | null;
+  readonly sourceSetRevision: string;
+  readonly deliveryRevision?: string;
 }
 export interface LifecyclePort {
   readonly command: (

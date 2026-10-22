@@ -9,6 +9,16 @@ import { join } from "node:path";
 
 const execute = promisify(execFile);
 
+export class FixtureCleanupError extends AggregateError {
+	constructor(startupError, cleanupError) {
+		super(
+			[startupError, cleanupError],
+			`Owned Redis startup cleanup failed: ${cleanupError.message}`,
+			{ cause: startupError },
+		);
+	}
+}
+
 /** Physical Redis belongs to this stage, not Vitest's repeated module lifetime. */
 export async function redisFixture(
 	cwd,
@@ -211,7 +221,11 @@ export async function redisFixture(
 			},
 		};
 	} catch (error) {
-		await close();
+		try {
+			await close();
+		} catch (cleanupError) {
+			throw new FixtureCleanupError(error, cleanupError);
+		}
 		throw error;
 	}
 }

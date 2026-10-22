@@ -179,8 +179,8 @@ test("fixture teardown kills a coordinator that cannot process SIGTERM", async (
 	}
 });
 
-async function until(check, details = () => "") {
-	const deadline = Date.now() + 5000;
+async function until(check, details = () => "", timeoutMs = 5000) {
+	const deadline = Date.now() + timeoutMs;
 	while (!check()) {
 		assert.ok(
 			Date.now() < deadline,
@@ -528,6 +528,27 @@ test("killing a coordinator keeps the host locked until its surviving command ex
 	writeFileSync(join(f.root, "release"), "");
 	const result = await next.done;
 	assert.equal(result.status, 0, result.output);
+});
+
+test("interruption completes promptly when the workload group exits", async (t) => {
+	const f = fixture(t);
+	const child = f.start(
+		"graceful",
+		"process.on('SIGTERM', () => process.exit(0)); require('node:fs').writeFileSync('started', ''); process.stdin.resume()",
+	);
+	await until(() => existsSync(join(f.root, "started")));
+	let result;
+	child.done.then((value) => {
+		result = value;
+	});
+	child.kill("SIGTERM");
+	await until(() => result !== undefined, child.output, 2000);
+	assert.equal(result.status, 143, result.output);
+	assert.equal(
+		spawnSync("flock", ["-n", f.env.DOCKER_VALIDATION_LOCK_FILE, "true"])
+			.status,
+		0,
+	);
 });
 
 for (const inherit of [true, false]) {

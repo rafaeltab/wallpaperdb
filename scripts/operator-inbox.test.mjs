@@ -28,87 +28,89 @@ async function assertProblem(response, expected) {
 	assert.deepEqual(await response.json(), expected);
 }
 
-test("operator receipts require credentials, survive restart and deduplicate delivery", async () => {
-	const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));
-	let server;
-	async function start() {
-		server = await createOperatorInbox({
-			directory,
-			token: "test-inbox-token",
-		});
-		server.listen(0, "127.0.0.1");
-		await once(server, "listening");
-		return `http://127.0.0.1:${server.address().port}`;
-	}
-	const stop = async () => {
-		server.closeAllConnections();
-		await new Promise((resolve) => server.close(resolve));
-	};
-	try {
-		let url = await start();
-		const health = await fetch(`${url}/health`);
-		assert.equal(health.status, 200);
-		assert.equal(await health.text(), "ready");
-		for (const response of [
-			await fetch(`${url}/`),
-			await fetch(`${url}/receipts`, { headers: application }),
-			await fetch(`${url}/events`, {
-				method: "POST",
-				body: JSON.stringify(notice),
-			}),
-			await fetch(`${url}/events`, {
-				method: "POST",
-				headers: operator,
-				body: JSON.stringify(notice),
-			}),
-		]) {
-			assert.equal(
-				response.headers.get("www-authenticate"),
-				'Basic realm="WallpaperDB operator inbox"',
-			);
-			await assertProblem(response, {
-				type: "https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/unauthorized.md",
-				title: "Unauthorized",
-				status: 401,
-				detail: "Valid operator inbox credentials are required.",
+for (const kind of ["result-quarantine", "source-confirmation-quarantine"])
+	test(`${kind} receipts require credentials, survive restart and deduplicate delivery`, async () => {
+		const receipt = { ...notice, kind };
+		const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));
+		let server;
+		async function start() {
+			server = await createOperatorInbox({
+				directory,
+				token: "test-inbox-token",
 			});
+			server.listen(0, "127.0.0.1");
+			await once(server, "listening");
+			return `http://127.0.0.1:${server.address().port}`;
 		}
-		for (let delivery = 0; delivery < 2; delivery++) {
-			const response = await fetch(`${url}/events`, {
+		const stop = async () => {
+			server.closeAllConnections();
+			await new Promise((resolve) => server.close(resolve));
+		};
+		try {
+			let url = await start();
+			const health = await fetch(`${url}/health`);
+			assert.equal(health.status, 200);
+			assert.equal(await health.text(), "ready");
+			for (const response of [
+				await fetch(`${url}/`),
+				await fetch(`${url}/receipts`, { headers: application }),
+				await fetch(`${url}/events`, {
+					method: "POST",
+					body: JSON.stringify(receipt),
+				}),
+				await fetch(`${url}/events`, {
+					method: "POST",
+					headers: operator,
+					body: JSON.stringify(receipt),
+				}),
+			]) {
+				assert.equal(
+					response.headers.get("www-authenticate"),
+					'Basic realm="WallpaperDB operator inbox"',
+				);
+				await assertProblem(response, {
+					type: "https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/unauthorized.md",
+					title: "Unauthorized",
+					status: 401,
+					detail: "Valid operator inbox credentials are required.",
+				});
+			}
+			for (let delivery = 0; delivery < 2; delivery++) {
+				const response = await fetch(`${url}/events`, {
+					method: "POST",
+					headers: application,
+					body:
+						delivery === 0
+							? JSON.stringify(receipt).padEnd(8192, " ")
+							: JSON.stringify(receipt),
+				});
+				assert.equal(response.status, 200);
+				assert.equal(await response.text(), "");
+			}
+			await stop();
+			url = await start();
+			const replay = await fetch(`${url}/events`, {
 				method: "POST",
 				headers: application,
-				body:
-					delivery === 0
-						? JSON.stringify(notice).padEnd(8192, " ")
-						: JSON.stringify(notice),
+				body: JSON.stringify(receipt),
 			});
+			assert.equal(replay.status, 200);
+			assert.equal(await replay.text(), "");
+			const response = await fetch(`${url}/receipts`, { headers: operator });
 			assert.equal(response.status, 200);
-			assert.equal(await response.text(), "");
+			assert.equal(response.headers.get("content-type"), "application/json");
+			const receipts = await response.json();
+			assert.equal(receipts.length, 1);
+			assert.deepEqual(receipts[0].notice, receipt);
+			assert.match(
+				await (await fetch(`${url}/`, { headers: operator })).text(),
+				new RegExp(kind),
+			);
+		} finally {
+			await stop();
+			await rm(directory, { recursive: true, force: true });
 		}
-		await stop();
-		url = await start();
-		const replay = await fetch(`${url}/events`, {
-			method: "POST",
-			headers: application,
-			body: JSON.stringify(notice),
-		});
-		assert.equal(replay.status, 200);
-		assert.equal(await replay.text(), "");
-		const response = await fetch(`${url}/receipts`, { headers: operator });
-		assert.equal(response.status, 200);
-		assert.equal(response.headers.get("content-type"), "application/json");
-		const receipts = await response.json();
-		assert.equal(receipts.length, 1);
-		assert.deepEqual(receipts[0].notice, notice);
-		assert.match(
-			await (await fetch(`${url}/`, { headers: operator })).text(),
-			/result-quarantine/,
-		);
-	} finally {
-		await stop();
-		await rm(directory, { recursive: true, force: true });
-	}
-});
+	});
 
 test("operator HTTP errors disclose only safe Problem Details", async (t) => {
 	const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));

@@ -94,7 +94,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           [[ "$IMPORT_RUN" =~ ^[0-9]+$ ]] || exit 1
-          gh run download "$IMPORT_RUN" --name mutation-checkpoint --dir /tmp/mutation-import
+          default_branch=$(gh api "repos/$GITHUB_REPOSITORY" --jq .default_branch)
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$IMPORT_RUN" |
+            jq -e --arg repository "$GITHUB_REPOSITORY" --arg branch "$default_branch" '
+              .repository.full_name == $repository and
+              .head_repository.full_name == $repository and
+              .head_branch == $branch and
+              .path == ".github/workflows/mutation.yml" and
+              .status == "completed" and .conclusion == "success" and
+              (.event == "schedule" or .event == "workflow_dispatch" or .event == "push")
+            ' > /dev/null
+          gh run download "$IMPORT_RUN" --repo "$GITHUB_REPOSITORY" --name mutation-checkpoint --dir /tmp/mutation-import
       - name: Run bounded advisory analysis
         timeout-minutes: 63
         shell: bash

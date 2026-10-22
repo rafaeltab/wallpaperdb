@@ -354,12 +354,14 @@ export async function coordinate() {
 			let result;
 			try {
 				if (job.suite === "integration" && !process.env.GITHUB_ACTIONS)
-					releaseLock = acquireMutationLock(
+					releaseLock = await acquireMutationLock(
 						Math.max(
 							1,
 							Math.min(15_000, executionDeadline - performance.now()),
 						),
+						cancellation.signal,
 					);
+				if (cancelled) break;
 				const remaining = executionDeadline - performance.now();
 				const visitMs = Math.min(quantumMs, remaining);
 				const graceMs = Math.min(15_000, Math.floor(visitMs / 4));
@@ -380,6 +382,9 @@ export async function coordinate() {
 					graceMs,
 					output: join(root, job.workspace, "reports/mutation", job.suite),
 				});
+			} catch (error) {
+				if (cancelled && error.name === "AbortError") break;
+				throw error;
 			} finally {
 				releaseLock?.();
 			}

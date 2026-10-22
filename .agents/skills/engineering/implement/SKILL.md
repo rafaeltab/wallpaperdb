@@ -1,15 +1,9 @@
 ---
 name: implement
-description: "Implement a piece of work based on a spec or set of tickets."
+description: "Implement one issue through the do-work workflow, including independent reviews and PR publication."
 disable-model-invocation: true
 ---
 
-Implement the work described by the user in the spec or tickets.
+Follow [do-work](../../wallpaperdb/do-work/SKILL.md) for the selected issue or requested change, through both independent reviews and PR publication. Preserve any supplied branch, parent commit, and draft requirement.
 
-Use /tdd where possible, at pre-agreed seams.
-
-Run typechecking regularly, single test files regularly, and the full test suite once at the end.
-
-Once done, use /code-review to review the work.
-
-Commit your work to the current branch.
+For an entire spec with implementation tickets, use [implement-spec](../implement-spec/SKILL.md).

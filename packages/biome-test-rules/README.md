@@ -22,9 +22,13 @@ Async assertion checking follows direct syntax and bindings. It recognizes test 
 
 Aggregate handling preserves the inherited lint contract: awaiting `Promise.all`, `allSettled`, `race` or `any` consumes their direct input promises. This does not prove that assertion failures reach the test runner. `allSettled` records rejections, and another input can win a race or fulfill `any`. Deliberate outcome inspection remains valid. Rejection handlers are also consumption boundaries without analysis of their bodies. The unresolved failure-propagation check is tracked in [#477](https://github.com/rafaeltab/wallpaperdb/issues/477).
 
+The aggregate recognizer requires the unshadowed global `Promise`. Bound helper results reuse the same immutable-alias and known-consumer checks as direct callbacks; creating an unused bound function does not create an assertion promise. Registration option checks inspect conditional and logical alternatives conservatively, without inferring arbitrary conditions or mutable flow.
+
 Mutable binding resolution follows one direct assignment in the same statement list, checking its order relative to the read. Conditional, nested and repeated writes remain unresolved. Options checks cannot infer prohibited values through those ambiguous writes; promise checks do not treat an ambiguous read as proof of handling. Keep explicit handling beside the promise creation when this bounded analysis cannot establish the connection.
 
 An unknown concise-arrow callback argument passed to a custom wrapper is reported even when the wrapper call is awaited: awaiting a wrapper does not prove that it awaits its callback. Ordinary object-property helper arrows retain their normal function return contract. Explicit `await` and block `return` remain local handling boundaries; accepting them does not prove that an arbitrary caller propagates callback completion. Verify that contract in the wrapper. Keep regression controls for supported consumer boundaries when changing the rule; do not expand it into an open-ended library API catalog.
+
+Assertion invocation through `Function.prototype.call` or `apply` is outside the current shape checks. For example, matcherless `expect.call(null, 1)` and `expect.apply(null, [1])` pass both #437's ESLint baseline and this policy. This inherited gap is tracked in [#477](https://github.com/rafaeltab/wallpaperdb/issues/477); the policy does not claim to validate every JavaScript invocation form.
 
 The [root configuration](../../biome.json) leaves the newly recommended component-hook-factory rule disabled to keep unrelated React refactors outside this upgrade.
 

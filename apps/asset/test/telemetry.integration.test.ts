@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
+import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { NodeSDK } from '@opentelemetry/sdk-node';
 import { recordCounter } from '@wallpaperdb/core/telemetry';
 import {
   createDefaultTesterBuilder,
@@ -14,7 +16,14 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
 import { assetLayer } from '../src/app.js';
 import { Availability } from '../src/capabilities/availability/index.js';
+import { AssetDelivery } from '../src/capabilities/delivery/index.js';
+import { Lifecycle } from '../src/capabilities/lifecycle/index.js';
+import {
+  AuthorAuthentication,
+  AuthorAuthenticationFailure,
+} from '../src/adapters/authors/index.js';
 import { createHttpApp } from '../src/http/index.js';
+import { tracingLayer } from '../src/runtime.js';
 import { AssetMigrationsTesterBuilder } from './builders/AssetMigrationsBuilder.js';
 import type { Config } from '../src/config.js';
 
@@ -35,6 +44,77 @@ afterEach(() => {
 });
 
 describe('Production telemetry composition', () => {
+  it('exports author work through the shared HTTP telemetry mechanism', async () => {
+    const exporter = new InMemorySpanExporter();
+    const sdk = new NodeSDK({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+    sdk.start();
+    trace.getTracer('contract').startSpan('telemetry.sdk.author.contract').end();
+    const services = Layer.merge(
+      Layer.succeed(AssetDelivery, {
+        wallpaper: () => Effect.die('Unused delivery route'),
+        picture: () => Effect.die('Unused delivery route'),
+      }),
+      Layer.succeed(Availability, {
+        health: () => Effect.die('Unused health route'),
+        ready: () => Effect.die('Unused readiness route'),
+      })
+    ).pipe(Layer.provideMerge(tracingLayer));
+    const authorServices = Layer.merge(
+      Layer.succeed(AuthorAuthentication, {
+        verify: () =>
+          Effect.fail(
+            new AuthorAuthenticationFailure({
+              cause: new Error('Contract identity dependency failure'),
+            })
+          ).pipe(Effect.withSpan('telemetry.author.contract')),
+      }),
+      Layer.succeed(Lifecycle, {
+        command: () => Effect.die('No HTTP creation route'),
+        inspect: () => Effect.die('Authentication failure cannot inspect Assets'),
+      })
+    );
+    try {
+      const app = await createHttpApp({ nodeEnv: 'test', port: 0 }, services, { authorServices });
+      try {
+        const response = await app.inject({
+          method: 'GET',
+          url: '/assets/asset_contract/sources',
+          headers: {
+            authorization: 'Bearer private-contract-token',
+            traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
+          },
+        });
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toEqual({
+          type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/service-unavailable.md',
+          title: 'Service unavailable',
+          status: 503,
+        });
+      } finally {
+        await app.close();
+      }
+      const spans = exporter.getFinishedSpans();
+      // This test-owned span qualifies the mechanism, not production instrumentation details.
+      expect(spans).toContainEqual(
+        expect.objectContaining({ name: 'telemetry.sdk.author.contract' })
+      );
+      expect(spans).toContainEqual(
+        expect.objectContaining({
+          name: 'telemetry.author.contract',
+          parentSpanContext: expect.objectContaining({
+            traceId: '0123456789abcdef0123456789abcdef',
+            spanId: '0123456789abcdef',
+          }),
+        })
+      );
+      expect(
+        JSON.stringify(spans.map(({ attributes, events }) => ({ attributes, events })))
+      ).not.toContain('private-contract-token');
+    } finally {
+      await sdk.shutdown();
+    }
+  });
+
   it('exports traces, logs, shared core metrics and Effect metrics before its owning scope closes', async () => {
     const tester = new Tester()
       .withPostgres((builder) => builder.withDatabase('asset_telemetry'))

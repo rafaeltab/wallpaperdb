@@ -11,6 +11,7 @@ import { registerDeliveryRoutes } from './delivery.js';
 import { registerAuthorRoutes, type AuthorExecution as AuthorExecutionPort } from './authors.js';
 import { AuthorAuthentication } from '../adapters/authors/index.js';
 import { Lifecycle } from '../capabilities/lifecycle/index.js';
+import { tracingLayer } from '../runtime.js';
 
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -105,7 +106,9 @@ export async function createHttpApp<E, EAuthor = never>(
     : Layer.succeed(AuthorExecution, {
         run: () => Promise.reject(new Error('Author services are not configured')),
       });
-  const graph = Layer.merge(executionLayer.pipe(Layer.provide(services)), authorExecution);
+  const graph = Layer.merge(executionLayer.pipe(Layer.provide(services)), authorExecution).pipe(
+    Layer.provide(tracingLayer)
+  );
   const runtime = ManagedRuntime.make(graph);
   const app = Fastify({
     logger: options.logger ?? false,

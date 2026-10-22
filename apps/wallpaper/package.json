@@ -45,7 +45,8 @@
     "@opentelemetry/api-logs": "0.222.0",
     "@opentelemetry/semantic-conventions": "1.43.0",
     "@opentelemetry/exporter-logs-otlp-http": "0.222.0",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "zod-to-json-schema": "^3.23.0"
   },
   "devDependencies": {
     "@wallpaperdb/scripts": "workspace:*",

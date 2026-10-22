@@ -60,6 +60,24 @@ export function syntaxTree(root) {
 			return result;
 		}
 		const list = (values) => (values ?? []).map(child).filter(Boolean);
+		function withDefault(left, initializer) {
+			if (!initializer) return left;
+			const right = child(initializer.expression);
+			const pattern = {
+				native,
+				type: "AssignmentPattern",
+				range: [left.range[0], right.range[1]],
+				loc: { start: left.loc.start, end: right.loc.end },
+				parent: node,
+				left,
+				right,
+				children: [left, right],
+			};
+			for (const entry of pattern.children) entry.parent = pattern;
+			node.children = node.children.filter((n) => n !== left && n !== right);
+			node.children.push(pattern);
+			return pattern;
+		}
 		switch (native.kind) {
 			case "JS_MODULE":
 			case "JS_SCRIPT":
@@ -174,7 +192,7 @@ export function syntaxTree(root) {
 				node.body = child(native.body);
 				break;
 			case "JS_FORMAL_PARAMETER":
-				return child(native.binding);
+				return withDefault(child(native.binding), native.initializer);
 			case "JS_FUNCTION_BODY":
 			case "JS_BLOCK_STATEMENT":
 				node.type = "BlockStatement";
@@ -198,7 +216,10 @@ export function syntaxTree(root) {
 				node.computed =
 					(native.name ?? native.member)?.kind === "JS_COMPUTED_MEMBER_NAME";
 				node.key = child(native.name ?? native.member);
-				node.value = child(native.value ?? native.pattern);
+				node.value = withDefault(
+					child(native.value ?? native.pattern),
+					native.init,
+				);
 				break;
 			case "JS_METHOD_OBJECT_MEMBER":
 			case "JS_GETTER_OBJECT_MEMBER":
@@ -230,7 +251,10 @@ export function syntaxTree(root) {
 			case "JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY":
 				node.type = "Property";
 				node.key = child(native.name ?? native.identifier);
-				node.value = child(native.name ?? native.identifier);
+				node.value = withDefault(
+					child(native.name ?? native.identifier),
+					native.init,
+				);
 				break;
 			case "JS_COMPUTED_MEMBER_NAME":
 				return child(native.expression);

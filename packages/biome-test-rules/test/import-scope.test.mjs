@@ -90,3 +90,20 @@ test("static template destructuring keys retain upstream imported names", () => 
 		[],
 	);
 });
+
+test("escaped require identifiers retain the pinned loader identity", () => {
+	for (const loader of [String.raw`requ\u0069re`, String.raw`requ\u{69}re`]) {
+		assert.equal(
+			diagnostics(
+				`const { expect: check } = ${loader}('vitest'); check(1);`,
+				"valid-expect",
+			).length,
+			1,
+		);
+		for (const source of [
+			`const { expect: check } = ${loader}('vitest'); check(1).toBe(1);`,
+			`const { expect: check } = ${loader}('application'); check(1);`,
+		])
+			assert.deepEqual(diagnostics(source, "valid-expect"), [], source);
+	}
+});

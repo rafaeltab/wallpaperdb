@@ -1,5 +1,6 @@
 /** Container declarations matter even when a decoder exposes only an SDR primary. */
 export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
+  const isoGainMapHeader = Buffer.from('urn:iso:std:iso:ts:21496:-1\0');
   const invalid = () => {
     throw new Error('invalid-image');
   };
@@ -32,7 +33,7 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
       if (
         marker === 0xe2 &&
         (data.subarray(0, 4).equals(Buffer.from('MPF\0')) ||
-          data.subarray(0, 26).equals(Buffer.from('urn:iso:std:iso:ts:21496:-1\0')))
+          data.subarray(0, isoGainMapHeader.length).equals(isoGainMapHeader))
       )
         unsupported();
       if (

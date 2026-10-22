@@ -76,6 +76,27 @@ test("concise assertion callbacks require a consumer that handles their result",
 		assert.deepEqual(lint(prelude + expression), [], expression);
 });
 
+test("each invocation of a concise assertion helper needs its own consumer", () => {
+	const prelude =
+		"import { expect } from 'vitest'; const values = [1]; const check = () => expect(Promise.resolve(1)).resolves.toBe(1); ";
+	for (const expression of [
+		"values.forEach(check); await Promise.all(values.map(check));",
+		"check(); await check();",
+	])
+		assert.ok(
+			lint(prelude + expression).some((d) =>
+				d.message.includes("async assertion"),
+			),
+			expression,
+		);
+	for (const expression of [
+		"await check(); await check();",
+		"const name = check.name; const type = typeof check; await check();",
+		"const alias = check; await alias(); await check();",
+	])
+		assert.deepEqual(lint(prelude + expression), [], expression);
+});
+
 test("Vitest awaits concise lifecycle callbacks through import aliases", () => {
 	for (const hook of ["beforeEach", "beforeAll", "afterEach", "afterAll"]) {
 		for (const imports of [

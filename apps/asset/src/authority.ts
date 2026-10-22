@@ -24,6 +24,7 @@ const provider = z
     jwksUrl: httpsUrl,
     tokenProfile: z.literal('session'),
     authorizedParties: z.array(z.string().url()),
+    requireAuthorizedParty: z.boolean().default(false),
     audience: z.array(OwnerValueSchema),
   })
   .strict()
@@ -88,6 +89,11 @@ export function parseAuthority(input: unknown) {
   const namespaces = new Set(
     Object.values(parsed.identityProviders).map((entry) => entry.ownerNamespace)
   );
+  if (
+    new Set(Object.values(parsed.identityProviders).map((entry) => entry.issuer)).size !==
+    Object.keys(parsed.identityProviders).length
+  )
+    throw new Error('Each configured issuer must select one Owner namespace');
   const users = new Set<string>();
   const credentials = [
     parsed.broker.service,

@@ -181,60 +181,8 @@ export async function coordinate() {
 	const output = join(root, "reports/mutation");
 	mkdirSync(output, { recursive: true });
 	const run = mkdtempSync(join(output, "run-"));
-	let scheduling = restoreScheduling(root);
+	let scheduling = { cursor: null, attempts: {} };
 	let remote = "offline";
-	if (values.baseline) {
-		const imported = importCheckpoint(
-			root,
-			full.jobs,
-			resolve(values.baseline),
-		);
-		if (imported.importedStages) scheduling = imported.scheduling;
-		remote = imported.importedStages
-			? "explicit-import"
-			: "incompatible-explicit-import-cold-fallback";
-	} else if (!values.offline) {
-		const imported = await downloadCheckpoint(
-			root,
-			full.jobs,
-			process.env.GITHUB_ACTIONS
-				? Infinity
-				: invocationStart + budgetMs - publicationReserveMs,
-		);
-		remote = imported
-			? "default-branch-checkpoint"
-			: "unavailable-bounded-cold-fallback";
-		if (imported) {
-			if (imported.importedStages) scheduling = imported.scheduling;
-			else {
-				remote = "incompatible-default-branch-checkpoint-cold-fallback";
-				console.warn(
-					"Default-branch artifact has no compatible stages; bounded cold fallback",
-				);
-			}
-		}
-	}
-	// Authentication is needed only for remote checkpoint transfer, never workers.
-	delete process.env.GH_TOKEN;
-	delete process.env.GITHUB_TOKEN;
-	// A declared environment can invalidate a stage without a Git diff. Resolve
-	// selection after imports so compatible remote evidence keeps changed scope.
-	for (const job of jobs) {
-		if (job.config.environmentKeys?.length && !restoreBaseline(job.context)) {
-			job.mutate = job.sourceFiles;
-			job.scope = "all";
-		}
-	}
-	if (values.files) {
-		const files = values.files.split(",");
-		for (const file of files)
-			if (!jobs.some((job) => job.sourceFiles.includes(file)))
-				throw new Error(`File outside eligible scope: ${file}`);
-		for (const job of jobs) {
-			job.mutate = job.mutate.filter((file) => files.includes(file));
-			job.scope = "representative";
-		}
-	}
 
 	const summary = {
 		outcome: "completed",
@@ -253,10 +201,7 @@ export async function coordinate() {
 			JSON.stringify(full.jobs.map((job) => [job.id, job.context.inputDigest])),
 		),
 	};
-	const start = performance.now(),
-		deadline =
-			(process.env.GITHUB_ACTIONS ? start : invocationStart) + budgetMs;
-	const executionDeadline = deadline - publicationReserveMs;
+	let start = performance.now();
 	const baselines = new Map();
 	const readBaseline = (context) => {
 		if (!baselines.has(context.key))
@@ -271,14 +216,81 @@ export async function coordinate() {
 	};
 	process.on("SIGINT", cancel);
 	process.on("SIGTERM", cancel);
-	let cursor = Math.max(
-		0,
-		jobs.findIndex((job) => job.id === scheduling.cursor),
-	);
+	let cursor = 0;
 	let visits = 0;
 	let preparationReady = true;
 	try {
-		if (!process.env.GITHUB_ACTIONS && jobs.some((job) => job.mutate.length)) {
+		scheduling = restoreScheduling(root);
+
+		if (values.baseline) {
+			const imported = importCheckpoint(
+				root,
+				full.jobs,
+				resolve(values.baseline),
+			);
+			if (imported.importedStages) scheduling = imported.scheduling;
+			remote = imported.importedStages
+				? "explicit-import"
+				: "incompatible-explicit-import-cold-fallback";
+		} else if (!values.offline) {
+			const imported = await downloadCheckpoint(
+				root,
+				full.jobs,
+				process.env.GITHUB_ACTIONS
+					? Infinity
+					: invocationStart + budgetMs - publicationReserveMs,
+				cancellation.signal,
+			);
+			remote = cancelled
+				? "cancelled-during-transfer"
+				: imported
+					? "default-branch-checkpoint"
+					: "unavailable-bounded-cold-fallback";
+			if (imported) {
+				if (imported.importedStages) scheduling = imported.scheduling;
+				else {
+					remote = "incompatible-default-branch-checkpoint-cold-fallback";
+					console.warn(
+						"Default-branch artifact has no compatible stages; bounded cold fallback",
+					);
+				}
+			}
+		}
+		// Authentication is needed only for remote checkpoint transfer, never workers.
+		delete process.env.GH_TOKEN;
+		delete process.env.GITHUB_TOKEN;
+		// A declared environment can invalidate a stage without a Git diff. Resolve
+		// selection after imports so compatible remote evidence keeps changed scope.
+		for (const job of jobs) {
+			if (job.config.environmentKeys?.length && !restoreBaseline(job.context)) {
+				job.mutate = job.sourceFiles;
+				job.scope = "all";
+			}
+		}
+		if (values.files) {
+			const files = values.files.split(",");
+			for (const file of files)
+				if (!jobs.some((job) => job.sourceFiles.includes(file)))
+					throw new Error(`File outside eligible scope: ${file}`);
+			for (const job of jobs) {
+				job.mutate = job.mutate.filter((file) => files.includes(file));
+				job.scope = "representative";
+			}
+		}
+		summary.remote = remote;
+		start = performance.now();
+		const deadline =
+			(process.env.GITHUB_ACTIONS ? start : invocationStart) + budgetMs;
+		const executionDeadline = deadline - publicationReserveMs;
+		cursor = Math.max(
+			0,
+			jobs.findIndex((job) => job.id === scheduling.cursor),
+		);
+		if (
+			!cancelled &&
+			!process.env.GITHUB_ACTIONS &&
+			jobs.some((job) => job.mutate.length)
+		) {
 			const preparationStart = performance.now();
 			const remaining = executionDeadline - preparationStart;
 			const graceMs = Math.min(15_000, Math.max(0, Math.floor(remaining / 4)));
@@ -412,6 +424,8 @@ export async function coordinate() {
 		summary.error = error.stack;
 		console.error(error.stack);
 	} finally {
+		delete process.env.GH_TOKEN;
+		delete process.env.GITHUB_TOKEN;
 		try {
 			const publicationStart = performance.now();
 			summary.workspaces = summarize(full.jobs, false, full.jobs, readBaseline);

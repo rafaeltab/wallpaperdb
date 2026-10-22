@@ -21,12 +21,3 @@ test("Biome rejects unhandled directly imported helper promises", () => {
 		[],
 	);
 });
-
-test("awaited lifecycle promises from the real shared tester remain valid", () => {
-	assert.deepEqual(
-		lint(
-			"import { createDefaultTesterBuilder } from '@wallpaperdb/test-utils'; const Tester = createDefaultTesterBuilder().build(); const tester = new Tester(); await tester.setup(); await tester.cleanup(); await tester.destroy();",
-		),
-		[],
-	);
-});

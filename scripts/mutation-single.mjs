@@ -23,6 +23,7 @@ import {
 } from "./lib/mutation-state.mjs";
 import { runBounded } from "./lib/mutation-process.mjs";
 import { downloadBaselineCancellable } from "./lib/mutation-remote.mjs";
+import { readMutationTimings } from "./lib/mutation-timings.mjs";
 
 const json = (file) => JSON.parse(readFileSync(file, "utf8"));
 async function main() {
@@ -158,6 +159,7 @@ async function main() {
 		errors: 0,
 		baselineRestored: false,
 		checkpointSaved: false,
+		checkpointReuseSeconds: 0,
 	};
 	let cancelled = false;
 	const cancellation = new AbortController();
@@ -167,10 +169,13 @@ async function main() {
 	};
 	process.on("SIGINT", cancel);
 	process.on("SIGTERM", cancel);
+	const runnerTimings = join(run, "runner-timings.jsonl");
 	try {
+		let reuseStart = performance.now();
 		if (values.baseline && !importBaseline(context, resolve(values.baseline)))
 			throw new Error("Baseline is incompatible with this workspace/toolchain");
 		let baseline = restoreBaseline(context, { forExecution: true });
+		summary.checkpointReuseSeconds += (performance.now() - reuseStart) / 1000;
 		if (
 			!baseline &&
 			!values.offline &&
@@ -181,7 +186,9 @@ async function main() {
 				executionDeadline,
 				cancellation.signal,
 			);
+			reuseStart = performance.now();
 			baseline = restoreBaseline(context, { forExecution: true });
+			summary.checkpointReuseSeconds += (performance.now() - reuseStart) / 1000;
 		}
 		// Remote transfer is finished before application tests inherit the environment.
 		delete process.env.GH_TOKEN;
@@ -201,16 +208,18 @@ async function main() {
 		} else {
 			summary.baselineRestored = Boolean(baseline);
 			const incrementalFile = join(run, "incremental.json");
+			reuseStart = performance.now();
 			if (baseline)
 				writeFileSync(incrementalFile, JSON.stringify(baseline.report));
 			const initialReport = existsSync(incrementalFile)
 				? readFileSync(incrementalFile, "utf8")
 				: null;
+			summary.checkpointReuseSeconds += (performance.now() - reuseStart) / 1000;
 			const progress = join(run, "progress.json"),
 				complete = join(run, "complete");
 			sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
 			const options = {
-				testRunner: "vitest",
+				testRunner: "checkpoint-vitest",
 				plugins: [
 					import.meta.resolve("@stryker-mutator/vitest-runner"),
 					new URL("./lib/mutation-reporter.mjs", import.meta.url).href,
@@ -258,6 +267,7 @@ async function main() {
 								env: {
 									...process.env,
 									WALLPAPERDB_MUTATION_PROGRESS: progress,
+									WALLPAPERDB_MUTATION_TIMINGS: runnerTimings,
 								},
 							},
 						);
@@ -307,6 +317,7 @@ async function main() {
 		delete process.env.GITHUB_TOKEN;
 		try {
 			if (sandbox) rmSync(sandbox, { recursive: true, force: true });
+			Object.assign(summary, readMutationTimings(runnerTimings));
 			await new Promise((resolve) => setImmediate(resolve));
 			if (cancelled && summary.outcome !== "failed")
 				summary.outcome = "cancelled";

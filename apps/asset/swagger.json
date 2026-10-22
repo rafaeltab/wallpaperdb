@@ -6,19 +6,20 @@
     "description": "Delivers original and resized wallpapers and current Profile pictures."
   },
   "components": {
+    "securitySchemes": {
+      "ownerSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
     "schemas": {
       "HealthResponse": {
         "type": "object",
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "healthy",
-              "unhealthy",
-              "degraded",
-              "error",
-              "shutting_down"
-            ],
+            "enum": ["healthy", "unhealthy", "degraded", "error", "shutting_down"],
             "description": "Overall health status of the service"
           },
           "checks": {
@@ -41,11 +42,7 @@
             "description": "Duration of all checks in milliseconds"
           }
         },
-        "required": [
-          "status",
-          "checks",
-          "timestamp"
-        ],
+        "required": ["status", "checks", "timestamp"],
         "additionalProperties": false
       },
       "ReadyResponse": {
@@ -64,10 +61,7 @@
             "description": "Reason if service is not ready"
           }
         },
-        "required": [
-          "ready",
-          "timestamp"
-        ],
+        "required": ["ready", "timestamp"],
         "additionalProperties": false
       },
       "ProblemDetails": {
@@ -142,10 +136,7 @@
                   "description": "Error code for programmatic handling"
                 }
               },
-              "required": [
-                "field",
-                "message"
-              ],
+              "required": ["field", "message"],
               "additionalProperties": false
             },
             "description": "Array of validation errors"
@@ -160,9 +151,7 @@
     "/health": {
       "get": {
         "summary": "Dependency health",
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "responses": {
           "200": {
             "description": "Default Response",
@@ -196,20 +185,14 @@
                       "properties": {
                         "status": {
                           "type": "integer",
-                          "enum": [
-                            503
-                          ]
+                          "enum": [503]
                         },
                         "timestamp": {
                           "type": "string"
                         },
                         "healthStatus": {
                           "type": "string",
-                          "enum": [
-                            "degraded",
-                            "unhealthy",
-                            "shutting_down"
-                          ]
+                          "enum": ["degraded", "unhealthy", "shutting_down"]
                         },
                         "checks": {
                           "type": "object",
@@ -233,9 +216,7 @@
     "/ready": {
       "get": {
         "summary": "Readiness",
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "responses": {
           "200": {
             "description": "Default Response",
@@ -258,29 +239,18 @@
                     },
                     {
                       "type": "object",
-                      "required": [
-                        "type",
-                        "title",
-                        "status",
-                        "timestamp",
-                        "ready",
-                        "reason"
-                      ],
+                      "required": ["type", "title", "status", "timestamp", "ready", "reason"],
                       "properties": {
                         "status": {
                           "type": "integer",
-                          "enum": [
-                            503
-                          ]
+                          "enum": [503]
                         },
                         "timestamp": {
                           "type": "string"
                         },
                         "ready": {
                           "type": "boolean",
-                          "enum": [
-                            false
-                          ]
+                          "enum": [false]
                         },
                         "reason": {
                           "type": "string"
@@ -333,21 +303,288 @@
         }
       }
     },
-    "/assets/{assetId}/sources": {
+    "/asset-types/{type}/policy": {
       "get": {
-        "summary": "Inspect the authenticated Owner's active Sources",
-        "tags": [
-          "Assets"
+        "tags": ["Sources"],
+        "security": [
+          {
+            "ownerSession": []
+          }
         ],
         "parameters": [
           {
             "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
+              "type": "string"
+            },
+            "in": "path",
+            "name": "type",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/assets/{assetId}/sources": {
+      "get": {
+        "tags": ["Sources"],
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
             },
             "in": "path",
             "name": "assetId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/assets/{assetId}/source-candidates": {
+      "post": {
+        "tags": ["Sources"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "type": "string",
+                    "enum": ["add", "replace-one", "replace-set"]
+                  },
+                  "expectedSourceSetRevision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,39})$"
+                  },
+                  "targetSourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "required": ["operation", "expectedSourceSetRevision"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "assetId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/assets/{assetId}/source-candidates/{candidateId}": {
+      "get": {
+        "tags": ["Sources"],
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "assetId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "candidateId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Sources"],
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "assetId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "candidateId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/assets/{assetId}/source-candidates/{candidateId}/bytes": {
+      "put": {
+        "tags": ["Sources"],
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "assetId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "candidateId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/assets/{assetId}/source-candidates/{candidateId}/accept": {
+      "post": {
+        "tags": ["Sources"],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "type": "string",
+                    "enum": ["add", "replace-one", "replace-set"]
+                  },
+                  "expectedSourceSetRevision": {
+                    "type": "string",
+                    "pattern": "^(0|[1-9][0-9]{0,39})$"
+                  },
+                  "targetSourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "required": ["operation", "expectedSourceSetRevision"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "assetId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "candidateId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/assets/{assetId}/sources/{sourceId}/original": {
+      "get": {
+        "tags": ["Sources"],
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "assetId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "sourceId",
             "required": true
           }
         ],

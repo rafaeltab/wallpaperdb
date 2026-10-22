@@ -286,3 +286,151 @@ it('rejects an ISO gain-map APP2 declaration without relying on APP1 or MPF meta
     await runtime.dispose();
   }
 });
+it('reports mandatory displayed-geometry rejection as a normal result', async () => {
+  const s3 = tester.getS3();
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: s3.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'source-private',
+    })
+  );
+  const png = await sharp({ create: { width: 20001, height: 1, channels: 3, background: 'red' } })
+    .png()
+    .toBuffer();
+  try {
+    await runtime.runPromise(
+      SourceBytes.use((bytes) =>
+        bytes.put('candidate_axis_limit', png, createHash('sha256').update(png).digest('hex'))
+      )
+    );
+    expect(
+      await runtime.runPromise(
+        MandatoryInspection.use((inspector) =>
+          inspector.inspect('candidate_axis_limit', initialSourcePolicies.wallpaper)
+        )
+      )
+    ).toEqual({ kind: 'rejected', reason: 'geometry-limit' });
+  } finally {
+    await runtime.dispose();
+  }
+});
+it.each([
+  'request cancellation',
+  'runtime shutdown',
+] as const)('kills and reaps actual inspection during %s', async (mode) => {
+  const { createServer, request } = await import('node:http');
+  const { readFile, readdir } = await import('node:fs/promises');
+  const children = async () => {
+    const threads = await readdir(`/proc/${process.pid}/task`);
+    const groups = await Promise.all(
+      threads.map((thread) =>
+        readFile(`/proc/${process.pid}/task/${thread}/children`, 'utf8').catch(() => '')
+      )
+    );
+    return new Set(
+      groups.flatMap((group) => group.trim().split(/\s+/).filter(Boolean).map(Number))
+    );
+  };
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const s3 = tester.getS3();
+  const target = new URL(s3.endpoints.fromHost);
+  let entered!: () => void;
+  const stalled = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  let release = () => {};
+  // Keep a real S3 response open so the production inspection child stays active deterministically.
+  const proxy = createServer((incoming, outgoing) => {
+    const forwarded = request(
+      {
+        hostname: target.hostname,
+        port: target.port,
+        path: incoming.url,
+        method: incoming.method,
+        headers: incoming.headers,
+      },
+      (response) => {
+        outgoing.writeHead(response.statusCode ?? 502, response.headers);
+        if (incoming.method !== 'GET') {
+          response.pipe(outgoing);
+          return;
+        }
+        response.once('readable', () => {
+          const first: unknown = response.read(1);
+          if (Buffer.isBuffer(first)) outgoing.write(first);
+          outgoing.flushHeaders();
+          response.pause();
+          release = () => response.pipe(outgoing);
+          entered();
+        });
+        outgoing.once('close', () => response.destroy());
+      }
+    );
+    forwarded.on('error', () => outgoing.destroy());
+    incoming.pipe(forwarded);
+  });
+  await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+  const address = proxy.address();
+  if (!address || typeof address === 'string') throw new Error('Missing address');
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: `http://127.0.0.1:${address.port}`,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'source-private',
+    })
+  );
+  const png = await sharp({ create: { width: 3, height: 2, channels: 3, background: 'red' } })
+    .png()
+    .toBuffer();
+  const controller = new AbortController();
+  let pending: Promise<unknown> | undefined;
+  try {
+    const id =
+      mode === 'request cancellation' ? 'candidate_native_cancel' : 'candidate_native_shutdown';
+    await runtime.runPromise(
+      SourceBytes.use((bytes) => bytes.put(id, png, createHash('sha256').update(png).digest('hex')))
+    );
+    const baseline = await children();
+    pending = runtime.runPromise(
+      MandatoryInspection.use((inspector) =>
+        inspector.inspect(id, initialSourcePolicies.wallpaper)
+      ),
+      { signal: controller.signal }
+    );
+    void pending.catch(() => undefined);
+    await stalled;
+    let child: number | undefined;
+    await expect
+      .poll(async () => {
+        child = [...(await children())].find((pid) => !baseline.has(pid));
+        return child !== undefined;
+      })
+      .toBe(true);
+    if (child === undefined) throw new Error('Missing native inspection process');
+    const pid = child;
+    expect(alive(pid)).toBe(true);
+    if (mode === 'request cancellation') controller.abort();
+    else await runtime.dispose();
+    await expect(pending).rejects.toBeDefined();
+    await expect.poll(() => alive(pid)).toBe(false);
+  } finally {
+    controller.abort();
+    release();
+    await pending?.catch(() => undefined);
+    await runtime.dispose();
+    proxy.closeAllConnections();
+    await new Promise<void>((resolve) => proxy.close(() => resolve()));
+  }
+});

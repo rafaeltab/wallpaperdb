@@ -220,6 +220,7 @@ function hasRetry(
 		case "JS_PARENTHESIZED_EXPRESSION":
 		case "TS_AS_EXPRESSION":
 		case "TS_SATISFIES_EXPRESSION":
+		case "TS_NON_NULL_ASSERTION_EXPRESSION":
 			return hasRetry(node.expression, model, seen);
 		case "JS_IDENTIFIER_EXPRESSION": {
 			if (!node.name) return false;

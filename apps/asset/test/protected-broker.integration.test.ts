@@ -10,7 +10,7 @@ let container: Awaited<ReturnType<GenericContainer['start']>>;
 const connections: NatsConnection[] = [];
 let url: string;
 async function connection(user?: string, pass?: string, inboxPrefix?: string) {
-  const connection = await connect({ servers: url, user, pass, inboxPrefix });
+  const connection = await connect({ servers: url, user, pass, inboxPrefix, reconnect: false });
   connections.push(connection);
   return connection;
 }
@@ -56,7 +56,9 @@ it('isolates application publication and each filtered result consumer from all 
     '$JS.API.CONSUMER.MSG.NEXT.ASSET_RESULTS.results_wallpaper',
     '$JS.ACK.ASSET_RESULTS.results_wallpaper.1.1.1.1.0',
   ]) {
-    await expect(user.request(target, codec.encode('{}'), { timeout: 200 })).rejects.toThrow();
+    await expect(user.request(target, codec.encode('{}'), { timeout: 200 })).rejects.toMatchObject({
+      code: 'PERMISSIONS_VIOLATION',
+    });
   }
   await expect(
     wallpaper
@@ -96,6 +98,26 @@ it('cannot use permitted JetStream APIs to reflect replies into another applicat
   const service = await connection('asset-service_user', 'service-secret', '_ASSET_INBOX.service');
   const operator = await connection('asset-operator_user', 'operator-secret');
   const manager = await operator.jetstreamManager();
+  const victimOperator = await connection('asset-operator_wallpaper', 'operator-secret');
+  const observed = [
+    'asset.commands.wallpaper.create',
+    'asset.results.wallpaper',
+    '_ASSET_INBOX.wallpaper.attack',
+  ].map(
+    (subject) =>
+      new Promise<string | undefined>((resolve, reject) => {
+        victimOperator.subscribe(subject, {
+          max: 1,
+          timeout: 1000,
+          callback: (error, message) => {
+            if (error?.code === 'TIMEOUT') resolve(undefined);
+            else if (error) reject(error);
+            else resolve(message.string());
+          },
+        });
+      })
+  );
+  await victimOperator.flush();
   const commandCount = (await manager.streams.info('ASSET_COMMANDS')).state.messages;
   const resultCount = (await manager.streams.info('ASSET_RESULTS')).state.messages;
   await service.jetstream().publish('asset.results.user', 'private-user-result');
@@ -107,11 +129,75 @@ it('cannot use permitted JetStream APIs to reflect replies into another applicat
   user.publish('$JS.API.CONSUMER.INFO.ASSET_RESULTS.results_user', '{}', {
     reply: 'asset.commands.wallpaper.create',
   });
+  user.publish('$JS.API.CONSUMER.INFO.ASSET_RESULTS.results_user', '{}', {
+    reply: '_ASSET_INBOX.wallpaper.attack',
+  });
   await user.flush();
+  expect(await Promise.all(observed)).toEqual([undefined, undefined, undefined]);
   await expect
     .poll(async () => (await manager.streams.info('ASSET_COMMANDS')).state.messages, {
       timeout: 1500,
     })
     .toBe(commandCount);
   expect((await manager.streams.info('ASSET_RESULTS')).state.messages).toBe(resultCount + 1);
+});
+
+it('denies direct reads of another application and retains application identity through credential overlap and revocation', async () => {
+  const old = await connection('user-1', 'user-secret', '_ASSET_INBOX.user');
+  for (const subject of [
+    'asset.results.wallpaper',
+    '_ASSET_INBOX.wallpaper.>',
+    '_ASSET_INBOX.service.>',
+    'asset.commands.>',
+  ]) {
+    const denied = new Promise<unknown>((resolve) => {
+      old.subscribe(subject, { timeout: 1000, callback: (error) => resolve(error) });
+    });
+    await old.flush();
+    expect(await denied).toMatchObject({ code: 'PERMISSIONS_VIOLATION' });
+  }
+  const raw = authorityFixture();
+  raw.applications.user.credentials.push({
+    user: 'user-2',
+    password: 'rotated-secret',
+    revision: '2',
+  });
+  const overlap = parseAuthority(raw);
+  await container.copyContentToContainer([
+    { content: renderBrokerConfiguration(overlap), target: '/etc/nats/asset.conf' },
+  ]);
+  await container.exec(['sh', '-c', 'kill -HUP 1']);
+  let current: NatsConnection | undefined;
+  await expect
+    .poll(
+      async () => {
+        try {
+          current = await connection('user-2', 'rotated-secret', '_ASSET_INBOX.user');
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 3000 }
+    )
+    .toBe(true);
+  await old.jetstream().publish('asset.commands.user.create', 'old-generation');
+  if (!current) throw new Error('Rotation did not establish a new connection');
+  await current.jetstream().publish('asset.commands.user.create', 'new-generation');
+  raw.applications.user.credentials.shift();
+  await container.copyContentToContainer([
+    { content: renderBrokerConfiguration(parseAuthority(raw)), target: '/etc/nats/asset.conf' },
+  ]);
+  await container.exec(['sh', '-c', 'kill -HUP 1']);
+  await expect.poll(() => old.isClosed(), { timeout: 3000 }).toBe(true);
+  await expect(connection('user-1', 'user-secret', '_ASSET_INBOX.user')).rejects.toMatchObject({
+    code: 'AUTHORIZATION_VIOLATION',
+  });
+  await current.jetstream().publish('asset.commands.user.create', 'still-same-application');
+  const operator = await connection('asset-operator_user', 'operator-secret');
+  const manager = await operator.jetstreamManager();
+  expect((await manager.streams.info('ASSET_COMMANDS')).config.subjects).toEqual([
+    'asset.commands.user.create',
+    'asset.commands.user.delete',
+  ]);
 });

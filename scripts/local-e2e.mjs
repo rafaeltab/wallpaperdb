@@ -107,18 +107,30 @@ for (const [signal, status] of [
 function stopChild() {
 	if (!activeChild) return;
 	const child = activeChild;
+	if (child.stopping) return;
 	try {
 		process.kill(-child.pid, "SIGTERM");
 	} catch {
 		/* Already exited. */
 	}
-	const killer = setTimeout(() => {
-		try {
-			process.kill(-child.pid, "SIGKILL");
-		} catch {}
-	}, 5000);
-	killer.unref();
-	child.once("close", () => clearTimeout(killer));
+	child.stopping = new Promise((resolve) => {
+		const killer = setTimeout(() => {
+			try {
+				process.kill(-child.pid, "SIGKILL");
+			} catch {}
+			resolve();
+		}, 5000);
+		child.once("close", () => {
+			try {
+				process.kill(-child.pid, 0);
+			} catch (error) {
+				if (error.code === "ESRCH") {
+					clearTimeout(killer);
+					resolve();
+				}
+			}
+		});
+	});
 }
 
 function redact(value) {
@@ -264,27 +276,22 @@ async function run(
 				}
 			});
 		}
-		let killer;
 		const timer = setTimeout(
 			() => {
 				timedOut = true;
 				stopChild();
-				killer = setTimeout(() => {
-					try {
-						process.kill(-child.pid, "SIGKILL");
-					} catch {}
-				}, 5000);
 			},
 			Math.max(1, timeout),
 		);
-		child.on("error", (error) => {
+		child.on("error", async (error) => {
 			clearTimeout(timer);
+			await child.stopping;
 			activeChild = undefined;
 			reject(error);
 		});
-		child.on("close", (code, signal) => {
+		child.on("close", async (code, signal) => {
 			clearTimeout(timer);
-			clearTimeout(killer);
+			await child.stopping;
 			activeChild = undefined;
 			if (captureFailure) {
 				reject(captureFailure);

@@ -155,7 +155,18 @@ if (args.includes('--dry=json')) {
   const artifacts = process.env.E2E_ARTIFACTS_DIR || 'apps/web-e2e';
   fs.mkdirSync(artifacts + '/test-results', {recursive: true});
   fs.writeFileSync(artifacts + '/test-results/trace.zip', 'retained browser artifact');
-  if (process.env.TEST_HOLD) {
+  if (process.env.TEST_STUBBORN_DESCENDANT) {
+    process.on('SIGTERM', () => process.exit(0));
+    const watcher = fs.watch('.', () => {
+      if (fs.existsSync('stubborn-descendant.pid')) {
+        watcher.close();
+        console.log('Browser fixture running');
+      }
+    });
+    require('node:child_process').spawn(process.execPath, ['-e', "process.on('SIGTERM', () => {}); require('node:fs').writeFileSync('stubborn-descendant.pid', String(process.pid)); setInterval(() => {}, 1000)"], {stdio: ['ignore', 'ignore', 'ignore', ...Array(6).fill('ignore'), 9]});
+    setInterval(() => {}, 1000);
+  }
+  else if (process.env.TEST_HOLD) {
     fs.writeFileSync('active-fixture-child.pid', String(process.pid));
     const hold = setInterval(() => {}, 1000);
     if (process.env.TEST_PIPE_STREAM) {
@@ -922,6 +933,39 @@ test("interruption cleans its owned stack and releases the lock", async (t) => {
 		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
 		0,
 	);
+});
+
+test("interruption kills an E2E descendant retaining the lease after its parent exits", async (t) => {
+	const f = await browserFixture(t);
+	f.env.TEST_STUBBORN_DESCENDANT = "1";
+	let pid;
+	t.after(() => {
+		if (pid) {
+			try {
+				process.kill(pid, "SIGKILL");
+			} catch {}
+		}
+	});
+	f.onOutput = (output, child) => {
+		if (output.includes("Browser fixture running")) {
+			pid = Number(
+				readFileSync(join(f.root, "stubborn-descendant.pid"), "utf8"),
+			);
+			process.kill(-child.pid, "SIGTERM");
+		}
+	};
+	const result = await f.runAsync("PACKAGE=web-e2e");
+	assert.notEqual(result.status, 0);
+	assert.equal(
+		spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+		0,
+	);
+	try {
+		const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+		assert.match(stat.slice(stat.lastIndexOf(")") + 2), /^Z /);
+	} catch (error) {
+		if (error.code !== "ENOENT") throw error;
+	}
 });
 
 test("interruption during successful browser cleanup finishes teardown and reports the cleanup phase", async (t) => {

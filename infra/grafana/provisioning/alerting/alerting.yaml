@@ -490,3 +490,114 @@ groups:
         labels:
           severity: critical
           service: user
+
+      - uid: asset-dependency-unhealthy
+        title: Asset Dependency or Protective Worker Unavailable
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: min by (dependency) (asset_dependency_healthy{required="true"})
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: A required Asset dependency or protective worker is unavailable
+          description: "Inspect the dependency label and Asset logs. Database and NATS failures prevent durable Asset operations. A stopped command consumer, result dispatcher, or operator notification worker remains unhealthy even when another application makes progress. Identity describes actual public-key contact; local authentication rejection or cached verification cannot clear a failed contact. Inspect the selected issuer, key retrieval, result publication, and operator receipt delivery. Intentionally disabled telemetry is marked optional and does not trigger this rule."
+        labels:
+          severity: critical
+          service: asset
+
+      - uid: asset-dependency-signal-missing
+        title: Asset Dependency Monitoring Signal Missing
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (time() - asset_dependency_observed_at_seconds > bool 120)
+                or absent_over_time(asset_dependency_observed_at_seconds[5m])
+                or absent_over_time(asset_dependency_healthy{dependency="database",required="true"}[5m])
+                or absent_over_time(asset_dependency_healthy{dependency="nats",required="true"}[5m])
+                or absent_over_time(asset_dependency_healthy{dependency="consumer",required="true"}[5m])
+                or absent_over_time(asset_dependency_healthy{dependency="s3",required="true"}[5m])
+                or absent_over_time(asset_dependency_healthy{dependency="identity",required="true"}[5m])
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: Asset dependency observations are stale or absent
+          description: "The monitored Asset deployment has stopped reporting fresh dependency observations. Check process availability, the scoped monitor, telemetry initialization, and the collector. This rule expects telemetry-enabled deployments; disable this missing-signal rule for deployments that intentionally turn all telemetry off. Optional telemetry is excluded from dependency-failure alerts, but an absent stream alone cannot distinguish intentional disablement from a dead service."
+        labels:
+          severity: critical
+          service: asset

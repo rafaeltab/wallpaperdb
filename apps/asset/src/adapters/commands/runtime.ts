@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
-import { Cause, Context, Data, Effect, Fiber, Layer, Ref, Stream } from 'effect';
+import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
+import { context as otelContext, propagation, trace } from '@opentelemetry/api';
+import { Cause, Clock, Context, Data, Effect, Exit, Fiber, Layer, Ref, Stream } from 'effect';
 import { connect, type JsMsg, type NatsConnection } from 'nats';
 import {
   Lifecycle,
   ResultOutbox,
+  type CommandContext,
   type LifecyclePort,
   type ResultOutboxPort,
 } from '../../capabilities/lifecycle/index.js';
@@ -103,46 +106,102 @@ const quarantine = Effect.fn('asset.commands.quarantine')(function* (
       )
   );
 });
-const processCommand = Effect.fn('asset.commands.consume')(function* (
+function workflow<A extends string, E, R>(
+  name: string,
+  context: CommandContext | undefined,
+  attributes: Readonly<Record<string, string | number>>,
+  effect: Effect.Effect<A, E, R>
+) {
+  const observed = Effect.gen(function* () {
+    const started = yield* Clock.currentTimeMillis;
+    yield* Effect.annotateCurrentSpan(attributes);
+    return yield* effect.pipe(
+      Effect.onExit((exit) =>
+        Effect.gen(function* () {
+          const diagnostic = {
+            'event.outcome': Exit.isSuccess(exit) ? exit.value : 'failed',
+            'event.duration_ms': (yield* Clock.currentTimeMillis) - started,
+          };
+          yield* Effect.annotateCurrentSpan(diagnostic);
+          yield* Effect.logInfo('Asset durable workflow transition', diagnostic);
+        })
+      )
+    );
+  }).pipe(Effect.annotateLogs(attributes), Effect.withSpan(name));
+  const parent =
+    context &&
+    trace.getSpanContext(
+      propagation.extract(otelContext.active(), {
+        traceparent: context.traceparent,
+        tracestate: context.tracestate,
+      })
+    );
+  return parent ? observed.pipe(OtelTracer.withSpanContext(parent)) : observed;
+}
+function processCommand(
   connection: NatsConnection,
   message: JsMsg,
   lifecycle: LifecyclePort,
   options: ProtectedCommandOptions,
   routes: readonly CommandRoute[]
 ) {
+  // Guard before decoding so even an unexpected decoder defect has a finite handoff.
+  if (message.info.deliveryCount > options.maxAttempts)
+    return quarantine(connection, message, 'exhausted').pipe(
+      Effect.tap(() => Effect.sync(() => message.ack())),
+      Effect.as('quarantined')
+    );
   const input = decodeAssetCommand(routes, message.subject, message.data);
-  yield* Effect.annotateCurrentSpan({
+  const attributes = {
     'event.subject': message.subject,
     'event.consumer': message.info.consumer,
     'event.delivery_attempt': message.info.deliveryCount,
-  });
-  if (input.kind !== 'command') {
-    yield* quarantine(connection, message, 'invalid');
-    message.ack();
-    return;
-  }
-  if (message.info.deliveryCount > options.maxAttempts) {
-    yield* quarantine(connection, message, 'exhausted');
-    message.ack();
-    return;
-  }
-  const succeeded = yield* lifecycle
-    .command(input.applicationId, input.command, input.context)
-    .pipe(
-      Effect.as(true),
-      Effect.catch(() => Effect.succeed(false))
-    );
-  if (succeeded) {
-    message.ack();
-    return;
-  }
-  if (message.info.deliveryCount >= options.maxAttempts) {
-    yield* quarantine(connection, message, 'exhausted');
-    message.ack();
-    return;
-  }
-  message.nak(Math.min(30000, options.retryDelayMs * 2 ** (message.info.deliveryCount - 1)));
-});
+    ...(input.kind === 'command'
+      ? {
+          'event.id': input.context.occurrence.id,
+          'event.source': input.context.occurrence.source,
+          'event.type': `asset.command.${input.command.operation}`,
+          'application.id': input.applicationId,
+          'command.id': input.command.commandId,
+          ...(input.context.correlationId
+            ? { 'event.correlation_id': input.context.correlationId }
+            : {}),
+          ...('assetType' in input.command ? { 'asset.type': input.command.assetType } : {}),
+        }
+      : {}),
+  };
+  return workflow(
+    'asset.commands.consume',
+    input.kind === 'command' ? input.context : undefined,
+    attributes,
+    Effect.gen(function* () {
+      if (input.kind !== 'command') {
+        yield* quarantine(connection, message, 'invalid');
+        message.ack();
+        return 'quarantined';
+      }
+      const result = yield* lifecycle
+        .command(input.applicationId, input.command, input.context)
+        .pipe(Effect.catch(() => Effect.succeed(null)));
+      if (result) {
+        yield* Effect.annotateCurrentSpan({
+          'command.outcome': result.outcome,
+          ...(result.assetId ? { 'asset.id': result.assetId } : {}),
+          ...('reason' in result ? { 'command.rejection_reason': result.reason } : {}),
+        });
+        message.ack();
+        return result.outcome;
+      }
+      if (message.info.deliveryCount >= options.maxAttempts) {
+        yield* quarantine(connection, message, 'exhausted');
+        message.ack();
+        return 'quarantined';
+      }
+      message.nak(Math.min(30000, options.retryDelayMs * 2 ** (message.info.deliveryCount - 1)));
+      return 'retry';
+    })
+  );
+}
 const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
   connections: ReadonlyMap<string, NatsConnection>,
   outbox: ResultOutboxPort
@@ -150,25 +209,45 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
   const publications = yield* outbox.claim(1);
   let healthy = true;
   for (const publication of publications) {
-    const succeeded = yield* Effect.gen(function* () {
-      const connection = connections.get(publication.applicationId);
-      if (!connection)
-        return yield* Effect.fail(
-          new CommandBrokerFailure({
-            operation: 'route-result',
-            cause: new Error('No configured application connection'),
+    const succeeded = yield* workflow(
+      'asset.commands.publish-result',
+      publication.context,
+      {
+        'event.id': publication.id,
+        'event.source': 'https://wallpaperdb/asset',
+        'event.type': 'asset.command.result',
+        'event.causation_id': publication.context.occurrence.id,
+        'event.causation_source': publication.context.occurrence.source,
+        'event.delivery_attempt': publication.attempts,
+        'application.id': publication.applicationId,
+        'command.id': publication.result.commandId,
+        'command.outcome': publication.result.outcome,
+        ...(publication.result.assetId ? { 'asset.id': publication.result.assetId } : {}),
+        ...(publication.context.correlationId
+          ? { 'event.correlation_id': publication.context.correlationId }
+          : {}),
+      },
+      Effect.gen(function* () {
+        const connection = connections.get(publication.applicationId);
+        if (!connection)
+          return yield* Effect.fail(
+            new CommandBrokerFailure({
+              operation: 'route-result',
+              cause: new Error('No configured application connection'),
+            })
+          );
+        const encoded = encodeAssetResult(publication);
+        yield* broker('publish-result', () =>
+          connection.jetstream().publish(encoded.subject, JSON.stringify(encoded.event), {
+            msgID: publication.id,
+            expect: { streamName: 'ASSET_RESULTS' },
+            timeout: 5000,
           })
         );
-      const encoded = encodeAssetResult(publication);
-      yield* broker('publish-result', () =>
-        connection.jetstream().publish(encoded.subject, JSON.stringify(encoded.event), {
-          msgID: publication.id,
-          expect: { streamName: 'ASSET_RESULTS' },
-          timeout: 5000,
-        })
-      );
-      yield* outbox.published(publication);
-    }).pipe(
+        yield* outbox.published(publication);
+        return 'published';
+      })
+    ).pipe(
       Effect.as(true),
       Effect.catch((error) =>
         Effect.logError('Asset command result remains durable', {
@@ -209,6 +288,7 @@ export function protectedCommandsLayer(
       const outbox = yield* ResultOutbox;
       const accepting = yield* Ref.make(true);
       const publishingHealthy = yield* Ref.make(true);
+      const liveness: Array<Ref.Ref<boolean>> = [];
       const workers: Array<Fiber.Fiber<void, unknown>> = [];
       const stops: Array<() => void> = [];
       const connections = new Map<string, NatsConnection>();
@@ -268,11 +348,15 @@ export function protectedCommandsLayer(
               cause: new Error('Protected consumer does not match configured ingress'),
             })
           );
+        const alive = yield* Ref.make(true);
+        liveness.push(alive);
         const consumer = yield* broker('get-consumer', () =>
           connection.jetstream().consumers.get('ASSET_COMMANDS', durable)
         );
         const messages = yield* Effect.acquireRelease(
-          broker('consume', () => consumer.consume({ max_messages: 1, expires: 1000 })),
+          broker('consume', () =>
+            consumer.consume({ max_messages: 1, expires: 1000, abort_on_missing_resource: true })
+          ),
           (messages) => Effect.sync(() => messages.stop())
         );
         stops.push(() => messages.stop());
@@ -303,10 +387,13 @@ export function protectedCommandsLayer(
                 ? Effect.void
                 : Effect.logError('Protected Asset command consumer stopped', cause)
             ),
+            Effect.ensuring(Ref.set(alive, false)),
             Effect.forkScoped
           )
         );
       }
+      const dispatcherAlive = yield* Ref.make(true);
+      liveness.push(dispatcherAlive);
       workers.push(
         yield* Effect.gen(function* () {
           while (yield* Ref.get(accepting)) {
@@ -320,7 +407,7 @@ export function protectedCommandsLayer(
             yield* Ref.set(publishingHealthy, healthy);
             yield* Effect.sleep(options.pollMs);
           }
-        }).pipe(Effect.forkScoped)
+        }).pipe(Effect.ensuring(Ref.set(dispatcherAlive, false)), Effect.forkScoped)
       );
       yield* Effect.addFinalizer(() =>
         Effect.gen(function* () {
@@ -342,10 +429,11 @@ export function protectedCommandsLayer(
       );
       return {
         check: () =>
-          Ref.get(publishingHealthy).pipe(
+          Effect.all([Ref.get(publishingHealthy), ...liveness.map(Ref.get)]).pipe(
             Effect.map(
-              (healthy) =>
-                healthy && [...connections.values()].every((connection) => !connection.isClosed())
+              (health) =>
+                health.every(Boolean) &&
+                [...connections.values()].every((connection) => !connection.isClosed())
             )
           ),
       };

@@ -346,3 +346,53 @@ it('durably quarantines the largest accepted raw envelope after finite dependenc
     )
     .toBe(1);
 });
+
+it('hands excessively nested malformed input to durable quarantine without repeated application processing', async () => {
+  const manager = await operator.jetstreamManager();
+  const before = (await manager.streams.info('ASSET_QUARANTINE')).state.messages;
+  const event = JSON.stringify({
+    specversion: '1.0',
+    id: 'deep-malformed',
+    source: 'https://example.test/application',
+    type: 'asset.command.create',
+    time: '2026-10-22T00:00:00.000Z',
+    datacontenttype: 'application/json',
+    data: { commandId: 'deep-malformed', applicationReference: '', nested: null },
+  }).replace('"nested":null', '"nested":' + '['.repeat(5000) + '0' + ']'.repeat(5000));
+  await application.jetstream().publish('asset.commands.user.create', event);
+  await expect
+    .poll(async () => (await manager.streams.info('ASSET_QUARANTINE')).state.messages, {
+      timeout: 3000,
+    })
+    .toBe(before + 1);
+  const sequence = (await manager.streams.info('ASSET_QUARANTINE')).state.last_seq;
+  const record = JSON.parse(
+    (await manager.streams.getMessage('ASSET_QUARANTINE', { seq: sequence })).string()
+  );
+  expect(record.data).toMatchObject({ reason: 'invalid', attempts: 1 });
+  expect(
+    (
+      await pool.query(
+        "SELECT count(*)::int AS count FROM asset_commands WHERE command_id='deep-malformed'"
+      )
+    ).rows[0].count
+  ).toBe(0);
+});
+
+it('reports an essential stopped command worker while the broker and other application remain available', async () => {
+  const manager = await operator.jetstreamManager();
+  await manager.consumers.delete('ASSET_COMMANDS', 'commands_user');
+  try {
+    await expect
+      .poll(() => runtime.runPromise(ProtectedCommandHealth.use((service) => service.check())), {
+        timeout: 3000,
+      })
+      .toBe(false);
+    expect((await manager.streams.info('ASSET_COMMANDS')).config.name).toBe('ASSET_COMMANDS');
+  } finally {
+    await runtime.dispose();
+    await provisionAssetBroker(operator, authority, 'user');
+    runtime = start();
+    await runtime.runPromise(ProtectedCommandHealth);
+  }
+});

@@ -8,6 +8,8 @@ The assertion rules reject incomplete matchers and unhandled Vitest async assert
 
 The shared policy uses Biome's built-in focus, skip, self-comparison, floating-promise and Playwright checks. Targeted plugins cover known Effect promise APIs, registration aliases, and TODO/skip/focus registration options. Node's `only` option is prohibited as a focus registration option; its runtime effect depends on the runner's only-mode configuration. Normal repository linting applies the policy to test sources, including maintained fixture helpers, and excludes generated output and deliberate CRAP input fixtures.
 
+Node skip/TODO string reasons are registration flags even when empty. On the Node 22 CI runtime, empty reasons label the results SKIP/TODO while supplied callbacks can still execute; the rule prohibits the flag without claiming it always suppresses the body. Vitest retains boolean/truthiness option semantics. Known boolean-disabled `skipIf`/`runIf` factories are rejected through direct and aliased registrations, while enabled and unknown conditions remain valid. This is bounded coverage beyond the #437 baseline, which accepts those conditional factories; arbitrary condition evaluation is not inferred.
+
 The regression tests run the actual Biome CLI with the exported configuration. Keep invalid examples in those tests so ordinary repository linting does not discover them as test sources.
 
 The [shared policy](./test-correctness.json) targets ESM and TypeScript tests, matching the inherited test inventory. Adding CommonJS test sources requires extending discovery and binding support together; `.cjs` tests and `require()` test API bindings are outside the current policy.

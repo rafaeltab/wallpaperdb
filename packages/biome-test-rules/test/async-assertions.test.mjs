@@ -324,3 +324,24 @@ test("aggregate consumption preserves baseline semantics without proving failure
 		);
 	}
 });
+
+test("equal logical operand text cannot hide a discarded assertion promise", () => {
+	const assertion = "expect(Promise.resolve(1)).resolves.toBe(1)";
+	const prelude = "import { expect } from 'vitest'; ";
+	assert.ok(
+		lint(`${prelude} await (${assertion} && ${assertion});`).some((d) =>
+			d.message.includes("async assertion"),
+		),
+	);
+	for (const operator of ["||", "??"])
+		assert.deepEqual(
+			lint(`${prelude} await (${assertion} ${operator} ${assertion});`),
+			[],
+		);
+	assert.deepEqual(
+		lint(
+			`${prelude} const pending = ${assertion}; await (pending && pending);`,
+		),
+		[],
+	);
+});

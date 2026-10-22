@@ -668,7 +668,12 @@ function handled(
 	switch (parent.kind) {
 		case "JS_LOGICAL_EXPRESSION":
 			return (
-				(parent.right?.text === node.text ||
+				((parent.right?.kind === node.kind &&
+					parent.right.text === node.text &&
+					// Native handles expose neither offsets nor stable identity. Equal
+					// call operands are ambiguous; never bless a discarded left promise.
+					(parent.left?.text !== parent.right.text ||
+						node.kind === "JS_IDENTIFIER_EXPRESSION")) ||
 					parent.operatorToken === "||" ||
 					parent.operatorToken === "??") &&
 				handled(parent, model, seen, allowVoid)

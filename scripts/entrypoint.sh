@@ -40,4 +40,9 @@ if [ "${RUN_DB_MIGRATE:-false}" = "true" ]; then
 fi
 
 # ── Hand off to CMD ───────────────────────────────────────────────────────────
+if [ "${RUN_ASSET_BOOTSTRAP:-false}" = "true" ]; then
+    echo "[entrypoint] Verifying Asset broker provisioning and configuration activation..."
+    pnpm run authority:bootstrap
+fi
+
 exec "$@"

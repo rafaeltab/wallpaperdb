@@ -55,6 +55,7 @@ process.exit(result.status ?? 1);
 }
 
 const required = [
+	"asset-operator-inbox",
 	"lgtm",
 	"nats",
 	"nats-setup",

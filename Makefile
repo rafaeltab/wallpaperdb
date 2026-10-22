@@ -71,6 +71,7 @@ install: ## Install dependencies and initialize this worktree
 	mise install --locked
 	mise exec -- node scripts/toolchain.mjs
 	mise exec -- pnpm install --frozen-lockfile
+	@$(MAKE) run PACKAGE=asset SCRIPT=dev:configure
 
 toolchain: ## Verify effective project executables and version pins
 	@node scripts/toolchain.mjs

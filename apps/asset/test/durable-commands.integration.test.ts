@@ -1,4 +1,7 @@
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { GenericContainer, Wait } from 'testcontainers';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -16,6 +19,7 @@ import {
 } from '../src/adapters/commands/index.js';
 import { Lifecycle, lifecycleLayer } from '../src/capabilities/lifecycle/index.js';
 import { authorityFixture } from './fixtures/authority.js';
+import { runOperator } from '../scripts/operator.js';
 
 const authority = parseAuthority(authorityFixture());
 let postgres: Awaited<ReturnType<PostgreSqlContainer['start']>>;
@@ -80,6 +84,56 @@ beforeAll(async () => {
   });
   runtime = start();
   await runtime.runPromise(ProtectedCommandHealth);
+});
+
+it('runs trusted bootstrap and the application creation CLI against real adapters', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'asset-cli-'));
+  const path = join(directory, 'authority.json');
+  const previous = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = postgres.getConnectionUri();
+  await writeFile(path, JSON.stringify(authorityFixture()), { mode: 0o600 });
+  try {
+    expect(await runOperator(['bootstrap', '--url', url, '--authority-file', path])).toMatchObject({
+      outcome: 'initialized',
+      configuration: authority.identity,
+    });
+    const result = await runOperator([
+      'create',
+      '--url',
+      url,
+      '--authority-file',
+      path,
+      '--application',
+      'user',
+      '--command-id',
+      'cli-create-1',
+      '--owner-subject',
+      'cli-owner',
+      '--asset-type',
+      'picture',
+    ]);
+    expect(result).toMatchObject({
+      commandId: 'cli-create-1',
+      applicationReference: '',
+      outcome: 'created',
+      assetId: expect.stringMatching(/^asset_/),
+    });
+    expect(
+      await runOperator([
+        'quarantine',
+        '--url',
+        url,
+        '--authority-file',
+        path,
+        '--application',
+        'user',
+      ])
+    ).toEqual({ records: [] });
+  } finally {
+    if (previous === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previous;
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 afterAll(async () => {
   await runtime?.dispose();

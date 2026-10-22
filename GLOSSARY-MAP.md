@@ -5,6 +5,7 @@
 - [User](./apps/user/GLOSSARY.md) - owns Profiles and their community-facing identity
 - [Gateway Catalogue](./apps/gateway/GLOSSARY.md) - owns public wallpaper discovery and its interpretations of contributor Profiles
 - [Wallpaper Ingestion](./apps/ingestor/GLOSSARY.md) - currently owns byte ingestion; the target retains Wallpaper identity/publication workflow while Asset owns Source admission and bytes
+- [Wallpaper](./apps/wallpaper/GLOSSARY.md) - owns new Wallpaper creation, contributor facts and publication using confirmed Asset references
 
 Additional contexts are documented lazily as their domain language is resolved.
 

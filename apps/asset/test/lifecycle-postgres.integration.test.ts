@@ -66,6 +66,16 @@ it('atomically assigns one identity through concurrent replay, preserves applica
       expect(yield* outbox.claim(10)).toEqual([]);
       if (!publication) throw new Error('Missing result');
       yield* outbox.published(publication);
+      expect(
+        yield* store.accept({
+          ...input,
+          context: { occurrence: { source: 'https://test/app', id: 'request-replay-2' } },
+        })
+      ).toEqual(results[0]);
+      const replayPublications = yield* outbox.claim(10);
+      expect(replayPublications).toHaveLength(1);
+      expect(replayPublications[0]?.id).not.toBe(publication.id);
+      for (const replay of replayPublications) yield* outbox.published(replay);
       const conflict = yield* store.accept({
         ...input,
         canonical: '["delete","one"]',

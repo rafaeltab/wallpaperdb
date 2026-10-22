@@ -143,10 +143,15 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
     const digest = createHash('sha256')
       .update(JSON.stringify([input.applicationId, input.correlation.commandId, input.canonical]))
       .digest('hex');
+    const publicationId = createHash('sha256')
+      .update(
+        JSON.stringify([digest, input.context.occurrence.source, input.context.occurrence.id])
+      )
+      .digest('hex');
     await tx
       .insert(assetResultOutbox)
       .values({
-        id: digest,
+        id: publicationId,
         applicationId: input.applicationId,
         commandId: input.correlation.commandId,
         payloadDigest: digest,

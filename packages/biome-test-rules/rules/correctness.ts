@@ -438,32 +438,36 @@ function staticMemberName(node: AnyJsAstNode | undefined): string | undefined {
 		: undefined;
 }
 
-function hasOption(
+const optionAbsent = 1;
+const optionDisabled = 2;
+const optionEnabled = 4;
+
+function optionStates(
 	node: AnyJsAstNode | undefined,
 	model: SemanticModel,
-	option = "retry",
+	option: string,
 	seen = new Set<string>(),
-): boolean {
-	if (!node) return false;
+): number {
+	if (!node) return optionAbsent;
 	switch (node.kind) {
 		case "JS_PARENTHESIZED_EXPRESSION":
 		case "TS_AS_EXPRESSION":
 		case "TS_SATISFIES_EXPRESSION":
 		case "TS_NON_NULL_ASSERTION_EXPRESSION":
-			return hasOption(node.expression, model, option, seen);
+			return optionStates(node.expression, model, option, seen);
 		case "JS_IDENTIFIER_EXPRESSION": {
-			if (!node.name) return false;
+			if (!node.name) return optionAbsent;
 			const binding = model.binding(node.name);
-			if (!binding) return false;
+			if (!binding) return optionAbsent;
 			const key = `${binding.syntax().text}:${binding.scope().syntax().text}`;
-			if (seen.has(key)) return false;
+			if (seen.has(key)) return optionAbsent;
 			seen.add(key);
-			return hasOption(variableValueAt(node, model), model, option, seen);
+			return optionStates(variableValueAt(node, model), model, option, seen);
 		}
 		case "JS_CONDITIONAL_EXPRESSION":
 			return (
-				hasOption(node.consequent, model, option, new Set(seen)) ||
-				hasOption(node.alternate, model, option, new Set(seen))
+				optionStates(node.consequent, model, option, new Set(seen)) |
+				optionStates(node.alternate, model, option, new Set(seen))
 			);
 		case "JS_LOGICAL_EXPRESSION": {
 			let left = node.left;
@@ -478,42 +482,63 @@ function hasOption(
 				"expression" in left
 			)
 				left = left.expression;
-			if (node.operatorToken === "&&")
-				return (
-					!definitelyFalsy(left, model) &&
-					hasOption(node.right, model, option, seen)
-				);
-			// Literal option objects are truthy and non-nullish. Their keys used as
-			// an && condition are not returned options, and ||/?? cannot reach the RHS.
+			if (node.operatorToken === "&&") {
+				if (definitelyFalsy(left, model)) return optionAbsent;
+				const right = optionStates(node.right, model, option, seen);
+				return left?.kind === "JS_OBJECT_EXPRESSION" || left?.text === "true"
+					? right
+					: optionAbsent | right;
+			}
 			if (left?.kind === "JS_OBJECT_EXPRESSION")
-				return hasOption(left, model, option, seen);
+				return optionStates(left, model, option, seen);
 			return (
-				hasOption(left, model, option, new Set(seen)) ||
-				hasOption(node.right, model, option, new Set(seen))
+				optionStates(left, model, option, new Set(seen)) |
+				optionStates(node.right, model, option, new Set(seen))
 			);
 		}
-		case "JS_OBJECT_EXPRESSION":
-			return node.members.some((member) => {
-				if (member.kind === "JS_SPREAD")
-					return hasOption(member.argument, model, option, seen);
-				if (!("name" in member)) return false;
-				const name = member.name;
-				return (
-					staticMemberName(name) === option &&
-					(option === "retry" ||
-						!definitelyFalsy(
-							member.kind === "JS_PROPERTY_OBJECT_MEMBER"
-								? member.value
-								: member.kind === "JS_SHORTHAND_PROPERTY_OBJECT_MEMBER"
-									? member.name
-									: undefined,
-							model,
-						))
-				);
-			});
+		case "JS_OBJECT_EXPRESSION": {
+			let states = optionAbsent;
+			for (const member of node.members) {
+				if (member.kind === "JS_SPREAD") {
+					const spread = optionStates(
+						member.argument,
+						model,
+						option,
+						new Set(seen),
+					);
+					// A spread replaces the previous value only on alternatives where
+					// the property is present. An empty/unknown spread cannot clear it.
+					states =
+						(spread & optionAbsent ? states : 0) | (spread & ~optionAbsent);
+				} else if (
+					"name" in member &&
+					staticMemberName(member.name) === option
+				) {
+					const value =
+						member.kind === "JS_PROPERTY_OBJECT_MEMBER"
+							? member.value
+							: member.kind === "JS_SHORTHAND_PROPERTY_OBJECT_MEMBER"
+								? member.name
+								: undefined;
+					states =
+						option !== "retry" && definitelyFalsy(value, model)
+							? optionDisabled
+							: optionEnabled;
+				}
+			}
+			return states;
+		}
 		default:
-			return false;
+			return optionAbsent;
 	}
+}
+
+function hasOption(
+	node: AnyJsAstNode | undefined,
+	model: SemanticModel,
+	option = "retry",
+): boolean {
+	return (optionStates(node, model, option) & optionEnabled) !== 0;
 }
 
 export const noTestRetries = defineRule({

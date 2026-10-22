@@ -249,3 +249,45 @@ test("shorthand option names remain literal while computed identifier keys stay 
 		);
 	}
 });
+
+test("flag options respect the last known write while retries forbid any override", () => {
+	for (const flag of ["todo", "skip", "only"]) {
+		for (const options of [
+			`{ ...{ ${flag}: true }, ${flag}: false }`,
+			`{ ${flag}: true, ...{ ${flag}: false } }`,
+			`{ ${flag}: true, ...disabled }`,
+			`{ ...enabled, ...disabled }`,
+			`{ ${flag}: true, ...(condition ? disabled : disabled) }`,
+		])
+			assert.deepEqual(
+				lint(
+					`import { it } from 'vitest'; const disabled = { ${flag}: false }; const enabled = { ${flag}: true }; it('case', ${options}, () => {});`,
+				),
+				[],
+				options,
+			);
+		for (const options of [
+			`{ ${flag}: false, ...{ ${flag}: true } }`,
+			`{ ...{ ${flag}: false }, ${flag}: true }`,
+			`{ ${flag}: true, ...{} }`,
+			`{ ${flag}: true, ...(condition ? { ${flag}: false } : {}) }`,
+		])
+			assert.ok(
+				lint(
+					`import { it } from 'vitest'; it('case', ${options}, () => {});`,
+				).some((d) => d.severity === "error"),
+				options,
+			);
+	}
+	for (const options of [
+		"{ retry: false }",
+		"{ ...{ retry: 3 }, retry: false }",
+		"{ retry: 3, ...{ retry: false } }",
+	])
+		assert.ok(
+			lint(
+				`import { it } from 'vitest'; it('case', ${options}, () => {});`,
+			).some((d) => d.message.includes("retry policy")),
+			options,
+		);
+});

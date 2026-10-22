@@ -44,7 +44,7 @@ Apply the repository's [development-principles](../development-principles/SKILL.
 
 Address the verified problem; use the reviewer's suggested implementation only if it is appropriate. If a valid concern is already fixed on the PR branch, verify the existing change and identify its commit or code location. Acknowledge it without an empty commit. Invalid feedback needs an explanation, not a code change.
 
-Run the required checks for the completed changes before publication. Keep fixes whose verification failed pending, and report the failure. Follow [do-work](../do-work/SKILL.md) for publication and the shared [PR history policy](../../../CONTRIBUTING.md#pull-request-history) for the existing PR. Push to the PR's actual head branch and confirm the fix commits are on the remote before reporting them as delivered.
+Run the required checks for the completed changes before publication. Keep fixes whose verification failed pending, and report the failure. Apply [do-work](../do-work/SKILL.md)'s validation and push steps and the shared [PR history policy](../../../CONTRIBUTING.md#pull-request-history) to the selected PR's existing head branch. Update that PR in place; PR creation applies only to new work. Confirm the fix commits are on the remote before reporting them as delivered.
 
 ## 4. Reply, react, and resolve
 

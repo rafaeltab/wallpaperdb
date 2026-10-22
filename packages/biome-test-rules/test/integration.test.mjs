@@ -136,24 +136,29 @@ function makeRuleTests(directory) {
 	return result.stdout + result.stderr;
 }
 
-test("rule-test cache reruns for staged and untracked discovered source tests", () => {
-	const directory = isolatedRepository();
-	try {
-		const workspace = join(directory, "packages/biome-test-rules");
-		mkdirSync(join(workspace, "test"));
-		mkdirSync(join(workspace, ".turbo"));
-		const count = join(workspace, ".turbo/executions");
-		writeFileSync(
-			join(workspace, "test/cache.test.mjs"),
-			`import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+function installRuleTestCounter(directory) {
+	const workspace = join(directory, "packages/biome-test-rules");
+	mkdirSync(join(workspace, "test"));
+	mkdirSync(join(workspace, ".turbo"));
+	const count = join(workspace, ".turbo/executions");
+	writeFileSync(
+		join(workspace, "test/cache.test.mjs"),
+		`import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 test('records actual execution', () => {
   const path = '.turbo/executions';
   const previous = existsSync(path) ? Number(readFileSync(path, 'utf8')) : 0;
   writeFileSync(path, String(previous + 1));
 });`,
-		);
-		gitFixture(directory, ["add", "--", "."]);
+	);
+	gitFixture(directory, ["add", "--", "."]);
+	return count;
+}
+
+test("rule-test cache reruns for staged and untracked discovered source tests", () => {
+	const directory = isolatedRepository();
+	try {
+		const count = installRuleTestCounter(directory);
 		makeRuleTests(directory);
 		assert.equal(readFileSync(count, "utf8"), "1");
 		assert.match(makeRuleTests(directory), /cache hit/);
@@ -308,4 +313,33 @@ test("ordinary lint ignores generated sources and deliberately invalid CRAP fixt
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}
+});
+
+test("rule-test cache tracks every copied infrastructure config and ignore policy", async (context) => {
+	for (const path of ["scripts/biome.json", "infra/biome.json", ".gitignore"])
+		await context.test(path, () => {
+			const directory = isolatedRepository();
+			try {
+				const count = installRuleTestCounter(directory);
+				makeRuleTests(directory);
+				assert.equal(readFileSync(count, "utf8"), "1");
+				assert.match(makeRuleTests(directory), /cache hit/);
+				assert.equal(readFileSync(count, "utf8"), "1");
+				const config = join(directory, path);
+				writeFileSync(
+					config,
+					path === ".gitignore"
+						? readFileSync(config, "utf8") + "\napps/docs/src/ignored.test.ts\n"
+						: JSON.stringify({
+								files: { includes: ["*.json"] },
+								linter: { rules: { preset: "none" } },
+							}),
+				);
+				gitFixture(directory, ["add", "--", path]);
+				makeRuleTests(directory);
+				assert.equal(readFileSync(count, "utf8"), "2", path);
+			} finally {
+				rmSync(directory, { recursive: true, force: true });
+			}
+		});
 });

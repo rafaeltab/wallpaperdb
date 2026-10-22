@@ -45,7 +45,9 @@ const sourcePolicy = z
         maxAxis: positive,
         squareSize: positive.optional(),
         // HDR classes remain disabled until an exact mandatory-inspection adapter is qualified.
-        sourceModels: z.array(z.enum(['sdr-jpeg', 'sdr-png', 'sdr-webp'])).min(1),
+        sourceModels: z
+          .array(z.enum(['sdr-jpeg', 'sdr-png', 'sdr-webp', 'animated-sdr-webp']))
+          .min(1),
       })
       .strict(),
     retention: z.object({ evidenceMs: positive, candidateMs: positive }).strict(),

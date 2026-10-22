@@ -12,6 +12,13 @@ export interface SourceFacts {
   readonly height: number;
   readonly byteLength: number;
   readonly digest: string;
+  readonly animation?: {
+    readonly frames: number;
+    readonly loop: number;
+    readonly delaysMs: readonly number[];
+  };
+  readonly hasAlpha?: boolean;
+  readonly orientation?: number;
 }
 export type SourceOperation = 'add' | 'replace-one' | 'replace-set';
 export interface CandidateIntent {

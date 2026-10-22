@@ -42,6 +42,7 @@ test("Vitest retry overrides are rejected through registration and options alias
 		"{ ...shared }",
 		"shared",
 		"alias",
+		"alias!",
 		"({ ...alias } satisfies Record<string, number>)",
 	])
 		assert.ok(

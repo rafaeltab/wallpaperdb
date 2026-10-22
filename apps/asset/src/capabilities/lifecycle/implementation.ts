@@ -30,7 +30,9 @@ export function lifecycleLayer(policy: LifecyclePolicy) {
       const store = yield* LifecycleStore;
       return Lifecycle.of({
         command: Effect.fn('asset.lifecycle.command')(function* (applicationId, command) {
-          const application = policy.applications[applicationId];
+          const application = Object.hasOwn(policy.applications, applicationId)
+            ? policy.applications[applicationId]
+            : undefined;
           let decision: Acceptance['decision'];
           if (
             !application?.allowedOperations.includes(command.operation) ||

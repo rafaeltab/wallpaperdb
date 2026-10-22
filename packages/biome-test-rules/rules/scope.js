@@ -156,11 +156,21 @@ export function resolveScope(scope, identifier) {
 						? initializer
 						: undefined;
 			const source = imported?.arguments?.args[0];
+			const staticTemplate =
+				source?.kind === "JS_TEMPLATE_EXPRESSION" &&
+				!source.tag &&
+				source.elements.every((e) => e.kind === "JS_TEMPLATE_CHUNK_ELEMENT");
 			let key = parent.member ?? parent.identifier;
 			if (key?.kind === "JS_COMPUTED_MEMBER_NAME") key = key.expression;
-			if (source?.kind === "JS_STRING_LITERAL_EXPRESSION" && key)
+			if (
+				(source?.kind === "JS_STRING_LITERAL_EXPRESSION" || staticTemplate) &&
+				key
+			)
 				return {
-					source: stringValue(source.text),
+					// The pinned getStringValue uses raw text for template literals.
+					source: staticTemplate
+						? source.elements.map((e) => e.text).join("")
+						: stringValue(source.text),
 					imported:
 						key.kind === "JS_LITERAL_MEMBER_NAME" && /^["']/.test(key.text)
 							? stringValue(key.text)

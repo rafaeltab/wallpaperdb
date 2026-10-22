@@ -71,6 +71,11 @@ it('delivers durable operator notices to the configured HTTP destination and qua
       kind: 'result-quarantine',
       subject: 'asset.results.user',
       reason: 'exhausted',
+      context: {
+        occurrence: { source: 'https://example.test/application', id: 'command-occurrence' },
+        correlationId: 'workflow-1',
+        traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
+      },
     };
     await operator.jetstream().publish('asset.operator.notifications', JSON.stringify(notice));
     await expect

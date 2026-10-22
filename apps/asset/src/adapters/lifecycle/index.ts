@@ -250,7 +250,11 @@ export function lifecyclePostgresLayer(options: PostgresOptions) {
         pendingAlerts: (limit) =>
           run('pending-result-alerts', (db) =>
             db
-              .select({ id: assetResultOutbox.id, applicationId: assetResultOutbox.applicationId })
+              .select({
+                id: assetResultOutbox.id,
+                applicationId: assetResultOutbox.applicationId,
+                context: assetResultOutbox.context,
+              })
               .from(assetResultOutbox)
               .where(
                 and(

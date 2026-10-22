@@ -2,14 +2,29 @@ import { createHash } from 'node:crypto';
 import { Cause, Context, Effect, Fiber, Layer, Ref, Stream } from 'effect';
 import { connect, type JsMsg, type NatsConnection } from 'nats';
 import { z } from 'zod';
-import { CommandBrokerFailure } from './runtime.js';
+import type { CommandContext } from '../../capabilities/lifecycle/index.js';
+import { CommandBrokerFailure, observeWorkflow } from './runtime.js';
 
+const bounded = (bytes: number) =>
+  z
+    .string()
+    .min(1)
+    .refine((value) => Buffer.byteLength(value) <= bytes);
+const noticeContext = z
+  .object({
+    occurrence: z.object({ id: bounded(128), source: bounded(256) }).strict(),
+    correlationId: bounded(256).optional(),
+    traceparent: bounded(128).optional(),
+    tracestate: bounded(512).optional(),
+  })
+  .strict();
 export const noticeSchema = z
   .object({
     id: z.string().regex(/^[a-f0-9]{64}$/),
     kind: z.enum(['command-quarantine', 'result-quarantine']),
     subject: z.string().min(1).max(256),
     reason: z.enum(['invalid', 'exhausted']),
+    context: noticeContext.optional(),
   })
   .strict();
 export class OperatorNotificationHealth extends Context.Service<
@@ -37,7 +52,7 @@ const operation = <A>(name: string, run: (signal: AbortSignal) => Promise<A>) =>
     ),
     Effect.withSpan(`asset.notifications.${name}`)
   );
-const quarantineNotice = (connection: NatsConnection, message: JsMsg) =>
+const quarantineNotice = (connection: NatsConnection, message: JsMsg, context?: CommandContext) =>
   operation('quarantine-notification', () =>
     connection.jetstream().publish(
       'asset.quarantine',
@@ -50,6 +65,12 @@ const quarantineNotice = (connection: NatsConnection, message: JsMsg) =>
         type: 'asset.notification.quarantined',
         time: new Date().toISOString(),
         datacontenttype: 'application/json',
+        ...(context?.traceparent ? { traceparent: context.traceparent } : {}),
+        ...(context?.tracestate ? { tracestate: context.tracestate } : {}),
+        ...(context?.correlationId ? { correlationid: context.correlationId } : {}),
+        ...(context
+          ? { causationid: context.occurrence.id, causationsource: context.occurrence.source }
+          : {}),
         data: {
           subject: 'asset.operator.notifications',
           reason: 'exhausted',
@@ -59,7 +80,7 @@ const quarantineNotice = (connection: NatsConnection, message: JsMsg) =>
       { msgID: `notification-quarantine:${message.info.streamSequence}`, timeout: 5000 }
     )
   );
-const deliver = Effect.fn('asset.notifications.deliver')(function* (
+function deliver(
   connection: NatsConnection,
   message: JsMsg,
   applicationId: string,
@@ -72,38 +93,68 @@ const deliver = Effect.fn('asset.notifications.deliver')(function* (
     raw = null;
   }
   const parsed = noticeSchema.safeParse(raw);
-  if (!parsed.success || message.info.deliveryCount > options.maxAttempts) {
-    yield* quarantineNotice(connection, message);
-    message.ack();
-    return false;
-  }
-  const succeeded = yield* operation('deliver-webhook', async (signal) => {
-    const response = await fetch(options.target.url, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${options.target.token}`,
-        'content-type': 'application/json',
-        'idempotency-key': `${applicationId}:${parsed.data.id}`,
-      },
-      body: JSON.stringify({ ...parsed.data, applicationId }),
-      signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
-    });
-    await response.body?.cancel();
-    if (!response.ok) throw new Error(`Operator destination returned HTTP ${response.status}`);
-  }).pipe(
-    Effect.as(true),
-    Effect.catch(() => Effect.succeed(false))
-  );
-  if (succeeded) {
-    message.ack();
-    return true;
-  }
-  if (message.info.deliveryCount >= options.maxAttempts) {
-    yield* quarantineNotice(connection, message);
-    message.ack();
-  } else message.nak(Math.min(30000, options.retryDelayMs * 2 ** (message.info.deliveryCount - 1)));
-  return false;
-});
+  const context = parsed.success ? parsed.data.context : undefined;
+  return observeWorkflow(
+    'asset.notifications.deliver',
+    context,
+    {
+      'event.source': 'https://wallpaperdb/asset',
+      'event.subject': message.subject,
+      'event.consumer': message.info.consumer,
+      'event.delivery_attempt': message.info.deliveryCount,
+      'application.id': applicationId,
+      ...(parsed.success
+        ? {
+            'event.id': parsed.data.id,
+            'notification.kind': parsed.data.kind,
+            'notification.reason': parsed.data.reason,
+          }
+        : {}),
+      ...(context
+        ? {
+            'event.causation_id': context.occurrence.id,
+            'event.causation_source': context.occurrence.source,
+          }
+        : {}),
+      ...(context?.correlationId ? { 'event.correlation_id': context.correlationId } : {}),
+    },
+    Effect.gen(function* () {
+      if (!parsed.success || message.info.deliveryCount > options.maxAttempts) {
+        yield* quarantineNotice(connection, message, context);
+        message.ack();
+        return 'quarantined';
+      }
+      const succeeded = yield* operation('deliver-webhook', async (signal) => {
+        const response = await fetch(options.target.url, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${options.target.token}`,
+            'content-type': 'application/json',
+            'idempotency-key': `${applicationId}:${parsed.data.id}`,
+          },
+          body: JSON.stringify({ ...parsed.data, applicationId }),
+          signal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+        });
+        await response.body?.cancel();
+        if (!response.ok) throw new Error(`Operator destination returned HTTP ${response.status}`);
+      }).pipe(
+        Effect.as(true),
+        Effect.catch(() => Effect.succeed(false))
+      );
+      if (succeeded) {
+        message.ack();
+        return 'delivered';
+      }
+      if (message.info.deliveryCount >= options.maxAttempts) {
+        yield* quarantineNotice(connection, message, context);
+        message.ack();
+        return 'quarantined';
+      }
+      message.nak(Math.min(30000, options.retryDelayMs * 2 ** (message.info.deliveryCount - 1)));
+      return 'retry';
+    })
+  ).pipe(Effect.map((outcome) => outcome === 'delivered'));
+}
 /** Broker responsibility remains durable until HTTP acceptance or a confirmed
  * quarantine handoff. Exhaustion requires explicit operator replay. */
 export function operatorWebhookLayer(options: NotificationOptions) {

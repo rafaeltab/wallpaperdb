@@ -15,5 +15,6 @@ export {
   type LifecyclePolicy,
   type LifecyclePort,
   type AssetInspection,
+  type CommandContext,
 } from './contract.js';
 export { lifecycleLayer } from './implementation.js';

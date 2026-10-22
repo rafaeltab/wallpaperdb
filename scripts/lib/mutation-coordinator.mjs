@@ -214,6 +214,9 @@ export async function coordinate() {
 			}
 		}
 	}
+	// Authentication is needed only for remote checkpoint transfer, never workers.
+	delete process.env.GH_TOKEN;
+	delete process.env.GITHUB_TOKEN;
 	// A declared environment can invalidate a stage without a Git diff. Resolve
 	// selection after imports so compatible remote evidence keeps changed scope.
 	for (const job of jobs) {

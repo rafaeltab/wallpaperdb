@@ -76,13 +76,11 @@ const poolResource = (databaseUrl: string) =>
         statement_timeout: 10000,
       });
       pool.on('error', (cause) =>
-        logs
-          .getLogger('asset.lifecycle')
-          .emit({
-            severityNumber: SeverityNumber.ERROR,
-            body: 'Idle Asset database connection failed',
-            attributes: { 'error.type': cause.name, 'error.message': cause.message },
-          })
+        logs.getLogger('asset.lifecycle').emit({
+          severityNumber: SeverityNumber.ERROR,
+          body: 'Idle Asset database connection failed',
+          attributes: { 'error.type': cause.name, 'error.message': cause.message },
+        })
       );
       return pool;
     }),

@@ -35,6 +35,16 @@ const provider = z
 const schema = z
   .object({
     revision: OwnerValueSchema,
+    operatorNotification: z
+      .object({
+        url: z
+          .string()
+          .url()
+          .refine((value) => ['http:', 'https:'].includes(new URL(value).protocol)),
+        token: z.string().min(1),
+        revision: OwnerValueSchema,
+      })
+      .strict(),
     broker: z
       .object({
         service: credential,
@@ -137,6 +147,10 @@ export function parseAuthority(input: unknown) {
   }
   const effective = {
     ...parsed,
+    operatorNotification: {
+      url: parsed.operatorNotification.url,
+      revision: parsed.operatorNotification.revision,
+    },
     broker: {
       ...parsed.broker,
       service: { user: parsed.broker.service.user, revision: parsed.broker.service.revision },

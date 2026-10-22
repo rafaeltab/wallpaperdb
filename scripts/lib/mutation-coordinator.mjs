@@ -189,7 +189,7 @@ export async function coordinate() {
 			full.jobs,
 			resolve(values.baseline),
 		);
-		scheduling = imported.scheduling;
+		if (imported.importedStages) scheduling = imported.scheduling;
 		remote = imported.importedStages
 			? "explicit-import"
 			: "incompatible-explicit-import-cold-fallback";

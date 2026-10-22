@@ -34,14 +34,18 @@ test("awaited lifecycle promises from the real shared tester remain valid", () =
 test("Biome's Playwright rule checks the real imported assertion types in specs", () => {
 	const source =
 		"import { expect, test } from '@playwright/test'; test('page', async ({ page }) => { expect(page.getByRole('button')).toBeVisible(); });";
-	const filename = "specs/example.spec.ts";
-	assert.ok(
-		lint(source, {}, filename).some((d) =>
-			d.category.endsWith("noPlaywrightMissingAwait"),
-		),
-	);
-	assert.deepEqual(
-		lint(source.replace("expect(page", "await expect(page"), {}, filename),
-		[],
-	);
+	for (const filename of [
+		"specs/example.spec.ts",
+		"specs/base-user.setup.ts",
+	]) {
+		assert.ok(
+			lint(source, {}, filename).some((d) =>
+				d.category.endsWith("noPlaywrightMissingAwait"),
+			),
+		);
+		assert.deepEqual(
+			lint(source.replace("expect(page", "await expect(page"), {}, filename),
+			[],
+		);
+	}
 });

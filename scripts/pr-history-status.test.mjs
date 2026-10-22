@@ -66,6 +66,7 @@ const endpoint = args.at(-1);
 const requested = endpoint.match(/\\/pulls\\/(\\d+)$/);
 const ref = endpoint.match(/\\/git\\/ref\\/heads\\/(.+)$/);
 const pr = prs.find(p => requested ? p.number === Number(requested[1]) : ref ? p.base.ref === decodeURIComponent(ref[1]) : false) || prs[0];
+if (requested && requested[1] === process.env.TEST_FAIL_PR) { console.error('PR API unavailable'); process.exit(1); }
 if (args.includes('POST')) {
   const body = JSON.parse(fs.readFileSync(0, 'utf8'));
   fs.appendFileSync('statuses.jsonl', JSON.stringify({endpoint: args.find(x => x.includes('/statuses/')), ...body}) + '\\n');
@@ -78,6 +79,7 @@ else if (args.some(x => x.includes('/git/ref/heads/'))) console.log(JSON.stringi
 else {
   const reads = fs.existsSync('reads') ? Number(fs.readFileSync('reads', 'utf8')) + 1 : 1;
   fs.writeFileSync('reads', String(reads));
+  if (pr.number === 1 && process.env.TEST_ALTERNATE_HEAD) pr.head.sha = reads % 2 ? pr.head.sha : process.env.TEST_ALTERNATE_HEAD;
   if (reads >= 2 && process.env.TEST_CLOSE_DURING_CHECK) pr.state = 'closed';
   if (reads >= 2 && process.env.TEST_ADVANCED_BASE) {
     pr.base.sha = process.env.TEST_ADVANCED_BASE;
@@ -110,7 +112,29 @@ else {
 					.map((line) => JSON.parse(line))
 			: [];
 	}
-	return { root, git, commit, head, record, run, statuses, env };
+	function addSecondPullRequest() {
+		git("branch", "stack", "main");
+		writeFileSync(
+			join(root, "extra-pr.json"),
+			JSON.stringify({
+				number: 2,
+				state: "open",
+				head: { sha: head },
+				base: { ref: "stack", sha: git("rev-parse", "stack") },
+			}),
+		);
+	}
+	return {
+		root,
+		git,
+		commit,
+		head,
+		record,
+		run,
+		statuses,
+		env,
+		addSecondPullRequest,
+	};
 }
 
 test("a base push publishes history status for each open PR comparison", (t) => {
@@ -133,16 +157,7 @@ test("a base push publishes history status for each open PR comparison", (t) => 
 test("trusted reconciliation checks open PRs across all base branches", (t) => {
 	const f = fixture(t);
 	delete f.env.HISTORY_BASE;
-	f.git("branch", "stack", "main");
-	writeFileSync(
-		join(f.root, "extra-pr.json"),
-		JSON.stringify({
-			number: 2,
-			state: "open",
-			head: { sha: f.head },
-			base: { ref: "stack", sha: f.git("rev-parse", "stack") },
-		}),
-	);
+	f.addSecondPullRequest();
 	const result = f.run();
 	assert.equal(result.status, 0, result.stderr);
 	assert.deepEqual(
@@ -153,6 +168,46 @@ test("trusted reconciliation checks open PRs across all base branches", (t) => {
 		[...new Set(f.statuses().map((s) => s.context))],
 		["PR history #1", "PR history #2"],
 	);
+});
+
+for (const failure of ["API", "comparison churn"]) {
+	test(`reconciliation continues to later PRs after ${failure}`, (t) => {
+		const f = fixture(t);
+		delete f.env.HISTORY_BASE;
+		f.addSecondPullRequest();
+		if (failure === "API") f.env.TEST_FAIL_PR = "1";
+		else {
+			f.git("checkout", "feature");
+			f.commit("churn");
+			f.env.TEST_ALTERNATE_HEAD = f.git("rev-parse", "HEAD");
+			f.git("checkout", "main");
+		}
+		const result = f.run();
+		assert.notEqual(result.status, 0);
+		assert.deepEqual(
+			f
+				.statuses()
+				.filter((s) => s.context === "PR history #2")
+				.map((s) => s.state),
+			["pending", "success"],
+		);
+		assert.match(
+			result.stderr,
+			failure === "API"
+				? /PR #1: PR API unavailable/
+				: /PR #1: .*changed comparison repeatedly/,
+		);
+	});
+}
+
+test("an explicitly selected PR still fails without checking other PRs", (t) => {
+	const f = fixture(t);
+	f.addSecondPullRequest();
+	f.env.TEST_FAIL_PR = "1";
+	const result = f.run("1");
+	assert.notEqual(result.status, 0);
+	assert.match(result.stderr, /PR API unavailable/);
+	assert.deepEqual(f.statuses(), []);
 });
 
 test("a base advance that lands the patch replaces stale green with failure", (t) => {

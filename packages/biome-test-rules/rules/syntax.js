@@ -188,9 +188,37 @@ export function syntaxTree(root) {
 			case "JS_PROPERTY_OBJECT_MEMBER":
 			case "JS_OBJECT_BINDING_PATTERN_PROPERTY":
 				node.type = "Property";
+				node.computed =
+					(native.name ?? native.member)?.kind === "JS_COMPUTED_MEMBER_NAME";
 				node.key = child(native.name ?? native.member);
 				node.value = child(native.value ?? native.pattern);
 				break;
+			case "JS_METHOD_OBJECT_MEMBER":
+			case "JS_GETTER_OBJECT_MEMBER":
+			case "JS_SETTER_OBJECT_MEMBER": {
+				node.type = "Property";
+				node.computed = native.name?.kind === "JS_COMPUTED_MEMBER_NAME";
+				node.key = child(native.name);
+				const fn = {
+					native,
+					type: "FunctionExpression",
+					range: node.range,
+					loc: node.loc,
+					parent: node,
+					children: [],
+				};
+				fn.async = !!native.asyncToken;
+				fn.params = list(
+					native.parameters?.items ??
+						(native.parameter ? [native.parameter] : []),
+				);
+				fn.body = child(native.body);
+				fn.children = [...fn.params, fn.body].filter(Boolean);
+				for (const entry of fn.children) entry.parent = fn;
+				node.value = fn;
+				node.children = [node.key, fn].filter(Boolean);
+				break;
+			}
 			case "JS_SHORTHAND_PROPERTY_OBJECT_MEMBER":
 			case "JS_OBJECT_BINDING_PATTERN_SHORTHAND_PROPERTY":
 				node.type = "Property";

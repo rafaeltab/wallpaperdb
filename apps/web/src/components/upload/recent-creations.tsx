@@ -13,13 +13,13 @@ const labels = {
 export function RecentCreations() {
   const { userId, isSignedIn } = useAuth();
   const active = useRef(new Set<AbortController>());
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    if (!userId) return;
+    return () => {
       for (const c of active.current) c.abort();
       active.current.clear();
-    },
-    [userId]
-  );
+    };
+  }, [userId]);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(new Set<string>());
   const [resuming, setResuming] = useState<ReadonlySet<string>>(new Set());

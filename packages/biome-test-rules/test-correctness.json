@@ -36,7 +36,7 @@
 			}
 		},
 		{
-			"includes": ["**/specs/**/*.spec.ts"],
+			"includes": ["**/specs/**/*.{spec,setup}.ts"],
 			"linter": {
 				"rules": {
 					"correctness": {

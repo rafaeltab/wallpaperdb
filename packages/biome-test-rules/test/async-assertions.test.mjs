@@ -278,3 +278,24 @@ test("rejection handlers may be imported functions and local aliases", () => {
 		[],
 	);
 });
+
+test("handled reads must consume the original mutable assertion promise", () => {
+	const promise = "expect(Promise.resolve(1)).resolves.toBe(1)";
+	const prelude = "import { expect } from 'vitest'; ";
+	for (const source of [
+		`let pending = ${promise}; pending = Promise.resolve(); await pending;`,
+		`let pending; await pending; pending = ${promise};`,
+		`let pending = ${promise}; pending = ${promise}; await pending;`,
+		`let pending; if (condition) pending = ${promise}; await pending;`,
+	])
+		assert.ok(
+			lint(prelude + source).some((d) => d.message.includes("async assertion")),
+			source,
+		);
+	for (const source of [
+		`let pending = ${promise}; await pending; pending = Promise.resolve();`,
+		`let pending; pending = ${promise}; await pending;`,
+		`const pending = ${promise}; const alias = pending; await alias;`,
+	])
+		assert.deepEqual(lint(prelude + source), [], source);
+});

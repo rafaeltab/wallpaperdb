@@ -620,6 +620,22 @@ function callbackResultHandled(
 	return false;
 }
 
+function readsValue(
+	read: AnyJsAstNode,
+	value: AnyJsAstNode,
+	model: SemanticModel,
+) {
+	const selected = variableValueAt(read, model);
+	// Equal call text can create distinct promises in an initializer and a later
+	// assignment. Compare the producing parent as well as the selected expression.
+	return (
+		selected?.kind === value.kind &&
+		selected.text === value.text &&
+		selected.parent?.kind === value.parent?.kind &&
+		selected.parent?.text === value.parent?.text
+	);
+}
+
 function handled(
 	node: AnyJsAstNode,
 	model: SemanticModel,
@@ -656,7 +672,8 @@ function handled(
 				const expression = reference.syntax().parent;
 				return (
 					expression?.kind === "JS_IDENTIFIER_EXPRESSION" &&
-					handled(expression, model, seen, allowVoid)
+					readsValue(expression, node, model) &&
+					handled(expression, model, new Set(seen), allowVoid)
 				);
 			});
 		}
@@ -704,7 +721,8 @@ function handled(
 				const expression = reference.syntax().parent;
 				return (
 					expression?.kind === "JS_IDENTIFIER_EXPRESSION" &&
-					handled(expression, model, seen, allowVoid)
+					readsValue(expression, node, model) &&
+					handled(expression, model, new Set(seen), allowVoid)
 				);
 			});
 		}

@@ -92,3 +92,23 @@ test("Node lifecycle hooks await promise returns through source-bound aliases", 
 			source,
 		);
 });
+
+test("Effect promise reads follow the same direct assignment boundary", () => {
+	const promise = "Effect.runPromise(Effect.succeed(1))";
+	const prelude = "import { Effect } from 'effect'; ";
+	for (const source of [
+		`let pending = ${promise}; pending = Promise.resolve(); await pending;`,
+		`let pending; await pending; pending = ${promise};`,
+	])
+		assert.ok(
+			lint(prelude + source).some((d) => d.message.includes("Effect promise")),
+			source,
+		);
+	assert.deepEqual(
+		lint(
+			prelude +
+				`let pending = ${promise}; await pending; pending = Promise.resolve();`,
+		),
+		[],
+	);
+});

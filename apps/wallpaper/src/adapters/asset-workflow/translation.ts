@@ -18,10 +18,19 @@ const envelope = z
     data: z.unknown(),
   })
   .strict();
+export type ConfirmationContext = Omit<z.infer<typeof envelope>, 'data'>;
 export type Confirmation =
   | { readonly kind: 'invalid' }
-  | { readonly kind: 'created'; readonly result: AssetResult }
-  | { readonly kind: 'source'; readonly confirmation: SourceAcceptance };
+  | {
+      readonly kind: 'created';
+      readonly result: AssetResult;
+      readonly context: ConfirmationContext;
+    }
+  | {
+      readonly kind: 'source';
+      readonly confirmation: SourceAcceptance;
+      readonly context: ConfirmationContext;
+    };
 export function decodeConfirmation(bytes: Uint8Array): Confirmation {
   if (bytes.byteLength > 16384) return { kind: 'invalid' };
   let input: unknown;
@@ -33,6 +42,7 @@ export function decodeConfirmation(bytes: Uint8Array): Confirmation {
   const parsed = envelope.safeParse(input);
   if (!parsed.success) return { kind: 'invalid' };
   const event = parsed.data;
+  const { data: _data, ...context } = event;
   if (event.type === 'asset.command.result') {
     if (event.causationsource !== 'https://wallpaperdb/wallpaper') return { kind: 'invalid' };
     const data = AssetCommandResultSchema.safeParse(event.data);
@@ -40,6 +50,7 @@ export function decodeConfirmation(bytes: Uint8Array): Confirmation {
       return { kind: 'invalid' };
     return {
       kind: 'created',
+      context,
       result: {
         wallpaperId: data.data.applicationReference,
         commandId: data.data.commandId,
@@ -59,6 +70,7 @@ export function decodeConfirmation(bytes: Uint8Array): Confirmation {
     return { kind: 'invalid' };
   return {
     kind: 'source',
+    context,
     confirmation: {
       assetId: data.data.assetId,
       candidateId: data.data.candidateId,

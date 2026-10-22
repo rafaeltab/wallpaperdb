@@ -67,7 +67,11 @@ export interface SourceAcceptance extends SourceIntent {
 }
 export interface CreationPort {
   readonly list: (owner: Creator) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
-  readonly begin: (owner: Creator, key: string, trace?:WorkflowTrace) => Effect.Effect<WallpaperOutcome, WorkflowFailure>;
+  readonly begin: (
+    owner: Creator,
+    key: string,
+    trace?: WorkflowTrace
+  ) => Effect.Effect<WallpaperOutcome, WorkflowFailure>;
   readonly get: (owner: Creator, id: string) => Effect.Effect<WallpaperOutcome, WorkflowFailure>;
   readonly expectSource: (
     owner: Creator,
@@ -91,7 +95,11 @@ export class Creation extends Context.Service<Creation, CreationPort>()(
  * together, including through an ambiguous commit. Asset identity is globally unique. */
 export interface WorkflowStorePort {
   readonly list: (owner: Creator) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
-  readonly begin: (owner: Creator, key: string, trace?:WorkflowTrace) => Effect.Effect<Wallpaper, WorkflowFailure>;
+  readonly begin: (
+    owner: Creator,
+    key: string,
+    trace?: WorkflowTrace
+  ) => Effect.Effect<Wallpaper, WorkflowFailure>;
   readonly change: <A>(
     selector: { readonly kind: 'wallpaper' | 'asset'; readonly id: string },
     transition: (wallpaper: Wallpaper | null) => {

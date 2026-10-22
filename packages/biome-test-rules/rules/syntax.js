@@ -231,6 +231,7 @@ export function syntaxTree(root) {
 				node.type = native.kind.endsWith("_CLASS_MEMBER")
 					? "MethodDefinition"
 					: "Property";
+				node.decorators = list(native.modifiers);
 				node.computed = native.name?.kind === "JS_COMPUTED_MEMBER_NAME";
 				node.key = child(native.name);
 				const fn = {
@@ -251,7 +252,7 @@ export function syntaxTree(root) {
 				fn.children = [...fn.params, fn.body].filter(Boolean);
 				for (const entry of fn.children) entry.parent = fn;
 				node.value = fn;
-				node.children = [node.key, fn].filter(Boolean);
+				node.children = [...node.decorators, node.key, fn].filter(Boolean);
 				break;
 			}
 			case "JS_SHORTHAND_PROPERTY_OBJECT_MEMBER":

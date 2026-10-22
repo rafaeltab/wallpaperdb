@@ -1,5 +1,5 @@
 interface:
   display_name: "Implement Spec"
-  short_description: "Run ticket threads in separate worktrees, stack PRs, and review the spec."
+  short_description: "Implement spec tickets in worktrees and review the PR stack."
 policy:
   allow_implicit_invocation: false

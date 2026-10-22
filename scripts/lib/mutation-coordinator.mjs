@@ -314,7 +314,8 @@ export async function coordinate() {
 			const job = jobs[cursor];
 			cursor = (cursor + 1) % jobs.length;
 			visits++;
-			scheduling.cursor = jobs[cursor].id;
+			// Subset diagnostics must not reset the next repository-wide visit.
+			if (jobs.length === full.jobs.length) scheduling.cursor = jobs[cursor].id;
 			if (!job.mutate.length) continue;
 			const unitJob = full.jobs.find(
 				(other) => other.workspace === job.workspace && other.suite === "unit",

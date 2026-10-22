@@ -32,7 +32,12 @@ export function queuePresentation(state: {
   const isUploading = state.files.some(
     (file) => file.status === 'pending' || file.status === 'uploading'
   );
-  const isComplete = hasFiles && !isUploading && !state.isPaused && !state.isStopped;
+  const isComplete =
+    hasFiles &&
+    !isUploading &&
+    !state.files.some((file) => file.status === 'confirming') &&
+    !state.isPaused &&
+    !state.isStopped;
   const hasFailures = state.files.some((file) => file.status === 'failed');
   const hasFailuresOrDuplicates =
     hasFailures || state.files.some((file) => file.status === 'duplicate');

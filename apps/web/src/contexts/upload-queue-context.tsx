@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/react';
 import {
   createContext,
   type ReactNode,
@@ -32,6 +33,10 @@ type UploadQueueContextValue = ReturnType<BrowserUploadQueue['getSnapshot']> &
 const UploadQueueContext = createContext<UploadQueueContextValue | undefined>(undefined);
 
 export function UploadQueueProvider({ children }: { children: ReactNode }) {
+  const { userId } = useAuth();
+  return <OwnerUploadQueue key={userId ?? 'signed-out'}>{children}</OwnerUploadQueue>;
+}
+function OwnerUploadQueue({ children }: { children: ReactNode }) {
   const [queue] = useState(createBrowserUploadQueue);
   const snapshot = useSyncExternalStore(queue.subscribe, queue.getSnapshot, queue.getSnapshot);
   useEffect(() => queue.activate(), [queue]);

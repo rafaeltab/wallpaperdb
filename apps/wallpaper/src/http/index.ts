@@ -201,7 +201,7 @@ export async function createHttpApp<E>(
       '/health',
       {
         schema: {
-          wallpaper: ['Health'],
+          tags: ['Health'],
           response: {
             200: { $ref: 'HealthResponse#' },
             503: unavailableSchema(
@@ -235,7 +235,7 @@ export async function createHttpApp<E>(
       '/ready',
       {
         schema: {
-          wallpaper: ['Health'],
+          tags: ['Health'],
           response: {
             200: { $ref: 'ReadyResponse#' },
             503: unavailableSchema(

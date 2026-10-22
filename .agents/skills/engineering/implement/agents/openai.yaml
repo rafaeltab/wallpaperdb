@@ -1,5 +1,5 @@
 interface:
   display_name: "Implement"
-  short_description: "Implement, review, and publish one issue with do-work."
+  short_description: "Implement, review, and publish one issue with $do-work."
 policy:
   allow_implicit_invocation: false

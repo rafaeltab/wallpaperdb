@@ -1,3 +1,4 @@
+import { initialSourcePolicies } from '../src/capabilities/sources/policy.js';
 import { randomBytes } from 'node:crypto';
 import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -96,9 +97,17 @@ export async function configureDevelopment(
             requireAuthorizedParty: false,
           },
         },
-        assetTypes: { wallpaper: {}, picture: {} },
+        assetTypes: structuredClone(initialSourcePolicies),
         delivery: { maxAttempts: 3, retryDelayMs: 1000, pollMs: 1000, shutdownTimeoutMs: 5000 },
       };
+  // Explicit setup upgrades the former empty type entries while preserving credentials.
+  let upgraded = false;
+  for (const [type, policy] of Object.entries(initialSourcePolicies)) {
+    if (raw.assetTypes?.[type] && Object.keys(raw.assetTypes[type]).length === 0) {
+      raw.assetTypes[type] = structuredClone(policy);
+      upgraded = true;
+    }
+  }
   let authority = parseAuthority(raw);
   const resolvesPlaceholder =
     authority.identityProviders.clerk?.issuer === 'https://unconfigured.clerk.accounts.dev' &&
@@ -112,7 +121,7 @@ export async function configureDevelopment(
   await mkdir(join(root, 'infra/nats'), { recursive: true });
   if (!existing)
     await writeFile(path, `${JSON.stringify(raw, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
-  else if (resolvesPlaceholder)
+  else if (resolvesPlaceholder || upgraded)
     await writeFile(path, `${JSON.stringify(raw, null, 2)}\n`, { mode: 0o600 });
   await chmod(path, 0o600);
   const brokerPath = join(root, 'infra/nats/.generated.conf');

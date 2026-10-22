@@ -1,10 +1,14 @@
 import { execFileSync } from "node:child_process";
 import { constants, openSync, closeSync, fstatSync, lstatSync } from "node:fs";
+import { defaultDockerLock } from "./docker-queue.mjs";
 
 /** Share the same host lock as ordinary Docker-heavy local validation. */
 export function acquireMutationLock(timeoutMs) {
 	const waitMs = Math.max(1, Math.floor(timeoutMs));
-	const file = "/tmp/wallpaperdb-perf-validation.lock";
+	const file =
+		process.env.DOCKER_VALIDATION_LOCK_FILE ||
+		process.env.E2E_LOCK_FILE ||
+		defaultDockerLock;
 	const descriptor = openSync(
 		file,
 		constants.O_CREAT |

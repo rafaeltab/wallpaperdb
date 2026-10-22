@@ -95,3 +95,33 @@ test("registration options use an unambiguous preceding assignment", () => {
 		[],
 	);
 });
+
+test("retry checks inspect locally visible option alternatives", () => {
+	for (const options of [
+		"enabled ? { retry: 3 } : {}",
+		"enabled ? {} : { retry: 3 }",
+		"enabled && { retry: 3 }",
+		"maybe || { retry: 3 }",
+		"maybe ?? { retry: 3 }",
+		"{ retry: 3 } || {}",
+	])
+		assert.ok(
+			lint(
+				`import { it } from 'vitest'; it('case', ${options}, () => {});`,
+			).some((d) => d.message.includes("retry policy")),
+			options,
+		);
+	for (const options of [
+		"enabled ? { timeout: 100 } : {}",
+		"({ retry: 3 }) ? {} : {}",
+		"{ retry: 3 } && {}",
+		"{} || { retry: 3 }",
+		"{} ?? { retry: 3 }",
+		"false && { retry: 3 }",
+	])
+		assert.deepEqual(
+			lint(`import { it } from 'vitest'; it('case', ${options}, () => {});`),
+			[],
+			options,
+		);
+});

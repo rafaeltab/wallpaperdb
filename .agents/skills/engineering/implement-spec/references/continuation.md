@@ -10,4 +10,4 @@ Worktree branches remain checked out in their owning worktrees. Run repairs ther
 
 Verify native membership separately from local Git state. This workflow needs no shared local `gh-stack` catalog. Preserve any existing catalog without adopting or rewriting it; use [native membership preservation](stack-recovery.md#preserve-native-membership) for the remote stack.
 
-Resume the [ticket workflow](../SKILL.md#steps) only after the relevant thread, worktree, branch, PR, and evidence agree. Refresh `main` and restack when a parent has changed.
+Resume the [ticket workflow](../SKILL.md#steps) only after the relevant thread, worktree, branch, PR, and evidence agree. Refresh `main` and inspect changed parents; restack for changed lower layers, conflicts, or native stack readiness under the shared history policy.

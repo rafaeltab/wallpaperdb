@@ -46,7 +46,7 @@ Resolve both skills before starting review. An unavailable skill or failed revie
 
 Verify every finding against the code and accepted requirements. Fix all confirmed issues with new, focused commits, using TDD for behavior changes. Record the evidence for findings that do not apply; do not silently discard them or treat a review suggestion as permission to expand the agreed scope. Rerun affected checks and Step 4 after fixes, then repeat both reviews on the resulting complete diff. Continue until both skills pass with no unresolved findings.
 
-Record the passing parent/head commits, validation results, and both review reports. Before publication, reconcile any later rebase or change with this evidence: reuse validation only for an identical tree and reuse reviews only after verifying an identical parent-relative diff and unchanged requirements and relevant behavior from the base. Record the comparison and updated commit pair. Otherwise rerun affected validation and both reviews before publication.
+Record the passing parent/head commits, validation results, and both review reports. Follow the shared [PR history policy](../../../CONTRIBUTING.md#pull-request-history) for published history, including its authorization and fresh-review requirements after a rewrite. For unpublished work, reconcile any later rebase or change with this evidence: reuse validation only for an identical tree and reuse reviews only after verifying an identical parent-relative diff and unchanged requirements and relevant behavior from the base. Record the comparison and updated commit pair. Otherwise rerun affected validation and both reviews before publication.
 
 ### 6. Open a PR
 

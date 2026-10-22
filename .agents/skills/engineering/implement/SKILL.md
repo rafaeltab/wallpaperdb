@@ -6,4 +6,4 @@ disable-model-invocation: true
 
 Follow [do-work](../../wallpaperdb/do-work/SKILL.md) for the selected issue or requested change, through both independent reviews and PR publication. Preserve any supplied branch, parent commit, and draft requirement.
 
-For an entire spec with implementation tickets, use [implement-spec](../implement-spec/SKILL.md).
+The corresponding user command for an entire spec with implementation tickets is [$implement-spec](../implement-spec/SKILL.md).

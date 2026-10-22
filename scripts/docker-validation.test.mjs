@@ -314,6 +314,19 @@ test("a nested coordinated command borrows its inherited lock instead of waiting
 	assert.equal(result.status, 19, result.output);
 });
 
+test("a nested launcher that drops the descriptor fails clearly before execution", async (t) => {
+	const f = fixture(t);
+	const nested = f.start(
+		"outer",
+		`const { spawnSync } = require('node:child_process'); process.exit(spawnSync(process.execPath, [${JSON.stringify(runner)}, '--label', 'inner', '--', process.execPath, '-e', "require('node:fs').writeFileSync('wrong', '')"], { stdio: 'inherit' }).status)`,
+	);
+	const result = await nested.done;
+	assert.equal(result.status, 1, result.output);
+	assert.match(result.output, /Cannot reuse inherited Docker lock descriptor/);
+	assert.match(result.output, /Forward WALLPAPERDB_DOCKER_LEASE_FD/);
+	assert.equal(existsSync(join(f.root, "wrong")), false);
+});
+
 test("killing a coordinator keeps the host locked until its surviving command exits", async (t) => {
 	const f = fixture(t);
 	const owner = f.start(

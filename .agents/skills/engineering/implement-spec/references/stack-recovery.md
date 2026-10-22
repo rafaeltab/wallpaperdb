@@ -13,3 +13,7 @@ Register native membership with [gh stack link](https://github.com/github/gh-sta
 Record old parent boundaries before changing refs. Wait for active work to finish and require clean owning worktrees. Rebase each layer in its ticket's worktree, bottom to top, using [rebase --onto](https://git-scm.com/docs/git-rebase#_transplanting_a_topic_branch_with_onto) to move only that layer's commits onto its new parent.
 
 Refresh issue evidence after rewrites. Reuse validation only for an identical tree; repeat affected validation and the parallel reviews required by $do-work and the shared history policy. Republish with explicit leases and verify targets and native membership. Repeat final spec review when the reviewed result or relevant base behavior changes.
+
+## Combined validation
+
+When current `main` is not an ancestor of the top commit, validate their combined tree in a disposable worktree using a temporary integration commit. Record both input commits and the tested tree. Preserve the published stack; integration conflicts block readiness until resolved, validated, and reviewed under the history policy.

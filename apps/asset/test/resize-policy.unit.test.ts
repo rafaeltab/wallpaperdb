@@ -115,11 +115,10 @@ function fixture() {
       renditions.set(source.id, [...(renditions.get(source.id) ?? []), rendition]);
       if (present) objects.set(`renditions/${key}`, key);
     },
-    request: (options?: ResizeOptions) => {
-      return Effect.runPromise(
+    request: (options?: ResizeOptions) =>
+      Effect.runPromise(
         AssetDelivery.use((d) => d.wallpaper(source.id, options)).pipe(Effect.provide(delivery))
-      );
-    },
+      ),
     app: () => createHttpApp({ nodeEnv: 'test', port: 0 }, Layer.merge(health, delivery)),
   };
 }

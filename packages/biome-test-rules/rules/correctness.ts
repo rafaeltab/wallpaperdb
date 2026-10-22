@@ -621,6 +621,9 @@ function handled(
 		case "JS_RETURN_STATEMENT":
 			return true;
 		case "JS_ARROW_FUNCTION_EXPRESSION":
+			// A helper property declares a function return contract. It is not a
+			// callback argument whose consumer can discard the returned promise.
+			if (parent.parent?.kind === "JS_PROPERTY_OBJECT_MEMBER") return true;
 			return callbackResultHandled(parent, model, seen, allowVoid);
 		case "JS_PARENTHESIZED_EXPRESSION":
 		case "TS_AS_EXPRESSION":

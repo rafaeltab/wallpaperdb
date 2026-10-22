@@ -132,8 +132,8 @@ function fixture(
     deny: () => {
       allowed = false;
     },
-    run: <A, E>(effect: Effect.Effect<A, E, AssetDelivery>) => {
-      return Effect.runPromise(
+    run: <A, E>(effect: Effect.Effect<A, E, AssetDelivery>) =>
+      Effect.runPromise(
         effect.pipe(
           Effect.provide(
             deliveryLayer({
@@ -144,8 +144,7 @@ function fixture(
             }).pipe(Layer.provide(dependencies))
           )
         )
-      );
-    },
+      ),
   };
 }
 describe('asset delivery', () => {

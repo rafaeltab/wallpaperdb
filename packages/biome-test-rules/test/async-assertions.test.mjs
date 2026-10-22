@@ -137,6 +137,30 @@ test("unknown custom consumers require explicit local assertion handling", () =>
 		);
 });
 
+test("ordinary object helper arrows return promises like explicit block returns", () => {
+	for (const expression of [
+		"Effect.runPromise(Effect.succeed(1))",
+		"expect(Promise.resolve(1)).resolves.toBe(1)",
+	]) {
+		const prelude =
+			"import { Effect } from 'effect'; import { expect } from 'vitest'; ";
+		for (const body of [expression, `{ return ${expression}; }`])
+			assert.deepEqual(
+				lint(
+					`${prelude} const helpers = { run: () => ${body} }; await helpers.run();`,
+				),
+				[],
+				body,
+			);
+		assert.ok(
+			lint(`${prelude} [1].forEach(() => ${expression});`).some(
+				(d) => d.severity === "error",
+			),
+			expression,
+		);
+	}
+});
+
 test("awaited conditional branches handle assertions", () => {
 	assert.deepEqual(
 		lint(

@@ -4,6 +4,7 @@ node_modules
 .repos/
 mise.local.toml
 mise.local.lock
+.mise/
 
 # Ignore any local state left by the removed Sandcastle runner.
 .sandcastle/

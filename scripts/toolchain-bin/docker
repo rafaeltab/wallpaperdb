@@ -1,7 +1,32 @@
-#!/bin/sh
-set -eu
-case "${1:-}" in
-  compose) shift; exec docker-compose "$@" ;;
-  buildx) shift; exec docker-buildx "$@" ;;
-  *) exec "$(mise where docker-cli)/docker/docker" "$@" ;;
+#!/bin/bash
+set -euo pipefail
+
+source_config=${WALLPAPERDB_DOCKER_SOURCE_CONFIG:-${DOCKER_CONFIG:-$HOME/.docker}}
+args=()
+command_name=
+while (($#)); do
+  case "$1" in
+    --config)
+      source_config=$2
+      shift 2
+      ;;
+    --config=*) source_config=${1#--config=}; shift ;;
+    --context|-c|--host|-H|--log-level|-l|--tlscacert|--tlscert|--tlskey)
+      args+=("$1" "$2"); shift 2 ;;
+    -*) args+=("$1"); shift ;;
+    *) command_name=$1; args+=("$@"); break ;;
+  esac
+done
+
+# Account and context changes must continue to write the user's configuration.
+case "$command_name" in
+    login|logout|context)
+      exec "$(mise where docker-cli)/docker/docker" --config "$source_config" "${args[@]}"
+      ;;
 esac
+
+export WALLPAPERDB_DOCKER_SOURCE_CONFIG="$source_config"
+export BUILDX_CONFIG=${BUILDX_CONFIG:-$source_config/buildx}
+DOCKER_CONFIG=$(node "$(dirname "$0")/../docker-config.mjs" "$source_config")
+export DOCKER_CONFIG
+exec "$(mise where docker-cli)/docker/docker" --config "$DOCKER_CONFIG" "${args[@]}"

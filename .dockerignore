@@ -27,6 +27,7 @@ coverage
 .sandcastle
 .agents
 .repos
+.mise
 
 # IDE
 .vscode

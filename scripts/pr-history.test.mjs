@@ -81,3 +81,13 @@ test("already-landed patches fail after the base gains unrelated changes", (t) =
 	assert.notEqual(result.status, 0);
 	assert.match(result.stderr, /already match|already landed/);
 });
+
+test("a PR can reapply an equivalent patch that was later reverted on the base", (t) => {
+	const f = fixture(t);
+	const head = f.git("rev-parse", "feature");
+	f.git("checkout", "main");
+	f.git("-c", "commit.gpgSign=false", "cherry-pick", "-x", head);
+	f.git("-c", "commit.gpgSign=false", "revert", "--no-edit", "HEAD");
+	const result = f.check();
+	assert.equal(result.status, 0, result.stderr);
+});

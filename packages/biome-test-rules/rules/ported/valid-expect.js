@@ -1,0 +1,375 @@
+// Adapted from @vitest/eslint-plugin 1.6.27, commit aad57d121647efe764463c37414a8cd67ec9cf92.
+// MIT; see ../../UPSTREAM-LICENSE.txt. Biome supplies syntax/scope and diagnostics.
+import { AST_NODE_TYPES } from "./utils.js";
+import {
+	createEslintRule,
+	getAccessorValue,
+	isFunction,
+	isSupportedAccessor,
+} from "./utils.js";
+import { parseVitestFnCallWithReason } from "./parse-vitest-fn-call.js";
+import { ModifierName } from "./types.js";
+import { parsePluginSettings } from "./parse-plugin-settings.js";
+const RULE_NAME = "valid-expect";
+const defaultAsyncMatchers = ["toReject", "toResolve"];
+/**
+ * Async assertions might be called in Promise
+ * methods like `Promise.x(expect1)` or `Promise.x([expect1, expect2])`.
+ * If that's the case, Promise node have to be awaited or returned.
+ *
+ * @Returns CallExpressionNode
+ */
+const getPromiseCallExpressionNode = (node) => {
+	if (
+		node.type === AST_NODE_TYPES.ArrayExpression &&
+		node.parent &&
+		node.parent.type === AST_NODE_TYPES.CallExpression
+	)
+		node = node.parent;
+	if (
+		node.type === AST_NODE_TYPES.CallExpression &&
+		node.callee.type === AST_NODE_TYPES.MemberExpression &&
+		isSupportedAccessor(node.callee.object, "Promise") &&
+		node.parent
+	)
+		return node;
+	return null;
+};
+const promiseArrayExceptionKey = ({ start, end }) =>
+	`${start.line}:${start.column}-${end.line}:${end.column}`;
+const getNormalizeFunctionExpression = (functionExpression) => {
+	if (
+		functionExpression.parent.type === AST_NODE_TYPES.Property &&
+		functionExpression.type === AST_NODE_TYPES.FunctionExpression
+	)
+		return functionExpression.parent;
+	return functionExpression;
+};
+const promiseChainMethods = new Set(["catch", "finally", "then"]);
+const findTopMostMatcherCallExpression = (node) => {
+	let currentNode = node;
+	let topMostMatcherCallExpression = node;
+	while (
+		currentNode.parent?.type === AST_NODE_TYPES.MemberExpression &&
+		currentNode.parent.object === currentNode &&
+		isSupportedAccessor(currentNode.parent.property)
+	) {
+		if (promiseChainMethods.has(getAccessorValue(currentNode.parent.property)))
+			break;
+		currentNode = currentNode.parent;
+		if (
+			currentNode.parent?.type === AST_NODE_TYPES.CallExpression &&
+			currentNode.parent.callee === currentNode
+		) {
+			topMostMatcherCallExpression = currentNode.parent;
+			currentNode = currentNode.parent;
+		}
+	}
+	return topMostMatcherCallExpression;
+};
+function getParentIfThenified(node) {
+	const grandParentNode = node.parent?.parent;
+	if (
+		grandParentNode &&
+		grandParentNode.type === AST_NODE_TYPES.CallExpression &&
+		grandParentNode.callee.type === AST_NODE_TYPES.MemberExpression &&
+		isSupportedAccessor(grandParentNode.callee.property) &&
+		promiseChainMethods.has(
+			getAccessorValue(grandParentNode.callee.property),
+		) &&
+		grandParentNode.parent
+	)
+		return getParentIfThenified(grandParentNode);
+	return node;
+}
+const findPromiseCallExpressionNode = (node) =>
+	node.parent?.parent &&
+	[AST_NODE_TYPES.CallExpression, AST_NODE_TYPES.ArrayExpression].includes(
+		node.parent.type,
+	)
+		? getPromiseCallExpressionNode(node.parent)
+		: null;
+const findFirstFunctionExpression = ({ parent }) => {
+	if (!parent) return null;
+	return isFunction(parent) ? parent : findFirstFunctionExpression(parent);
+};
+const isAcceptableReturnNode = (node, allowReturn) => {
+	if (allowReturn && node.type === AST_NODE_TYPES.ReturnStatement) return true;
+	if (node.type === AST_NODE_TYPES.ConditionalExpression && node.parent)
+		return isAcceptableReturnNode(node.parent, allowReturn);
+	return [
+		AST_NODE_TYPES.ArrowFunctionExpression,
+		AST_NODE_TYPES.AwaitExpression,
+	].includes(node.type);
+};
+export default createEslintRule({
+	name: RULE_NAME,
+	meta: {
+		docs: {
+			description: "enforce valid `expect()` usage",
+			recommended: false,
+		},
+		messages: {
+			tooManyArgs: "Expect takes at most {{ amount}} argument{{ s }}",
+			notEnoughArgs: "Expect requires at least {{ amount }} argument{{ s }}",
+			modifierUnknown: "Expect has an unknown modifier",
+			matcherNotFound: "Expect must have a corresponding matcher call",
+			matcherNotCalled: "Matchers must be called to assert",
+			asyncMustBeAwaited: "Async assertions must be awaited{{ orReturned }}",
+			promisesWithAsyncAssertionsMustBeAwaited:
+				"Promises which return async assertions must be awaited{{ orReturned }}",
+		},
+		type: "suggestion",
+		fixable: "code",
+		schema: [
+			{
+				type: "object",
+				properties: {
+					alwaysAwait: {
+						description: "Require awaiting every async assertion.",
+						type: "boolean",
+					},
+					asyncMatchers: {
+						description: "Matchers that should be considered async assertions.",
+						type: "array",
+						items: { type: "string" },
+					},
+					minArgs: {
+						description: "Minimum number of arguments allowed for `expect`.",
+						type: "number",
+						minimum: 1,
+					},
+					maxArgs: {
+						description: "Maximum number of arguments allowed for `expect`.",
+						type: "number",
+						minimum: 1,
+					},
+				},
+				additionalProperties: false,
+			},
+		],
+		defaultOptions: [
+			{
+				alwaysAwait: false,
+				asyncMatchers: defaultAsyncMatchers,
+				minArgs: 1,
+				maxArgs: 1,
+			},
+		],
+	},
+	create: (
+		context,
+		[
+			{
+				alwaysAwait,
+				asyncMatchers = defaultAsyncMatchers,
+				minArgs = 1,
+				maxArgs = 1,
+			},
+		],
+	) => {
+		const arrayExceptions = new Set();
+		const descriptors = [];
+		const pushPromiseArrayException = (loc) =>
+			arrayExceptions.add(promiseArrayExceptionKey(loc));
+		/**
+		 * Promise method that accepts an array of promises,
+		 * (eg. Promise.all), will throw warnings for the each
+		 * unawaited or non-returned promise. To avoid throwing
+		 * multiple warnings, we check if there is a warning in
+		 * the given location.
+		 */
+		const promiseArrayExceptionExists = (loc) =>
+			arrayExceptions.has(promiseArrayExceptionKey(loc));
+		const findTopMostMemberExpression = (node) => {
+			let topMostMemberExpression = node;
+			let { parent } = node;
+			while (parent) {
+				if (parent.type !== AST_NODE_TYPES.MemberExpression) break;
+				topMostMemberExpression = parent;
+				parent = parent.parent;
+			}
+			return topMostMemberExpression;
+		};
+		return {
+			CallExpression(node) {
+				const vitestFnCall = parseVitestFnCallWithReason(node, context);
+				const settings = parsePluginSettings(context.settings);
+				if (typeof vitestFnCall === "string") {
+					const reportingNode =
+						node.parent?.type === AST_NODE_TYPES.MemberExpression
+							? findTopMostMemberExpression(node.parent).property
+							: node;
+					if (vitestFnCall === "matcher-not-found") {
+						context.report({
+							messageId: "matcherNotFound",
+							node: reportingNode,
+						});
+						return;
+					}
+					if (vitestFnCall === "matcher-not-called") {
+						context.report({
+							messageId:
+								isSupportedAccessor(reportingNode) &&
+								Object.prototype.hasOwnProperty.call(
+									ModifierName,
+									getAccessorValue(reportingNode),
+								)
+									? "matcherNotFound"
+									: "matcherNotCalled",
+							node: reportingNode,
+						});
+					}
+					if (vitestFnCall === "modifier-unknown") {
+						context.report({
+							messageId: "modifierUnknown",
+							node: reportingNode,
+						});
+						return;
+					}
+					return;
+				} else if (
+					vitestFnCall?.type === "expectTypeOf" &&
+					settings.typecheck
+				) {
+					return;
+				} else if (vitestFnCall?.type !== "expect") {
+					return;
+				}
+				const expect = vitestFnCall.expectCall;
+				if (!expect) return;
+				if (expect.arguments.length < minArgs) {
+					const expectLength =
+						expect.callee.loc.end.column - expect.loc.start.column;
+					const loc = {
+						start: {
+							column: expect.loc.start.column + expectLength,
+							line: expect.loc.start.line,
+						},
+						end: {
+							column: expect.loc.start.column + expectLength + 1,
+							line: expect.loc.start.line,
+						},
+					};
+					context.report({
+						messageId: "notEnoughArgs",
+						data: { amount: minArgs, s: minArgs === 1 ? "" : "s" },
+						node: expect,
+						loc,
+					});
+				}
+				if (expect.arguments.length > maxArgs) {
+					// if expect(value, "message") and expect(value, `${message}`), it is valid usage
+					// Note: 2nd argument should be string, not a variable in current implementation
+					if (expect.arguments.length === 2) {
+						//  expect(value, "string literal")
+						const isSecondArgString =
+							expect.arguments[1].type === AST_NODE_TYPES.Literal &&
+							typeof expect.arguments[1].value === "string";
+						// expect(value, `template literal`)
+						const isSecondArgTemplateLiteral =
+							expect.arguments[1].type === AST_NODE_TYPES.TemplateLiteral;
+						// expect.poll(fn, { timeout }) and expect.element(el, { timeout })
+						// accept an options object as their second argument
+						const takesOptionsArg =
+							vitestFnCall.expectApiName === "poll" ||
+							vitestFnCall.expectApiName === "element";
+						if (
+							isSecondArgString ||
+							isSecondArgTemplateLiteral ||
+							takesOptionsArg
+						) {
+							return;
+						}
+					}
+					const { start } = expect.arguments[maxArgs].loc;
+					const { end } = expect.arguments[expect.arguments.length - 1].loc;
+					const loc = {
+						start,
+						end: {
+							column: end.column + 1,
+							line: end.line,
+						},
+					};
+					context.report({
+						messageId: "tooManyArgs",
+						data: { amount: maxArgs, s: maxArgs === 1 ? "" : "s" },
+						node: expect,
+						loc,
+					});
+				}
+				const { matcher } = vitestFnCall;
+				const matcherCallExpression = matcher.parent.parent;
+				if (matcherCallExpression.type !== AST_NODE_TYPES.CallExpression)
+					return;
+				const parentNode = findTopMostMatcherCallExpression(
+					matcherCallExpression,
+				);
+				const shouldBeAwaited =
+					vitestFnCall.modifiers.some((modifier) => {
+						const value = getAccessorValue(modifier);
+						return (
+							value === ModifierName.resolves || value === ModifierName.rejects
+						);
+					}) || asyncMatchers.includes(getAccessorValue(matcher));
+				if (!parentNode?.parent || !shouldBeAwaited) return;
+				const isParentArrayExpression =
+					parentNode.parent.type === AST_NODE_TYPES.ArrayExpression;
+				const targetNode = getParentIfThenified(parentNode);
+				const finalNode =
+					findPromiseCallExpressionNode(targetNode) || targetNode;
+				if (
+					finalNode.parent &&
+					!isAcceptableReturnNode(finalNode.parent, !alwaysAwait) &&
+					!promiseArrayExceptionExists(finalNode.loc)
+				) {
+					descriptors.push({
+						messageId:
+							finalNode === targetNode
+								? "asyncMustBeAwaited"
+								: "promisesWithAsyncAssertionsMustBeAwaited",
+						node: finalNode,
+					});
+					if (isParentArrayExpression) pushPromiseArrayException(finalNode.loc);
+				}
+			},
+			"Program:exit"() {
+				const fixes = [];
+				descriptors.forEach(({ node, messageId }, index) => {
+					const orReturned = alwaysAwait ? "" : " or returned";
+					context.report({
+						loc: node.loc,
+						data: { orReturned },
+						messageId,
+						node,
+						fix(fixer) {
+							const functionExpression = findFirstFunctionExpression(node);
+							if (!functionExpression) return null;
+							const foundAsyncFixer = fixes.some(
+								(fix) => fix.text === "async ",
+							);
+							if (!functionExpression.async && !foundAsyncFixer) {
+								const targetFunction =
+									getNormalizeFunctionExpression(functionExpression);
+								fixes.push(fixer.insertTextBefore(targetFunction, "async "));
+							}
+							const returnStatement =
+								node.parent?.type === AST_NODE_TYPES.ReturnStatement
+									? node.parent
+									: null;
+							if (alwaysAwait && returnStatement) {
+								const sourceCodeText =
+									context.sourceCode.getText(returnStatement);
+								const replacedText = sourceCodeText.replace("return", "await");
+								fixes.push(fixer.replaceText(returnStatement, replacedText));
+							} else {
+								fixes.push(fixer.insertTextBefore(node, "await "));
+							}
+							return index === descriptors.length - 1 ? fixes : null;
+						},
+					});
+				});
+			},
+		};
+	},
+});

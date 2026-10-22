@@ -1,41 +1,26 @@
 # Test correctness rules
 
-This workspace owns WallpaperDB's shared test correctness policy for Biome. It adds checks for mistakes that can make a test pass without verifying its assertion.
+This workspace supplies the shared test lint configuration and four custom Biome rules. Normal Make/Turbo lint tasks load the [configuration](./test-correctness.json).
 
-## Capabilities
+## Rule ownership
 
-The assertion rules reject incomplete matchers and unhandled Vitest async assertions, including task-local `expect` bindings. A reason as the second argument remains valid when the assertion has a matcher. Retry checks follow Vitest registration aliases and shared options while accepting application retry settings and test data.
+Biome 2.6.2 owns floating promises (`noFloatingPromises`), focused tests (`noFocusedTests`), skipped tests (`noSkippedTests`), self-comparisons (`noSelfCompare`) and the configured TODO properties (`noJsRestrictedProperties`). The TODO entries restrict `it.todo`, `test.todo`, `describe.todo` and `suite.todo`, with the message from #437. Floating-promise checks apply to TypeScript test sources. Native behavior is used directly; there is no custom Effect checker, Promise API catalog or TypeScript compiler bridge.
 
-The shared policy uses Biome's built-in focus, skip, self-comparison, floating-promise and Playwright checks. Targeted plugins cover known Effect promise APIs, registration aliases, and TODO/skip/focus registration options. Node's `only` option is prohibited as a focus registration option; its runtime effect depends on the runner's only-mode configuration. Normal repository linting applies the policy to test sources, including maintained fixture helpers, and excludes generated output and deliberate CRAP input fixtures.
+The remaining rules translate the implementations enabled in [#437 at 7cfe7fc1](https://github.com/rafaeltab/wallpaperdb/blob/7cfe7fc1ab5450d1e35b01216640527fca2a3995/scripts/eslint.tests.config.mjs):
 
-Node skip/TODO string reasons are registration flags even when empty. On the Node 22 CI runtime, empty reasons label the results SKIP/TODO while supplied callbacks can still execute; the rule prohibits the flag without claiming it always suppresses the body. Vitest retains boolean/truthiness option semantics. Known boolean-disabled `skipIf`/`runIf` factories are rejected through direct and aliased registrations, while enabled and unknown conditions remain valid. This is bounded coverage beyond the #437 baseline, which accepts those conditional factories; arbitrary condition evaluation is not inferred.
+| Custom rule | Pinned implementation and configuration |
+| --- | --- |
+| `validExpect` | `@vitest/eslint-plugin` 1.6.27 `valid-expect`, with `maxArgs: 2` and the other upstream defaults. |
+| `validExpectInPromise` | The same plugin's `valid-expect-in-promise`, with its default syntax and test-callback handling. |
+| `requireAwaitedExpectPoll` | The same plugin's `require-awaited-expect-poll`, covering `poll` and `element`. |
+| `noTestRetries` | #437's local `test-policy/no-retries`, following initializer aliases and shared/spread option objects. |
 
-The regression tests run the actual Biome CLI with the exported configuration. Keep invalid examples in those tests so ordinary repository linting does not discover them as test sources.
+The assertion algorithm sources and parser are retained under [rules/ported](./rules/ported), adapted to Biome syntax, lexical scopes and diagnostics. [The notices](./UPSTREAM-LICENSE.txt) preserve the upstream MIT licenses. No ESLint runtime or dependency is included. The adapters do not supply arbitrary type, callback-contract or control-flow analysis. The pinned algorithms determine assertion handling, including their stored-assertion restriction and syntactic limitations. Custom rules report diagnostics; upstream text-based automatic fixes are not offered by these Biome adapters.
 
-The [shared policy](./test-correctness.json) targets ESM and TypeScript tests, matching the inherited test inventory. Adding CommonJS test sources requires extending discovery and binding support together; `.cjs` tests and `require()` test API bindings are outside the current policy.
+## Verification and maintenance
 
-## Maintenance
+The tests exercise the real Biome CLI. [Upstream fixture data](./test/upstream-fixtures.json) records the pinned source URL, original expectations and every excluded case with its line and reason. Exclusions distinguish different rule options, fixture-specific plugin settings and nonliteral fixture construction; they are not blanket claims that the source syntax is unsupported. The fixture runner checks the configured rule behavior; native rules have their own CLI controls. [Integration tests](./test/integration.test.mjs) exercise actual Make/Turbo discovery and cache invalidation.
 
-The CLI and runtime versions are pinned together because Biome's JavaScript plugin API is a developer preview. Check the [upstream plugin documentation](https://biomejs.dev/linter/plugins/) and run the regression suite when upgrading either dependency.
+Keep the CLI and runtime versions pinned together while JavaScript plugins are in developer preview. When changing a custom rule, compare the pinned implementation and fixtures before changing its semantics. Do not add a framework API or a new test-quality policy to compensate for a native rule's behavior. Rule selection and migration history are tracked in [#477](https://github.com/rafaeltab/wallpaperdb/issues/477).
 
-Biome does not infer every imported generic return type. The plugins use supported bindings and syntax APIs, which do not expose TypeScript type inference. The demonstrated shared-tester promise gap and the migration decision remain tracked in [#477](https://github.com/rafaeltab/wallpaperdb/issues/477).
-
-Async assertion checking follows direct syntax and bindings. It recognizes test registrations and lifecycle hooks, Promise chains and direct aggregates, Vitest polling, and the existing Effect promise constructors. Discarded concise-arrow assertion results passed to `forEach` or a discarded `map` call are rejected. This is a bounded set of known consumers, not inference of callback contracts.
-
-An aggregated `map` call is accepted under the standard `Array.prototype.map` callback-result contract. Receiver types and method implementations are not inferred. A custom same-name method that discards callback promises can pass both #437's baseline and this policy; it is outside the supported consumer contract. This inherited semantic gap remains tracked in [#477](https://github.com/rafaeltab/wallpaperdb/issues/477). Do not add generic collection inference or reject normal imported arrays to approximate receiver-type proof.
-
-Aggregate handling preserves the inherited lint contract: awaiting `Promise.all`, `allSettled`, `race` or `any` consumes their direct input promises. This does not prove that assertion failures reach the test runner. `allSettled` records rejections, and another input can win a race or fulfill `any`. Deliberate outcome inspection remains valid. Rejection handlers are also consumption boundaries without analysis of their bodies. The unresolved failure-propagation check is tracked in [#477](https://github.com/rafaeltab/wallpaperdb/issues/477).
-
-The aggregate recognizer requires the unshadowed global `Promise`. Bound helper results reuse the same immutable-alias and known-consumer checks as direct callbacks; creating an unused bound function does not create an assertion promise. Registration option checks inspect conditional and logical alternatives conservatively, without inferring arbitrary conditions or mutable flow. Flag options respect the last visible write through literal and shared spreads; a later absent property does not clear an earlier flag. Retry overrides remain prohibited regardless of value.
-
-Mutable binding resolution follows one direct assignment in the same statement list, checking its order relative to the read. Conditional, nested and repeated writes remain unresolved. Options checks cannot infer prohibited values through those ambiguous writes; promise checks do not treat an ambiguous read as proof of handling. Keep explicit handling beside the promise creation when this bounded analysis cannot establish the connection.
-
-Finding a matching await or return does not prove that every execution path reaches it. A stored async assertion awaited only inside an `if` can pass this policy. #437's `vitest/valid-expect` rejects that case by rejecting stored async assertions altogether, including valid unconditional later awaits and `finally` handling. This migration deliberately retains bounded binding support and loses that coarse restriction. Cancellation tests in the [gateway](../../apps/gateway/test/unit/runtime.unit.test.ts), [color extractor](../../apps/color-extractor/test/image-cancellation.integration.test.ts) and [browser processing](../../apps/web/test/browser/picture-processing.spec.ts) attach rejection assertions before abort/dispose and await them afterward. The concrete assertion path gap is a migration tradeoff, not inherited parity. The equivalent conditional Effect-promise gap also passes the baseline and is inherited. Both remain tracked in [#477](https://github.com/rafaeltab/wallpaperdb/issues/477), alongside the unresolved generic typed-promise scope decision. No every-path or caller-contract proof is claimed.
-
-An unknown concise-arrow callback argument passed to a custom wrapper is reported even when the wrapper call is awaited: awaiting a wrapper does not prove that it awaits its callback. Ordinary object-property helper arrows retain their normal function return contract. Explicit `await` and block `return` remain local handling boundaries; accepting them does not prove that an arbitrary caller propagates callback completion. Verify that contract in the wrapper. Keep regression controls for supported consumer boundaries when changing the rule; do not expand it into an open-ended library API catalog.
-
-Assertion invocation through `Function.prototype.call` or `apply` is outside the current shape checks. For example, matcherless `expect.call(null, 1)` and `expect.apply(null, [1])` pass both #437's ESLint baseline and this policy. This inherited gap is tracked in [#477](https://github.com/rafaeltab/wallpaperdb/issues/477); the policy does not claim to validate every JavaScript invocation form.
-
-The [root configuration](../../biome.json) leaves the newly recommended component-hook-factory rule disabled to keep unrelated React refactors outside this upgrade.
-
-Use the standard workspace tasks through [Make](../../Makefile). Repository ownership and testing requirements are in the [coding guidelines](../../CODING_STANDARDS.md).
+The shared configuration covers existing ESM/TypeScript test sources, including maintained fixture helpers, while excluding generated output and deliberately invalid CRAP input fixtures. The [root configuration](../../biome.json) keeps the unrelated newly recommended component-hook-factory rule disabled. Workspace integration follows the [coding guidelines](../../CODING_STANDARDS.md); run package tasks through [Make](../../Makefile).

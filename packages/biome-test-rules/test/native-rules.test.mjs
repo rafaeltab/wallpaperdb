@@ -9,10 +9,9 @@ test("native restricted properties cover the four configured TODO names and mess
 			diagnostics.some((d) => d.category.endsWith("noJsRestrictedProperties")),
 			object,
 		);
-		assert.ok(
-			JSON.stringify(diagnostics).includes(
-				"Track unfinished tests in an issue rather than a passing placeholder.",
-			),
+		assert.match(
+			lint(`${object}.todo('unfinished');`, {}, "example.test.ts", "terminal"),
+			/Track unfinished tests in an issue rather than a passing placeholder\./,
 		);
 	}
 	assert.deepEqual(lint("application.todo('request');"), []);

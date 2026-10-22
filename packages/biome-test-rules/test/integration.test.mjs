@@ -199,8 +199,8 @@ test("root lint cache changes when the shared rules or configuration changes", (
 			const policy = join(directory, "packages/biome-test-rules");
 			const rule = join(policy, "rules/correctness.ts");
 			const stricter = readFileSync(rule, "utf8").replace(
-				"count < 1",
-				"count < 2",
+				"maxArgs: 2",
+				"maxArgs: 2, minArgs: 2",
 			);
 			writeFileSync(join(policy, "rules/stricter.ts"), stricter);
 			assert.equal(makeLint(directory, "root", false).status, 0);
@@ -218,7 +218,7 @@ test("root lint cache changes when the shared rules or configuration changes", (
 			}
 			const result = makeLint(directory, "root", false);
 			assert.notEqual(result.status, 0, `${changed}: ${result.output}`);
-			assert.match(result.output, /Complete the assertion/);
+			assert.match(result.output, /Expect requires at least/);
 		} finally {
 			rmSync(directory, { recursive: true, force: true });
 		}
@@ -276,7 +276,11 @@ test("Make lint discovers each workspace's actual test directories and accepts v
 			const invalid = makeLint(directory, workspace);
 			assert.notEqual(invalid.status, 0, path);
 			assert.ok(invalid.output.includes(basename(path)), invalid.output);
-			assert.match(invalid.output, /Complete the assertion/, path);
+			assert.match(
+				invalid.output,
+				/Expect must have a corresponding matcher/,
+				path,
+			);
 			writeFileSync(
 				fixture,
 				'import { expect } from "vitest";\nexpect(1).toBe(1);\n',

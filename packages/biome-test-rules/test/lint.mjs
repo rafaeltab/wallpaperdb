@@ -20,7 +20,12 @@ const biome = join(
 	"bin/biome",
 );
 
-export function lint(source, files = {}, filename = "example.test.ts") {
+export function lint(
+	source,
+	files = {},
+	filename = "example.test.ts",
+	reporter = "json",
+) {
 	const directory = mkdtempSync(join(tmpdir(), "biome-test-rules-"));
 	try {
 		const config = JSON.parse(
@@ -42,7 +47,12 @@ export function lint(source, files = {}, filename = "example.test.ts") {
 			writeFileSync(join(directory, path), content);
 		const result = spawnSync(
 			process.execPath,
-			[biome, "lint", "--reporter=json", filename],
+			[
+				biome,
+				"lint",
+				...(reporter === "json" ? ["--reporter=json"] : []),
+				filename,
+			],
 			{
 				cwd: directory,
 				encoding: "utf8",
@@ -51,7 +61,13 @@ export function lint(source, files = {}, filename = "example.test.ts") {
 		);
 		assert.equal(result.error, undefined);
 		assert.ok(result.status === 0 || result.status === 1, result.stderr);
+		if (reporter !== "json") return result.stdout + result.stderr;
+		assert.ok(result.stdout, result.stderr);
 		const report = JSON.parse(result.stdout);
+		assert.ok(
+			!report.diagnostics.some((d) => /Rule .* errored:/.test(d.message)),
+			JSON.stringify(report.diagnostics),
+		);
 		return report.diagnostics;
 	} finally {
 		rmSync(directory, { recursive: true, force: true });

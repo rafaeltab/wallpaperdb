@@ -5,7 +5,8 @@
 		"moduleResolution": "bundler",
 		"strict": true,
 		"noEmit": true,
-		"skipLibCheck": true
+		"skipLibCheck": true,
+		"allowJs": true
 	},
-	"include": ["rules/**/*.ts"]
+	"include": ["rules/**/*.ts", "rules/**/*.js"]
 }

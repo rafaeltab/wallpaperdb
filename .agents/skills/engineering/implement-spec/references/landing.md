@@ -8,4 +8,4 @@ If a merge queue applies, follow the extension's [queue behavior](https://github
 
 After a partial landing, fetch `main` from the selected remote, rebase the remaining layers onto their new parents, and update the stack.
 
-After any partial landing, apply the main workflow's $implement-spec evidence rules and [publication rules](stack-recovery.md#publishing), including [local recovery and native membership preservation](stack-recovery.md).
+After any partial landing, record which PRs landed and the remaining layers' old parent boundaries. Follow [restacking and evidence refresh](stack-recovery.md#restacking), then [publish and preserve complete native membership](stack-recovery.md#publishing).

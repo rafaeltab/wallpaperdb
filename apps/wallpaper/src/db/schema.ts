@@ -28,6 +28,7 @@ export const wallpaperIntents = pgTable(
 export const workflowOutbox = pgTable(
   'wallpaper_workflow_outbox',
   {
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
     id: text('id').primaryKey(),
     wallpaperId: text('wallpaper_id')
       .notNull()
@@ -48,6 +49,8 @@ export const workflowOutbox = pgTable(
   ]
 );
 export const workflowQuarantine = pgTable('wallpaper_workflow_quarantine', {
+  notifiedAt: timestamp('notified_at', { withTimezone: true }),
+  recoveredAt: timestamp('recovered_at', { withTimezone: true }),
   id: text('id').primaryKey(),
   payload: text('payload').notNull(),
   reason: text('reason').notNull(),

@@ -109,18 +109,46 @@ export function assetWorkflowLayer(options: Options) {
                 ? 'asset.commands.wallpaper.create'
                 : 'wallpaper.published';
             const stored = yield* attempt('publish', () =>
-              connection
-                .jetstream()
-                .publish(subject, JSON.stringify(p.event), {
-                  msgID: `https://wallpaperdb/wallpaper#${p.id}`,
-                  timeout: 2000,
-                })
+              connection.jetstream().publish(subject, JSON.stringify(p.event), {
+                msgID: `https://wallpaperdb/wallpaper#${p.id}`,
+                timeout: 2000,
+              })
             ).pipe(
               Effect.as(true),
               Effect.catch(() => Effect.succeed(false))
             );
             if (stored) yield* delivery.complete(p);
             else yield* delivery.failed(p);
+          }
+          for (const alert of yield* delivery.alerts()) {
+            const id = createHash('sha256')
+              .update(`wallpaper:${alert.scope}:${alert.id}`)
+              .digest('hex');
+            yield* attempt('notify-operator', async () => {
+              const response = await fetch(options.operatorNotification.url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${options.operatorNotification.token}`,
+                },
+                body: JSON.stringify({
+                  id,
+                  applicationId: 'wallpaper',
+                  kind: 'wallpaper-workflow-quarantine',
+                  subject:
+                    alert.scope === 'outbox'
+                      ? 'wallpaper.workflow.outbox'
+                      : 'asset.results.wallpaper',
+                  reason: alert.reason,
+                  recoveryId: alert.id,
+                  recoveryScope: alert.scope,
+                }),
+                signal: AbortSignal.timeout(2000),
+              });
+              await response.body?.cancel();
+              if (!response.ok) throw new Error('Operator destination rejected notification');
+            });
+            yield* delivery.alerted(alert.id, alert.scope);
           }
         }),
         sendingHealthy
@@ -150,7 +178,12 @@ export function assetWorkflowLayer(options: Options) {
               ? delivery.quarantine(
                   identity,
                   new TextDecoder().decode(message.data),
-                  'confirmation-exhausted'
+                  'confirmation-exhausted',
+                  decoded.kind === 'created'
+                    ? { kind: 'wallpaper', id: decoded.result.wallpaperId }
+                    : decoded.kind === 'source'
+                      ? { kind: 'asset', id: decoded.confirmation.assetId }
+                      : undefined
                 )
               : operation
           ).pipe(
@@ -192,3 +225,5 @@ export function assetWorkflowLayer(options: Options) {
     })
   );
 }
+
+export { decodeConfirmation } from './translation.js';

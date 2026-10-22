@@ -1,4 +1,4 @@
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Effect, type Layer, ManagedRuntime } from 'effect';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
@@ -20,7 +20,7 @@ const identity = z.string().regex(/^[A-Za-z0-9_-]{1,128}$/);
 const sourceIntent = z.object({ candidateId: identity, intentId: identity }).strict();
 function schemaOptions(schema: z.ZodTypeAny) {
   return {
-    schema: { body: zodToJsonSchema(schema) },
+    schema: { body: zodToJsonSchema(schema,{$refStrategy:'none'}) },
     validatorCompiler: () => (value: unknown) => {
       const result = schema.safeParse(value);
       return result.success ? { value: result.data } : { error: new Error('Invalid request') };
@@ -44,6 +44,8 @@ function publicWallpaper(w: Wallpaper) {
     assetId: w.assetId,
     sourceId: w.sourceId,
     createdAt: w.createdAt,
+    ...(w.intent ? { candidateId: w.intent.candidateId } : {}),
+    ...(w.attentionRequired ? { attentionRequired: true } : {}),
   };
 }
 export async function registerCreationHttp<E>(
@@ -52,6 +54,7 @@ export async function registerCreationHttp<E>(
   options: { readonly monitorWorkflow?: boolean } = {}
 ) {
   const runtime = ManagedRuntime.make(services);
+  app.addHook('onRoute',route=>{if(route.url.startsWith('/wallpapers'))route.schema={tags:['Wallpapers'],security:[{ownerSession:[]}],...route.schema};});
   await runtime.runPromise(Creation).catch(async (error) => {
     await runtime.dispose();
     throw error;
@@ -146,7 +149,18 @@ export async function registerCreationHttp<E>(
       .safeParse(request.headers['idempotency-key']);
     if (!key.success)
       return reply.code(400).type('application/problem+json').send(problem(400, 'invalid-request'));
-    return run(request, reply, (c, owner) => c.begin(owner, key.data), true);
+    const carrier: Record<string, string> = {};
+    propagation.inject(propagation.extract(context.active(), request.headers), carrier);
+    return run(
+      request,
+      reply,
+      (c, owner) =>
+        c.begin(owner, key.data, {
+          ...(carrier.traceparent ? { traceparent: carrier.traceparent } : {}),
+          ...(carrier.tracestate ? { tracestate: carrier.tracestate } : {}),
+        }),
+      true
+    );
   });
   app.get<{ Params: { wallpaperId: string } }>('/wallpapers/:wallpaperId', (request, reply) =>
     run(request, reply, (c, owner) => c.get(owner, request.params.wallpaperId))

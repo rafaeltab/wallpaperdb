@@ -7,6 +7,7 @@ const https = z
 const identity = z.string().min(1).max(256);
 const schema = z
   .object({
+    operatorNotification: z.object({ url: z.string().url(), token: z.string().min(1) }).strict(),
     ownerNamespace: identity,
     credential: z.object({ user: identity, password: z.string().min(1) }).strict(),
     identityProviders: z
@@ -15,6 +16,7 @@ const schema = z
           .object({
             issuer: https,
             jwksUrl: https,
+
             ownerNamespace: identity,
             audience: z.array(identity),
             authorizedParties: z.array(z.string().url()),

@@ -73,14 +73,58 @@ test("setup rejects a package-manager pin that disagrees with mise", () => {
 test("CI installs the locked project tools instead of selecting separate Node and pnpm versions", () => {
 	for (const workflow of ["ci.yml", "e2e.yml", "pr-history.yml"]) {
 		const source = readFileSync(`.github/workflows/${workflow}`, "utf8");
-		assert.match(source, /uses: jdx\/mise-action@/);
 		assert.doesNotMatch(
 			source,
 			/uses: (?:actions\/setup-node|pnpm\/action-setup)@/,
 		);
-		assert.match(source, /run: make toolchain/);
+		const jobs = source
+			.slice(source.indexOf("\njobs:\n"))
+			.split(/^  (?=[\w-]+:\n)/m)
+			.filter((job) => job.includes("runs-on:"));
+		assert.ok(jobs.length > 0);
+		for (const job of jobs) {
+			assert.match(job, /uses: jdx\/mise-action@/);
+			assert.match(job, /install_args: --locked/);
+			assert.match(job, /run: make toolchain/);
+		}
 	}
 });
+
+for (const [version, diagnostic] of [
+	["99.0.0", /gh selected.*expected 2.103.0/],
+	["2.103.0", /gh resolved outside the managed toolchain/],
+]) {
+	test(`tool verification rejects an unowned gh executable reporting ${version}`, () => {
+		const directory = mkdtempSync(join(tmpdir(), "wallpaperdb-toolchain-"));
+		try {
+			for (const file of ["mise.toml", "mise.lock", "package.json"])
+				copyFileSync(file, join(directory, file));
+			mkdirSync(join(directory, "bin"));
+			writeFileSync(
+				join(directory, "bin/gh"),
+				`#!/bin/sh\necho 'gh version ${version}'\n`,
+				{ mode: 0o755 },
+			);
+			const result = spawnSync(
+				process.execPath,
+				[resolve("scripts/toolchain.mjs")],
+				{
+					cwd: directory,
+					encoding: "utf8",
+					env: {
+						...process.env,
+						PATH: `${directory}/bin:${process.env.PATH}`,
+						MISE_TRUSTED_CONFIG_PATHS: directory,
+					},
+				},
+			);
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, diagnostic);
+		} finally {
+			rmSync(directory, { recursive: true, force: true });
+		}
+	});
+}
 
 test("setup rejects a container Node version that disagrees with mise", () => {
 	const directory = mkdtempSync(join(tmpdir(), "wallpaperdb-toolchain-"));
@@ -138,6 +182,41 @@ test("Make rejects a local override instead of silently changing project tools",
 		});
 		assert.notEqual(result.status, 0);
 		assert.match(result.stderr, /node.*this checkout's mise.toml/);
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});
+
+test("Docker builds discover the managed plugin with an explicit host configuration", () => {
+	const directory = mkdtempSync(join(tmpdir(), "wallpaperdb-docker-config-"));
+	try {
+		mkdirSync(join(directory, "cli-plugins"));
+		const config =
+			'{"auths":{"example.test":{"auth":"fixture"}},"currentContext":"default"}';
+		writeFileSync(join(directory, "config.json"), config);
+		writeFileSync(
+			join(directory, "cli-plugins/docker-buildx"),
+			'#!/bin/sh\nif [ "$1" = docker-cli-plugin-metadata ]; then\n  echo \'{"SchemaVersion":"0.1.0","Vendor":"fixture","Version":"0.16.0","ShortDescription":"fixture"}\'\nelse\n  echo HOST_PLUGIN_SELECTED\nfi\n',
+			{ mode: 0o755 },
+		);
+		const result = spawnSync(
+			"docker",
+			["--config", directory, "buildx", "version"],
+			{ encoding: "utf8" },
+		);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /github.com\/docker\/buildx v0.37.1/);
+		assert.equal(readFileSync(join(directory, "config.json"), "utf8"), config);
+		const compose = spawnSync(
+			"docker",
+			["--config", directory, "compose", "-f", "-", "config", "--services"],
+			{
+				encoding: "utf8",
+				input: "services:\n  command-forwarding:\n    image: alpine:3\n",
+			},
+		);
+		assert.equal(compose.status, 0, compose.stderr);
+		assert.equal(compose.stdout.trim(), "command-forwarding");
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}

@@ -217,7 +217,6 @@ export async function coordinate() {
 	process.on("SIGINT", cancel);
 	process.on("SIGTERM", cancel);
 	let cursor = 0;
-	let visits = 0;
 	let preparationReady = true;
 	try {
 		scheduling = restoreScheduling(root);
@@ -286,6 +285,7 @@ export async function coordinate() {
 			0,
 			jobs.findIndex((job) => job.id === scheduling.cursor),
 		);
+		const pending = jobs.map((_, offset) => (cursor + offset) % jobs.length);
 		if (
 			!cancelled &&
 			!process.env.GITHUB_ACTIONS &&
@@ -317,20 +317,16 @@ export async function coordinate() {
 				summary.diagnostic =
 					"Dependency preparation ended before mutation stages could start";
 		}
-		// A bounded pass visits each stage once. The persisted cursor rotates the
-		// first stage of the next run even if this run expired during startup.
+		// Visit each stage once, deferring cold integration until its selected unit
+		// stage has had a chance to publish evidence in this invocation.
 		while (
 			preparationReady &&
-			visits < jobs.length &&
+			pending.length &&
 			performance.now() < executionDeadline &&
 			!cancelled
 		) {
-			const job = jobs[cursor];
-			cursor = (cursor + 1) % jobs.length;
-			visits++;
-			// Subset diagnostics must not reset the next repository-wide visit.
-			if (jobs.length === full.jobs.length) scheduling.cursor = jobs[cursor].id;
-			if (!job.mutate.length) continue;
+			const index = pending.shift();
+			const job = jobs[index];
 			const unitJob = full.jobs.find(
 				(other) => other.workspace === job.workspace && other.suite === "unit",
 			);
@@ -338,6 +334,24 @@ export async function coordinate() {
 				job.suite === "integration" && unitJob
 					? current(unitJob, readBaseline)
 					: null;
+			if (
+				job.mutate.length &&
+				job.suite === "integration" &&
+				unitJob &&
+				!unit
+			) {
+				const unitIndex = pending.findIndex(
+					(other) => jobs[other].id === unitJob.id,
+				);
+				if (unitIndex !== -1) {
+					pending.splice(unitIndex + 1, 0, index);
+					continue;
+				}
+			}
+			cursor = (index + 1) % jobs.length;
+			// Subset diagnostics must not reset the next repository-wide visit.
+			if (jobs.length === full.jobs.length) scheduling.cursor = jobs[cursor].id;
+			if (!job.mutate.length) continue;
 			if (
 				job.suite === "integration" &&
 				unitJob &&

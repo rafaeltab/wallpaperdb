@@ -128,7 +128,9 @@ export function resolveScope(scope, identifier) {
 			["JS_IMPORT_NAMED_CLAUSE", "JS_IMPORT_COMBINED_CLAUSE"].includes(n.kind),
 		);
 		if (clause && parent?.kind === "JS_NAMED_IMPORT_SPECIFIER") {
-			if (clause.typeToken === "type") return "local";
+			// The pinned Vitest parser accepts Identifier import names only.
+			if (clause.typeToken === "type" || /^["']/.test(parent.name?.text ?? ""))
+				return "local";
 			return {
 				source: stringValue(clause.source.text),
 				imported: importedName(parent.name),

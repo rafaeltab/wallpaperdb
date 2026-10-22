@@ -86,7 +86,7 @@ test("identifier escapes retain retry names and initializer binding identity", (
 		assert.deepEqual(diagnostics(source, "test-policy/no-retries"), [], source);
 });
 
-test("quoted ESM imported names retain pinned registration and assertion identity", () => {
+test("quoted ESM imports retain the pinned rule-specific handling", () => {
 	assert.equal(
 		diagnostics(
 			"import { 'it' as scenario } from 'vitest'; scenario('case', { retry: 3 }, () => {});",
@@ -99,7 +99,7 @@ test("quoted ESM imported names retain pinned registration and assertion identit
 			"import { 'expect' as check } from 'vitest'; check(1);",
 			"valid-expect",
 		).length,
-		1,
+		0,
 	);
 	for (const source of [
 		"import { 'it' as scenario } from 'vitest'; scenario('case', { timeout: 3 }, () => {});",

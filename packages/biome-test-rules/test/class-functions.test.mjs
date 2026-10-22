@@ -45,3 +45,24 @@ test("an unhandled promise directly inside a test still reports", () => {
 		1,
 	);
 });
+
+test("class accessors retain the same pinned function boundaries", () => {
+	for (const member of [
+		"get pending() { return this.work = Promise.resolve(1).then(value => expect(value).toBe(1)); }",
+		"get pending() { this.work = Promise.resolve(1).then(value => expect(value).toBe(1)); return this.work; }",
+		"set start(value) { this.work = Promise.resolve(1).then(value => expect(value).toBe(1)); }",
+	])
+		assert.deepEqual(
+			promiseDiagnostics(`
+import { it, expect } from 'vitest';
+it('case', async () => {
+  class Job { ${member} }
+  const job = new Job();
+  await job.pending;
+  job.start = true;
+  await job.work;
+});`),
+			[],
+			member,
+		);
+});

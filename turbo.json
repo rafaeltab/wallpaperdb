@@ -278,6 +278,8 @@
             "inputs": [
                 "test/**",
                 "biome.json",
+                "packages/biome-test-rules/test-correctness.json",
+                "packages/biome-test-rules/rules/**",
                 "package.json",
                 "pnpm-lock.yaml"
             ],

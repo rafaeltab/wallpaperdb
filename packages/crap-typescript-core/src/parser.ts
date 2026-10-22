@@ -1,4 +1,4 @@
-// Modified by WallpaperDB: discover callbacks, retain function ranges and isolate nested branches; see ../UPSTREAM.md.
+// Modified by WallpaperDB: parse JavaScript, discover callbacks, retain function ranges and isolate nested branches; see ../UPSTREAM.md.
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
 
@@ -55,7 +55,7 @@ const NESTED_BOUNDARY_KINDS = new Set([
 
 export async function parseFileMethods(filePath: string): Promise<MethodDescriptor[]> {
   const sourceText = await readFile(filePath, "utf8");
-  const scriptKind = resolveScriptKind(filePath) === "tsx" ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const scriptKind = { ts: ts.ScriptKind.TS, tsx: ts.ScriptKind.TSX, js: ts.ScriptKind.JS }[resolveScriptKind(filePath)];
   const sourceFile = ts.createSourceFile(filePath, sourceText, ts.ScriptTarget.Latest, true, scriptKind);
   throwIfParseDiagnostics(sourceFile);
   const methods: MethodDescriptor[] = [];

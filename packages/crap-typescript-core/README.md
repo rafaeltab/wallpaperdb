@@ -1,6 +1,6 @@
 # CRAP analyzer
 
-This private workspace supplies the TypeScript analyzer used by WallpaperDB's CRAP reports. It maintains an upstream copy with callback discovery and coverage attribution fixes so they can mature in repository use before an upstream contribution.
+This private workspace supplies the TypeScript AST analyzer used by WallpaperDB's CRAP reports, including maintained `.js` sources. It maintains an upstream copy with callback discovery and coverage attribution fixes so they can mature in repository use before an upstream contribution.
 
 ## Capabilities
 

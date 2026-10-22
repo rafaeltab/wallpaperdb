@@ -182,7 +182,9 @@ export function formatNumber(value: number): string {
   return value.toFixed(1);
 }
 
-export function resolveScriptKind(filePath: string): "ts" | "tsx" {
+// Modified by WallpaperDB: select the JavaScript parser for maintained .js sources; see ../UPSTREAM.md.
+export function resolveScriptKind(filePath: string): "ts" | "tsx" | "js" {
+  if (filePath.toLowerCase().endsWith(".js")) return "js";
   return filePath.toLowerCase().endsWith(".tsx") ? "tsx" : "ts";
 }
 

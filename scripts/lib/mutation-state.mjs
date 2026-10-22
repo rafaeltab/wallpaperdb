@@ -11,7 +11,7 @@ import {
 import { basename, isAbsolute, join, resolve } from "node:path";
 import { release } from "node:os";
 import { createRequire } from "node:module";
-import { mergeReports } from "./mutation-results.mjs";
+import { isProcessed, mergeReports } from "./mutation-results.mjs";
 
 const version = 1;
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -387,41 +387,40 @@ export function restoreBaseline(context, { forExecution = false } = {}) {
 	compatible.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 	const provenanceOf = (entry, file) =>
 		entry.provenance?.[file] ?? entry.inputDigest;
-	const fresh = new Set(
-		compatible.flatMap((entry) =>
-			Object.keys(entry.report.files).filter(
-				(file) => provenanceOf(entry, file) === state.inputDigest,
-			),
-		),
-	);
+	const selected = new Map();
+	for (const entry of compatible)
+		for (const [file, report] of Object.entries(entry.report.files)) {
+			const inputDigest = provenanceOf(entry, file);
+			const previous = selected.get(file);
+			const terminal =
+				report.mutants.some(
+					(mutant) => isProcessed(mutant) || mutant.conflictingStatuses?.length,
+				) ||
+				(previous?.inputDigest === inputDigest && previous.terminal);
+			// Merge a file only within one provenance. Prefer current inputs;
+			// otherwise a later plan cannot relabel retained terminal evidence.
+			if (
+				!previous ||
+				previous.inputDigest === inputDigest ||
+				inputDigest === state.inputDigest ||
+				(previous.inputDigest !== state.inputDigest &&
+					(terminal || !previous.terminal))
+			)
+				selected.set(file, { inputDigest, terminal });
+		}
 	const reports = compatible.map((entry) => ({
 		...entry.report,
 		files: Object.fromEntries(
-			Object.entries(entry.report.files).filter(([file]) => !fresh.has(file)),
+			Object.entries(entry.report.files).filter(
+				([file]) =>
+					provenanceOf(entry, file) === selected.get(file).inputDigest,
+			),
 		),
 	}));
-	for (const entry of compatible)
-		reports.push({
-			...entry.report,
-			files: Object.fromEntries(
-				Object.entries(entry.report.files).filter(
-					([file]) => provenanceOf(entry, file) === state.inputDigest,
-				),
-			),
-		});
 	const report = mergeReports(reports);
-	const provenance = Object.assign(
-		{},
-		...compatible.map((entry) =>
-			Object.fromEntries(
-				Object.keys(entry.report.files).map((file) => [
-					file,
-					provenanceOf(entry, file),
-				]),
-			),
-		),
+	const provenance = Object.fromEntries(
+		[...selected].map(([file, evidence]) => [file, evidence.inputDigest]),
 	);
-	for (const file of fresh) provenance[file] = state.inputDigest;
 	for (const [name, file] of Object.entries(report.files))
 		file.mutants = file.mutants.filter(
 			(m) =>

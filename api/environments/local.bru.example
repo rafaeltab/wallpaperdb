@@ -3,6 +3,7 @@ vars {
   assetBaseUrl: http://localhost:8000/asset
   gatewayBaseUrl: http://localhost:8000/gateway
   colorExtractorBaseUrl: http://localhost:8000/color-extractor
+  wallpaperBaseUrl: http://localhost:8000/wallpaper
   tagsBaseUrl: http://localhost:8000/tagging
   userBaseUrl: http://localhost:8000/user
   userId: test-user-123

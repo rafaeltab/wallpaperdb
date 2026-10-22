@@ -37,6 +37,8 @@ Open the ingress address printed by `make help`, followed by `/web`. The same in
 
 `make infra-start` and browser E2E omit the optional database and search admin UIs. Run `make infra-start-admin` to include both, then access `/pgadmin/` and `/opensearch-dashboards/` through the application stack's existing Caddy ingress. Infrastructure stop, reset, logs, and worktree teardown include the admin profile. LGTM stays enabled because the applications export telemetry to its collector. Headless runs preserve that behavior while omitting the admin UIs.
 
+PostgreSQL runs its [database initialization](infra/postgres/init/01-init.sql) only for an empty volume. An existing development volume needs the new `wallpaperdb_wallpaper` database before Wallpaper can report readiness. Use `make psql` to create that database and apply its grant from the initialization file; restarting PostgreSQL does not rerun initialization.
+
 `make dev` runs the applications in Docker with source watching. `make dev PACKAGE=<workspace>` runs that workspace's development script; the script determines whether it runs on the host or in Docker. Host-run services need host-accessible dependency endpoints. Use [service upgrade instructions](apps/docs/content/docs/guides/service-upgrades.mdx) and the [storage migration procedure](apps/docs/content/docs/infrastructure/seaweedfs.mdx) when upgrading existing data.
 
 ## Check a change

@@ -101,6 +101,8 @@ jobs:
             variant-generator.cache-to=type=gha,version=2,scope=browser-e2e-variant-generator,mode=max,ignore-error=true,timeout=60s
             color-extractor.cache-from=type=gha,version=2,scope=browser-e2e-color-extractor,timeout=60s
             color-extractor.cache-to=type=gha,version=2,scope=browser-e2e-color-extractor,mode=max,ignore-error=true,timeout=60s
+            wallpaper.cache-from=type=gha,version=2,scope=browser-e2e-wallpaper,timeout=60s
+            wallpaper.cache-to=type=gha,version=2,scope=browser-e2e-wallpaper,mode=max,ignore-error=true,timeout=60s
             tags.cache-from=type=gha,version=2,scope=browser-e2e-tags,timeout=60s
             tags.cache-to=type=gha,version=2,scope=browser-e2e-tags,mode=max,ignore-error=true,timeout=60s
             user.cache-from=type=gha,version=2,scope=browser-e2e-user,timeout=60s

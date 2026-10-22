@@ -11,7 +11,7 @@ const equal = (left, right) => {
 		supplied.length === expected.length && timingSafeEqual(supplied, expected)
 	);
 };
-const escape = (value) =>
+const escapeHtml = (value) =>
 	String(value).replace(
 		/[&<>"']/g,
 		(character) =>
@@ -129,7 +129,7 @@ export async function createOperatorInbox({ directory, token }) {
 							.reverse()
 							.map(
 								(record) =>
-									`<article><p>${escape(record.receivedAt)}</p><pre>${escape(JSON.stringify(record.notice, null, 2))}</pre></article>`,
+									`<article><p>${escapeHtml(record.receivedAt)}</p><pre>${escapeHtml(JSON.stringify(record.notice, null, 2))}</pre></article>`,
 							)
 							.join("") || "<p>No notifications received.</p>"
 					}</html>`,

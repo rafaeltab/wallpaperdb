@@ -190,7 +190,12 @@ export const pictureAttachmentsLayer = Layer.effect(
               intent.attentionRequired = false;
               return {
                 intent,
-                attach: { assetId: c.assetId, sourceId: c.sourceId, causationId: c.occurrenceId },
+                attach: {
+                  assetId: c.assetId,
+                  sourceId: c.sourceId,
+                  causationId: c.occurrenceId,
+                  ...(c.trace ? { trace: c.trace } : {}),
+                },
                 result: 'applied',
               };
             }

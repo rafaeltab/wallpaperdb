@@ -19,5 +19,6 @@ export type {
   WorkflowStorePort,
   WorkflowDeliveryPort,
   WorkflowPublication,
+  WorkflowAlert,
 } from './contract.js';
 export { creationLayer } from './implementation.js';

@@ -122,11 +122,15 @@ it('quarantines finite failed publication attempts across restart and recovers t
     runtime = ManagedRuntime.make(layer());
     expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.claim()))).toEqual([]);
     const alerts = await runtime.runPromise(WorkflowDelivery.use((s) => s.alerts()));
-    expect(alerts).toEqual([{ id: first.id, scope: 'outbox', reason: 'exhausted' }]);
+    expect(alerts).toEqual([
+      { id: first.id, scope: 'outbox', reason: 'exhausted', quarantineId: expect.any(String) },
+    ]);
     expect(
       await runtime.runPromise(WorkflowStore.use((s) => s.begin(wallpaper.owner, wallpaper.key)))
     ).toMatchObject({ attentionRequired: true });
-    await runtime.runPromise(WorkflowDelivery.use((s) => s.alerted(first.id, 'outbox')));
+    const [alert] = alerts;
+    if (!alert) throw new Error('Expected outbox notice');
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.alerted(alert)));
     expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.alerts()))).toEqual([]);
     expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.recover(first.id)))).toBe(true);
     const recovered = (await runtime.runPromise(WorkflowDelivery.use((s) => s.claim())))[0];
@@ -378,6 +382,73 @@ function sourceEvent(w: Wallpaper) {
   };
 }
 const quarantineId = (id: string) => createHash('sha256').update(id).digest('hex');
+it('fences stale notification acknowledgement across deliberate recovery and renewed exhaustion', async () => {
+  let runtime = recoveryRuntime();
+  try {
+    const wallpaper = await runtime.runPromise(
+      WorkflowStore.use((s) =>
+        s.begin({ namespace: 'authors', subject: 'stale-notice' }, 'request')
+      )
+    );
+    const first = await claim(runtime);
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.failed(first)));
+    const [alert] = await runtime.runPromise(WorkflowDelivery.use((s) => s.alerts()));
+    if (!alert || alert.scope !== 'outbox') throw new Error('Expected first outbox notice');
+    expect(
+      await runtime.runPromise(WorkflowStore.use((s) => s.begin(wallpaper.owner, wallpaper.key)))
+    ).toMatchObject({ attentionRequired: true });
+    expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.alerts()))).toEqual([alert]);
+    expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.recover(first.id)))).toBe(true);
+    const occurrence = (
+      await pool.query('SELECT quarantine_id FROM wallpaper_workflow_outbox WHERE id=$1', [
+        first.id,
+      ])
+    ).rows[0]?.quarantine_id;
+    expect(occurrence).not.toBe(alert.quarantineId);
+    expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.recover(first.id)))).toBe(false);
+    expect(
+      (
+        await pool.query('SELECT quarantine_id FROM wallpaper_workflow_outbox WHERE id=$1', [
+          first.id,
+        ])
+      ).rows[0]?.quarantine_id
+    ).toBe(occurrence);
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.alerted(alert)));
+    expect(
+      (
+        await pool.query('SELECT notified_at FROM wallpaper_workflow_outbox WHERE id=$1', [
+          first.id,
+        ])
+      ).rows[0]?.notified_at
+    ).toBeNull();
+    const renewed = await claim(runtime);
+    expect(renewed).toMatchObject({ id: first.id, event: first.event, attempts: 0 });
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.failed(renewed)));
+    const [later] = await runtime.runPromise(WorkflowDelivery.use((s) => s.alerts()));
+    expect(later).toEqual({ ...alert, quarantineId: occurrence });
+    if (!later) throw new Error('Expected renewed outbox notice');
+    await runtime.dispose();
+    runtime = recoveryRuntime();
+    expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.alerts()))).toEqual([later]);
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.alerted(alert)));
+    expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.alerts()))).toEqual([later]);
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.alerted(later)));
+    expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.alerts()))).toEqual([]);
+    expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.recover(first.id)))).toBe(true);
+    const completed = await claim(runtime);
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(completed)));
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.alerted(later)));
+    expect(
+      (
+        await pool.query('SELECT status, notified_at FROM wallpaper_workflow_outbox WHERE id=$1', [
+          first.id,
+        ])
+      ).rows
+    ).toEqual([{ status: 'published', notified_at: null }]);
+  } finally {
+    await runtime.dispose();
+  }
+});
 async function claim<R>(runtime: ManagedRuntime.ManagedRuntime<R | WorkflowDelivery, never>) {
   let publications: readonly WorkflowPublication[] = [];
   await expect
@@ -545,7 +616,7 @@ it('counts abandoned claims across restart, fences stale leases and recovers the
     runtime = recoveryRuntime(2);
     expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.claim()))).toEqual([]);
     expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.alerts()))).toEqual([
-      { id: first.id, scope: 'outbox', reason: 'exhausted' },
+      { id: first.id, scope: 'outbox', reason: 'exhausted', quarantineId: expect.any(String) },
     ]);
     expect(await read(runtime, w)).toMatchObject({ attentionRequired: true });
     await runtime.runPromise(WorkflowDelivery.use((s) => s.recover(first.id)));

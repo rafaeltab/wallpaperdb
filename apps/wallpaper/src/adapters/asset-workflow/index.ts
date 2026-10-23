@@ -136,7 +136,11 @@ export function assetWorkflowLayer(options: Options) {
           }
           for (const alert of yield* delivery.alerts()) {
             const id = createHash('sha256')
-              .update(`wallpaper:${alert.scope}:${alert.id}`)
+              .update(
+                alert.scope === 'outbox'
+                  ? `wallpaper:${alert.scope}:${alert.id}:${alert.quarantineId}`
+                  : `wallpaper:${alert.scope}:${alert.id}`
+              )
               .digest('hex');
             yield* attempt('notify-operator', async () => {
               const response = await fetch(options.operatorNotification.url, {
@@ -162,7 +166,7 @@ export function assetWorkflowLayer(options: Options) {
               await response.body?.cancel();
               if (!response.ok) throw new Error('Operator destination rejected notification');
             });
-            yield* delivery.alerted(alert.id, alert.scope);
+            yield* delivery.alerted(alert);
           }
         }),
         sendingHealthy

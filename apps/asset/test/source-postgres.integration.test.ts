@@ -1,7 +1,7 @@
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Effect, ManagedRuntime } from 'effect';
+import { Cause, Effect, Exit, ManagedRuntime } from 'effect';
 import { Pool } from 'pg';
 import { beforeAll, afterAll, expect, it } from 'vitest';
 import { activateLifecycle, lifecyclePostgresLayer } from '../src/adapters/lifecycle/index.js';
@@ -23,6 +23,133 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool?.end();
   await container?.stop();
+});
+it('preserves a pure transition exception as a defect and rolls back the proposed Source state', async () => {
+  const sources = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  // This Asset is independent of the other contracts and needs no activation change.
+  await pool.query(
+    `INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+     VALUES ('asset_decision_defect', 'wallpaper', 'wallpaper', 'clerk', 'owner')`
+  );
+  const defect = new Error('unique Source transition defect');
+  const read = SourceStore.use((store) =>
+    store.transact('asset_decision_defect', null, (state) => ({ state, result: state }))
+  );
+  try {
+    const before = await sources.runPromise(read);
+    const result = await sources.runPromiseExit(
+      SourceStore.use((store) =>
+        store.transact('asset_decision_defect', null, (state) => {
+          if (!state) throw new Error('Expected Asset');
+          state.sourceSetRevision = '999';
+          state.defaultSourceId = 'source_uncommitted';
+          throw defect;
+        })
+      )
+    );
+    expect(Exit.isFailure(result)).toBe(true);
+    if (!Exit.isFailure(result)) throw new Error('Expected failure');
+    expect(Cause.hasDies(result.cause)).toBe(true);
+    expect(Cause.squash(result.cause)).toBe(defect);
+    expect(await sources.runPromise(read)).toEqual(before);
+    expect(
+      await sources.runPromise(SourceAcceptanceOutbox.use((outbox) => outbox.claim(10)))
+    ).toEqual([]);
+    // A genuine database/policy failure keeps the declared technical error channel.
+    const unavailable = await sources.runPromiseExit(
+      SourceStore.use((store) =>
+        store.transact('asset_decision_defect', 'inactive-revision', (state) => ({
+          state,
+          result: state,
+        }))
+      )
+    );
+    expect(Exit.isFailure(unavailable)).toBe(true);
+    if (!Exit.isFailure(unavailable)) throw new Error('Expected technical failure');
+    expect(Cause.hasFails(unavailable.cause)).toBe(true);
+    expect(Cause.hasDies(unavailable.cause)).toBe(false);
+    expect(Cause.squash(unavailable.cause)).toMatchObject({
+      _tag: 'SourceFailure',
+      operation: 'transact',
+    });
+    expect(await sources.runPromise(read)).toEqual(before);
+  } finally {
+    await sources.dispose();
+  }
+});
+it('owns a checked-out connection lost during a Source transaction and can continue on a fresh client', async () => {
+  const databaseUrl = new URL(container.getConnectionUri());
+  databaseUrl.searchParams.set('application_name', 'source-disconnect-contract');
+  const sources = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: databaseUrl.toString(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  await pool.query(
+    `INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+     VALUES ('asset_disconnect', 'wallpaper', 'wallpaper', 'clerk', 'owner')`
+  );
+  const read = SourceStore.use((store) =>
+    store.transact('asset_disconnect', null, (state) => ({ state, result: state }))
+  );
+  const blocker = await pool.connect();
+  let pending: ReturnType<typeof sources.runPromiseExit> | undefined;
+  try {
+    const before = await sources.runPromise(read);
+    await blocker.query('BEGIN');
+    await blocker.query("SELECT id FROM owned_assets WHERE id = 'asset_disconnect' FOR UPDATE");
+    pending = sources.runPromiseExit(
+      SourceStore.use((store) =>
+        store.transact('asset_disconnect', null, (state) => {
+          if (!state) throw new Error('Expected Asset');
+          state.sourceSetRevision = '999';
+          return { state, result: state };
+        })
+      )
+    );
+    let pid: number | undefined;
+    await expect
+      .poll(async () => {
+        const result = await pool.query<{ pid: number }>(
+          "SELECT pid FROM pg_stat_activity WHERE application_name = 'source-disconnect-contract' AND wait_event_type = 'Lock'"
+        );
+        pid = result.rows[0]?.pid;
+        return pid !== undefined;
+      })
+      .toBe(true);
+    if (pid === undefined) throw new Error('Expected blocked Source backend');
+    expect((await pool.query('SELECT pg_terminate_backend($1) AS terminated', [pid])).rows).toEqual(
+      [{ terminated: true }]
+    );
+    const result = await pending;
+    expect(Exit.isFailure(result)).toBe(true);
+    if (!Exit.isFailure(result)) throw new Error('Expected connection failure');
+    expect(Cause.hasDies(result.cause)).toBe(false);
+    expect(Cause.squash(result.cause)).toMatchObject({
+      _tag: 'SourceFailure',
+      operation: 'transact',
+    });
+    await blocker.query('ROLLBACK');
+    expect(await sources.runPromise(read)).toEqual(before);
+    expect(
+      await sources.runPromise(SourceAcceptanceOutbox.use((outbox) => outbox.claim(10)))
+    ).toEqual([]);
+  } finally {
+    await blocker.query('ROLLBACK');
+    blocker.release();
+    await pending;
+    await sources.dispose();
+  }
 });
 it('commits immutable metadata, revisions, first provenance and one logical outbox together and fences stale activation', async () => {
   const runtime = ManagedRuntime.make(

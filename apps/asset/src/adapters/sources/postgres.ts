@@ -28,6 +28,16 @@ interface Options {
   readonly retryDelayMs: number;
   readonly leaseMs: number;
 }
+class SourceDecisionDefect {
+  constructor(readonly cause: unknown) {}
+}
+function decide<A>(change: () => A): A {
+  try {
+    return change();
+  } catch (cause) {
+    throw new SourceDecisionDefect(cause);
+  }
+}
 export function sourcePostgresLayer(options: Options) {
   return Layer.effectContext(
     Effect.gen(function* () {
@@ -40,13 +50,11 @@ export function sourcePostgresLayer(options: Options) {
             statement_timeout: 10000,
           });
           pool.on('error', (cause) =>
-            logs
-              .getLogger('asset.sources')
-              .emit({
-                severityNumber: SeverityNumber.ERROR,
-                body: 'Idle Source database connection failed',
-                attributes: { 'error.type': cause.name, 'error.message': cause.message },
-              })
+            logs.getLogger('asset.sources').emit({
+              severityNumber: SeverityNumber.ERROR,
+              body: 'Idle Source database connection failed',
+              attributes: { 'error.type': cause.name, 'error.message': cause.message },
+            })
           );
           return pool;
         }),
@@ -57,6 +65,12 @@ export function sourcePostgresLayer(options: Options) {
           try: async (signal) => {
             const client = await pool.connect();
             let released = false;
+            let connectionFailure: Error | undefined;
+            // pg also emits errors on borrowed clients, outside query rejection.
+            const connectionError = (cause: Error) => {
+              connectionFailure = cause;
+            };
+            client.on('error', connectionError);
             const deadline = AbortSignal.any([signal, AbortSignal.timeout(15000)]);
             const abort = () => {
               if (!released) {
@@ -70,14 +84,22 @@ export function sourcePostgresLayer(options: Options) {
                 abort();
                 throw new Error('Source operation cancelled');
               }
-              return await work(drizzle(client));
+              const result = await work(drizzle(client));
+              if (connectionFailure) throw connectionFailure;
+              return result;
             } finally {
               deadline.removeEventListener('abort', abort);
-              if (!released) client.release();
+              if (!released) client.release(connectionFailure !== undefined);
+              client.off('error', connectionError);
             }
           },
           catch: (cause) => new SourceFailure({ operation, cause }),
         }).pipe(
+          Effect.catchTag('SourceFailure', (failure) =>
+            failure.cause instanceof SourceDecisionDefect
+              ? Effect.die(failure.cause.cause)
+              : Effect.fail(failure)
+          ),
           Effect.tapError((error) =>
             Effect.logError('Source persistence failed', { operation, cause: error.cause })
           ),
@@ -120,7 +142,7 @@ export function sourcePostgresLayer(options: Options) {
                     candidates: [],
                   })
                 : null;
-              const changed = change(initial);
+              const changed = decide(() => change(initial));
               if (changed.state && asset) {
                 for (const source of changed.state.sources) {
                   const [existing] = await tx

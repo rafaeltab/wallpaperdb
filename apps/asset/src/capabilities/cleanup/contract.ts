@@ -24,7 +24,11 @@ export class CleanupStore extends Context.Service<
     readonly completed: (work: CleanupWork) => Effect.Effect<void, CleanupFailure>;
     readonly failed: (work: CleanupWork) => Effect.Effect<void, CleanupFailure>;
     readonly pendingAlerts: () => Effect.Effect<
-      readonly { readonly id: string; readonly applicationId: string }[],
+      readonly {
+        readonly id: string;
+        readonly applicationId: string;
+        readonly notificationId: string;
+      }[],
       CleanupFailure
     >;
     readonly alerted: (id: string) => Effect.Effect<void, CleanupFailure>;

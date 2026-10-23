@@ -1,0 +1,1 @@
+ALTER TABLE "source_cleanup" ADD COLUMN "notification_id" text DEFAULT gen_random_uuid()::text NOT NULL;

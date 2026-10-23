@@ -166,11 +166,20 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 			cleanupDeadline = performance.now() + cleanupMs;
 			const timer = setTimeout(
 				() => {
+					lifetime.abort();
 					void disconnectAll();
 				},
-				Math.max(1, Math.min(1000, cleanupMs / 3)),
+				Math.max(1, cleanupMs - Math.min(1000, cleanupMs / 3)),
 			);
 			let disposalError;
+			// The worker has stopped, but its last reset can still be finishing.
+			// Drain it before aborting its owned operations; the cleanup timer and
+			// independent reset deadline still bound this wait and preserve faults.
+			try {
+				await resetDone;
+			} catch (error) {
+				disposalError = error;
+			}
 			// The last mutant has no next reset to detect leaked clients for it.
 			if (admin && !resetting && !failure && !operation.aborted) {
 				try {

@@ -44,6 +44,13 @@ export async function runStage({
 	signal,
 }) {
 	const start = performance.now();
+	const postgres = config.fixture === "postgres";
+	const fixtureCleanupMs = postgres
+		? Math.max(1, Math.floor(graceMs / 2))
+		: Math.max(100, graceMs / 2);
+	const runnerGraceMs = postgres
+		? graceMs - fixtureCleanupMs
+		: fixtureCleanupMs;
 	const cwd = join(root, workspace);
 	const contextConfig = { ...config, sourceFiles };
 	const context = mutationContext(root, workspace, suite, contextConfig);
@@ -132,8 +139,10 @@ export async function runStage({
 		fixture = await mutationFixture(
 			cwd,
 			config,
-			start + budgetMs,
-			Math.max(100, graceMs / 2),
+			// PostgreSQL may finish an in-flight reset while the native runner drains.
+			// This uses the reserved runner grace, leaving fixture cleanup separate.
+			start + budgetMs + (postgres ? runnerGraceMs : 0),
+			fixtureCleanupMs,
 			signal,
 		);
 		const remaining = budgetMs - (performance.now() - start);
@@ -156,7 +165,7 @@ export async function runStage({
 			{
 				cwd,
 				budgetMs: remaining,
-				graceMs: fixture ? Math.max(100, graceMs / 2) : graceMs,
+				graceMs: fixture ? runnerGraceMs : graceMs,
 				failureSignal: fixture?.failureSignal,
 				env: {
 					...process.env,

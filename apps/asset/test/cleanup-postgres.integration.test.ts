@@ -30,6 +30,211 @@ const options = () => ({
   leaseMs: 1000,
 });
 
+it('bounds failed and abandoned claims, fences stale completion and recovers deliberately across restart', async () => {
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({ ...options(), revision: 'cleanup-1' })
+  );
+  const sources = ManagedRuntime.make(sourcePostgresLayer(options()));
+  let cleanup = ManagedRuntime.make(cleanupPostgresLayer(options()));
+  try {
+    const created = await lifecycle.runPromise(
+      LifecycleStore.use((store) =>
+        store.accept({
+          revision: 'cleanup-1',
+          applicationId: 'wallpaper',
+          canonical: 'recover',
+          correlation: { commandId: crypto.randomUUID(), applicationReference: '' },
+          decision: {
+            kind: 'create',
+            assetType: 'wallpaper',
+            owner: { namespace: 'clerk', subject: 'recover' },
+          },
+          context: { occurrence: { source: 'https://test/wallpaper', id: 'recover-create' } },
+        })
+      )
+    );
+    if (created.outcome !== 'created') throw new Error('Expected Asset');
+    const assetId = created.assetId,
+      candidateId = crypto.randomUUID();
+    await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(assetId, null, (state) => {
+          if (!state) throw new Error('Expected Asset');
+          state.candidates = [
+            {
+              candidateId,
+              sourceId: crypto.randomUUID(),
+              idempotencyKey: 'recover',
+              operation: 'add',
+              expectedSourceSetRevision: '0',
+              status: 'cancelled',
+              layout: 'asset-layout-1',
+              expiresAt: '2000-01-01T00:00:00Z',
+              orphanExpiresAt: '2000-01-01T00:00:00Z',
+            },
+          ];
+          return { state, result: undefined };
+        })
+      )
+    );
+    const initial = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
+    const first = initial.find(
+      (work) => work.target.kind === 'candidate' && work.target.candidateId === candidateId
+    );
+    if (!first) throw new Error('Expected candidate claim');
+    for (const work of initial)
+      if (work !== first)
+        await cleanup.runPromise(CleanupStore.use((store) => store.completed(work)));
+    await pool.query("UPDATE source_cleanup SET available_at='2000-01-01' WHERE id=$1", [first.id]);
+    await cleanup.dispose();
+    cleanup = ManagedRuntime.make(cleanupPostgresLayer(options()));
+    const [second] = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
+    if (!second) throw new Error('Expected restart claim');
+    expect(second.attempts).toBe(2);
+    expect(second.leaseId).not.toBe(first.leaseId);
+    await cleanup.runPromise(CleanupStore.use((store) => store.completed(first)));
+    expect(
+      (await pool.query('SELECT status FROM source_cleanup WHERE id=$1', [first.id])).rows
+    ).toEqual([{ status: 'reclaiming' }]);
+    await cleanup.runPromise(CleanupStore.use((store) => store.failed(second)));
+    expect(await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)))).toEqual([]);
+    expect(
+      await cleanup.runPromise(CleanupStore.use((store) => store.pendingAlerts()))
+    ).toContainEqual({ id: first.id, applicationId: 'wallpaper' });
+    await cleanup.runPromise(CleanupStore.use((store) => store.alerted(first.id)));
+    expect(
+      await cleanup.runPromise(CleanupStore.use((store) => store.pendingAlerts()))
+    ).not.toContainEqual({ id: first.id, applicationId: 'wallpaper' });
+    expect(await cleanup.runPromise(CleanupStore.use((store) => store.recover(first.id)))).toBe(
+      true
+    );
+    const [recovered] = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
+    if (!recovered) throw new Error('Expected recovered claim');
+    expect(recovered.attempts).toBe(1);
+    await cleanup.runPromise(CleanupStore.use((store) => store.completed(recovered)));
+    expect(
+      (await pool.query('SELECT due_at FROM source_cleanup WHERE id=$1', [first.id])).rows
+    ).toEqual([{ due_at: new Date('2000-01-01T00:00:00Z') }]);
+  } finally {
+    await cleanup.dispose();
+    await sources.dispose();
+    await lifecycle.dispose();
+  }
+});
+
+it('atomically schedules terminal Source evidence and cancelled reservations without resetting recorded expiry', async () => {
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({ ...options(), revision: 'cleanup-1' })
+  );
+  const sources = ManagedRuntime.make(sourcePostgresLayer(options()));
+  const cleanup = ManagedRuntime.make(cleanupPostgresLayer(options()));
+  try {
+    const command = {
+      revision: 'cleanup-1',
+      applicationId: 'wallpaper',
+      canonical: 'terminal',
+      correlation: { commandId: crypto.randomUUID(), applicationReference: '' },
+      decision: {
+        kind: 'create' as const,
+        assetType: 'wallpaper',
+        owner: { namespace: 'clerk', subject: 'terminal' },
+      },
+      context: { occurrence: { source: 'https://test/wallpaper', id: 'terminal-create' } },
+    };
+    const created = await lifecycle.runPromise(
+      LifecycleStore.use((store) => store.accept(command))
+    );
+    if (created.outcome !== 'created') throw new Error('Expected Asset');
+    const assetId = created.assetId;
+    const sourceId = `source_${crypto.randomUUID()}`,
+      orphan = `source_${crypto.randomUUID()}`,
+      candidateId = crypto.randomUUID();
+    const facts = {
+      digest: 'a'.repeat(64),
+      byteLength: 4,
+      mimeType: 'image/png',
+      model: 'sdr-png',
+      width: 2,
+      height: 2,
+    };
+    await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(assetId, null, (state) => {
+          if (!state) throw new Error('Expected Asset');
+          state.sources = [{ sourceId, facts, layout: 'asset-layout-1' }];
+          state.candidates = [
+            {
+              candidateId,
+              sourceId: orphan,
+              idempotencyKey: 'late',
+              operation: 'add',
+              expectedSourceSetRevision: '0',
+              status: 'ready',
+              facts,
+              layout: 'asset-layout-1',
+              expiresAt: '2099-01-01T00:00:00Z',
+              orphanExpiresAt: '2099-01-01T00:00:00Z',
+            },
+          ];
+          state.nonterminalCandidateCount = 1;
+          return { state, result: undefined };
+        })
+      )
+    );
+    const deletion = {
+      ...command,
+      canonical: 'delete-terminal',
+      correlation: { ...command.correlation, commandId: crypto.randomUUID() },
+      decision: { kind: 'delete' as const, assetId, evidenceRetentionMsByType: { wallpaper: 0 } },
+    };
+    expect(
+      await lifecycle.runPromise(LifecycleStore.use((store) => store.accept(deletion)))
+    ).toMatchObject({ outcome: 'deleted' });
+    const recorded = (
+      await pool.query('SELECT due_at FROM source_cleanup WHERE asset_id=$1 ORDER BY id', [assetId])
+    ).rows;
+    expect(
+      await lifecycle.runPromise(LifecycleStore.use((store) => store.accept(deletion)))
+    ).toMatchObject({ outcome: 'deleted' });
+    expect(
+      (
+        await pool.query('SELECT due_at FROM source_cleanup WHERE asset_id=$1 ORDER BY id', [
+          assetId,
+        ])
+      ).rows
+    ).toEqual(recorded);
+    const work = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
+    expect(work.map((item) => item.target)).toEqual(
+      expect.arrayContaining([
+        { kind: 'candidate', candidateId },
+        { kind: 'source', assetId, sourceId },
+        { kind: 'source', assetId, sourceId: orphan },
+      ])
+    );
+    expect(work).toHaveLength(3);
+    for (const item of work)
+      await cleanup.runPromise(CleanupStore.use((store) => store.completed(item)));
+    expect(
+      (await pool.query('SELECT deleted_at FROM owned_assets WHERE id=$1', [assetId])).rows[0]
+        .deleted_at
+    ).toBeInstanceOf(Date);
+    expect(
+      (await pool.query('SELECT cleanup_pending FROM asset_deletions WHERE asset_id=$1', [assetId]))
+        .rows
+    ).toEqual([{ cleanup_pending: false }]);
+    expect(
+      await lifecycle.runPromise(LifecycleStore.use((store) => store.accept(command)))
+    ).toMatchObject({ outcome: 'created', assetId });
+    expect(
+      await lifecycle.runPromise(LifecycleStore.use((store) => store.find(assetId)))
+    ).toBeNull();
+  } finally {
+    await cleanup.dispose();
+    await sources.dispose();
+    await lifecycle.dispose();
+  }
+});
+
 it('serializes accepted read protection with membership and releases it without restoring retired eligibility', async () => {
   const lifecycle = ManagedRuntime.make(
     lifecyclePostgresLayer({ ...options(), revision: 'cleanup-1' })
@@ -200,7 +405,10 @@ it('records bounded orphan work atomically, protects current membership and recl
       reason: 'candidate-expired',
       expiresAt: '2000-01-01T00:00:00Z',
     });
-    const retained = await pool.query('SELECT due_at, status FROM source_cleanup ORDER BY id');
+    const retained = await pool.query(
+      'SELECT due_at, status FROM source_cleanup WHERE asset_id=$1 ORDER BY id',
+      [assetId]
+    );
     expect(retained.rows.every((row) => row.status === 'completed')).toBe(true);
     expect(
       retained.rows.every((row) => row.due_at.toISOString() === '2000-01-01T00:00:00.000Z')

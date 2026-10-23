@@ -41,6 +41,7 @@ export interface Candidate extends CandidateIntent {
     | 'cancelled';
   readonly expiresAt: string;
   readonly orphanExpiresAt: string;
+  readonly temporaryExpiresAt?: string;
   readonly layout: 'asset-layout-1';
   digest?: string;
   facts?: SourceFacts;

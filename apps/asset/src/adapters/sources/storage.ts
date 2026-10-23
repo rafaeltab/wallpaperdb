@@ -264,34 +264,39 @@ export function sourceStorageLayer(options: Options) {
         Context.add(CleanupBytes, {
           reclaim: (target) =>
             run('reclaim', async (signal) => {
-              const key =
+              const keys =
                 target.kind === 'candidate'
-                  ? candidateKey(target.candidateId)
-                  : sourceKey(target.assetId, target.sourceId);
+                  ? [
+                      candidateKey(target.candidateId),
+                      `asset-layout-1/private/candidates/${target.candidateId}/canonical`,
+                    ]
+                  : [sourceKey(target.assetId, target.sourceId)];
               // Atomic replacement leaves no gap for a delayed conditional writer.
               // Empty fences survive metadata purge because identities are never reused.
-              try {
-                await client.send(
-                  new PutObjectCommand({
-                    Bucket: options.bucket,
-                    Key: key,
-                    Body: new Uint8Array(),
-                    ContentLength: 0,
-                    Metadata: { reclaimed: 'true' },
-                  }),
-                  { abortSignal: signal }
-                );
-              } catch (cause) {
-                const head = await client
-                  .send(
-                    new HeadObjectCommand({
+              for (const key of keys) {
+                try {
+                  await client.send(
+                    new PutObjectCommand({
                       Bucket: options.bucket,
                       Key: key,
+                      Body: new Uint8Array(),
+                      ContentLength: 0,
+                      Metadata: { reclaimed: 'true' },
                     }),
                     { abortSignal: signal }
-                  )
-                  .catch(() => null);
-                if (head?.Metadata?.reclaimed !== 'true' || head.ContentLength !== 0) throw cause;
+                  );
+                } catch (cause) {
+                  const head = await client
+                    .send(
+                      new HeadObjectCommand({
+                        Bucket: options.bucket,
+                        Key: key,
+                      }),
+                      { abortSignal: signal }
+                    )
+                    .catch(() => null);
+                  if (head?.Metadata?.reclaimed !== 'true' || head.ContentLength !== 0) throw cause;
+                }
               }
             }).pipe(
               Effect.mapError(

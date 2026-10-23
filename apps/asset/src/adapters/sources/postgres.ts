@@ -132,24 +132,24 @@ export function sourcePostgresLayer(options: Options) {
                 const protection = changed.readProtection;
                 if (!initial?.sources.some((source) => source.sourceId === protection.sourceId))
                   throw new Error('Read protection requires active membership');
-                await tx
-                  .insert(sourceReads)
-                  .values({
-                    id: protection.readId,
-                    assetId,
-                    sourceId: protection.sourceId,
-                    expiresAt: new Date(protection.expiresAt),
-                  });
+                await tx.insert(sourceReads).values({
+                  id: protection.readId,
+                  assetId,
+                  sourceId: protection.sourceId,
+                  expiresAt: new Date(protection.expiresAt),
+                });
               }
               if (changed.state && (!asset || asset.deletedAt !== null))
                 throw new Error('Unavailable Asset cannot accept Source state');
               if (changed.state && asset) {
                 for (const candidate of changed.state.candidates) {
                   const terminal = ['accepted', 'rejected', 'cancelled'].includes(candidate.status);
+                  const inputExpiry = Math.min(
+                    Date.parse(candidate.expiresAt),
+                    Date.parse(candidate.temporaryExpiresAt ?? candidate.expiresAt)
+                  );
                   const inputDue = new Date(
-                    terminal
-                      ? Math.min(Date.now(), Date.parse(candidate.expiresAt))
-                      : candidate.expiresAt
+                    terminal ? Math.min(Date.now(), inputExpiry) : inputExpiry
                   );
                   await tx
                     .insert(sourceCleanup)

@@ -21,6 +21,7 @@ import {
   assetSourceState,
   immutableSources,
   sourceAcceptanceOutbox,
+  sourceCleanup,
 } from '../../db/schema.js';
 interface Options {
   readonly databaseUrl: string;
@@ -125,7 +126,66 @@ export function sourcePostgresLayer(options: Options) {
               if (changed.state && (!asset || asset.deletedAt !== null))
                 throw new Error('Unavailable Asset cannot accept Source state');
               if (changed.state && asset) {
+                for (const candidate of changed.state.candidates) {
+                  const terminal = ['accepted', 'rejected', 'cancelled'].includes(candidate.status);
+                  const inputDue = new Date(
+                    terminal
+                      ? Math.min(Date.now(), Date.parse(candidate.expiresAt))
+                      : candidate.expiresAt
+                  );
+                  await tx
+                    .insert(sourceCleanup)
+                    .values({
+                      id: `candidate:${candidate.candidateId}`,
+                      assetId,
+                      applicationId: asset.applicationId,
+                      target: { kind: 'candidate', candidateId: candidate.candidateId },
+                      dueAt: inputDue,
+                    })
+                    .onConflictDoUpdate({
+                      target: sourceCleanup.id,
+                      set: {
+                        dueAt: sql`least(${sourceCleanup.dueAt}, ${inputDue})`,
+                      },
+                    });
+                  const sourceDue =
+                    candidate.status === 'accepted'
+                      ? null
+                      : new Date(
+                          terminal
+                            ? Math.min(Date.now(), Date.parse(candidate.orphanExpiresAt))
+                            : candidate.orphanExpiresAt
+                        );
+                  const sourceWork = tx.insert(sourceCleanup).values({
+                    id: `source:${candidate.sourceId}`,
+                    assetId,
+                    applicationId: asset.applicationId,
+                    target: { kind: 'source', assetId, sourceId: candidate.sourceId },
+                    dueAt: sourceDue,
+                  });
+                  if (
+                    changed.state.sources.some((source) => source.sourceId === candidate.sourceId)
+                  )
+                    await sourceWork.onConflictDoUpdate({
+                      target: sourceCleanup.id,
+                      set: { dueAt: null },
+                    });
+                  else if (candidate.status === 'accepted') await sourceWork.onConflictDoNothing();
+                  else
+                    await sourceWork.onConflictDoUpdate({
+                      target: sourceCleanup.id,
+                      set: {
+                        dueAt: sql`least(${sourceCleanup.dueAt}, ${sourceDue})`,
+                      },
+                    });
+                }
                 for (const source of changed.state.sources) {
+                  const [fence] = await tx
+                    .select({ status: sourceCleanup.status })
+                    .from(sourceCleanup)
+                    .where(eq(sourceCleanup.id, `source:${source.sourceId}`));
+                  if (fence && fence.status !== 'pending')
+                    throw new Error('Reclaimed Source cannot regain membership');
                   const [existing] = await tx
                     .select()
                     .from(immutableSources)
@@ -165,6 +225,19 @@ export function sourcePostgresLayer(options: Options) {
                     )
                     .returning({ id: immutableSources.id });
                   if (retired.length !== 1) throw new Error('Source already retired');
+                  await tx
+                    .insert(sourceCleanup)
+                    .values({
+                      id: `source:${sourceId}`,
+                      assetId,
+                      applicationId: asset.applicationId,
+                      target: { kind: 'source', assetId, sourceId },
+                      dueAt: new Date(evidenceExpiresAt),
+                    })
+                    .onConflictDoUpdate({
+                      target: sourceCleanup.id,
+                      set: { dueAt: new Date(evidenceExpiresAt) },
+                    });
                 }
                 await tx
                   .insert(assetSourceState)

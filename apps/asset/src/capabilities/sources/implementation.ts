@@ -125,6 +125,7 @@ export function sourcesLayer(configuration: {
                     assetId,
                     assetType: state.asset.assetType,
                     sources: state.sources,
+                    candidates: state.candidates,
                     defaultSourceId: state.defaultSourceId,
                     sourceSetRevision: state.sourceSetRevision,
                     deliveryRevision: state.deliveryRevision,

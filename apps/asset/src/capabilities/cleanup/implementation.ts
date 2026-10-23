@@ -11,7 +11,7 @@ export const cleanupLayer = Layer.effect(
         let completed = 0,
           failed = 0;
         for (const work of yield* store.claim(Math.max(1, Math.min(100, Math.floor(limit))))) {
-          const reclaimed = yield* bytes.reclaim(work.target).pipe(
+          const reclaimed = yield* bytes.reclaim(work.target, work).pipe(
             Effect.as(true),
             Effect.catch(() => Effect.succeed(false))
           );

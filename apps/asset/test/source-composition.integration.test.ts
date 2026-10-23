@@ -403,7 +403,7 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
       app.inject({
         method: 'DELETE',
         url: `/assets/${created.assetId}/sources/${winner.sourceId}`,
-        headers,
+        headers: { ...headers, 'x-correlation-id': 'withdrawal-intent' },
         payload: { expectedSourceSetRevision: '4' },
       });
     try {
@@ -455,6 +455,15 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
       [winner.sourceId]
     );
     expect(withdrawn.rows[0]?.evidence_expires_at).toBeInstanceOf(Date);
+    const withdrawalContext = (
+      await pool.query('SELECT context FROM source_cleanup WHERE id=$1', [
+        `source:${winner.sourceId}`,
+      ])
+    ).rows[0]?.context;
+    expect(withdrawalContext).toMatchObject({
+      occurrence: { source: 'https://wallpaperdb/asset/authors', id: expect.any(String) },
+      correlationId: 'withdrawal-intent',
+    });
     expect((await withdraw()).statusCode).toBe(409);
     expect(
       (
@@ -552,6 +561,17 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
     expect(
       await lifecycle.runPromise(LifecycleStore.use((s) => s.accept(deleteInput)))
     ).toMatchObject({ outcome: 'deleted', assetId: created.assetId });
+    expect(
+      (await pool.query('SELECT context FROM source_cleanup WHERE id=$1', [`source:${nextSource}`]))
+        .rows[0]?.context
+    ).toEqual(deleteInput.context);
+    expect(
+      (
+        await pool.query('SELECT context FROM source_cleanup WHERE id=$1', [
+          `source:${winner.sourceId}`,
+        ])
+      ).rows[0]?.context
+    ).toEqual(withdrawalContext);
     for (const request of [
       { method: 'GET' as const, url: `/assets/${created.assetId}/sources` },
       { method: 'GET' as const, url: `/assets/${created.assetId}/sources/${nextSource}/original` },

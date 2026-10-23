@@ -12,12 +12,14 @@ import {
 it('finishes exact reclaimed identities and leaves failed responsibilities durably retryable', async () => {
   const first: CleanupWork = {
     id: 'first',
+    assetId: 'asset',
     leaseId: 'lease-1',
     attempts: 1,
     target: { kind: 'candidate', candidateId: 'old' },
   };
   const second: CleanupWork = {
     id: 'second',
+    assetId: 'asset',
     leaseId: 'lease-2',
     attempts: 1,
     target: { kind: 'source', assetId: 'asset', sourceId: 'retired' },

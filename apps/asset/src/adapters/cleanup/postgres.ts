@@ -3,6 +3,7 @@ import { and, asc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Clock, Effect, Layer } from 'effect';
 import { Pool } from 'pg';
+import { observeCleanup } from './telemetry.js';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import {
   CleanupStore,
@@ -105,6 +106,14 @@ export function cleanupPostgresLayer(options: Options) {
           ),
           Effect.withSpan(`asset.cleanup.database.${operation}`)
         );
+      const identity = (row: typeof sourceCleanup.$inferSelect) => ({
+        id: row.id,
+        assetId: row.assetId,
+        target: row.target,
+        attempts: row.attempts,
+        context: row.context ?? undefined,
+        leaseId: row.leaseId ?? undefined,
+      });
       const match = (work: CleanupWork) =>
         and(
           eq(sourceCleanup.id, work.id),
@@ -115,7 +124,7 @@ export function cleanupPostgresLayer(options: Options) {
         claim: (limit) =>
           Effect.gen(function* () {
             const now = new Date(yield* Clock.currentTimeMillis);
-            return yield* run('claim', async (db) => {
+            const claimed = yield* run('claim', async (db) => {
               const expiredReads = await db
                 .select({ id: sourceReads.id })
                 .from(sourceReads)
@@ -263,97 +272,144 @@ export function cleanupPostgresLayer(options: Options) {
                       availableAt: new Date(now.getTime() + options.leaseMs),
                     })
                     .where(eq(sourceCleanup.id, row.id));
-                  return { id: row.id, leaseId, attempts: row.attempts + 1, target: row.target };
+                  return { ...identity(row), leaseId, attempts: row.attempts + 1 };
                 });
                 if (work) result.push(work);
               }
               return result;
             });
+            for (const work of claimed)
+              yield* observeCleanup('asset.cleanup.claim', work, Effect.succeed('claimed'));
+            return claimed;
           }),
         completed: (work) =>
-          run('completed', (db) =>
-            db.transaction(async (tx) => {
-              const [entry] = await tx
-                .select({ assetId: sourceCleanup.assetId })
-                .from(sourceCleanup)
-                .where(eq(sourceCleanup.id, work.id));
-              if (!entry) return;
-              await tx
-                .select()
-                .from(ownedAssets)
-                .where(eq(ownedAssets.id, entry.assetId))
-                .for('update');
-              const rows = await tx
-                .update(sourceCleanup)
-                .set({ status: 'completed', leaseId: null })
-                .where(match(work))
-                .returning({ assetId: sourceCleanup.assetId });
-              if (!rows[0]) return;
-              if (work.target.kind === 'source')
+          observeCleanup(
+            'asset.cleanup.complete',
+            work,
+            run('completed', (db) =>
+              db.transaction(async (tx) => {
+                const [entry] = await tx
+                  .select({ assetId: sourceCleanup.assetId })
+                  .from(sourceCleanup)
+                  .where(eq(sourceCleanup.id, work.id));
+                if (!entry) return 'stale-claim';
                 await tx
-                  .delete(immutableSources)
-                  .where(
-                    and(
-                      eq(immutableSources.id, work.target.sourceId),
-                      eq(immutableSources.assetId, work.target.assetId)
-                    )
-                  );
-              await finishDeletedAsset(tx, rows[0].assetId);
-            })
-          ),
+                  .select()
+                  .from(ownedAssets)
+                  .where(eq(ownedAssets.id, entry.assetId))
+                  .for('update');
+                const rows = await tx
+                  .update(sourceCleanup)
+                  .set({ status: 'completed', leaseId: null })
+                  .where(match(work))
+                  .returning({ assetId: sourceCleanup.assetId });
+                if (!rows[0]) return 'stale-claim';
+                if (work.target.kind === 'source')
+                  await tx
+                    .delete(immutableSources)
+                    .where(
+                      and(
+                        eq(immutableSources.id, work.target.sourceId),
+                        eq(immutableSources.assetId, work.target.assetId)
+                      )
+                    );
+                await finishDeletedAsset(tx, rows[0].assetId);
+                return 'completed';
+              })
+            )
+          ).pipe(Effect.asVoid),
         failed: (work) =>
-          run('failed', async (db) => {
-            await db
-              .update(sourceCleanup)
-              .set({
-                status: work.attempts >= options.maxAttempts ? 'quarantined' : 'pending',
-                leaseId: null,
-                availableAt: new Date(
-                  Date.now() + Math.min(30000, options.retryDelayMs * 2 ** (work.attempts - 1))
-                ),
-              })
-              .where(match(work));
-          }),
+          observeCleanup(
+            'asset.cleanup.fail',
+            work,
+            run('failed', async (db) => {
+              const rows = await db
+                .update(sourceCleanup)
+                .set({
+                  status: work.attempts >= options.maxAttempts ? 'quarantined' : 'pending',
+                  leaseId: null,
+                  availableAt: new Date(
+                    Date.now() + Math.min(30000, options.retryDelayMs * 2 ** (work.attempts - 1))
+                  ),
+                })
+                .where(match(work))
+                .returning({ id: sourceCleanup.id });
+              return rows.length
+                ? work.attempts >= options.maxAttempts
+                  ? 'quarantined'
+                  : 'retry-recorded'
+                : 'stale-claim';
+            })
+          ).pipe(Effect.asVoid),
         pendingAlerts: () =>
-          run('pending-alerts', (db) =>
-            db
-              .select({
-                id: sourceCleanup.id,
-                applicationId: sourceCleanup.applicationId,
-                notificationId: sourceCleanup.notificationId,
-              })
-              .from(sourceCleanup)
-              .where(and(eq(sourceCleanup.status, 'quarantined'), isNull(sourceCleanup.notifiedAt)))
-              .limit(100)
+          run('pending-alerts', async (db) =>
+            (
+              await db
+                .select()
+                .from(sourceCleanup)
+                .where(
+                  and(eq(sourceCleanup.status, 'quarantined'), isNull(sourceCleanup.notifiedAt))
+                )
+                .limit(100)
+            ).map((row) => ({
+              ...identity(row),
+              applicationId: row.applicationId,
+              notificationId: row.notificationId,
+            }))
           ),
         alerted: (id, notificationId) =>
-          run('alerted', async (db) => {
-            await db
-              .update(sourceCleanup)
-              .set({ notifiedAt: new Date() })
-              .where(
-                and(
-                  eq(sourceCleanup.id, id),
-                  eq(sourceCleanup.notificationId, notificationId),
-                  eq(sourceCleanup.status, 'quarantined')
-                )
-              );
+          Effect.gen(function* () {
+            const [row] = yield* run('inspect-alert', (db) =>
+              db.select().from(sourceCleanup).where(eq(sourceCleanup.id, id))
+            );
+            if (!row) return;
+            yield* observeCleanup(
+              'asset.cleanup.confirm-notification',
+              identity(row),
+              run('alerted', async (db) => {
+                const rows = await db
+                  .update(sourceCleanup)
+                  .set({ notifiedAt: new Date() })
+                  .where(
+                    and(
+                      eq(sourceCleanup.id, id),
+                      eq(sourceCleanup.notificationId, notificationId),
+                      eq(sourceCleanup.status, 'quarantined')
+                    )
+                  )
+                  .returning({ id: sourceCleanup.id });
+                return rows.length ? 'notified' : 'stale-notification';
+              }),
+              { 'cleanup.notification_id': notificationId }
+            );
           }),
         recover: (id) =>
-          run('recover', async (db) => {
-            const rows = await db
-              .update(sourceCleanup)
-              .set({
-                status: 'pending',
-                attempts: 0,
-                leaseId: null,
-                availableAt: new Date(),
-                notifiedAt: null,
-                notificationId: randomUUID(),
-              })
-              .where(and(eq(sourceCleanup.id, id), eq(sourceCleanup.status, 'quarantined')))
-              .returning({ id: sourceCleanup.id });
-            return rows.length === 1;
+          Effect.gen(function* () {
+            const [row] = yield* run('inspect-recovery', (db) =>
+              db.select().from(sourceCleanup).where(eq(sourceCleanup.id, id))
+            );
+            if (!row) return false;
+            const outcome = yield* observeCleanup(
+              'asset.cleanup.recover',
+              identity(row),
+              run('recover', async (db) => {
+                const rows = await db
+                  .update(sourceCleanup)
+                  .set({
+                    status: 'pending',
+                    attempts: 0,
+                    leaseId: null,
+                    availableAt: new Date(),
+                    notifiedAt: null,
+                    notificationId: randomUUID(),
+                  })
+                  .where(and(eq(sourceCleanup.id, id), eq(sourceCleanup.status, 'quarantined')))
+                  .returning({ id: sourceCleanup.id });
+                return rows.length ? 'recovered' : 'unavailable';
+              }),
+              { 'cleanup.notification_id': row.notificationId }
+            );
+            return outcome === 'recovered';
           }),
       };
     })

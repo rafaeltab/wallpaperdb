@@ -84,14 +84,16 @@ export function createWallpaperSourceBatch<TFile>(
   let current: {
     readonly rows: typeof rows;
     readonly busy: boolean;
+    readonly canResume: boolean;
     readonly wallpaperId?: string;
     readonly assetId?: string;
-  } = { rows, busy };
+  } = { rows, busy, canResume: false };
   const listeners = new Set<() => void>();
   const publish = () => {
     current = {
       rows,
       busy,
+      canResume: !busy && !blockedInitial && rows.some((row) => row.status === 'pending'),
       ...(wallpaper
         ? {
             wallpaperId: wallpaper.wallpaperId,

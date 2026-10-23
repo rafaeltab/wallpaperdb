@@ -25,3 +25,20 @@ it('shows independent initial outcomes and retries the failed file while keeping
   expect(uploads).toEqual(['bad.png','good.png','bad.png']);
   view.unmount();client.clear();
 });
+it('resumes all retained pending files after the first publication wait expires even when the 16-file input is disabled',async()=>{
+ let revision=0,publicationReady=false;const uploads:string[]=[];
+ const wallpaper={wallpaperId:'delayed-publication',assetId:'asset',sourceId:null,state:'awaiting-source' as const,createdAt:'now'};
+ const current=()=>publicationReady?{...wallpaper,state:'published' as const,sourceId:'first'}:wallpaper;
+ vi.mocked(ownedSources).mockImplementation(async()=>({sourceSetRevision:String(revision),sources:revision?[{sourceId:'first'}]:[],candidates:[]}));
+ vi.mocked(browserSourceBatchApi).mockReturnValue({identifier:()=>crypto.randomUUID(),begin:async()=>current(),wallpaper:async()=>current(),list:async()=>({sourceSetRevision:String(revision),sources:revision?[{sourceId:'first'}]:[],candidates:[]}),create:async(_asset,key,expected)=>({candidateId:key,status:'awaiting-bytes',expectedSourceSetRevision:expected}),status:async()=>{throw new Error('Accepted files must not be polled or uploaded again');},upload:async(_asset,id,file)=>{uploads.push(file.name);return {candidateId:id,status:'ready',expectedSourceSetRevision:String(revision)};},expectSource:async()=>{},accept:async(_asset,id,expected)=>{revision++;return {candidateId:id,status:'accepted',sourceId:`source-${revision}`,expectedSourceSetRevision:expected};},cancel:async()=>{},wait:async()=>{}});
+ const client=new QueryClient({defaultOptions:{queries:{retry:false}}});const view=render(<QueryClientProvider client={client}><WallpaperSources /></QueryClientProvider>);
+ const user=userEvent.setup();const input=screen.getByLabelText('Choose initial Sources for one Wallpaper');
+ await user.upload(input,Array.from({length:16},(_,n)=>new File(['image'],`${n}.png`,{type:'image/png'})));
+ await waitFor(()=>expect(screen.getAllByTestId('source-upload-outcome')[0]).toHaveTextContent('Source accepted'));
+ expect(uploads).toEqual(['0.png']);expect(input).toBeDisabled();
+ publicationReady=true;
+ await user.click(await screen.findByRole('button',{name:'Resume remaining Sources'}));
+ await waitFor(()=>expect(uploads).toHaveLength(16));expect(new Set(uploads).size).toBe(16);
+ await waitFor(()=>expect(screen.getAllByTestId('source-upload-outcome').every(row=>row.textContent?.includes('Source accepted'))).toBe(true));
+ view.unmount();client.clear();
+});

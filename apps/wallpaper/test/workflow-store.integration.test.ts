@@ -245,6 +245,86 @@ function recoveryRuntime(maxAttempts = 1) {
     )
   );
 }
+it.each([
+  'transition',
+  'complete',
+])('owns a checked-out connection lost during %s and continues on a fresh client', async (operation) => {
+  const url = new URL(databaseUrl());
+  const application = `wallpaper-disconnect-${operation}`;
+  url.searchParams.set('application_name', application);
+  const runtime = ManagedRuntime.make(
+    workflowPostgresLayer({
+      databaseUrl: url.toString(),
+      maxAttempts: 3,
+      retryDelayMs: 0,
+      leaseMs: 60_000,
+    })
+  );
+  const owner = { namespace: 'authors', subject: application };
+  const blocker = await pool.connect();
+  let pending: ReturnType<typeof runtime.runPromiseExit> | undefined;
+  try {
+    const wallpaper = await runtime.runPromise(WorkflowStore.use((s) => s.begin(owner, 'loss')));
+    const publication = await claim(runtime);
+    await blocker.query('BEGIN');
+    await blocker.query('SELECT id FROM wallpaper_intents WHERE id=$1 FOR UPDATE', [wallpaper.id]);
+    pending = runtime.runPromiseExit(
+      operation === 'transition'
+        ? WorkflowStore.use((s) =>
+            s.change({ kind: 'wallpaper', id: wallpaper.id }, (current) => {
+              if (!current) throw new Error('Expected Wallpaper');
+              return { wallpaper: { ...current, assetId: 'must-not-commit' }, result: undefined };
+            })
+          )
+        : WorkflowDelivery.use((s) => s.complete(publication))
+    );
+    let pid: number | undefined;
+    await expect
+      .poll(async () => {
+        const result = await pool.query<{ pid: number }>(
+          "SELECT pid FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'",
+          [application]
+        );
+        pid = result.rows[0]?.pid;
+        return pid !== undefined;
+      })
+      .toBe(true);
+    if (pid === undefined) throw new Error('Expected blocked Wallpaper backend');
+    expect((await pool.query('SELECT pg_terminate_backend($1) AS terminated', [pid])).rows).toEqual(
+      [{ terminated: true }]
+    );
+    const result = await pending;
+    expect(Exit.isFailure(result)).toBe(true);
+    if (!Exit.isFailure(result)) throw new Error('Expected connection failure');
+    expect(Cause.hasDies(result.cause)).toBe(false);
+    expect(Cause.squash(result.cause)).toMatchObject({ _tag: 'WorkflowFailure', operation });
+    await blocker.query('ROLLBACK');
+    expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([wallpaper]);
+    expect(
+      (await pool.query('SELECT id, status, lease_id FROM wallpaper_workflow_outbox')).rows
+    ).toEqual([{ id: publication.id, status: 'leased', lease_id: publication.leaseId }]);
+    await runtime.runPromise(
+      WorkflowStore.use((s) =>
+        s.change({ kind: 'wallpaper', id: wallpaper.id }, (current) => {
+          if (!current) throw new Error('Expected Wallpaper');
+          return { wallpaper: { ...current, assetId: 'fresh-client' }, result: undefined };
+        })
+      )
+    );
+    await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(publication)));
+    expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([
+      { ...wallpaper, assetId: 'fresh-client', attentionRequired: false },
+    ]);
+    expect((await pool.query('SELECT id, status FROM wallpaper_workflow_outbox')).rows).toEqual([
+      { id: publication.id, status: 'published' },
+    ]);
+  } finally {
+    await blocker.query('ROLLBACK');
+    blocker.release();
+    await pending;
+    await runtime.dispose();
+  }
+});
 function resultEvent(w: Wallpaper) {
   return {
     specversion: '1.0',
@@ -286,7 +366,7 @@ function sourceEvent(w: Wallpaper) {
   };
 }
 const quarantineId = (id: string) => createHash('sha256').update(id).digest('hex');
-async function claim(runtime: ReturnType<typeof recoveryRuntime>) {
+async function claim<R>(runtime: ManagedRuntime.ManagedRuntime<R | WorkflowDelivery, never>) {
   let publications: readonly WorkflowPublication[] = [];
   await expect
     .poll(

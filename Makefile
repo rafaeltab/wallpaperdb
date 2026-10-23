@@ -56,7 +56,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
         infra-start infra-start-admin infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
         coverage-summary crap check-crap \
-        worktree-remove ci clean toolchain turbo-telemetry-enable
+        worktree-remove ci clean toolchain
 
 help: ## Show commands and selectors
 	@echo "WallpaperDB — project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
@@ -74,9 +74,6 @@ install: ## Install dependencies and initialize this worktree
 
 toolchain: ## Verify effective project executables and version pins
 	@node scripts/toolchain.mjs
-
-turbo-telemetry-enable: ## Collect this repository's local Turbo metrics across worktrees
-	@python scripts/turbo-telemetry.py install $(ARGS)
 
 dev: ## Watch all app containers, or one workspace with PACKAGE
 ifneq ($(strip $(PACKAGE)),)

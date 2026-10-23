@@ -39,6 +39,7 @@ ffmpeg = "9.0.2" # PR recording conversion
 #   project must not replace a running agent or install account credentials.
 
 [env]
+_.file = { path = "~/.config/wallpaperdb/turbo.env", redact = true }
 # Docker and Compose discover plugins through config, not PATH. A private
 # derived config exposes managed plugins and preserves host settings/contexts.
 _.path = ["{{ config_root }}/scripts/toolchain-bin"]

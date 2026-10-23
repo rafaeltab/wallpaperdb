@@ -42,5 +42,3 @@ coverage
 **/.auth/
 **/test-results/
 **/playwright-report/
-# Python tooling state
-__pycache__/

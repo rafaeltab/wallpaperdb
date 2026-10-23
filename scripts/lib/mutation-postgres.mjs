@@ -18,7 +18,8 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 			"Mutation PostgreSQL requires an immutable fixtureImage digest",
 		);
 	const name = `wallpaperdb-mutation-${randomUUID()}`;
-	const password = randomUUID();
+	const adminPassword = randomUUID();
+	const applicationPassword = randomUUID();
 	const token = randomUUID();
 	const lifetime = new AbortController();
 	const operation = signal
@@ -88,7 +89,7 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 			port,
 			database,
 			username: user,
-			password,
+			password: user === "postgres" ? adminPassword : applicationPassword,
 			max: 1,
 			connect_timeout: 2,
 			connection: {
@@ -131,7 +132,7 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 			"--publish",
 			`127.0.0.1:${fixedPort}:5432`,
 			"--env",
-			`POSTGRES_PASSWORD=${password}`,
+			`POSTGRES_PASSWORD=${adminPassword}`,
 			image,
 		);
 		await docker("start", name);
@@ -155,7 +156,7 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 		}
 		admin = connect("postgres");
 		await admin.unsafe(
-			`create role mutation login password '${password}' nosuperuser nocreatedb nocreaterole`,
+			`create role mutation login password '${applicationPassword}' nosuperuser nocreatedb nocreaterole`,
 		);
 		timings.startupSeconds += (performance.now() - start) / 1000;
 	};
@@ -346,7 +347,7 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 			},
 			failureSignal: abort.signal,
 			env: {
-				WALLPAPERDB_MUTATION_POSTGRES_URL: `postgresql://mutation:${password}@127.0.0.1:${port}/mutation`,
+				WALLPAPERDB_MUTATION_POSTGRES_URL: `postgresql://mutation:${applicationPassword}@127.0.0.1:${port}/mutation`,
 				WALLPAPERDB_MUTATION_POSTGRES_RESET: `http://127.0.0.1:${server.address().port}/reset`,
 				WALLPAPERDB_MUTATION_POSTGRES_TOKEN: token,
 			},

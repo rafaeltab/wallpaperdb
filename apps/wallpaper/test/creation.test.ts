@@ -12,6 +12,9 @@ const owner = { namespace: 'authors', subject: 'creator-1' };
 function setup() {
   const records = new Map<string, Wallpaper>();
   const events: Publication[] = [];
+  const registrations = new Set<string>();
+  const registrationKey = (wallpaper: string, candidate: string, intent: string) =>
+    JSON.stringify([wallpaper, candidate, intent]);
   const layer = Layer.succeed(WorkflowStore, {
     list: (principal) =>
       Effect.succeed(
@@ -50,7 +53,26 @@ function setup() {
           selector.kind === 'wallpaper'
             ? records.get(selector.id)
             : [...records.values()].find((w) => w.assetId === selector.id);
-        const changed = transition(current ? structuredClone(current) : null);
+        const registered =
+          !!current &&
+          selector.kind === 'asset' &&
+          !!selector.sourceIntent &&
+          registrations.has(
+            registrationKey(
+              current.id,
+              selector.sourceIntent.candidateId,
+              selector.sourceIntent.intentId
+            )
+          );
+        const changed = transition(current ? structuredClone(current) : null, registered);
+        if (changed.registration && changed.wallpaper)
+          registrations.add(
+            registrationKey(
+              changed.wallpaper.id,
+              changed.registration.candidateId,
+              changed.registration.intentId
+            )
+          );
         if (changed.wallpaper) records.set(changed.wallpaper.id, changed.wallpaper);
         if (changed.publication) events.push(changed.publication);
         return changed.result;
@@ -120,7 +142,7 @@ it('keeps Wallpaper identity separate from its confirmed Asset and publishes its
   }
 });
 
-it('fences changed source intents, unrelated Assets and stale creation confirmations', async () => {
+it('retains competing registered first-Source intents while fencing unregistered and unrelated confirmations', async () => {
   const s = setup();
   try {
     const result = await s.run((c) => c.begin(owner, 'intent-fences'));
@@ -161,7 +183,11 @@ it('fences changed source intents, unrelated Assets and stale creation confirmat
       initialAnalysisSourceId: 'source-1',
       occurrenceId: 'event-1',
     };
-    expect(await s.run((c) => c.sourceAccepted(accepted))).toBe('ignored');
+    expect(
+      await s.run((c) =>
+        c.sourceAccepted({ ...accepted, candidateId: 'unregistered', intentId: 'unregistered' })
+      )
+    ).toBe('ignored');
     expect(
       await s.run((c) =>
         c.sourceAccepted({
@@ -173,11 +199,21 @@ it('fences changed source intents, unrelated Assets and stale creation confirmat
       )
     ).toBe('ignored');
     expect(s.events).toEqual([]);
+    expect(await s.run((c) => c.sourceAccepted(accepted))).toBe('applied');
+    expect(await s.run((c) => c.sourceAccepted(accepted))).toBe('ignored');
     expect(
       await s.run((c) =>
         c.sourceAccepted({ ...accepted, candidateId: 'candidate-2', intentId: 'intent-2' })
       )
-    ).toBe('applied');
+    ).toBe('ignored');
+    expect(s.events).toHaveLength(1);
+    expect(await s.run((c) => c.get(owner, w.id))).toMatchObject({
+      wallpaper: {
+        state: 'published',
+        sourceId: 'source-1',
+        intent: { candidateId: 'candidate-1', intentId: 'intent-1' },
+      },
+    });
   } finally {
     await s.close();
   }
@@ -191,6 +227,52 @@ it('rejects a non-printable or unbounded creation key at the capability boundary
     expect(await s.run((c) => c.begin({ ...owner, namespace: 'other' }, 'valid'))).toEqual({
       kind: 'forbidden',
     });
+  } finally {
+    await s.close();
+  }
+});
+it('keeps each Wallpaper read bounded while retaining exact registered winners across many initial retries', async () => {
+  const s = setup();
+  try {
+    const result = await s.run((c) => c.begin(owner, 'bounded-registration-work'));
+    if (result.kind !== 'wallpaper') throw new Error('Expected Wallpaper');
+    const w = result.wallpaper;
+    await s.run((c) =>
+      c.assetResult({
+        wallpaperId: w.id,
+        commandId: w.commandId,
+        creationEventId: w.creationEventId,
+        outcome: 'created',
+        assetId: 'bounded-work-asset',
+      })
+    );
+    for (let n = 0; n < 256; n++)
+      expect(
+        await s.run((c) =>
+          c.expectSource(owner, w.id, { candidateId: `candidate-${n}`, intentId: `intent-${n}` })
+        )
+      ).toMatchObject({ kind: 'wallpaper' });
+    const before = await s.run((c) => c.get(owner, w.id));
+    expect(JSON.stringify(before).length).toBeLessThan(2048);
+    expect(
+      await s.run((c) =>
+        c.expectSource(owner, w.id, { candidateId: 'candidate-255', intentId: 'intent-255' })
+      )
+    ).toEqual(before);
+    const confirmation = {
+      assetId: 'bounded-work-asset',
+      candidateId: 'candidate-0',
+      intentId: 'intent-0',
+      sourceId: 'first',
+      defaultSourceId: 'first',
+      initialAnalysisSourceId: 'first',
+      occurrenceId: 'accepted',
+    };
+    expect(
+      await s.run((c) => c.sourceAccepted({ ...confirmation, intentId: 'unregistered-intent' }))
+    ).toBe('ignored');
+    expect(await s.run((c) => c.sourceAccepted(confirmation))).toBe('applied');
+    expect(s.events).toHaveLength(1);
   } finally {
     await s.close();
   }

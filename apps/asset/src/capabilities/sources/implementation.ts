@@ -11,9 +11,12 @@ import {
   type SourceOutcome,
   type SourceState,
   type SourceFacts,
+  type SourcesPort,
 } from './contract.js';
 import type { SourcePolicy } from './policy.js';
 const unavailable = { kind: 'unavailable' } as const;
+const nonterminal = (candidate: Candidate) =>
+  !['accepted', 'rejected', 'cancelled'].includes(candidate.status);
 const reject = (reason: string): SourceOutcome => ({ kind: 'rejected', reason });
 const result = (candidate: Candidate): SourceOutcome => ({
   kind: 'candidate',
@@ -52,6 +55,27 @@ function policyRejection(facts: SourceFacts, policy: SourcePolicy): string | und
     return 'noncanonical-picture';
   return undefined;
 }
+// Facts already use displayed dimensions. Compare integer cross-products and the
+// configured decimal exactly so the inclusive boundary does not depend on rounding.
+function similarAspectRatios(facts: readonly SourceFacts[], tolerance: number): boolean {
+  const first = facts[0];
+  if (!first) return true;
+  let smallest = first,
+    largest = first;
+  for (const fact of facts) {
+    if (BigInt(fact.width) * BigInt(smallest.height) < BigInt(smallest.width) * BigInt(fact.height))
+      smallest = fact;
+    if (BigInt(fact.width) * BigInt(largest.height) > BigInt(largest.width) * BigInt(fact.height))
+      largest = fact;
+  }
+  const [decimal = '0', exponent = '0'] = tolerance.toString().split('e');
+  const places = (decimal.split('.')[1]?.length ?? 0) - Number(exponent);
+  const numerator = BigInt(decimal.replace('.', '')) * 10n ** BigInt(Math.max(0, -places));
+  const denominator = 10n ** BigInt(Math.max(0, places));
+  const upper = BigInt(largest.width) * BigInt(smallest.height);
+  const lower = BigInt(smallest.width) * BigInt(largest.height);
+  return (upper - lower) * denominator <= lower * numerator;
+}
 export function sourcesLayer(configuration: {
   readonly revision: string;
   readonly types: Readonly<Record<string, SourcePolicy>>;
@@ -81,7 +105,11 @@ export function sourcesLayer(configuration: {
       ) =>
         modify(owner, assetId, revision, (state) => {
           const found = state.candidates.find((c) => c.candidateId === id);
-          return found ? change(state, found) : unavailable;
+          if (!found) return unavailable;
+          const wasPending = nonterminal(found);
+          const outcome = change(state, found);
+          if (wasPending && !nonterminal(found)) state.nonterminalCandidateCount--;
+          return outcome;
         });
       return Sources.of({
         policy: (owner, type) => {
@@ -94,23 +122,51 @@ export function sourcesLayer(configuration: {
               : unavailable
           );
         },
-        list: (owner, assetId) =>
-          store.transact(assetId, null, (state) => ({
-            state,
-            result: owns(owner, state)
-              ? {
+        list: (owner, assetId, cursor) =>
+          store.transact<Effect.Success<ReturnType<SourcesPort['list']>>>(
+            assetId,
+            null,
+            (state) => {
+              if (!owns(owner, state)) return { state, result: unavailable };
+              let end = state.candidates.length;
+              if (cursor !== undefined) {
+                if (typeof cursor !== 'string' || new TextEncoder().encode(cursor).length > 256)
+                  return { state, result: unavailable };
+                const split = cursor.indexOf(':');
+                const position = cursor.slice(0, split);
+                const index = Number(position);
+                if (
+                  split < 1 ||
+                  !/^(0|[1-9][0-9]*)$/.test(position) ||
+                  !Number.isSafeInteger(index) ||
+                  state.candidates[index]?.candidateId !== cursor.slice(split + 1)
+                )
+                  return { state, result: unavailable };
+                end = index;
+              }
+              // Appending history preserves existing index/identity cursors. Verify the
+              // identity so a stale cursor cannot silently skip data after future retirement.
+              const start = Math.max(0, end - 32);
+              const next = start > 0 ? state.candidates[start] : undefined;
+              return {
+                state,
+                result: {
                   kind: 'found' as const,
                   asset: {
                     assetId,
                     assetType: state.asset.assetType,
                     sources: state.sources,
+                    candidates: state.candidates.slice(start, end).reverse(),
+                    hasPendingCandidates: state.nonterminalCandidateCount > 0,
+                    ...(next ? { nextCandidateCursor: `${start}:${next.candidateId}` } : {}),
                     defaultSourceId: state.defaultSourceId,
                     sourceSetRevision: state.sourceSetRevision,
                     deliveryRevision: state.deliveryRevision,
                   },
-                }
-              : unavailable,
-          })),
+                },
+              };
+            }
+          ),
         create: Effect.fn('asset.sources.create')(function* (owner, assetId, input) {
           if (
             !validRevision(input.expectedSourceSetRevision) ||
@@ -133,11 +189,12 @@ export function sourcesLayer(configuration: {
             const policy = configuration.types[state.asset.assetType];
             if (!policy || !policy.operations.includes(input.operation))
               return reject('unsupported-operation');
-            // Later tickets implement noninitial membership operations without claiming them here.
-            if (input.operation !== 'add' || state.sources.length !== 0)
-              return reject('unsupported-operation');
+            // Replacements are separate operations with their own membership semantics.
+            if (input.operation !== 'add') return reject('unsupported-operation');
             if (input.expectedSourceSetRevision !== state.sourceSetRevision)
               return reject('source-set-conflict');
+            if (state.sources.length >= policy.maxActiveSources)
+              return reject('source-count-limit');
             if (
               state.candidates.filter(
                 (c) =>
@@ -157,6 +214,7 @@ export function sourcesLayer(configuration: {
               layout: 'asset-layout-1',
             };
             state.candidates.push(created);
+            state.nonterminalCandidateCount++;
             return result(created);
           });
         }),
@@ -277,26 +335,34 @@ export function sourcesLayer(configuration: {
             const reason =
               Date.parse(current.expiresAt) <= now
                 ? 'candidate-expired'
-                : policyRejection(current.facts, policy);
+                : (policyRejection(current.facts, policy) ??
+                  (similarAspectRatios(
+                    [...state.sources.map((s) => s.facts), current.facts],
+                    policy.aspectRatioTolerance
+                  )
+                    ? undefined
+                    : 'aspect-ratio-limit'));
             if (reason) {
               current.status = 'rejected';
+              state.nonterminalCandidateCount--;
               current.reason = reason;
               return { state, result: result(current) };
             }
             if (state.sourceSetRevision !== intent.expectedSourceSetRevision)
               return { state, result: reject('source-set-conflict') };
-            if (state.sources.length >= policy.maxActiveSources || state.sources.length > 0)
+            if (state.sources.length >= policy.maxActiveSources)
               return { state, result: reject('source-count-limit') };
             state.sources.push({
               sourceId: current.sourceId,
               facts: current.facts,
               layout: current.layout,
             });
-            state.defaultSourceId = current.sourceId;
+            state.defaultSourceId ??= current.sourceId;
             state.initialAnalysisSourceId ??= current.sourceId;
             state.sourceSetRevision = (BigInt(state.sourceSetRevision) + 1n).toString();
             state.deliveryRevision = (BigInt(state.deliveryRevision) + 1n).toString();
             current.status = 'accepted';
+            state.nonterminalCandidateCount--;
             current.sourceSetRevision = state.sourceSetRevision;
             return {
               state,

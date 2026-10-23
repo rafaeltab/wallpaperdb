@@ -92,7 +92,9 @@ export class Creation extends Context.Service<Creation, CreationPort>()(
  * identities and records its immutable Asset creation command. Equal replay returns
  * that same intent. change serializes the selected Wallpaper across replicas; the
  * pure callback receives detached values. State and optional publication commit
- * together, including through an ambiguous commit. Asset identity is globally unique. */
+ * together, including through an ambiguous commit. Registration writes and exact
+ * pair lookups share that transaction and perform bounded indexed work without
+ * loading or rewriting registration history. Asset identity is globally unique. */
 export interface WorkflowStorePort {
   readonly list: (owner: Creator) => Effect.Effect<readonly Wallpaper[], WorkflowFailure>;
   readonly begin: (
@@ -101,11 +103,17 @@ export interface WorkflowStorePort {
     trace?: WorkflowTrace
   ) => Effect.Effect<Wallpaper, WorkflowFailure>;
   readonly change: <A>(
-    selector: { readonly kind: 'wallpaper' | 'asset'; readonly id: string },
-    transition: (wallpaper: Wallpaper | null) => {
+    selector:
+      | { readonly kind: 'wallpaper'; readonly id: string }
+      | { readonly kind: 'asset'; readonly id: string; readonly sourceIntent?: SourceIntent },
+    transition: (
+      wallpaper: Wallpaper | null,
+      registered: boolean
+    ) => {
       readonly wallpaper: Wallpaper | null;
       readonly result: A;
       readonly publication?: Publication;
+      readonly registration?: SourceIntent;
     }
   ) => Effect.Effect<A, WorkflowFailure>;
 }

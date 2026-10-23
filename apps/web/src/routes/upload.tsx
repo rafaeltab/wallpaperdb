@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { AlertCircle, Check, Copy, FileImage, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { WallpaperSources } from '@/components/upload/wallpaper-sources';
 import { UploadAuthGate } from '@/components/upload-auth-gate';
 import { UploadActionButtons } from '@/components/upload/upload-action-buttons';
 import { WallpaperUploadSelection } from '@/components/upload/upload-admission';
@@ -101,7 +102,9 @@ export function UploadPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <WallpaperSources />
             <RecentCreations />
+            <p className="text-sm font-medium">Create a separate Wallpaper for each image</p>
             {/* Drop Zone */}
             <WallpaperUploadSelection
               onFilesSelected={handleFilesSelected}

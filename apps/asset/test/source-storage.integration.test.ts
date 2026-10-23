@@ -582,3 +582,36 @@ it.each([
     await new Promise<void>((resolve) => proxy.close(() => resolve()));
   }
 });
+
+it('reports displayed geometry for an oriented Source without rewriting its immutable original', async () => {
+  const s3 = tester.getS3();
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: s3.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'source-private',
+    })
+  );
+  const bytes = await sharp({ create: { width: 100, height: 103, channels: 3, background: 'red' } })
+    .jpeg()
+    .withMetadata({ orientation: 6 })
+    .toBuffer();
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  try {
+    await runtime.runPromise(SourceBytes.use((s) => s.put('candidate-oriented', bytes, digest)));
+    expect(
+      await runtime.runPromise(
+        MandatoryInspection.use((s) =>
+          s.inspect('candidate-oriented', initialSourcePolicies.wallpaper)
+        )
+      )
+    ).toMatchObject({
+      kind: 'verified',
+      facts: { width: 103, height: 100, orientation: 6, digest, byteLength: bytes.length },
+    });
+  } finally {
+    await runtime.dispose();
+  }
+});

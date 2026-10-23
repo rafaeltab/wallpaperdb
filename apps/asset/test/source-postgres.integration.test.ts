@@ -518,3 +518,80 @@ it('rolls back immutable metadata and membership when acceptance confirmation ca
     await lifecycle.dispose();
   }
 });
+
+it('serializes concurrent per-Asset preparation without dropping a candidate or exceeding its reserved count', async () => {
+  await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-concurrent'));
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      revision: 'revision-concurrent',
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  const sources = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  try {
+    const created = await lifecycle.runPromise(
+      LifecycleStore.use((s) =>
+        s.accept({
+          revision: 'revision-concurrent',
+          applicationId: 'wallpaper',
+          canonical: 'concurrent',
+          correlation: { commandId: 'concurrent', applicationReference: 'concurrent-intent' },
+          decision: {
+            kind: 'create',
+            assetType: 'wallpaper',
+            owner: { namespace: 'clerk', subject: 'owner' },
+          },
+          context: { occurrence: { source: 'https://test/author', id: 'concurrent-create' } },
+        })
+      )
+    );
+    if (created.outcome !== 'created') throw new Error('Expected Asset');
+    const reserve = (id: string) =>
+      sources.runPromise(
+        SourceStore.use((s) =>
+          s.transact(created.assetId, 'revision-concurrent', (state) => {
+            if (!state) throw new Error('Missing Asset');
+            if (state.candidates.length === 2) return { state, result: 'full' };
+            state.nonterminalCandidateCount++;
+            state.candidates.push({
+              candidateId: id,
+              sourceId: `source-${id}`,
+              idempotencyKey: id,
+              operation: 'add',
+              expectedSourceSetRevision: '0',
+              status: 'awaiting-bytes',
+              expiresAt: '2099-01-01T00:00:00Z',
+              orphanExpiresAt: '2099-01-01T00:00:00Z',
+              layout: 'asset-layout-1',
+            });
+            return { state, result: 'reserved' };
+          })
+        )
+      );
+    expect((await Promise.all(['a', 'b', 'c'].map(reserve))).sort()).toEqual([
+      'full',
+      'reserved',
+      'reserved',
+    ]);
+    const saved = await sources.runPromise(
+      SourceStore.use((s) =>
+        s.transact(created.assetId, null, (state) => ({ state, result: state }))
+      )
+    );
+    expect(saved?.candidates).toHaveLength(2);
+    expect(new Set(saved?.candidates.map((c) => c.candidateId)).size).toBe(2);
+  } finally {
+    await sources.dispose();
+    await lifecycle.dispose();
+  }
+});

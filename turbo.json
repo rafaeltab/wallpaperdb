@@ -289,6 +289,7 @@
             "inputs": [
                 "$TURBO_DEFAULT$",
                 "$TURBO_ROOT$/crap.config.mts",
+                "$TURBO_ROOT$/scripts/crap.mts",
                 "$TURBO_ROOT$/mutation.inventory.json",
                 "$TURBO_ROOT$/scripts/mutation.mjs",
                 "$TURBO_ROOT$/scripts/lib/mutation-*.mjs",

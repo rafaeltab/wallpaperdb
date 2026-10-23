@@ -18,6 +18,8 @@ import {
   ProtectedCommandHealth,
   encodeAssetResult,
   recoverQuarantine,
+  operatorWebhookLayer,
+  OperatorNotificationHealth,
 } from '../src/adapters/commands/index.js';
 import {
   Lifecycle,
@@ -28,7 +30,13 @@ import {
 import { authorityFixture } from './fixtures/authority.js';
 import { runOperator } from '../scripts/operator.js';
 
-const authority = parseAuthority(authorityFixture());
+function deleteAuthority() {
+  const raw = authorityFixture();
+  raw.applications.user.allowedOperations.push('delete');
+  raw.applications.wallpaper.allowedOperations.push('delete');
+  return raw;
+}
+const authority = parseAuthority(deleteAuthority());
 let postgres: Awaited<ReturnType<PostgreSqlContainer['start']>>;
 let broker: Awaited<ReturnType<GenericContainer['start']>>;
 let pool: Pool;
@@ -99,7 +107,7 @@ it('runs trusted bootstrap and the application creation CLI against real adapter
   const path = join(directory, 'authority.json');
   const previous = process.env.DATABASE_URL;
   process.env.DATABASE_URL = postgres.getConnectionUri();
-  await writeFile(path, JSON.stringify(authorityFixture()), { mode: 0o600 });
+  await writeFile(path, JSON.stringify(deleteAuthority()), { mode: 0o600 });
   try {
     expect(await runOperator(['bootstrap', '--url', url, '--authority-file', path])).toMatchObject({
       outcome: 'initialized',
@@ -216,6 +224,147 @@ it('creates durably over protected NATS, returns its assigned empty Asset, and r
   conflict?.ack();
 });
 
+it('accepts deletion only on the original application channel and cannot revive it through command replay', async () => {
+  const other = await connect({
+    servers: url,
+    user: 'wallpaper-1',
+    pass: 'wallpaper-secret',
+    inboxPrefix: '_ASSET_INBOX.wallpaper',
+  });
+  const results = await application.jetstream().consumers.get('ASSET_RESULTS', 'results_user');
+  const otherResults = await other.jetstream().consumers.get('ASSET_RESULTS', 'results_wallpaper');
+  const context = {
+    specversion: '1.0',
+    source: 'https://spoof.example/user',
+    time: '2026-10-22T00:00:00.000Z',
+    datacontenttype: 'application/json',
+  };
+  const create = {
+    ...context,
+    id: 'delete-create-event',
+    type: 'asset.command.create',
+    data: {
+      commandId: 'delete-create',
+      applicationReference: 'reusable-reference',
+      assetType: 'picture',
+      ownerSubject: 'delete-owner',
+    },
+  };
+  const next = async (consumer: typeof results, commandId: string) => {
+    for (let index = 0; index < 30; index++) {
+      const message = await consumer.next({ expires: 5000 });
+      if (!message) throw new Error('Missing command result');
+      const event = message.json<{
+        data: { commandId: string; assetId: string; outcome: string; reason?: string };
+      }>();
+      message.ack();
+      if (event.data.commandId === commandId) return event.data;
+    }
+    throw new Error('Result backlog exceeded bounded test fixture');
+  };
+  try {
+    await application.jetstream().publish('asset.commands.user.create', JSON.stringify(create));
+    const created = await next(results, 'delete-create');
+    const assetId = created.assetId;
+    const deletion = {
+      ...context,
+      id: 'terminal-delete-event',
+      type: 'asset.command.delete',
+      data: {
+        commandId: 'terminal-broker-delete',
+        applicationReference: 'removal-intent',
+        assetId,
+      },
+    };
+    await other.jetstream().publish('asset.commands.wallpaper.delete', JSON.stringify(deletion));
+    expect(await next(otherResults, deletion.data.commandId)).toMatchObject({
+      outcome: 'rejected',
+      reason: 'unavailable-asset',
+    });
+    expect(
+      await runtime.runPromise(
+        Lifecycle.use((s) =>
+          s.inspect({ namespace: 'clerk-test', subject: 'delete-owner' }, assetId)
+        )
+      )
+    ).toMatchObject({ kind: 'found' });
+    await application.jetstream().publish(
+      'asset.commands.user.delete',
+      JSON.stringify({
+        ...deletion,
+        id: 'forged-body-event',
+        data: {
+          ...deletion.data,
+          commandId: 'forged-body-delete',
+          applicationId: 'user',
+          ownerSubject: 'delete-owner',
+        },
+      })
+    );
+    expect(await next(results, 'forged-body-delete')).toMatchObject({
+      outcome: 'rejected',
+      reason: 'malformed-command',
+    });
+    await application.jetstream().publish(
+      'asset.commands.user.delete',
+      JSON.stringify({
+        ...deletion,
+        id: 'operation-conflict-event',
+        data: { ...deletion.data, commandId: 'delete-create' },
+      })
+    );
+    expect(await next(results, 'delete-create')).toMatchObject({
+      outcome: 'rejected',
+      reason: 'idempotency-conflict',
+    });
+    await application.jetstream().publish('asset.commands.user.delete', JSON.stringify(deletion));
+    const deleted = await next(results, deletion.data.commandId);
+    expect(deleted).toMatchObject({
+      outcome: 'deleted',
+      assetId,
+      applicationReference: 'removal-intent',
+    });
+    await runtime.dispose();
+    runtime = start();
+    await runtime.runPromise(ProtectedCommandHealth);
+    await application
+      .jetstream()
+      .publish(
+        'asset.commands.user.delete',
+        JSON.stringify({ ...deletion, id: 'terminal-delete-replay' })
+      );
+    expect(await next(results, deletion.data.commandId)).toEqual(deleted);
+    await application
+      .jetstream()
+      .publish(
+        'asset.commands.user.create',
+        JSON.stringify({ ...create, id: 'deleted-create-replay' })
+      );
+    expect(await next(results, 'delete-create')).toEqual(created);
+    await application.jetstream().publish(
+      'asset.commands.user.delete',
+      JSON.stringify({
+        ...deletion,
+        id: 'already-terminal-event',
+        data: { ...deletion.data, commandId: 'already-terminal' },
+      })
+    );
+    expect(await next(results, 'already-terminal')).toMatchObject({
+      outcome: 'already-deleted',
+      assetId,
+    });
+    expect(
+      await runtime.runPromise(
+        Lifecycle.use((s) =>
+          s.inspect({ namespace: 'clerk-test', subject: 'delete-owner' }, assetId)
+        )
+      )
+    ).toEqual({ kind: 'unavailable' });
+  } finally {
+    await other.close();
+  }
+});
+
 it('reclaims an ambiguous real broker publication after process restart with the same occurrence and bytes', async () => {
   await runtime.dispose();
   const persistence = () =>
@@ -287,75 +436,146 @@ it('reclaims an ambiguous real broker publication after process restart with the
   await runtime.runPromise(ProtectedCommandHealth);
 });
 
-it('durably quarantines the largest accepted raw envelope after finite dependency failures and recovers deliberately', async () => {
+it('quarantines deletion during finite dependency failure, routes its actual notice and deletes only after deliberate recovery', async () => {
+  const { createServer } = await import('node:http');
+  const { once } = await import('node:events');
+  const received: unknown[] = [];
+  const server = createServer(async (request, response) => {
+    if (request.headers.authorization !== 'Bearer operator-test-token') {
+      response.writeHead(401).end();
+      return;
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    received.push(JSON.parse(Buffer.concat(chunks).toString()));
+    response.writeHead(204).end();
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Missing notification address');
+  const notifier = ManagedRuntime.make(
+    operatorWebhookLayer({
+      url,
+      credential: authority.broker.service,
+      applications: authority.applications,
+      target: { url: `http://127.0.0.1:${address.port}/events`, token: 'operator-test-token' },
+      ...authority.delivery,
+    })
+  );
+  const created = await runtime.runPromise(
+    Lifecycle.use((service) =>
+      service.command(
+        'user',
+        {
+          operation: 'create',
+          commandId: 'quarantined-delete-create',
+          applicationReference: '',
+          assetType: 'picture',
+          ownerSubject: 'quarantined-delete-owner',
+        },
+        { occurrence: { source: 'https://test/app', id: 'quarantined-delete-create' } }
+      )
+    )
+  );
+  if (created.outcome !== 'created') throw new Error('Expected Asset');
   const event = JSON.stringify({
     specversion: '1.0',
     id: 'bounded-quarantine',
     source: 'https://example.test/application',
     correlationid: 'quarantine-workflow',
     traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
-    type: 'asset.command.create',
+    type: 'asset.command.delete',
     time: '2026-10-22T00:00:00.000Z',
     datacontenttype: 'application/json',
-    data: {
-      commandId: 'bounded-quarantine',
-      applicationReference: '',
-      assetType: 'picture',
-      ownerSubject: 'bounded-owner',
-    },
+    data: { commandId: 'bounded-quarantine', applicationReference: '', assetId: created.assetId },
   });
   const bytes = Buffer.from(event + ' '.repeat(16384 - Buffer.byteLength(event)));
   const manager = await operator.jetstreamManager();
-  await Effect.runPromise(activateLifecycle(postgres.getConnectionUri(), 'temporarily-inactive'));
   try {
-    await application.jetstream().publish('asset.commands.user.create', bytes);
-    await expect
-      .poll(async () => (await manager.streams.info('ASSET_QUARANTINE')).state.messages, {
-        timeout: 5000,
-      })
-      .toBe(1);
-    const stored = await manager.streams.getMessage('ASSET_QUARANTINE', { seq: 1 });
-    const record = JSON.parse(stored.string());
-    expect(record.data).toMatchObject({ reason: 'exhausted', attempts: 3 });
-    expect(Buffer.from(record.data.encoded, 'base64')).toEqual(bytes);
-    expect(stored.data.byteLength).toBeGreaterThan(16384);
-    expect((await manager.streams.info('ASSET_OPERATIONS')).state.messages).toBe(1);
-    const notice = JSON.parse(
-      (await manager.streams.getMessage('ASSET_OPERATIONS', { seq: 1 })).string()
-    );
-    expect(notice.context).toEqual({
-      occurrence: { source: 'https://example.test/application', id: 'bounded-quarantine' },
-      correlationId: 'quarantine-workflow',
-      traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
-    });
-    expect(
-      (
-        await pool.query(
-          "SELECT count(*)::int AS count FROM asset_commands WHERE command_id='bounded-quarantine'"
-        )
-      ).rows[0].count
-    ).toBe(0);
-  } finally {
-    await Effect.runPromise(activateLifecycle(postgres.getConnectionUri(), authority.identity));
-  }
-  await recoverQuarantine(operator, authority, 'user', 1);
-  const recoveredSequence = (await manager.streams.info('ASSET_COMMANDS')).state.last_seq;
-  expect(
-    Buffer.from(
-      (await manager.streams.getMessage('ASSET_COMMANDS', { seq: recoveredSequence })).data
-    )
-  ).toEqual(bytes);
-  await expect
-    .poll(
-      async () =>
+    await notifier.runPromise(OperatorNotificationHealth);
+    await Effect.runPromise(activateLifecycle(postgres.getConnectionUri(), 'temporarily-inactive'));
+    try {
+      await application.jetstream().publish('asset.commands.user.delete', bytes);
+      await expect
+        .poll(async () => (await manager.streams.info('ASSET_QUARANTINE')).state.messages, {
+          timeout: 5000,
+        })
+        .toBe(1);
+      const stored = await manager.streams.getMessage('ASSET_QUARANTINE', { seq: 1 });
+      const record = JSON.parse(stored.string());
+      expect(record.data).toMatchObject({ reason: 'exhausted', attempts: 3 });
+      expect(Buffer.from(record.data.encoded, 'base64')).toEqual(bytes);
+      expect(stored.data.byteLength).toBeGreaterThan(16384);
+      await expect
+        .poll(() => received, { timeout: 5000 })
+        .toEqual([
+          {
+            id: expect.stringMatching(/^[a-f0-9]{64}$/),
+            applicationId: 'user',
+            kind: 'command-quarantine',
+            subject: 'asset.commands.user.delete',
+            reason: 'exhausted',
+            context: {
+              occurrence: { source: 'https://example.test/application', id: 'bounded-quarantine' },
+              correlationId: 'quarantine-workflow',
+              traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
+            },
+          },
+        ]);
+      expect(
         (
           await pool.query(
             "SELECT count(*)::int AS count FROM asset_commands WHERE command_id='bounded-quarantine'"
           )
-        ).rows[0].count,
-      { timeout: 3000 }
-    )
-    .toBe(1);
+        ).rows[0].count
+      ).toBe(0);
+      expect(
+        await runtime.runPromise(
+          Lifecycle.use((s) =>
+            s.inspect(
+              { namespace: 'clerk-test', subject: 'quarantined-delete-owner' },
+              created.assetId
+            )
+          )
+        )
+      ).toMatchObject({ kind: 'found' });
+    } finally {
+      await Effect.runPromise(activateLifecycle(postgres.getConnectionUri(), authority.identity));
+    }
+    await recoverQuarantine(operator, authority, 'user', 1);
+    const recoveredSequence = (await manager.streams.info('ASSET_COMMANDS')).state.last_seq;
+    expect(
+      Buffer.from(
+        (await manager.streams.getMessage('ASSET_COMMANDS', { seq: recoveredSequence })).data
+      )
+    ).toEqual(bytes);
+    await expect
+      .poll(
+        async () =>
+          (
+            await pool.query(
+              "SELECT result FROM asset_commands WHERE command_id='bounded-quarantine'"
+            )
+          ).rows[0]?.result,
+        { timeout: 3000 }
+      )
+      .toMatchObject({ outcome: 'deleted', assetId: created.assetId });
+    expect(
+      await runtime.runPromise(
+        Lifecycle.use((s) =>
+          s.inspect(
+            { namespace: 'clerk-test', subject: 'quarantined-delete-owner' },
+            created.assetId
+          )
+        )
+      )
+    ).toEqual({ kind: 'unavailable' });
+  } finally {
+    await notifier.dispose();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
 
 it('hands excessively nested malformed input to durable quarantine without repeated application processing', async () => {

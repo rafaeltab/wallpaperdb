@@ -1,1 +1,9 @@
-export { CleanupBytes, CleanupFailure, type CleanupTarget } from './contract.js';
+export {
+  Cleanup,
+  CleanupBytes,
+  CleanupStore,
+  CleanupFailure,
+  type CleanupTarget,
+  type CleanupWork,
+} from './contract.js';
+export { cleanupLayer } from './implementation.js';

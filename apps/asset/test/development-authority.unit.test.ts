@@ -25,6 +25,17 @@ it('preserves configured identities and credentials across setup and keeps gener
     expect(authority.applications.user?.allowedOperations).toEqual(['create', 'delete']);
     expect(authority.applications.wallpaper?.allowedOperations).toEqual(['create', 'delete']);
     expect((await stat(path)).mode & 0o777).toBe(0o600);
+    const userWorkflow = join(directory, 'apps/user/.workflow.json');
+    const userConfig = JSON.parse(await readFile(userWorkflow, 'utf8'));
+    expect(userConfig.credential).toEqual({
+      user: authority.applications.user?.credentials[0]?.user,
+      password: authority.applications.user?.credentials[0]?.password,
+    });
+    expect(userConfig.operatorNotification).toEqual({
+      url: authority.operatorNotification.url,
+      token: authority.operatorNotification.token,
+    });
+    expect((await stat(userWorkflow)).mode & 0o777).toBe(0o600);
     await configureDevelopment(directory, {
       issuer: 'https://selected.clerk.accounts.dev',
       ingress: 'http://localhost:8970',

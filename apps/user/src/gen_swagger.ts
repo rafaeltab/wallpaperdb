@@ -3,6 +3,8 @@ import { Effect, Layer } from 'effect';
 import { AvailabilityProbe, availabilityLayer } from './capabilities/availability/index.js';
 import { Profiles } from './capabilities/profile/index.js';
 import { Pictures } from './capabilities/pictures/index.js';
+import { PictureAttachments, AttachmentHealth } from './capabilities/picture-attachments/index.js';
+import { registerAttachmentHttp } from './http/index.js';
 import { createHttpApp } from './http/index.js';
 
 const unavailable = () => Effect.die('Schema generation does not execute commands');
@@ -35,7 +37,23 @@ const services = Layer.mergeAll(
     cleanupExpired: unavailable,
   })
 );
-const app = await createHttpApp({ nodeEnv: 'test', port: 3009 }, services);
+const app = await createHttpApp({ nodeEnv: 'test', port: 3009 }, services, {
+  configure: (app) =>
+    registerAttachmentHttp(
+      app,
+      Layer.merge(
+        Layer.succeed(AttachmentHealth, { check: unavailable }),
+        Layer.succeed(PictureAttachments, {
+          begin: unavailable,
+          get: unavailable,
+          expectSource: unavailable,
+          cancel: unavailable,
+          assetResult: unavailable,
+          sourceAccepted: unavailable,
+        })
+      )
+    ),
+});
 try {
   await app.ready();
   await writeFile('swagger.json', JSON.stringify(app.swagger(), null, 2));

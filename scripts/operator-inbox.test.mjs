@@ -33,6 +33,7 @@ for (const kind of [
 	"result-quarantine",
 	"source-confirmation-quarantine",
 	"wallpaper-workflow-quarantine",
+	"user-workflow-quarantine",
 	"cleanup-quarantine",
 ])
 	test(`${kind} receipts require credentials, survive restart and deduplicate delivery`, async () => {

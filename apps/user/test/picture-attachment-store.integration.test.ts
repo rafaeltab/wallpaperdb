@@ -5,6 +5,7 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ProfileStore } from '../src/capabilities/profile/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
+import { runAttachmentOperator } from '../scripts/attachment-operator.js';
 import { profilePolicy } from './helpers/profiles.js';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { attachmentPostgresLayer } from '../src/adapters/picture-attachments/store.js';
@@ -220,8 +221,12 @@ describe('PostgreSQL picture attachment contract', () => {
       reason: 'exhausted',
     });
     expect(
-      await runtime.runPromise(AttachmentDelivery.use((d) => d.recover(i.creationEventId)))
-    ).toBe(true);
+      await runAttachmentOperator(['recover-outbox', i.creationEventId], {
+        databaseUrl,
+        maxAttempts: 2,
+        retryDelayMs: 1,
+      })
+    ).toEqual({ recovered: true });
     const recovered = (await claim())[0];
     expect(recovered?.event).toEqual(first.event);
     expect(recovered?.attempts).toBe(0);

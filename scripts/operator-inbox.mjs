@@ -38,6 +38,7 @@ function isNotice(value) {
 			"result-quarantine",
 			"source-confirmation-quarantine",
 			"wallpaper-workflow-quarantine",
+			"user-workflow-quarantine",
 			"cleanup-quarantine",
 		].includes(value.kind) &&
 		typeof value.subject === "string" &&

@@ -84,7 +84,7 @@ export interface PictureAttachments {
   ) => Effect.Effect<AttachmentOutcome, AttachmentFailure>;
   readonly assetResult: (
     result: AttachmentResult
-  ) => Effect.Effect<'applied' | 'ignored', AttachmentFailure>;
+  ) => Effect.Effect<'applied' | 'ignored' | 'requires-attention', AttachmentFailure>;
   readonly sourceAccepted: (
     confirmation: SourceConfirmation
   ) => Effect.Effect<'applied' | 'ignored', AttachmentFailure>;

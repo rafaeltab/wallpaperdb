@@ -15,6 +15,28 @@ const at = (date: string) => {
 afterEach(() => vi.useRealTimers());
 
 describe('Profiles capability', () => {
+  it('removes a pending initial attachment even when the current picture is already empty', async () => {
+    const test = controlledProfiles();
+    await test.ensure();
+    test.beginAttachment('owner');
+    expect(await test.run((p) => p.adoptPicture(principal, null, 2))).toMatchObject({
+      _tag: 'Rejected',
+      reason: 'version-conflict',
+    });
+    expect(await test.run((p) => p.adoptPicture(principal, null, 1))).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 2, pictureAssetId: null },
+    });
+    expect(test.transitions.at(-1)?.mutation).toEqual({
+      type: 'picture',
+      asset: null,
+      source: 'remove',
+    });
+    expect(await test.run((p) => p.adoptPicture(principal, null, 2))).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 2, pictureAssetId: null },
+    });
+  });
   it('keeps a collision suffix within minimum length after trimming its stem', async () => {
     const test = controlledProfiles({ profileHandleMinLength: 10, profileHandleMaxLength: 10 });
     const identity = { displayName: 'Ab Cd Efgh', firstName: null, lastName: null };

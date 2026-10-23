@@ -32,7 +32,7 @@ import {
   type ProfileDecision,
 } from '../../capabilities/profile/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
-import { fencePendingAttachment } from '../picture-attachments/transaction.js';
+import { fencePendingAttachment, selectedAttachment } from '../picture-attachments/transaction.js';
 import { recentHistoricalHandles, type ProfileReader } from './history.js';
 
 type Db = Parameters<Parameters<Database['run']>[0]>[0];
@@ -294,6 +294,11 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                 ).map((entry) => entry.handle);
                 const snapshot = {
                   profile,
+                  pendingAttachment: [
+                    'creating-asset',
+                    'awaiting-source',
+                    'accepting-source',
+                  ].includes((await selectedAttachment(tx, current.id))?.state ?? ''),
                   observedAt,
                   eligibleHandles,
                   targetClaim: targetClaim ?? null,
@@ -328,7 +333,11 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                   policy,
                   asset ?? null
                 );
-                await fencePendingAttachment(tx, current.id);
+                await fencePendingAttachment(
+                  tx,
+                  current.id,
+                  decision.mutation.type === 'picture' ? current.pictureAssetId : null
+                );
                 await appendProfileEvent(tx, updated, change, observedAt, metadata);
                 return {
                   outcome: {

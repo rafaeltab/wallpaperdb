@@ -102,3 +102,17 @@ it('replays the same supplied bytes to recover a retained inspection instead of 
  const batch=createWallpaperSourceBatch(api,{wallpaperId:'published'});batch.resume({value:'same-immutable-bytes',name:'same.png'},retained);await batch.run(new AbortController().signal);
  expect(batch.getSnapshot().rows[0]).toMatchObject({status:'accepted',sourceId:'second'});expect(uploads).toEqual(['same-immutable-bytes']);expect(polls).toBe(1);
 });
+it('reaches a retained ambiguous initial candidate after an earlier rejection while keeping later files fenced',async()=>{
+ const uploads:string[]=[],intents:string[]=[];
+ const candidates=new Map<string,{candidateId:string;status:string;expectedSourceSetRevision:string;sourceId?:string}>();
+ let revision=0,loseAcceptance=true;
+ const wallpaper={wallpaperId:'retained-after-rejection',assetId:'asset',sourceId:null,state:'awaiting-source' as const,createdAt:'now'};
+ const api:SourceBatchApi<string>={identifier:()=>crypto.randomUUID(),begin:async()=>wallpaper,wallpaper:async()=>revision?{...wallpaper,state:'published',sourceId:'source-b'}:wallpaper,list:async()=>({sourceSetRevision:String(revision),sources:revision?[{sourceId:'source-b'}]:[],candidates:[]}),create:async(_asset,key,expected)=>{const c={candidateId:key,status:'awaiting-bytes',expectedSourceSetRevision:expected};candidates.set(key,c);return c;},status:async(_asset,id)=>{const c=candidates.get(id);if(!c)throw new Error('Unknown retained candidate');return c;},upload:async(_asset,id,file)=>{uploads.push(file);const c={candidateId:id,status:file==='a'?'rejected':'ready',expectedSourceSetRevision:String(revision)};candidates.set(id,c);return c;},expectSource:async(_wallpaper,id)=>{intents.push(id);},accept:async(_asset,id,expected)=>{revision++;const c={candidateId:id,status:'accepted',expectedSourceSetRevision:expected,sourceId:`source-${revision}`};candidates.set(id,c);if(loseAcceptance){loseAcceptance=false;throw new Error('Acceptance response lost');}return c;},cancel:async()=>{throw new Error('Do not supersede ambiguous acceptance');},wait:async()=>{}};
+ const batch=createWallpaperSourceBatch(api,{creationKey:'one-wallpaper'});batch.addFiles([{value:'a',name:'a.png'},{value:'b',name:'b.png'},{value:'c',name:'c.png'}]);
+ await batch.run(new AbortController().signal);
+ expect(batch.getSnapshot().rows.map(row=>row.status)).toEqual(['failed','failed','pending']);expect(uploads).toEqual(['a','b']);
+ await batch.run(new AbortController().signal);expect(uploads).toEqual(['a','b']);
+ const b=batch.getSnapshot().rows[1];if(!b)throw new Error('Missing retained B');batch.retry(b.id);await batch.run(new AbortController().signal);
+ expect(batch.getSnapshot().rows.map(row=>row.status)).toEqual(['failed','accepted','accepted']);expect(uploads).toEqual(['a','b','c']);expect(intents).toHaveLength(1);
+ batch.retry(b.id);await batch.run(new AbortController().signal);expect(uploads).toEqual(['a','b','c']);
+});

@@ -248,7 +248,8 @@ function recoveryRuntime(maxAttempts = 1) {
 it.each([
   'transition',
   'complete',
-])('owns a checked-out connection lost during %s and continues on a fresh client', async (operation) => {
+  'cancellation',
+])('owns a checked-out client through %s and continues on a fresh client', async (operation) => {
   const url = new URL(databaseUrl());
   const application = `wallpaper-disconnect-${operation}`;
   url.searchParams.set('application_name', application);
@@ -262,6 +263,7 @@ it.each([
   );
   const owner = { namespace: 'authors', subject: application };
   const blocker = await pool.connect();
+  const cancellation = new AbortController();
   let pending: ReturnType<typeof runtime.runPromiseExit> | undefined;
   try {
     const wallpaper = await runtime.runPromise(WorkflowStore.use((s) => s.begin(owner, 'loss')));
@@ -269,14 +271,15 @@ it.each([
     await blocker.query('BEGIN');
     await blocker.query('SELECT id FROM wallpaper_intents WHERE id=$1 FOR UPDATE', [wallpaper.id]);
     pending = runtime.runPromiseExit(
-      operation === 'transition'
+      operation !== 'complete'
         ? WorkflowStore.use((s) =>
             s.change({ kind: 'wallpaper', id: wallpaper.id }, (current) => {
               if (!current) throw new Error('Expected Wallpaper');
               return { wallpaper: { ...current, assetId: 'must-not-commit' }, result: undefined };
             })
           )
-        : WorkflowDelivery.use((s) => s.complete(publication))
+        : WorkflowDelivery.use((s) => s.complete(publication)),
+      { signal: cancellation.signal }
     );
     let pid: number | undefined;
     await expect
@@ -290,15 +293,24 @@ it.each([
       })
       .toBe(true);
     if (pid === undefined) throw new Error('Expected blocked Wallpaper backend');
-    expect((await pool.query('SELECT pg_terminate_backend($1) AS terminated', [pid])).rows).toEqual(
-      [{ terminated: true }]
-    );
+    if (operation === 'cancellation') cancellation.abort();
+    else
+      expect(
+        (await pool.query('SELECT pg_terminate_backend($1) AS terminated', [pid])).rows
+      ).toEqual([{ terminated: true }]);
     const result = await pending;
     expect(Exit.isFailure(result)).toBe(true);
     if (!Exit.isFailure(result)) throw new Error('Expected connection failure');
     expect(Cause.hasDies(result.cause)).toBe(false);
-    expect(Cause.squash(result.cause)).toMatchObject({ _tag: 'WorkflowFailure', operation });
+    if (operation === 'cancellation') expect(Cause.hasInterrupts(result.cause)).toBe(true);
+    else expect(Cause.squash(result.cause)).toMatchObject({ _tag: 'WorkflowFailure', operation });
+    // The server can observe the closed socket once the blocked query resumes.
     await blocker.query('ROLLBACK');
+    await expect
+      .poll(
+        async () => (await pool.query('SELECT pid FROM pg_stat_activity WHERE pid=$1', [pid])).rows
+      )
+      .toEqual([]);
     expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([wallpaper]);
     expect(
       (await pool.query('SELECT id, status, lease_id FROM wallpaper_workflow_outbox')).rows

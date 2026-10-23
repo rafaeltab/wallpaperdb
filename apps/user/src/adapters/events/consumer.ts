@@ -26,7 +26,6 @@ export const ConsumerHealth = Context.Service<ConsumerHealth>(
   'wallpaperdb.user.adapters.ConsumerHealth'
 );
 const notFound = Schema.is(Schema.Struct({ code: Schema.Literal('404') }));
-const durable = 'user-wallpaper-ownership';
 const retryDelay = (message: JsMsg, options: EventsOptions) =>
   Math.min(
     30_000,
@@ -45,7 +44,8 @@ const processMessage = Effect.fn('profiles.events.consume')(function* (
   service: EventsBroker,
   maintenance: Maintenance,
   options: EventsOptions,
-  pendingFailures: DeliveryFailures
+  pendingFailures: DeliveryFailures,
+  durable: string
 ) {
   const input = translateOwnership(message.subject, message.data, message.headers);
   const started = yield* Clock.currentTimeMillis;
@@ -118,7 +118,8 @@ function consumeMessage(
   service: EventsBroker,
   maintenance: Maintenance,
   options: EventsOptions,
-  pendingFailures: DeliveryFailures
+  pendingFailures: DeliveryFailures,
+  durable: string
 ) {
   const carrier: Record<string, string> = {};
   for (const key of ['traceparent', 'tracestate']) {
@@ -132,7 +133,7 @@ function consumeMessage(
       Effect.forever,
       Effect.forkScoped
     );
-    yield* processMessage(message, service, maintenance, options, pendingFailures);
+    yield* processMessage(message, service, maintenance, options, pendingFailures, durable);
   }).pipe(
     Effect.scoped,
     Effect.catchCause((cause) => {
@@ -145,6 +146,112 @@ function consumeMessage(
   );
   return parent ? effect.pipe(OtelTracer.withSpanContext(parent)) : effect;
 }
+function ownershipSubscription(
+  service: EventsBroker,
+  maintenance: Maintenance,
+  options: EventsOptions,
+  durable: string,
+  subject: string
+) {
+  return Effect.gen(function* () {
+    // The durable is shared across replicas. A retry can finish elsewhere, so
+    // remember only a bounded high-water mark and reconcile it with broker ACKs.
+    const pendingFailures: DeliveryFailures = { latestSequence: 0 };
+    const configuration = {
+      durable_name: durable,
+      ack_policy: AckPolicy.Explicit,
+      ack_wait: 30_000_000_000,
+      max_deliver: -1,
+      filter_subject: subject,
+      max_ack_pending: 1000,
+    };
+    yield* broker('inspect-ownership-consumer', () =>
+      service.manager.consumers.info(options.stream, durable)
+    ).pipe(
+      Effect.flatMap((existing) => {
+        if ((existing.config.max_deliver ?? -1) > 0 && existing.num_redelivered > 0)
+          return Effect.fail(
+            new MaintenanceFailure({
+              operation: 'legacy-consumer-recovery',
+              cause: new Error(
+                `Recreate ${options.stream}/${durable} from sequence ${existing.ack_floor.stream_seq + 1} after stopping replicas; legacy deliveries may have exhausted their limit`
+              ),
+            })
+          );
+        return broker('update-ownership-consumer', () =>
+          service.manager.consumers.update(options.stream, durable, configuration)
+        );
+      }),
+      Effect.catchIf(
+        (failure) => notFound(failure.cause),
+        () =>
+          broker('create-ownership-consumer', () =>
+            service.manager.consumers.add(options.stream, configuration)
+          )
+      )
+    );
+    const consumer = yield* broker('get-ownership-consumer', () =>
+      service.client.consumers.get(options.stream, durable)
+    );
+    const messages = yield* Effect.acquireRelease(
+      broker('consume-ownership', () => consumer.consume({ max_messages: 1 })),
+      (messages) => Effect.sync(() => messages.stop())
+    );
+    const accepting = yield* Ref.make(true);
+    const healthy = yield* Ref.make(true);
+    const worker = yield* Stream.fromAsyncIterable(
+      messages,
+      (cause) => new MaintenanceFailure({ operation: 'read-ownership', cause })
+    ).pipe(
+      Stream.runForEach((message) =>
+        Ref.get(accepting).pipe(
+          Effect.flatMap((accept) =>
+            accept
+              ? consumeMessage(message, service, maintenance, options, pendingFailures, durable)
+              : Effect.void
+          )
+        )
+      ),
+      Effect.catchCause((cause) =>
+        Cause.hasInterrupts(cause)
+          ? Effect.void
+          : Effect.logError('Ownership consumer stopped', cause)
+      ),
+      Effect.ensuring(Ref.set(healthy, false)),
+      Effect.forkScoped
+    );
+    yield* Effect.addFinalizer(() =>
+      Effect.gen(function* () {
+        yield* Ref.set(accepting, false);
+        yield* Ref.set(healthy, false);
+        messages.stop();
+        yield* Fiber.await(worker).pipe(
+          Effect.interruptible,
+          Effect.timeoutOrElse({
+            duration: options.shutdownTimeoutMs ?? 5000,
+            orElse: () => Fiber.interrupt(worker),
+          })
+        );
+      })
+    );
+    return ConsumerHealth.of({
+      check: () =>
+        Effect.gen(function* () {
+          if (!(yield* Ref.get(healthy)) || service.connection.isClosed()) return false;
+          const observed = pendingFailures.latestSequence;
+          if (observed === 0) return true;
+          const state = yield* broker('reconcile-ownership-deliveries', () =>
+            service.manager.consumers.info(options.stream, durable)
+          ).pipe(Effect.match({ onSuccess: (state) => state, onFailure: () => null }));
+          if (!state || state.ack_floor.stream_seq < observed) return false;
+          // A later failure may have arrived while querying the shared consumer.
+          if (pendingFailures.latestSequence === observed) pendingFailures.latestSequence = 0;
+          return pendingFailures.latestSequence === 0;
+        }),
+    });
+  });
+}
+
 export const ownershipConsumerLayer = (options: EventsOptions) =>
   Layer.effect(
     ConsumerHealth,
@@ -152,100 +259,28 @@ export const ownershipConsumerLayer = (options: EventsOptions) =>
       const service = yield* EventsBroker;
       const maintenance = yield* Maintenance;
       yield* ensureQuarantine(service);
-      // The durable is shared across replicas. A retry can finish elsewhere, so
-      // remember only a bounded high-water mark and reconcile it with broker ACKs.
-      const pendingFailures: DeliveryFailures = { latestSequence: 0 };
-      const configuration = {
-        durable_name: durable,
-        ack_policy: AckPolicy.Explicit,
-        ack_wait: 30_000_000_000,
-        max_deliver: -1,
-        filter_subject: 'wallpaper.uploaded',
-        max_ack_pending: 1000,
-      };
-      yield* broker('inspect-ownership-consumer', () =>
-        service.manager.consumers.info(options.stream, durable)
-      ).pipe(
-        Effect.flatMap((existing) => {
-          if ((existing.config.max_deliver ?? -1) > 0 && existing.num_redelivered > 0)
-            return Effect.fail(
-              new MaintenanceFailure({
-                operation: 'legacy-consumer-recovery',
-                cause: new Error(
-                  `Recreate ${options.stream}/${durable} from sequence ${existing.ack_floor.stream_seq + 1} after stopping replicas; legacy deliveries may have exhausted their limit`
-                ),
-              })
-            );
-          return broker('update-ownership-consumer', () =>
-            service.manager.consumers.update(options.stream, durable, configuration)
-          );
-        }),
-        Effect.catchIf(
-          (failure) => notFound(failure.cause),
-          () =>
-            broker('create-ownership-consumer', () =>
-              service.manager.consumers.add(options.stream, configuration)
-            )
-        )
+      const legacy = yield* ownershipSubscription(
+        service,
+        maintenance,
+        options,
+        'user-wallpaper-ownership',
+        'wallpaper.uploaded'
       );
-      const consumer = yield* broker('get-ownership-consumer', () =>
-        service.client.consumers.get(options.stream, durable)
-      );
-      const messages = yield* Effect.acquireRelease(
-        broker('consume-ownership', () => consumer.consume({ max_messages: 1 })),
-        (messages) => Effect.sync(() => messages.stop())
-      );
-      const accepting = yield* Ref.make(true);
-      const healthy = yield* Ref.make(true);
-      const worker = yield* Stream.fromAsyncIterable(
-        messages,
-        (cause) => new MaintenanceFailure({ operation: 'read-ownership', cause })
-      ).pipe(
-        Stream.runForEach((message) =>
-          Ref.get(accepting).pipe(
-            Effect.flatMap((accept) =>
-              accept
-                ? consumeMessage(message, service, maintenance, options, pendingFailures)
-                : Effect.void
-            )
-          )
-        ),
-        Effect.catchCause((cause) =>
-          Cause.hasInterrupts(cause)
-            ? Effect.void
-            : Effect.logError('Ownership consumer stopped', cause)
-        ),
-        Effect.ensuring(Ref.set(healthy, false)),
-        Effect.forkScoped
-      );
-      yield* Effect.addFinalizer(() =>
-        Effect.gen(function* () {
-          yield* Ref.set(accepting, false);
-          yield* Ref.set(healthy, false);
-          messages.stop();
-          yield* Fiber.await(worker).pipe(
-            Effect.interruptible,
-            Effect.timeoutOrElse({
-              duration: options.shutdownTimeoutMs ?? 5000,
-              orElse: () => Fiber.interrupt(worker),
-            })
-          );
-        })
+      // An independent cursor replays retained publications already skipped by the legacy filter.
+      const published = yield* ownershipSubscription(
+        service,
+        maintenance,
+        options,
+        'user-wallpaper-publication-ownership',
+        'wallpaper.published'
       );
       return ConsumerHealth.of({
         check: () =>
-          Effect.gen(function* () {
-            if (!(yield* Ref.get(healthy)) || service.connection.isClosed()) return false;
-            const observed = pendingFailures.latestSequence;
-            if (observed === 0) return true;
-            const state = yield* broker('reconcile-ownership-deliveries', () =>
-              service.manager.consumers.info(options.stream, durable)
-            ).pipe(Effect.match({ onSuccess: (state) => state, onFailure: () => null }));
-            if (!state || state.ack_floor.stream_seq < observed) return false;
-            // A later failure may have arrived while querying the shared consumer.
-            if (pendingFailures.latestSequence === observed) pendingFailures.latestSequence = 0;
-            return pendingFailures.latestSequence === 0;
-          }),
+          legacy
+            .check()
+            .pipe(
+              Effect.flatMap((healthy) => (healthy ? published.check() : Effect.succeed(false)))
+            ),
       });
     })
   );

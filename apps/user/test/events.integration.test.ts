@@ -1031,3 +1031,135 @@ it('requires envelope agreement on identity and extensions before ownership proj
     await manager.streams.purge('WALLPAPER');
   }
 });
+
+it('validates the published contract and envelope agreement, and subscribes only to supported ownership facts', async () => {
+  const options = {
+    url: nats.getConnectionUrl(),
+    stream: 'WALLPAPER',
+    serviceName: 'user-publication-envelope',
+    shutdownTimeoutMs: 200,
+  };
+  const accepted: Array<{ wallpaperId: string; profileId: string }> = [];
+  const unused = () => Effect.die('Unexpected maintenance task');
+  const runtime = ManagedRuntime.make(
+    ownershipConsumerLayer(options).pipe(
+      Layer.provide(brokerLayer(options)),
+      Layer.provide(
+        Layer.succeed(Maintenance, {
+          publishPending: unused,
+          cleanupEvents: unused,
+          expireAliases: unused,
+          recordWallpaperOwnership: (ownership) =>
+            Effect.sync(() => {
+              accepted.push(ownership);
+            }),
+        })
+      )
+    )
+  );
+  const manager = await connection.jetstreamManager();
+  const event = {
+    specversion: '1.0',
+    source: 'https://wallpaperdb/wallpaper',
+    id: 'published-occurrence',
+    type: 'wallpaper.published',
+    time: occurred,
+    datacontenttype: 'application/json',
+    correlationid: 'wallpaper',
+    causationid: 'source-accepted',
+    causationsource: 'https://wallpaperdb/asset',
+    data: {
+      wallpaperId: 'wallpaper',
+      contributorId: 'contributor',
+      assetId: 'asset',
+      firstSourceId: 'source',
+      initialAnalysisSourceId: 'source',
+    },
+  };
+  const metadata = () => {
+    const carrier = headers();
+    for (const key of [
+      'specversion',
+      'source',
+      'id',
+      'type',
+      'time',
+      'correlationid',
+      'causationid',
+      'causationsource',
+    ] as const)
+      carrier.set(`ce-${key}`, event[key]);
+    return carrier;
+  };
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    const js = connection.jetstream();
+    await js.publish('wallpaper.published', JSON.stringify(event), { headers: metadata() });
+    const invalid: Array<{ payload: string | Uint8Array; metadata?: ReturnType<typeof headers> }> =
+      [
+        { payload: '{' },
+        { payload: new Uint8Array([0xff]) },
+        { payload: JSON.stringify({ ...event, data: { ...event.data, contributorId: '' } }) },
+        {
+          payload: JSON.stringify({ ...event, data: { ...event.data, storageKey: 'not-public' } }),
+        },
+        { payload: JSON.stringify({ ...event, data: { ...event.data, assetId: undefined } }) },
+        { payload: JSON.stringify({ ...event, specversion: undefined }) },
+        { payload: JSON.stringify({ ...event, source: 'invalid-uri' }) },
+        { payload: JSON.stringify({ ...event, time: 'invalid-time' }) },
+        { payload: JSON.stringify({ ...event, type: 'wallpaper.uploaded' }) },
+        { payload: JSON.stringify({ ...event, datacontenttype: 'text/plain' }) },
+        { payload: JSON.stringify(event.data) },
+      ];
+    for (const key of [
+      'id',
+      'source',
+      'time',
+      'type',
+      'correlationid',
+      'causationid',
+      'causationsource',
+    ] as const) {
+      const carrier = metadata();
+      carrier.set(
+        `ce-${key}`,
+        key === 'source'
+          ? 'https://another.example'
+          : key === 'time'
+            ? '2030-01-01T00:00:01.000Z'
+            : 'contradiction'
+      );
+      invalid.push({ payload: JSON.stringify(event), metadata: carrier });
+    }
+    const duplicate = metadata();
+    duplicate.append('ce-id', event.id);
+    invalid.push({ payload: JSON.stringify(event), metadata: duplicate });
+    let lastSequence = 0;
+    for (const input of invalid)
+      lastSequence = (
+        await js.publish('wallpaper.published', input.payload, { headers: input.metadata })
+      ).seq;
+    await js.publish('wallpaper.future', JSON.stringify(event));
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'user-wallpaper-publication-ownership'))
+            .ack_floor.stream_seq
+      )
+      .toBe(lastSequence);
+    expect(accepted).toEqual([{ wallpaperId: 'wallpaper', profileId: 'contributor' }]);
+    expect((await manager.streams.info('USER_QUARANTINE')).state.messages).toBe(invalid.length);
+    expect(
+      (await manager.consumers.info('WALLPAPER', 'user-wallpaper-publication-ownership')).config
+        .filter_subject
+    ).toBe('wallpaper.published');
+    expect(
+      (await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).config.filter_subject
+    ).toBe('wallpaper.uploaded');
+  } finally {
+    await runtime.dispose();
+    await manager.consumers.delete('WALLPAPER', 'user-wallpaper-ownership');
+    await manager.consumers.delete('WALLPAPER', 'user-wallpaper-publication-ownership');
+    await manager.streams.purge('WALLPAPER');
+  }
+});

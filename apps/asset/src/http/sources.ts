@@ -12,6 +12,7 @@ import {
   type Candidate,
   type SourcesPort,
   type SourceOutcome,
+  type SourceChangeOutcome,
 } from '../capabilities/sources/index.js';
 import type { Owner } from '../capabilities/lifecycle/index.js';
 export interface SourceExecution {
@@ -43,6 +44,21 @@ const mutationOptions = {
       : { error: new Error('Invalid candidate intent') };
   },
 };
+const sourceRevision = z
+  .object({ expectedSourceSetRevision: z.string().regex(/^(0|[1-9][0-9]{0,39})$/) })
+  .strict();
+const defaultInput = sourceRevision.extend({ sourceId: z.string().min(1).max(256) }).strict();
+function sourceChangeOptions(schema: z.AnyZodObject) {
+  return {
+    schema: { body: zodToJsonSchema(schema) },
+    validatorCompiler: () => (value: unknown) => {
+      const parsed = schema.safeParse(value);
+      return parsed.success
+        ? { value: parsed.data }
+        : { error: new Error('Invalid Source mutation') };
+    },
+  };
+}
 function requestContext(request: FastifyRequest) {
   const carrier: Record<string, string> = {};
   propagation.inject(propagation.extract(otelContext.active(), request.headers), carrier);
@@ -72,18 +88,24 @@ function publicCandidate(candidate: Candidate) {
     expiresAt: candidate.expiresAt,
   };
 }
-function outcome(reply: FastifyReply, result: SourceOutcome, success = 200) {
+function outcome(reply: FastifyReply, result: SourceOutcome | SourceChangeOutcome, success = 200) {
   if (result.kind === 'unavailable')
     return reply.code(404).type('application/problem+json').send(problem(404, 'not-found'));
   if (result.kind === 'rejected') {
     const status =
       result.reason === 'encoded-size-limit'
         ? 413
-        : /conflict|already-accepted|count-limit/.test(result.reason)
+        : /conflict|already-accepted|count-limit|source-withdrawal/.test(result.reason)
           ? 409
           : 422;
     return reply.code(status).type('application/problem+json').send(problem(status, result.reason));
   }
+  if (result.kind === 'changed')
+    return reply.code(success).send({
+      sourceSetRevision: result.sourceSetRevision,
+      deliveryRevision: result.deliveryRevision,
+      defaultSourceId: result.defaultSourceId,
+    });
   return reply.code(success).send(publicCandidate(result.candidate));
 }
 export function registerSourceRoutes(app: FastifyInstance, execution: SourceExecution) {
@@ -168,6 +190,54 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
                 candidates: result.asset.candidates.map(publicCandidate),
               })
             : reply.code(404).type('application/problem+json').send(problem(404, 'not-found'))
+      );
+    }
+  );
+  app.put<{ Params: { assetId: string } }>(
+    '/assets/:assetId/default-source',
+    sourceChangeOptions(defaultInput),
+    (request, reply) => {
+      const body = defaultInput.safeParse(request.body);
+      if (!body.success)
+        return reply
+          .code(400)
+          .type('application/problem+json')
+          .send(problem(400, 'invalid-request'));
+      return run(
+        request,
+        reply,
+        (sources, owner) =>
+          sources.selectDefault(
+            owner,
+            request.params.assetId,
+            body.data.sourceId,
+            body.data.expectedSourceSetRevision
+          ),
+        (result) => outcome(reply, result)
+      );
+    }
+  );
+  app.delete<{ Params: { assetId: string; sourceId: string } }>(
+    '/assets/:assetId/sources/:sourceId',
+    sourceChangeOptions(sourceRevision),
+    (request, reply) => {
+      const body = sourceRevision.safeParse(request.body);
+      if (!body.success)
+        return reply
+          .code(400)
+          .type('application/problem+json')
+          .send(problem(400, 'invalid-request'));
+      return run(
+        request,
+        reply,
+        (sources, owner) =>
+          sources.withdraw(
+            owner,
+            request.params.assetId,
+            request.params.sourceId,
+            body.data.expectedSourceSetRevision
+          ),
+        (result) => outcome(reply, result)
       );
     }
   );

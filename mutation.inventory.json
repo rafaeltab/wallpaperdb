@@ -14,8 +14,8 @@
     },
     "infra": {
       "decision": "excluded",
-      "reason": "Configuration and shell provisioning; native TypeScript mutations do not instrument the shell implementation.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "Compose, service configuration and SQL/shell provisioning have no native TypeScript mutation target. The maintained nats/init/setup-streams.test.ts suite spawns sh with a controlled nats CLI; it asserts shell behavior but does not activate mutations in setup-streams.sh. Shell activation needs separate validation before opt-in.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/521"
     },
     "apps/color-extractor": {
       "decision": "enabled",
@@ -30,8 +30,8 @@
     },
     "apps/docs": {
       "decision": "excluded",
-      "reason": "No maintained mutation-compatible behavioral suite.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "Next/Fumadocs pages, search and text routes, and OpenAPI generation contain application behavior, but the workspace has no maintained behavioral tests or test script. Build and type checks do not prove mutation detection. Establish a maintained route/rendering or generation contract before activation validation.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/521"
     },
     "apps/gateway": {
       "decision": "enabled",
@@ -161,8 +161,8 @@
     },
     "packages/test-logger": {
       "decision": "excluded",
-      "reason": "No maintained mutation-compatible behavioral suite.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "createTestLogger wraps Pino with a name and LOG_LEVEL fallback to silent. Fixture consumers use it for diagnostics; no maintained suite asserts its logging contract and the workspace has no test script. Consumer execution alone does not prove mutation detection. Establish that contract before activation validation.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/521"
     },
     "packages/test-utils": {
       "decision": "excluded",
@@ -181,13 +181,13 @@
     },
     "packages/vitest-config": {
       "decision": "excluded",
-      "reason": "Shared configuration only; invalidate all dependent suites instead of claiming a standalone score.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "Shared defaults and defineBaseConfig compose dependent Vitest suites; no standalone mutation score. The existing mutationContext dependency traversal hashes tracked dependency inputs, changes checkpoint compatibility and watches this package to widen dependent source selection. Preserve workspace dependency declarations for consumers; external undeclared inputs require externalInputs.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/521"
     },
     "experiments/cosine_color_accuracy": {
       "decision": "excluded",
-      "reason": "No maintained mutation-compatible behavioral suite.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "Interactive color-ranking experiment with Sharp image loading, vector and color calculations. src/index.ts reads a hard-coded personal Downloads directory and stdin; only start-dev is declared, with no maintained assertion suite. Controlled image inputs and an agreed calculation/ranking contract are needed before activation validation.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/521"
     }
   }
 }

@@ -130,13 +130,14 @@ export interface AttachmentTransition<A> {
   };
 }
 /** Locks the owning Profile before its intents across all selectors. Begin supplies a fresh,
- * detached intent unless the owner/key was already reserved. The callback is pure.
+ * detached intent unless the owner/key/expected-version was already reserved.
+ * Reusing a key at a later Profile version reserves a new identity. The callback is pure.
  * Intent changes, current-intent selection, Profile attachment/version and its event,
  * and stable create/orphan-delete outbox obligations commit in one transaction.
  * Every intent write reconciles attention against retained confirmations, publication
  * duties and rejected deletion under those locks, without blocking valid attachment.
  * Attachment is permitted only for the selected intent at its expected Profile version
- * with no current picture. Intent, key, Asset and command identities are never reused.
+ * with no current picture. Intent, Asset and command identities are never reused.
  * No external resource participates in this transaction. */
 export interface AttachmentStore {
   readonly change: <A>(

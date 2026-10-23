@@ -26,7 +26,10 @@ function controlled() {
         const existing =
           selector.kind === 'begin'
             ? [...intents.values()].find(
-                (i) => i.profileId === selector.profileId && i.key === selector.key
+                (i) =>
+                  i.profileId === selector.profileId &&
+                  i.key === selector.key &&
+                  i.expectedVersion === selector.expectedVersion
               )
             : selector.kind === 'intent'
               ? intents.get(selector.id)

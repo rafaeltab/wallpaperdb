@@ -203,6 +203,7 @@ export async function coordinate() {
 	};
 	let start = performance.now();
 	const baselines = new Map();
+	const invalidStages = new Set();
 	const readBaseline = (context) => {
 		if (!baselines.has(context.key))
 			baselines.set(context.key, restoreBaseline(context));
@@ -412,6 +413,8 @@ export async function coordinate() {
 				releaseLock?.();
 			}
 			summary.stages.push(result.summary);
+			if (result.summary.invalidFixtureResults)
+				invalidStages.add(job.context.key);
 			baselines.delete(job.context.key);
 			const after = current(job, readBaseline);
 			const unitResults = resultIndex(unit?.report);
@@ -459,8 +462,12 @@ export async function coordinate() {
 		delete process.env.GITHUB_TOKEN;
 		try {
 			const publicationStart = performance.now();
-			summary.workspaces = summarize(full.jobs, false, full.jobs, readBaseline);
-			const selected = summarize(jobs, true, full.jobs, readBaseline);
+			// Preserve valid snapshots for later reuse, while this invocation's failed
+			// infrastructure leaves integration and combined conclusions pending.
+			const readEvidence = (context) =>
+				invalidStages.has(context.key) ? null : readBaseline(context);
+			summary.workspaces = summarize(full.jobs, false, full.jobs, readEvidence);
+			const selected = summarize(jobs, true, full.jobs, readEvidence);
 			summary.selectedWorkspaces = selected;
 			summary.processed = selected.reduce((n, w) => n + w.processed, 0);
 			summary.total = selected.reduce((n, w) => n + w.total, 0);

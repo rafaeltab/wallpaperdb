@@ -96,6 +96,11 @@ export function catalog(root, { package: selected, scope, base }) {
 				`Mutation stage inventory/configuration disagree: ${directory}`,
 			);
 		for (const [suite, settings] of Object.entries(config.suites)) {
+			if (
+				settings.fixture &&
+				!["redis-owned-reuse", "postgres-owned"].includes(settings.fixture)
+			)
+				throw new Error(`Unsupported mutation fixture: ${settings.fixture}`);
 			const sourceFiles = files
 				.filter((file) => file.startsWith(`${directory}/`))
 				.map((file) => file.slice(directory.length + 1))

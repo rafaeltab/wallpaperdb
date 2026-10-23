@@ -13,10 +13,34 @@ export class FixtureCleanupError extends AggregateError {
 	constructor(startupError, cleanupError) {
 		super(
 			[startupError, cleanupError],
-			`Owned Redis startup cleanup failed: ${cleanupError.message}`,
+			`Owned fixture startup cleanup failed: ${cleanupError.message}`,
 			{ cause: startupError },
 		);
 	}
+}
+
+// The stage owns this small interface; instrumented suites borrow only env.
+export async function mutationFixture(
+	cwd,
+	config,
+	deadline,
+	cleanupMs,
+	signal,
+) {
+	if (!config.fixture) return undefined;
+	if (config.fixture === "redis-owned-reuse")
+		return redisFixture(cwd, config.fixtureImage, deadline, cleanupMs, signal);
+	if (config.fixture === "postgres-owned") {
+		const { postgresFixture } = await import("./mutation-postgres.mjs");
+		return postgresFixture(
+			cwd,
+			config.fixtureImage,
+			deadline,
+			cleanupMs,
+			signal,
+		);
+	}
+	throw new Error(`Unsupported mutation fixture: ${config.fixture}`);
 }
 
 /** Physical Redis belongs to this stage, not Vitest's repeated module lifetime. */

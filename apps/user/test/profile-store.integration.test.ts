@@ -9,6 +9,7 @@ import { profileStoreLayer } from '../src/adapters/profiles/index.js';
 import { eventStoreLayer } from '../src/adapters/events/index.js';
 import { MaintenanceStore } from '../src/capabilities/maintenance/index.js';
 import { profileStoreContract } from './contracts/profile-store.js';
+import { mutationPostgresEndpoint } from './mutation-postgres-endpoint.js';
 import {
   Identities,
   Profiles,
@@ -50,30 +51,51 @@ const testLayer = (databaseUrl: string, settings: ProfilePolicy = policy) =>
   );
 
 describe('PostgreSQL profile transactions', () => {
-  let database: StartedPostgreSqlContainer;
+  let database: StartedPostgreSqlContainer | undefined;
+  let databaseUrl: string;
   let sql: ReturnType<typeof postgres>;
   let runtime: ManagedRuntime.ManagedRuntime<
     Profiles | ProfileStore | Identities | MaintenanceStore,
     unknown
   >;
   beforeAll(async () => {
-    database = await new PostgreSqlContainer('postgres:16-alpine').start();
-    const databaseUrl = database.getConnectionUri().replace('localhost', '127.0.0.1');
+    const start = performance.now();
+    if (mutationPostgresEndpoint.url) databaseUrl = mutationPostgresEndpoint.url;
+    else {
+      database = await new PostgreSqlContainer('postgres:16-alpine').start();
+      databaseUrl = database.getConnectionUri().replace('localhost', '127.0.0.1');
+    }
     sql = postgres(databaseUrl);
     const migrations = new URL('../drizzle/', import.meta.url);
-    for (const name of readdirSync(migrations)
+    for (const name of (mutationPostgresEndpoint.url ? [] : readdirSync(migrations))
       .filter((name) => name.endsWith('.sql'))
       .sort())
       await sql.unsafe(readFileSync(new URL(name, migrations), 'utf8'));
     runtime = ManagedRuntime.make(testLayer(databaseUrl));
+    if (mutationPostgresEndpoint.url) {
+      await runtime.runPromise(Effect.void);
+      mutationPostgresEndpoint.recordLifecycle?.('created', (performance.now() - start) / 1000);
+    }
   });
   beforeEach(async () => {
     await sql`truncate table outbox_events, handle_claims, wallpaper_ownership, profiles cascade`;
   });
   afterAll(async () => {
-    await runtime?.dispose();
-    await sql?.end();
-    await database?.stop();
+    const start = performance.now();
+    const cleanup = async () => {
+      try {
+        await runtime?.dispose();
+      } finally {
+        try {
+          await sql?.end();
+        } finally {
+          await database?.stop();
+        }
+      }
+    };
+    if (mutationPostgresEndpoint.withDisposal) await mutationPostgresEndpoint.withDisposal(cleanup);
+    else await cleanup();
+    mutationPostgresEndpoint.recordLifecycle?.('disposed', (performance.now() - start) / 1000);
   });
   const run = <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) =>
     runtime.runPromise(
@@ -98,7 +120,7 @@ describe('PostgreSQL profile transactions', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
     const custom = ManagedRuntime.make(
-      testLayer(database.getConnectionUri().replace('localhost', '127.0.0.1'), {
+      testLayer(databaseUrl, {
         ...policy,
         profileEvidenceRetentionDays: 7,
       })

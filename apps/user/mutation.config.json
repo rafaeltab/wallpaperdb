@@ -5,6 +5,17 @@
         "configFile": "vitest.mutation.config.ts",
         "related": false
       }
+    },
+    "integration": {
+      "sourceRoots": ["src/adapters/profiles/"],
+      "vitest": {
+        "configFile": "vitest.mutation.integration.config.ts",
+        "related": false
+      },
+      "timeoutMS": 10000,
+      "fixture": "postgres-owned",
+      "fixtureImage": "postgres:16-alpine@sha256:e013e867e712fec275706a6c51c966f0bb0c93cfa8f51000f85a15f9865a28cb",
+      "environmentKeys": ["MUTATION_POSTGRES_ISOLATED", "MUTATION_POSTGRES_RESET_FAILURE"]
     }
   }
 }

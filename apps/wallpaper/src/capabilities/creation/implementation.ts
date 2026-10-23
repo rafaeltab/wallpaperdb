@@ -43,6 +43,14 @@ export function creationLayer(ownerNamespace: string) {
               if (wallpaper.state !== 'awaiting-source' && wallpaper.state !== 'accepting-source')
                 return { wallpaper, result: { kind: 'conflict' } };
               wallpaper.state = 'accepting-source';
+              if (
+                !wallpaper.sourceIntents.some(
+                  (registered) =>
+                    registered.candidateId === intent.candidateId &&
+                    registered.intentId === intent.intentId
+                )
+              )
+                wallpaper.sourceIntents.push(intent);
               wallpaper.intent = intent;
               return { wallpaper, result: { kind: 'wallpaper', wallpaper } };
             })
@@ -75,14 +83,21 @@ export function creationLayer(ownerNamespace: string) {
                 if (
                   !wallpaper ||
                   wallpaper.state !== 'accepting-source' ||
-                  wallpaper.intent?.candidateId !== confirmation.candidateId ||
-                  wallpaper.intent.intentId !== confirmation.intentId ||
+                  !wallpaper.sourceIntents.some(
+                    (registered) =>
+                      registered.candidateId === confirmation.candidateId &&
+                      registered.intentId === confirmation.intentId
+                  ) ||
                   confirmation.sourceId !== confirmation.defaultSourceId ||
                   confirmation.sourceId !== confirmation.initialAnalysisSourceId
                 )
                   return { wallpaper, result: 'ignored' };
                 wallpaper.attentionRequired = false;
                 wallpaper.state = 'published';
+                wallpaper.intent = {
+                  candidateId: confirmation.candidateId,
+                  intentId: confirmation.intentId,
+                };
                 wallpaper.sourceId = confirmation.sourceId;
                 wallpaper.initialAnalysisSourceId = confirmation.initialAnalysisSourceId;
                 return {

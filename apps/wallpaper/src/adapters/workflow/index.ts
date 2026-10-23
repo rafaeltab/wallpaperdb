@@ -173,6 +173,7 @@ export function workflowPostgresLayer(options: Options) {
                 state: 'creating-asset',
                 assetId: null,
                 intent: null,
+                sourceIntents: [],
                 sourceId: null,
                 initialAnalysisSourceId: null,
               };

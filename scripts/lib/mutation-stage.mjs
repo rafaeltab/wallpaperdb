@@ -119,6 +119,7 @@ export async function runStage({
 			await fixture.close();
 		} catch (error) {
 			cleanupFailed = true;
+			summary.invalidFixtureResults = true;
 			summary.outcome = "failed";
 			summary.cleanupError = error.message;
 		}

@@ -46,7 +46,18 @@ afterEach(() => {
 describe('Production telemetry composition', () => {
   it('exports author work through the shared HTTP telemetry mechanism', async () => {
     const exporter = new InMemorySpanExporter();
-    const sdk = new NodeSDK({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
+    const processor = new SimpleSpanProcessor(exporter);
+    // Exercise export while resource detection is still pending after the HTTP request.
+    let finishResourceDetection: () => void = () => undefined;
+    const resourceAttribute = new Promise<string>((resolve) => {
+      finishResourceDetection = () => resolve('ready');
+    });
+    const sdk = new NodeSDK({
+      spanProcessors: [processor],
+      resourceDetectors: [
+        { detect: () => ({ attributes: { 'contract.resource': resourceAttribute } }) },
+      ],
+    });
     sdk.start();
     trace.getTracer('contract').startSpan('telemetry.sdk.author.contract').end();
     const services = Layer.merge(
@@ -93,7 +104,9 @@ describe('Production telemetry composition', () => {
       } finally {
         await app.close();
       }
-      const spans = exporter.getFinishedSpans();
+      finishResourceDetection();
+      await processor.forceFlush();
+      const spans = [...exporter.getFinishedSpans()];
       // This test-owned span qualifies the mechanism, not production instrumentation details.
       expect(spans).toContainEqual(
         expect.objectContaining({ name: 'telemetry.sdk.author.contract' })
@@ -111,7 +124,12 @@ describe('Production telemetry composition', () => {
         JSON.stringify(spans.map(({ attributes, events }) => ({ attributes, events })))
       ).not.toContain('private-contract-token');
     } finally {
-      await sdk.shutdown();
+      finishResourceDetection();
+      try {
+        await processor.forceFlush();
+      } finally {
+        await sdk.shutdown();
+      }
     }
   });
 

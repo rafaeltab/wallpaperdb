@@ -169,6 +169,9 @@ export interface ProfileQuery {
  * commits each accepted transition with its handle claims, picture state and
  * durable event. A rejected or unchanged decision writes nothing. A handle
  * conflict is a rejection; unrelated persistence failures are typed failures.
+ * Each accepted transition advances the Profile version exactly once. Read
+ * results are detached values, including their mutable Date fields; callers
+ * cannot write to persistence by mutating a returned Profile.
  * The decision must not escape its scope or perform external effects.
  */
 export interface ProfileStore {

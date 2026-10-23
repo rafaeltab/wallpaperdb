@@ -23,6 +23,7 @@ import {
   assetSourceState,
   immutableSources,
   assetDeletions,
+  sourceCleanup,
 } from '../../db/schema.js';
 
 interface PostgresOptions {
@@ -185,13 +186,49 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
                 candidate.status = 'cancelled';
                 candidate.reason = 'asset-deleted';
               }
+            for (const candidate of state.candidates) {
+              await tx
+                .insert(sourceCleanup)
+                .values({
+                  id: `candidate:${candidate.candidateId}`,
+                  assetId: asset.id,
+                  applicationId: asset.applicationId,
+                  target: { kind: 'candidate', candidateId: candidate.candidateId },
+                  dueAt: new Date(
+                    Math.min(
+                      deletedAt.getTime(),
+                      Date.parse(candidate.temporaryExpiresAt ?? candidate.expiresAt)
+                    )
+                  ),
+                })
+                .onConflictDoUpdate({
+                  target: sourceCleanup.id,
+                  set: { dueAt: sql`least(${sourceCleanup.dueAt}, ${deletedAt})` },
+                });
+              if (candidate.status !== 'accepted')
+                await tx
+                  .insert(sourceCleanup)
+                  .values({
+                    id: `source:${candidate.sourceId}`,
+                    assetId: asset.id,
+                    applicationId: asset.applicationId,
+                    target: { kind: 'source', assetId: asset.id, sourceId: candidate.sourceId },
+                    dueAt: new Date(
+                      Math.min(deletedAt.getTime(), Date.parse(candidate.orphanExpiresAt))
+                    ),
+                  })
+                  .onConflictDoUpdate({
+                    target: sourceCleanup.id,
+                    set: { dueAt: sql`least(${sourceCleanup.dueAt}, ${deletedAt})` },
+                  });
+            }
             state.nonterminalCandidateCount = 0;
             await tx
               .update(assetSourceState)
               .set({ state })
               .where(eq(assetSourceState.assetId, asset.id));
           }
-          await tx
+          const retiredSources = await tx
             .update(immutableSources)
             .set({ evidenceExpiresAt })
             .where(
@@ -199,7 +236,19 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
                 eq(immutableSources.assetId, asset.id),
                 isNull(immutableSources.evidenceExpiresAt)
               )
-            );
+            )
+            .returning({ id: immutableSources.id });
+          for (const source of retiredSources)
+            await tx
+              .insert(sourceCleanup)
+              .values({
+                id: `source:${source.id}`,
+                assetId: asset.id,
+                applicationId: asset.applicationId,
+                target: { kind: 'source', assetId: asset.id, sourceId: source.id },
+                dueAt: evidenceExpiresAt,
+              })
+              .onConflictDoUpdate({ target: sourceCleanup.id, set: { dueAt: evidenceExpiresAt } });
           await tx.insert(assetDeletions).values({
             assetId: asset.id,
             deletedAt,

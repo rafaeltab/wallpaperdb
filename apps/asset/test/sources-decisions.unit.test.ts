@@ -518,3 +518,93 @@ it('adds independent Sources after first acceptance while preserving the Default
     await f.close();
   }
 });
+
+it.each([
+  { first: [100, 100], next: [103, 100], accepted: true },
+  { first: [103, 100], next: [100, 100], accepted: true },
+  { first: [100, 100], next: [10301, 10000], accepted: false },
+  { first: [10301, 10000], next: [100, 100], accepted: false },
+])('checks inclusive extreme ratio after orientation: $first then $next', async ({
+  first,
+  next,
+  accepted,
+}) => {
+  const f = fixture();
+  const admit = async (key: string, dimensions: number[], revision: string) => {
+    const [width, height] = dimensions;
+    if (!width || !height) throw new Error('Missing dimensions');
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width,
+          height,
+          orientation: 6,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    const id = await create(f, key, revision);
+    await upload(f, id);
+    return f.call((s) =>
+      s.accept(owner, 'asset_one', id, { ...intent, expectedSourceSetRevision: revision })
+    );
+  };
+  try {
+    await admit('first', first, '0');
+    expect(await admit('next', next, '1')).toMatchObject({
+      candidate: accepted
+        ? { status: 'accepted' }
+        : { status: 'rejected', reason: 'aspect-ratio-limit' },
+    });
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { sourceSetRevision: accepted ? '2' : '1' },
+    });
+  } finally {
+    await f.close();
+  }
+});
+it('compares the full active set rather than chaining pairwise similar Sources', async () => {
+  const f = fixture();
+  const admit = async (key: string, width: number, revision: string) => {
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width,
+          height: 1000,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    const id = await create(f, key, revision);
+    await upload(f, id);
+    return f.call((s) =>
+      s.accept(owner, 'asset_one', id, { ...intent, expectedSourceSetRevision: revision })
+    );
+  };
+  try {
+    await admit('first', 1000, '0');
+    await admit('middle', 1020, '1');
+    expect(await admit('extreme', 1040, '2')).toMatchObject({
+      candidate: { status: 'rejected', reason: 'aspect-ratio-limit' },
+    });
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: {
+        sourceSetRevision: '2',
+        sources: expect.arrayContaining([
+          expect.objectContaining({ facts: expect.objectContaining({ width: 1000 }) }),
+          expect.objectContaining({ facts: expect.objectContaining({ width: 1020 }) }),
+        ]),
+      },
+    });
+  } finally {
+    await f.close();
+  }
+});

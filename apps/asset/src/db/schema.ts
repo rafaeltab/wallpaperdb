@@ -214,8 +214,12 @@ export const immutableSources = pgTable(
     assetId: text('asset_id').notNull(),
     facts: jsonb('facts').notNull().$type<import('../capabilities/sources/index.js').SourceFacts>(),
     layout: text('layout').notNull(),
+    evidenceExpiresAt: timestamp('evidence_expires_at', { withTimezone: true }),
   },
   (table) => [
+    index('immutable_sources_retired_expiry')
+      .on(table.evidenceExpiresAt)
+      .where(sql`${table.evidenceExpiresAt} IS NOT NULL`),
     index('immutable_sources_asset').on(table.assetId),
     check('immutable_sources_layout', sql`${table.layout} = 'asset-layout-1'`),
   ]

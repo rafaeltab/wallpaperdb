@@ -85,6 +85,13 @@
       "when": 1792869516911,
       "tag": "0011_cooing_stellaris",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792875815608,
+      "tag": "0012_majestic_retro_girl",
+      "breakpoints": true
     }
   ]
 }

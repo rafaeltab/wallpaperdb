@@ -143,6 +143,7 @@ export function sourcePostgresLayer(options: Options) {
                     nonterminalCandidateCount: 0,
                   })
                 : null;
+              const priorSources = initial?.sources.map((source) => source.sourceId) ?? [];
               const changed = decide(() => change(initial));
               if (changed.state && asset) {
                 for (const source of changed.state.sources) {
@@ -152,7 +153,8 @@ export function sourcePostgresLayer(options: Options) {
                     .where(eq(immutableSources.id, source.sourceId));
                   if (
                     existing &&
-                    (existing.assetId !== assetId ||
+                    (existing.evidenceExpiresAt !== null ||
+                      existing.assetId !== assetId ||
                       !isDeepStrictEqual(existing.facts, source.facts) ||
                       existing.layout !== source.layout)
                   )
@@ -164,6 +166,26 @@ export function sourcePostgresLayer(options: Options) {
                       facts: source.facts,
                       layout: source.layout,
                     });
+                }
+                if (changed.retirement) {
+                  const { sourceId, evidenceExpiresAt } = changed.retirement;
+                  if (
+                    !priorSources.includes(sourceId) ||
+                    changed.state.sources.some((source) => source.sourceId === sourceId)
+                  )
+                    throw new Error('Invalid Source retirement');
+                  const retired = await tx
+                    .update(immutableSources)
+                    .set({ evidenceExpiresAt: new Date(evidenceExpiresAt) })
+                    .where(
+                      and(
+                        eq(immutableSources.id, sourceId),
+                        eq(immutableSources.assetId, assetId),
+                        isNull(immutableSources.evidenceExpiresAt)
+                      )
+                    )
+                    .returning({ id: immutableSources.id });
+                  if (retired.length !== 1) throw new Error('Source already retired');
                 }
                 await tx
                   .insert(assetSourceState)

@@ -516,6 +516,78 @@ it('rolls back immutable metadata and membership when acceptance confirmation ca
       initialAnalysisSourceId: 'source_rollback',
       sources: [{ facts: { digest: 'e'.repeat(64) } }],
     });
+    const replace = (applicationId: string) =>
+      SourceStore.use((store) =>
+        store.transact(created.assetId, 'revision-4', (state) => {
+          const old = state?.sources[0];
+          if (!state || !old) throw new Error('Expected accepted predecessor');
+          state.sources = [{ ...old, sourceId: 'source_replacement_rollback' }];
+          state.defaultSourceId = 'source_replacement_rollback';
+          state.sourceSetRevision = '2';
+          state.deliveryRevision = '2';
+          return {
+            state,
+            result: state,
+            retirement: {
+              sourceId: 'source_rollback',
+              evidenceExpiresAt: '2030-01-01T00:00:00.000Z',
+            },
+            confirmation: {
+              id: 'source-accepted:source_replacement_rollback',
+              applicationId,
+              assetId: created.assetId,
+              assetType: 'wallpaper',
+              candidateId: 'candidate_replacement_rollback',
+              sourceId: 'source_replacement_rollback',
+              defaultSourceId: 'source_replacement_rollback',
+              initialAnalysisSourceId: 'source_rollback',
+              sourceSetRevision: '2',
+              deliveryRevision: '2',
+              context: {
+                occurrence: { source: 'https://test/author', id: 'replacement-rollback' },
+              },
+            },
+          };
+        })
+      );
+    expect(await sources.runPromise(Effect.exit(replace('wrong-application')))).toMatchObject({
+      _tag: 'Failure',
+    });
+    expect(
+      (
+        await pool.query('SELECT evidence_expires_at FROM immutable_sources WHERE id = $1', [
+          'source_rollback',
+        ])
+      ).rows
+    ).toEqual([{ evidence_expires_at: null }]);
+    const unchanged = await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(created.assetId, null, (state) => ({ state, result: state }))
+      )
+    );
+    expect(unchanged).toMatchObject({ sourceSetRevision: '1', defaultSourceId: 'source_rollback' });
+    expect(await sources.runPromise(replace('wallpaper'))).toMatchObject({
+      sourceSetRevision: '2',
+      initialAnalysisSourceId: 'source_rollback',
+    });
+    expect(
+      (
+        await pool.query('SELECT evidence_expires_at FROM immutable_sources WHERE id = $1', [
+          'source_rollback',
+        ])
+      ).rows
+    ).toEqual([{ evidence_expires_at: new Date('2030-01-01T00:00:00.000Z') }]);
+    // Even a stale adapter callback cannot resurrect retired immutable identity.
+    expect(await sources.runPromise(Effect.exit(write('wallpaper', 'e'.repeat(64))))).toMatchObject(
+      { _tag: 'Failure' }
+    );
+    expect(
+      (
+        await pool.query('SELECT evidence_expires_at FROM immutable_sources WHERE id = $1', [
+          'source_rollback',
+        ])
+      ).rows
+    ).toEqual([{ evidence_expires_at: new Date('2030-01-01T00:00:00.000Z') }]);
   } finally {
     await sources.dispose();
     await lifecycle.dispose();

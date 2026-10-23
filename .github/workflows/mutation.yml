@@ -253,6 +253,8 @@ jobs:
             packages/*/reports/mutation/*/summary.json
             packages/*/reports/mutation/*/mutation.json
             packages/*/reports/mutation/*/mutation.html
+            apps/user/reports/mutation/integration/run-*/*.json
+            apps/user/reports/mutation/integration/run-*/*.jsonl
             ${{ runner.temp }}/wallpaperdb-postgres-comparison/
           if-no-files-found: warn
           retention-days: 30

@@ -43,6 +43,7 @@ interface Options {
   readonly accessKeyId: string;
   readonly secretAccessKey: string;
   readonly bucket: string;
+  readonly reclamationTimeoutMs?: number;
 }
 const candidateKey = (id: string) => `asset-layout-1/private/candidates/${id}/input`;
 const sourceKey = (asset: string, source: string) =>
@@ -264,6 +265,10 @@ export function sourceStorageLayer(options: Options) {
         Context.add(CleanupBytes, {
           reclaim: (target) =>
             run('reclaim', async (signal) => {
+              const deadline = AbortSignal.any([
+                signal,
+                AbortSignal.timeout(options.reclamationTimeoutMs ?? 5000),
+              ]);
               const keys =
                 target.kind === 'candidate'
                   ? [
@@ -283,7 +288,7 @@ export function sourceStorageLayer(options: Options) {
                       ContentLength: 0,
                       Metadata: { reclaimed: 'true' },
                     }),
-                    { abortSignal: signal }
+                    { abortSignal: deadline }
                   );
                 } catch (cause) {
                   const head = await client
@@ -292,7 +297,7 @@ export function sourceStorageLayer(options: Options) {
                         Bucket: options.bucket,
                         Key: key,
                       }),
-                      { abortSignal: signal }
+                      { abortSignal: deadline }
                     )
                     .catch(() => null);
                   if (head?.Metadata?.reclaimed !== 'true' || head.ContentLength !== 0) throw cause;

@@ -42,17 +42,18 @@ export function creationLayer(ownerNamespace: string) {
                 return { wallpaper, result: { kind: 'unavailable' } };
               if (wallpaper.state !== 'awaiting-source' && wallpaper.state !== 'accepting-source')
                 return { wallpaper, result: { kind: 'conflict' } };
-              wallpaper.state = 'accepting-source';
               if (
-                !wallpaper.sourceIntents.some(
-                  (registered) =>
-                    registered.candidateId === intent.candidateId &&
-                    registered.intentId === intent.intentId
+                ![intent.candidateId, intent.intentId].every(
+                  (value) =>
+                    typeof value === 'string' &&
+                    new TextEncoder().encode(value).length > 0 &&
+                    new TextEncoder().encode(value).length <= 256
                 )
               )
-                wallpaper.sourceIntents.push(intent);
+                return { wallpaper, result: { kind: 'conflict' } };
+              wallpaper.state = 'accepting-source';
               wallpaper.intent = intent;
-              return { wallpaper, result: { kind: 'wallpaper', wallpaper } };
+              return { wallpaper, result: { kind: 'wallpaper', wallpaper }, registration: intent };
             })
             .pipe(Effect.withSpan('wallpaper.creation.expect-source')),
         assetResult: (result) =>
@@ -78,16 +79,19 @@ export function creationLayer(ownerNamespace: string) {
         sourceAccepted: (confirmation) =>
           store
             .change<'applied' | 'ignored'>(
-              { kind: 'asset', id: confirmation.assetId },
-              (wallpaper) => {
+              {
+                kind: 'asset',
+                id: confirmation.assetId,
+                sourceIntent: {
+                  candidateId: confirmation.candidateId,
+                  intentId: confirmation.intentId,
+                },
+              },
+              (wallpaper, registered) => {
                 if (
                   !wallpaper ||
                   wallpaper.state !== 'accepting-source' ||
-                  !wallpaper.sourceIntents.some(
-                    (registered) =>
-                      registered.candidateId === confirmation.candidateId &&
-                      registered.intentId === confirmation.intentId
-                  ) ||
+                  !registered ||
                   confirmation.sourceId !== confirmation.defaultSourceId ||
                   confirmation.sourceId !== confirmation.initialAnalysisSourceId
                 )

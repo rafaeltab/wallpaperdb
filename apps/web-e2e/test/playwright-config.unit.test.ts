@@ -65,6 +65,14 @@ describe("buildWebE2EConfig", () => {
     expect(ciConfig.retries).toBe(1);
   });
 
+  it("rejects focused tests and keeps recovered retries failing", () => {
+    for (const env of [{}, { CI: "true" }]) {
+      const config = buildWebE2EConfig(env);
+      expect(config.forbidOnly).toBe(true);
+      expect(config.failOnFlakyTests).toBe(true);
+    }
+  });
+
   it("retains Playwright failure artifacts in stable workspace paths", () => {
     const config = buildWebE2EConfig({} as NodeJS.ProcessEnv);
 

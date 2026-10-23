@@ -1170,3 +1170,68 @@ it('fences late cancelled replacement inspection after a new candidate has won',
     await f.close();
   }
 });
+
+describe('Owner Default selection and Source withdrawal', () => {
+  it('changes Default before withdrawing its predecessor while preserving first analysis and fixed private evidence', async () => {
+    const clockRuntime = ManagedRuntime.make(TestClock.layer());
+    const clock = await clockRuntime.runPromise(Clock.Clock);
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-10-23T00:00:00Z')));
+    const f = fixture(initialSourcePolicies.wallpaper, clock);
+    try {
+      const first = await create(f, 'first');
+      await upload(f, first);
+      await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+      const a = f.state.defaultSourceId;
+      if (!a) throw new Error('Expected first Default');
+      const second = await create(f, 'second', '1');
+      await upload(f, second, [4, 3, 2, 1]);
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', second, { ...intent, expectedSourceSetRevision: '1' })
+      );
+      const b = f.state.sources.find((s) => s.sourceId !== a)?.sourceId;
+      if (!b) throw new Error('Expected second Source');
+      expect(await f.call((s) => s.withdraw(owner, 'asset_one', a, '2'))).toEqual({
+        kind: 'rejected',
+        reason: 'default-source-withdrawal',
+      });
+      expect(await f.call((s) => s.selectDefault(owner, 'asset_one', b, '2'))).toEqual({
+        kind: 'changed',
+        sourceSetRevision: '3',
+        deliveryRevision: '3',
+        defaultSourceId: b,
+      });
+      expect(await f.call((s) => s.withdraw(owner, 'asset_one', a, '3'))).toEqual({
+        kind: 'changed',
+        sourceSetRevision: '4',
+        deliveryRevision: '4',
+        defaultSourceId: b,
+      });
+      expect(f.state.sources.map((s) => s.sourceId)).toEqual([b]);
+      expect(f.state.initialAnalysisSourceId).toBe(a);
+      expect(f.confirmations).toHaveLength(2);
+      expect(f.retirements).toEqual([
+        { sourceId: a, evidenceExpiresAt: '2026-10-30T00:00:00.000Z' },
+      ]);
+      expect(await f.call((s) => s.original(owner, 'asset_one', a))).toEqual({
+        kind: 'unavailable',
+      });
+      expect(await f.call((s) => s.original(owner, 'asset_one', b))).toMatchObject({
+        kind: 'original',
+      });
+      expect(await f.call((s) => s.withdraw(owner, 'asset_one', b, '4'))).toEqual({
+        kind: 'rejected',
+        reason: 'last-source-withdrawal',
+      });
+      await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-11-06T00:00:00Z')));
+      expect(await f.call((s) => s.withdraw(owner, 'asset_one', a, '4'))).toEqual({
+        kind: 'rejected',
+        reason: 'unavailable-source',
+      });
+      expect(f.retirements).toHaveLength(1);
+      expect(f.state.sourceSetRevision).toBe('4');
+    } finally {
+      await f.close();
+      await clockRuntime.dispose();
+    }
+  });
+});

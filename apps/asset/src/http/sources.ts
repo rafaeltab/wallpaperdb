@@ -143,19 +143,33 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
           : reply.code(404).type('application/problem+json').send(problem(404, 'not-found'))
     )
   );
-  app.get<{ Params: { assetId: string } }>('/assets/:assetId/sources', (request, reply) =>
-    run(
-      request,
-      reply,
-      (sources, owner) => sources.list(owner, request.params.assetId),
-      (result) =>
-        result.kind === 'found'
-          ? reply.send({
-              ...result.asset,
-              sources: result.asset.sources.map(({ sourceId, facts }) => ({ sourceId, facts })),
-            })
-          : reply.code(404).type('application/problem+json').send(problem(404, 'not-found'))
-    )
+  const discoveryQuery = z
+    .object({ candidateCursor: z.string().min(1).max(256).optional() })
+    .strict();
+  app.get<{ Params: { assetId: string } }>(
+    '/assets/:assetId/sources',
+    { schema: { querystring: zodToJsonSchema(discoveryQuery) } },
+    (request, reply) => {
+      const query = discoveryQuery.safeParse(request.query);
+      if (!query.success)
+        return reply
+          .code(400)
+          .type('application/problem+json')
+          .send(problem(400, 'invalid-request'));
+      return run(
+        request,
+        reply,
+        (sources, owner) => sources.list(owner, request.params.assetId, query.data.candidateCursor),
+        (result) =>
+          result.kind === 'found'
+            ? reply.send({
+                ...result.asset,
+                sources: result.asset.sources.map(({ sourceId, facts }) => ({ sourceId, facts })),
+                candidates: result.asset.candidates.map(publicCandidate),
+              })
+            : reply.code(404).type('application/problem+json').send(problem(404, 'not-found'))
+      );
+    }
   );
   app.post<{ Params: { assetId: string } }>(
     '/assets/:assetId/source-candidates',

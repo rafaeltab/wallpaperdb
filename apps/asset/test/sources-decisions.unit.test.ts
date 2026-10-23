@@ -23,6 +23,7 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
     deliveryRevision: '0',
     sources: [],
     candidates: [],
+    nonterminalCandidateCount: 0,
     defaultSourceId: null,
     initialAnalysisSourceId: null,
   };
@@ -132,9 +133,13 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
     close: () => Promise.all(runtimes.map((r) => r.dispose())),
   };
 }
-async function create(f: ReturnType<typeof fixture>, key: string) {
+async function create(f: ReturnType<typeof fixture>, key: string, revision = '0') {
   const result = await f.call((s) =>
-    s.create(owner, 'asset_one', { ...intent, idempotencyKey: key })
+    s.create(owner, 'asset_one', {
+      ...intent,
+      expectedSourceSetRevision: revision,
+      idempotencyKey: key,
+    })
   );
   if (result.kind !== 'candidate') throw new Error(JSON.stringify(result));
   return result.candidate.candidateId;
@@ -479,6 +484,345 @@ it('rechecks the activated operation policy atomically for a retained ready cand
     expect(f.state.sources).toEqual([]);
     expect(f.state.sourceSetRevision).toBe('0');
     expect(f.confirmations).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});
+
+it('adds independent Sources after first acceptance while preserving the Default and initial analysis identity', async () => {
+  const f = fixture();
+  try {
+    const first = await create(f, 'first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const original = await f.call((s) => s.list(owner, 'asset_one'));
+    const second = await create(f, 'second', '1');
+    await upload(f, second, [5, 6]);
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', second, { ...intent, expectedSourceSetRevision: '1' })
+      )
+    ).toMatchObject({ candidate: { status: 'accepted', sourceSetRevision: '2' } });
+    const current = await f.call((s) => s.list(owner, 'asset_one'));
+    if (original.kind !== 'found' || current.kind !== 'found') throw new Error('Expected Sources');
+    expect(current.asset).toMatchObject({
+      assetId: 'asset_one',
+      sourceSetRevision: '2',
+      deliveryRevision: '2',
+      defaultSourceId: original.asset.defaultSourceId,
+    });
+    expect(current.asset.sources).toHaveLength(2);
+    expect(current.asset.sources[0]).toEqual(original.asset.sources[0]);
+    expect(f.confirmations).toHaveLength(2);
+    expect(f.confirmations[1]?.initialAnalysisSourceId).toBe(original.asset.defaultSourceId);
+  } finally {
+    await f.close();
+  }
+});
+
+it.each([
+  { first: [100, 100], next: [103, 100], accepted: true },
+  { first: [103, 100], next: [100, 100], accepted: true },
+  { first: [100, 100], next: [1031, 1000], accepted: false },
+  { first: [1031, 1000], next: [100, 100], accepted: false },
+])('checks inclusive extreme ratio after orientation: $first then $next', async ({
+  first,
+  next,
+  accepted,
+}) => {
+  const f = fixture();
+  const admit = async (key: string, dimensions: number[], revision: string) => {
+    const [width, height] = dimensions;
+    if (!width || !height) throw new Error('Missing dimensions');
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width,
+          height,
+          orientation: 6,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    const id = await create(f, key, revision);
+    await upload(f, id);
+    return f.call((s) =>
+      s.accept(owner, 'asset_one', id, { ...intent, expectedSourceSetRevision: revision })
+    );
+  };
+  try {
+    await admit('first', first, '0');
+    expect(await admit('next', next, '1')).toMatchObject({
+      candidate: accepted
+        ? { status: 'accepted' }
+        : { status: 'rejected', reason: 'aspect-ratio-limit' },
+    });
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { sourceSetRevision: accepted ? '2' : '1' },
+    });
+  } finally {
+    await f.close();
+  }
+});
+it('compares the full active set rather than chaining pairwise similar Sources', async () => {
+  const f = fixture();
+  const admit = async (key: string, width: number, revision: string) => {
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width,
+          height: 1000,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    const id = await create(f, key, revision);
+    await upload(f, id);
+    return f.call((s) =>
+      s.accept(owner, 'asset_one', id, { ...intent, expectedSourceSetRevision: revision })
+    );
+  };
+  try {
+    await admit('first', 1000, '0');
+    await admit('middle', 1020, '1');
+    expect(await admit('extreme', 1040, '2')).toMatchObject({
+      candidate: { status: 'rejected', reason: 'aspect-ratio-limit' },
+    });
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: {
+        sourceSetRevision: '2',
+        sources: expect.arrayContaining([
+          expect.objectContaining({ facts: expect.objectContaining({ width: 1000 }) }),
+          expect.objectContaining({ facts: expect.objectContaining({ width: 1020 }) }),
+        ]),
+      },
+    });
+  } finally {
+    await f.close();
+  }
+});
+
+it('bounds concurrent preparation and acceptance and refuses preparation at the active Source limit', async () => {
+  const f = fixture({ ...initialSourcePolicies.wallpaper, maxActiveSources: 2 });
+  try {
+    const prepared = await Promise.all(
+      ['one', 'two', 'three'].map((key) =>
+        f.call((s) => s.create(owner, 'asset_one', { ...intent, idempotencyKey: key }))
+      )
+    );
+    expect(prepared.filter((o) => o.kind === 'candidate')).toHaveLength(2);
+    expect(prepared).toContainEqual({ kind: 'rejected', reason: 'candidate-count-limit' });
+    const ids = prepared.flatMap((o) => (o.kind === 'candidate' ? [o.candidate.candidateId] : []));
+    for (const id of ids) await upload(f, id);
+    const outcomes = await Promise.all(
+      ids.map((id) => f.call((s) => s.accept(owner, 'asset_one', id, intent)))
+    );
+    expect(
+      outcomes.filter((o) => o.kind === 'candidate' && o.candidate.status === 'accepted')
+    ).toHaveLength(1);
+    expect(outcomes).toContainEqual({ kind: 'rejected', reason: 'source-set-conflict' });
+    const stale = ids.find((_, i) => outcomes[i]?.kind === 'rejected');
+    if (!stale) throw new Error('Expected stale candidate');
+    await f.call((s) => s.cancel(owner, 'asset_one', stale));
+    const next = await create(f, 'next', '1');
+    await upload(f, next);
+    await f.call((s) =>
+      s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+    );
+    expect(
+      await f.call((s) =>
+        s.create(owner, 'asset_one', {
+          ...intent,
+          expectedSourceSetRevision: '2',
+          idempotencyKey: 'full',
+        })
+      )
+    ).toEqual({ kind: 'rejected', reason: 'source-count-limit' });
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { sourceSetRevision: '2' },
+    });
+  } finally {
+    await f.close();
+  }
+});
+it.each([
+  'count',
+  'ratio',
+])('rechecks effective %s policy at acceptance without withdrawing existing Sources', async (limit) => {
+  const f = fixture();
+  try {
+    const first = await create(f, 'first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width: 102,
+          height: 100,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    const next = await create(f, 'next', '1');
+    await upload(f, next);
+    const policy = {
+      ...initialSourcePolicies.wallpaper,
+      ...(limit === 'count' ? { maxActiveSources: 1 } : { aspectRatioTolerance: 0.01 }),
+    };
+    const useNew = f.activate(policy);
+    await expect(
+      f.call((s) =>
+        s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+      )
+    ).rejects.toBeDefined();
+    useNew();
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+      )
+    ).toMatchObject(
+      limit === 'count'
+        ? { kind: 'rejected', reason: 'source-count-limit' }
+        : { candidate: { status: 'rejected', reason: 'aspect-ratio-limit' } }
+    );
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: {
+        sourceSetRevision: '1',
+        sources: [expect.objectContaining({ facts: expect.objectContaining({ width: 100 }) })],
+      },
+    });
+  } finally {
+    await f.close();
+  }
+});
+it('recovers stopped additional inspection by same-digest replay while fencing changed bytes and preserving accepted Sources', async () => {
+  const f = fixture();
+  try {
+    const first = await create(f, 'accepted-first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const original = await f.call((s) => s.list(owner, 'asset_one'));
+    expect(original).toMatchObject({ asset: { hasPendingCandidates: false } });
+    const next = await create(f, 'stopped-inspection', '1');
+    f.setInspect(() =>
+      Effect.fail(new SourceFailure({ operation: 'inspect', cause: 'owned inspection stopped' }))
+    );
+    await expect(upload(f, next)).rejects.toBeDefined();
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { hasPendingCandidates: true },
+    });
+    expect(await f.call((s) => s.status(owner, 'asset_one', next))).toMatchObject({
+      candidate: { status: 'inspecting' },
+    });
+    expect(await upload(f, next, [9, 8, 7])).toEqual({
+      kind: 'rejected',
+      reason: 'byte-digest-conflict',
+    });
+    const unchanged = await f.call((s) => s.list(owner, 'asset_one'));
+    if (original.kind !== 'found' || unchanged.kind !== 'found')
+      throw new Error('Expected Sources');
+    expect(unchanged.asset.sources).toEqual(original.asset.sources);
+    expect(unchanged.asset.sourceSetRevision).toBe('1');
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width: 100,
+          height: 100,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    expect(await upload(f, next)).toMatchObject({ candidate: { status: 'ready' } });
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+      )
+    ).toMatchObject({ candidate: { status: 'accepted', sourceSetRevision: '2' } });
+    const recovered = await f.call((s) => s.list(owner, 'asset_one'));
+    if (recovered.kind !== 'found') throw new Error('Expected Sources');
+    expect(recovered.asset.sources[0]).toEqual(original.asset.sources[0]);
+    expect(recovered.asset.sources).toHaveLength(2);
+    expect(recovered.asset.hasPendingCandidates).toBe(false);
+  } finally {
+    await f.close();
+  }
+});
+it('bounds each discovery page while preserving continuation, exact old status and pending initial-work detection', async () => {
+  const f = fixture();
+  try {
+    const pending = await create(f, 'pending');
+    const history: string[] = [];
+    for (let n = 0; n < 70; n++) {
+      const id = await create(f, `cancelled-${n}`);
+      history.push(id);
+      await f.call((s) => s.cancel(owner, 'asset_one', id));
+    }
+    const discovered: string[] = [];
+    let cursor: string | undefined;
+    let appended: string | undefined;
+    do {
+      const page = await f.call((s) => s.list(owner, 'asset_one', cursor));
+      if (page.kind !== 'found') throw new Error('Expected owner discovery');
+      expect(page.asset.candidates.length).toBeLessThanOrEqual(32);
+      expect(page.asset.hasPendingCandidates).toBe(true);
+      discovered.push(...page.asset.candidates.map((c) => c.candidateId));
+      cursor = page.asset.nextCandidateCursor;
+      if (!appended) {
+        const added = await create(f, 'appended-after-first-page');
+        appended = added;
+        await f.call((s) => s.cancel(owner, 'asset_one', added));
+      }
+    } while (cursor);
+    expect(discovered).toEqual([...history].reverse().concat(pending));
+    expect(new Set(discovered).size).toBe(71);
+    expect(await f.call((s) => s.status(owner, 'asset_one', pending))).toMatchObject({
+      candidate: { candidateId: pending, status: 'awaiting-bytes' },
+    });
+    expect(
+      await f.call((s) => s.list({ ...owner, subject: 'other' }, 'asset_one', history[0]))
+    ).toEqual({ kind: 'unavailable' });
+    expect(await f.call((s) => s.list(owner, 'asset_one', 'missing-candidate'))).toEqual({
+      kind: 'unavailable',
+    });
+    const latest = await f.call((s) => s.list(owner, 'asset_one'));
+    expect(latest).toMatchObject({
+      asset: {
+        candidates: [
+          expect.objectContaining({ candidateId: appended }),
+          ...Array.from({ length: 31 }, () => expect.anything()),
+        ],
+        hasPendingCandidates: true,
+      },
+    });
+    expect(await f.call((s) => s.list(owner, 'asset_one', '0:wrong-identity'))).toEqual({
+      kind: 'unavailable',
+    });
+    const terminal = history[0];
+    if (!terminal) throw new Error('Missing retained history');
+    await f.call((s) => s.cancel(owner, 'asset_one', terminal));
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { hasPendingCandidates: true },
+    });
+    await f.call((s) => s.cancel(owner, 'asset_one', pending));
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { hasPendingCandidates: false },
+    });
   } finally {
     await f.close();
   }

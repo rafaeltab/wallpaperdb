@@ -37,6 +37,7 @@ const sourcePolicy = z
   .object({
     maxActiveSources: positive,
     maxCandidates: positive,
+    aspectRatioTolerance: z.number().finite().min(0).max(1).default(0.03),
     operations: z.array(z.enum(['add', 'replace-one', 'replace-set'])).min(1),
     admission: z
       .object({

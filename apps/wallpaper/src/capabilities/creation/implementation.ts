@@ -42,9 +42,18 @@ export function creationLayer(ownerNamespace: string) {
                 return { wallpaper, result: { kind: 'unavailable' } };
               if (wallpaper.state !== 'awaiting-source' && wallpaper.state !== 'accepting-source')
                 return { wallpaper, result: { kind: 'conflict' } };
+              if (
+                ![intent.candidateId, intent.intentId].every(
+                  (value) =>
+                    typeof value === 'string' &&
+                    new TextEncoder().encode(value).length > 0 &&
+                    new TextEncoder().encode(value).length <= 256
+                )
+              )
+                return { wallpaper, result: { kind: 'conflict' } };
               wallpaper.state = 'accepting-source';
               wallpaper.intent = intent;
-              return { wallpaper, result: { kind: 'wallpaper', wallpaper } };
+              return { wallpaper, result: { kind: 'wallpaper', wallpaper }, registration: intent };
             })
             .pipe(Effect.withSpan('wallpaper.creation.expect-source')),
         assetResult: (result) =>
@@ -70,19 +79,29 @@ export function creationLayer(ownerNamespace: string) {
         sourceAccepted: (confirmation) =>
           store
             .change<'applied' | 'ignored'>(
-              { kind: 'asset', id: confirmation.assetId },
-              (wallpaper) => {
+              {
+                kind: 'asset',
+                id: confirmation.assetId,
+                sourceIntent: {
+                  candidateId: confirmation.candidateId,
+                  intentId: confirmation.intentId,
+                },
+              },
+              (wallpaper, registered) => {
                 if (
                   !wallpaper ||
                   wallpaper.state !== 'accepting-source' ||
-                  wallpaper.intent?.candidateId !== confirmation.candidateId ||
-                  wallpaper.intent.intentId !== confirmation.intentId ||
+                  !registered ||
                   confirmation.sourceId !== confirmation.defaultSourceId ||
                   confirmation.sourceId !== confirmation.initialAnalysisSourceId
                 )
                   return { wallpaper, result: 'ignored' };
                 wallpaper.attentionRequired = false;
                 wallpaper.state = 'published';
+                wallpaper.intent = {
+                  candidateId: confirmation.candidateId,
+                  intentId: confirmation.intentId,
+                };
                 wallpaper.sourceId = confirmation.sourceId;
                 wallpaper.initialAnalysisSourceId = confirmation.initialAnalysisSourceId;
                 return {

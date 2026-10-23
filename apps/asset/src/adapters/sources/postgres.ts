@@ -40,13 +40,11 @@ export function sourcePostgresLayer(options: Options) {
             statement_timeout: 10000,
           });
           pool.on('error', (cause) =>
-            logs
-              .getLogger('asset.sources')
-              .emit({
-                severityNumber: SeverityNumber.ERROR,
-                body: 'Idle Source database connection failed',
-                attributes: { 'error.type': cause.name, 'error.message': cause.message },
-              })
+            logs.getLogger('asset.sources').emit({
+              severityNumber: SeverityNumber.ERROR,
+              body: 'Idle Source database connection failed',
+              attributes: { 'error.type': cause.name, 'error.message': cause.message },
+            })
           );
           return pool;
         }),
@@ -118,6 +116,7 @@ export function sourcePostgresLayer(options: Options) {
                     initialAnalysisSourceId: null,
                     sources: [],
                     candidates: [],
+                    nonterminalCandidateCount: 0,
                   })
                 : null;
               const changed = change(initial);

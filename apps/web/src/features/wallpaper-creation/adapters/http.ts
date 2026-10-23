@@ -1,5 +1,13 @@
 import { getAuthToken } from '@/lib/auth/token-provider';
-import type { CreationApi, WallpaperStatus, CandidateStatus } from '../index';
+import {
+  SourceIntakeError,
+  type SourceBatchApi,
+  type ManagedCandidate,
+  type OwnedSources,
+  type CreationApi,
+  type WallpaperStatus,
+  type CandidateStatus,
+} from '../index';
 const wallpaperUrl = import.meta.env.VITE_WALLPAPER_URL || '/wallpaper';
 const assetUrl = import.meta.env.VITE_ASSET_URL || '/asset';
 function object(input: unknown): Record<string, unknown> {
@@ -44,6 +52,18 @@ async function request(url: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   const response = await fetch(url, { ...init, headers });
+  if (response.status === 409)
+    throw new SourceIntakeError(
+      'Sources changed or their current limit was reached. Retry this file against the current set.',
+      true
+    );
+  if (response.status === 413 || response.status === 422)
+    throw new SourceIntakeError(
+      response.status === 413
+        ? 'Image exceeds the current upload limit.'
+        : 'Asset rejected this image under its current policy.',
+      true
+    );
   if (!response.ok)
     throw new Error(
       response.status === 401
@@ -203,13 +223,20 @@ export async function recentCreations(signal?: AbortSignal): Promise<readonly Wa
 }
 export async function downloadOriginal(wallpaper: WallpaperStatus, signal: AbortSignal) {
   if (!wallpaper.assetId || !wallpaper.sourceId) return;
+  return downloadSourceOriginal(wallpaper.assetId, wallpaper.sourceId, signal);
+}
+export async function downloadSourceOriginal(
+  assetId: string,
+  sourceId: string,
+  signal: AbortSignal
+) {
   const response = await request(
-    `${assetUrl}/assets/${encodeURIComponent(wallpaper.assetId)}/sources/${encodeURIComponent(wallpaper.sourceId)}/original`,
+    `${assetUrl}/assets/${encodeURIComponent(assetId)}/sources/${encodeURIComponent(sourceId)}/original`,
     { signal }
   );
   const filename =
     /filename="([A-Za-z0-9_.-]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ??
-    wallpaper.sourceId;
+    sourceId;
   const blob = await response.blob();
   signal.throwIfAborted();
   const url = URL.createObjectURL(blob);
@@ -218,4 +245,129 @@ export async function downloadOriginal(wallpaper: WallpaperStatus, signal: Abort
   anchor.download = filename;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function managedCandidate(input: unknown): ManagedCandidate {
+  const v = object(input);
+  if (
+    typeof v.candidateId !== 'string' ||
+    typeof v.expectedSourceSetRevision !== 'string' ||
+    !/^(0|[1-9][0-9]{0,39})$/.test(v.expectedSourceSetRevision) ||
+    typeof v.status !== 'string' ||
+    ![
+      'awaiting-bytes',
+      'inspecting',
+      'ready',
+      'accepting',
+      'accepted',
+      'rejected',
+      'cancelled',
+    ].includes(v.status) ||
+    (v.status === 'accepted' && typeof v.sourceId !== 'string')
+  )
+    throw new Error('Invalid Source candidate response');
+  return {
+    candidateId: v.candidateId,
+    expectedSourceSetRevision: v.expectedSourceSetRevision,
+    status: v.status,
+    ...(typeof v.sourceId === 'string' ? { sourceId: v.sourceId } : {}),
+    ...(typeof v.reason === 'string' ? { reason: v.reason } : {}),
+  };
+}
+export async function ownedSources(
+  asset: string,
+  signal: AbortSignal,
+  candidateCursor?: string
+): Promise<OwnedSources> {
+  const v = object(
+    await (
+      await request(
+        `${assetUrl}/assets/${encodeURIComponent(asset)}/sources${candidateCursor ? `?candidateCursor=${encodeURIComponent(candidateCursor)}` : ''}`,
+        { signal }
+      )
+    ).json()
+  );
+  if (
+    typeof v.sourceSetRevision !== 'string' ||
+    !/^(0|[1-9][0-9]{0,39})$/.test(v.sourceSetRevision) ||
+    !Array.isArray(v.sources) ||
+    !Array.isArray(v.candidates) ||
+    v.candidates.length > 32 ||
+    typeof v.hasPendingCandidates !== 'boolean' ||
+    (v.nextCandidateCursor !== undefined &&
+      (typeof v.nextCandidateCursor !== 'string' ||
+        v.nextCandidateCursor.length === 0 ||
+        v.nextCandidateCursor.length > 256))
+  )
+    throw new Error('Invalid owned Sources response');
+  return {
+    sourceSetRevision: v.sourceSetRevision,
+    hasPendingCandidates: v.hasPendingCandidates,
+    ...(typeof v.nextCandidateCursor === 'string'
+      ? { nextCandidateCursor: v.nextCandidateCursor }
+      : {}),
+    candidates: v.candidates.map(managedCandidate),
+    sources: v.sources.map((input) => {
+      const s = object(input),
+        facts = object(s.facts);
+      if (
+        typeof s.sourceId !== 'string' ||
+        typeof facts.width !== 'number' ||
+        typeof facts.height !== 'number'
+      )
+        throw new Error('Invalid accepted Source response');
+      return { sourceId: s.sourceId, facts: { width: facts.width, height: facts.height } };
+    }),
+  };
+}
+export function browserSourceBatchApi(): SourceBatchApi<File> {
+  const creation = browserCreationApi();
+  const path = (asset: string, id: string) =>
+    `${assetUrl}/assets/${encodeURIComponent(asset)}/source-candidates/${encodeURIComponent(id)}`;
+  return {
+    identifier: () => crypto.randomUUID(),
+    begin: creation.begin,
+    wallpaper: creation.status,
+    list: ownedSources,
+    expectSource: creation.expectSource,
+    wait: creation.wait,
+    create: async (asset, key, revision, signal) =>
+      managedCandidate(
+        await (
+          await request(`${assetUrl}/assets/${encodeURIComponent(asset)}/source-candidates`, {
+            method: 'POST',
+            ...json({ operation: 'add', expectedSourceSetRevision: revision }),
+            headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
+            signal,
+          })
+        ).json()
+      ),
+    status: async (asset, id, signal) =>
+      managedCandidate(await (await request(path(asset, id), { signal })).json()),
+    upload: async (asset, id, file, signal) =>
+      managedCandidate(
+        await (
+          await request(`${path(asset, id)}/bytes`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body: file,
+            signal,
+          })
+        ).json()
+      ),
+    accept: async (asset, id, revision, correlation, signal) =>
+      managedCandidate(
+        await (
+          await request(`${path(asset, id)}/accept`, {
+            method: 'POST',
+            ...json({ operation: 'add', expectedSourceSetRevision: revision }),
+            headers: { 'Content-Type': 'application/json', 'X-Correlation-Id': correlation },
+            signal,
+          })
+        ).json()
+      ),
+    cancel: async (asset, id, signal) => {
+      await request(path(asset, id), { method: 'DELETE', signal });
+    },
+  };
 }

@@ -1,3 +1,4 @@
+vi.mock('@/components/upload/wallpaper-sources',()=>({WallpaperSources:()=>null}));
 import {UploadDropZone} from '@/components/upload/upload-drop-zone';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';

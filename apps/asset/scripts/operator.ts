@@ -17,6 +17,8 @@ import { provisionAssetBroker, recoverQuarantine } from '../src/adapters/command
 import { sourcePostgresLayer } from '../src/adapters/sources/index.js';
 import { SourceAcceptanceOutbox } from '../src/capabilities/sources/index.js';
 import { ResultOutbox } from '../src/capabilities/lifecycle/index.js';
+import { CleanupStore } from '../src/capabilities/cleanup/index.js';
+import { cleanupPostgresLayer } from '../src/adapters/cleanup/index.js';
 
 async function usingConnection<A>(
   url: string,
@@ -67,16 +69,32 @@ export async function runOperator(args: readonly string[]) {
       'recover',
       'recover-result',
       'recover-source-confirmation',
+      'recover-cleanup',
     ].includes(mode ?? '')
   )
     throw new Error(
-      'Select bootstrap, provision, activate, create, quarantine, recover, recover-result or recover-source-confirmation'
+      'Select bootstrap, provision, activate, create, quarantine, recover, recover-result, recover-source-confirmation or recover-cleanup'
     );
   const authority = readAuthority(
     values['authority-file'] ?? process.env.ASSET_AUTHORITY_FILE ?? './.authority.json'
   );
   const url = values.url ?? process.env.NATS_URL;
   const databaseUrl = process.env.DATABASE_URL;
+  if (mode === 'recover-cleanup') {
+    if (!databaseUrl || !values.id || !/^(candidate|source):[A-Za-z0-9_-]{1,128}$/.test(values.id))
+      throw new Error('DATABASE_URL and exact cleanup responsibility ID required');
+    const id = values.id;
+    const runtime = ManagedRuntime.make(
+      cleanupPostgresLayer({ databaseUrl, ...authority.delivery, leaseMs: 30000 })
+    );
+    try {
+      return {
+        recovered: await runtime.runPromise(CleanupStore.use((store) => store.recover(id))),
+      };
+    } finally {
+      await runtime.dispose();
+    }
+  }
   if (mode === 'bootstrap' || mode === 'provision') {
     if (!url) throw new Error('NATS_URL required');
     for (const application of Object.values(authority.applications))

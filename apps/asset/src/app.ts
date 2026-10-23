@@ -33,6 +33,12 @@ import {
 } from './adapters/commands/index.js';
 
 import { lifecycleSourceInspectionLayer } from './source-lifecycle.js';
+import { cleanupLayer } from './capabilities/cleanup/index.js';
+import {
+  cleanupPostgresLayer,
+  cleanupWorkerLayer,
+  CleanupHealth,
+} from './adapters/cleanup/index.js';
 import { sourcesLayer } from './capabilities/sources/index.js';
 import {
   sourcePostgresLayer,
@@ -95,12 +101,24 @@ function authorityComposition(config: Config) {
     accessKeyId: config.s3AccessKeyId,
     secretAccessKey: config.s3SecretAccessKey,
     bucket: config.s3Bucket,
+    reclamationTimeoutMs: authority.sourceOperations.reclamationTimeoutMs,
   });
-  const sources = sourcesLayer({ revision: authority.identity, types: authority.assetTypes }).pipe(
-    Layer.provide(Layer.merge(sourcePersistence, sourceStorage))
-  );
+  const sources = sourcesLayer({
+    revision: authority.identity,
+    types: authority.assetTypes,
+    readLifetimeMs: authority.sourceOperations.readLifetimeMs,
+  }).pipe(Layer.provide(Layer.merge(sourcePersistence, sourceStorage)));
   const sourcePublisher = sourceConfirmationsLayer(commandOptions).pipe(
     Layer.provide(sourcePersistence)
+  );
+  const cleanupPersistence = cleanupPostgresLayer({
+    databaseUrl: config.databaseUrl,
+    ...authority.delivery,
+    leaseMs: authority.sourceOperations.reclamationTimeoutMs + 30000,
+  });
+  const cleanup = cleanupLayer.pipe(Layer.provide(Layer.merge(cleanupPersistence, sourceStorage)));
+  const reclamation = cleanupWorkerLayer(commandOptions).pipe(
+    Layer.provide(Layer.merge(cleanup, cleanupPersistence))
   );
   const notifications = operatorWebhookLayer({
     ...commandOptions,
@@ -114,15 +132,23 @@ function authorityComposition(config: Config) {
       const notification = yield* OperatorNotificationHealth;
       const identity = yield* AuthorAuthenticationHealth;
       const sourceConfirmation = yield* SourceConfirmationHealth;
+      const cleanupHealth = yield* CleanupHealth;
       return {
         identity: identity.check,
         check: () =>
-          Effect.all([command.check(), notification.check(), sourceConfirmation.check()]).pipe(
-            Effect.map((values) => values.every(Boolean))
-          ),
+          Effect.all([
+            command.check(),
+            notification.check(),
+            sourceConfirmation.check(),
+            cleanupHealth.check(),
+          ]).pipe(Effect.map((values) => values.every(Boolean))),
       };
     })
-  ).pipe(Layer.provide(Layer.mergeAll(commands, notifications, authentication, sourcePublisher)));
+  ).pipe(
+    Layer.provide(
+      Layer.mergeAll(commands, notifications, authentication, sourcePublisher, reclamation)
+    )
+  );
   const inspectedLifecycle = lifecycleSourceInspectionLayer.pipe(
     Layer.provide(Layer.merge(lifecycle, sources))
   );

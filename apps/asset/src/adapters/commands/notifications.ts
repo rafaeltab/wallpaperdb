@@ -32,7 +32,12 @@ export const noticeSchema = z
       .string()
       .regex(/^source-accepted:source_[a-f0-9-]{36}$/)
       .optional(),
-    kind: z.enum(['command-quarantine', 'result-quarantine', 'source-confirmation-quarantine']),
+    kind: z.enum([
+      'command-quarantine',
+      'result-quarantine',
+      'source-confirmation-quarantine',
+      'cleanup-quarantine',
+    ]),
     subject: z.string().min(1).max(256),
     reason: z.enum(['invalid', 'exhausted']),
     context: noticeContext.optional(),

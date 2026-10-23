@@ -706,3 +706,54 @@ it.each([
     await f.close();
   }
 });
+it('recovers stopped additional inspection by same-digest replay while fencing changed bytes and preserving accepted Sources', async () => {
+  const f = fixture();
+  try {
+    const first = await create(f, 'accepted-first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const original = await f.call((s) => s.list(owner, 'asset_one'));
+    const next = await create(f, 'stopped-inspection', '1');
+    f.setInspect(() =>
+      Effect.fail(new SourceFailure({ operation: 'inspect', cause: 'owned inspection stopped' }))
+    );
+    await expect(upload(f, next)).rejects.toBeDefined();
+    expect(await f.call((s) => s.status(owner, 'asset_one', next))).toMatchObject({
+      candidate: { status: 'inspecting' },
+    });
+    expect(await upload(f, next, [9, 8, 7])).toEqual({
+      kind: 'rejected',
+      reason: 'byte-digest-conflict',
+    });
+    const unchanged = await f.call((s) => s.list(owner, 'asset_one'));
+    if (original.kind !== 'found' || unchanged.kind !== 'found')
+      throw new Error('Expected Sources');
+    expect(unchanged.asset.sources).toEqual(original.asset.sources);
+    expect(unchanged.asset.sourceSetRevision).toBe('1');
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width: 100,
+          height: 100,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    expect(await upload(f, next)).toMatchObject({ candidate: { status: 'ready' } });
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+      )
+    ).toMatchObject({ candidate: { status: 'accepted', sourceSetRevision: '2' } });
+    const recovered = await f.call((s) => s.list(owner, 'asset_one'));
+    if (recovered.kind !== 'found') throw new Error('Expected Sources');
+    expect(recovered.asset.sources[0]).toEqual(original.asset.sources[0]);
+    expect(recovered.asset.sources).toHaveLength(2);
+  } finally {
+    await f.close();
+  }
+});

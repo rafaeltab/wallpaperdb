@@ -1102,3 +1102,63 @@ it.each([
     await f.close();
   }
 });
+
+it('fences late cancelled replacement inspection after a new candidate has won', async () => {
+  const f = fixture();
+  let entered!: () => void, finish!: () => void;
+  const inspecting = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  let pending: Promise<unknown> | undefined;
+  try {
+    const first = await create(f, 'first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const previous = f.state.sources[0];
+    if (!previous) throw new Error('Expected predecessor');
+    const replacement = {
+      operation: 'replace-one' as const,
+      targetSourceId: previous.sourceId,
+      expectedSourceSetRevision: '1',
+    };
+    const proposed = await f.call((s) =>
+      s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'late' })
+    );
+    if (proposed.kind !== 'candidate') throw new Error('Expected candidate');
+    const facts = previous.facts;
+    f.setInspect(() =>
+      Effect.promise(async () => {
+        entered();
+        await release;
+        return { kind: 'verified' as const, facts };
+      })
+    );
+    pending = upload(f, proposed.candidate.candidateId);
+    await inspecting;
+    await f.call((s) => s.cancel(owner, 'asset_one', proposed.candidate.candidateId));
+    f.setInspect(() => Effect.succeed({ kind: 'verified', facts }));
+    const winning = await f.call((s) =>
+      s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'winner' })
+    );
+    if (winning.kind !== 'candidate') throw new Error('Expected candidate');
+    await upload(f, winning.candidate.candidateId);
+    await f.call((s) => s.accept(owner, 'asset_one', winning.candidate.candidateId, replacement));
+    const saved = structuredClone(f.state);
+    finish();
+    await pending;
+    expect(
+      await f.call((s) => s.accept(owner, 'asset_one', proposed.candidate.candidateId, replacement))
+    ).toEqual({ kind: 'rejected', reason: 'candidate-not-ready' });
+    expect(f.state).toEqual(saved);
+    expect(f.state.defaultSourceId).toBe(winning.candidate.sourceId);
+    expect(f.retirements).toHaveLength(1);
+    expect(f.confirmations).toHaveLength(2);
+  } finally {
+    finish();
+    await pending;
+    await f.close();
+  }
+});

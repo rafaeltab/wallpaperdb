@@ -189,7 +189,7 @@ export function sourcesLayer(configuration: {
             const policy = configuration.types[state.asset.assetType];
             if (!policy || !policy.operations.includes(input.operation))
               return reject('unsupported-operation');
-            // Replacements are separate operations with their own membership semantics.
+            // Full-set replacement belongs to picture intake.
             if (input.operation === 'replace-set') return reject('unsupported-operation');
             if (input.expectedSourceSetRevision !== state.sourceSetRevision)
               return reject('source-set-conflict');

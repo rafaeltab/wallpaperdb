@@ -37,7 +37,7 @@
       "description": "",
       "options": {
         "mode": "markdown",
-        "content": "Completed run summaries only. Run panels use **host only**; task panels also use package/task. Attempt = task node with valid execution timing; skipped/untimed nodes are excluded. Window totals are **Prometheus increase estimates**, placed at collection time, not exact run completion time. MISS = execution elapsed; HIT = cache-hit handling elapsed, including legitimate **0 ms**. Parallel task elapsed can exceed run wall time. Neither is CPU time or saved compute. Gaps mean unavailable data, not zero; ratios and means are undefined with zero attempts. Lifetime values ignore the time picker and cover persisted exporter state only. Freshness is pipeline/exporter liveness, not proof every Turbo invocation produced a summary."
+        "content": "Completed summaries, not invocation coverage. Runs filter by **host**; tasks also use package/task. Attempts require valid execution timing; skipped/untimed nodes are excluded. Window totals are **Prometheus increase estimates** at collection time, not exact completion time. MISS = execution elapsed; HIT = cache-hit handling, including valid **0 ms**. Parallel task elapsed can exceed run wall time. Neither is CPU time or saved compute. Gaps are unavailable, not zero. Ratios/means are undefined without attempts. Lifetime snapshots are cumulative state at range end, not window increases. Heartbeat measures exporter/pipeline liveness."
       }
     },
     {
@@ -267,7 +267,7 @@
     },
     {
       "id": 6,
-      "title": "Collector age \u00b7 now",
+      "title": "Collector age \u00b7 range end",
       "type": "stat",
       "gridPos": {
         "x": 16,
@@ -279,7 +279,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Age of latest exported heartbeat value at selected range end. Under 60s expected; over 120s stale. A missing heartbeat is No data, not healthy. Independent of package/task filters.",
+      "description": "Worst heartbeat age across reporting selected hosts at range end. Under 60s expected; over 120s stale. Missing heartbeat is unavailable, not healthy. This is pipeline/exporter liveness, not invocation coverage. Independent of package/task filters.",
       "targets": [
         {
           "datasource": {
@@ -287,7 +287,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "time() - max (wallpaperdb_turbo_collector_heartbeat_seconds{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"})",
+          "expr": "max (time() - wallpaperdb_turbo_collector_heartbeat_seconds{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"})",
           "refId": "A",
           "legendFormat": "",
           "instant": true,
@@ -351,7 +351,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Instant cumulative total since persistent collection state was created. Ignores dashboard window; host filter only. State deletion resets this lifetime.",
+      "description": "Instant cumulative total since persistent collection state was created. Snapshot at selected range end, not a window increase; host filter only. State deletion resets this lifetime.",
       "targets": [
         {
           "datasource": {
@@ -856,7 +856,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Instant cumulative counts, histogram sums and sum/count means from the one persistent exporter per host. Ignores selected window. Uses host and, for task measures, package/task. No recorded observations means undefined mean. State deletion starts a new collection lifetime.",
+      "description": "Instant cumulative counts, histogram sums and sum/count means from the one persistent exporter per host. Snapshot at selected range end, not a window increase. Uses host and, for task measures, package/task. No recorded observations means undefined mean. State deletion starts a new collection lifetime.",
       "targets": [
         {
           "datasource": {

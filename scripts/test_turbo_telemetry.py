@@ -180,7 +180,9 @@ class TelemetryTest(unittest.TestCase):
                    "--interval", "0.1", "--endpoint", f"http://127.0.0.1:{server.server_port}/v1/metrics"]
 
         def start():
-            process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            log = (self.root / "collector.log").open("a")
+            self.addCleanup(log.close)
+            process = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=log)
 
             def stop():
                 process.terminate()
@@ -211,6 +213,7 @@ class TelemetryTest(unittest.TestCase):
         first = wait_for_count(0)
         start_ns = self.metric("wallpaperdb.turbo.runs", first)["sum"]["dataPoints"][0]["startTimeUnixNano"]
         wait_for_count(1)
+        self.assertIn("operation=export error=HTTPError http_status=503", (self.root / "collector.log").read_text())
         process.terminate()
         process.wait(timeout=10)
         process = start()

@@ -178,6 +178,24 @@ def export(payload, endpoint):
             raise ValueError("collector rejected metric points")
 
 
+def report_failure(operation, error):
+    details = f"operation={operation} error={type(error).__name__}"
+    if isinstance(error, urllib.error.HTTPError):
+        details += f" http_status={error.code}"
+    elif isinstance(error, subprocess.CalledProcessError):
+        details += f" exit_code={error.returncode}"
+    elif isinstance(error, subprocess.TimeoutExpired):
+        details += f" timeout_seconds={error.timeout}"
+    else:
+        reason = error.reason if isinstance(error, urllib.error.URLError) else error
+        if isinstance(error, urllib.error.URLError):
+            details += f" reason_type={type(reason).__name__}"
+        if isinstance(reason, OSError) and reason.errno is not None:
+            details += f" errno={reason.errno}"
+    # Exception messages and response bodies can contain URLs, paths or content.
+    print(f"Turbo telemetry failed: {details}; cumulative state retained for retry.", file=sys.stderr, flush=True)
+
+
 def collect(git_dir, state, endpoint, interval):
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     with (state / "collector.lock").open("w") as lock:
@@ -194,12 +212,16 @@ def collect(git_dir, state, endpoint, interval):
         signal.signal(signal.SIGINT, stop)
         try:
             while not stopping:
+                operation = "discover"
                 try:
-                    scan(store, worktrees(git_dir), store.start_ns // 1_000_000, seen)
+                    paths = worktrees(git_dir)
+                    operation = "scan"
+                    scan(store, paths, store.start_ns // 1_000_000, seen)
+                    operation = "export"
                     export(store.payload(bootstrap=True), endpoint)
                     store.exported()
-                except (OSError, ValueError, subprocess.SubprocessError):
-                    print("Turbo telemetry collection/export failed; cumulative state retained for retry.", file=sys.stderr, flush=True)
+                except (OSError, ValueError, subprocess.SubprocessError) as error:
+                    report_failure(operation, error)
                 for _ in range(max(1, int(interval * 10))):
                     if stopping:
                         break

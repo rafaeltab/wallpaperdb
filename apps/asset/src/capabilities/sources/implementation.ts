@@ -513,9 +513,17 @@ export function sourcesLayer(configuration: {
             )
           );
           const elapsed = (yield* Clock.currentTimeMillis) - startedAt;
+          if (elapsed >= lifetimeMs) {
+            yield* release;
+            return unavailable;
+          }
           const opened = yield* storage
-            .read(sourceId, assetId, Math.max(1, lifetimeMs - elapsed))
+            .read(sourceId, assetId, Math.min(lifetimeMs, lifetimeMs - elapsed))
             .pipe(Effect.onError(() => release));
+          if ((yield* Clock.currentTimeMillis) >= startedAt + lifetimeMs) {
+            yield* opened.close().pipe(Effect.ensuring(release));
+            return unavailable;
+          }
           yield* opened.closed.pipe(Effect.ensuring(release), Effect.forkIn(scope));
           return {
             kind: 'original' as const,

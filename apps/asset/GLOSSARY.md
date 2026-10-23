@@ -70,6 +70,9 @@ Removal of a non-default Source rendition from an Asset's active membership whil
 **Private evidence retention**:
 The Asset service's retention of retired Source bytes under the policy selected by Asset type, separately from public delivery and active source membership. Retained evidence does not restore a deleted Asset, and its recorded expiry survives later configuration changes.
 
+**Source candidate**:
+An Owner's private proposal to add or replace a Source rendition, bound to one Asset and one intended operation. Receiving its bytes or verifying its mandatory facts does not make it an accepted member of the Asset. Cancelling a candidate cannot withdraw an accepted Source rendition.
+
 **Source acceptance policy**:
 The rules selected by Asset type governing whether the Asset service accepts a proposed Source rendition. Changes apply to later additions and replacements without automatically withdrawing already accepted sources.
 

@@ -1,0 +1,26 @@
+export {
+  SourceFailure,
+  SourceStore,
+  SourceBytes,
+  MandatoryInspection,
+  Sources,
+  SourceAcceptanceOutbox,
+  type SourceFacts,
+  type SourceOperation,
+  type CandidateIntent,
+  type Candidate,
+  type AcceptedSource,
+  type SourceState,
+  type SourceConfirmation,
+  type SourceOutcome,
+  type SourceStorePort,
+  type SourceBytesPort,
+  type MandatoryInspectionPort,
+  type SourceUpload,
+  type SourcesPort,
+  type SourcePublication,
+  type SourceConfirmationAlert,
+  type SourceAcceptanceOutboxPort,
+} from './contract.js';
+export { sourcesLayer } from './implementation.js';
+export { initialSourcePolicies, type SourcePolicy } from './policy.js';

@@ -2,6 +2,7 @@
 export interface SourcePolicy {
   readonly maxActiveSources: number;
   readonly maxCandidates: number;
+  readonly aspectRatioTolerance: number;
   readonly operations: readonly ('add' | 'replace-one' | 'replace-set')[];
   readonly admission: {
     readonly maxBytes: number;
@@ -17,6 +18,7 @@ export const initialSourcePolicies = {
   wallpaper: {
     maxActiveSources: 16,
     maxCandidates: 2,
+    aspectRatioTolerance: 0.03,
     operations: ['add', 'replace-one'],
     admission: {
       maxBytes: 52428800,
@@ -30,6 +32,7 @@ export const initialSourcePolicies = {
   picture: {
     maxActiveSources: 1,
     maxCandidates: 2,
+    aspectRatioTolerance: 0.03,
     operations: ['add', 'replace-set'],
     admission: {
       maxBytes: 5242880,

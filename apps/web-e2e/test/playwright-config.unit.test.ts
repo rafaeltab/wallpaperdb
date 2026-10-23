@@ -304,6 +304,9 @@ describe("workspace commands", () => {
     expect(packageJson.scripts["test:e2e:ui"]).toContain(
       "node --experimental-strip-types ./src/verify-environment.ts &&",
     );
+    for (const script of ["test:e2e", "test:e2e:ui", "test:e2e:headed"]) {
+      expect(packageJson.scripts[script]).not.toContain("--pass-with-no-tests");
+    }
   });
 
   it("commits two image fixtures for the first authenticated upload flow", () => {

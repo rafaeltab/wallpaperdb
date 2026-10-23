@@ -20,6 +20,9 @@ import {
   assetConfiguration,
   assetResultOutbox,
   ownedAssets,
+  assetSourceState,
+  immutableSources,
+  assetDeletions,
 } from '../../db/schema.js';
 
 interface PostgresOptions {
@@ -88,8 +91,6 @@ const poolResource = (databaseUrl: string) =>
   );
 function result(input: unknown): CommandResult {
   const parsed = AssetCommandResultSchema.parse(input);
-  if (parsed.outcome !== 'created' && parsed.outcome !== 'rejected')
-    throw new Error('Unexpected lifecycle result');
   return parsed;
 }
 async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
@@ -134,6 +135,74 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
           ownerSubject: input.decision.owner.subject,
         });
         outcome = { ...input.correlation, outcome: 'created', assetId: id };
+      } else if (input.decision.kind === 'delete') {
+        const decision = input.decision;
+        const [asset] = await tx
+          .select()
+          .from(ownedAssets)
+          .where(eq(ownedAssets.id, decision.assetId))
+          .for('update');
+        if (!asset || asset.applicationId !== input.applicationId)
+          outcome = {
+            ...input.correlation,
+            outcome: 'rejected',
+            assetId: null,
+            reason: 'unavailable-asset',
+          };
+        else if (asset.deletedAt !== null)
+          outcome = { ...input.correlation, outcome: 'already-deleted', assetId: asset.id };
+        else {
+          const retentionMs = decision.evidenceRetentionMsByType[asset.assetType];
+          if (!Number.isSafeInteger(retentionMs) || retentionMs === undefined || retentionMs < 0)
+            throw new Error('Missing Asset deletion retention policy');
+          const deletedAt = new Date();
+          const evidenceExpiresAt = new Date(deletedAt.getTime() + retentionMs);
+          const [record] = await tx
+            .select()
+            .from(assetSourceState)
+            .where(eq(assetSourceState.assetId, asset.id));
+          const sourceSetRevision = (
+            BigInt(record?.state.sourceSetRevision ?? '0') + 1n
+          ).toString();
+          const deliveryRevision = (BigInt(record?.state.deliveryRevision ?? '0') + 1n).toString();
+          await tx.update(ownedAssets).set({ deletedAt }).where(eq(ownedAssets.id, asset.id));
+          if (record) {
+            const state = record.state;
+            state.sources = [];
+            state.defaultSourceId = null;
+            state.sourceSetRevision = sourceSetRevision;
+            state.deliveryRevision = deliveryRevision;
+            for (const candidate of state.candidates)
+              if (!['accepted', 'rejected', 'cancelled'].includes(candidate.status)) {
+                candidate.status = 'cancelled';
+                candidate.reason = 'asset-deleted';
+              }
+            state.nonterminalCandidateCount = 0;
+            await tx
+              .update(assetSourceState)
+              .set({ state })
+              .where(eq(assetSourceState.assetId, asset.id));
+          }
+          await tx
+            .update(immutableSources)
+            .set({ evidenceExpiresAt })
+            .where(
+              and(
+                eq(immutableSources.assetId, asset.id),
+                isNull(immutableSources.evidenceExpiresAt)
+              )
+            );
+          await tx
+            .insert(assetDeletions)
+            .values({
+              assetId: asset.id,
+              deletedAt,
+              sourceSetRevision,
+              deliveryRevision,
+              evidenceExpiresAt,
+            });
+          outcome = { ...input.correlation, outcome: 'deleted', assetId: asset.id };
+        }
       } else
         outcome = {
           ...input.correlation,
@@ -229,7 +298,10 @@ export function lifecyclePostgresLayer(options: PostgresOptions) {
         accept: (input) => run('accept-command', (db) => accept(db, input)),
         find: (id) =>
           run('inspect-owner', async (db) => {
-            const [row] = await db.select().from(ownedAssets).where(eq(ownedAssets.id, id));
+            const [row] = await db
+              .select()
+              .from(ownedAssets)
+              .where(and(eq(ownedAssets.id, id), isNull(ownedAssets.deletedAt)));
             return row
               ? {
                   id: row.id,

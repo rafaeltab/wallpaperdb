@@ -22,7 +22,7 @@ it('creates a stable empty Asset whose inspection requires both Owner parts', as
             ...input.correlation,
             outcome: 'rejected',
             assetId: null,
-            reason: input.decision.reason,
+            reason: input.decision.kind === 'reject' ? input.decision.reason : 'unavailable-asset',
           };
         stored = {
           id: 'asset_assigned',
@@ -36,6 +36,7 @@ it('creates a stable empty Asset whose inspection requires both Owner parts', as
   };
   const runtime = ManagedRuntime.make(
     lifecycleLayer({
+      assetTypes: {},
       revision: 'policy-1',
       applications: {
         user: { ownerNamespace: 'clerk', allowedOperations: ['create'], allowedTypes: ['picture'] },

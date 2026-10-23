@@ -44,6 +44,7 @@ function start() {
     leaseMs: 1000,
   });
   const lifecycle = lifecycleLayer({
+    assetTypes: authority.assetTypes,
     revision: authority.identity,
     applications: authority.applications,
   }).pipe(Layer.provide(persistence));

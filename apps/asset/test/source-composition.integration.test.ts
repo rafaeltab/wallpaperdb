@@ -269,6 +269,7 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
         })
       ).rawPayload
     ).toEqual(png);
+    const acceptanceStartedAt = Date.now();
     const race = await Promise.all(
       candidates.map((replacementId) =>
         app.inject({
@@ -279,6 +280,7 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
         })
       )
     );
+    const acceptanceFinishedAt = Date.now();
     expect(race.map((response) => response.statusCode).sort()).toEqual([200, 409]);
     const winner = race
       .find((response) => response.statusCode === 200)
@@ -316,7 +318,9 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
     );
     const deadline = retirement.rows[0]?.evidence_expires_at;
     expect(deadline).toBeInstanceOf(Date);
-    expect((deadline?.getTime() ?? 0) - Date.now()).toBeGreaterThan(604790000);
+    const retiredAt = (deadline?.getTime() ?? 0) - 7 * 24 * 60 * 60 * 1000;
+    expect(retiredAt).toBeGreaterThanOrEqual(acceptanceStartedAt);
+    expect(retiredAt).toBeLessThanOrEqual(acceptanceFinishedAt);
     // An old callback is fenced; a winner replay cannot reset retirement or create a third membership revision.
     const replay = await Promise.all(
       candidates.map((replacementId) =>

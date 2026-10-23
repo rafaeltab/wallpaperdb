@@ -108,6 +108,10 @@ export interface SourceStorePort {
         readonly sourceId: string;
         readonly evidenceExpiresAt: string;
       };
+      readonly retirements?: readonly {
+        readonly sourceId: string;
+        readonly evidenceExpiresAt: string;
+      }[];
       readonly readProtection?: {
         readonly readId: string;
         readonly sourceId: string;

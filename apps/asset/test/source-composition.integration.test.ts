@@ -22,7 +22,7 @@ import {
   sourceConfirmationsLayer,
   SourceConfirmationHealth,
 } from '../src/adapters/sources/index.js';
-import { SourceBytes, sourcesLayer } from '../src/capabilities/sources/index.js';
+import { SourceBytes, Sources, sourcesLayer } from '../src/capabilities/sources/index.js';
 import { LifecycleStore } from '../src/capabilities/lifecycle/index.js';
 import { AuthorAuthentication } from '../src/adapters/authors/index.js';
 import { AssetDelivery } from '../src/capabilities/delivery/index.js';
@@ -630,6 +630,172 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
   } finally {
     await app.close();
     await publisher.dispose();
+    await lifecycle.dispose();
+  }
+});
+
+it('fences late upload and immutable preparation completion after terminal deletion', async () => {
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: postgres.getConnectionUri(),
+      revision: authority.identity,
+      ...authority.delivery,
+      leaseMs: 1000,
+    })
+  );
+  const persistence = sourcePostgresLayer({
+    databaseUrl: postgres.getConnectionUri(),
+    ...authority.delivery,
+    leaseMs: 1000,
+  });
+  const s3 = tester.getS3();
+  const storage = sourceStorageLayer({
+    endpoint: s3.endpoints.fromHost,
+    region: 'us-east-1',
+    accessKeyId: s3.options.accessKey,
+    secretAccessKey: s3.options.secretKey,
+    bucket: 'composition-private',
+  });
+  let suspend: 'upload' | 'prepare' | null = null;
+  let entered = () => {};
+  let release = () => {};
+  let resume: Promise<void> = Promise.resolve();
+  const delayed = Layer.effect(
+    SourceBytes,
+    Effect.gen(function* () {
+      const real = yield* SourceBytes;
+      const pause = (phase: 'upload' | 'prepare') =>
+        Effect.gen(function* () {
+          if (suspend !== phase) return;
+          entered();
+          yield* Effect.promise(() => resume);
+        });
+      return SourceBytes.of({
+        ...real,
+        put: (...args) => real.put(...args).pipe(Effect.andThen(pause('upload'))),
+        prepare: (...args) => real.prepare(...args).pipe(Effect.andThen(pause('prepare'))),
+      });
+    })
+  ).pipe(Layer.provide(storage));
+  const sources = ManagedRuntime.make(
+    sourcesLayer({ revision: authority.identity, types: authority.assetTypes }).pipe(
+      Layer.provide(Layer.mergeAll(persistence, storage, delayed))
+    )
+  );
+  const owner = { namespace: 'clerk-test', subject: 'late-work-owner' };
+  const png = await sharp({ create: { width: 8, height: 6, channels: 3, background: 'green' } })
+    .png()
+    .toBuffer();
+  const stream = () => ({
+    async *[Symbol.asyncIterator]() {
+      yield png;
+    },
+    cancel() {},
+  });
+  try {
+    for (const phase of ['upload', 'prepare'] as const) {
+      suspend = null;
+      const created = await lifecycle.runPromise(
+        LifecycleStore.use((s) =>
+          s.accept({
+            revision: authority.identity,
+            applicationId: 'wallpaper',
+            canonical: `late-create-${phase}`,
+            correlation: { commandId: `late-create-${phase}`, applicationReference: '' },
+            context: {
+              occurrence: { source: 'https://test/wallpaper', id: `late-create-${phase}` },
+            },
+            decision: { kind: 'create', assetType: 'wallpaper', owner },
+          })
+        )
+      );
+      if (created.outcome !== 'created') throw new Error('Expected Asset');
+      const assetId = created.assetId;
+      const intent = { operation: 'add' as const, expectedSourceSetRevision: '0' };
+      const candidate = await sources.runPromise(
+        Sources.use((s) => s.create(owner, assetId, { ...intent, idempotencyKey: `late-${phase}` }))
+      );
+      if (candidate.kind !== 'candidate') throw new Error('Expected candidate');
+      const id = candidate.candidate.candidateId;
+      if (phase === 'prepare')
+        expect(
+          await sources.runPromise(Sources.use((s) => s.upload(owner, assetId, id, stream())))
+        ).toMatchObject({ kind: 'candidate', candidate: { status: 'ready' } });
+      const ready = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      resume = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      suspend = phase;
+      const pending = sources.runPromise(
+        Sources.use((s) =>
+          phase === 'upload'
+            ? s.upload(owner, assetId, id, stream())
+            : s.accept(owner, assetId, id, intent)
+        )
+      );
+      try {
+        await ready;
+        expect(
+          await lifecycle.runPromise(
+            LifecycleStore.use((s) =>
+              s.accept({
+                revision: authority.identity,
+                applicationId: 'wallpaper',
+                canonical: `late-delete-${phase}`,
+                correlation: { commandId: `late-delete-${phase}`, applicationReference: '' },
+                context: {
+                  occurrence: { source: 'https://test/wallpaper', id: `late-delete-${phase}` },
+                },
+                decision: {
+                  kind: 'delete',
+                  assetId,
+                  evidenceRetentionMsByType: { wallpaper: 604800000 },
+                },
+              })
+            )
+          )
+        ).toMatchObject({ outcome: 'deleted' });
+      } finally {
+        release();
+      }
+      expect(await pending).toEqual({ kind: 'unavailable' });
+      expect(await sources.runPromise(Sources.use((s) => s.list(owner, assetId)))).toEqual({
+        kind: 'unavailable',
+      });
+      expect(
+        await sources.runPromise(Sources.use((s) => s.accept(owner, assetId, id, intent)))
+      ).toEqual({ kind: 'unavailable' });
+      expect(
+        (await pool.query('SELECT state FROM asset_source_state WHERE asset_id=$1', [assetId]))
+          .rows[0].state
+      ).toMatchObject({
+        sources: [],
+        nonterminalCandidateCount: 0,
+        candidates: [{ candidateId: id, status: 'cancelled', reason: 'asset-deleted' }],
+      });
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS count FROM source_acceptance_outbox WHERE confirmation->>'assetId'=$1",
+            [assetId]
+          )
+        ).rows
+      ).toEqual([{ count: 0 }]);
+      // The reserved candidate and Source destinations remain known for bounded cleanup.
+      expect(
+        (
+          await pool.query(
+            'SELECT count(*)::int AS count FROM asset_deletions WHERE asset_id=$1 AND cleanup_pending',
+            [assetId]
+          )
+        ).rows
+      ).toEqual([{ count: 1 }]);
+    }
+  } finally {
+    release();
+    await sources.dispose();
     await lifecycle.dispose();
   }
 });

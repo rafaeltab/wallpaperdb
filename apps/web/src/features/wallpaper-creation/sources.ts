@@ -215,12 +215,11 @@ export function createWallpaperSourceBatch<TFile>(
                   currentReceipt.candidate = candidate;
                 }
               };
-              await waitForInspection();
-              if (candidate.status === 'awaiting-bytes') {
+              if (candidate.status === 'awaiting-bytes' || candidate.status === 'inspecting') {
                 candidate = await api.upload(asset, candidate.candidateId, row.value, signal);
                 receipt.candidate = candidate;
-                await waitForInspection();
               }
+              await waitForInspection();
               if (['rejected', 'cancelled'].includes(candidate.status)) {
                 definitiveFailure = true;
                 if (blockedInitial === row.id) blockedInitial = undefined;

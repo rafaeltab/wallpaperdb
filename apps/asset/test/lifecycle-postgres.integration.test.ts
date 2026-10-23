@@ -51,7 +51,9 @@ afterAll(async () => {
   await container?.stop();
 });
 beforeEach(async () => {
-  await pool.query('TRUNCATE owned_assets, asset_commands, asset_result_outbox');
+  await pool.query(
+    'TRUNCATE owned_assets, asset_commands, asset_result_outbox, asset_deletions, asset_source_state, immutable_sources'
+  );
 });
 it('atomically assigns one identity through concurrent replay, preserves application scoping and records conflict results', async () => {
   await runtime.runPromise(
@@ -333,4 +335,80 @@ it('terminally deletes only for its Creating application and preserves replay fe
       ).toMatchObject({ outcome: 'rejected', reason: 'unavailable-asset' });
     })
   );
+});
+
+it('rolls back terminal state and all responsibilities if the deletion result cannot commit', async () => {
+  const created = await runtime.runPromise(LifecycleStore.use((s) => s.accept(input)));
+  if (created.outcome !== 'created') throw new Error('Expected Asset');
+  const deletion: Acceptance = {
+    ...input,
+    canonical: 'rollback-delete',
+    correlation: { commandId: 'rollback-delete', applicationReference: '' },
+    decision: {
+      kind: 'delete',
+      assetId: created.assetId,
+      evidenceRetentionMsByType: { picture: 2592000000 },
+    },
+  };
+  await pool.query(
+    'ALTER TABLE asset_result_outbox ADD CONSTRAINT proof_delete_failure CHECK (false) NOT VALID'
+  );
+  try {
+    await expect(
+      runtime.runPromise(LifecycleStore.use((s) => s.accept(deletion)))
+    ).rejects.toThrow();
+    expect(
+      await runtime.runPromise(LifecycleStore.use((s) => s.find(created.assetId)))
+    ).not.toBeNull();
+    expect((await pool.query('SELECT count(*)::int AS count FROM asset_deletions')).rows).toEqual([
+      { count: 0 },
+    ]);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS count FROM asset_commands WHERE command_id = 'rollback-delete'"
+        )
+      ).rows
+    ).toEqual([{ count: 0 }]);
+  } finally {
+    await pool.query('ALTER TABLE asset_result_outbox DROP CONSTRAINT proof_delete_failure');
+  }
+  const outcomes = await Promise.all(
+    ['delete-a', 'delete-b'].map((commandId) =>
+      runtime.runPromise(
+        LifecycleStore.use((s) =>
+          s.accept({
+            ...deletion,
+            canonical: commandId,
+            correlation: { commandId, applicationReference: '' },
+          })
+        )
+      )
+    )
+  );
+  expect(outcomes.map((outcome) => outcome.outcome).sort()).toEqual(['already-deleted', 'deleted']);
+  const before = (await pool.query('SELECT * FROM asset_deletions')).rows;
+  expect(before).toHaveLength(1);
+  expect(before[0]).toMatchObject({
+    asset_id: created.assetId,
+    source_set_revision: '1',
+    delivery_revision: '1',
+    capabilities_pending: true,
+    cleanup_pending: true,
+  });
+  await runtime.runPromise(
+    LifecycleStore.use((s) =>
+      s.accept({
+        ...deletion,
+        canonical: 'after-expiry',
+        correlation: { commandId: 'after-expiry', applicationReference: '' },
+        decision: {
+          kind: 'delete',
+          assetId: created.assetId,
+          evidenceRetentionMsByType: { picture: 1 },
+        },
+      })
+    )
+  );
+  expect((await pool.query('SELECT * FROM asset_deletions')).rows).toEqual(before);
 });

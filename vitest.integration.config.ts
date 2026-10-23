@@ -1,10 +1,10 @@
-import { defineConfig } from 'vitest/config';
+import { defineBaseConfig } from "@wallpaperdb/vitest-config";
 
-export default defineConfig({
-  test: {
-    name: 'repository-integration',
-    include: ['test/integration/**/*.test.ts'],
-    fileParallelism: false,
-    maxWorkers: 1,
-  },
+export default defineBaseConfig({
+	test: {
+		name: "repository-integration",
+		include: ["test/integration/**/*.test.ts"],
+		fileParallelism: false,
+		maxWorkers: 1,
+	},
 });

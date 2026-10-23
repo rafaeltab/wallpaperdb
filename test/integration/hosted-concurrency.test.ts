@@ -52,10 +52,13 @@ test.each([
       let active = 0;
       let peak = 0;
       let completed = 0;
-      it.concurrent.each([1, 2, 3, 4])('owned case %s', async () => {
+      it.concurrent.for([1, 2, 3, 4])('owned case %s', async (_case, { expect }) => {
         active++;
         peak = Math.max(peak, active);
-        try { await new Promise(resolve => setImmediate(resolve)); }
+        try {
+          expect(active).toBeLessThanOrEqual(${peak});
+          await new Promise(resolve => setImmediate(resolve));
+        }
         finally { active--; completed++; }
       });
       afterAll(() => writeFileSync(${JSON.stringify(resultPath)}, JSON.stringify({ active, completed, peak })));

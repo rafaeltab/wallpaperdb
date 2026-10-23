@@ -187,13 +187,15 @@ it('interrupts capability work when the requesting client disconnects', async ()
     await running;
     controller.abort();
     await response;
-    await Promise.race([
-      interrupted,
-      new Promise((_, reject) => {
-        const t = setTimeout(() => reject(new Error('Capability was not interrupted')), 1000);
-        t.unref();
-      }),
-    ]);
+    await expect(
+      Promise.race([
+        interrupted,
+        new Promise((_, reject) => {
+          const t = setTimeout(() => reject(new Error('Capability was not interrupted')), 1000);
+          t.unref();
+        }),
+      ])
+    ).resolves.toBeUndefined();
   } finally {
     await app.close();
   }

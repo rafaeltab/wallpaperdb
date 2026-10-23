@@ -34,7 +34,7 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   await pool.query(
-    'TRUNCATE wallpaper_workflow_quarantine, wallpaper_workflow_outbox, wallpaper_intents'
+    'TRUNCATE wallpaper_workflow_quarantine, wallpaper_workflow_outbox, wallpaper_source_intents, wallpaper_intents'
   );
 });
 it('durably reserves one identity and its command across concurrent callers and restart', async () => {

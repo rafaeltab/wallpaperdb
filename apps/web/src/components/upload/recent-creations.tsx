@@ -1,3 +1,4 @@
+import { WallpaperSources } from './wallpaper-sources';
 import { useAuth } from '@clerk/react';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
@@ -75,7 +76,7 @@ function RecentCreationsForOwner({
           >
             <p className="font-medium">
               {w.candidateStatus === 'rejected'
-                ? 'Source upload was rejected. Select the file again to start a new creation.'
+                ? 'Source upload was rejected. Add or retry a Source below for this same Wallpaper.'
                 : w.candidateStatus === 'cancelled'
                   ? 'Source upload was cancelled.'
                   : w.candidateStatus === 'unavailable'
@@ -85,7 +86,8 @@ function RecentCreationsForOwner({
                       : labels[w.state]}
             </p>
             <p className="text-xs break-all text-muted-foreground">{w.wallpaperId}</p>
-            {w.state !== 'published' &&
+            {!w.assetId &&
+              w.state !== 'published' &&
               w.state !== 'failed' &&
               w.candidateStatus !== 'rejected' &&
               w.candidateStatus !== 'cancelled' && (
@@ -118,6 +120,12 @@ function RecentCreationsForOwner({
                     }}
                   />
                 </label>
+              )}
+            {w.assetId &&
+              (w.state === 'published' ||
+                w.state === 'awaiting-source' ||
+                w.state === 'accepting-source') && (
+                <WallpaperSources wallpaperId={w.wallpaperId} assetId={w.assetId} />
               )}
             {w.state === 'published' && w.sourceId && (
               <button

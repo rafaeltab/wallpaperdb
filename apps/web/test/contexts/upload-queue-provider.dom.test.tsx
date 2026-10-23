@@ -1,3 +1,4 @@
+vi.mock('@/components/upload/wallpaper-sources',()=>({WallpaperSources:()=>null}));
 import {UploadDropZone} from '@/components/upload/upload-drop-zone';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';

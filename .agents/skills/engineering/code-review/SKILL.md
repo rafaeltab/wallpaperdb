@@ -28,12 +28,16 @@ Before going further, confirm the fixed point resolves (`git rev-parse <fixed-po
 
 ### 2. Identify the spec source
 
-Look for the originating spec, in this order:
+Use originating requirements supplied by the invoking workflow or established in the current conversation as the spec source. When `do-work` invokes this review, use its recorded requirements and starting comparison. Follow their issue or document references for supporting context.
+
+If requirements are not already available, look for the originating spec in this order:
 
 1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.), fetched via the workflow in `docs/agents/issue-tracker.md`.
 2. A path the user passed as an argument.
 3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
+
+When production behavior, tests, or test helpers change, gather the full affected public implementation, owning test suites, helpers, port contracts, and originating issue comments. Follow references to surrounding tests before claiming coverage is absent. Gather this context directly from the repository and issue tracker; the user does not need to assemble a review packet. Give the relevant paths and requirements to both sub-agents.
 
 ### 3. Identify the standards sources
 
@@ -76,6 +80,8 @@ Use the applicability decisions from step 1. Spawn one sub-agent per axis requir
 - The diff command and commit list.
 - The path or fetched contents of the spec.
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
+
+- For affected behavior, also assess the owning tests against the shared and subject-specific testing principles. For a test-quality finding, cite its assertion or missing case, the supporting requirement, and a plausible incorrect outcome the suite would accept or an unnecessary implementation dependency. Check surrounding independent encode/decode cases before criticizing a round trip. Distinguish explicit stability, idempotency, and input-preservation comparisons from circular expectations. Source text, serialized output and interactions may themselves be public contracts. Report supported defects and unresolved evidence gaps separately; a clean result is valid, and numerical readability limits or a finding quota are not review goals.
 
 If the spec is missing, skip the Spec sub-agent and note this in the final report.
 

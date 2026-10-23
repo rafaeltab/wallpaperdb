@@ -8,6 +8,10 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { Availability } from '../capabilities/availability/index.js';
 import { AssetDelivery } from '../capabilities/delivery/index.js';
 import { registerDeliveryRoutes } from './delivery.js';
+import { registerAuthorRoutes, type AuthorExecution as AuthorExecutionPort } from './authors.js';
+import { AuthorAuthentication } from '../adapters/authors/index.js';
+import { Lifecycle } from '../capabilities/lifecycle/index.js';
+import { tracingLayer } from '../runtime.js';
 
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -67,16 +71,45 @@ const executionLayer = Layer.effect(
     };
   })
 );
-export async function createHttpApp<E>(
+const AuthorExecution = Context.Service<AuthorExecutionPort>('asset/http/AuthorExecution');
+const authorExecutionLayer = Layer.effect(
+  AuthorExecution,
+  Effect.gen(function* () {
+    yield* AuthorAuthentication;
+    yield* Lifecycle;
+    const fibers = yield* FiberSet.make();
+    const run = yield* FiberSet.runtimePromise(fibers)<AuthorAuthentication | Lifecycle>();
+    return {
+      run: <A, E>(
+        effect: Effect.Effect<A, E, AuthorAuthentication | Lifecycle>,
+        headers: IncomingHttpHeaders,
+        signal?: AbortSignal
+      ) => {
+        const parent = trace.getSpan(propagation.extract(context.active(), headers))?.spanContext();
+        return run(parent ? OtelTracer.withSpanContext(effect, parent) : effect, { signal });
+      },
+    };
+  })
+);
+export async function createHttpApp<E, EAuthor = never>(
   config: HttpConfig,
   services: Layer.Layer<Availability | AssetDelivery, E>,
   options: {
     readonly logger?: boolean;
     readonly signal?: AbortSignal;
     readonly shutdownTimeoutMs?: number;
+    readonly authorServices?: Layer.Layer<AuthorAuthentication | Lifecycle, EAuthor>;
   } = {}
 ): Promise<FastifyInstance> {
-  const runtime = ManagedRuntime.make(executionLayer.pipe(Layer.provide(services)));
+  const authorExecution = options.authorServices
+    ? authorExecutionLayer.pipe(Layer.provide(options.authorServices))
+    : Layer.succeed(AuthorExecution, {
+        run: () => Promise.reject(new Error('Author services are not configured')),
+      });
+  const graph = Layer.merge(executionLayer.pipe(Layer.provide(services)), authorExecution).pipe(
+    Layer.provide(tracingLayer)
+  );
+  const runtime = ManagedRuntime.make(graph);
   const app = Fastify({
     logger: options.logger ?? false,
     forceCloseConnections: 'idle',
@@ -252,6 +285,10 @@ export async function createHttpApp<E>(
       }
     );
     registerDeliveryRoutes(app, run);
+    registerAuthorRoutes(
+      app,
+      options.authorServices ? await runtime.runPromise(AuthorExecution) : undefined
+    );
     await app.ready();
     app.connectionsState.connectionsInitialized = true;
     return app;

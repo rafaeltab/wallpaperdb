@@ -39,6 +39,11 @@
         reverse_proxy asset:3003
     }
 
+    handle_path /operator-inbox/* {
+        reverse_proxy asset-operator-inbox:3012
+    }
+    redir /operator-inbox /operator-inbox/ permanent
+
     handle_path /gateway/* {
         reverse_proxy gateway:3004
     }

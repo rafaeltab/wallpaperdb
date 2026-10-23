@@ -332,6 +332,31 @@
           }
         }
       }
+    },
+    "/assets/{assetId}/sources": {
+      "get": {
+        "summary": "Inspect the authenticated Owner's active Sources",
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "path",
+            "name": "assetId",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
     }
   },
   "servers": [

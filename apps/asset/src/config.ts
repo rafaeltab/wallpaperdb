@@ -9,6 +9,7 @@ import {
 } from '@wallpaperdb/core/config';
 import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
+import { readAuthority, type Authority } from './authority.js';
 
 // Load environment variables from .env file
 loadEnv();
@@ -33,7 +34,7 @@ const configSchema = z.object({
   userAssetServiceToken: z.string().min(1).optional(),
 });
 
-export type Config = z.infer<typeof configSchema>;
+export type Config = z.infer<typeof configSchema> & { readonly authority?: Authority };
 
 export function loadConfig(): Config {
   const nodeEnv = getEnv('NODE_ENV', 'development');
@@ -69,5 +70,8 @@ export function loadConfig(): Config {
     userAssetServiceToken: process.env.USER_MEDIA_SERVICE_TOKEN,
   };
 
-  return configSchema.parse(raw);
+  return {
+    ...configSchema.parse(raw),
+    authority: readAuthority(process.env.ASSET_AUTHORITY_FILE ?? './.authority.json'),
+  };
 }

@@ -32,7 +32,11 @@ import {
   type ProfileDecision,
 } from '../../capabilities/profile/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
-import { fencePendingAttachment, selectedAttachment } from '../picture-attachments/transaction.js';
+import {
+  fencePendingAttachment,
+  isPendingAttachment,
+  selectedAttachment,
+} from '../picture-attachments/transaction.js';
 import { recentHistoricalHandles, type ProfileReader } from './history.js';
 
 type Db = Parameters<Parameters<Database['run']>[0]>[0];
@@ -295,11 +299,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                 ).map((entry) => entry.handle);
                 const snapshot = {
                   profile,
-                  pendingAttachment: [
-                    'creating-asset',
-                    'awaiting-source',
-                    'accepting-source',
-                  ].includes(attachment?.state ?? ''),
+                  pendingAttachment: isPendingAttachment(attachment),
                   observedAt,
                   eligibleHandles,
                   targetClaim: targetClaim ?? null,

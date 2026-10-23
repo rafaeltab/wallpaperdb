@@ -125,6 +125,8 @@ Deployments retaining `GRAPHQL_MAX_COMPLEXITY=1000` must raise it to admit the w
 
 Drain old User replicas before applying `0010_dark_terrax.sql` and `0011_faithful_skrulls.sql`, then start the new image. These migrations add picture upload/deletion recovery states and outbox trace context. Do not run older picture cleanup workers alongside the new state machine.
 
+User's private Biography ownership feed accepts both legacy uploads and new Wallpaper publications. The [ownership consumer](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/user/src/adapters/events/consumer.ts) keeps the existing `user-wallpaper-ownership` durable and creates a separate `user-wallpaper-publication-ownership` durable for `wallpaper.published`. Its independent cursor reads retained publications that the legacy filter may already have skipped. Preserve both consumers and the ownership projection on restart; changing the old filter alone cannot recover those skipped facts. Replay is limited to history still retained in the configured Wallpaper stream. The [cross-context contract](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/user/test/wallpaper-publication.integration.test.ts) covers this upgrade path and Biography authorization.
+
 If startup rejects the legacy `WALLPAPER/user-wallpaper-ownership` consumer for a finite delivery limit and recorded redeliveries:
 
 1. Stop every User replica. Save the consumer configuration and acknowledgement floor, and verify retained history.

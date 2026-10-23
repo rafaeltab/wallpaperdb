@@ -110,6 +110,44 @@ function diagnose(rule, statements) {
 	return reports;
 }
 
+test("syntax locations retain UTF-16 columns and LF-only line boundaries", () => {
+	const tree = syntaxTree({
+		kind: "JS_MODULE",
+		text: "\ufeff/*😀*/one;\r\n\n  two;\r\u2028one;",
+		items: ["one", "two", "one"].map((name) => statement(identifier(name))),
+	});
+	assert.deepEqual(tree.loc, {
+		start: { line: 1, column: 0 },
+		end: { line: 3, column: 12 },
+	});
+	assert.deepEqual(
+		tree.body.map((node) => node.loc),
+		[
+			{ start: { line: 1, column: 7 }, end: { line: 1, column: 11 } },
+			{ start: { line: 3, column: 2 }, end: { line: 3, column: 6 } },
+			{ start: { line: 3, column: 8 }, end: { line: 3, column: 12 } },
+		],
+	);
+	assert.deepEqual(
+		tree.body.map((node) => node.expression.loc),
+		[
+			{ start: { line: 1, column: 7 }, end: { line: 1, column: 10 } },
+			{ start: { line: 3, column: 2 }, end: { line: 3, column: 5 } },
+			{ start: { line: 3, column: 8 }, end: { line: 3, column: 11 } },
+		],
+	);
+	for (const [text, end] of [
+		["", { line: 1, column: 0 }],
+		["one;\n", { line: 2, column: 0 }],
+		["one;\r\n\n", { line: 3, column: 0 }],
+	]) {
+		assert.deepEqual(syntaxTree({ kind: "JS_MODULE", text, items: [] }).loc, {
+			start: { line: 1, column: 0 },
+			end,
+		});
+	}
+});
+
 test("assertion algorithm distinguishes missing, uncalled and invalid matchers", () => {
 	assert.deepEqual(
 		diagnose(validExpect, [

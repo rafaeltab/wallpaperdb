@@ -33,9 +33,24 @@ function decodeEscapes(text) {
 
 export function syntaxTree(root) {
 	const source = root.text;
+	const lineStarts = [0];
+	for (
+		let newline = source.indexOf("\n");
+		newline !== -1;
+		newline = source.indexOf("\n", newline + 1)
+	) {
+		lineStarts.push(newline + 1);
+	}
 	const location = (offset) => {
-		const lines = source.slice(0, offset).split("\n");
-		return { line: lines.length, column: lines.at(-1).length };
+		const position = Math.min(offset, source.length);
+		let low = 0;
+		let high = lineStarts.length;
+		while (low + 1 < high) {
+			const middle = Math.floor((low + high) / 2);
+			if (lineStarts[middle] <= position) low = middle;
+			else high = middle;
+		}
+		return { line: low + 1, column: position - lineStarts[low] };
 	};
 	function build(native, start = 0) {
 		if (!native) return null;

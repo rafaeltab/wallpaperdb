@@ -11,6 +11,8 @@ export function buildWebE2EConfig(
 ): Pick<
   PlaywrightTestConfig,
   | "fullyParallel"
+  | "forbidOnly"
+  | "failOnFlakyTests"
   | "outputDir"
   | "projects"
   | "reporter"
@@ -25,6 +27,8 @@ export function buildWebE2EConfig(
   return {
     testDir: "./specs",
     fullyParallel: false,
+    forbidOnly: true,
+    failOnFlakyTests: true,
     workers: 1,
     retries: env.CI ? 1 : 0,
     outputDir: artifacts ? join(artifacts, "test-results") : "test-results",

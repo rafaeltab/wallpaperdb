@@ -31,6 +31,17 @@ function isNotice(value) {
 		["invalid", "exhausted"].includes(value.reason)
 	);
 }
+function problem(response, status, type, title, detail) {
+	response.writeHead(status, { "Content-Type": "application/problem+json" });
+	response.end(
+		JSON.stringify({
+			type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`,
+			title,
+			status,
+			detail,
+		}),
+	);
+}
 /** A local development operator destination. It exposes receipts, never Asset or
  * broker management. Delivery succeeds only after its receipt survives restart. */
 export async function createOperatorInbox({ directory, token }) {
@@ -68,7 +79,13 @@ export async function createOperatorInbox({ directory, token }) {
 				"WWW-Authenticate",
 				'Basic realm="WallpaperDB operator inbox"',
 			);
-			response.writeHead(401).end();
+			problem(
+				response,
+				401,
+				"unauthorized",
+				"Unauthorized",
+				"Valid operator inbox credentials are required.",
+			);
 			return;
 		}
 		try {
@@ -78,7 +95,13 @@ export async function createOperatorInbox({ directory, token }) {
 				for await (const chunk of request) {
 					size += chunk.length;
 					if (size > 8192) {
-						response.writeHead(413).end();
+						problem(
+							response,
+							413,
+							"payload-too-large",
+							"Payload too large",
+							"Operator notices must not exceed 8192 bytes.",
+						);
 						return;
 					}
 					chunks.push(chunk);
@@ -87,11 +110,23 @@ export async function createOperatorInbox({ directory, token }) {
 				try {
 					notice = JSON.parse(Buffer.concat(chunks).toString("utf8"));
 				} catch {
-					response.writeHead(400).end();
+					problem(
+						response,
+						400,
+						"invalid-operator-notice",
+						"Invalid operator notice",
+						"A valid operator notice is required.",
+					);
 					return;
 				}
 				if (!isNotice(notice)) {
-					response.writeHead(400).end();
+					problem(
+						response,
+						400,
+						"invalid-operator-notice",
+						"Invalid operator notice",
+						"A valid operator notice is required.",
+					);
 					return;
 				}
 				const accepted = writing
@@ -136,9 +171,21 @@ export async function createOperatorInbox({ directory, token }) {
 				);
 				return;
 			}
-			response.writeHead(404).end();
+			problem(
+				response,
+				404,
+				"not-found",
+				"Not found",
+				"The requested operator inbox route is unavailable.",
+			);
 		} catch {
-			response.writeHead(503).end();
+			problem(
+				response,
+				503,
+				"service-unavailable",
+				"Service unavailable",
+				"The operator inbox could not complete the request. Try again later.",
+			);
 		}
 	});
 }

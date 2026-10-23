@@ -1,13 +1,14 @@
 import { getAuthToken } from '@/lib/auth/token-provider';
 import {
-  SourceIntakeError,
-  type SourceBatchApi,
+  type CandidateStatus,
+  type CreationApi,
   type ManagedCandidate,
   type OwnedSources,
-  type CreationApi,
+  type SourceBatchApi,
+  SourceIntakeError,
   type WallpaperStatus,
-  type CandidateStatus,
 } from '../index';
+
 const wallpaperUrl = import.meta.env.VITE_WALLPAPER_URL || '/wallpaper';
 const assetUrl = import.meta.env.VITE_ASSET_URL || '/asset';
 function object(input: unknown): Record<string, unknown> {
@@ -46,12 +47,19 @@ function candidate(input: unknown): CandidateStatus {
     throw new Error('Invalid candidate response');
   return { candidateId: v.candidateId, status: v.status };
 }
-async function request(url: string, init: RequestInit = {}) {
+async function request(url: string, init: RequestInit = {}, sourceManagement = false) {
   const token = await getAuthToken();
-  if (!token) throw new Error('Sign in to create a Wallpaper.');
+  if (!token)
+    throw new Error(
+      sourceManagement ? 'Sign in to manage Wallpaper Sources.' : 'Sign in to create a Wallpaper.'
+    );
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   const response = await fetch(url, { ...init, headers });
+  if (sourceManagement && (response.status === 409 || response.status === 422))
+    throw new Error(
+      'Sources changed or this Source cannot be changed. Review the current Sources and try again.'
+    );
   if (response.status === 409)
     throw new SourceIntakeError(
       'Sources changed or their current limit was reached. Retry this file against the current set.',
@@ -227,6 +235,38 @@ export async function downloadOriginal(wallpaper: WallpaperStatus, signal: Abort
   const selected = current.sources.find((source) => source.sourceId === current.defaultSourceId);
   if (!selected) throw new Error('Accepted Source is unavailable. Refresh Sources and retry.');
   return downloadSourceOriginal(wallpaper.assetId, selected.sourceId, signal);
+}
+export async function selectSourceDefault(
+  assetId: string,
+  sourceId: string,
+  revision: string,
+  signal: AbortSignal
+) {
+  await request(
+    `${assetUrl}/assets/${encodeURIComponent(assetId)}/default-source`,
+    {
+      method: 'PUT',
+      ...json({ sourceId, expectedSourceSetRevision: revision }),
+      signal,
+    },
+    true
+  );
+}
+export async function withdrawSource(
+  assetId: string,
+  sourceId: string,
+  revision: string,
+  signal: AbortSignal
+) {
+  await request(
+    `${assetUrl}/assets/${encodeURIComponent(assetId)}/sources/${encodeURIComponent(sourceId)}`,
+    {
+      method: 'DELETE',
+      ...json({ expectedSourceSetRevision: revision }),
+      signal,
+    },
+    true
+  );
 }
 export async function downloadSourceOriginal(
   assetId: string,

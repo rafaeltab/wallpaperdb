@@ -66,7 +66,7 @@ declare module '@tanstack/react-router' {
 
 function SessionUploadQueue({ children }: { children: React.ReactNode }) {
   const { userId } = useAuth();
-  return <UploadQueueProvider key={userId ?? 'signed-out'}>{children}</UploadQueueProvider>;
+  return <UploadQueueProvider ownerId={userId}>{children}</UploadQueueProvider>;
 }
 
 function App() {

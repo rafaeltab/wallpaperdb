@@ -45,3 +45,32 @@ it('activates a tolerance edit as a distinct effective policy and rejects invali
     ).toThrow();
   }
 });
+
+it('keeps picture configuration canonical while allowing configured square dimensions and limits', () => {
+  const raw = authorityFixture();
+  const picture = raw.assetTypes.picture;
+  for (const invalid of [
+    { ...picture, maxActiveSources: 2 },
+    { ...picture, operations: ['add', 'replace-one'] },
+    { ...picture, admission: { ...picture.admission, squareSize: undefined } },
+    { ...picture, admission: { ...picture.admission, sourceModels: ['sdr-png'] } },
+  ]) {
+    expect(() =>
+      parseAuthority({ ...raw, assetTypes: { ...raw.assetTypes, picture: invalid } })
+    ).toThrow();
+  }
+  const configured = {
+    ...picture,
+    admission: {
+      ...picture.admission,
+      squareSize: 1024,
+      maxAxis: 1024,
+      maxPixels: 1048576,
+      maxBytes: 10485760,
+    },
+  };
+  expect(
+    parseAuthority({ ...raw, assetTypes: { ...raw.assetTypes, picture: configured } }).assetTypes
+      .picture
+  ).toMatchObject(configured);
+});

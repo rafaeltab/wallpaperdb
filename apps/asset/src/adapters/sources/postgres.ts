@@ -102,25 +102,28 @@ export function sourcePostgresLayer(options: Options) {
                 .select()
                 .from(assetSourceState)
                 .where(eq(assetSourceState.assetId, assetId));
-              const initial: SourceState | null = asset
-                ? (record?.state ?? {
-                    asset: {
-                      id: asset.id,
-                      applicationId: asset.applicationId,
-                      assetType: asset.assetType,
-                      owner: { namespace: asset.ownerNamespace, subject: asset.ownerSubject },
-                    },
-                    sourceSetRevision: '0',
-                    deliveryRevision: '0',
-                    defaultSourceId: null,
-                    initialAnalysisSourceId: null,
-                    sources: [],
-                    candidates: [],
-                    nonterminalCandidateCount: 0,
-                  })
-                : null;
+              const initial: SourceState | null =
+                asset && asset.deletedAt === null
+                  ? (record?.state ?? {
+                      asset: {
+                        id: asset.id,
+                        applicationId: asset.applicationId,
+                        assetType: asset.assetType,
+                        owner: { namespace: asset.ownerNamespace, subject: asset.ownerSubject },
+                      },
+                      sourceSetRevision: '0',
+                      deliveryRevision: '0',
+                      defaultSourceId: null,
+                      initialAnalysisSourceId: null,
+                      sources: [],
+                      candidates: [],
+                      nonterminalCandidateCount: 0,
+                    })
+                  : null;
               const priorSources = initial?.sources.map((source) => source.sourceId) ?? [];
               const changed = change(initial);
+              if (changed.state && (!asset || asset.deletedAt !== null))
+                throw new Error('Unavailable Asset cannot accept Source state');
               if (changed.state && asset) {
                 for (const source of changed.state.sources) {
                   const [existing] = await tx

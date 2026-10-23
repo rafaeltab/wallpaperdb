@@ -140,20 +140,18 @@ beforeAll(async () => {
   await manager.streams.add({ name: 'WALLPAPER', subjects: ['wallpaper.>'] });
   await manager.streams.add({ name: 'PROFILE', subjects: ['profile.>'] });
   const s3 = tester.getS3();
-  assetUrl = z
-    .object({ url: z.string().url() })
-    .parse(
-      await control('configure', {
-        databaseUrl: assetDatabase.getConnectionUri(),
-        natsUrl,
-        storage: {
-          endpoint: s3.endpoints.fromHost,
-          accessKeyId: s3.options.accessKey,
-          secretAccessKey: s3.options.secretKey,
-          bucket: 'picture-attachment-roundtrip',
-        },
-      })
-    ).url;
+  assetUrl = z.object({ url: z.string().url() }).parse(
+    await control('configure', {
+      databaseUrl: assetDatabase.getConnectionUri(),
+      natsUrl,
+      storage: {
+        endpoint: s3.endpoints.fromHost,
+        accessKeyId: s3.options.accessKey,
+        secretAccessKey: s3.options.secretKey,
+        bucket: 'picture-attachment-roundtrip',
+      },
+    })
+  ).url;
   operator = await connect({
     servers: natsUrl,
     user: descriptor.operator.user,
@@ -320,11 +318,36 @@ it('attaches a canonical SDR Source only after durable User confirmation, and pr
     )
   ).rows[0]?.event;
   if (!command) throw new Error('Missing durable creation command');
-  await application.jetstream().publish('asset.commands.user.create', JSON.stringify(command));
-  await new Promise((r) => setTimeout(r, 100));
+  const manager = await operator.jetstreamManager();
+  const resultsBeforeReplay = (await manager.streams.info('ASSET_RESULTS')).state.last_seq;
+  await poll(
+    () => manager.consumers.info('ASSET_RESULTS', 'results_user'),
+    (state) => state.ack_floor.stream_seq >= resultsBeforeReplay
+  );
+  const quarantineBeforeReplay = (await manager.streams.info('ASSET_QUARANTINE')).state.last_seq;
+  const profileEvents = () =>
+    userPool.query('select id,payload from outbox_events where aggregate_id=$1 order by id', [
+      'owner',
+    ]);
+  const eventsBeforeReplay = (await profileEvents()).rows;
+  const replay = await application
+    .jetstream()
+    .publish('asset.commands.user.create', JSON.stringify(command));
+  expect(replay.duplicate).toBe(false);
+  await poll(
+    () => manager.consumers.info('ASSET_COMMANDS', 'commands_user'),
+    (state) => state.ack_floor.stream_seq >= replay.seq
+  );
+  // The identical command occurrence retains its already published result identity.
+  expect((await manager.streams.info('ASSET_RESULTS')).state.last_seq).toBe(resultsBeforeReplay);
+  expect((await manager.streams.info('ASSET_QUARANTINE')).state.last_seq).toBe(
+    quarantineBeforeReplay
+  );
+  expect(await status()).toMatchObject({ state: 'attached', assetId: created.assetId, sourceId });
   expect(
     (await user.inject({ method: 'POST', url: '/profile/me/ensure', headers: headers() })).json()
   ).toMatchObject({ version: version + 1, pictureAssetId: created.assetId });
+  expect((await profileEvents()).rows).toEqual(eventsBeforeReplay);
   expect(
     (
       await user.inject({

@@ -32,6 +32,7 @@ import {
   type ProfileDecision,
 } from '../../capabilities/profile/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
+import { fencePendingAttachment } from '../picture-attachments/transaction.js';
 import { recentHistoricalHandles, type ProfileReader } from './history.js';
 
 type Db = Parameters<Parameters<Database['run']>[0]>[0];
@@ -107,7 +108,7 @@ async function ownerProfile(
     policy
   );
 }
-async function appendEvent(
+export async function appendProfileEvent(
   tx: Transaction,
   profile: Profile,
   change: ProfileUpdatedEvent['change'] | { type: 'created' },
@@ -246,7 +247,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                     createdAt: acceptedAt,
                     nextAttemptAt: acceptedAt,
                   });
-                await appendEvent(tx, profile, { type: 'created' }, acceptedAt, metadata);
+                await appendProfileEvent(tx, profile, { type: 'created' }, acceptedAt, metadata);
                 return ownerProfile(tx, profile, policy, acceptedAt);
               });
             } catch (cause) {
@@ -327,7 +328,8 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                   policy,
                   asset ?? null
                 );
-                await appendEvent(tx, updated, change, observedAt, metadata);
+                await fencePendingAttachment(tx, current.id);
+                await appendProfileEvent(tx, updated, change, observedAt, metadata);
                 return {
                   outcome: {
                     _tag: 'Success',

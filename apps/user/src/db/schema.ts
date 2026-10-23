@@ -1,11 +1,14 @@
 import type { ProfileCreatedEvent, ProfileUpdatedEvent } from '@wallpaperdb/events';
+import type { PictureAttachment } from '../capabilities/picture-attachments/index.js';
 import { sql } from 'drizzle-orm';
 import {
   bigserial,
+  check,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   pgEnum,
   text,
   timestamp,
@@ -143,3 +146,79 @@ export const wallpaperOwnership = pgTable('wallpaper_ownership', {
 });
 export type WallpaperOwnership = typeof wallpaperOwnership.$inferSelect;
 export type NewWallpaperOwnership = typeof wallpaperOwnership.$inferInsert;
+
+export const pictureAttachmentIntents = pgTable(
+  'picture_attachment_intents',
+  {
+    id: text('id').primaryKey(),
+    profileId: text('profile_id')
+      .notNull()
+      .references(() => profiles.id),
+    key: text('request_key').notNull(),
+    assetId: text('asset_id'),
+    state: jsonb('state').$type<PictureAttachment>().notNull(),
+  },
+  (t) => [
+    uniqueIndex('picture_attachment_request_identity').on(t.profileId, t.key),
+    uniqueIndex('picture_attachment_asset_identity').on(t.assetId),
+  ]
+);
+export const attachmentOutbox = pgTable(
+  'picture_attachment_outbox',
+  {
+    id: text('id').primaryKey(),
+    attachmentId: text('attachment_id')
+      .notNull()
+      .references(() => pictureAttachmentIntents.id),
+    destination: text('destination').notNull(),
+    event: jsonb('event').$type<Readonly<Record<string, unknown>>>().notNull(),
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+    leaseId: text('lease_id'),
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
+  },
+  (t) => [
+    index('picture_attachment_outbox_due').on(t.status, t.availableAt),
+    check(
+      'picture_attachment_outbox_status',
+      sql`${t.status} IN ('pending','leased','published','quarantined')`
+    ),
+  ]
+);
+export const attachmentQuarantine = pgTable('picture_attachment_quarantine', {
+  id: text('id').primaryKey(),
+  payload: text('payload').notNull(),
+  reason: text('reason').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  notifiedAt: timestamp('notified_at', { withTimezone: true }),
+  recoveredAt: timestamp('recovered_at', { withTimezone: true }),
+});
+
+export const pictureAttachmentSlots = pgTable('picture_attachment_slots', {
+  profileId: text('profile_id')
+    .primaryKey()
+    .references(() => profiles.id),
+  intentId: text('intent_id')
+    .notNull()
+    .references(() => pictureAttachmentIntents.id),
+});
+
+export const attachmentSourceIntents = pgTable(
+  'picture_attachment_source_intents',
+  {
+    attachmentId: text('attachment_id')
+      .notNull()
+      .references(() => pictureAttachmentIntents.id),
+    candidateId: text('candidate_id').notNull(),
+    intentId: text('intent_id').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.attachmentId, t.candidateId, t.intentId] }),
+    check(
+      'picture_attachment_candidate_bound',
+      sql`octet_length(${t.candidateId}) BETWEEN 1 AND 256`
+    ),
+    check('picture_attachment_intent_bound', sql`octet_length(${t.intentId}) BETWEEN 1 AND 256`),
+  ]
+);

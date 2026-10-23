@@ -107,8 +107,14 @@ export interface SourceStorePort {
         readonly sourceId: string;
         readonly evidenceExpiresAt: string;
       };
+      readonly readProtection?: {
+        readonly readId: string;
+        readonly sourceId: string;
+        readonly expiresAt: string;
+      };
     }
   ) => Effect.Effect<A, SourceFailure>;
+  readonly releaseRead: (readId: string) => Effect.Effect<void, SourceFailure>;
 }
 export class SourceStore extends Context.Service<SourceStore, SourceStorePort>()(
   'asset/sources/Store'
@@ -130,9 +136,14 @@ export interface SourceBytesPort {
   ) => Effect.Effect<void, SourceFailure>;
   readonly read: (
     sourceId: string,
-    assetId: string
+    assetId: string,
+    lifetimeMs?: number
   ) => Effect.Effect<
-    { readonly bytes: AsyncIterable<Uint8Array>; readonly close: () => Effect.Effect<void> },
+    {
+      readonly bytes: AsyncIterable<Uint8Array>;
+      readonly close: () => Effect.Effect<void>;
+      readonly closed: Effect.Effect<void>;
+    },
     SourceFailure
   >;
 }

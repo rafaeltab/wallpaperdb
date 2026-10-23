@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Effect, Layer } from 'effect';
 import { Pool } from 'pg';
@@ -15,6 +15,7 @@ import {
   assetSourceState,
   immutableSources,
   assetDeletions,
+  sourceReads,
 } from '../../db/schema.js';
 
 interface Options {
@@ -126,11 +127,34 @@ export function cleanupPostgresLayer(options: Options) {
                   row.availableAt > now
                 )
                   return null;
+                const target = row.target;
+                if (target.kind === 'source') {
+                  const protectedReads = await tx
+                    .select({ id: sourceReads.id })
+                    .from(sourceReads)
+                    .where(
+                      and(
+                        eq(sourceReads.assetId, row.assetId),
+                        eq(sourceReads.sourceId, target.sourceId),
+                        gt(sourceReads.expiresAt, now)
+                      )
+                    )
+                    .limit(1);
+                  if (protectedReads.length) return null;
+                  await tx
+                    .delete(sourceReads)
+                    .where(
+                      and(
+                        eq(sourceReads.assetId, row.assetId),
+                        eq(sourceReads.sourceId, target.sourceId),
+                        lte(sourceReads.expiresAt, now)
+                      )
+                    );
+                }
                 const [record] = await tx
                   .select()
                   .from(assetSourceState)
                   .where(eq(assetSourceState.assetId, row.assetId));
-                const target = row.target;
                 if (
                   target.kind === 'source' &&
                   record?.state.sources.some((source) => source.sourceId === target.sourceId)

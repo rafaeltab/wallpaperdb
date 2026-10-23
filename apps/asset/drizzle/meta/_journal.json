@@ -92,6 +92,13 @@
       "when": 1792735609579,
       "tag": "0012_sad_baron_strucker",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792735855562,
+      "tag": "0013_curved_stranger",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,119 @@ const tester = new Tester().withS3().withS3Bucket('cleanup-private');
 beforeAll(() => tester.setup(), 60000);
 afterAll(() => tester.destroy());
 
+it('does not acknowledge permanent reclamation before an already consumed conditional PUT is fenced', async () => {
+  const s3 = tester.getS3(),
+    upstream = new URL(s3.endpoints.fromHost);
+  let entered!: () => void,
+    rejectEntered!: (cause: unknown) => void,
+    release = () => {};
+  const consuming = new Promise<void>((resolve, reject) => {
+    entered = resolve;
+    rejectEntered = reject;
+  });
+  let held = false;
+  const proxy = createServer(async (incoming, outgoing) => {
+    if (!held && incoming.method === 'PUT' && incoming.headers['if-none-match'] === '*') {
+      held = true;
+      const chunks: Buffer[] = [];
+      for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
+      const body = Buffer.concat(chunks);
+      const forwarded = request(
+        {
+          hostname: upstream.hostname,
+          port: upstream.port,
+          path: incoming.url,
+          method: incoming.method,
+          headers: { ...incoming.headers, expect: '100-continue' },
+          signal: AbortSignal.timeout(5000),
+        },
+        (response) => {
+          outgoing.writeHead(response.statusCode ?? 502, response.headers);
+          response.pipe(outgoing);
+        }
+      );
+      forwarded.on('error', (cause) => {
+        rejectEntered(cause);
+        outgoing.destroy();
+      });
+      forwarded.once('continue', () => {
+        forwarded.write(body.subarray(0, -1));
+        release = () => forwarded.end(body.subarray(-1));
+        entered();
+      });
+      forwarded.flushHeaders();
+    } else {
+      const forwarded = request(
+        {
+          hostname: upstream.hostname,
+          port: upstream.port,
+          path: incoming.url,
+          method: incoming.method,
+          headers: incoming.headers,
+        },
+        (response) => {
+          outgoing.writeHead(response.statusCode ?? 502, response.headers);
+          response.pipe(outgoing);
+        }
+      );
+      forwarded.on('error', () => outgoing.destroy());
+      incoming.pipe(forwarded);
+    }
+  });
+  await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+  const address = proxy.address();
+  if (!address || typeof address === 'string') throw new Error('Missing proxy');
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: `http://127.0.0.1:${address.port}`,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'cleanup-private',
+      reclamationTimeoutMs: 1000,
+    })
+  );
+  const bytes = new Uint8Array([2, 4, 6, 8]),
+    digest = createHash('sha256').update(bytes).digest('hex');
+  const pending = runtime.runPromise(
+    SourceBytes.use((storage) => Effect.exit(storage.put('consumed-put', bytes, digest)))
+  );
+  try {
+    await consuming;
+    const reclaimed = await runtime.runPromise(
+      CleanupBytes.use((cleanup) =>
+        Effect.exit(cleanup.reclaim({ kind: 'candidate', candidateId: 'consumed-put' }))
+      )
+    );
+    release();
+    const put = await pending;
+    expect(reclaimed._tag).toBe('Success');
+    expect(put._tag).toBe('Failure');
+    const head = await tester.s3.getS3Client().send(
+      new HeadObjectCommand({
+        Bucket: 'cleanup-private',
+        Key: 'asset-layout-1/private/candidates/consumed-put/input',
+      })
+    );
+    expect(head.ContentLength).toBe(0);
+    expect(head.Metadata).toEqual({ reclaimed: 'true' });
+    console.info(
+      JSON.stringify({
+        qualification:
+          'Seaweed 4.47 conditional PUT after HTTP100Continue with last body byte held',
+        reclamation: reclaimed._tag,
+        putAfterReclamation: put._tag,
+      })
+    );
+  } finally {
+    release();
+    await pending;
+    await runtime.dispose();
+    proxy.closeAllConnections();
+    await new Promise<void>((resolve) => proxy.close(() => resolve()));
+  }
+});
+
 it.each([
   'upload',
   'prepare',

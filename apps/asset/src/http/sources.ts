@@ -153,6 +153,7 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
           ? reply.send({
               ...result.asset,
               sources: result.asset.sources.map(({ sourceId, facts }) => ({ sourceId, facts })),
+              candidates: result.asset.candidates.map(publicCandidate),
             })
           : reply.code(404).type('application/problem+json').send(problem(404, 'not-found'))
     )

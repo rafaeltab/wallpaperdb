@@ -158,6 +158,7 @@ export interface SourcesPort {
           readonly assetId: string;
           readonly assetType: string;
           readonly sources: readonly AcceptedSource[];
+          readonly candidates: readonly Candidate[];
           readonly defaultSourceId: string | null;
           readonly sourceSetRevision: string;
           readonly deliveryRevision: string;

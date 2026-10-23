@@ -100,11 +100,11 @@ it('bounds failed and abandoned claims, fences stale completion and recovers del
     expect(await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)))).toEqual([]);
     expect(
       await cleanup.runPromise(CleanupStore.use((store) => store.pendingAlerts()))
-    ).toContainEqual({ id: first.id, applicationId: 'wallpaper' });
+    ).toContainEqual(expect.objectContaining({ id: first.id, applicationId: 'wallpaper' }));
     await cleanup.runPromise(CleanupStore.use((store) => store.alerted(first.id)));
     expect(
       await cleanup.runPromise(CleanupStore.use((store) => store.pendingAlerts()))
-    ).not.toContainEqual({ id: first.id, applicationId: 'wallpaper' });
+    ).not.toContainEqual(expect.objectContaining({ id: first.id, applicationId: 'wallpaper' }));
     expect(await cleanup.runPromise(CleanupStore.use((store) => store.recover(first.id)))).toBe(
       true
     );

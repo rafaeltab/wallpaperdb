@@ -63,24 +63,24 @@ export function cleanupWorkerLayer(options: Options) {
       const worker = yield* Effect.gen(function* () {
         while (yield* Ref.get(accepting)) {
           const successful = yield* Effect.gen(function* () {
-            const progress = yield* cleanup.run(10);
+            const progress = yield* cleanup.run(1);
             for (const alert of yield* store.pendingAlerts()) {
               const connection = connections.get(alert.applicationId);
               if (!connection) return false;
-              const id = createHash('sha256').update(`cleanup:${alert.id}`).digest('hex');
+              const id = createHash('sha256')
+                .update(`cleanup:${alert.notificationId}`)
+                .digest('hex');
               yield* broker('notify-quarantine', () =>
-                connection
-                  .jetstream()
-                  .publish(
-                    'asset.operator.notifications',
-                    JSON.stringify({
-                      id,
-                      kind: 'cleanup-quarantine',
-                      subject: 'asset.cleanup',
-                      reason: 'exhausted',
-                    }),
-                    { msgID: `cleanup-notification:${id}`, timeout: 5000 }
-                  )
+                connection.jetstream().publish(
+                  'asset.operator.notifications',
+                  JSON.stringify({
+                    id,
+                    kind: 'cleanup-quarantine',
+                    subject: 'asset.cleanup',
+                    reason: 'exhausted',
+                  }),
+                  { msgID: `cleanup-notification:${id}`, timeout: 5000 }
+                )
               );
               yield* store.alerted(alert.id);
             }

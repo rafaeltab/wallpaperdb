@@ -54,7 +54,14 @@ function authorityComposition(config: Config) {
   });
   const lifecycle = lifecycleLayer({
     revision: authority.identity,
-    applications: authority.applications,
+    applications: Object.fromEntries(
+      Object.entries(authority.applications).map(
+        ([id, { ownerNamespace, allowedOperations, allowedTypes }]) => [
+          id,
+          { ownerNamespace, allowedOperations, allowedTypes },
+        ]
+      )
+    ),
   }).pipe(Layer.provide(persistence));
   const commandOptions = {
     url: config.natsUrl,

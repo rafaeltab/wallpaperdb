@@ -266,6 +266,7 @@ export const sourceCleanup = pgTable(
     availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
     leaseId: text('lease_id'),
     notifiedAt: timestamp('notified_at', { withTimezone: true }),
+    notificationId: text('notification_id').notNull().default(sql`gen_random_uuid()::text`),
   },
   (table) => [
     index('source_cleanup_ready').on(table.status, table.dueAt, table.availableAt),

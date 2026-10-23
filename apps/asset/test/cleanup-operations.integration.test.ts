@@ -180,10 +180,16 @@ it('routes exhausted cleanup to the authenticated operator inbox and resumes onl
       await pool.query('SELECT id, status, due_at FROM source_cleanup ORDER BY id')
     ).rows;
     expect(quarantined.every((row) => row.status === 'quarantined')).toBe(true);
-    failing = false;
     const path = join(directory, 'authority.json');
     await writeFile(path, JSON.stringify(raw), { mode: 0o600 });
     process.env.DATABASE_URL = postgres.getConnectionUri();
+    for (const row of quarantined)
+      expect(
+        await runOperator(['recover-cleanup', '--id', row.id, '--authority-file', path])
+      ).toEqual({ recovered: true });
+    await expect.poll(() => received.length, { timeout: 5000 }).toBe(4);
+    expect(calls).toBe(8);
+    failing = false;
     for (const row of quarantined)
       expect(
         await runOperator(['recover-cleanup', '--id', row.id, '--authority-file', path])
@@ -199,7 +205,7 @@ it('routes exhausted cleanup to the authenticated operator inbox and resumes onl
         { timeout: 5000 }
       )
       .toBe(0);
-    expect(calls).toBe(6);
+    expect(calls).toBe(10);
     expect((await pool.query('SELECT due_at FROM source_cleanup ORDER BY id')).rows).toEqual(
       quarantined.map((row) => ({ due_at: row.due_at }))
     );

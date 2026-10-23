@@ -12,6 +12,22 @@ const labels = {
 };
 export function RecentCreations() {
   const { userId, isSignedIn } = useAuth();
+  return (
+    <RecentCreationsForOwner
+      key={userId ?? 'signed-out'}
+      userId={userId}
+      isSignedIn={!!isSignedIn}
+    />
+  );
+}
+
+function RecentCreationsForOwner({
+  userId,
+  isSignedIn,
+}: {
+  userId: string | null | undefined;
+  isSignedIn: boolean;
+}) {
   const active = useRef(new Set<AbortController>());
   useEffect(() => {
     if (!userId) return;

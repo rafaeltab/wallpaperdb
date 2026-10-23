@@ -1,4 +1,5 @@
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Clock, Effect, Layer, ManagedRuntime } from 'effect';
+import { TestClock } from 'effect/testing';
 import { describe, expect, it } from 'vitest';
 import {
   Sources,
@@ -16,7 +17,7 @@ import {
 import { initialSourcePolicies, type SourcePolicy } from '../src/capabilities/sources/index.js';
 const owner = { namespace: 'clerk', subject: 'owner' };
 const intent = { operation: 'add' as const, expectedSourceSetRevision: '0' };
-function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
+function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper, clock?: Clock.Clock) {
   let state: SourceState = {
     asset: { id: 'asset_one', applicationId: 'wallpaper', assetType: 'wallpaper', owner },
     sourceSetRevision: '0',
@@ -29,6 +30,7 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
   };
   let activeRevision = 'one';
   const confirmations: SourceConfirmation[] = [];
+  const retirements: { sourceId: string; evidenceExpiresAt: string }[] = [];
   const stored = new Map<string, Uint8Array>();
   let prepare: () => Effect.Effect<void, SourceFailure> = () => Effect.void;
   let inspect: () => Effect.Effect<
@@ -54,6 +56,7 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
           return Effect.fail(new SourceFailure({ operation: 'inactive-policy', cause: null }));
         const changed = change(assetId === state.asset.id ? structuredClone(state) : null);
         if (changed.state) state = structuredClone(changed.state);
+        if (changed.retirement) retirements.push(changed.retirement);
         if (changed.confirmation && !confirmations.some((c) => c.id === changed.confirmation?.id))
           confirmations.push(changed.confirmation);
         if (changed.confirmation && ambiguousCommit) {
@@ -104,11 +107,15 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
   let current = initialRuntime;
   return {
     call: <A, E>(f: (s: SourcesPort) => Effect.Effect<A, E>, signal?: AbortSignal) =>
-      current.runPromise(Sources.use(f), { signal }),
+      current.runPromise(
+        clock ? Sources.use(f).pipe(Effect.provideService(Clock.Clock, clock)) : Sources.use(f),
+        { signal }
+      ),
     get state() {
       return state;
     },
     confirmations,
+    retirements,
     setPrepare: (value: typeof prepare) => {
       prepare = value;
     },
@@ -824,6 +831,342 @@ it('bounds each discovery page while preserving continuation, exact old status a
       asset: { hasPendingCandidates: false },
     });
   } finally {
+    await f.close();
+  }
+});
+
+it('replaces the Default at the count limit only after preparation while retaining first analysis provenance', async () => {
+  const clockRuntime = ManagedRuntime.make(TestClock.layer());
+  await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-10-23T00:00:00.000Z')));
+  const clock = await clockRuntime.runPromise(Clock.clockWith(Effect.succeed));
+  const f = fixture({ ...initialSourcePolicies.wallpaper, maxActiveSources: 1 }, clock);
+  try {
+    const first = await create(f, 'first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const previous = f.state.sources[0];
+    if (!previous) throw new Error('Expected first Source');
+    const replacement = {
+      operation: 'replace-one' as const,
+      expectedSourceSetRevision: '1',
+      targetSourceId: previous.sourceId,
+    };
+    const proposed = await f.call((s) =>
+      s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'replace-first' })
+    );
+    expect(proposed).toMatchObject({ candidate: { status: 'awaiting-bytes' } });
+    if (proposed.kind !== 'candidate') throw new Error('Expected replacement candidate');
+    const id = proposed.candidate.candidateId;
+    await upload(f, id, [9, 8, 7]);
+    f.setPrepare(() =>
+      Effect.fail(new SourceFailure({ operation: 'interrupted-write', cause: null }))
+    );
+    await expect(
+      f.call((s) => s.accept(owner, 'asset_one', id, replacement))
+    ).rejects.toBeDefined();
+    expect(await f.call((s) => s.original(owner, 'asset_one', previous.sourceId))).toMatchObject({
+      kind: 'original',
+      facts: previous.facts,
+    });
+    expect(f.state.sources).toEqual([previous]);
+    expect(f.state.sourceSetRevision).toBe('1');
+    f.setPrepare(() => Effect.void);
+    expect(await f.call((s) => s.accept(owner, 'asset_one', id, replacement))).toMatchObject({
+      candidate: { status: 'accepted', sourceSetRevision: '2' },
+    });
+    const winner = f.state.sources[0];
+    expect(winner?.sourceId).not.toBe(previous.sourceId);
+    expect(f.state.sources).toHaveLength(1);
+    expect(f.state.defaultSourceId).toBe(winner?.sourceId);
+    expect(f.state.initialAnalysisSourceId).toBe(previous.sourceId);
+    expect(await f.call((s) => s.original(owner, 'asset_one', previous.sourceId))).toEqual({
+      kind: 'unavailable',
+    });
+    expect(f.confirmations[1]).toMatchObject({
+      assetId: 'asset_one',
+      defaultSourceId: winner?.sourceId,
+      initialAnalysisSourceId: previous.sourceId,
+      sourceSetRevision: '2',
+      deliveryRevision: '2',
+    });
+    expect(await f.call((s) => s.accept(owner, 'asset_one', id, replacement))).toMatchObject({
+      candidate: { status: 'accepted' },
+    });
+    expect(f.confirmations).toHaveLength(2);
+    const deadline = '2026-10-30T00:00:00.000Z';
+    expect(f.retirements).toEqual([{ sourceId: previous.sourceId, evidenceExpiresAt: deadline }]);
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-11-06T00:00:00.000Z')));
+    f.activate({
+      ...initialSourcePolicies.wallpaper,
+      retention: { evidenceMs: 1, candidateMs: 86400000 },
+    })();
+    expect(await f.call((s) => s.accept(owner, 'asset_one', id, replacement))).toMatchObject({
+      candidate: { status: 'accepted', sourceSetRevision: '2' },
+    });
+    expect(f.retirements).toEqual([{ sourceId: previous.sourceId, evidenceExpiresAt: deadline }]);
+  } finally {
+    await f.close();
+    await clockRuntime.dispose();
+  }
+});
+
+it.each([
+  { width: 1030, accepted: true },
+  { width: 1031, accepted: false },
+])('includes the replaced Source in the full oriented inclusive ratio check: $width', async ({
+  width,
+  accepted,
+}) => {
+  const f = fixture();
+  try {
+    const first = await create(f, 'ratio-first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const predecessor = f.state.sources[0];
+    if (!predecessor) throw new Error('Expected Source');
+    const replacement = {
+      operation: 'replace-one' as const,
+      expectedSourceSetRevision: '1',
+      targetSourceId: predecessor.sourceId,
+    };
+    const candidate = await f.call((s) =>
+      s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'ratio-replace' })
+    );
+    if (candidate.kind !== 'candidate') throw new Error('Expected candidate');
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width,
+          height: 1000,
+          orientation: 6,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    await upload(f, candidate.candidate.candidateId);
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', candidate.candidate.candidateId, replacement)
+      )
+    ).toMatchObject({
+      candidate: accepted
+        ? { status: 'accepted' }
+        : { status: 'rejected', reason: 'aspect-ratio-limit' },
+    });
+    expect(f.state.sourceSetRevision).toBe(accepted ? '2' : '1');
+    expect(f.retirements).toHaveLength(accepted ? 1 : 0);
+  } finally {
+    await f.close();
+  }
+});
+
+it('replaces a non-default independently and fences concurrent replacement, retargeting and late replay', async () => {
+  const f = fixture();
+  try {
+    const first = await create(f, 'first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const second = await create(f, 'second', '1');
+    await upload(f, second);
+    await f.call((s) =>
+      s.accept(owner, 'asset_one', second, { ...intent, expectedSourceSetRevision: '1' })
+    );
+    const predecessor = f.state.sources[1];
+    if (!predecessor) throw new Error('Expected second Source');
+    const replacement = {
+      operation: 'replace-one' as const,
+      targetSourceId: predecessor.sourceId,
+      expectedSourceSetRevision: '2',
+    };
+    const ids: string[] = [];
+    for (const key of ['replace-a', 'replace-b']) {
+      const outcome = await f.call((s) =>
+        s.create(owner, 'asset_one', { ...replacement, idempotencyKey: key })
+      );
+      if (outcome.kind !== 'candidate') throw new Error('Expected candidate');
+      ids.push(outcome.candidate.candidateId);
+      await upload(f, outcome.candidate.candidateId);
+    }
+    const one = ids[0];
+    if (!one) throw new Error('Expected candidate');
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', one, {
+          ...replacement,
+          targetSourceId: f.state.defaultSourceId ?? '',
+        })
+      )
+    ).toEqual({ kind: 'rejected', reason: 'candidate-intent-conflict' });
+    const results = await Promise.all(
+      ids.map((id) => f.call((s) => s.accept(owner, 'asset_one', id, replacement)))
+    );
+    expect(
+      results.filter((r) => r.kind === 'candidate' && r.candidate.status === 'accepted')
+    ).toHaveLength(1);
+    expect(results).toContainEqual({ kind: 'rejected', reason: 'source-set-conflict' });
+    const saved = structuredClone(f.state.sources);
+    for (const id of ids) await f.call((s) => s.accept(owner, 'asset_one', id, replacement));
+    expect(f.state.sources).toEqual(saved);
+    expect(f.state.sources).toHaveLength(2);
+    expect(f.state.defaultSourceId).toBe(f.state.initialAnalysisSourceId);
+    expect(f.retirements).toHaveLength(1);
+    expect(f.retirements[0]?.sourceId).toBe(predecessor.sourceId);
+    expect(
+      await f.call((s) =>
+        s.create(owner, 'asset_one', {
+          ...replacement,
+          expectedSourceSetRevision: '3',
+          idempotencyKey: 'retired-target',
+        })
+      )
+    ).toEqual({ kind: 'rejected', reason: 'unavailable-source' });
+    expect(
+      await f.call((s) =>
+        s.create({ ...owner, namespace: 'other' }, 'asset_one', {
+          ...replacement,
+          idempotencyKey: 'other-owner',
+        })
+      )
+    ).toEqual({ kind: 'unavailable' });
+  } finally {
+    await f.close();
+  }
+});
+
+it.each([
+  'ratio',
+  'count',
+  'operation',
+  'model',
+])('rechecks activated %s policy for replacement without retiring its predecessor', async (limit) => {
+  const f = fixture();
+  try {
+    const first = await create(f, 'first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const predecessor = f.state.sources[0];
+    if (!predecessor) throw new Error('Expected Source');
+    const replacement = {
+      operation: 'replace-one' as const,
+      expectedSourceSetRevision: '1',
+      targetSourceId: predecessor.sourceId,
+    };
+    const proposed = await f.call((s) =>
+      s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'replace' })
+    );
+    if (proposed.kind !== 'candidate') throw new Error('Expected candidate');
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width: 102,
+          height: 100,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    await upload(f, proposed.candidate.candidateId);
+    const useNew = f.activate({
+      ...initialSourcePolicies.wallpaper,
+      ...(limit === 'ratio' ? { aspectRatioTolerance: 0.01 } : {}),
+      ...(limit === 'count' ? { maxActiveSources: 1 } : {}),
+      ...(limit === 'operation' ? { operations: ['add'] } : {}),
+      ...(limit === 'model'
+        ? {
+            admission: { ...initialSourcePolicies.wallpaper.admission, sourceModels: ['sdr-jpeg'] },
+          }
+        : {}),
+    });
+    await expect(
+      f.call((s) => s.accept(owner, 'asset_one', proposed.candidate.candidateId, replacement))
+    ).rejects.toBeDefined();
+    useNew();
+    const outcome = await f.call((s) =>
+      s.accept(owner, 'asset_one', proposed.candidate.candidateId, replacement)
+    );
+    // One-for-one replacement still fits a newly lowered count of one.
+    expect(outcome).toMatchObject(
+      limit === 'count'
+        ? { candidate: { status: 'accepted' } }
+        : limit === 'operation'
+          ? { kind: 'rejected', reason: 'unsupported-operation' }
+          : {
+              candidate: {
+                status: 'rejected',
+                reason: limit === 'ratio' ? 'aspect-ratio-limit' : 'unsupported-source-model',
+              },
+            }
+    );
+    expect(f.retirements).toHaveLength(limit === 'count' ? 1 : 0);
+    if (limit !== 'count') expect(f.state.sources).toEqual([predecessor]);
+  } finally {
+    await f.close();
+  }
+});
+
+it('fences late cancelled replacement inspection after a new candidate has won', async () => {
+  const f = fixture();
+  let entered!: () => void, finish!: () => void;
+  const inspecting = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  let pending: Promise<unknown> | undefined;
+  try {
+    const first = await create(f, 'first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const previous = f.state.sources[0];
+    if (!previous) throw new Error('Expected predecessor');
+    const replacement = {
+      operation: 'replace-one' as const,
+      targetSourceId: previous.sourceId,
+      expectedSourceSetRevision: '1',
+    };
+    const proposed = await f.call((s) =>
+      s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'late' })
+    );
+    if (proposed.kind !== 'candidate') throw new Error('Expected candidate');
+    const facts = previous.facts;
+    f.setInspect(() =>
+      Effect.promise(async () => {
+        entered();
+        await release;
+        return { kind: 'verified' as const, facts };
+      })
+    );
+    pending = upload(f, proposed.candidate.candidateId);
+    await inspecting;
+    await f.call((s) => s.cancel(owner, 'asset_one', proposed.candidate.candidateId));
+    f.setInspect(() => Effect.succeed({ kind: 'verified', facts }));
+    const winning = await f.call((s) =>
+      s.create(owner, 'asset_one', { ...replacement, idempotencyKey: 'winner' })
+    );
+    if (winning.kind !== 'candidate') throw new Error('Expected candidate');
+    await upload(f, winning.candidate.candidateId);
+    await f.call((s) => s.accept(owner, 'asset_one', winning.candidate.candidateId, replacement));
+    const saved = structuredClone(f.state);
+    finish();
+    await pending;
+    expect(
+      await f.call((s) => s.accept(owner, 'asset_one', proposed.candidate.candidateId, replacement))
+    ).toEqual({ kind: 'rejected', reason: 'candidate-not-ready' });
+    expect(f.state).toEqual(saved);
+    expect(f.state.defaultSourceId).toBe(winning.candidate.sourceId);
+    expect(f.retirements).toHaveLength(1);
+    expect(f.confirmations).toHaveLength(2);
+  } finally {
+    finish();
+    await pending;
     await f.close();
   }
 });

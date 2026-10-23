@@ -1,0 +1,2 @@
+ALTER TABLE "immutable_sources" ADD COLUMN "evidence_expires_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "immutable_sources_retired_expiry" ON "immutable_sources" USING btree ("evidence_expires_at") WHERE "immutable_sources"."evidence_expires_at" IS NOT NULL;

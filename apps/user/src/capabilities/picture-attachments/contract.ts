@@ -16,6 +16,7 @@ export interface PictureAttachment {
   readonly commandId: string;
   readonly creationEventId: string;
   readonly createdAt: string;
+  readonly trace?: AttachmentTrace;
   readonly deleteCommandId: string;
   readonly deletionEventId: string;
   state:
@@ -54,6 +55,7 @@ export interface AttachmentResult {
   readonly assetId: string | null;
 }
 export interface SourceConfirmation extends SourceIntent {
+  readonly trace?: AttachmentTrace;
   readonly assetId: string;
   readonly sourceId: string;
   readonly defaultSourceId: string;
@@ -120,6 +122,7 @@ export interface AttachmentTransition<A> {
     readonly assetId: string;
     readonly sourceId: string;
     readonly causationId: string;
+    readonly trace?: AttachmentTrace;
   };
 }
 /** Locks the owning Profile before its intents across all selectors. Begin supplies a fresh,
@@ -175,6 +178,9 @@ export interface AttachmentDelivery {
 export const AttachmentDelivery = Context.Service<AttachmentDelivery>(
   'user/picture-attachments/Delivery'
 );
-export const AttachmentHealth = Context.Service<{ readonly check: () => Effect.Effect<boolean> }>(
+export interface AttachmentHealth {
+  readonly check: () => Effect.Effect<boolean>;
+}
+export const AttachmentHealth = Context.Service<AttachmentHealth>(
   'user/picture-attachments/Health'
 );

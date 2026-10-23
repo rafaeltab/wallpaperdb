@@ -60,3 +60,33 @@ it('replaces the discovery page and resumes an older inspecting candidate throug
  expect(vi.mocked(ownedSources).mock.calls.some(call=>call[2]==='7:latest-cancelled')).toBe(true);
  view.unmount();client.clear();
 });
+
+it('keeps the accepted predecessor visible on replacement failure and switches the owner list after retry succeeds', async () => {
+  const wallpaper = { wallpaperId: 'same-wallpaper', assetId: 'same-asset', sourceId: 'first', state: 'published' as const, createdAt: 'now' };
+  let replaced = false, failUpload = true;
+  const list = async () => ({ sourceSetRevision: replaced ? '2' : '1', sources: [{ sourceId: replaced ? 'new-source' : 'old-source', facts: { width: 100, height: 100 } }], hasPendingCandidates: false, candidates: [] });
+  vi.mocked(ownedSources).mockImplementation(list);
+  const candidate = { candidateId: 'saved-replacement', expectedSourceSetRevision: '1', operation: 'replace-one' as const, targetSourceId: 'old-source', status: 'awaiting-bytes' };
+  vi.mocked(browserSourceBatchApi).mockReturnValue({
+    identifier: () => crypto.randomUUID(), begin: async () => wallpaper, wallpaper: async () => wallpaper, list,
+    create: async (_asset, _key, _revision, _signal, mutation) => { expect(mutation).toEqual({ operation: 'replace-one', targetSourceId: 'old-source' }); return candidate; },
+    status: async () => candidate,
+    upload: async () => { if (failUpload) { failUpload = false; throw new Error('Storage unavailable. Retry.'); } return { ...candidate, status: 'ready' }; },
+    expectSource: async () => { throw new Error('Keep original Wallpaper publication'); },
+    accept: async (_asset, _id, _revision, _correlation, _signal, mutation) => { expect(mutation).toEqual({ operation: 'replace-one', targetSourceId: 'old-source' }); replaced = true; return { ...candidate, status: 'accepted', sourceId: 'new-source' }; },
+    cancel: async () => {}, wait: async () => {},
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const view = render(<QueryClientProvider client={client}><WallpaperSources wallpaperId="same-wallpaper" assetId="same-asset" /></QueryClientProvider>);
+  const user = userEvent.setup();
+  const replacement = await screen.findByLabelText('Replace Source old-source');
+  await user.upload(replacement, new File(['new bytes'], 'replacement.png', { type: 'image/png' }));
+  await screen.findByRole('button', { name: 'Retry replacement.png' });
+  expect(screen.getByLabelText('Replace Source old-source')).toBeInTheDocument();
+  expect(screen.getByText(/Its accepted image stays active until replacement succeeds/)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Retry replacement.png' }));
+  await screen.findByLabelText('Replace Source new-source');
+  expect(screen.queryByLabelText('Replace Source old-source')).not.toBeInTheDocument();
+  expect(screen.getByTestId('source-upload-outcome')).toHaveTextContent('Source accepted');
+  view.unmount(); client.clear();
+});

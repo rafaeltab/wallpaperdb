@@ -209,7 +209,7 @@ describe('PostgreSQL picture attachment contract', () => {
     const first = (await claim())[0];
     if (!first) throw new Error('missing claim');
     await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(first)));
-    await new Promise((r) => setTimeout(r, 5));
+    await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${first.id}`;
     const second = (await claim())[0];
     if (!second) throw new Error('missing retry');
     expect(second.id).toBe(i.creationEventId);

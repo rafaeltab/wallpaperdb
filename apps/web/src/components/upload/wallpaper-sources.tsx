@@ -104,6 +104,11 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
         />
       </label>
       {snapshot.busy && <output>Saving Source progress…</output>}
+      {snapshot.canResume && (
+        <button type="button" className="underline text-sm" onClick={run}>
+          Resume remaining Sources
+        </button>
+      )}
       <ul className="space-y-2">
         {snapshot.rows.map((row) => (
           <li key={row.id} data-testid="source-upload-outcome" className="text-sm">

@@ -270,8 +270,11 @@ export function sourcesLayer(configuration: {
             const policy = configuration.types[state.asset.assetType];
             if (!policy || !policy.operations.includes(input.operation))
               return reject('unsupported-operation');
-            // Full-set replacement belongs to picture intake.
-            if (input.operation === 'replace-set') return reject('unsupported-operation');
+            if (
+              (input.operation === 'replace-set' && state.asset.assetType !== 'picture') ||
+              (input.operation === 'replace-one' && state.asset.assetType === 'picture')
+            )
+              return reject('unsupported-operation');
             if (input.expectedSourceSetRevision !== state.sourceSetRevision)
               return reject('source-set-conflict');
             if (
@@ -280,7 +283,9 @@ export function sourcesLayer(configuration: {
             )
               return reject('unavailable-source');
             if (
-              state.sources.length + (input.operation === 'add' ? 1 : 0) >
+              (input.operation === 'replace-set'
+                ? 1
+                : state.sources.length + (input.operation === 'add' ? 1 : 0)) >
               policy.maxActiveSources
             )
               return reject('source-count-limit');
@@ -447,6 +452,11 @@ export function sourcesLayer(configuration: {
             if (!policy) return { state, result: reject('unsupported-type') };
             if (!policy.operations.includes(current.operation))
               return { state, result: reject('unsupported-operation') };
+            if (
+              (current.operation === 'replace-set' && state.asset.assetType !== 'picture') ||
+              (current.operation === 'replace-one' && state.asset.assetType === 'picture')
+            )
+              return { state, result: reject('unsupported-operation') };
             const reason =
               Date.parse(current.expiresAt) <= now
                 ? 'candidate-expired'
@@ -471,13 +481,15 @@ export function sourcesLayer(configuration: {
                 : undefined;
             if (current.operation === 'replace-one' && !replaced)
               return { state, result: reject('unavailable-source') };
-            if (state.sources.length + (replaced ? 0 : 1) > policy.maxActiveSources)
+            const retired =
+              current.operation === 'replace-set' ? state.sources : replaced ? [replaced] : [];
+            if (state.sources.length - retired.length + 1 > policy.maxActiveSources)
               return { state, result: reject('source-count-limit') };
-            if (replaced) {
+            if (retired.length > 0) {
               state.sources = state.sources.filter(
-                (source) => source.sourceId !== replaced.sourceId
+                (source) => !retired.some((prior) => prior.sourceId === source.sourceId)
               );
-              if (state.defaultSourceId === replaced.sourceId)
+              if (retired.some((prior) => prior.sourceId === state.defaultSourceId))
                 state.defaultSourceId = current.sourceId;
             }
             state.sources.push({
@@ -496,12 +508,12 @@ export function sourcesLayer(configuration: {
               state,
               result: result(current),
               cleanupContext: context,
-              ...(replaced
+              ...(retired.length > 0
                 ? {
-                    retirement: {
-                      sourceId: replaced.sourceId,
+                    retirements: retired.map((source) => ({
+                      sourceId: source.sourceId,
                       evidenceExpiresAt: new Date(now + policy.retention.evidenceMs).toISOString(),
-                    },
+                    })),
                   }
                 : {}),
               confirmation: {

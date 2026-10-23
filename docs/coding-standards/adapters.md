@@ -37,5 +37,6 @@ Transaction mechanics follow the [application's declared atomicity](application-
 
 - Driving-adapter contract tests prove that external requests or messages become the correct driving-port calls and that every declared driving-port outcome or typed failure becomes the correct external response. Test protocol translation at this boundary.
 - Driven-adapter contract tests run a port's behavioral contract against the production adapter and real infrastructure. Test infrastructure semantics at this boundary.
+- When capability tests rely on a controlled adapter for a stateful port, exercise the shared declared guarantees against both implementations. Keep the shared cases with the owning capability's tests, give each participant isolated state, and observe effects through its public interfaces. Production-specific failure and infrastructure checks remain in the production adapter tests.
 
 Apply the [shared testing principles](project-organization.md#shared-testing-principles). When testing composition rather than an adapter's contract, use [composition tests](composition-and-operations.md#testing). Instrumentation follows the separate [telemetry testing policy](composition-and-operations.md#testing).

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { Effect, Layer } from 'effect';
+import { Clock, Effect, Layer } from 'effect';
 import { Pool } from 'pg';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import {
@@ -113,148 +113,150 @@ export function cleanupPostgresLayer(options: Options) {
         );
       return {
         claim: (limit) =>
-          run('claim', async (db) => {
-            const now = new Date();
-            const expiredReads = await db
-              .select({ id: sourceReads.id })
-              .from(sourceReads)
-              .where(lte(sourceReads.expiresAt, now))
-              .limit(100);
-            if (expiredReads.length)
-              await db.delete(sourceReads).where(
-                inArray(
-                  sourceReads.id,
-                  expiredReads.map((read) => read.id)
+          Effect.gen(function* () {
+            const now = new Date(yield* Clock.currentTimeMillis);
+            return yield* run('claim', async (db) => {
+              const expiredReads = await db
+                .select({ id: sourceReads.id })
+                .from(sourceReads)
+                .where(lte(sourceReads.expiresAt, now))
+                .limit(100);
+              if (expiredReads.length)
+                await db.delete(sourceReads).where(
+                  inArray(
+                    sourceReads.id,
+                    expiredReads.map((read) => read.id)
+                  )
+                );
+              const finished = await db
+                .select({ assetId: assetDeletions.assetId })
+                .from(assetDeletions)
+                .where(
+                  and(
+                    eq(assetDeletions.cleanupPending, true),
+                    sql`NOT EXISTS (SELECT 1 FROM ${sourceCleanup} WHERE ${sourceCleanup.assetId} = ${assetDeletions.assetId} AND ${sourceCleanup.status} <> 'completed')`
+                  )
                 )
-              );
-            const finished = await db
-              .select({ assetId: assetDeletions.assetId })
-              .from(assetDeletions)
-              .where(
-                and(
-                  eq(assetDeletions.cleanupPending, true),
-                  sql`NOT EXISTS (SELECT 1 FROM ${sourceCleanup} WHERE ${sourceCleanup.assetId} = ${assetDeletions.assetId} AND ${sourceCleanup.status} <> 'completed')`
-                )
-              )
-              .limit(100);
-            for (const asset of finished)
-              await db.transaction(async (tx) => {
-                await tx
-                  .select()
-                  .from(ownedAssets)
-                  .where(eq(ownedAssets.id, asset.assetId))
-                  .for('update');
-                await finishDeletedAsset(tx, asset.assetId);
-              });
-            const candidates = await db
-              .select()
-              .from(sourceCleanup)
-              .where(
-                and(
-                  inArray(sourceCleanup.status, ['pending', 'reclaiming']),
-                  lte(sourceCleanup.dueAt, now),
-                  lte(sourceCleanup.availableAt, now)
-                )
-              )
-              .orderBy(asc(sourceCleanup.dueAt), asc(sourceCleanup.id))
-              .limit(Math.max(1, Math.min(100, limit)));
-            const result: CleanupWork[] = [];
-            for (const candidate of candidates) {
-              const work = await db.transaction(async (tx) => {
-                await tx
-                  .select()
-                  .from(ownedAssets)
-                  .where(eq(ownedAssets.id, candidate.assetId))
-                  .for('update');
-                const [row] = await tx
-                  .select()
-                  .from(sourceCleanup)
-                  .where(eq(sourceCleanup.id, candidate.id))
-                  .for('update', { skipLocked: true });
-                if (
-                  !row ||
-                  !['pending', 'reclaiming'].includes(row.status) ||
-                  !row.dueAt ||
-                  row.dueAt > now ||
-                  row.availableAt > now
-                )
-                  return null;
-                const target = row.target;
-                if (target.kind === 'source') {
-                  const protectedReads = await tx
-                    .select({ id: sourceReads.id })
-                    .from(sourceReads)
-                    .where(
-                      and(
-                        eq(sourceReads.assetId, row.assetId),
-                        eq(sourceReads.sourceId, target.sourceId),
-                        gt(sourceReads.expiresAt, now)
-                      )
-                    )
-                    .limit(1);
-                  if (protectedReads.length) return null;
+                .limit(100);
+              for (const asset of finished)
+                await db.transaction(async (tx) => {
                   await tx
-                    .delete(sourceReads)
-                    .where(
-                      and(
-                        eq(sourceReads.assetId, row.assetId),
-                        eq(sourceReads.sourceId, target.sourceId),
-                        lte(sourceReads.expiresAt, now)
-                      )
-                    );
-                }
-                const [record] = await tx
-                  .select()
-                  .from(assetSourceState)
-                  .where(eq(assetSourceState.assetId, row.assetId));
-                if (
-                  target.kind === 'source' &&
-                  record?.state.sources.some((source) => source.sourceId === target.sourceId)
+                    .select()
+                    .from(ownedAssets)
+                    .where(eq(ownedAssets.id, asset.assetId))
+                    .for('update');
+                  await finishDeletedAsset(tx, asset.assetId);
+                });
+              const candidates = await db
+                .select()
+                .from(sourceCleanup)
+                .where(
+                  and(
+                    inArray(sourceCleanup.status, ['pending', 'reclaiming']),
+                    lte(sourceCleanup.dueAt, now),
+                    lte(sourceCleanup.availableAt, now)
+                  )
                 )
-                  return null;
-                if (row.attempts >= options.maxAttempts) {
+                .orderBy(asc(sourceCleanup.dueAt), asc(sourceCleanup.id))
+                .limit(Math.max(1, Math.min(100, limit)));
+              const result: CleanupWork[] = [];
+              for (const candidate of candidates) {
+                const work = await db.transaction(async (tx) => {
+                  await tx
+                    .select()
+                    .from(ownedAssets)
+                    .where(eq(ownedAssets.id, candidate.assetId))
+                    .for('update');
+                  const [row] = await tx
+                    .select()
+                    .from(sourceCleanup)
+                    .where(eq(sourceCleanup.id, candidate.id))
+                    .for('update', { skipLocked: true });
+                  if (
+                    !row ||
+                    !['pending', 'reclaiming'].includes(row.status) ||
+                    !row.dueAt ||
+                    row.dueAt > now ||
+                    row.availableAt > now
+                  )
+                    return null;
+                  const target = row.target;
+                  if (target.kind === 'source') {
+                    const protectedReads = await tx
+                      .select({ id: sourceReads.id })
+                      .from(sourceReads)
+                      .where(
+                        and(
+                          eq(sourceReads.assetId, row.assetId),
+                          eq(sourceReads.sourceId, target.sourceId),
+                          gt(sourceReads.expiresAt, now)
+                        )
+                      )
+                      .limit(1);
+                    if (protectedReads.length) return null;
+                    await tx
+                      .delete(sourceReads)
+                      .where(
+                        and(
+                          eq(sourceReads.assetId, row.assetId),
+                          eq(sourceReads.sourceId, target.sourceId),
+                          lte(sourceReads.expiresAt, now)
+                        )
+                      );
+                  }
+                  const [record] = await tx
+                    .select()
+                    .from(assetSourceState)
+                    .where(eq(assetSourceState.assetId, row.assetId));
+                  if (
+                    target.kind === 'source' &&
+                    record?.state.sources.some((source) => source.sourceId === target.sourceId)
+                  )
+                    return null;
+                  if (row.attempts >= options.maxAttempts) {
+                    await tx
+                      .update(sourceCleanup)
+                      .set({ status: 'quarantined', leaseId: null })
+                      .where(eq(sourceCleanup.id, row.id));
+                    return null;
+                  }
+                  if (record) {
+                    const state = record.state;
+                    for (const pending of state.candidates) {
+                      if (
+                        pending.candidateId !==
+                          (row.target.kind === 'candidate' ? row.target.candidateId : undefined) &&
+                        pending.sourceId !==
+                          (row.target.kind === 'source' ? row.target.sourceId : undefined)
+                      )
+                        continue;
+                      if (!['accepted', 'rejected', 'cancelled'].includes(pending.status)) {
+                        pending.status = 'rejected';
+                        pending.reason = 'candidate-expired';
+                        state.nonterminalCandidateCount--;
+                      }
+                    }
+                    await tx
+                      .update(assetSourceState)
+                      .set({ state })
+                      .where(eq(assetSourceState.assetId, row.assetId));
+                  }
+                  const leaseId = randomUUID();
                   await tx
                     .update(sourceCleanup)
-                    .set({ status: 'quarantined', leaseId: null })
+                    .set({
+                      status: 'reclaiming',
+                      attempts: row.attempts + 1,
+                      leaseId,
+                      availableAt: new Date(now.getTime() + options.leaseMs),
+                    })
                     .where(eq(sourceCleanup.id, row.id));
-                  return null;
-                }
-                if (record) {
-                  const state = record.state;
-                  for (const pending of state.candidates) {
-                    if (
-                      pending.candidateId !==
-                        (row.target.kind === 'candidate' ? row.target.candidateId : undefined) &&
-                      pending.sourceId !==
-                        (row.target.kind === 'source' ? row.target.sourceId : undefined)
-                    )
-                      continue;
-                    if (!['accepted', 'rejected', 'cancelled'].includes(pending.status)) {
-                      pending.status = 'rejected';
-                      pending.reason = 'candidate-expired';
-                      state.nonterminalCandidateCount--;
-                    }
-                  }
-                  await tx
-                    .update(assetSourceState)
-                    .set({ state })
-                    .where(eq(assetSourceState.assetId, row.assetId));
-                }
-                const leaseId = randomUUID();
-                await tx
-                  .update(sourceCleanup)
-                  .set({
-                    status: 'reclaiming',
-                    attempts: row.attempts + 1,
-                    leaseId,
-                    availableAt: new Date(Date.now() + options.leaseMs),
-                  })
-                  .where(eq(sourceCleanup.id, row.id));
-                return { id: row.id, leaseId, attempts: row.attempts + 1, target: row.target };
-              });
-              if (work) result.push(work);
-            }
-            return result;
+                  return { id: row.id, leaseId, attempts: row.attempts + 1, target: row.target };
+                });
+                if (work) result.push(work);
+              }
+              return result;
+            });
           }),
         completed: (work) =>
           run('completed', (db) =>

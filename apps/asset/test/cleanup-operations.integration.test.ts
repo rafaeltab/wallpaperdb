@@ -31,7 +31,7 @@ import {
 import { runOperator } from '../scripts/operator.js';
 
 it('routes exhausted cleanup to the authenticated operator inbox and resumes only deliberate trusted recovery', async () => {
-  const received: { kind: string; applicationId: string }[] = [];
+  const received: { kind: string; applicationId: string; subject: string }[] = [];
   const server = createServer(async (request, response) => {
     if (request.headers.authorization !== 'Bearer operator-inbox-token') {
       response.writeHead(401).end();
@@ -175,6 +175,10 @@ it('routes exhausted cleanup to the authenticated operator inbox and resumes onl
         (notice) => notice.kind === 'cleanup-quarantine' && notice.applicationId === 'wallpaper'
       )
     ).toBe(true);
+    expect(received.map((notice) => notice.subject).sort()).toEqual([
+      'asset.cleanup.candidate:candidate_notice',
+      'asset.cleanup.source:source_notice',
+    ]);
     expect(calls).toBe(4);
     const quarantined = (
       await pool.query('SELECT id, status, due_at FROM source_cleanup ORDER BY id')

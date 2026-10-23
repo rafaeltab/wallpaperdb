@@ -11,9 +11,12 @@ import {
   type SourceOutcome,
   type SourceState,
   type SourceFacts,
+  type SourcesPort,
 } from './contract.js';
 import type { SourcePolicy } from './policy.js';
 const unavailable = { kind: 'unavailable' } as const;
+const nonterminal = (candidate: Candidate) =>
+  !['accepted', 'rejected', 'cancelled'].includes(candidate.status);
 const reject = (reason: string): SourceOutcome => ({ kind: 'rejected', reason });
 const result = (candidate: Candidate): SourceOutcome => ({
   kind: 'candidate',
@@ -102,7 +105,11 @@ export function sourcesLayer(configuration: {
       ) =>
         modify(owner, assetId, revision, (state) => {
           const found = state.candidates.find((c) => c.candidateId === id);
-          return found ? change(state, found) : unavailable;
+          if (!found) return unavailable;
+          const wasPending = nonterminal(found);
+          const outcome = change(state, found);
+          if (wasPending && !nonterminal(found)) state.nonterminalCandidateCount--;
+          return outcome;
         });
       return Sources.of({
         policy: (owner, type) => {
@@ -115,24 +122,51 @@ export function sourcesLayer(configuration: {
               : unavailable
           );
         },
-        list: (owner, assetId) =>
-          store.transact(assetId, null, (state) => ({
-            state,
-            result: owns(owner, state)
-              ? {
+        list: (owner, assetId, cursor) =>
+          store.transact<Effect.Success<ReturnType<SourcesPort['list']>>>(
+            assetId,
+            null,
+            (state) => {
+              if (!owns(owner, state)) return { state, result: unavailable };
+              let end = state.candidates.length;
+              if (cursor !== undefined) {
+                if (typeof cursor !== 'string' || new TextEncoder().encode(cursor).length > 256)
+                  return { state, result: unavailable };
+                const split = cursor.indexOf(':');
+                const position = cursor.slice(0, split);
+                const index = Number(position);
+                if (
+                  split < 1 ||
+                  !/^(0|[1-9][0-9]*)$/.test(position) ||
+                  !Number.isSafeInteger(index) ||
+                  state.candidates[index]?.candidateId !== cursor.slice(split + 1)
+                )
+                  return { state, result: unavailable };
+                end = index;
+              }
+              // Appending history preserves existing index/identity cursors. Verify the
+              // identity so a stale cursor cannot silently skip data after future retirement.
+              const start = Math.max(0, end - 32);
+              const next = start > 0 ? state.candidates[start] : undefined;
+              return {
+                state,
+                result: {
                   kind: 'found' as const,
                   asset: {
                     assetId,
                     assetType: state.asset.assetType,
                     sources: state.sources,
-                    candidates: state.candidates,
+                    candidates: state.candidates.slice(start, end).reverse(),
+                    hasPendingCandidates: state.nonterminalCandidateCount > 0,
+                    ...(next ? { nextCandidateCursor: `${start}:${next.candidateId}` } : {}),
                     defaultSourceId: state.defaultSourceId,
                     sourceSetRevision: state.sourceSetRevision,
                     deliveryRevision: state.deliveryRevision,
                   },
-                }
-              : unavailable,
-          })),
+                },
+              };
+            }
+          ),
         create: Effect.fn('asset.sources.create')(function* (owner, assetId, input) {
           if (
             !validRevision(input.expectedSourceSetRevision) ||
@@ -180,6 +214,7 @@ export function sourcesLayer(configuration: {
               layout: 'asset-layout-1',
             };
             state.candidates.push(created);
+            state.nonterminalCandidateCount++;
             return result(created);
           });
         }),
@@ -309,6 +344,7 @@ export function sourcesLayer(configuration: {
                     : 'aspect-ratio-limit'));
             if (reason) {
               current.status = 'rejected';
+              state.nonterminalCandidateCount--;
               current.reason = reason;
               return { state, result: result(current) };
             }
@@ -326,6 +362,7 @@ export function sourcesLayer(configuration: {
             state.sourceSetRevision = (BigInt(state.sourceSetRevision) + 1n).toString();
             state.deliveryRevision = (BigInt(state.deliveryRevision) + 1n).toString();
             current.status = 'accepted';
+            state.nonterminalCandidateCount--;
             current.sourceSetRevision = state.sourceSetRevision;
             return {
               state,

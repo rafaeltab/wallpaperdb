@@ -7,6 +7,8 @@ export interface ManagedCandidate {
   readonly reason?: string;
 }
 export interface OwnedSources {
+  readonly hasPendingCandidates: boolean;
+  readonly nextCandidateCursor?: string;
   readonly sourceSetRevision: string;
   readonly sources: readonly {
     readonly sourceId: string;
@@ -185,12 +187,7 @@ export function createWallpaperSourceBatch<TFile>(
                 await api.cancel(asset, receipt.candidate.candidateId, signal);
               if (!receipt || row.restart) {
                 const saved = await api.list(asset, signal);
-                if (
-                  saved.sources.length === 0 &&
-                  saved.candidates.some(
-                    (candidate) => !['accepted', 'rejected', 'cancelled'].includes(candidate.status)
-                  )
-                )
+                if (saved.sources.length === 0 && saved.hasPendingCandidates)
                   throw new Error(
                     'An initial Source is still pending. Resume its saved candidate before selecting another file.'
                   );

@@ -41,13 +41,14 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
     []
   );
   const currentAsset = assetId ?? snapshot.assetId;
+  const [candidateCursor, setCandidateCursor] = useState<string>();
   const { userId } = useAuth();
   const saved = useQuery({
-    queryKey: ['wallpaper-sources', userId, currentAsset],
+    queryKey: ['wallpaper-sources', userId, currentAsset, candidateCursor],
     enabled: !!currentAsset,
     queryFn: ({ signal }) =>
       currentAsset
-        ? ownedSources(currentAsset, signal)
+        ? ownedSources(currentAsset, signal, candidateCursor)
         : Promise.reject(new Error('Asset pending')),
     refetchInterval: 2000,
   });
@@ -145,12 +146,32 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
           Source progress is temporarily unavailable. Accepted Sources remain saved.
         </p>
       )}
+      {candidateCursor !== undefined && (
+        <button
+          type="button"
+          className="underline text-sm"
+          disabled={saved.isFetching}
+          onClick={() => setCandidateCursor(undefined)}
+        >
+          Latest Source outcomes
+        </button>
+      )}
       {saved.data && (
         <>
           <p className="text-sm">
             {saved.data.sources.length} accepted Sources. Source revision{' '}
             {saved.data.sourceSetRevision}.
           </p>
+          {saved.data.nextCandidateCursor && (
+            <button
+              type="button"
+              className="underline text-sm"
+              disabled={saved.isFetching}
+              onClick={() => setCandidateCursor(saved.data?.nextCandidateCursor)}
+            >
+              Older Source outcomes
+            </button>
+          )}
           <ul className="space-y-2">
             {saved.data.sources.map((source) => (
               <li key={source.sourceId} className="text-xs break-all">

@@ -140,6 +140,7 @@ export function sourcePostgresLayer(options: Options) {
                     initialAnalysisSourceId: null,
                     sources: [],
                     candidates: [],
+                    nonterminalCandidateCount: 0,
                   })
                 : null;
               const changed = decide(() => change(initial));

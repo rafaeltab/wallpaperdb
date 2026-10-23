@@ -12,6 +12,7 @@ it('composes owned Asset inspection with accepted Source membership rather than 
       assetType: 'wallpaper',
       sources: [],
       candidates: [],
+      hasPendingCandidates: false,
       defaultSourceId: 'source_one',
       sourceSetRevision: '1',
       deliveryRevision: '1',

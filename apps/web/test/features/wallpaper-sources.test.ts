@@ -94,3 +94,11 @@ it('retries a stale additional candidate against current membership and never re
  const stale=batch.getSnapshot().rows[1];if(!stale)throw new Error('Missing stale row');batch.retry(stale.id);await batch.run(new AbortController().signal);
  expect(uploads).toEqual(['good','stale','stale']);expect(cancellations).toHaveLength(1);expect(batch.getSnapshot().rows.map(row=>row.status)).toEqual(['accepted','accepted']);
 });
+it('replays the same supplied bytes to recover a retained inspection instead of polling it forever',async()=>{
+ const wallpaper={wallpaperId:'published',assetId:'asset',sourceId:'first',state:'published' as const,createdAt:'now'};
+ const retained={candidateId:'stopped-inspection',status:'inspecting',expectedSourceSetRevision:'1'};
+ const uploads:string[]=[];let polls=0;
+ const api:SourceBatchApi<string>={identifier:()=>crypto.randomUUID(),begin:async()=>wallpaper,wallpaper:async()=>wallpaper,list:async()=>({sourceSetRevision:'1',sources:[{sourceId:'first'}],candidates:[retained]}),create:async()=>{throw new Error('Preserve the retained candidate');},status:async()=>{polls++;return retained;},upload:async(_asset,id,file)=>{expect(id).toBe('stopped-inspection');uploads.push(file);return {...retained,status:'ready'};},expectSource:async()=>{throw new Error('Keep original publication');},accept:async()=>({...retained,status:'accepted',sourceId:'second'}),cancel:async()=>{throw new Error('Do not replace interrupted work');},wait:async()=>{}};
+ const batch=createWallpaperSourceBatch(api,{wallpaperId:'published'});batch.resume({value:'same-immutable-bytes',name:'same.png'},retained);await batch.run(new AbortController().signal);
+ expect(batch.getSnapshot().rows[0]).toMatchObject({status:'accepted',sourceId:'second'});expect(uploads).toEqual(['same-immutable-bytes']);expect(polls).toBe(1);
+});

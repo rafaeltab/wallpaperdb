@@ -24,6 +24,27 @@ interface Options {
   readonly retryDelayMs: number;
   readonly leaseMs: number;
 }
+type Database = ReturnType<typeof drizzle>;
+type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+async function finishDeletedAsset(tx: Transaction, assetId: string) {
+  const [terminal] = await tx
+    .select({ id: assetDeletions.assetId })
+    .from(assetDeletions)
+    .where(eq(assetDeletions.assetId, assetId));
+  if (!terminal) return;
+  const pending = await tx
+    .select({ id: sourceCleanup.id })
+    .from(sourceCleanup)
+    .where(and(eq(sourceCleanup.assetId, assetId), sql`${sourceCleanup.status} <> 'completed'`))
+    .limit(1);
+  if (pending.length) return;
+  await tx
+    .update(assetDeletions)
+    .set({ cleanupPending: false })
+    .where(eq(assetDeletions.assetId, assetId));
+  await tx.delete(assetSourceState).where(eq(assetSourceState.assetId, assetId));
+  await tx.delete(sourceReads).where(eq(sourceReads.assetId, assetId));
+}
 export function cleanupPostgresLayer(options: Options) {
   return Layer.effect(
     CleanupStore,
@@ -94,6 +115,37 @@ export function cleanupPostgresLayer(options: Options) {
         claim: (limit) =>
           run('claim', async (db) => {
             const now = new Date();
+            const expiredReads = await db
+              .select({ id: sourceReads.id })
+              .from(sourceReads)
+              .where(lte(sourceReads.expiresAt, now))
+              .limit(100);
+            if (expiredReads.length)
+              await db.delete(sourceReads).where(
+                inArray(
+                  sourceReads.id,
+                  expiredReads.map((read) => read.id)
+                )
+              );
+            const finished = await db
+              .select({ assetId: assetDeletions.assetId })
+              .from(assetDeletions)
+              .where(
+                and(
+                  eq(assetDeletions.cleanupPending, true),
+                  sql`NOT EXISTS (SELECT 1 FROM ${sourceCleanup} WHERE ${sourceCleanup.assetId} = ${assetDeletions.assetId} AND ${sourceCleanup.status} <> 'completed')`
+                )
+              )
+              .limit(100);
+            for (const asset of finished)
+              await db.transaction(async (tx) => {
+                await tx
+                  .select()
+                  .from(ownedAssets)
+                  .where(eq(ownedAssets.id, asset.assetId))
+                  .for('update');
+                await finishDeletedAsset(tx, asset.assetId);
+              });
             const candidates = await db
               .select()
               .from(sourceCleanup)
@@ -207,6 +259,16 @@ export function cleanupPostgresLayer(options: Options) {
         completed: (work) =>
           run('completed', (db) =>
             db.transaction(async (tx) => {
+              const [entry] = await tx
+                .select({ assetId: sourceCleanup.assetId })
+                .from(sourceCleanup)
+                .where(eq(sourceCleanup.id, work.id));
+              if (!entry) return;
+              await tx
+                .select()
+                .from(ownedAssets)
+                .where(eq(ownedAssets.id, entry.assetId))
+                .for('update');
               const rows = await tx
                 .update(sourceCleanup)
                 .set({ status: 'completed', leaseId: null })
@@ -222,21 +284,7 @@ export function cleanupPostgresLayer(options: Options) {
                       eq(immutableSources.assetId, work.target.assetId)
                     )
                   );
-              const pending = await tx
-                .select({ id: sourceCleanup.id })
-                .from(sourceCleanup)
-                .where(
-                  and(
-                    eq(sourceCleanup.assetId, rows[0].assetId),
-                    sql`${sourceCleanup.status} <> 'completed'`
-                  )
-                )
-                .limit(1);
-              if (!pending.length)
-                await tx
-                  .update(assetDeletions)
-                  .set({ cleanupPending: false })
-                  .where(eq(assetDeletions.assetId, rows[0].assetId));
+              await finishDeletedAsset(tx, rows[0].assetId);
             })
           ),
         failed: (work) =>

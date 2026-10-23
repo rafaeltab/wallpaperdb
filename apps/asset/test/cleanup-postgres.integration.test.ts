@@ -223,6 +223,9 @@ it('atomically schedules terminal Source evidence and cancelled reservations wit
         .rows
     ).toEqual([{ cleanup_pending: false }]);
     expect(
+      (await pool.query('SELECT state FROM asset_source_state WHERE asset_id=$1', [assetId])).rows
+    ).toEqual([]);
+    expect(
       await lifecycle.runPromise(LifecycleStore.use((store) => store.accept(command)))
     ).toMatchObject({ outcome: 'created', assetId });
     expect(

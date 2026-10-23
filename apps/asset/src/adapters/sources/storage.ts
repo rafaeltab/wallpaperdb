@@ -11,6 +11,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Context, Effect, Layer } from 'effect';
 import { z } from 'zod';
+import { CleanupBytes, CleanupFailure } from '../../capabilities/cleanup/index.js';
 import {
   SourceBytes,
   MandatoryInspection,
@@ -121,6 +122,10 @@ export function sourceStorageLayer(options: Options) {
         );
         if (!(object.Body instanceof Readable)) throw new Error('Unavailable Source body');
         const body = object.Body;
+        if (object.Metadata?.reclaimed === 'true') {
+          body.destroy();
+          throw new Error('Reclaimed Source bytes');
+        }
         streams.add(body);
         body.once('close', () => streams.delete(body));
         return body;
@@ -237,7 +242,51 @@ export function sourceStorageLayer(options: Options) {
             }
           }),
       };
-      return Context.make(SourceBytes, storage).pipe(Context.add(MandatoryInspection, inspection));
+      return Context.make(SourceBytes, storage).pipe(
+        Context.add(MandatoryInspection, inspection),
+        Context.add(CleanupBytes, {
+          reclaim: (target) =>
+            run('reclaim', async (signal) => {
+              const key =
+                target.kind === 'candidate'
+                  ? candidateKey(target.candidateId)
+                  : sourceKey(target.assetId, target.sourceId);
+              // Atomic replacement leaves no gap for a delayed conditional writer.
+              // Empty fences survive metadata purge because identities are never reused.
+              try {
+                await client.send(
+                  new PutObjectCommand({
+                    Bucket: options.bucket,
+                    Key: key,
+                    Body: new Uint8Array(),
+                    ContentLength: 0,
+                    Metadata: { reclaimed: 'true' },
+                  }),
+                  { abortSignal: signal }
+                );
+              } catch (cause) {
+                const head = await client
+                  .send(
+                    new HeadObjectCommand({
+                      Bucket: options.bucket,
+                      Key: key,
+                    }),
+                    { abortSignal: signal }
+                  )
+                  .catch(() => null);
+                if (head?.Metadata?.reclaimed !== 'true' || head.ContentLength !== 0) throw cause;
+              }
+            }).pipe(
+              Effect.mapError(
+                (error) =>
+                  new CleanupFailure({
+                    operation: error.operation,
+                    cause: error.cause,
+                  })
+              )
+            ),
+        })
+      );
     })
   );
 }

@@ -522,8 +522,8 @@ it('adds independent Sources after first acceptance while preserving the Default
 it.each([
   { first: [100, 100], next: [103, 100], accepted: true },
   { first: [103, 100], next: [100, 100], accepted: true },
-  { first: [100, 100], next: [10301, 10000], accepted: false },
-  { first: [10301, 10000], next: [100, 100], accepted: false },
+  { first: [100, 100], next: [1031, 1000], accepted: false },
+  { first: [1031, 1000], next: [100, 100], accepted: false },
 ])('checks inclusive extreme ratio after orientation: $first then $next', async ({
   first,
   next,

@@ -129,9 +129,15 @@
       "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
     },
     "packages/core": {
-      "decision": "excluded",
-      "reason": "The unit database health probe opens an unowned localhost:59999 PostgreSQL endpoint. Control this external input before enabling mutations. Integration container ownership/reset and subprocess activation also remain unvalidated.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "Only unit tests with controlled external inputs are enabled. Integration/Testcontainers ownership and reset remain unvalidated under #515 through #518; subprocess mutation activation remains excluded under #520.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
     },
     "packages/crap-typescript-core": {
       "decision": "enabled",

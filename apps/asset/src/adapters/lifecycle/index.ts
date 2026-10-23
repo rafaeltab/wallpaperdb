@@ -51,6 +51,13 @@ async function connection<A>(
   const deadline = AbortSignal.any([signal, AbortSignal.timeout(15000)]);
   const client = await pool.connect();
   let released = false;
+  let failed = false;
+  // pg rejects outstanding queries and also emits on the checked-out client.
+  // Keep that event owned until release; the operation records the typed failure.
+  const connectionError = () => {
+    failed = true;
+  };
+  client.on('error', connectionError);
   const abort = () => {
     if (!released) {
       released = true;
@@ -66,7 +73,8 @@ async function connection<A>(
     return await run(drizzle(client));
   } finally {
     deadline.removeEventListener('abort', abort);
-    if (!released) client.release();
+    client.off('error', connectionError);
+    if (!released) client.release(failed);
   }
 }
 const poolResource = (databaseUrl: string) =>
@@ -192,15 +200,13 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
                 isNull(immutableSources.evidenceExpiresAt)
               )
             );
-          await tx
-            .insert(assetDeletions)
-            .values({
-              assetId: asset.id,
-              deletedAt,
-              sourceSetRevision,
-              deliveryRevision,
-              evidenceExpiresAt,
-            });
+          await tx.insert(assetDeletions).values({
+            assetId: asset.id,
+            deletedAt,
+            sourceSetRevision,
+            deliveryRevision,
+            evidenceExpiresAt,
+          });
           outcome = { ...input.correlation, outcome: 'deleted', assetId: asset.id };
         }
       } else

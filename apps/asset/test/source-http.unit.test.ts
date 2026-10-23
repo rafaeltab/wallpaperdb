@@ -8,6 +8,7 @@ import { Availability } from '../src/capabilities/availability/index.js';
 import { initialSourcePolicies } from '../src/capabilities/sources/index.js';
 it('authenticates byte-free discovery and preserves candidate intent/revision/idempotency on author routes', async () => {
   const calls: unknown[] = [];
+  const discoveryCursors: (string | undefined)[] = [];
   const app = await createHttpApp(
     { nodeEnv: 'test', port: 3003 },
     Layer.merge(
@@ -35,8 +36,9 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
               policy: initialSourcePolicies.wallpaper,
               revision: 'revision-1',
             }),
-          list: () =>
-            Effect.succeed({
+          list: (_owner, _asset, cursor) => {
+            discoveryCursors.push(cursor);
+            return Effect.succeed({
               kind: 'found',
               asset: {
                 assetId: 'asset_1',
@@ -45,6 +47,8 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
                 deliveryRevision: '1',
                 defaultSourceId: 'source_1',
                 sources: [],
+                hasPendingCandidates: false,
+                nextCandidateCursor: '0:candidate_previous',
                 candidates: [
                   {
                     candidateId: 'candidate_saved',
@@ -60,7 +64,8 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
                   },
                 ],
               },
-            }),
+            });
+          },
           create: (owner, assetId, intent) =>
             Effect.sync(() => {
               calls.push({ owner, assetId, intent });
@@ -110,6 +115,16 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
       'orphanExpiresAt',
     ])
       expect(saved.body).not.toContain(privateValue);
+    const continued = await app.inject({
+      url: '/assets/asset_1/sources?candidateCursor=0%3Acandidate_previous',
+      headers: { authorization: 'Bearer owner' },
+    });
+    expect(continued.statusCode).toBe(200);
+    expect(discoveryCursors).toEqual([undefined, '0:candidate_previous']);
+    expect(saved.json()).toMatchObject({
+      hasPendingCandidates: false,
+      nextCandidateCursor: '0:candidate_previous',
+    });
     const created = await app.inject({
       method: 'POST',
       url: '/assets/asset_1/source-candidates',

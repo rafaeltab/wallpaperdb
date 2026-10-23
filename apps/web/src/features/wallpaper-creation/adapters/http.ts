@@ -274,21 +274,38 @@ function managedCandidate(input: unknown): ManagedCandidate {
     ...(typeof v.reason === 'string' ? { reason: v.reason } : {}),
   };
 }
-export async function ownedSources(asset: string, signal: AbortSignal): Promise<OwnedSources> {
+export async function ownedSources(
+  asset: string,
+  signal: AbortSignal,
+  candidateCursor?: string
+): Promise<OwnedSources> {
   const v = object(
     await (
-      await request(`${assetUrl}/assets/${encodeURIComponent(asset)}/sources`, { signal })
+      await request(
+        `${assetUrl}/assets/${encodeURIComponent(asset)}/sources${candidateCursor ? `?candidateCursor=${encodeURIComponent(candidateCursor)}` : ''}`,
+        { signal }
+      )
     ).json()
   );
   if (
     typeof v.sourceSetRevision !== 'string' ||
     !/^(0|[1-9][0-9]{0,39})$/.test(v.sourceSetRevision) ||
     !Array.isArray(v.sources) ||
-    !Array.isArray(v.candidates)
+    !Array.isArray(v.candidates) ||
+    v.candidates.length > 32 ||
+    typeof v.hasPendingCandidates !== 'boolean' ||
+    (v.nextCandidateCursor !== undefined &&
+      (typeof v.nextCandidateCursor !== 'string' ||
+        v.nextCandidateCursor.length === 0 ||
+        v.nextCandidateCursor.length > 256))
   )
     throw new Error('Invalid owned Sources response');
   return {
     sourceSetRevision: v.sourceSetRevision,
+    hasPendingCandidates: v.hasPendingCandidates,
+    ...(typeof v.nextCandidateCursor === 'string'
+      ? { nextCandidateCursor: v.nextCandidateCursor }
+      : {}),
     candidates: v.candidates.map(managedCandidate),
     sources: v.sources.map((input) => {
       const s = object(input),

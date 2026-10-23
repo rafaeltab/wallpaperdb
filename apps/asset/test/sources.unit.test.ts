@@ -25,6 +25,7 @@ it('keeps private bytes outside membership until immutable preparation and first
     initialAnalysisSourceId: null,
     sources: [],
     candidates: [],
+    nonterminalCandidateCount: 0,
   };
   const confirmations: unknown[] = [];
   const objects = new Map<string, Uint8Array>();

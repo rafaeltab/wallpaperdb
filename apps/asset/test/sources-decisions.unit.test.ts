@@ -54,6 +54,7 @@ function fixture(
     });
   let ambiguousCommit = false;
   const store: SourceStorePort = {
+    releaseRead: () => Effect.void,
     transact: (assetId, revision, change) =>
       Effect.suspend(() => {
         if (revision !== null && revision !== activeRevision)
@@ -95,6 +96,7 @@ function fixture(
             yield bytes;
           })(),
           close: () => Effect.void,
+          closed: Effect.void,
         }),
     }),
     Layer.succeed(MandatoryInspection, { inspect: () => inspect() })

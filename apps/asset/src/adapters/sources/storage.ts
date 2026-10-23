@@ -151,11 +151,28 @@ export function sourceStorageLayer(options: Options) {
               body.destroy();
             }
           }),
-        read: (sourceId, assetId) =>
+        read: (sourceId, assetId, lifetimeMs = 300000) =>
           run('read-original', async (signal) => {
-            const body = await get(sourceKey(assetId, sourceId), signal);
+            const deadline = Date.now() + lifetimeMs;
+            const body = await get(
+              sourceKey(assetId, sourceId),
+              AbortSignal.any([signal, AbortSignal.timeout(lifetimeMs)])
+            );
+            const timer = setTimeout(
+              () => body.destroy(new Error('Source read lifetime elapsed')),
+              Math.max(1, deadline - Date.now())
+            );
+            timer.unref();
+            body.on('error', () => undefined);
+            const closed = new Promise<void>((resolve) => {
+              body.once('close', () => {
+                clearTimeout(timer);
+                resolve();
+              });
+            });
             return {
               bytes: body,
+              closed: Effect.promise(() => closed),
               close: () =>
                 Effect.sync(() => {
                   body.destroy();

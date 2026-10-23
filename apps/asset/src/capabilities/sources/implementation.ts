@@ -80,6 +80,7 @@ function similarAspectRatios(facts: readonly SourceFacts[], tolerance: number): 
 export function sourcesLayer(configuration: {
   readonly revision: string;
   readonly types: Readonly<Record<string, SourcePolicy>>;
+  readonly readLifetimeMs?: number;
 }) {
   return Layer.effect(
     Sources,
@@ -87,6 +88,7 @@ export function sourcesLayer(configuration: {
       const store = yield* SourceStore;
       const storage = yield* SourceBytes;
       const inspection = yield* MandatoryInspection;
+      const scope = yield* Effect.scope;
       const modify = (
         owner: Owner,
         assetId: string,
@@ -480,15 +482,46 @@ export function sourcesLayer(configuration: {
           });
         }),
         original: Effect.fn('asset.sources.original')(function* (owner, assetId, sourceId) {
-          const facts = yield* store.transact(assetId, null, (state) => ({
-            state,
-            result: owns(owner, state)
+          const readId = crypto.randomUUID();
+          const lifetimeMs = configuration.readLifetimeMs ?? 300000;
+          const startedAt = yield* Clock.currentTimeMillis;
+          const facts = yield* store.transact(assetId, null, (state) => {
+            const facts = owns(owner, state)
               ? state.sources.find((s) => s.sourceId === sourceId)?.facts
-              : undefined,
-          }));
+              : undefined;
+            return {
+              state,
+              result: facts,
+              ...(facts
+                ? {
+                    readProtection: {
+                      readId,
+                      sourceId,
+                      expiresAt: new Date(startedAt + lifetimeMs).toISOString(),
+                    },
+                  }
+                : {}),
+            };
+          });
           if (!facts) return unavailable;
-          const opened = yield* storage.read(sourceId, assetId);
-          return { kind: 'original' as const, facts, ...opened };
+          const release = store.releaseRead(readId).pipe(
+            Effect.catch((error) =>
+              Effect.logError('Read protection release remains bounded by its recorded expiry', {
+                operation: error.operation,
+              })
+            )
+          );
+          const elapsed = (yield* Clock.currentTimeMillis) - startedAt;
+          const opened = yield* storage
+            .read(sourceId, assetId, Math.max(1, lifetimeMs - elapsed))
+            .pipe(Effect.onError(() => release));
+          yield* opened.closed.pipe(Effect.ensuring(release), Effect.forkIn(scope));
+          return {
+            kind: 'original' as const,
+            facts,
+            bytes: opened.bytes,
+            close: () => opened.close().pipe(Effect.ensuring(release)),
+          };
         }),
       });
     })

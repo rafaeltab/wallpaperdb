@@ -61,13 +61,19 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
       if (!controller.signal.aborted) void saved.refetch();
     });
   };
-  const select = (files: FileList | null, candidate?: ManagedCandidate) => {
+  const select = (
+    files: FileList | null,
+    candidate?: ManagedCandidate,
+    targetSourceId?: string
+  ) => {
     if (!files?.length) return;
     const file = files[0];
     const added =
       candidate && file
         ? batch.resume({ value: file, name: file.name }, candidate)
-        : batch.addFiles(Array.from(files).map((file) => ({ value: file, name: file.name })));
+        : targetSourceId && file
+          ? batch.replace({ value: file, name: file.name }, targetSourceId)
+          : batch.addFiles(Array.from(files).map((file) => ({ value: file, name: file.name })));
     if (!added) {
       setError('Select at most 16 files per upload batch.');
       return;
@@ -123,6 +129,12 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                   : row.status === 'uploading'
                     ? 'Uploading Source'
                     : 'Waiting to upload'}
+            {row.targetSourceId && (
+              <p>
+                Replacing Source {row.targetSourceId}. Its accepted image stays active until
+                replacement succeeds.
+              </p>
+            )}
             {row.message && <p>{row.message}</p>}
             {(row.status === 'failed' || row.status === 'confirming') && (
               <button
@@ -176,6 +188,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
             {saved.data.sources.map((source) => (
               <li key={source.sourceId} className="text-xs break-all">
                 {source.sourceId}
+                {source.sourceId === saved.data.defaultSourceId && ' · Default Source'}
                 {source.facts && ` · ${source.facts.width} × ${source.facts.height}`}{' '}
                 <button
                   type="button"
@@ -195,6 +208,18 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                 >
                   Download original
                 </button>
+                <label className="block">
+                  Replace Source {source.sourceId}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={snapshot.busy || snapshot.rows.length >= 16}
+                    onChange={(event) => {
+                      select(event.target.files, undefined, source.sourceId);
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
               </li>
             ))}
           </ul>
@@ -212,7 +237,9 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                   Saved Source {candidate.candidateId}: {candidate.status}
                   {candidate.reason && ` · ${candidate.reason}`}
                   <label className="block">
-                    Retry or resume this Source with its image
+                    {candidate.operation === 'replace-one'
+                      ? `Retry or resume replacement for ${candidate.targetSourceId}`
+                      : 'Retry or resume this Source with its image'}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"

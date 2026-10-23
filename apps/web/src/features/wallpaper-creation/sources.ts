@@ -1,5 +1,10 @@
 import type { WallpaperStatus } from './contract';
+export type SourceMutation =
+  | { readonly operation: 'add' }
+  | { readonly operation: 'replace-one'; readonly targetSourceId: string };
 export interface ManagedCandidate {
+  readonly operation?: 'add' | 'replace-one' | 'replace-set';
+  readonly targetSourceId?: string;
   readonly candidateId: string;
   readonly expectedSourceSetRevision: string;
   readonly status: string;
@@ -7,6 +12,7 @@ export interface ManagedCandidate {
   readonly reason?: string;
 }
 export interface OwnedSources {
+  readonly defaultSourceId?: string | null;
   readonly hasPendingCandidates: boolean;
   readonly nextCandidateCursor?: string;
   readonly sourceSetRevision: string;
@@ -25,7 +31,8 @@ export interface SourceBatchApi<TFile> {
     asset: string,
     key: string,
     revision: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    mutation?: SourceMutation
   ) => Promise<ManagedCandidate>;
   readonly status: (asset: string, id: string, signal: AbortSignal) => Promise<ManagedCandidate>;
   readonly upload: (
@@ -45,7 +52,8 @@ export interface SourceBatchApi<TFile> {
     id: string,
     revision: string,
     correlation: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    mutation?: SourceMutation
   ) => Promise<ManagedCandidate>;
   readonly cancel: (asset: string, id: string, signal: AbortSignal) => Promise<void>;
   readonly wait: (signal: AbortSignal) => Promise<void>;
@@ -61,6 +69,7 @@ interface Receipt {
   readonly key: string;
   readonly revision: string;
   readonly initial: boolean;
+  readonly mutation: SourceMutation;
   candidate?: ManagedCandidate;
 }
 export interface SourceUploadRow<TFile> {
@@ -69,6 +78,7 @@ export interface SourceUploadRow<TFile> {
   readonly value: TFile;
   readonly status: 'pending' | 'uploading' | 'accepted' | 'failed' | 'confirming';
   readonly sourceId?: string;
+  readonly targetSourceId?: string;
   readonly message?: string;
   readonly receipt?: Receipt;
   readonly restart?: boolean;
@@ -128,19 +138,36 @@ export function createWallpaperSourceBatch<TFile>(
       publish();
       return true;
     },
+    replace(file: { readonly value: TFile; readonly name: string }, targetSourceId: string) {
+      if (busy || rows.length >= 16 || !targetSourceId) return false;
+      rows = [...rows, { ...file, targetSourceId, id: api.identifier(), status: 'pending' }];
+      publish();
+      return true;
+    },
     resume(file: { readonly value: TFile; readonly name: string }, candidate: ManagedCandidate) {
-      if (busy || rows.length >= 16 || candidate.status === 'accepted') return false;
+      if (
+        busy ||
+        rows.length >= 16 ||
+        candidate.status === 'accepted' ||
+        candidate.operation === 'replace-set' ||
+        (candidate.operation === 'replace-one' && !candidate.targetSourceId)
+      )
+        return false;
       rows = [
         ...rows,
         {
           ...file,
           id: api.identifier(),
+          targetSourceId: candidate.targetSourceId,
           status: 'pending',
           restart: ['rejected', 'cancelled'].includes(candidate.status),
           receipt: {
             key: api.identifier(),
             revision: candidate.expectedSourceSetRevision,
             initial: candidate.expectedSourceSetRevision === '0',
+            mutation: candidate.targetSourceId
+              ? { operation: 'replace-one', targetSourceId: candidate.targetSourceId }
+              : { operation: 'add' },
             candidate,
           },
         },
@@ -191,7 +218,17 @@ export function createWallpaperSourceBatch<TFile>(
                   throw new Error(
                     'An initial Source is still pending. Resume its saved candidate before selecting another file.'
                   );
+                if (
+                  row.targetSourceId &&
+                  !saved.sources.some((source) => source.sourceId === row.targetSourceId)
+                )
+                  throw new Error(
+                    'The Source to replace is no longer active. Select a current Source to replace.'
+                  );
                 receipt = {
+                  mutation: row.targetSourceId
+                    ? { operation: 'replace-one', targetSourceId: row.targetSourceId }
+                    : { operation: 'add' },
                   key: api.identifier(),
                   revision: saved.sourceSetRevision,
                   initial: saved.sources.length === 0,
@@ -200,7 +237,7 @@ export function createWallpaperSourceBatch<TFile>(
               }
               let candidate = receipt.candidate
                 ? await api.status(asset, receipt.candidate.candidateId, signal)
-                : await api.create(asset, receipt.key, receipt.revision, signal);
+                : await api.create(asset, receipt.key, receipt.revision, signal, receipt.mutation);
               receipt.candidate = candidate;
               const currentReceipt = receipt;
               const waitForInspection = async () => {
@@ -250,7 +287,8 @@ export function createWallpaperSourceBatch<TFile>(
                   candidate.candidateId,
                   receipt.revision,
                   candidate.candidateId,
-                  signal
+                  signal,
+                  receipt.mutation
                 );
                 receipt.candidate = candidate;
               }

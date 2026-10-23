@@ -12,6 +12,7 @@ import {
 import { Context, Effect, Layer } from 'effect';
 import { z } from 'zod';
 import { CleanupBytes, CleanupFailure } from '../../capabilities/cleanup/index.js';
+import { observeCleanup } from '../cleanup/index.js';
 import {
   SourceBytes,
   MandatoryInspection,
@@ -265,8 +266,8 @@ export function sourceStorageLayer(options: Options) {
       return Context.make(SourceBytes, storage).pipe(
         Context.add(MandatoryInspection, inspection),
         Context.add(CleanupBytes, {
-          reclaim: (target) =>
-            run('reclaim', async (signal) => {
+          reclaim: (target, work) => {
+            const reclamation = run('reclaim', async (signal) => {
               const deadline = AbortSignal.any([
                 signal,
                 AbortSignal.timeout(operations.reclamationTimeoutMs),
@@ -313,7 +314,15 @@ export function sourceStorageLayer(options: Options) {
                     cause: error.cause,
                   })
               )
-            ),
+            );
+            return work
+              ? observeCleanup(
+                  'asset.cleanup.reclaim-bytes',
+                  work,
+                  reclamation.pipe(Effect.as('reclaimed'))
+                ).pipe(Effect.asVoid)
+              : reclamation;
+          },
         })
       );
     })

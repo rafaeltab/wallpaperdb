@@ -258,6 +258,7 @@ export const sourceCleanup = pgTable(
     id: text('id').primaryKey(),
     assetId: text('asset_id').notNull(),
     applicationId: text('application_id').notNull(),
+    context: jsonb('context').$type<import('../capabilities/lifecycle/index.js').CommandContext>(),
     target: jsonb('target')
       .notNull()
       .$type<import('../capabilities/cleanup/index.js').CleanupTarget>(),

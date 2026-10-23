@@ -191,6 +191,7 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
                 .insert(sourceCleanup)
                 .values({
                   id: `candidate:${candidate.candidateId}`,
+                  context: input.context,
                   assetId: asset.id,
                   applicationId: asset.applicationId,
                   target: { kind: 'candidate', candidateId: candidate.candidateId },
@@ -203,13 +204,17 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
                 })
                 .onConflictDoUpdate({
                   target: sourceCleanup.id,
-                  set: { dueAt: sql`least(${sourceCleanup.dueAt}, ${deletedAt})` },
+                  set: {
+                    dueAt: sql`least(${sourceCleanup.dueAt}, ${deletedAt})`,
+                    context: input.context,
+                  },
                 });
               if (candidate.status !== 'accepted')
                 await tx
                   .insert(sourceCleanup)
                   .values({
                     id: `source:${candidate.sourceId}`,
+                    context: input.context,
                     assetId: asset.id,
                     applicationId: asset.applicationId,
                     target: { kind: 'source', assetId: asset.id, sourceId: candidate.sourceId },
@@ -219,7 +224,10 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
                   })
                   .onConflictDoUpdate({
                     target: sourceCleanup.id,
-                    set: { dueAt: sql`least(${sourceCleanup.dueAt}, ${deletedAt})` },
+                    set: {
+                      dueAt: sql`least(${sourceCleanup.dueAt}, ${deletedAt})`,
+                      context: input.context,
+                    },
                   });
             }
             state.nonterminalCandidateCount = 0;
@@ -243,12 +251,16 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
               .insert(sourceCleanup)
               .values({
                 id: `source:${source.id}`,
+                context: input.context,
                 assetId: asset.id,
                 applicationId: asset.applicationId,
                 target: { kind: 'source', assetId: asset.id, sourceId: source.id },
                 dueAt: evidenceExpiresAt,
               })
-              .onConflictDoUpdate({ target: sourceCleanup.id, set: { dueAt: evidenceExpiresAt } });
+              .onConflictDoUpdate({
+                target: sourceCleanup.id,
+                set: { dueAt: evidenceExpiresAt, context: input.context },
+              });
           await tx.insert(assetDeletions).values({
             assetId: asset.id,
             deletedAt,

@@ -37,8 +37,18 @@ type UploadQueueContextValue = ReturnType<BrowserUploadQueue['getSnapshot']> &
 
 const UploadQueueContext = createContext<UploadQueueContextValue | undefined>(undefined);
 
-export function UploadQueueProvider({ children }: { children: ReactNode }) {
-  const [queue] = useState(createBrowserUploadQueue);
+export function UploadQueueProvider({
+  children,
+  ownerId,
+}: {
+  children: ReactNode;
+  ownerId?: string | null;
+}) {
+  const [session, setSession] = useState(() => ({ ownerId, queue: createBrowserUploadQueue() }));
+  if (session.ownerId !== ownerId) {
+    setSession({ ownerId, queue: createBrowserUploadQueue() });
+  }
+  const { queue } = session;
   const snapshot = useSyncExternalStore(queue.subscribe, queue.getSnapshot, queue.getSnapshot);
   useEffect(() => queue.activate(), [queue]);
 

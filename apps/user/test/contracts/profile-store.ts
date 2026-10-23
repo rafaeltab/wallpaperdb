@@ -134,8 +134,16 @@ const cases: ReadonlyArray<{
       expect(await run(f.store.read(query.profileId, now)), 'owner rollback').toEqual(before);
       expect(await run(f.store.read('contract-other', now)), 'other owner intact').toEqual(other);
       await run(
+        f.store.transact({ ...query, handle: 'ada' }, (snapshot) => {
+          expect(snapshot.targetClaim?.profileId, 'owner claim intact').toBe(query.profileId);
+          return { _tag: 'Unchanged' };
+        })
+      );
+      await run(
         f.store.transact({ ...query, handle: 'occupied' }, (snapshot) => {
-          expect(snapshot.targetClaim?.profileId, 'original claim intact').toBe('contract-other');
+          expect(snapshot.targetClaim?.profileId, 'conflicting claim intact').toBe(
+            'contract-other'
+          );
           return { _tag: 'Unchanged' };
         })
       );

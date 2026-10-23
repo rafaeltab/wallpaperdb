@@ -232,8 +232,20 @@ export function cleanupPostgresLayer(options: Options) {
                         continue;
                       if (!['accepted', 'rejected', 'cancelled'].includes(pending.status)) {
                         pending.status = 'rejected';
-                        pending.reason = 'candidate-expired';
+                        pending.reason =
+                          Date.parse(pending.expiresAt) <= now.getTime()
+                            ? 'candidate-expired'
+                            : 'temporary-input-expired';
                         state.nonterminalCandidateCount--;
+                        await tx
+                          .update(sourceCleanup)
+                          .set({ dueAt: sql`least(${sourceCleanup.dueAt}, ${now})` })
+                          .where(
+                            inArray(sourceCleanup.id, [
+                              `candidate:${pending.candidateId}`,
+                              `source:${pending.sourceId}`,
+                            ])
+                          );
                       }
                     }
                     await tx

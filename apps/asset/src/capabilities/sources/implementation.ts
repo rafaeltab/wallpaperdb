@@ -133,9 +133,8 @@ export function sourcesLayer(configuration: {
             const policy = configuration.types[state.asset.assetType];
             if (!policy || !policy.operations.includes(input.operation))
               return reject('unsupported-operation');
-            // Later tickets implement noninitial membership operations without claiming them here.
-            if (input.operation !== 'add' || state.sources.length !== 0)
-              return reject('unsupported-operation');
+            // Replacements are separate operations with their own membership semantics.
+            if (input.operation !== 'add') return reject('unsupported-operation');
             if (input.expectedSourceSetRevision !== state.sourceSetRevision)
               return reject('source-set-conflict');
             if (
@@ -285,14 +284,14 @@ export function sourcesLayer(configuration: {
             }
             if (state.sourceSetRevision !== intent.expectedSourceSetRevision)
               return { state, result: reject('source-set-conflict') };
-            if (state.sources.length >= policy.maxActiveSources || state.sources.length > 0)
+            if (state.sources.length >= policy.maxActiveSources)
               return { state, result: reject('source-count-limit') };
             state.sources.push({
               sourceId: current.sourceId,
               facts: current.facts,
               layout: current.layout,
             });
-            state.defaultSourceId = current.sourceId;
+            state.defaultSourceId ??= current.sourceId;
             state.initialAnalysisSourceId ??= current.sourceId;
             state.sourceSetRevision = (BigInt(state.sourceSetRevision) + 1n).toString();
             state.deliveryRevision = (BigInt(state.deliveryRevision) + 1n).toString();

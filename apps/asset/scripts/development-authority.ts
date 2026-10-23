@@ -74,13 +74,13 @@ export async function configureDevelopment(
         applications: {
           wallpaper: {
             ownerNamespace: 'clerk-development',
-            allowedOperations: ['create'],
+            allowedOperations: ['create', 'delete'],
             allowedTypes: ['wallpaper'],
             credentials: [credential('wallpaper-1')],
           },
           user: {
             ownerNamespace: 'clerk-development',
-            allowedOperations: ['create'],
+            allowedOperations: ['create', 'delete'],
             allowedTypes: ['picture'],
             credentials: [credential('user-1')],
           },

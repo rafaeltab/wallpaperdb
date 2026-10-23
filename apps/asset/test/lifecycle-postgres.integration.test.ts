@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -51,7 +52,9 @@ afterAll(async () => {
   await container?.stop();
 });
 beforeEach(async () => {
-  await pool.query('TRUNCATE owned_assets, asset_commands, asset_result_outbox');
+  await pool.query(
+    'TRUNCATE owned_assets, asset_commands, asset_result_outbox, asset_deletions, asset_source_state, immutable_sources'
+  );
 });
 it('atomically assigns one identity through concurrent replay, preserves application scoping and records conflict results', async () => {
   await runtime.runPromise(
@@ -170,4 +173,291 @@ it('rolls back Asset and command acceptance when the outbox write fails, then sa
     await runtime.runPromise(LifecycleStore.use((store) => store.accept(input)))
   ).toMatchObject({ outcome: 'created' });
   expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toHaveLength(1);
+});
+
+it('terminally deletes only for its Creating application and preserves replay fences after deletion', async () => {
+  await runtime.runPromise(
+    Effect.gen(function* () {
+      const store = yield* LifecycleStore;
+      const created = yield* store.accept(input);
+      if (created.outcome !== 'created') throw new Error('Expected Asset');
+      const deletion: Acceptance = {
+        ...input,
+        canonical: '["delete","terminal"]',
+        correlation: { commandId: 'terminal', applicationReference: 'removal-1' },
+        decision: {
+          kind: 'delete',
+          assetId: created.assetId,
+          evidenceRetentionMsByType: { picture: 2592000000 },
+        },
+      };
+      expect(yield* store.accept({ ...deletion, applicationId: 'wallpaper' })).toMatchObject({
+        outcome: 'rejected',
+        reason: 'unavailable-asset',
+      });
+      expect(yield* store.find(created.assetId)).not.toBeNull();
+      const deleted = yield* store.accept(deletion);
+      expect(deleted).toEqual({
+        commandId: 'terminal',
+        applicationReference: 'removal-1',
+        outcome: 'deleted',
+        assetId: created.assetId,
+      });
+      expect(yield* store.find(created.assetId)).toBeNull();
+      expect(yield* store.accept(deletion)).toEqual(deleted);
+      expect(
+        yield* store.accept({
+          ...deletion,
+          canonical: '["delete","again"]',
+          correlation: { commandId: 'again', applicationReference: '' },
+        })
+      ).toMatchObject({ outcome: 'already-deleted', assetId: created.assetId });
+      expect(yield* store.accept(input)).toEqual(created);
+      expect(yield* store.find(created.assetId)).toBeNull();
+      expect(
+        yield* store.accept({
+          ...deletion,
+          canonical: '["delete","unknown"]',
+          correlation: { commandId: 'unknown', applicationReference: '' },
+          decision: {
+            ...deletion.decision,
+            kind: 'delete',
+            assetId: 'asset_unknown',
+            evidenceRetentionMsByType: { picture: 2592000000 },
+          },
+        })
+      ).toMatchObject({ outcome: 'rejected', reason: 'unavailable-asset' });
+    })
+  );
+});
+
+it('rolls back terminal state and all responsibilities if the deletion result cannot commit', async () => {
+  const created = await runtime.runPromise(LifecycleStore.use((s) => s.accept(input)));
+  if (created.outcome !== 'created') throw new Error('Expected Asset');
+  const deletion: Acceptance = {
+    ...input,
+    canonical: 'rollback-delete',
+    correlation: { commandId: 'rollback-delete', applicationReference: '' },
+    decision: {
+      kind: 'delete',
+      assetId: created.assetId,
+      evidenceRetentionMsByType: { picture: 2592000000 },
+    },
+  };
+  await pool.query(
+    'ALTER TABLE asset_result_outbox ADD CONSTRAINT proof_delete_failure CHECK (false) NOT VALID'
+  );
+  try {
+    await expect(
+      runtime.runPromise(LifecycleStore.use((s) => s.accept(deletion)))
+    ).rejects.toThrow();
+    expect(
+      await runtime.runPromise(LifecycleStore.use((s) => s.find(created.assetId)))
+    ).not.toBeNull();
+    expect((await pool.query('SELECT count(*)::int AS count FROM asset_deletions')).rows).toEqual([
+      { count: 0 },
+    ]);
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS count FROM asset_commands WHERE command_id = 'rollback-delete'"
+        )
+      ).rows
+    ).toEqual([{ count: 0 }]);
+  } finally {
+    await pool.query('ALTER TABLE asset_result_outbox DROP CONSTRAINT proof_delete_failure');
+  }
+  const outcomes = await Promise.all(
+    ['delete-a', 'delete-b'].map((commandId) =>
+      runtime.runPromise(
+        LifecycleStore.use((s) =>
+          s.accept({
+            ...deletion,
+            canonical: commandId,
+            correlation: { commandId, applicationReference: '' },
+          })
+        )
+      )
+    )
+  );
+  expect(outcomes.map((outcome) => outcome.outcome).sort()).toEqual(['already-deleted', 'deleted']);
+  const before = (await pool.query('SELECT * FROM asset_deletions')).rows;
+  expect(before).toHaveLength(1);
+  expect(before[0]).toMatchObject({
+    asset_id: created.assetId,
+    source_set_revision: '1',
+    delivery_revision: '1',
+    capabilities_pending: true,
+    cleanup_pending: true,
+  });
+  await runtime.runPromise(
+    LifecycleStore.use((s) =>
+      s.accept({
+        ...deletion,
+        canonical: 'after-expiry',
+        correlation: { commandId: 'after-expiry', applicationReference: '' },
+        decision: {
+          kind: 'delete',
+          assetId: created.assetId,
+          evidenceRetentionMsByType: { picture: 1 },
+        },
+      })
+    )
+  );
+  expect((await pool.query('SELECT * FROM asset_deletions')).rows).toEqual(before);
+});
+
+it('resolves a lost real PostgreSQL COMMIT response by replay without resetting terminal obligations', async () => {
+  const { createServer, connect } = await import('node:net');
+  const sockets = new Set<import('node:net').Socket>();
+  const upstreamUrl = new URL(container.getConnectionUri());
+  let dropCommit = false;
+  let dropped = false;
+  const proxy = createServer((client) => {
+    const upstream = connect({ host: upstreamUrl.hostname, port: Number(upstreamUrl.port) });
+    sockets.add(client);
+    sockets.add(upstream);
+    client.on('error', () => upstream.destroy());
+    upstream.on('error', () => client.destroy());
+    client.on('close', () => {
+      sockets.delete(client);
+      upstream.destroy();
+    });
+    upstream.on('close', () => {
+      sockets.delete(upstream);
+      client.destroy();
+    });
+    client.pipe(upstream);
+    let buffered = Buffer.alloc(0);
+    upstream.on('data', (chunk) => {
+      buffered = Buffer.concat([buffered, chunk]);
+      while (buffered.length >= 5) {
+        const length = 1 + buffered.readInt32BE(1);
+        if (buffered.length < length) return;
+        const frame = buffered.subarray(0, length);
+        buffered = buffered.subarray(length);
+        // CommandComplete COMMIT is emitted only after PostgreSQL has committed.
+        if (dropCommit && frame[0] === 67 && frame.subarray(5).equals(Buffer.from('COMMIT\0'))) {
+          dropCommit = false;
+          dropped = true;
+          client.destroy();
+          upstream.destroy();
+          return;
+        }
+        client.write(frame);
+      }
+    });
+  });
+  proxy.listen(0, '127.0.0.1');
+  await once(proxy, 'listening');
+  const address = proxy.address();
+  if (!address || typeof address === 'string') throw new Error('Missing proxy address');
+  const proxyUrl = new URL(upstreamUrl);
+  proxyUrl.hostname = '127.0.0.1';
+  proxyUrl.port = String(address.port);
+  const ambiguous = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: proxyUrl.toString(),
+      revision: 'revision-1',
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  try {
+    const created = await runtime.runPromise(LifecycleStore.use((s) => s.accept(input)));
+    if (created.outcome !== 'created') throw new Error('Expected Asset');
+    const deletion: Acceptance = {
+      ...input,
+      canonical: 'ambiguous-delete',
+      correlation: { commandId: 'ambiguous-delete', applicationReference: '' },
+      decision: {
+        kind: 'delete',
+        assetId: created.assetId,
+        evidenceRetentionMsByType: { picture: 2592000000 },
+      },
+    };
+    await ambiguous.runPromise(LifecycleStore);
+    dropCommit = true;
+    await expect(
+      ambiguous.runPromise(LifecycleStore.use((s) => s.accept(deletion)))
+    ).rejects.toThrow();
+    expect(dropped).toBe(true);
+    expect(await runtime.runPromise(LifecycleStore.use((s) => s.find(created.assetId)))).toBeNull();
+    const committed = (
+      await pool.query('SELECT * FROM asset_deletions WHERE asset_id=$1', [created.assetId])
+    ).rows;
+    expect(committed).toHaveLength(1);
+    expect(await ambiguous.runPromise(LifecycleStore.use((s) => s.accept(deletion)))).toMatchObject(
+      { outcome: 'deleted', assetId: created.assetId }
+    );
+    expect(
+      (await pool.query('SELECT * FROM asset_deletions WHERE asset_id=$1', [created.assetId])).rows
+    ).toEqual(committed);
+    expect(await ambiguous.runPromise(LifecycleStore.use((s) => s.accept(input)))).toEqual(created);
+    expect(await runtime.runPromise(LifecycleStore.use((s) => s.find(created.assetId)))).toBeNull();
+  } finally {
+    await ambiguous.dispose();
+    for (const socket of sockets) socket.destroy();
+    await new Promise<void>((resolve) => proxy.close(() => resolve()));
+  }
+});
+
+it('fences obsolete deletion workers and retains recorded terminal outcomes independently of purgeable Source facts', async () => {
+  const created = await runtime.runPromise(LifecycleStore.use((s) => s.accept(input)));
+  if (created.outcome !== 'created') throw new Error('Expected Asset');
+  const deletion: Acceptance = {
+    ...input,
+    canonical: 'configuration-delete',
+    correlation: { commandId: 'configuration-delete', applicationReference: '' },
+    decision: {
+      kind: 'delete',
+      assetId: created.assetId,
+      evidenceRetentionMsByType: { picture: 2592000000 },
+    },
+  };
+  const deleted = await runtime.runPromise(LifecycleStore.use((s) => s.accept(deletion)));
+  const obligations = (
+    await pool.query('SELECT * FROM asset_deletions WHERE asset_id=$1', [created.assetId])
+  ).rows;
+  await pool.query('DELETE FROM asset_source_state WHERE asset_id=$1', [created.assetId]);
+  await pool.query('DELETE FROM immutable_sources WHERE asset_id=$1', [created.assetId]);
+  await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-2'));
+  const current = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      revision: 'revision-2',
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  try {
+    await expect(
+      runtime.runPromise(LifecycleStore.use((s) => s.accept(deletion)))
+    ).rejects.toThrow();
+    expect(
+      await current.runPromise(
+        LifecycleStore.use((s) =>
+          s.accept({
+            ...deletion,
+            revision: 'revision-2',
+            decision: { kind: 'reject', reason: 'forbidden-operation' },
+          })
+        )
+      )
+    ).toEqual(deleted);
+    expect(
+      await current.runPromise(
+        LifecycleStore.use((s) => s.accept({ ...input, revision: 'revision-2' }))
+      )
+    ).toEqual(created);
+    expect(await current.runPromise(LifecycleStore.use((s) => s.find(created.assetId)))).toBeNull();
+    expect(
+      (await pool.query('SELECT * FROM asset_deletions WHERE asset_id=$1', [created.assetId])).rows
+    ).toEqual(obligations);
+  } finally {
+    await current.dispose();
+    await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-1'));
+  }
 });

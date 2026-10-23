@@ -5,7 +5,13 @@ import { parseAuthority } from '../src/authority.js';
 import { renderBrokerConfiguration, provisionAssetBroker } from '../src/adapters/commands/index.js';
 import { authorityFixture } from './fixtures/authority.js';
 
-const authority = parseAuthority(authorityFixture());
+function deleteAuthority() {
+  const raw = authorityFixture();
+  raw.applications.user.allowedOperations.push('delete');
+  raw.applications.wallpaper.allowedOperations.push('delete');
+  return raw;
+}
+const authority = parseAuthority(deleteAuthority());
 let container: Awaited<ReturnType<GenericContainer['start']>>;
 const connections: NatsConnection[] = [];
 let url: string;
@@ -42,9 +48,14 @@ it('isolates application publication and each filtered result consumer from all 
   const codec = StringCodec();
   const manager = await operator.jetstreamManager();
   await user.jetstream().publish('asset.commands.user.create', codec.encode('trusted-user'));
+  await user.jetstream().publish('asset.commands.user.delete', codec.encode('trusted-delete'));
   for (const target of [
     'asset.commands.wallpaper.create',
-    'asset.commands.user.delete',
+    'asset.commands.wallpaper.delete',
+    'asset.commands.user.delete.extra',
+    'asset.commands.delete',
+    'asset.commands.user',
+    'asset.replay.user.delete',
     'asset.results.user',
     'asset.quarantine',
     'asset.operator.notifications',
@@ -53,6 +64,9 @@ it('isolates application publication and each filtered result consumer from all 
     '$JS.API.STREAM.PURGE.ASSET_COMMANDS',
     '$JS.API.STREAM.MSG.GET.ASSET_COMMANDS',
     '$JS.API.CONSUMER.CREATE.ASSET_COMMANDS',
+    '$JS.API.CONSUMER.DELETE.ASSET_COMMANDS.commands_user',
+    '$JS.API.CONSUMER.MSG.NEXT.ASSET_COMMANDS.commands_user',
+    '$JS.API.STREAM.SNAPSHOT.ASSET_COMMANDS',
     '$JS.API.CONSUMER.MSG.NEXT.ASSET_RESULTS.results_wallpaper',
     '$JS.ACK.ASSET_RESULTS.results_wallpaper.1.1.1.1.0',
   ]) {
@@ -69,7 +83,11 @@ it('isolates application publication and each filtered result consumer from all 
     .jetstream()
     .publish('asset.commands.user.create', codec.encode('legacy-spoof'), { timeout: 200 })
     .catch(() => undefined);
-  expect((await manager.streams.info('ASSET_COMMANDS')).state.messages).toBe(1);
+  await legacy
+    .jetstream()
+    .publish('asset.commands.user.delete', codec.encode('legacy-delete'), { timeout: 200 })
+    .catch(() => undefined);
+  expect((await manager.streams.info('ASSET_COMMANDS')).state.messages).toBe(2);
   await service.jetstream().publish('asset.results.user', codec.encode('user-result'));
   const wallpaperService = await connection(
     'asset-service_wallpaper',
@@ -156,7 +174,7 @@ it('denies direct reads of another application and retains application identity 
     await old.flush();
     expect(await denied).toMatchObject({ code: 'PERMISSIONS_VIOLATION' });
   }
-  const raw = authorityFixture();
+  const raw = deleteAuthority();
   raw.applications.user.credentials.push({
     user: 'user-2',
     password: 'rotated-secret',

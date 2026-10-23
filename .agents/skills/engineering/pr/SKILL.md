@@ -32,6 +32,16 @@ Use this template for writing the PR body:
 <optional: potential ramifications of merge>
 ```
 
+## Closing issues
+
+When creating or updating a PR body, put a separate `Closes #123` line in the Summary for each issue the PR fully resolves. For an issue in another repository, use `Closes owner/repository#123`. Repeat the keyword for every issue. Write these as ordinary body text outside code fences, rather than only in the title, comments, or commits. Use `Refs #123` for related issues or partial work that should remain open.
+
+Check the PR's base against the repository's default branch. GitHub applies closing keywords only to PRs targeting that branch. For stacked PRs or other bases, carry the closing references into the PR that delivers the completed work to the default branch. Report that merging an intermediate PR will leave the issues open; keep the intended base.
+
+After publishing or editing the body, verify that GitHub's `closingIssuesReferences` contains every intended issue for a PR targeting the default branch. Fix missing or incorrect references before claiming the issues will close on merge.
+
+See [GitHub's issue-linking rules](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue).
+
 ## Sections
 
 Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.

@@ -610,3 +610,186 @@ it('cannot restore detached Source state or publish a late confirmation after te
     await lifecycle.dispose();
   }
 });
+
+it('retires the complete prior set atomically and rejects stale restoration while preserving another Asset', async () => {
+  const revision = 'picture-whole-set';
+  await Effect.runPromise(activateLifecycle(container.getConnectionUri(), revision));
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      revision,
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  const sources = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  const source = (id: string) => ({
+    sourceId: id,
+    layout: 'asset-layout-1' as const,
+    facts: {
+      width: 512,
+      height: 512,
+      model: 'sdr-webp',
+      mimeType: 'image/webp',
+      byteLength: 4,
+      digest: 'a'.repeat(64),
+    },
+  });
+  try {
+    const create = async (key: string) => {
+      const result = await lifecycle.runPromise(
+        LifecycleStore.use((store) =>
+          store.accept({
+            revision,
+            applicationId: 'user',
+            canonical: key,
+            correlation: { commandId: key, applicationReference: key },
+            context: { occurrence: { source: 'https://test/user', id: key } },
+            decision: {
+              kind: 'create',
+              assetType: 'picture',
+              owner: { namespace: 'clerk', subject: 'owner' },
+            },
+          })
+        )
+      );
+      if (result.outcome !== 'created') throw new Error('Expected picture');
+      return result.assetId;
+    };
+    const assetId = await create('whole-set-picture');
+    const adjacentId = await create('adjacent-picture');
+    const seed = (id: string, ids: string[]) =>
+      sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact(id, revision, (state) => {
+            if (!state) throw new Error('Expected Source state');
+            state.sources = ids.map(source);
+            state.sourceSetRevision = '1';
+            state.deliveryRevision = '7';
+            state.defaultSourceId = ids[0]!;
+            state.initialAnalysisSourceId = ids[0]!;
+            return { state, result: structuredClone(state) };
+          })
+        )
+      );
+    const before = await seed(assetId, ['picture-prior-a', 'picture-prior-b']);
+    const adjacent = await seed(adjacentId, ['picture-adjacent']);
+    const deadline = '2026-11-22T00:00:00.000Z';
+    const replace = (invalidSecond: boolean) =>
+      sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact(assetId, revision, (state) => {
+            if (!state) throw new Error('Expected Source state');
+            state.sources = [source('picture-winner')];
+            state.sourceSetRevision = '2';
+            state.deliveryRevision = '8';
+            state.defaultSourceId = 'picture-winner';
+            return {
+              state,
+              result: structuredClone(state),
+              retirements: [
+                { sourceId: 'picture-prior-a', evidenceExpiresAt: deadline },
+                {
+                  sourceId: invalidSecond ? 'unrelated-source' : 'picture-prior-b',
+                  evidenceExpiresAt: deadline,
+                },
+              ],
+              confirmation: {
+                id: 'picture-set-confirmation',
+                applicationId: 'user',
+                assetId,
+                assetType: 'picture',
+                candidateId: 'picture-set-candidate',
+                sourceId: 'picture-winner',
+                defaultSourceId: 'picture-winner',
+                initialAnalysisSourceId: 'picture-prior-a',
+                sourceSetRevision: '2',
+                deliveryRevision: '8',
+                context: { occurrence: { source: 'https://test/author', id: 'picture-whole-set' } },
+              },
+            };
+          })
+        )
+      );
+    const read = (id: string) =>
+      sources.runPromise(
+        SourceStore.use((store) => store.transact(id, null, (state) => ({ state, result: state })))
+      );
+    // The second retirement fails after the first write; all effects must roll back.
+    await expect(replace(true)).rejects.toThrow();
+    expect(await read(assetId)).toEqual(before);
+    expect(
+      (
+        await pool.query(
+          'SELECT id, evidence_expires_at FROM immutable_sources WHERE asset_id=$1 ORDER BY id',
+          [assetId]
+        )
+      ).rows
+    ).toEqual([
+      { id: 'picture-prior-a', evidence_expires_at: null },
+      { id: 'picture-prior-b', evidence_expires_at: null },
+    ]);
+    expect(
+      (
+        await pool.query(
+          'SELECT count(*)::int AS count FROM source_acceptance_outbox WHERE id=$1',
+          ['picture-set-confirmation']
+        )
+      ).rows
+    ).toEqual([{ count: 0 }]);
+    const winner = await replace(false);
+    expect(winner.initialAnalysisSourceId).toBe('picture-prior-a');
+    expect(winner.sources.map((s) => s.sourceId)).toEqual(['picture-winner']);
+    const retired = (
+      await pool.query(
+        'SELECT id, evidence_expires_at FROM immutable_sources WHERE asset_id=$1 AND evidence_expires_at IS NOT NULL ORDER BY id',
+        [assetId]
+      )
+    ).rows;
+    expect(retired).toEqual([
+      { id: 'picture-prior-a', evidence_expires_at: new Date(deadline) },
+      { id: 'picture-prior-b', evidence_expires_at: new Date(deadline) },
+    ]);
+    expect(
+      (
+        await pool.query('SELECT id, due_at FROM source_cleanup WHERE asset_id=$1 ORDER BY id', [
+          assetId,
+        ])
+      ).rows
+    ).toEqual([
+      { id: 'source:picture-prior-a', due_at: new Date(deadline) },
+      { id: 'source:picture-prior-b', due_at: new Date(deadline) },
+    ]);
+    // A retained Source and any descendant carrying that provenance have no active membership.
+    for (const old of before.sources)
+      expect(winner.sources.some((current) => current.sourceId === old.sourceId)).toBe(false);
+    await expect(
+      sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact(assetId, null, () => ({ state: before, result: undefined }))
+        )
+      )
+    ).rejects.toThrow();
+    expect(await read(assetId)).toEqual(winner);
+    expect(await read(adjacentId)).toEqual(adjacent);
+    expect(
+      (
+        await pool.query(
+          'SELECT id, evidence_expires_at FROM immutable_sources WHERE asset_id=$1 AND evidence_expires_at IS NOT NULL ORDER BY id',
+          [assetId]
+        )
+      ).rows
+    ).toEqual(retired);
+  } finally {
+    await sources.dispose();
+    await lifecycle.dispose();
+  }
+});

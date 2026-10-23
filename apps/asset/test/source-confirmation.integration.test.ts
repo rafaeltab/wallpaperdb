@@ -176,6 +176,7 @@ it('quarantines actual rejected Source publications, routes the operator notice 
     );
     const outbox = await sources.runPromise(SourceAcceptanceOutbox);
     const failures: SourcePublication[] = [];
+    const completed: SourcePublication[] = [];
     const startPublisher = () => {
       const runtime = ManagedRuntime.make(
         sourceConfirmationsLayer({
@@ -187,6 +188,14 @@ it('quarantines actual rejected Source publications, routes the operator notice 
           Layer.provide(
             Layer.succeed(SourceAcceptanceOutbox, {
               ...outbox,
+              published: (publication) =>
+                outbox.published(publication).pipe(
+                  Effect.andThen(
+                    Effect.sync(() => {
+                      completed.push(publication);
+                    })
+                  )
+                ),
               failed: (publication) =>
                 Effect.sync(() => {
                   failures.push(publication);
@@ -247,6 +256,16 @@ it('quarantines actual rejected Source publications, routes the operator notice 
       },
     });
     message?.ack();
+    await expect
+      .poll(() => completed, { timeout: 5000 })
+      .toEqual([
+        expect.objectContaining({
+          id: confirmation.id,
+          confirmation,
+          attempts: 1,
+          occurredAt: failures[0]?.occurredAt,
+        }),
+      ]);
     await expect
       .poll(() => recovered.runPromise(SourceConfirmationHealth.use((health) => health.check())))
       .toBe(true);

@@ -240,7 +240,11 @@ it('bounds failed and abandoned claims, fences stale completion and recovers del
     expect(
       await cleanup.runPromise(CleanupStore.use((store) => store.pendingAlerts()))
     ).toContainEqual(expect.objectContaining({ id: first.id, applicationId: 'wallpaper' }));
-    await cleanup.runPromise(CleanupStore.use((store) => store.alerted(first.id)));
+    const [oldAlert] = await cleanup.runPromise(CleanupStore.use((store) => store.pendingAlerts()));
+    if (!oldAlert) throw new Error('Expected alert');
+    await cleanup.runPromise(
+      CleanupStore.use((store) => store.alerted(first.id, oldAlert.notificationId))
+    );
     expect(
       await cleanup.runPromise(CleanupStore.use((store) => store.pendingAlerts()))
     ).not.toContainEqual(expect.objectContaining({ id: first.id, applicationId: 'wallpaper' }));
@@ -250,7 +254,32 @@ it('bounds failed and abandoned claims, fences stale completion and recovers del
     const [recovered] = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
     if (!recovered) throw new Error('Expected recovered claim');
     expect(recovered.attempts).toBe(1);
-    await cleanup.runPromise(CleanupStore.use((store) => store.completed(recovered)));
+    await cleanup.runPromise(CleanupStore.use((store) => store.failed(recovered)));
+    await pool.query("UPDATE source_cleanup SET available_at='2000-01-01' WHERE id=$1", [first.id]);
+    const [retried] = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
+    if (!retried) throw new Error('Expected current retry');
+    await cleanup.runPromise(CleanupStore.use((store) => store.failed(retried)));
+    const [currentAlert] = await cleanup.runPromise(
+      CleanupStore.use((store) => store.pendingAlerts())
+    );
+    if (!currentAlert) throw new Error('Expected new quarantine');
+    expect(currentAlert.notificationId).not.toBe(oldAlert.notificationId);
+    await cleanup.runPromise(
+      CleanupStore.use((store) => store.alerted(first.id, oldAlert.notificationId))
+    );
+    expect(
+      await cleanup.runPromise(CleanupStore.use((store) => store.pendingAlerts()))
+    ).toContainEqual(currentAlert);
+    await cleanup.runPromise(
+      CleanupStore.use((store) => store.alerted(first.id, currentAlert.notificationId))
+    );
+    expect(
+      await cleanup.runPromise(CleanupStore.use((store) => store.pendingAlerts()))
+    ).not.toContainEqual(currentAlert);
+    await cleanup.runPromise(CleanupStore.use((store) => store.recover(first.id)));
+    const [last] = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
+    if (!last) throw new Error('Expected final recovered claim');
+    await cleanup.runPromise(CleanupStore.use((store) => store.completed(last)));
     expect(
       (await pool.query('SELECT due_at FROM source_cleanup WHERE id=$1', [first.id])).rows
     ).toEqual([{ due_at: new Date('2000-01-01T00:00:00Z') }]);

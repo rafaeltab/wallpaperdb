@@ -31,7 +31,7 @@ export class CleanupStore extends Context.Service<
       }[],
       CleanupFailure
     >;
-    readonly alerted: (id: string) => Effect.Effect<void, CleanupFailure>;
+    readonly alerted: (id: string, notificationId: string) => Effect.Effect<void, CleanupFailure>;
     readonly recover: (id: string) => Effect.Effect<boolean, CleanupFailure>;
   }
 >()('asset/cleanup/Store') {}

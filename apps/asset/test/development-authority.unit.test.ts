@@ -22,12 +22,22 @@ it('preserves configured identities and credentials across setup and keeps gener
     const authority = readAuthority(path);
     expect(authority.identityProviders.clerk?.issuer).toBe('https://selected.clerk.accounts.dev');
     expect(authority.broker.service.password).toBe(initialCredential);
+    expect(authority.applications.user?.allowedOperations).toEqual(['create', 'delete']);
+    expect(authority.applications.wallpaper?.allowedOperations).toEqual(['create', 'delete']);
     expect((await stat(path)).mode & 0o777).toBe(0o600);
     await configureDevelopment(directory, {
       issuer: 'https://selected.clerk.accounts.dev',
       ingress: 'http://localhost:8970',
     });
     expect(await readFile(path, 'utf8')).toBe(first);
+    const restricted = JSON.parse(first);
+    restricted.applications.user.allowedOperations = ['create'];
+    await writeFile(path, JSON.stringify(restricted));
+    await configureDevelopment(directory, {
+      issuer: 'https://selected.clerk.accounts.dev',
+      ingress: 'http://localhost:8970',
+    });
+    expect(readAuthority(path).applications.user?.allowedOperations).toEqual(['create']);
     await writeFile(path, '{}');
     await expect(
       configureDevelopment(directory, {

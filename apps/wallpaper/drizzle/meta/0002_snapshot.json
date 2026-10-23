@@ -1,0 +1,335 @@
+{
+  "id": "a95b8af2-05d6-4f06-92f7-26b273ed5f60",
+  "prevId": "8a1b4257-d8b8-4641-8537-2848a5368569",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.wallpaper_source_intents": {
+      "name": "wallpaper_source_intents",
+      "schema": "",
+      "columns": {
+        "wallpaper_id": {
+          "name": "wallpaper_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "candidate_id": {
+          "name": "candidate_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "intent_id": {
+          "name": "intent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "wallpaper_source_intents_wallpaper_id_wallpaper_intents_id_fk": {
+          "name": "wallpaper_source_intents_wallpaper_id_wallpaper_intents_id_fk",
+          "tableFrom": "wallpaper_source_intents",
+          "tableTo": "wallpaper_intents",
+          "columnsFrom": [
+            "wallpaper_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "wallpaper_source_intents_wallpaper_id_candidate_id_intent_id_pk": {
+          "name": "wallpaper_source_intents_wallpaper_id_candidate_id_intent_id_pk",
+          "columns": [
+            "wallpaper_id",
+            "candidate_id",
+            "intent_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "wallpaper_source_candidate_bound": {
+          "name": "wallpaper_source_candidate_bound",
+          "value": "octet_length(\"wallpaper_source_intents\".\"candidate_id\") BETWEEN 1 AND 256"
+        },
+        "wallpaper_source_intent_bound": {
+          "name": "wallpaper_source_intent_bound",
+          "value": "octet_length(\"wallpaper_source_intents\".\"intent_id\") BETWEEN 1 AND 256"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.wallpaper_intents": {
+      "name": "wallpaper_intents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "owner_namespace": {
+          "name": "owner_namespace",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contributor_id": {
+          "name": "contributor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_key": {
+          "name": "request_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_id": {
+          "name": "asset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "wallpaper_request_identity": {
+          "name": "wallpaper_request_identity",
+          "columns": [
+            {
+              "expression": "owner_namespace",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "contributor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "request_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "wallpaper_asset_identity": {
+          "name": "wallpaper_asset_identity",
+          "columns": [
+            {
+              "expression": "asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.wallpaper_workflow_outbox": {
+      "name": "wallpaper_workflow_outbox",
+      "schema": "",
+      "columns": {
+        "notified_at": {
+          "name": "notified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "wallpaper_id": {
+          "name": "wallpaper_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "destination": {
+          "name": "destination",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event": {
+          "name": "event",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "available_at": {
+          "name": "available_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "lease_id": {
+          "name": "lease_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "wallpaper_outbox_due": {
+          "name": "wallpaper_outbox_due",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "available_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "wallpaper_workflow_outbox_wallpaper_id_wallpaper_intents_id_fk": {
+          "name": "wallpaper_workflow_outbox_wallpaper_id_wallpaper_intents_id_fk",
+          "tableFrom": "wallpaper_workflow_outbox",
+          "tableTo": "wallpaper_intents",
+          "columnsFrom": [
+            "wallpaper_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "wallpaper_outbox_status": {
+          "name": "wallpaper_outbox_status",
+          "value": "\"wallpaper_workflow_outbox\".\"status\" IN ('pending','leased','published','quarantined')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.wallpaper_workflow_quarantine": {
+      "name": "wallpaper_workflow_quarantine",
+      "schema": "",
+      "columns": {
+        "notified_at": {
+          "name": "notified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recovered_at": {
+          "name": "recovered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

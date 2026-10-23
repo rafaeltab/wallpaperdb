@@ -518,6 +518,11 @@ it('retains concurrent first-Source registrations across restart and atomically 
         )
       )
     );
+    await runtime.runPromise(
+      Creation.use((c) =>
+        c.expectSource(owner, w.id, { candidateId: 'candidate-one', intentId: 'intent-one' })
+      )
+    );
     await runtime.dispose();
     runtime = ManagedRuntime.make(layer());
     const raw = {
@@ -563,6 +568,75 @@ it('retains concurrent first-Source registrations across restart and atomically 
     expect(
       publications.filter((p) => p.wallpaperId === w.id && p.destination === 'publication')
     ).toHaveLength(1);
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('commits one Source registration with its state and rolls both back on a persistence constraint failure', async () => {
+  const runtime = ManagedRuntime.make(
+    workflowPostgresLayer({
+      databaseUrl: databaseUrl(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 20,
+    })
+  );
+  try {
+    const w = await runtime.runPromise(
+      WorkflowStore.use((s) =>
+        s.begin(
+          { namespace: 'authors', subject: 'registration-atomic-owner' },
+          'registration-atomic'
+        )
+      )
+    );
+    const register = (candidate: string) =>
+      runtime.runPromise(
+        WorkflowStore.use((s) =>
+          s.change({ kind: 'wallpaper', id: w.id }, (current) => {
+            if (!current) throw new Error('Expected Wallpaper');
+            current.assetId = 'registration-atomic-asset';
+            current.state = 'accepting-source';
+            current.intent = { candidateId: candidate, intentId: 'registered-intent' };
+            return { wallpaper: current, result: true, registration: current.intent };
+          })
+        )
+      );
+    await expect(register('x'.repeat(257))).rejects.toBeDefined();
+    expect(
+      await runtime.runPromise(
+        WorkflowStore.use((s) =>
+          s.change({ kind: 'wallpaper', id: w.id }, (current) => ({
+            wallpaper: current,
+            result: current,
+          }))
+        )
+      )
+    ).toEqual(w);
+    await register('registered-candidate');
+    await register('registered-candidate');
+    const registrationCases: readonly (readonly [string, string, boolean])[] = [
+      ['registered-candidate', 'registered-intent', true],
+      ['registered-candidate', 'wrong-intent', false],
+      ['wrong-candidate', 'registered-intent', false],
+    ];
+    for (const [candidateId, intentId, expected] of registrationCases) {
+      expect(
+        await runtime.runPromise(
+          WorkflowStore.use((s) =>
+            s.change(
+              {
+                kind: 'asset',
+                id: 'registration-atomic-asset',
+                sourceIntent: { candidateId, intentId },
+              },
+              (current, registered) => ({ wallpaper: current, result: registered })
+            )
+          )
+        )
+      ).toBe(expected);
+    }
   } finally {
     await runtime.dispose();
   }

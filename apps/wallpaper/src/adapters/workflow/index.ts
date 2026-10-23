@@ -13,7 +13,12 @@ import {
   type WorkflowDeliveryPort,
   type WorkflowPublication,
 } from '../../capabilities/creation/index.js';
-import { wallpaperIntents, workflowOutbox, workflowQuarantine } from '../../db/schema.js';
+import {
+  wallpaperIntents,
+  workflowOutbox,
+  workflowQuarantine,
+  sourceIntents,
+} from '../../db/schema.js';
 import { decodeConfirmation } from '../asset-workflow/index.js';
 interface Options {
   readonly databaseUrl: string;
@@ -129,7 +134,6 @@ export function workflowPostgresLayer(options: Options) {
                 state: 'creating-asset',
                 assetId: null,
                 intent: null,
-                sourceIntents: [],
                 sourceId: null,
                 initialAnalysisSourceId: null,
               };
@@ -195,9 +199,39 @@ export function workflowPostgresLayer(options: Options) {
                 )
                 .for('update');
               const current = rows[0]?.state ?? null;
-              const changed = transition(current ? structuredClone(current) : null);
+              const intent = selector.kind === 'asset' ? selector.sourceIntent : undefined;
+              const registration =
+                current && intent
+                  ? await tx
+                      .select({ candidateId: sourceIntents.candidateId })
+                      .from(sourceIntents)
+                      .where(
+                        and(
+                          eq(sourceIntents.wallpaperId, current.id),
+                          eq(sourceIntents.candidateId, intent.candidateId),
+                          eq(sourceIntents.intentId, intent.intentId)
+                        )
+                      )
+                      .limit(1)
+                  : [];
+              const changed = transition(
+                current ? structuredClone(current) : null,
+                registration.length === 1
+              );
               if (changed.wallpaper) {
                 if (current?.attentionRequired) changed.wallpaper.attentionRequired = true;
+                if (changed.registration) {
+                  if (!current || changed.wallpaper.id !== current.id)
+                    throw new Error('Invalid Source registration target');
+                  await tx
+                    .insert(sourceIntents)
+                    .values({
+                      wallpaperId: current.id,
+                      candidateId: changed.registration.candidateId,
+                      intentId: changed.registration.intentId,
+                    })
+                    .onConflictDoNothing();
+                }
                 await tx
                   .update(wallpaperIntents)
                   .set({ state: changed.wallpaper, assetId: changed.wallpaper.assetId })

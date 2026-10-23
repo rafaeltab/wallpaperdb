@@ -5,6 +5,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -56,3 +57,22 @@ export const workflowQuarantine = pgTable('wallpaper_workflow_quarantine', {
   reason: text('reason').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const sourceIntents = pgTable(
+  'wallpaper_source_intents',
+  {
+    wallpaperId: text('wallpaper_id')
+      .notNull()
+      .references(() => wallpaperIntents.id),
+    candidateId: text('candidate_id').notNull(),
+    intentId: text('intent_id').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.wallpaperId, t.candidateId, t.intentId] }),
+    check(
+      'wallpaper_source_candidate_bound',
+      sql`octet_length(${t.candidateId}) BETWEEN 1 AND 256`
+    ),
+    check('wallpaper_source_intent_bound', sql`octet_length(${t.intentId}) BETWEEN 1 AND 256`),
+  ]
+);

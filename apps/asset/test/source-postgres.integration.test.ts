@@ -667,3 +667,110 @@ it('serializes concurrent per-Asset preparation without dropping a candidate or 
     await lifecycle.dispose();
   }
 });
+
+it('cannot restore detached Source state or publish a late confirmation after terminal deletion', async () => {
+  await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'terminal-revision'));
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      revision: 'terminal-revision',
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  const sources = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  try {
+    const created = await lifecycle.runPromise(
+      LifecycleStore.use((s) =>
+        s.accept({
+          revision: 'terminal-revision',
+          applicationId: 'wallpaper',
+          canonical: 'terminal-create',
+          correlation: { commandId: 'terminal-create', applicationReference: '' },
+          context: { occurrence: { source: 'https://test/app', id: 'terminal-create' } },
+          decision: {
+            kind: 'create',
+            assetType: 'wallpaper',
+            owner: { namespace: 'clerk', subject: 'owner' },
+          },
+        })
+      )
+    );
+    if (created.outcome !== 'created') throw new Error('Expected Asset');
+    const before = await sources.runPromise(
+      SourceStore.use((s) =>
+        s.transact(created.assetId, null, (state) => ({ state, result: state }))
+      )
+    );
+    if (!before) throw new Error('Expected Source state');
+    await lifecycle.runPromise(
+      LifecycleStore.use((s) =>
+        s.accept({
+          revision: 'terminal-revision',
+          applicationId: 'wallpaper',
+          canonical: 'terminal-delete',
+          correlation: { commandId: 'terminal-delete', applicationReference: '' },
+          context: { occurrence: { source: 'https://test/app', id: 'terminal-delete' } },
+          decision: {
+            kind: 'delete',
+            assetId: created.assetId,
+            evidenceRetentionMsByType: { wallpaper: 604800000 },
+          },
+        })
+      )
+    );
+    await expect(
+      sources.runPromise(
+        SourceStore.use((s) =>
+          s.transact(created.assetId, null, () => ({ state: before, result: undefined }))
+        )
+      )
+    ).rejects.toThrow();
+    expect(
+      await sources.runPromise(
+        SourceStore.use((s) =>
+          s.transact(created.assetId, null, (state) => ({ state, result: state }))
+        )
+      )
+    ).toBeNull();
+    const confirmation: SourceConfirmation = {
+      id: 'late-terminal-confirmation',
+      applicationId: 'wallpaper',
+      assetId: created.assetId,
+      assetType: 'wallpaper',
+      candidateId: 'late-terminal-candidate',
+      sourceId: 'late-terminal-source',
+      defaultSourceId: 'late-terminal-source',
+      initialAnalysisSourceId: 'late-terminal-source',
+      sourceSetRevision: '1',
+      deliveryRevision: '1',
+      context: { occurrence: { source: 'https://test/author', id: 'late-terminal-event' } },
+    };
+    await expect(
+      sources.runPromise(
+        SourceStore.use((s) =>
+          s.transact(created.assetId, null, (state) => ({ state, result: undefined, confirmation }))
+        )
+      )
+    ).rejects.toThrow();
+    expect(
+      (
+        await pool.query(
+          'SELECT count(*)::int AS count FROM source_acceptance_outbox WHERE id=$1',
+          [confirmation.id]
+        )
+      ).rows
+    ).toEqual([{ count: 0 }]);
+  } finally {
+    await sources.dispose();
+    await lifecycle.dispose();
+  }
+});

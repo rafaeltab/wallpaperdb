@@ -22,7 +22,7 @@ it('creates a stable empty Asset whose inspection requires both Owner parts', as
             ...input.correlation,
             outcome: 'rejected',
             assetId: null,
-            reason: input.decision.reason,
+            reason: input.decision.kind === 'reject' ? input.decision.reason : 'unavailable-asset',
           };
         stored = {
           id: 'asset_assigned',
@@ -36,6 +36,7 @@ it('creates a stable empty Asset whose inspection requires both Owner parts', as
   };
   const runtime = ManagedRuntime.make(
     lifecycleLayer({
+      assetTypes: {},
       revision: 'policy-1',
       applications: {
         user: { ownerNamespace: 'clerk', allowedOperations: ['create'], allowedTypes: ['picture'] },
@@ -105,6 +106,91 @@ it('creates a stable empty Asset whose inspection requires both Owner parts', as
         ).toMatchObject({ outcome: 'rejected', reason: 'forbidden-operation' });
       })
     );
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('grants delete responsibility only to configured application operations and retains operation in canonical replay identity', async () => {
+  const accepted: import('../src/capabilities/lifecycle/index.js').Acceptance[] = [];
+  const runtime = ManagedRuntime.make(
+    lifecycleLayer({
+      revision: 'policy-delete',
+      assetTypes: { picture: { retention: { evidenceMs: 2592000000 } } },
+      applications: {
+        user: {
+          ownerNamespace: 'clerk',
+          allowedOperations: ['create', 'delete'],
+          allowedTypes: ['picture'],
+        },
+        readonly: {
+          ownerNamespace: 'clerk',
+          allowedOperations: ['create'],
+          allowedTypes: ['picture'],
+        },
+      },
+    }).pipe(
+      Layer.provide(
+        Layer.succeed(LifecycleStore, {
+          find: () => Effect.succeed(null),
+          accept: (input) =>
+            Effect.sync(() => {
+              accepted.push(input);
+              return input.decision.kind === 'delete'
+                ? {
+                    ...input.correlation,
+                    outcome: 'deleted' as const,
+                    assetId: input.decision.assetId,
+                  }
+                : {
+                    ...input.correlation,
+                    outcome: 'rejected' as const,
+                    assetId: null,
+                    reason:
+                      input.decision.kind === 'reject'
+                        ? input.decision.reason
+                        : ('unsupported-type' as const),
+                  };
+            }),
+        })
+      )
+    )
+  );
+  const deletion = {
+    operation: 'delete' as const,
+    commandId: 'command-1',
+    applicationReference: 'opaque-reference',
+    assetId: 'asset_one',
+  };
+  try {
+    for (const app of ['user', 'readonly', 'unknown']) {
+      const result = await runtime.runPromise(
+        Lifecycle.use((s) =>
+          s.command(app, deletion, {
+            occurrence: { source: 'https://test/app', id: `event-${app}` },
+          })
+        )
+      );
+      expect(result).toMatchObject(
+        app === 'user'
+          ? { outcome: 'deleted', assetId: 'asset_one' }
+          : { outcome: 'rejected', reason: 'forbidden-operation' }
+      );
+    }
+    expect(accepted[0]).toMatchObject({
+      applicationId: 'user',
+      revision: 'policy-delete',
+      canonical: '["delete","command-1","opaque-reference","asset_one"]',
+      decision: {
+        kind: 'delete',
+        assetId: 'asset_one',
+        evidenceRetentionMsByType: { picture: 2592000000 },
+      },
+    });
+    expect(accepted.slice(1).map((input) => input.decision)).toEqual([
+      { kind: 'reject', reason: 'forbidden-operation' },
+      { kind: 'reject', reason: 'forbidden-operation' },
+    ]);
   } finally {
     await runtime.dispose();
   }

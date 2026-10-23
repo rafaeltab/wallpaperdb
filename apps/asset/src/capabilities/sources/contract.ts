@@ -82,7 +82,9 @@ export type SourceOutcome =
   | { readonly kind: 'rejected'; readonly reason: string };
 /** Serializes one Asset. The callback is pure, receives a detached state, and cannot
  * escape transaction resources. State, immutable Source metadata, cleanup deadlines,
- * initial analysis provenance and confirmation outbox commit together. A non-null
+ * initial analysis provenance and confirmation outbox commit together. Retirement records
+ * evidence expiry once on the immutable Source row, without hydrating retirement history.
+ * Active membership gates all Source and descendant eligibility; retained bytes confer none. A non-null
  * revision locks/compares the active configuration in that same transaction. */
 export interface SourceStorePort {
   readonly transact: <A>(
@@ -92,6 +94,10 @@ export interface SourceStorePort {
       readonly state: SourceState | null;
       readonly result: A;
       readonly confirmation?: SourceConfirmation;
+      readonly retirement?: {
+        readonly sourceId: string;
+        readonly evidenceExpiresAt: string;
+      };
     }
   ) => Effect.Effect<A, SourceFailure>;
 }

@@ -370,6 +370,7 @@ it('reconciles a lost successful conditional-write response against authoritativ
     );
     expect(inspected).toMatchObject({ kind: 'verified', facts: { digest, width: 2, height: 3 } });
     if (inspected.kind !== 'verified') throw new Error('Expected verified bytes');
+    lost = false;
     await runtime.runPromise(
       SourceBytes.use((bytes) =>
         bytes.prepare(
@@ -380,6 +381,7 @@ it('reconciles a lost successful conditional-write response against authoritativ
         )
       )
     );
+    expect(lost).toBe(true);
     const original = await runtime.runPromise(
       SourceBytes.use((bytes) => bytes.read('source_lost_response', 'asset_ambiguous'))
     );

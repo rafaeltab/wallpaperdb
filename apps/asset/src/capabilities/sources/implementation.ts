@@ -190,10 +190,18 @@ export function sourcesLayer(configuration: {
             if (!policy || !policy.operations.includes(input.operation))
               return reject('unsupported-operation');
             // Replacements are separate operations with their own membership semantics.
-            if (input.operation !== 'add') return reject('unsupported-operation');
+            if (input.operation === 'replace-set') return reject('unsupported-operation');
             if (input.expectedSourceSetRevision !== state.sourceSetRevision)
               return reject('source-set-conflict');
-            if (state.sources.length >= policy.maxActiveSources)
+            if (
+              input.operation === 'replace-one' &&
+              !state.sources.some((source) => source.sourceId === input.targetSourceId)
+            )
+              return reject('unavailable-source');
+            if (
+              state.sources.length + (input.operation === 'add' ? 1 : 0) >
+              policy.maxActiveSources
+            )
               return reject('source-count-limit');
             if (
               state.candidates.filter(
@@ -350,8 +358,21 @@ export function sourcesLayer(configuration: {
             }
             if (state.sourceSetRevision !== intent.expectedSourceSetRevision)
               return { state, result: reject('source-set-conflict') };
-            if (state.sources.length >= policy.maxActiveSources)
+            const replaced =
+              current.operation === 'replace-one'
+                ? state.sources.find((source) => source.sourceId === current.targetSourceId)
+                : undefined;
+            if (current.operation === 'replace-one' && !replaced)
+              return { state, result: reject('unavailable-source') };
+            if (state.sources.length + (replaced ? 0 : 1) > policy.maxActiveSources)
               return { state, result: reject('source-count-limit') };
+            if (replaced) {
+              state.sources = state.sources.filter(
+                (source) => source.sourceId !== replaced.sourceId
+              );
+              if (state.defaultSourceId === replaced.sourceId)
+                state.defaultSourceId = current.sourceId;
+            }
             state.sources.push({
               sourceId: current.sourceId,
               facts: current.facts,
@@ -367,6 +388,14 @@ export function sourcesLayer(configuration: {
             return {
               state,
               result: result(current),
+              ...(replaced
+                ? {
+                    retirement: {
+                      sourceId: replaced.sourceId,
+                      evidenceExpiresAt: new Date(now + policy.retention.evidenceMs).toISOString(),
+                    },
+                  }
+                : {}),
               confirmation: {
                 context,
                 id: `source-accepted:${current.sourceId}`,

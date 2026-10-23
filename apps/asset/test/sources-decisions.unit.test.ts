@@ -1404,8 +1404,8 @@ it('explicitly rejects these Wallpaper mutations for another configured Asset ty
 
 describe('canonical picture replacement', () => {
   const replacement = { operation: 'replace-set' as const, expectedSourceSetRevision: '1' };
-  const picture = () => {
-    const f = fixture(initialSourcePolicies.picture, undefined, 'picture');
+  const picture = (clock?: Clock.Clock) => {
+    const f = fixture(initialSourcePolicies.picture, clock, 'picture');
     f.setInspect(() =>
       Effect.succeed({
         kind: 'verified',
@@ -1437,7 +1437,9 @@ describe('canonical picture replacement', () => {
     return proposed.candidate.candidateId;
   };
   it('replaces the entire set once, retains the winner on conflict, and fences old acceptance replay', async () => {
-    const f = picture();
+    const clockRuntime = ManagedRuntime.make(TestClock.layer());
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-10-23T00:00:00Z')));
+    const f = picture(await clockRuntime.runPromise(Clock.Clock));
     try {
       const first = await acceptFirst(f);
       const ids = await Promise.all([propose(f, 'edit-a'), propose(f, 'edit-b')]);
@@ -1456,8 +1458,8 @@ describe('canonical picture replacement', () => {
       expect(await f.call((s) => s.original(owner, 'asset_one', first.sourceId))).toEqual({
         kind: 'unavailable',
       });
-      const deadline = f.retirements[0]?.evidenceExpiresAt;
-      expect(Date.parse(deadline!) - Date.now()).toBeGreaterThan(2591990000);
+      const deadline = '2026-11-22T00:00:00.000Z';
+      expect(f.retirements).toEqual([{ sourceId: first.sourceId, evidenceExpiresAt: deadline }]);
       await f.call((s) => s.accept(owner, 'asset_one', first.candidateId, intent));
       await Promise.all(
         ids.map((id) => f.call((s) => s.accept(owner, 'asset_one', id, replacement)))
@@ -1485,6 +1487,7 @@ describe('canonical picture replacement', () => {
       ).toMatchObject({ candidate: { status: 'awaiting-bytes' } });
     } finally {
       await f.close();
+      await clockRuntime.dispose();
     }
   });
   it('leaves the prior picture readable when immutable preparation fails', async () => {

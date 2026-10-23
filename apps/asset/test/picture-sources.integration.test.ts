@@ -215,7 +215,9 @@ it('replaces a canonical picture through Owner HTTP with atomic retirement, roll
     } finally {
       await pool.query('ALTER TABLE asset_source_state DROP CONSTRAINT picture_rollback');
     }
+    const acceptanceStartedAt = Date.now();
     const results = await Promise.all([accept(editA), accept(editB)]);
+    const acceptanceCompletedAt = Date.now();
     expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
     const winningIndex = results.findIndex((r) => r.statusCode === 200);
     const winning = results[winningIndex]!.json<{ sourceId: string }>();
@@ -238,7 +240,12 @@ it('replaces a canonical picture through Owner HTTP with atomic retirement, roll
     ).rows;
     const deadline = retirement[0]?.evidence_expires_at;
     expect(deadline).toBeInstanceOf(Date);
-    expect(deadline.getTime() - Date.now()).toBeGreaterThan(2591990000);
+    expect(deadline.getTime()).toBeGreaterThanOrEqual(
+      acceptanceStartedAt + authority.assetTypes.picture.retention.evidenceMs
+    );
+    expect(deadline.getTime()).toBeLessThanOrEqual(
+      acceptanceCompletedAt + authority.assetTypes.picture.retention.evidenceMs
+    );
     expect(
       (await pool.query('SELECT due_at FROM source_cleanup WHERE id=$1', [`source:${firstSource}`]))
         .rows

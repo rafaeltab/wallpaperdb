@@ -19,6 +19,7 @@ export {
   type SourceUpload,
   type SourcesPort,
   type SourcePublication,
+  type SourceConfirmationAlert,
   type SourceAcceptanceOutboxPort,
 } from './contract.js';
 export { sourcesLayer } from './implementation.js';

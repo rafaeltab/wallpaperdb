@@ -216,12 +216,16 @@ export interface SourcePublication {
   readonly occurredAt: string;
   readonly attempts: number;
 }
+/** Retries share one quarantine occurrence. Deliberate recovery starts another. */
+export interface SourceConfirmationAlert extends SourceConfirmation {
+  readonly quarantineId: string;
+}
 export interface SourceAcceptanceOutboxPort {
   readonly claim: (limit: number) => Effect.Effect<readonly SourcePublication[], SourceFailure>;
   readonly published: (publication: SourcePublication) => Effect.Effect<void, SourceFailure>;
   readonly failed: (publication: SourcePublication) => Effect.Effect<void, SourceFailure>;
-  readonly pendingAlerts: () => Effect.Effect<readonly SourceConfirmation[], SourceFailure>;
-  readonly alerted: (id: string) => Effect.Effect<void, SourceFailure>;
+  readonly pendingAlerts: () => Effect.Effect<readonly SourceConfirmationAlert[], SourceFailure>;
+  readonly alerted: (alert: SourceConfirmationAlert) => Effect.Effect<void, SourceFailure>;
   readonly recover: (id: string) => Effect.Effect<boolean, SourceFailure>;
 }
 export class SourceAcceptanceOutbox extends Context.Service<

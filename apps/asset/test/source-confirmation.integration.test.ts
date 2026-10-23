@@ -1,6 +1,8 @@
-import { createHash } from 'node:crypto';
 import { once } from 'node:events';
-import { createServer } from 'node:http';
+import { mkdtemp, rm } from 'node:fs/promises';
+import type { Server } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -25,27 +27,24 @@ import {
 import { LifecycleStore } from '../src/capabilities/lifecycle/index.js';
 import {
   SourceAcceptanceOutbox,
+  SourceFailure,
   SourceStore,
   type SourceConfirmation,
+  type SourceConfirmationAlert,
   type SourcePublication,
 } from '../src/capabilities/sources/index.js';
 import { authorityFixture } from './fixtures/authority.js';
 
-it('quarantines actual rejected Source publications, routes the operator notice and preserves event identity through explicit recovery', async () => {
+it('routes each renewed Source quarantine to the durable operator inbox while preserving the recovered confirmation identity', async () => {
   const authority = parseAuthority(authorityFixture());
-  const received: unknown[] = [];
   const cleanups: Array<() => Promise<unknown>> = [];
   const cleanupFailures: unknown[] = [];
-  const server = createServer(async (request, response) => {
-    if (request.headers.authorization !== 'Bearer operator-inbox-token') {
-      response.writeHead(401).end();
-      return;
-    }
-    const chunks: Buffer[] = [];
-    for await (const chunk of request) chunks.push(Buffer.from(chunk));
-    received.push(JSON.parse(Buffer.concat(chunks).toString()));
-    response.writeHead(200).end();
-  });
+  const directory = await mkdtemp(join(tmpdir(), 'source-quarantine-receipts-'));
+  cleanups.push(() => rm(directory, { recursive: true, force: true }));
+  const { createOperatorInbox } = await import(
+    new URL('../../../scripts/operator-inbox.mjs', import.meta.url).href
+  );
+  const server: Server = await createOperatorInbox({ directory, token: 'operator-inbox-token' });
   cleanups.push(async () => {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -55,6 +54,17 @@ it('quarantines actual rejected Source publications, routes the operator notice 
     await once(server, 'listening');
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('Missing operator address');
+    const received = async (): Promise<unknown[]> => {
+      const response = await fetch(`http://127.0.0.1:${address.port}/receipts`, {
+        headers: {
+          authorization: `Basic ${Buffer.from('operator:operator-inbox-token').toString('base64')}`,
+        },
+      });
+      expect(response.status).toBe(200);
+      const receipts: unknown = await response.json();
+      if (!Array.isArray(receipts)) throw new Error('Expected operator receipts');
+      return receipts;
+    };
     const postgres = await new PostgreSqlContainer('postgres:16-alpine').start();
     cleanups.push(() => postgres.stop());
     const pool = new Pool({ connectionString: postgres.getConnectionUri() });
@@ -177,6 +187,8 @@ it('quarantines actual rejected Source publications, routes the operator notice 
     const outbox = await sources.runPromise(SourceAcceptanceOutbox);
     const failures: SourcePublication[] = [];
     const completed: SourcePublication[] = [];
+    const alerts: SourceConfirmationAlert[] = [];
+    let failAcknowledgement = true;
     const startPublisher = () => {
       const runtime = ManagedRuntime.make(
         sourceConfirmationsLayer({
@@ -188,6 +200,21 @@ it('quarantines actual rejected Source publications, routes the operator notice 
           Layer.provide(
             Layer.succeed(SourceAcceptanceOutbox, {
               ...outbox,
+              alerted: (alert) =>
+                Effect.suspend(() => {
+                  alerts.push(alert);
+                  // The broker accepted the notice, but recording its completion failed.
+                  if (failAcknowledgement) {
+                    failAcknowledgement = false;
+                    return Effect.fail(
+                      new SourceFailure({
+                        operation: 'confirm-alert',
+                        cause: 'lost acknowledgement',
+                      })
+                    );
+                  }
+                  return outbox.alerted(alert);
+                }),
               published: (publication) =>
                 outbox.published(publication).pipe(
                   Effect.andThen(
@@ -209,27 +236,40 @@ it('quarantines actual rejected Source publications, routes the operator notice 
     };
     const publisher = startPublisher();
     await publisher.runPromise(SourceConfirmationHealth);
-    const noticeId = createHash('sha256').update(confirmation.id).digest('hex');
-    await expect
-      .poll(() => received, { timeout: 5000 })
-      .toEqual([
-        {
-          id: noticeId,
-          kind: 'source-confirmation-quarantine',
-          subject: 'asset.results.wallpaper',
-          reason: 'exhausted',
-          context: confirmation.context,
-          applicationId: 'wallpaper',
-        },
-      ]);
+    const receipt = expect.objectContaining({
+      notice: {
+        id: expect.stringMatching(/^[a-f0-9]{64}$/),
+        kind: 'source-confirmation-quarantine',
+        subject: 'asset.results.wallpaper',
+        reason: 'exhausted',
+        context: confirmation.context,
+        applicationId: 'wallpaper',
+      },
+    });
+    await expect.poll(received, { timeout: 5000 }).toEqual([receipt]);
     await expect.poll(() => sources.runPromise(outbox.pendingAlerts())).toEqual([]);
     await publisher.dispose();
+    expect(alerts.length).toBeGreaterThanOrEqual(2);
+    expect(alerts[1]).toEqual(alerts[0]);
+    expect((await manager.streams.info('ASSET_OPERATIONS')).state.messages).toBe(1);
     expect(failures.map((publication) => publication.attempts)).toEqual([1, 2, 3]);
     expect(failures.every((publication) => publication.confirmation.id === confirmation.id)).toBe(
       true
     );
     expect(new Set(failures.map((publication) => publication.occurredAt)).size).toBe(1);
     expect((await manager.streams.info('ASSET_RESULTS')).state.messages).toBe(0);
+    const firstReceipt = (await received())[0];
+    expect(await sources.runPromise(outbox.recover(confirmation.id))).toBe(true);
+    const renewed = startPublisher();
+    await renewed.runPromise(SourceConfirmationHealth);
+    await expect.poll(received, { timeout: 5000 }).toEqual([receipt, receipt]);
+    await expect.poll(() => sources.runPromise(outbox.pendingAlerts())).toEqual([]);
+    await renewed.dispose();
+    const receipts = await received();
+    expect(receipts[0]).toEqual(firstReceipt);
+    expect(receipts[1]).not.toEqual(firstReceipt);
+    expect((await manager.streams.info('ASSET_OPERATIONS')).state.messages).toBe(2);
+    expect(failures.map((publication) => publication.attempts)).toEqual([1, 2, 3, 1, 2, 3]);
     await manager.streams.update('ASSET_RESULTS', originalConfig);
     expect(await sources.runPromise(outbox.claim(10))).toEqual([]);
     expect(await sources.runPromise(outbox.recover(confirmation.id))).toBe(true);
@@ -273,7 +313,7 @@ it('quarantines actual rejected Source publications, routes the operator notice 
     expect(await sources.runPromise(outbox.claim(10))).toEqual([]);
     expect(await sources.runPromise(outbox.recover(confirmation.id))).toBe(false);
     expect((await manager.streams.info('ASSET_RESULTS')).state.messages).toBe(1);
-    expect(received).toHaveLength(1);
+    expect(await received()).toHaveLength(2);
   } finally {
     for (const cleanup of cleanups.reverse()) {
       try {

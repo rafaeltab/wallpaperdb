@@ -142,6 +142,24 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
         intent: { operation: 'add', expectedSourceSetRevision: '0', idempotencyKey: 'edit-1' },
       },
     ]);
+    const replacementIntent = {
+      operation: 'replace-one',
+      targetSourceId: 'source_previous',
+      expectedSourceSetRevision: '9007199254740993',
+    };
+    const replacement = await app.inject({
+      method: 'POST',
+      url: '/assets/asset_1/source-candidates',
+      headers: { authorization: 'Bearer owner', 'idempotency-key': 'replacement-key' },
+      payload: replacementIntent,
+    });
+    expect(replacement.statusCode).toBe(201);
+    expect(calls.at(-1)).toMatchObject({
+      assetId: 'asset_1',
+      owner: { namespace: 'clerk', subject: 'owner' },
+      intent: { ...replacementIntent, idempotencyKey: 'replacement-key' },
+    });
+    expect(replacement.json()).toMatchObject(replacementIntent);
     const conflict = await app.inject({
       method: 'POST',
       url: '/assets/asset_1/source-candidates/candidate_1/accept',

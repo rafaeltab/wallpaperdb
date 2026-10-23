@@ -96,6 +96,13 @@ const schema = z
     ),
     identityProviders: z.record(AssetIdentifierSchema, provider),
     assetTypes: z.record(AssetIdentifierSchema, sourcePolicy),
+    sourceOperations: z
+      .object({
+        readLifetimeMs: positive.max(3600000).default(300000),
+        reclamationTimeoutMs: positive.max(30000).default(5000),
+      })
+      .strict()
+      .default({ readLifetimeMs: 300000, reclamationTimeoutMs: 5000 }),
     delivery: z
       .object({
         maxAttempts: z.number().int().min(1).max(100),

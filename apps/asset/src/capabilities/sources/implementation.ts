@@ -52,6 +52,27 @@ function policyRejection(facts: SourceFacts, policy: SourcePolicy): string | und
     return 'noncanonical-picture';
   return undefined;
 }
+// Facts already use displayed dimensions. Compare integer cross-products and the
+// configured decimal exactly so the inclusive boundary does not depend on rounding.
+function similarAspectRatios(facts: readonly SourceFacts[], tolerance: number): boolean {
+  const first = facts[0];
+  if (!first) return true;
+  let smallest = first,
+    largest = first;
+  for (const fact of facts) {
+    if (BigInt(fact.width) * BigInt(smallest.height) < BigInt(smallest.width) * BigInt(fact.height))
+      smallest = fact;
+    if (BigInt(fact.width) * BigInt(largest.height) > BigInt(largest.width) * BigInt(fact.height))
+      largest = fact;
+  }
+  const [decimal = '0', exponent = '0'] = tolerance.toString().split('e');
+  const places = (decimal.split('.')[1]?.length ?? 0) - Number(exponent);
+  const numerator = BigInt(decimal.replace('.', '')) * 10n ** BigInt(Math.max(0, -places));
+  const denominator = 10n ** BigInt(Math.max(0, places));
+  const upper = BigInt(largest.width) * BigInt(smallest.height);
+  const lower = BigInt(smallest.width) * BigInt(largest.height);
+  return (upper - lower) * denominator <= lower * numerator;
+}
 export function sourcesLayer(configuration: {
   readonly revision: string;
   readonly types: Readonly<Record<string, SourcePolicy>>;
@@ -276,7 +297,13 @@ export function sourcesLayer(configuration: {
             const reason =
               Date.parse(current.expiresAt) <= now
                 ? 'candidate-expired'
-                : policyRejection(current.facts, policy);
+                : (policyRejection(current.facts, policy) ??
+                  (similarAspectRatios(
+                    [...state.sources.map((s) => s.facts), current.facts],
+                    policy.aspectRatioTolerance
+                  )
+                    ? undefined
+                    : 'aspect-ratio-limit'));
             if (reason) {
               current.status = 'rejected';
               current.reason = reason;

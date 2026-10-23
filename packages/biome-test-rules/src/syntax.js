@@ -52,22 +52,24 @@ export function syntaxTree(root) {
 		}
 		return { line: low + 1, column: position - lineStarts[low] };
 	};
-	function build(native, start = 0) {
+	function build(native, start = 0, sourceText) {
 		if (!native) return null;
+		const text = sourceText ?? native.text;
 		const node = {
 			native,
 			type: native.kind,
-			range: [start, start + native.text.length],
+			range: [start, start + text.length],
 			children: [],
 		};
 		node.loc = { start: location(start), end: location(node.range[1]) };
 		let cursor = 0;
 		function child(value) {
 			if (!value) return null;
-			let index = native.text.indexOf(value.text, cursor);
-			if (index < 0) index = native.text.indexOf(value.text);
-			const result = build(value, start + Math.max(index, 0));
-			cursor = Math.max(cursor, index + value.text.length);
+			const childText = value.text;
+			let index = text.indexOf(childText, cursor);
+			if (index < 0) index = text.indexOf(childText);
+			const result = build(value, start + Math.max(index, 0), childText);
+			cursor = Math.max(cursor, index + childText.length);
 			if (result) {
 				result.parent = node;
 				node.children.push(result);
@@ -104,36 +106,36 @@ export function syntaxTree(root) {
 				return child(native.expression ?? native.assignment);
 			case "JS_IDENTIFIER_EXPRESSION":
 				node.type = "Identifier";
-				node.name = identifierValue(native.name?.text ?? native.text);
+				node.name = identifierValue(native.name?.text ?? text);
 				node.native = native.name ?? native;
 				break;
 			case "JS_IDENTIFIER_BINDING":
 			case "JS_REFERENCE_IDENTIFIER":
 			case "JS_IDENTIFIER_ASSIGNMENT":
 				node.type = "Identifier";
-				node.name = identifierValue(native.text);
+				node.name = identifierValue(text);
 				break;
 			case "JS_LITERAL_MEMBER_NAME":
-				node.type = /^["']/.test(native.text) ? "Literal" : "Identifier";
-				if (node.type === "Literal") node.value = stringValue(native.text);
-				else node.name = identifierValue(native.text);
+				node.type = /^["']/.test(text) ? "Literal" : "Identifier";
+				if (node.type === "Literal") node.value = stringValue(text);
+				else node.name = identifierValue(text);
 				break;
 			case "JS_STRING_LITERAL_EXPRESSION":
 				node.type = "Literal";
-				node.value = stringValue(native.text);
+				node.value = stringValue(text);
 				break;
 			case "JS_NUMBER_LITERAL_EXPRESSION":
 			case "JS_BOOLEAN_LITERAL_EXPRESSION":
 			case "JS_NULL_LITERAL_EXPRESSION":
 				node.type = "Literal";
 				node.value =
-					native.text === "true"
+					text === "true"
 						? true
-						: native.text === "false"
+						: text === "false"
 							? false
-							: native.text === "null"
+							: text === "null"
 								? null
-								: Number(native.text);
+								: Number(text);
 				break;
 			case "JS_CALL_EXPRESSION":
 			case "JS_NEW_EXPRESSION":
@@ -153,7 +155,7 @@ export function syntaxTree(root) {
 				break;
 			case "JS_NAME":
 				node.type = "Identifier";
-				node.name = identifierValue(native.text);
+				node.name = identifierValue(text);
 				break;
 			case "JS_AWAIT_EXPRESSION":
 			case "JS_UNARY_EXPRESSION":
@@ -348,7 +350,7 @@ export function syntaxTree(root) {
 		}
 		return node;
 	}
-	const tree = build(root);
+	const tree = build(root, 0, source);
 	tree.parent = undefined;
 	return tree;
 }

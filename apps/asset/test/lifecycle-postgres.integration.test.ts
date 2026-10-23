@@ -278,3 +278,59 @@ it('retains each quarantine occurrence through retries and restart, rotates only
   expect(await occurrence()).toBe(terminalOccurrence);
   expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toEqual([]);
 });
+
+it('terminally deletes only for its Creating application and preserves replay fences after deletion', async () => {
+  await runtime.runPromise(
+    Effect.gen(function* () {
+      const store = yield* LifecycleStore;
+      const created = yield* store.accept(input);
+      if (created.outcome !== 'created') throw new Error('Expected Asset');
+      const deletion: Acceptance = {
+        ...input,
+        canonical: '["delete","terminal"]',
+        correlation: { commandId: 'terminal', applicationReference: 'removal-1' },
+        decision: {
+          kind: 'delete',
+          assetId: created.assetId,
+          evidenceRetentionMsByType: { picture: 2592000000 },
+        },
+      };
+      expect(yield* store.accept({ ...deletion, applicationId: 'wallpaper' })).toMatchObject({
+        outcome: 'rejected',
+        reason: 'unavailable-asset',
+      });
+      expect(yield* store.find(created.assetId)).not.toBeNull();
+      const deleted = yield* store.accept(deletion);
+      expect(deleted).toEqual({
+        commandId: 'terminal',
+        applicationReference: 'removal-1',
+        outcome: 'deleted',
+        assetId: created.assetId,
+      });
+      expect(yield* store.find(created.assetId)).toBeNull();
+      expect(yield* store.accept(deletion)).toEqual(deleted);
+      expect(
+        yield* store.accept({
+          ...deletion,
+          canonical: '["delete","again"]',
+          correlation: { commandId: 'again', applicationReference: '' },
+        })
+      ).toMatchObject({ outcome: 'already-deleted', assetId: created.assetId });
+      expect(yield* store.accept(input)).toEqual(created);
+      expect(yield* store.find(created.assetId)).toBeNull();
+      expect(
+        yield* store.accept({
+          ...deletion,
+          canonical: '["delete","unknown"]',
+          correlation: { commandId: 'unknown', applicationReference: '' },
+          decision: {
+            ...deletion.decision,
+            kind: 'delete',
+            assetId: 'asset_unknown',
+            evidenceRetentionMsByType: { picture: 2592000000 },
+          },
+        })
+      ).toMatchObject({ outcome: 'rejected', reason: 'unavailable-asset' });
+    })
+  );
+});

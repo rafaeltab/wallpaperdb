@@ -26,7 +26,7 @@ export type Rejection =
   | 'unavailable-asset';
 export type CommandResult = Correlation &
   (
-    | { readonly outcome: 'created'; readonly assetId: string }
+    | { readonly outcome: 'created' | 'deleted' | 'already-deleted'; readonly assetId: string }
     | { readonly outcome: 'rejected'; readonly assetId: string | null; readonly reason: Rejection }
   );
 export interface OwnedAsset {
@@ -47,13 +47,21 @@ export interface Acceptance {
   readonly correlation: Correlation;
   readonly decision:
     | { readonly kind: 'create'; readonly assetType: string; readonly owner: Owner }
+    | {
+        readonly kind: 'delete';
+        readonly assetId: string;
+        readonly evidenceRetentionMsByType: Readonly<Record<string, number>>;
+      }
     | { readonly kind: 'reject'; readonly reason: Rejection };
 }
 /** Atomically records (application, command), assigns a non-reused Asset identity,
  * and records the result outbox. Canonical payload includes operation. Equal
  * replay returns the original result, conflicting reuse records a safe rejection.
  * Every write fences the active revision in the same transaction. No external I/O
- * participates in that transaction. A lost COMMIT response is resolved by replay. */
+ * participates in that transaction. Deletion locks the same Asset row as Source
+ * changes, checks its Creating application, and commits terminal state, empty
+ * capability responsibility, fixed evidence deadlines and cleanup obligations.
+ * Terminal and command fences outlive byte retention. A lost COMMIT response is resolved by replay. */
 export interface LifecycleStorePort {
   readonly accept: (input: Acceptance) => Effect.Effect<CommandResult, LifecycleFailure>;
   readonly find: (assetId: string) => Effect.Effect<OwnedAsset | null, LifecycleFailure>;
@@ -97,6 +105,9 @@ export class ResultOutbox extends Context.Service<ResultOutbox, ResultOutboxPort
   'asset/lifecycle/ResultOutbox'
 ) {}
 export interface LifecyclePolicy {
+  readonly assetTypes: Readonly<
+    Record<string, { readonly retention: { readonly evidenceMs: number } }>
+  >;
   readonly revision: string;
   readonly applications: Readonly<
     Record<

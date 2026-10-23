@@ -31,7 +31,14 @@ import {
 import { runOperator } from '../scripts/operator.js';
 
 it('routes exhausted cleanup to the authenticated operator inbox and resumes only deliberate trusted recovery', async () => {
-  const received: { kind: string; applicationId: string; subject: string }[] = [];
+  const received: { kind: string; applicationId: string; subject: string; context?: unknown }[] =
+    [];
+  const origin = {
+    occurrence: { source: 'https://test/asset/author', id: 'candidate-origin' },
+    correlationId: 'cleanup-origin',
+    traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01',
+    tracestate: 'vendor=cleanup',
+  };
   const server = createServer(async (request, response) => {
     if (request.headers.authorization !== 'Bearer operator-inbox-token') {
       response.writeHead(401).end();
@@ -113,6 +120,7 @@ it('routes exhausted cleanup to the authenticated operator inbox and resumes onl
               operation: 'add',
               expectedSourceSetRevision: '0',
               status: 'cancelled',
+              context: origin,
               layout: 'asset-layout-1',
               expiresAt: '2000-01-01T00:00:00Z',
               orphanExpiresAt: '2000-01-01T00:00:00Z',
@@ -122,6 +130,7 @@ it('routes exhausted cleanup to the authenticated operator inbox and resumes onl
         })
       )
     );
+    await sources.dispose();
     let failing = true,
       calls = 0;
     const persistence = cleanupPostgresLayer(options);
@@ -175,6 +184,7 @@ it('routes exhausted cleanup to the authenticated operator inbox and resumes onl
         (notice) => notice.kind === 'cleanup-quarantine' && notice.applicationId === 'wallpaper'
       )
     ).toBe(true);
+    expect(received.map((notice) => notice.context)).toEqual([origin, origin]);
     expect(received.map((notice) => notice.subject).sort()).toEqual([
       'asset.cleanup.candidate:candidate_notice',
       'asset.cleanup.source:source_notice',
@@ -192,6 +202,7 @@ it('routes exhausted cleanup to the authenticated operator inbox and resumes onl
         await runOperator(['recover-cleanup', '--id', row.id, '--authority-file', path])
       ).toEqual({ recovered: true });
     await expect.poll(() => received.length, { timeout: 5000 }).toBe(4);
+    expect(received.slice(2).map((notice) => notice.context)).toEqual([origin, origin]);
     expect(calls).toBe(8);
     failing = false;
     for (const row of quarantined)

@@ -120,6 +120,13 @@
       "when": 1792875885492,
       "tag": "0016_faulty_exodus",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792875889182,
+      "tag": "0017_romantic_rictor",
+      "breakpoints": true
     }
   ]
 }

@@ -52,10 +52,39 @@ export function workflowPostgresLayer(options: Options) {
         }),
         (p) => Effect.promise(() => p.end())
       );
-      const db = drizzle(pool);
-      const query = <A>(operation: string, run: () => Promise<A>) =>
+      type Database = ReturnType<typeof drizzle>;
+      const query = <A>(operation: string, run: (db: Database) => Promise<A>) =>
         Effect.tryPromise({
-          try: run,
+          try: async (signal) => {
+            const client = await pool.connect();
+            let released = false;
+            let connectionFailure: Error | undefined;
+            // pg emits borrowed-client errors in addition to rejecting queries.
+            const connectionError = (cause: Error) => {
+              connectionFailure = cause;
+            };
+            client.on('error', connectionError);
+            const abort = () => {
+              if (!released) {
+                released = true;
+                client.release(true);
+              }
+            };
+            signal.addEventListener('abort', abort, { once: true });
+            try {
+              if (signal.aborted) {
+                abort();
+                throw new Error('Wallpaper operation cancelled');
+              }
+              const result = await run(drizzle(client));
+              if (connectionFailure) throw connectionFailure;
+              return result;
+            } finally {
+              signal.removeEventListener('abort', abort);
+              if (!released) client.release(connectionFailure !== undefined);
+              client.off('error', connectionError);
+            }
+          },
           catch: (cause) => new WorkflowFailure({ operation, cause }),
         }).pipe(
           Effect.catchTag('WorkflowFailure', (failure) =>
@@ -68,7 +97,7 @@ export function workflowPostgresLayer(options: Options) {
           ),
           Effect.withSpan(`wallpaper.persistence.${operation}`)
         );
-      type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+      type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
       type Target = NonNullable<Parameters<WorkflowDeliveryPort['quarantine']>[3]>;
       const targetOf = (payload: string): Target | undefined => {
         const decoded = decodeConfirmation(new TextEncoder().encode(payload));
@@ -114,7 +143,7 @@ export function workflowPostgresLayer(options: Options) {
       };
       const store: WorkflowStorePort = {
         list: (owner) =>
-          query('list', async () => {
+          query('list', async (db) => {
             const rows = await db
               .select({ state: wallpaperIntents.state })
               .from(wallpaperIntents)
@@ -129,7 +158,7 @@ export function workflowPostgresLayer(options: Options) {
             return rows.map((row) => row.state);
           }),
         begin: (owner, key, trace) =>
-          query('begin', () =>
+          query('begin', (db) =>
             db.transaction(async (tx) => {
               const id = `wlp_${randomUUID()}`;
               const creationEventId = randomUUID();
@@ -197,7 +226,7 @@ export function workflowPostgresLayer(options: Options) {
             })
           ),
         change: (selector, transition) =>
-          query('transition', () =>
+          query('transition', (db) =>
             db.transaction(async (tx) => {
               const rows = await tx
                 .select()
@@ -255,7 +284,7 @@ export function workflowPostgresLayer(options: Options) {
       };
       const delivery: WorkflowDeliveryPort = {
         alerts: () =>
-          query('alerts', async () => {
+          query('alerts', async (db) => {
             const outbox = await db
               .select({ id: workflowOutbox.id })
               .from(workflowOutbox)
@@ -287,7 +316,7 @@ export function workflowPostgresLayer(options: Options) {
             ];
           }),
         alerted: (id, scope) =>
-          query('alerted', async () => {
+          query('alerted', async (db) => {
             if (scope === 'outbox')
               await db
                 .update(workflowOutbox)
@@ -300,7 +329,7 @@ export function workflowPostgresLayer(options: Options) {
                 .where(eq(workflowQuarantine.id, id));
           }),
         retainedConfirmation: (id) =>
-          query('retained-confirmation', async () => {
+          query('retained-confirmation', async (db) => {
             const rows = await db
               .select({ payload: workflowQuarantine.payload })
               .from(workflowQuarantine)
@@ -308,7 +337,7 @@ export function workflowPostgresLayer(options: Options) {
             return rows[0]?.payload ?? null;
           }),
         confirmationRecovered: (id) =>
-          query('confirmation-recovered', () =>
+          query('confirmation-recovered', (db) =>
             db.transaction(async (tx) => {
               const [confirmation] = await tx
                 .select()
@@ -327,7 +356,7 @@ export function workflowPostgresLayer(options: Options) {
           ),
 
         claim: () =>
-          query('claim', () =>
+          query('claim', (db) =>
             db.transaction(async (tx) => {
               const now = new Date();
               const eligible = and(
@@ -387,7 +416,7 @@ export function workflowPostgresLayer(options: Options) {
             })
           ),
         complete: (p) =>
-          query('complete', () =>
+          query('complete', (db) =>
             db.transaction(async (tx) => {
               const matching = and(
                 eq(workflowOutbox.id, p.id),
@@ -413,7 +442,7 @@ export function workflowPostgresLayer(options: Options) {
             })
           ),
         failed: (p) =>
-          query('failed', () =>
+          query('failed', (db) =>
             db.transaction(async (tx) => {
               const matching = and(
                 eq(workflowOutbox.id, p.id),
@@ -453,7 +482,7 @@ export function workflowPostgresLayer(options: Options) {
             })
           ),
         quarantine: (id, payload, reason, target) =>
-          query('quarantine', () =>
+          query('quarantine', (db) =>
             db.transaction(async (tx) => {
               const record = target ? await lockWallpaper(tx, target) : undefined;
               await tx
@@ -478,7 +507,7 @@ export function workflowPostgresLayer(options: Options) {
             })
           ),
         recover: (id) =>
-          query('recover', () =>
+          query('recover', (db) =>
             db.transaction(async (tx) => {
               const [publication] = await tx
                 .select({ wallpaperId: workflowOutbox.wallpaperId })

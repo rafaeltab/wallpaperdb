@@ -17,9 +17,13 @@ import {
 import { initialSourcePolicies, type SourcePolicy } from '../src/capabilities/sources/index.js';
 const owner = { namespace: 'clerk', subject: 'owner' };
 const intent = { operation: 'add' as const, expectedSourceSetRevision: '0' };
-function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper, clock?: Clock.Clock) {
+function fixture(
+  policy: SourcePolicy = initialSourcePolicies.wallpaper,
+  clock?: Clock.Clock,
+  assetType = 'wallpaper'
+) {
   let state: SourceState = {
-    asset: { id: 'asset_one', applicationId: 'wallpaper', assetType: 'wallpaper', owner },
+    asset: { id: 'asset_one', applicationId: 'wallpaper', assetType, owner },
     sourceSetRevision: '0',
     deliveryRevision: '0',
     sources: [],
@@ -97,7 +101,7 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper, clock?:
   );
   const runtimes = [
     ManagedRuntime.make(
-      sourcesLayer({ revision: 'one', types: { wallpaper: policy } }).pipe(
+      sourcesLayer({ revision: 'one', types: { [assetType]: policy } }).pipe(
         Layer.provide(dependencies)
       )
     ),
@@ -128,7 +132,7 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper, clock?:
     activate: (next: SourcePolicy) => {
       activeRevision = 'two';
       const newer = ManagedRuntime.make(
-        sourcesLayer({ revision: 'two', types: { wallpaper: next } }).pipe(
+        sourcesLayer({ revision: 'two', types: { [assetType]: next } }).pipe(
           Layer.provide(dependencies)
         )
       );
@@ -1167,6 +1171,207 @@ it('fences late cancelled replacement inspection after a new candidate has won',
   } finally {
     finish();
     await pending;
+    await f.close();
+  }
+});
+
+describe('Owner Default selection and Source withdrawal', () => {
+  it('changes Default before withdrawing its predecessor while preserving first analysis and fixed private evidence', async () => {
+    const clockRuntime = ManagedRuntime.make(TestClock.layer());
+    const clock = await clockRuntime.runPromise(Clock.Clock);
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-10-23T00:00:00Z')));
+    const f = fixture(initialSourcePolicies.wallpaper, clock);
+    try {
+      const first = await create(f, 'first');
+      await upload(f, first);
+      await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+      const a = f.state.defaultSourceId;
+      if (!a) throw new Error('Expected first Default');
+      const second = await create(f, 'second', '1');
+      await upload(f, second, [4, 3, 2, 1]);
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', second, { ...intent, expectedSourceSetRevision: '1' })
+      );
+      const b = f.state.sources.find((s) => s.sourceId !== a)?.sourceId;
+      if (!b) throw new Error('Expected second Source');
+      expect(await f.call((s) => s.withdraw(owner, 'asset_one', a, '2'))).toEqual({
+        kind: 'rejected',
+        reason: 'default-source-withdrawal',
+      });
+      expect(await f.call((s) => s.selectDefault(owner, 'asset_one', b, '2'))).toEqual({
+        kind: 'changed',
+        sourceSetRevision: '3',
+        deliveryRevision: '3',
+        defaultSourceId: b,
+      });
+      expect(await f.call((s) => s.withdraw(owner, 'asset_one', a, '3'))).toEqual({
+        kind: 'changed',
+        sourceSetRevision: '4',
+        deliveryRevision: '4',
+        defaultSourceId: b,
+      });
+      expect(f.state.sources.map((s) => s.sourceId)).toEqual([b]);
+      expect(f.state.initialAnalysisSourceId).toBe(a);
+      expect(f.confirmations).toHaveLength(2);
+      expect(f.retirements).toEqual([
+        { sourceId: a, evidenceExpiresAt: '2026-10-30T00:00:00.000Z' },
+      ]);
+      expect(await f.call((s) => s.original(owner, 'asset_one', a))).toEqual({
+        kind: 'unavailable',
+      });
+      expect(await f.call((s) => s.original(owner, 'asset_one', b))).toMatchObject({
+        kind: 'original',
+      });
+      expect(await f.call((s) => s.withdraw(owner, 'asset_one', b, '4'))).toEqual({
+        kind: 'rejected',
+        reason: 'last-source-withdrawal',
+      });
+      await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-11-06T00:00:00Z')));
+      expect(await f.call((s) => s.withdraw(owner, 'asset_one', a, '4'))).toEqual({
+        kind: 'rejected',
+        reason: 'unavailable-source',
+      });
+      expect(f.retirements).toHaveLength(1);
+      expect(f.state.sourceSetRevision).toBe('4');
+    } finally {
+      await f.close();
+      await clockRuntime.dispose();
+    }
+  });
+});
+
+it('authorizes both Source mutations by exact Owner and Asset and requires a current active target and revision', async () => {
+  const f = fixture();
+  try {
+    const id = await create(f, 'one');
+    await upload(f, id);
+    await f.call((s) => s.accept(owner, 'asset_one', id, intent));
+    const source = f.state.defaultSourceId;
+    if (!source) throw new Error('Expected Default');
+    for (const operation of ['selectDefault', 'withdraw'] as const) {
+      for (const other of [
+        { namespace: 'other', subject: 'owner' },
+        { namespace: 'clerk', subject: 'other' },
+      ])
+        expect(await f.call((s) => s[operation](other, 'asset_one', source, '1'))).toEqual({
+          kind: 'unavailable',
+        });
+      expect(await f.call((s) => s[operation](owner, 'asset_other', source, '1'))).toEqual({
+        kind: 'unavailable',
+      });
+      expect(await f.call((s) => s[operation](owner, 'asset_one', source, '01'))).toEqual({
+        kind: 'rejected',
+        reason: 'malformed-source-change',
+      });
+      expect(await f.call((s) => s[operation](owner, 'asset_one', source, '0'))).toEqual({
+        kind: 'rejected',
+        reason: 'source-set-conflict',
+      });
+      expect(await f.call((s) => s[operation](owner, 'asset_one', 'source_other', '1'))).toEqual({
+        kind: 'rejected',
+        reason: 'unavailable-source',
+      });
+    }
+    expect(await f.call((s) => s.selectDefault(owner, 'asset_one', source, '1'))).toEqual({
+      kind: 'changed',
+      sourceSetRevision: '1',
+      deliveryRevision: '1',
+      defaultSourceId: source,
+    });
+    expect(f.state.sourceSetRevision).toBe('1');
+    expect(f.retirements).toEqual([]);
+    expect(f.confirmations).toHaveLength(1);
+    const activate = f.activate(initialSourcePolicies.wallpaper);
+    await expect(
+      f.call((s) => s.selectDefault(owner, 'asset_one', source, '1'))
+    ).rejects.toBeDefined();
+    activate();
+    expect(await f.call((s) => s.selectDefault(owner, 'asset_one', source, '1'))).toMatchObject({
+      kind: 'changed',
+      sourceSetRevision: '1',
+    });
+  } finally {
+    await f.close();
+  }
+});
+
+it('withdraws the first ratio constraint without restoring it through accepted replay or an older replacement', async () => {
+  const f = fixture();
+  const facts = (width: number): SourceFacts => ({
+    width,
+    height: 1000,
+    model: 'sdr-png',
+    mimeType: 'image/png',
+    digest: 'ignored',
+    byteLength: 4,
+  });
+  try {
+    f.setInspect(() => Effect.succeed({ kind: 'verified', facts: facts(1000) }));
+    const a = await create(f, 'a');
+    await upload(f, a);
+    await f.call((s) => s.accept(owner, 'asset_one', a, intent));
+    const old = f.state.defaultSourceId;
+    if (!old) throw new Error('Expected Source');
+    f.setInspect(() => Effect.succeed({ kind: 'verified', facts: facts(1030) }));
+    const b = await create(f, 'b', '1');
+    await upload(f, b);
+    await f.call((s) =>
+      s.accept(owner, 'asset_one', b, { ...intent, expectedSourceSetRevision: '1' })
+    );
+    const current = f.state.sources.find((s) => s.sourceId !== old)?.sourceId;
+    if (!current) throw new Error('Expected second Source');
+    const replace = {
+      operation: 'replace-one' as const,
+      targetSourceId: old,
+      expectedSourceSetRevision: '2',
+    };
+    const pending = await f.call((s) =>
+      s.create(owner, 'asset_one', { ...replace, idempotencyKey: 'pending' })
+    );
+    if (pending.kind !== 'candidate') throw new Error('Expected candidate');
+    await upload(f, pending.candidate.candidateId);
+    f.setInspect(() => Effect.succeed({ kind: 'verified', facts: facts(1060) }));
+    const blocked = await create(f, 'blocked', '2');
+    await upload(f, blocked);
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', blocked, { ...intent, expectedSourceSetRevision: '2' })
+      )
+    ).toMatchObject({ candidate: { status: 'rejected', reason: 'aspect-ratio-limit' } });
+    await f.call((s) => s.selectDefault(owner, 'asset_one', current, '2'));
+    await f.call((s) => s.withdraw(owner, 'asset_one', old, '3'));
+    const saved = structuredClone(f.state);
+    expect(await f.call((s) => s.accept(owner, 'asset_one', a, intent))).toMatchObject({
+      candidate: { status: 'accepted', sourceSetRevision: '1' },
+    });
+    expect(
+      await f.call((s) => s.accept(owner, 'asset_one', pending.candidate.candidateId, replace))
+    ).toEqual({ kind: 'rejected', reason: 'source-set-conflict' });
+    expect(f.state).toEqual(saved);
+    const allowed = await create(f, 'allowed', '4');
+    await upload(f, allowed);
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', allowed, { ...intent, expectedSourceSetRevision: '4' })
+      )
+    ).toMatchObject({ candidate: { status: 'accepted', sourceSetRevision: '5' } });
+    expect(f.state.initialAnalysisSourceId).toBe(old);
+    expect(f.retirements).toHaveLength(1);
+    expect(f.confirmations).toHaveLength(3);
+  } finally {
+    await f.close();
+  }
+});
+
+it('explicitly rejects these Wallpaper mutations for another configured Asset type', async () => {
+  const f = fixture(initialSourcePolicies.picture, undefined, 'picture');
+  try {
+    for (const operation of ['selectDefault', 'withdraw'] as const)
+      expect(await f.call((s) => s[operation](owner, 'asset_one', 'source_one', '0'))).toEqual({
+        kind: 'rejected',
+        reason: 'unsupported-operation',
+      });
+  } finally {
     await f.close();
   }
 });

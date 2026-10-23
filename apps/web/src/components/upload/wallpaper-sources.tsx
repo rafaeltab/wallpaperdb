@@ -4,8 +4,10 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createWallpaperSourceBatch, type ManagedCandidate } from '@/features/wallpaper-creation';
 import {
   browserSourceBatchApi,
-  ownedSources,
   downloadSourceOriginal,
+  ownedSources,
+  selectSourceDefault,
+  withdrawSource,
 } from '@/features/wallpaper-creation/adapters/http';
 
 export function WallpaperSources({
@@ -53,7 +55,35 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
     refetchInterval: 2000,
   });
   const [error, setError] = useState<string | null>(null);
+  const management = useRef(false);
+  const [managing, setManaging] = useState(false);
+  const changeSource = async (operation: 'select-default' | 'withdraw', sourceId: string) => {
+    if (management.current || batch.getSnapshot().busy || !currentAsset || !saved.data) return;
+    management.current = true;
+    setManaging(true);
+    setError(null);
+    const controller = new AbortController();
+    active.current.add(controller);
+    const revision = saved.data.sourceSetRevision;
+    try {
+      const change = operation === 'select-default' ? selectSourceDefault : withdrawSource;
+      await change(currentAsset, sourceId, revision, controller.signal);
+    } catch (cause) {
+      if (!controller.signal.aborted)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'Source change unavailable. Review Sources and try again.'
+        );
+    } finally {
+      if (!controller.signal.aborted) await saved.refetch();
+      active.current.delete(controller);
+      if (!controller.signal.aborted) setManaging(false);
+      management.current = false;
+    }
+  };
   const run = () => {
+    if (management.current) return;
     const controller = new AbortController();
     active.current.add(controller);
     void batch.run(controller.signal).finally(() => {
@@ -66,6 +96,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
     candidate?: ManagedCandidate,
     targetSourceId?: string
   ) => {
+    if (management.current) return;
     if (!files?.length) return;
     const file = files[0];
     const added =
@@ -103,7 +134,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
           type="file"
           multiple
           accept="image/jpeg,image/png,image/webp"
-          disabled={snapshot.busy || snapshot.rows.length >= 16}
+          disabled={snapshot.busy || managing || snapshot.rows.length >= 16}
           onChange={(event) => {
             select(event.target.files);
             event.target.value = '';
@@ -111,8 +142,9 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
         />
       </label>
       {snapshot.busy && <output>Saving Source progress…</output>}
+      {managing && <output>Saving Source change…</output>}
       {snapshot.canResume && (
-        <button type="button" className="underline text-sm" onClick={run}>
+        <button type="button" className="underline text-sm" onClick={run} disabled={managing}>
           Resume remaining Sources
         </button>
       )}
@@ -139,7 +171,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
             {(row.status === 'failed' || row.status === 'confirming') && (
               <button
                 type="button"
-                disabled={snapshot.busy}
+                disabled={snapshot.busy || managing}
                 className="underline"
                 onClick={() => {
                   batch.retry(row.id);
@@ -174,6 +206,9 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
             {saved.data.sources.length} accepted Sources. Source revision{' '}
             {saved.data.sourceSetRevision}.
           </p>
+          <p className="text-sm text-muted-foreground">
+            Change Default before withdrawing its Source.
+          </p>
           {saved.data.nextCandidateCursor && (
             <button
               type="button"
@@ -190,6 +225,31 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                 {source.sourceId}
                 {source.sourceId === saved.data.defaultSourceId && ' · Default Source'}
                 {source.facts && ` · ${source.facts.width} × ${source.facts.height}`}{' '}
+                {source.sourceId !== saved.data.defaultSourceId && (
+                  <button
+                    type="button"
+                    className="underline"
+                    disabled={snapshot.busy || managing}
+                    aria-label={`Make Default Source ${source.sourceId}`}
+                    onClick={() => void changeSource('select-default', source.sourceId)}
+                  >
+                    Make Default
+                  </button>
+                )}{' '}
+                <button
+                  type="button"
+                  className="underline"
+                  aria-label={`Withdraw Source ${source.sourceId}`}
+                  disabled={
+                    snapshot.busy ||
+                    managing ||
+                    saved.data.sources.length <= 1 ||
+                    source.sourceId === saved.data.defaultSourceId
+                  }
+                  onClick={() => void changeSource('withdraw', source.sourceId)}
+                >
+                  Withdraw Source
+                </button>{' '}
                 <button
                   type="button"
                   className="underline"
@@ -213,7 +273,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
-                    disabled={snapshot.busy || snapshot.rows.length >= 16}
+                    disabled={snapshot.busy || managing || snapshot.rows.length >= 16}
                     onChange={(event) => {
                       select(event.target.files, undefined, source.sourceId);
                       event.target.value = '';
@@ -243,7 +303,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
-                      disabled={snapshot.busy}
+                      disabled={snapshot.busy || managing}
                       onChange={(event) => {
                         select(event.target.files, candidate);
                         event.target.value = '';

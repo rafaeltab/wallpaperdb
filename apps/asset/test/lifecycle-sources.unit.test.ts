@@ -27,6 +27,8 @@ it('composes owned Asset inspection with accepted Source membership rather than 
             inspect: () => Effect.die('empty inspection must be replaced'),
           }),
           Layer.succeed(Sources, {
+            selectDefault: () => Effect.succeed({ kind: 'unavailable' }),
+            withdraw: () => Effect.succeed({ kind: 'unavailable' }),
             list: (actualOwner, assetId) =>
               Effect.sync(() => {
                 expect(actualOwner).toEqual(owner);

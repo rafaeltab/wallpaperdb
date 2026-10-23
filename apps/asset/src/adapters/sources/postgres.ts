@@ -264,8 +264,10 @@ export function sourcePostgresLayer(options: Options) {
                       layout: source.layout,
                     });
                 }
-                if (changed.retirement) {
-                  const { sourceId, evidenceExpiresAt } = changed.retirement;
+                for (const { sourceId, evidenceExpiresAt } of [
+                  ...(changed.retirement ? [changed.retirement] : []),
+                  ...(changed.retirements ?? []),
+                ]) {
                   if (
                     !priorSources.includes(sourceId) ||
                     changed.state.sources.some((source) => source.sourceId === sourceId)

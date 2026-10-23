@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { crc32 } from 'node:zlib';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -14,6 +15,153 @@ const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3Tes
 const tester = new Tester().withS3().withS3Bucket('source-private');
 beforeAll(() => tester.setup(), 60000);
 afterAll(() => tester.destroy());
+function pngChunk(kind: string, data: Buffer): Buffer {
+  const chunk = Buffer.alloc(data.length + 12);
+  chunk.writeUInt32BE(data.length);
+  chunk.write(kind, 4, 'ascii');
+  data.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(chunk.subarray(4, -4)), chunk.length - 4);
+  return chunk;
+}
+it('admits a full-range sRGB cICP PNG through mandatory inspection just like the matching plain SDR PNG', async () => {
+  const s3 = tester.getS3();
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: s3.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'source-private',
+    })
+  );
+  const plain = await sharp({ create: { width: 3, height: 2, channels: 3, background: 'red' } })
+    .png()
+    .toBuffer();
+  // PNG cICP contains primaries, transfer, RGB matrix and full-range flag.
+  const chunk = pngChunk('cICP', Buffer.from([1, 13, 0, 1]));
+  const signalled = Buffer.concat([plain.subarray(0, 33), chunk, plain.subarray(33)]);
+  try {
+    for (const [id, bytes] of [
+      ['candidate_plain_sdr', plain],
+      ['candidate_cicp_sdr', signalled],
+    ] as const) {
+      const digest = createHash('sha256').update(bytes).digest('hex');
+      await runtime.runPromise(SourceBytes.use((storage) => storage.put(id, bytes, digest)));
+      expect(
+        await runtime.runPromise(
+          MandatoryInspection.use((inspector) =>
+            inspector.inspect(id, initialSourcePolicies.wallpaper)
+          )
+        )
+      ).toMatchObject({
+        kind: 'verified',
+        facts: {
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          width: 3,
+          height: 2,
+          digest,
+          byteLength: bytes.length,
+        },
+      });
+    }
+  } finally {
+    await runtime.dispose();
+  }
+});
+it('keeps HDR, unknown, malformed cICP and APNG outside supported SDR PNG inspection', async () => {
+  const s3 = tester.getS3();
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: s3.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'source-private',
+    })
+  );
+  const plain = await sharp({ create: { width: 3, height: 2, channels: 3, background: 'red' } })
+    .png()
+    .toBuffer();
+  const insert = (...chunks: Buffer[]) =>
+    Buffer.concat([plain.subarray(0, 33), ...chunks, plain.subarray(33)]);
+  const sdr = pngChunk('cICP', Buffer.from([1, 13, 0, 1]));
+  const corrupt = Buffer.from(sdr);
+  corrupt.writeUInt32BE((corrupt.readUInt32BE(corrupt.length - 4) ^ 1) >>> 0, corrupt.length - 4);
+  // A one-frame APNG uses this PNG's actual default image as its first frame.
+  const frame = Buffer.alloc(26);
+  frame.writeUInt32BE(3, 4);
+  frame.writeUInt32BE(2, 8);
+  frame.writeUInt16BE(1, 20);
+  frame.writeUInt16BE(10, 22);
+  const fixtures = [
+    {
+      id: 'hlg',
+      bytes: insert(pngChunk('cICP', Buffer.from([9, 18, 0, 1]))),
+      reason: 'unsupported-source-model',
+    },
+    {
+      id: 'unknown-primaries',
+      bytes: insert(pngChunk('cICP', Buffer.from([2, 13, 0, 1]))),
+      reason: 'unsupported-source-model',
+    },
+    {
+      id: 'unknown-transfer',
+      bytes: insert(pngChunk('cICP', Buffer.from([1, 2, 0, 1]))),
+      reason: 'unsupported-source-model',
+    },
+    {
+      id: 'unsupported-matrix',
+      bytes: insert(pngChunk('cICP', Buffer.from([1, 13, 1, 1]))),
+      reason: 'unsupported-source-model',
+    },
+    {
+      id: 'narrow-range',
+      bytes: insert(pngChunk('cICP', Buffer.from([1, 13, 0, 0]))),
+      reason: 'unsupported-source-model',
+    },
+    {
+      id: 'short-cicp',
+      bytes: insert(pngChunk('cICP', Buffer.from([1, 13, 0]))),
+      reason: 'invalid-image',
+    },
+    { id: 'corrupt-cicp', bytes: insert(corrupt), reason: 'invalid-image' },
+    { id: 'duplicate-cicp', bytes: insert(sdr, sdr), reason: 'invalid-image' },
+    {
+      id: 'late-cicp',
+      bytes: Buffer.concat([plain.subarray(0, -12), sdr, plain.subarray(-12)]),
+      reason: 'invalid-image',
+    },
+    {
+      id: 'apng',
+      bytes: insert(
+        pngChunk('acTL', Buffer.from([0, 0, 0, 1, 0, 0, 0, 0])),
+        pngChunk('fcTL', frame)
+      ),
+      reason: 'unsupported-source-model',
+    },
+  ];
+  try {
+    for (const fixture of fixtures) {
+      const id = `candidate_png_${fixture.id}`;
+      await runtime.runPromise(
+        SourceBytes.use((storage) =>
+          storage.put(id, fixture.bytes, createHash('sha256').update(fixture.bytes).digest('hex'))
+        )
+      );
+      expect(
+        await runtime.runPromise(
+          MandatoryInspection.use((inspector) =>
+            inspector.inspect(id, initialSourcePolicies.wallpaper)
+          )
+        ),
+        fixture.id
+      ).toEqual({ kind: 'rejected', reason: fixture.reason });
+    }
+  } finally {
+    await runtime.dispose();
+  }
+});
 it('conditionally stores one exact identity, verifies mandatory actual facts and prepares immutable original bytes', async () => {
   const s3 = tester.getS3();
   const runtime = ManagedRuntime.make(

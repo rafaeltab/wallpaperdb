@@ -7,6 +7,7 @@ User owns contributor Profiles and the rules for changing public identity, inclu
 - Create a Profile from an authenticated identity, with a generated fallback when identity details are absent.
 - Edit Display names and Markdown Biographies with ownership checks and conflict detection, including validation of embedded wallpapers.
 - Change Handles while preserving earlier addresses as aliases, with controls for alias expiry and reactivation.
+- Durably attach an initial picture using locally recorded Asset and Source confirmations, with cancellation fencing and orphan deletion. The [attachment capability](src/capabilities/picture-attachments/index.ts) owns this workflow.
 - Import, validate, replace, and remove Profile pictures without allowing delayed imports to overwrite manual choices.
 - Authorize delivery of the current Profile picture, retry interrupted imports, and clean up unused picture assets.
 - Publish accepted Profile changes and expire eligible event history while preserving current state and undelivered announcements.

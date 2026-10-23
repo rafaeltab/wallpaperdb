@@ -11,7 +11,7 @@ export async function registerUserCors(
   await fastify.register(cors, {
     origin: nodeEnv === 'development' ? LOCAL_ORIGINS : false,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
     credentials: true,
   });
 }

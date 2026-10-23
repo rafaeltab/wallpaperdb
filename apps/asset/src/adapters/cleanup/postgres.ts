@@ -314,12 +314,18 @@ export function cleanupPostgresLayer(options: Options) {
               .where(and(eq(sourceCleanup.status, 'quarantined'), isNull(sourceCleanup.notifiedAt)))
               .limit(100)
           ),
-        alerted: (id) =>
+        alerted: (id, notificationId) =>
           run('alerted', async (db) => {
             await db
               .update(sourceCleanup)
               .set({ notifiedAt: new Date() })
-              .where(eq(sourceCleanup.id, id));
+              .where(
+                and(
+                  eq(sourceCleanup.id, id),
+                  eq(sourceCleanup.notificationId, notificationId),
+                  eq(sourceCleanup.status, 'quarantined')
+                )
+              );
           }),
         recover: (id) =>
           run('recover', async (db) => {

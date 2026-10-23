@@ -116,3 +116,58 @@ it('reaches a retained ambiguous initial candidate after an earlier rejection wh
  expect(batch.getSnapshot().rows.map(row=>row.status)).toEqual(['failed','accepted','accepted']);expect(uploads).toEqual(['a','b','c']);expect(intents).toHaveLength(1);
  batch.retry(b.id);await batch.run(new AbortController().signal);expect(uploads).toEqual(['a','b','c']);
 });
+
+it('captures replacement intent through failure, retry and resumed candidate without repeating publication', async () => {
+  const wallpaper = { wallpaperId: 'published', assetId: 'stable-asset', sourceId: 'first', state: 'published' as const, createdAt: 'now' };
+  const changes: unknown[] = [];
+  let failUpload = true;
+  let saved = { candidateId: 'replacement', status: 'awaiting-bytes', expectedSourceSetRevision: '5', operation: 'replace-one' as const, targetSourceId: 'old-source' };
+  const api: SourceBatchApi<string> = {
+    identifier: () => crypto.randomUUID(), begin: async () => wallpaper, wallpaper: async () => wallpaper,
+    list: async () => ({ sourceSetRevision: '5', sources: [{ sourceId: 'old-source' }], candidates: [], hasPendingCandidates: false }),
+    create: async (_asset, _key, revision, _signal, mutation) => { changes.push(mutation); expect(revision).toBe('5'); return saved; },
+    status: async () => saved,
+    upload: async () => { if (failUpload) { failUpload = false; throw new Error('Storage temporarily unavailable'); } saved = { ...saved, status: 'ready' }; return saved; },
+    accept: async (asset, _id, revision, _correlation, _signal, mutation) => { expect(asset).toBe('stable-asset'); expect(revision).toBe('5'); changes.push(mutation); return { ...saved, status: 'accepted', sourceId: 'new-source' }; },
+    expectSource: async () => { throw new Error('Preserve publication and first analysis intent'); },
+    cancel: async () => {}, wait: async () => {},
+  };
+  const batch = createWallpaperSourceBatch(api, { wallpaperId: 'published' });
+  expect(batch.replace({ value: 'replacement-bytes', name: 'replacement.png' }, 'old-source')).toBe(true);
+  await batch.run(new AbortController().signal);
+  expect(batch.getSnapshot().rows[0]).toMatchObject({ status: 'failed', targetSourceId: 'old-source' });
+  const row = batch.getSnapshot().rows[0]; if (!row) throw new Error('Expected replacement row');
+  batch.retry(row.id); await batch.run(new AbortController().signal);
+  expect(batch.getSnapshot().rows[0]).toMatchObject({ status: 'accepted', sourceId: 'new-source' });
+  expect(changes).toEqual([{ operation: 'replace-one', targetSourceId: 'old-source' }, { operation: 'replace-one', targetSourceId: 'old-source' }]);
+  changes.length = 0;
+  const resumed = createWallpaperSourceBatch(api, { wallpaperId: 'published' });
+  resumed.resume({ value: 'same-bytes', name: 'resumed.png' }, saved);
+  await resumed.run(new AbortController().signal);
+  expect(changes).toEqual([{ operation: 'replace-one', targetSourceId: 'old-source' }]);
+});
+
+it('requires explicit selection of the winner when a competing replacement retires the captured target', async () => {
+  const { SourceIntakeError } = await import('@/features/wallpaper-creation');
+  const wallpaper = { wallpaperId: 'published', assetId: 'asset', sourceId: 'first', state: 'published' as const, createdAt: 'now' };
+  let revision = '1', activeSource = 'old', conflict = true;
+  const changes: unknown[] = [];
+  const api: SourceBatchApi<string> = {
+    identifier: () => crypto.randomUUID(), begin: async () => wallpaper, wallpaper: async () => wallpaper,
+    list: async () => ({ sourceSetRevision: revision, sources: [{ sourceId: activeSource }], candidates: [], hasPendingCandidates: false }),
+    create: async (_asset, key, expected, _signal, mutation) => { changes.push(mutation); return { candidateId: key, status: 'awaiting-bytes', expectedSourceSetRevision: expected }; },
+    status: async () => { throw new Error('Cancel conflicting candidate before explicit retry'); },
+    upload: async (_asset, id) => ({ candidateId: id, status: 'ready', expectedSourceSetRevision: revision }),
+    accept: async (_asset, id) => { if (conflict) { conflict = false; revision = '2'; activeSource = 'winner'; throw new SourceIntakeError('Sources changed', true); } return { candidateId: id, status: 'accepted', expectedSourceSetRevision: revision, sourceId: 'explicit-replacement' }; },
+    expectSource: async () => { throw new Error('Keep publication'); }, cancel: async () => {}, wait: async () => {},
+  };
+  const batch = createWallpaperSourceBatch(api, { wallpaperId: 'published' });
+  batch.replace({ value: 'bytes', name: 'replacement.png' }, 'old'); await batch.run(new AbortController().signal);
+  const row = batch.getSnapshot().rows[0]; if (!row) throw new Error('Expected conflicting row');
+  batch.retry(row.id); await batch.run(new AbortController().signal);
+  expect(batch.getSnapshot().rows[0]).toMatchObject({ status: 'failed', message: expect.stringContaining('no longer active') });
+  expect(changes).toEqual([{ operation: 'replace-one', targetSourceId: 'old' }]);
+  batch.replace({ value: 'bytes', name: 'explicit.png' }, 'winner'); await batch.run(new AbortController().signal);
+  expect(changes).toEqual([{ operation: 'replace-one', targetSourceId: 'old' }, { operation: 'replace-one', targetSourceId: 'winner' }]);
+  expect(batch.getSnapshot().rows[1]).toMatchObject({ status: 'accepted' });
+});

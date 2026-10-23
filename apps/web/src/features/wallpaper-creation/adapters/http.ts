@@ -222,8 +222,11 @@ export async function recentCreations(signal?: AbortSignal): Promise<readonly Wa
   return result;
 }
 export async function downloadOriginal(wallpaper: WallpaperStatus, signal: AbortSignal) {
-  if (!wallpaper.assetId || !wallpaper.sourceId) return;
-  return downloadSourceOriginal(wallpaper.assetId, wallpaper.sourceId, signal);
+  if (!wallpaper.assetId) return;
+  const current = await ownedSources(wallpaper.assetId, signal);
+  const selected = current.sources.find((source) => source.sourceId === current.defaultSourceId);
+  if (!selected) throw new Error('Accepted Source is unavailable. Refresh Sources and retry.');
+  return downloadSourceOriginal(wallpaper.assetId, selected.sourceId, signal);
 }
 export async function downloadSourceOriginal(
   assetId: string,
@@ -254,6 +257,9 @@ function managedCandidate(input: unknown): ManagedCandidate {
     typeof v.expectedSourceSetRevision !== 'string' ||
     !/^(0|[1-9][0-9]{0,39})$/.test(v.expectedSourceSetRevision) ||
     typeof v.status !== 'string' ||
+    (v.operation !== 'add' && v.operation !== 'replace-one' && v.operation !== 'replace-set') ||
+    (v.operation === 'replace-one' &&
+      (typeof v.targetSourceId !== 'string' || v.targetSourceId.length === 0)) ||
     ![
       'awaiting-bytes',
       'inspecting',
@@ -269,6 +275,8 @@ function managedCandidate(input: unknown): ManagedCandidate {
   return {
     candidateId: v.candidateId,
     expectedSourceSetRevision: v.expectedSourceSetRevision,
+    operation: v.operation,
+    ...(typeof v.targetSourceId === 'string' ? { targetSourceId: v.targetSourceId } : {}),
     status: v.status,
     ...(typeof v.sourceId === 'string' ? { sourceId: v.sourceId } : {}),
     ...(typeof v.reason === 'string' ? { reason: v.reason } : {}),
@@ -290,6 +298,7 @@ export async function ownedSources(
   if (
     typeof v.sourceSetRevision !== 'string' ||
     !/^(0|[1-9][0-9]{0,39})$/.test(v.sourceSetRevision) ||
+    (typeof v.defaultSourceId !== 'string' && v.defaultSourceId !== null) ||
     !Array.isArray(v.sources) ||
     !Array.isArray(v.candidates) ||
     v.candidates.length > 32 ||
@@ -302,6 +311,7 @@ export async function ownedSources(
     throw new Error('Invalid owned Sources response');
   return {
     sourceSetRevision: v.sourceSetRevision,
+    defaultSourceId: v.defaultSourceId,
     hasPendingCandidates: v.hasPendingCandidates,
     ...(typeof v.nextCandidateCursor === 'string'
       ? { nextCandidateCursor: v.nextCandidateCursor }
@@ -331,12 +341,12 @@ export function browserSourceBatchApi(): SourceBatchApi<File> {
     list: ownedSources,
     expectSource: creation.expectSource,
     wait: creation.wait,
-    create: async (asset, key, revision, signal) =>
+    create: async (asset, key, revision, signal, mutation = { operation: 'add' }) =>
       managedCandidate(
         await (
           await request(`${assetUrl}/assets/${encodeURIComponent(asset)}/source-candidates`, {
             method: 'POST',
-            ...json({ operation: 'add', expectedSourceSetRevision: revision }),
+            ...json({ ...mutation, expectedSourceSetRevision: revision }),
             headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
             signal,
           })
@@ -355,12 +365,12 @@ export function browserSourceBatchApi(): SourceBatchApi<File> {
           })
         ).json()
       ),
-    accept: async (asset, id, revision, correlation, signal) =>
+    accept: async (asset, id, revision, correlation, signal, mutation = { operation: 'add' }) =>
       managedCandidate(
         await (
           await request(`${path(asset, id)}/accept`, {
             method: 'POST',
-            ...json({ operation: 'add', expectedSourceSetRevision: revision }),
+            ...json({ ...mutation, expectedSourceSetRevision: revision }),
             headers: { 'Content-Type': 'application/json', 'X-Correlation-Id': correlation },
             signal,
           })

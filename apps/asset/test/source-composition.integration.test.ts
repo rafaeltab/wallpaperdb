@@ -22,7 +22,7 @@ import {
   sourceConfirmationsLayer,
   SourceConfirmationHealth,
 } from '../src/adapters/sources/index.js';
-import { sourcesLayer } from '../src/capabilities/sources/index.js';
+import { SourceBytes, sourcesLayer } from '../src/capabilities/sources/index.js';
 import { LifecycleStore } from '../src/capabilities/lifecycle/index.js';
 import { AuthorAuthentication } from '../src/adapters/authors/index.js';
 import { AssetDelivery } from '../src/capabilities/delivery/index.js';
@@ -507,6 +507,126 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
       ).rows
     ).toEqual([{ count: 3 }]);
     expect(await publisher.runPromise(SourceConfirmationHealth.use((s) => s.check()))).toBe(true);
+    // An Author has no full-Asset deletion route, even with a valid Owner identity.
+    expect(
+      (await app.inject({ method: 'DELETE', url: `/assets/${created.assetId}`, headers }))
+        .statusCode
+    ).toBe(404);
+    const deleteInput = {
+      revision: authority.identity,
+      applicationId: 'wallpaper',
+      canonical: 'terminal-http-delete',
+      correlation: { commandId: 'terminal-http-delete', applicationReference: 'delete-wallpaper' },
+      decision: {
+        kind: 'delete' as const,
+        assetId: created.assetId,
+        evidenceRetentionMsByType: { wallpaper: 604800000 },
+      },
+      context: { occurrence: { source: 'https://test/wallpaper', id: 'delete-http-one' } },
+    };
+    await pool.query(
+      'ALTER TABLE asset_deletions ADD CONSTRAINT composition_delete_rollback CHECK (false) NOT VALID'
+    );
+    try {
+      await expect(
+        lifecycle.runPromise(LifecycleStore.use((s) => s.accept(deleteInput)))
+      ).rejects.toThrow();
+      expect(
+        (
+          await app.inject({
+            url: `/assets/${created.assetId}/sources/${nextSource}/original`,
+            headers,
+          })
+        ).rawPayload
+      ).toEqual(png);
+      expect(
+        (
+          await pool.query('SELECT evidence_expires_at FROM immutable_sources WHERE id=$1', [
+            nextSource,
+          ])
+        ).rows
+      ).toEqual([{ evidence_expires_at: null }]);
+    } finally {
+      await pool.query('ALTER TABLE asset_deletions DROP CONSTRAINT composition_delete_rollback');
+    }
+    expect(
+      await lifecycle.runPromise(LifecycleStore.use((s) => s.accept(deleteInput)))
+    ).toMatchObject({ outcome: 'deleted', assetId: created.assetId });
+    for (const request of [
+      { method: 'GET' as const, url: `/assets/${created.assetId}/sources` },
+      { method: 'GET' as const, url: `/assets/${created.assetId}/sources/${nextSource}/original` },
+      {
+        method: 'GET' as const,
+        url: `/assets/${created.assetId}/source-candidates/${nextCandidate}`,
+      },
+      {
+        method: 'DELETE' as const,
+        url: `/assets/${created.assetId}/source-candidates/${nextCandidate}`,
+      },
+      {
+        method: 'POST' as const,
+        url: `/assets/${created.assetId}/source-candidates`,
+        payload: addition,
+      },
+      {
+        method: 'POST' as const,
+        url: `/assets/${created.assetId}/source-candidates/${nextCandidate}/accept`,
+        payload: addition,
+      },
+      {
+        method: 'PUT' as const,
+        url: `/assets/${created.assetId}/source-candidates/${nextCandidate}/bytes`,
+        payload: png,
+        headers: { ...headers, 'content-type': 'application/octet-stream' },
+      },
+      {
+        method: 'PUT' as const,
+        url: `/assets/${created.assetId}/default-source`,
+        payload: { sourceId: nextSource, expectedSourceSetRevision: '5' },
+      },
+      {
+        method: 'DELETE' as const,
+        url: `/assets/${created.assetId}/sources/${nextSource}`,
+        payload: { expectedSourceSetRevision: '5' },
+      },
+    ])
+      expect((await app.inject({ headers, ...request })).statusCode).toBe(404);
+    const rawStorage = ManagedRuntime.make(bytes);
+    try {
+      const retained = await rawStorage.runPromise(
+        SourceBytes.use((s) => s.read(nextSource, created.assetId))
+      );
+      try {
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of retained.bytes) chunks.push(chunk);
+        expect(Buffer.concat(chunks)).toEqual(png);
+      } finally {
+        await rawStorage.runPromise(retained.close());
+      }
+    } finally {
+      await rawStorage.dispose();
+    }
+    const terminal = (
+      await pool.query('SELECT state FROM asset_source_state WHERE asset_id=$1', [created.assetId])
+    ).rows[0].state;
+    expect(terminal).toMatchObject({
+      sources: [],
+      defaultSourceId: null,
+      sourceSetRevision: '6',
+      deliveryRevision: '6',
+      initialAnalysisSourceId: sourceId,
+      nonterminalCandidateCount: 0,
+    });
+    expect(
+      (
+        await pool.query('SELECT evidence_expires_at FROM immutable_sources WHERE id=$1', [
+          winner.sourceId,
+        ])
+      ).rows
+    ).toEqual(withdrawn.rows);
+    expect(
+      await lifecycle.runPromise(LifecycleStore.use((s) => s.accept(deleteInput)))
+    ).toMatchObject({ outcome: 'deleted' });
   } finally {
     await app.close();
     await publisher.dispose();

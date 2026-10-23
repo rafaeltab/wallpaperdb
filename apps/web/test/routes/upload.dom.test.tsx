@@ -1,3 +1,4 @@
+import {UploadDropZone} from '@/components/upload/upload-drop-zone';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -15,6 +16,9 @@ vi.mock('sonner', () => ({
     error: vi.fn(),
   },
 }));
+
+vi.mock('@/components/upload/upload-admission',()=>({WallpaperUploadSelection:(props:React.ComponentProps<typeof UploadDropZone>)=><UploadDropZone {...props}/>}));
+vi.mock('@/components/upload/recent-creations',()=>({RecentCreations:()=>null}));
 
 vi.mock('@/components/upload-auth-gate', () => ({
   UploadAuthGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,

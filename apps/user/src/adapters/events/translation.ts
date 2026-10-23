@@ -1,7 +1,8 @@
-import { reconcileEventMetadata } from '@wallpaperdb/events/envelope';
+import { reconcileEventMetadata, type CloudEventMetadata } from '@wallpaperdb/events/envelope';
 import {
   WallpaperUploadedCloudEventSchema,
   WallpaperUploadedEventSchema,
+  WallpaperPublishedSchema,
 } from '@wallpaperdb/events/schemas';
 import { Option, Predicate } from 'effect';
 import type { MsgHdrs } from 'nats';
@@ -23,8 +24,18 @@ const envelope = z.object({
 const structuredEnvelope = WallpaperUploadedCloudEventSchema.extend({
   causationsource: envelope.shape.causationsource,
 });
-type Envelope = z.infer<typeof envelope>;
-function ownershipAttributes(eventId: string, wallpaperId: string, metadata: Envelope | undefined) {
+const publicationEnvelope = envelope.extend({
+  type: z.literal('wallpaper.published'),
+});
+const structuredPublication = publicationEnvelope.extend({
+  datacontenttype: z.literal('application/json'),
+  data: WallpaperPublishedSchema,
+});
+function ownershipAttributes(
+  eventId: string,
+  wallpaperId: string,
+  metadata: CloudEventMetadata | undefined
+) {
   return {
     'event.id': eventId,
     'event.source': metadata?.source ?? 'wallpaperdb/ingestor',
@@ -35,6 +46,7 @@ function ownershipAttributes(eventId: string, wallpaperId: string, metadata: Env
 }
 
 export function translateOwnership(subject: string, bytes: Uint8Array, headers?: MsgHdrs) {
+  if (subject === 'wallpaper.published') return translatePublication(bytes, headers);
   if (subject !== 'wallpaper.uploaded')
     return { kind: 'invalid', reason: 'validation_error' } as const;
   const raw = decode(bytes);
@@ -58,5 +70,25 @@ export function translateOwnership(subject: string, bytes: Uint8Array, headers?:
     kind: 'ownership' as const,
     ownership: { wallpaperId: external.wallpaper.id, profileId: external.wallpaper.userId },
     attributes: ownershipAttributes(external.eventId, external.wallpaper.id, metadata.value),
+  };
+}
+
+function translatePublication(bytes: Uint8Array, headers?: MsgHdrs) {
+  const raw = decode(bytes);
+  if (Option.isNone(raw)) return { kind: 'invalid', reason: 'parse_error' } as const;
+  const parsed = structuredPublication.safeParse(raw.value);
+  if (!parsed.success) return { kind: 'invalid', reason: 'validation_error' } as const;
+  const external = parsed.data;
+  const metadata = reconcileEventMetadata(
+    raw.value,
+    headers,
+    { eventId: external.id, eventType: external.type, timestamp: external.time },
+    (value) => publicationEnvelope.safeParse(value).data
+  );
+  if (!metadata.valid) return { kind: 'invalid', reason: 'validation_error' } as const;
+  return {
+    kind: 'ownership' as const,
+    ownership: { wallpaperId: external.data.wallpaperId, profileId: external.data.contributorId },
+    attributes: ownershipAttributes(external.id, external.data.wallpaperId, metadata.value),
   };
 }

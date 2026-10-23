@@ -79,6 +79,15 @@ const failed: UploadResult = {
   error: { type: 'validation', message: 'Invalid image' },
 };
 
+it('resumes a pending confirmation with the retained file instead of starting another creation',async()=>{
+ const {queue,uploads}=setup();queue.addFiles(['retained-image']);
+ await complete(uploads[0],{success:false,pending:true,isDuplicate:false,response:{wallpaperId:'original-wallpaper',uploadState:'creating-asset'}});
+ expect(queue.getSnapshot().counts).toMatchObject({confirming:1,success:0,failed:0});
+ queue.resumeConfirming();
+ expect(uploads.map(u=>u.file)).toEqual(['retained-image','retained-image']);
+ await complete(uploads[1]);expect(queue.getSnapshot().counts.success).toBe(1);
+});
+
 describe('upload queue workflow', () => {
   it('uploads in selection order with one active request and reports completion', async () => {
     const { queue, uploads } = setup();

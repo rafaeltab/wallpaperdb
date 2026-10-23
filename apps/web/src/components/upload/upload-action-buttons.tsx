@@ -2,6 +2,8 @@ import { Check, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface UploadActionButtonsProps {
+  hasConfirming?: boolean;
+  onResumeConfirming?: () => void;
   isRunning: boolean;
   isPaused: boolean;
   isStopped: boolean;
@@ -15,6 +17,8 @@ interface UploadActionButtonsProps {
 }
 
 export function UploadActionButtons({
+  hasConfirming,
+  onResumeConfirming,
   isRunning,
   isPaused,
   isStopped,
@@ -32,6 +36,11 @@ export function UploadActionButtons({
 
   return (
     <div className="flex gap-2">
+      {hasConfirming && onResumeConfirming && (
+        <Button variant="outline" onClick={onResumeConfirming} disabled={isRunning}>
+          Resume pending uploads
+        </Button>
+      )}
       {hasFailures && (
         <Button
           data-testid="retry-failed-button"

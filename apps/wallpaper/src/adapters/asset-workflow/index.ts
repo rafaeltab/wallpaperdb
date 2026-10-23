@@ -1,0 +1,271 @@
+import { createHash } from 'node:crypto';
+import { Cause, Effect, Fiber, Layer, Ref } from 'effect';
+import { connect, type NatsConnection } from 'nats';
+import {
+  Creation,
+  WorkflowDelivery,
+  WorkflowFailure,
+  WorkflowHealth,
+} from '../../capabilities/creation/index.js';
+import type { WorkflowConfig } from '../../workflow-config.js';
+import { decodeConfirmation } from './translation.js';
+import { observeWorkflow } from './observation.js';
+interface Options extends WorkflowConfig {
+  readonly natsUrl: string;
+}
+export function assetWorkflowLayer(options: Options) {
+  return Layer.effect(
+    WorkflowHealth,
+    Effect.gen(function* () {
+      const creation = yield* Creation;
+      const delivery = yield* WorkflowDelivery;
+      const attempt = <A>(operation: string, run: () => Promise<A>) =>
+        Effect.tryPromise({
+          try: run,
+          catch: (cause) => new WorkflowFailure({ operation, cause }),
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logError('Wallpaper workflow transport unavailable', {
+              operation,
+              cause: error.cause,
+            })
+          ),
+          Effect.withSpan(`wallpaper.workflow.${operation}`)
+        );
+      const connectTo = (protectedAccount: boolean) =>
+        Effect.acquireRelease(
+          attempt('connect', () => {
+            const url = new URL(options.natsUrl);
+            const legacyCredentials =
+              url.username || url.password
+                ? { user: decodeURIComponent(url.username), pass: decodeURIComponent(url.password) }
+                : {};
+            url.username = '';
+            url.password = '';
+            return connect({
+              servers: url.toString(),
+              ...(protectedAccount
+                ? {
+                    user: options.credential.user,
+                    pass: options.credential.password,
+                    inboxPrefix: '_ASSET_INBOX.wallpaper',
+                  }
+                : legacyCredentials),
+              name: protectedAccount ? 'wallpaper-asset-workflow' : 'wallpaper-publication',
+              timeout: 2000,
+              ...(url.protocol === 'tls:' ? { tls: {} } : {}),
+            });
+          }),
+          (connection) =>
+            attempt('drain', () => connection.drain()).pipe(
+              Effect.interruptible,
+              Effect.timeout(options.shutdownTimeoutMs),
+              Effect.catchCause(() => Effect.promise(() => connection.close()))
+            )
+        );
+      const protectedConnection = yield* connectTo(true);
+      const publicationConnection = yield* connectTo(false);
+      const consumer = yield* attempt('bind-results', () =>
+        protectedConnection.jetstream().consumers.get('ASSET_RESULTS', 'results_wallpaper')
+      );
+      const accepting = yield* Ref.make(true);
+      const sendingHealthy = yield* Ref.make(true);
+      const receivingHealthy = yield* Ref.make(true);
+      const alive = yield* Ref.make(2);
+      const worker = (
+        name: string,
+        work: Effect.Effect<void, WorkflowFailure>,
+        healthy: Ref.Ref<boolean>
+      ) =>
+        Effect.gen(function* () {
+          while (yield* Ref.get(accepting)) {
+            yield* work.pipe(
+              Effect.tap(() => Ref.set(healthy, true)),
+              Effect.catch((error) =>
+                Effect.logError('Wallpaper workflow iteration failed', {
+                  worker: name,
+                  operation: error.operation,
+                }).pipe(Effect.andThen(Ref.set(healthy, false)))
+              )
+            );
+            yield* Effect.sleep(options.pollMs);
+          }
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Cause.hasInterrupts(cause)
+              ? Effect.void
+              : Effect.logError('Wallpaper workflow stopped', { worker: name, cause })
+          ),
+          Effect.ensuring(Ref.update(alive, (n) => n - 1)),
+          Effect.forkScoped
+        );
+      const sending = yield* worker(
+        'outbox',
+        Effect.gen(function* () {
+          for (const p of yield* delivery.claim()) {
+            const connection: NatsConnection =
+              p.destination === 'asset-create' ? protectedConnection : publicationConnection;
+            const subject =
+              p.destination === 'asset-create'
+                ? 'asset.commands.wallpaper.create'
+                : 'wallpaper.published';
+            yield* observeWorkflow(
+              'wallpaper.workflow.publish',
+              p.event,
+              {
+                'wallpaper.id': p.wallpaperId,
+                'event.subject': subject,
+                'event.consumer': 'wallpaper-workflow-outbox',
+                'event.delivery_attempt': p.attempts + 1,
+              },
+              Effect.gen(function* () {
+                const stored = yield* attempt('publish', () =>
+                  connection.jetstream().publish(subject, JSON.stringify(p.event), {
+                    msgID: `https://wallpaperdb/wallpaper#${p.id}`,
+                    timeout: 2000,
+                  })
+                ).pipe(
+                  Effect.as(true),
+                  Effect.catch(() => Effect.succeed(false))
+                );
+                if (stored) yield* delivery.complete(p);
+                else yield* delivery.failed(p);
+                return stored ? 'published' : 'retry-recorded';
+              })
+            );
+          }
+          for (const alert of yield* delivery.alerts()) {
+            const id = createHash('sha256')
+              .update(
+                alert.scope === 'outbox'
+                  ? `wallpaper:${alert.scope}:${alert.id}:${alert.quarantineId}`
+                  : `wallpaper:${alert.scope}:${alert.id}`
+              )
+              .digest('hex');
+            yield* attempt('notify-operator', async () => {
+              const response = await fetch(options.operatorNotification.url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${options.operatorNotification.token}`,
+                },
+                body: JSON.stringify({
+                  id,
+                  applicationId: 'wallpaper',
+                  kind: 'wallpaper-workflow-quarantine',
+                  subject:
+                    alert.scope === 'outbox'
+                      ? 'wallpaper.workflow.outbox'
+                      : 'asset.results.wallpaper',
+                  reason: alert.reason,
+                  recoveryId: alert.id,
+                  recoveryScope: alert.scope,
+                }),
+                signal: AbortSignal.timeout(2000),
+              });
+              await response.body?.cancel();
+              if (!response.ok) throw new Error('Operator destination rejected notification');
+            });
+            yield* delivery.alerted(alert);
+          }
+        }),
+        sendingHealthy
+      );
+      const receiving = yield* worker(
+        'confirmations',
+        Effect.gen(function* () {
+          const message = yield* attempt('fetch', () => consumer.next({ expires: 1000 }));
+          if (!message) return;
+          const identity = createHash('sha256').update(message.data).digest('hex');
+          const decoded =
+            message.subject === 'asset.results.wallpaper'
+              ? decodeConfirmation(message.data)
+              : { kind: 'invalid' as const };
+          const operation =
+            decoded.kind === 'created'
+              ? creation.assetResult(decoded.result)
+              : decoded.kind === 'source'
+                ? creation.sourceAccepted(decoded.confirmation)
+                : delivery.quarantine(
+                    identity,
+                    new TextDecoder().decode(message.data),
+                    'invalid-confirmation'
+                  );
+          const processing =
+            message.info.redeliveryCount >= options.maxAttempts
+              ? delivery
+                  .quarantine(
+                    identity,
+                    new TextDecoder().decode(message.data),
+                    'confirmation-exhausted',
+                    decoded.kind === 'created'
+                      ? { kind: 'wallpaper', id: decoded.result.wallpaperId }
+                      : decoded.kind === 'source'
+                        ? { kind: 'asset', id: decoded.confirmation.assetId }
+                        : undefined
+                  )
+                  .pipe(Effect.as('quarantined-exhausted'))
+              : operation.pipe(Effect.map((outcome) => outcome ?? 'quarantined-invalid'));
+          yield* observeWorkflow(
+            'wallpaper.workflow.consume-confirmation',
+            decoded.kind === 'invalid' ? undefined : decoded.context,
+            {
+              'event.subject': message.subject,
+              'event.consumer': message.info.consumer,
+              'event.delivery_attempt': message.info.deliveryCount,
+              ...(decoded.kind === 'created'
+                ? {
+                    'wallpaper.id': decoded.result.wallpaperId,
+                    ...(decoded.result.assetId ? { 'asset.id': decoded.result.assetId } : {}),
+                  }
+                : decoded.kind === 'source'
+                  ? {
+                      'asset.id': decoded.confirmation.assetId,
+                      'source.id': decoded.confirmation.sourceId,
+                      'candidate.id': decoded.confirmation.candidateId,
+                    }
+                  : { 'quarantine.id': identity }),
+            },
+            processing
+          ).pipe(
+            Effect.tap(() => Effect.sync(() => message.ack())),
+            Effect.tapError(() => Effect.sync(() => message.nak(options.retryDelayMs)))
+          );
+        }),
+        receivingHealthy
+      );
+      yield* Effect.addFinalizer(() =>
+        Ref.set(accepting, false).pipe(
+          Effect.andThen(
+            Effect.all([Fiber.await(sending), Fiber.await(receiving)], { concurrency: 2 })
+          ),
+          Effect.interruptible,
+          Effect.timeoutOrElse({
+            duration: options.shutdownTimeoutMs,
+            orElse: () =>
+              Effect.all([Fiber.interrupt(sending), Fiber.interrupt(receiving)], {
+                concurrency: 2,
+              }),
+          }),
+          Effect.asVoid
+        )
+      );
+      return {
+        check: () =>
+          Effect.all([Ref.get(sendingHealthy), Ref.get(receivingHealthy), Ref.get(alive)]).pipe(
+            Effect.map(
+              ([s, r, a]) =>
+                s &&
+                r &&
+                a === 2 &&
+                !protectedConnection.isClosed() &&
+                !publicationConnection.isClosed()
+            )
+          ),
+      };
+    })
+  );
+}
+
+export { decodeConfirmation } from './translation.js';
+export { recoverConfirmation } from './recovery.js';

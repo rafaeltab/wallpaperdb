@@ -1,12 +1,22 @@
-import { uploadWallpaperWithDetails } from '@/lib/api/ingestor';
+import { uploadWallpaperWithDetails } from '@/lib/api/wallpaper';
 import { createUploadQueue } from '../index';
 
 export function createBrowserUploadQueue() {
+  const keys = new WeakMap<File, string>();
   return createUploadQueue<File>({
     upload(file) {
       const controller = new AbortController();
       return {
-        result: uploadWallpaperWithDetails(file, 'user_demo_001', controller.signal),
+        result: uploadWallpaperWithDetails(
+          file,
+          keys.get(file) ??
+            (() => {
+              const key = crypto.randomUUID();
+              keys.set(file, key);
+              return key;
+            })(),
+          controller.signal
+        ),
         cancel: () => controller.abort(),
       };
     },

@@ -28,7 +28,11 @@ async function assertProblem(response, expected) {
 	assert.deepEqual(await response.json(), expected);
 }
 
-for (const kind of ["result-quarantine", "source-confirmation-quarantine"])
+for (const kind of [
+	"result-quarantine",
+	"source-confirmation-quarantine",
+	"wallpaper-workflow-quarantine",
+])
 	test(`${kind} receipts require credentials, survive restart and deduplicate delivery`, async () => {
 		const receipt = { ...notice, kind };
 		const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));

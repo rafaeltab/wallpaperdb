@@ -68,3 +68,4 @@ export {
   type ProfileUpdatedEvent,
 } from "./profile-updated.js";
 export { AssetSourceAcceptedSchema, type AssetSourceAccepted } from "./asset-source-accepted.js";
+export { WallpaperPublishedSchema, type WallpaperPublished } from "./wallpaper-published.js";

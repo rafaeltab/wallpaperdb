@@ -111,6 +111,7 @@ export async function createHttpApp<E>(
     readonly logger?: boolean;
     readonly signal?: AbortSignal;
     readonly shutdownTimeoutMs?: number;
+    readonly configure?: (app: FastifyInstance) => Promise<void>;
   } = {}
 ): Promise<FastifyInstance> {
   const runtime = ManagedRuntime.make(executionLayer.pipe(Layer.provide(services)));
@@ -184,14 +185,16 @@ export async function createHttpApp<E>(
           ? [/^https?:\/\/localhost:\d+$/, /^https?:\/\/127\.0\.0\.1:\d+$/]
           : false,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Correlation-Id'],
       credentials: true,
       strictPreflight: false,
     });
     await registerOpenAPI(app, {
       title: 'WallpaperDB Wallpaper API',
       version: '1.0.0',
-      description: 'Wallpaper service shell. Only operational endpoints are exposed today.',
+      description:
+        'Authenticated Wallpaper creation, first Source progress and operational status.',
+      securitySchemes: { ownerSession: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
       servers:
         config.nodeEnv === 'production'
           ? undefined
@@ -262,6 +265,7 @@ export async function createHttpApp<E>(
           .send({ ...problem(503, 'service-unavailable', 'Service unavailable'), ...result });
       }
     );
+    await options.configure?.(app);
     await app.ready();
     app.connectionsState.connectionsInitialized = true;
     return app;
@@ -271,3 +275,5 @@ export async function createHttpApp<E>(
     throw error;
   }
 }
+
+export { registerCreationHttp } from './creation.js';

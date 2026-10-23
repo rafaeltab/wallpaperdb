@@ -26,13 +26,29 @@ type BrowserUploadQueue = ReturnType<typeof createBrowserUploadQueue>;
 type UploadQueueContextValue = ReturnType<BrowserUploadQueue['getSnapshot']> &
   Pick<
     BrowserUploadQueue,
-    'addFiles' | 'clearCompleted' | 'retryFailed' | 'cancelAll' | 'stopQueue' | 'resumeQueue'
+    | 'addFiles'
+    | 'clearCompleted'
+    | 'resumeConfirming'
+    | 'retryFailed'
+    | 'cancelAll'
+    | 'stopQueue'
+    | 'resumeQueue'
   >;
 
 const UploadQueueContext = createContext<UploadQueueContextValue | undefined>(undefined);
 
-export function UploadQueueProvider({ children }: { children: ReactNode }) {
-  const [queue] = useState(createBrowserUploadQueue);
+export function UploadQueueProvider({
+  children,
+  ownerId,
+}: {
+  children: ReactNode;
+  ownerId?: string | null;
+}) {
+  const [session, setSession] = useState(() => ({ ownerId, queue: createBrowserUploadQueue() }));
+  if (session.ownerId !== ownerId) {
+    setSession({ ownerId, queue: createBrowserUploadQueue() });
+  }
+  const { queue } = session;
   const snapshot = useSyncExternalStore(queue.subscribe, queue.getSnapshot, queue.getSnapshot);
   useEffect(() => queue.activate(), [queue]);
 
@@ -41,6 +57,7 @@ export function UploadQueueProvider({ children }: { children: ReactNode }) {
     addFiles: queue.addFiles,
     clearCompleted: queue.clearCompleted,
     retryFailed: queue.retryFailed,
+    resumeConfirming: queue.resumeConfirming,
     cancelAll: queue.cancelAll,
     stopQueue: queue.stopQueue,
     resumeQueue: queue.resumeQueue,

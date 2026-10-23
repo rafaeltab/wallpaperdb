@@ -29,6 +29,16 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 	const commands = new Set();
 	const clients = new Set();
 	const ids = new Set();
+	const boundaries = [];
+	const recordBoundary = (event, details = {}) => {
+		if (boundaries.length === 64) boundaries.shift();
+		boundaries.push({
+			event,
+			at: Date.now(),
+			remainingMs: Math.floor(deadline - performance.now()),
+			...details,
+		});
+	};
 	const postgres = createRequire(join(cwd, "package.json"))("postgres");
 	const migrations = readdirSync(join(cwd, "drizzle"))
 		.filter((name) => name.endsWith(".sql"))
@@ -107,11 +117,34 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 		clients.delete(sql);
 	};
 	const disconnectAll = () => Promise.all([...clients].map(disconnect));
+	const applicationClients = () =>
+		admin`select pid, usename, application_name, state, backend_start
+			from pg_stat_activity where datname = 'mutation' order by pid`;
 	const verifyNoClients = async (boundary) => {
-		const [active] =
-			await admin`select count(*)::int as count from pg_stat_activity where datname = 'mutation'`;
-		if (active.count)
-			throw new Error(`${boundary} leaked ${active.count} PostgreSQL clients`);
+		const active = await applicationClients();
+		recordBoundary("client-audit", { boundary, clients: [...active] });
+		if (!active.length) return;
+		const error = new Error(
+			`${boundary} leaked ${active.length} PostgreSQL clients`,
+		);
+		// Observe server-side disconnect visibility without changing this verdict.
+		// A disappearing backend is diagnostic evidence, never a reason to accept
+		// this execution or erase its independent failure receipt.
+		const observationDeadline = Math.min(deadline, performance.now() + 250);
+		while (performance.now() + 25 < observationDeadline && !operation.aborted) {
+			try {
+				await delay(25, undefined, { signal: operation });
+				const observed = await applicationClients();
+				recordBoundary("client-audit-followup", {
+					boundary,
+					clients: [...observed],
+				});
+				if (!observed.length) break;
+			} catch {
+				break;
+			}
+		}
+		throw error;
 	};
 	const interrupted = () => {
 		void disconnectAll().catch((error) => {
@@ -163,6 +196,7 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 	const close = () => {
 		closePromise ??= (async () => {
 			const start = performance.now();
+			recordBoundary("close-start", { resetting });
 			cleanupDeadline = performance.now() + cleanupMs;
 			const timer = setTimeout(
 				() => {
@@ -209,6 +243,7 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 					clearTimeout(timer);
 					operation.removeEventListener("abort", interrupted);
 					timings.teardownSeconds = (performance.now() - start) / 1000;
+					recordBoundary("close-end");
 				}
 			}
 			if (disposalError) throw disposalError;
@@ -283,6 +318,7 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 			}
 			resetDone = (async () => {
 				const start = performance.now();
+				recordBoundary("reset-start");
 				let timer;
 				try {
 					if (closing || failure || resetting)
@@ -295,6 +331,7 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 					// Destroy underlying connections at the reset deadline, not just the HTTP wait.
 					timer = setTimeout(
 						() => {
+							recordBoundary("reset-deadline");
 							failure ??= new Error("Owned PostgreSQL reset deadline expired");
 							resetAbort.abort();
 							abort.abort();
@@ -336,6 +373,7 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 					abort.abort();
 				} finally {
 					clearTimeout(timer);
+					recordBoundary("reset-end", { failed: Boolean(failure) });
 					resetting = false;
 					resetAbort = undefined;
 				}
@@ -350,6 +388,9 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 			close,
 			get containerIds() {
 				return [...ids];
+			},
+			get boundaries() {
+				return [...boundaries];
 			},
 			get failure() {
 				return failure;

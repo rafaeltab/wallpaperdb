@@ -11,14 +11,16 @@ export function timeMutationRunner(runner) {
 			const file = process.env.WALLPAPERDB_MUTATION_TIMINGS;
 			const start = performance.now();
 			const id = `${process.pid}:${phase}:${start}`;
-			if (file) appendFileSync(file, `${JSON.stringify({ id, phase })}\n`);
+			const mutation = args[0]?.activeMutant?.id;
+			const record = { id, phase, mutation, at: Date.now() };
+			if (file) appendFileSync(file, `${JSON.stringify(record)}\n`);
 			try {
 				return await run(...args);
 			} finally {
 				if (file)
 					appendFileSync(
 						file,
-						`${JSON.stringify({ id, phase, seconds: (performance.now() - start) / 1000 })}\n`,
+						`${JSON.stringify({ ...record, endedAt: Date.now(), seconds: (performance.now() - start) / 1000 })}\n`,
 					);
 			}
 		};

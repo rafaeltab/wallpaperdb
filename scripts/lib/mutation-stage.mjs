@@ -316,6 +316,7 @@ export async function runStage({
 				name: fixture.name,
 				image: fixture.image,
 				containerIds: fixture.containerIds,
+				boundaries: fixture.boundaries,
 				...fixture.timings,
 			};
 		}

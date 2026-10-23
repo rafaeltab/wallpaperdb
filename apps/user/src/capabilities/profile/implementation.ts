@@ -103,7 +103,7 @@ export const profilesLayer = (policy: ProfilePolicy) =>
         const now = new Date(yield* Clock.currentTimeMillis);
         const result = yield* store.transact(
           { profileId: principal.profileId, assetId, now },
-          ({ profile, importJob, asset, observedAt: now }) => {
+          ({ profile, importJob, asset, pendingAttachment, observedAt: now }) => {
             if (authorization.type === 'import') {
               if (
                 !authorization.leaseToken ||
@@ -116,6 +116,7 @@ export const profilesLayer = (policy: ProfilePolicy) =>
             } else if (profile.version !== authorization.expectedVersion) return versionConflict();
             if (
               profile.pictureAssetId === assetId &&
+              !(assetId === null && pendingAttachment) &&
               (!importJob || importJob.status === 'complete')
             )
               return { _tag: 'Unchanged' };

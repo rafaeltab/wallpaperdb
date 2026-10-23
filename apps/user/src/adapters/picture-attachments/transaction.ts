@@ -64,27 +64,36 @@ export async function persistAttachment(
   }
   await reconcileAttention(tx, intent);
 }
-/** Profile concurrency belongs to User. A winning Profile mutation permanently
- * fences an unfinished attachment and records its orphan-delete duty immediately,
- * even if the client never polls or supplies another Source confirmation. */
-export async function fencePendingAttachment(tx: Transaction, profileId: string) {
+/** The Profile row lock serializes the selected intent across both adapters. */
+export async function selectedAttachment(tx: Transaction, profileId: string) {
   const [slot] = await tx
     .select()
     .from(pictureAttachmentSlots)
     .where(eq(pictureAttachmentSlots.profileId, profileId));
-  if (!slot) return;
+  if (!slot) return null;
   const [record] = await tx
     .select()
     .from(pictureAttachmentIntents)
     .where(eq(pictureAttachmentIntents.id, slot.intentId))
     .for('update');
+  return record?.state ?? null;
+}
+/** The caller commits the Profile change and this stable delete duty together.
+ * Other Profile mutations only fence unfinished attachment. Picture unlink also
+ * cancels the attached intent for precisely the former Asset. */
+export async function fencePendingAttachment(
+  tx: Transaction,
+  profileId: string,
+  formerAssetId: string | null = null
+) {
+  const intent = await selectedAttachment(tx, profileId);
+  const removed = intent?.state === 'attached' && intent.assetId === formerAssetId;
   if (
-    !record ||
-    !['creating-asset', 'awaiting-source', 'accepting-source'].includes(record.state.state)
+    !intent ||
+    (!removed && !['creating-asset', 'awaiting-source', 'accepting-source'].includes(intent.state))
   )
     return;
-  const intent = record.state;
-  intent.state = 'conflicted';
+  intent.state = removed ? 'cancelled' : 'conflicted';
   if (intent.assetId) intent.deletion = 'pending';
   await persistAttachment(tx, intent);
 }

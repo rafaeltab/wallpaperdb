@@ -57,9 +57,16 @@ const descriptorSchema = z.object({
 let descriptor: z.infer<typeof descriptorSchema>;
 let fixture: ReturnType<typeof assetFixture> | undefined;
 let assetUrl: string;
+let confirmationsStarted = false;
 const control = (operation: string, options?: unknown) => {
   if (!fixture) throw new Error('Missing owned Asset fixture');
   return fixture.call(operation, options);
+};
+const startConfirmations = async () => {
+  if (!confirmationsStarted) {
+    await control('start-confirmations');
+    confirmationsStarted = true;
+  }
 };
 const asset = {
   inject: async (input: {
@@ -295,7 +302,7 @@ it('attaches a canonical SDR Source only after durable User confirmation, and pr
   ).toMatchObject({ version, pictureAssetId: null });
   await user.close();
   user = await startUser();
-  await control('start-confirmations');
+  await startConfirmations();
   expect(await poll(status, (s) => s.state === 'attached')).toMatchObject({
     assetId: created.assetId,
     sourceId,
@@ -357,6 +364,199 @@ it('attaches a canonical SDR Source only after durable User confirmation, and pr
       })
     ).statusCode
   ).toBe(409);
+}, 30000);
+it('unlinks through the authenticated API while Asset command processing is unavailable and completes only the former Asset deletion after restart', async () => {
+  const owner = 'unlink-owner';
+  const author = { authorization: `Bearer ${owner}` };
+  await startConfirmations();
+  expect(
+    (await user.inject({ method: 'POST', url: '/profile/me/ensure', headers: headers(owner) }))
+      .statusCode
+  ).toBe(200);
+  const image = await sharp({
+    create: { width: 512, height: 512, channels: 4, background: '#33669988' },
+  })
+    .webp()
+    .toBuffer();
+  const begin = async (expectedVersion: number) => {
+    const response = await user.inject({
+      method: 'POST',
+      url: '/profile/me/picture-attachments',
+      headers: { ...headers(owner), 'idempotency-key': 'reused-picture-reference' },
+      payload: { expectedVersion },
+    });
+    expect(response.statusCode).toBe(202);
+    return response.json<{ attachmentId: string }>().attachmentId;
+  };
+  const status = async (id: string) =>
+    (
+      await user.inject({ url: `/profile/me/picture-attachments/${id}`, headers: headers(owner) })
+    ).json<{ state: string; assetId: string; sourceId: string; deletion: string }>();
+  const attach = async (id: string, edit: string) => {
+    const created = await poll(
+      () => status(id),
+      (s) => s.state === 'awaiting-source'
+    );
+    const input = { operation: 'add', expectedSourceSetRevision: '0' };
+    const candidate = await asset.inject({
+      method: 'POST',
+      url: `/assets/${created.assetId}/source-candidates`,
+      headers: { ...author, 'idempotency-key': edit },
+      payload: input,
+    });
+    expect(candidate.statusCode).toBe(201);
+    const candidateId = candidate.json<{ candidateId: string }>().candidateId;
+    expect(
+      (
+        await asset.inject({
+          method: 'PUT',
+          url: `/assets/${created.assetId}/source-candidates/${candidateId}/bytes`,
+          headers: { ...author, 'content-type': 'application/octet-stream' },
+          payload: image,
+        })
+      ).json()
+    ).toMatchObject({ status: 'ready' });
+    expect(
+      (
+        await user.inject({
+          method: 'PUT',
+          url: `/profile/me/picture-attachments/${id}/first-source`,
+          headers: headers(owner),
+          payload: { candidateId, intentId: edit },
+        })
+      ).statusCode
+    ).toBe(202);
+    expect(
+      (
+        await asset.inject({
+          method: 'POST',
+          url: `/assets/${created.assetId}/source-candidates/${candidateId}/accept`,
+          headers: { ...author, 'x-correlation-id': edit },
+          payload: input,
+        })
+      ).statusCode
+    ).toBe(200);
+    return poll(
+      () => status(id),
+      (s) => s.state === 'attached'
+    );
+  };
+  const firstId = await begin(1);
+  const first = await attach(firstId, 'first-unlink-source');
+  const original = `/assets/${first.assetId}/sources/${first.sourceId}/original`;
+  await control('stop-commands');
+  let commandsStopped = true;
+  try {
+    const stale = await user.inject({
+      method: 'DELETE',
+      url: '/profile/me/picture',
+      headers: headers(owner),
+      payload: { expectedVersion: 1 },
+    });
+    expect(stale.statusCode).toBe(409);
+    const removed = await user.inject({
+      method: 'DELETE',
+      url: '/profile/me/picture',
+      headers: headers(owner),
+      payload: { expectedVersion: 2 },
+    });
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json()).toMatchObject({ version: 3, pictureAssetId: null });
+    expect((await status(firstId)).deletion).toBe('pending');
+    // Accepted unlink does not promise immediate denial before Asset accepts deletion.
+    expect((await asset.inject({ url: original, headers: author })).rawPayload).toEqual(image);
+    await user.close();
+    user = await startUser();
+    expect((await status(firstId)).deletion).toBe('pending');
+    expect(
+      (
+        await user.inject({
+          method: 'DELETE',
+          url: '/profile/me/picture',
+          headers: headers(owner),
+          payload: { expectedVersion: 3 },
+        })
+      ).json()
+    ).toMatchObject({ version: 3, pictureAssetId: null });
+    const nextId = await begin(3);
+    expect(nextId).not.toBe(firstId);
+    expect((await status(nextId)).state).toBe('creating-asset');
+    await control('start-commands');
+    commandsStopped = false;
+    const next = await attach(nextId, 'later-unlink-source');
+    expect(next.assetId).not.toBe(first.assetId);
+    await poll(
+      () => status(firstId),
+      (s) => s.deletion === 'complete'
+    );
+    expect((await asset.inject({ url: original, headers: author })).statusCode).toBe(404);
+    const commands = (
+      await userPool.query<{ event: Record<string, unknown>; destination: string }>(
+        'select event,destination from picture_attachment_outbox where attachment_id=$1 order by destination',
+        [firstId]
+      )
+    ).rows;
+    const deletion = commands.find((c) => c.destination === 'asset-delete');
+    expect(deletion?.event).toMatchObject({
+      correlationid: firstId,
+      data: { applicationReference: firstId, assetId: first.assetId },
+    });
+    const events = (
+      await userPool.query(
+        'select id,payload from outbox_events where aggregate_id=$1 order by id',
+        [owner]
+      )
+    ).rows;
+    await user.close();
+    user = await startUser();
+    const manager = await operator.jetstreamManager();
+    for (const command of commands) {
+      const replay = await application
+        .jetstream()
+        .publish(
+          command.destination === 'asset-create'
+            ? 'asset.commands.user.create'
+            : 'asset.commands.user.delete',
+          JSON.stringify(command.event)
+        );
+      expect(replay.duplicate).toBe(false);
+      await poll(
+        () => manager.consumers.info('ASSET_COMMANDS', 'commands_user'),
+        (s) => s.ack_floor.stream_seq >= replay.seq
+      );
+    }
+    expect(
+      (
+        await user.inject({ method: 'POST', url: '/profile/me/ensure', headers: headers(owner) })
+      ).json()
+    ).toMatchObject({ version: 4, pictureAssetId: next.assetId });
+    expect(
+      (
+        await asset.inject({
+          url: `/assets/${next.assetId}/sources/${next.sourceId}/original`,
+          headers: author,
+        })
+      ).rawPayload
+    ).toEqual(image);
+    expect(
+      (
+        await userPool.query(
+          'select id,payload from outbox_events where aggregate_id=$1 order by id',
+          [owner]
+        )
+      ).rows
+    ).toEqual(events);
+    expect(
+      (
+        await userPool.query(
+          'select event,destination from picture_attachment_outbox where attachment_id=$1 order by destination',
+          [firstId]
+        )
+      ).rows
+    ).toEqual(commands);
+  } finally {
+    if (commandsStopped) await control('start-commands');
+  }
 }, 30000);
 it('durably accepts and cancels while Asset is unavailable, then deletes a late-created orphan through User authority', async () => {
   await control('stop-commands');

@@ -1,9 +1,14 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ProfileStore } from '../src/capabilities/profile/index.js';
+import {
+  Identities,
+  Profiles,
+  ProfileStore,
+  profilesLayer,
+} from '../src/capabilities/profile/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
 import { runAttachmentOperator } from '../scripts/attachment-operator.js';
 import { profilePolicy } from './helpers/profiles.js';
@@ -48,9 +53,9 @@ describe('PostgreSQL picture attachment contract', () => {
     await sql?.end();
     await container?.stop();
   });
-  const begin = async (key = 'first') => {
+  const begin = async (key = 'first', expectedVersion = 1) => {
     const result = await runtime.runPromise(
-      PictureAttachments.use((s) => s.begin({ profileId: 'owner' }, key, 1))
+      PictureAttachments.use((s) => s.begin({ profileId: 'owner' }, key, expectedVersion))
     );
     if (result.kind !== 'attachment') throw new Error(result.kind);
     return result.attachment;
@@ -90,6 +95,27 @@ describe('PostgreSQL picture attachment contract', () => {
         })
       )
     );
+  const remove = async (expectedVersion: number) => {
+    const owner = ManagedRuntime.make(
+      profilesLayer(profilePolicy).pipe(
+        Layer.provide(
+          Layer.merge(
+            profileStoreLayer(profilePolicy).pipe(Layer.provide(databaseLayer({ databaseUrl }))),
+            Layer.succeed(Identities, {
+              getIdentity: () => Effect.die('Unexpected identity lookup'),
+            })
+          )
+        )
+      )
+    );
+    try {
+      return await owner.runPromise(
+        Profiles.use((p) => p.adoptPicture({ profileId: 'owner' }, null, expectedVersion))
+      );
+    } finally {
+      await owner.dispose();
+    }
+  };
   const sourceConfirmation = () => ({
     specversion: '1.0',
     id: 'accepted-A',
@@ -135,6 +161,163 @@ describe('PostgreSQL picture attachment contract', () => {
       profile: { pictureAssetId: 'asset-A', version: 2 },
       change: { type: 'picture-changed', after: 'asset-A', asset: null },
     });
+  });
+  it('unlinks the Profile and commits the former Asset deletion locally without any delivery dependency', async () => {
+    const i = await begin();
+    await created(i);
+    await register(i);
+    expect(await confirm(i)).toBe('applied');
+    expect(await remove(1)).toMatchObject({ _tag: 'Rejected', reason: 'version-conflict' });
+    expect(await remove(2)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 3, pictureAssetId: null },
+    });
+    expect(
+      await runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)))
+    ).toMatchObject({
+      kind: 'attachment',
+      attachment: { state: 'cancelled', assetId: 'asset-A', deletion: 'pending' },
+    });
+    const [deletion] =
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`;
+    expect(deletion.event).toMatchObject({
+      id: i.deletionEventId,
+      correlationid: i.id,
+      data: { commandId: i.deleteCommandId, applicationReference: i.id, assetId: 'asset-A' },
+    });
+    expect(await remove(3)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 3, pictureAssetId: null },
+    });
+    expect(
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+    ).toEqual([deletion]);
+  });
+  it('gives a reused request key a fresh identity after unlink and fences every old completion from the later picture', async () => {
+    const first = await begin();
+    await created(first);
+    await register(first);
+    await confirm(first);
+    await remove(2);
+    const [next, retry] = await Promise.all([begin('first', 3), begin('first', 3)]);
+    expect(next.id).not.toBe(first.id);
+    expect(retry.id).toBe(next.id);
+    expect((await begin('first', 1)).id).toBe(first.id);
+    expect(next.commandId).not.toBe(first.commandId);
+    await created(next, 'asset-B');
+    await register(next);
+    expect(await confirm({ ...next, assetId: 'asset-B' })).toBe('applied');
+    expect(await created(first)).toBe('ignored');
+    expect(await confirm(first)).toBe('ignored');
+    await runtime.dispose();
+    runtime = ManagedRuntime.make(layer());
+    const deleted = () =>
+      runtime.runPromise(
+        PictureAttachments.use((s) =>
+          s.assetResult({
+            attachmentId: first.id,
+            commandId: first.deleteCommandId,
+            causationId: first.deletionEventId,
+            assetId: 'asset-A',
+            outcome: 'deleted',
+          })
+        )
+      );
+    expect(await deleted()).toBe('applied');
+    expect(await deleted()).toBe('ignored');
+    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+      { picture_asset_id: 'asset-B', version: 4 },
+    ]);
+    const deletion =
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`;
+    expect(deletion).toHaveLength(1);
+    expect(deletion[0].event).toMatchObject({
+      id: first.deletionEventId,
+      data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+    });
+  });
+  it.each([
+    'creating',
+    'awaiting-source',
+  ])('removes an empty Profile during %s and durably deletes a late-created Asset', async (state) => {
+    const first = await begin();
+    if (state === 'awaiting-source') await created(first);
+    expect(await remove(1)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 2, pictureAssetId: null },
+    });
+    if (state === 'creating') expect(await created(first)).toBe('applied');
+    expect(await confirm(first)).toBe('ignored');
+    expect(
+      await runtime.runPromise(
+        PictureAttachments.use((s) => s.get({ profileId: 'owner' }, first.id))
+      )
+    ).toMatchObject({
+      attachment: { state: 'conflicted', assetId: 'asset-A', deletion: 'pending' },
+    });
+    expect(
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+    ).toMatchObject([
+      {
+        event: {
+          id: first.deletionEventId,
+          data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+        },
+      },
+    ]);
+    expect(await remove(2)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 2, pictureAssetId: null },
+    });
+  });
+  it.each([
+    'outbox_events',
+    'picture_attachment_outbox',
+  ])('rolls back unlink, intent and delete duty when %s cannot commit', async (table) => {
+    const first = await begin();
+    await created(first);
+    await register(first);
+    await confirm(first);
+    await sql.unsafe(
+      "create function reject_unlink_write() returns trigger language plpgsql as $$ begin raise exception 'intentional unlink write failure'; end $$"
+    );
+    await sql.unsafe(
+      `create trigger reject_unlink_write before insert on ${table} for each row execute function reject_unlink_write()`
+    );
+    try {
+      await expect(remove(2)).rejects.toMatchObject({ _tag: 'ProfileUnavailable' });
+      expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+        { picture_asset_id: 'asset-A', version: 2 },
+      ]);
+      expect(
+        await runtime.runPromise(
+          PictureAttachments.use((s) => s.get({ profileId: 'owner' }, first.id))
+        )
+      ).toMatchObject({
+        attachment: { state: 'attached', deletion: 'none' },
+      });
+      expect(
+        await sql`select id from picture_attachment_outbox where destination='asset-delete'`
+      ).toEqual([]);
+    } finally {
+      await sql.unsafe(
+        `drop trigger reject_unlink_write on ${table};drop function reject_unlink_write()`
+      );
+    }
+    expect(await remove(2)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 3, pictureAssetId: null },
+    });
+    expect(
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+    ).toMatchObject([
+      {
+        event: {
+          id: first.deletionEventId,
+          data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+        },
+      },
+    ]);
   });
   it('rolls back the intent and Profile together when its event cannot commit', async () => {
     const i = await begin();
@@ -649,18 +832,23 @@ describe('PostgreSQL picture attachment contract', () => {
       profileStoreLayer(profilePolicy).pipe(Layer.provide(databaseLayer({ databaseUrl })))
     );
     try {
-      await profileRuntime.runPromise(
-        ProfileStore.use((s) =>
-          s.transact({ profileId: 'owner', now: new Date() }, () => ({
-            _tag: 'Change',
-            mutation: {
-              type: 'details',
-              displayName: 'New name',
-              biographyMarkdown: 'Changed Biography',
-            },
-          }))
+      expect(
+        await profileRuntime.runPromise(
+          ProfileStore.use((s) =>
+            s.transact({ profileId: 'owner', now: new Date() }, () => ({
+              _tag: 'Change',
+              mutation: {
+                type: 'details',
+                displayName: 'New name',
+                biographyMarkdown: 'Changed Biography',
+              },
+            }))
+          )
         )
-      );
+      ).toMatchObject({
+        outcome: { _tag: 'Success', profile: { version: 2 } },
+        changed: true,
+      });
     } finally {
       await profileRuntime.dispose();
     }
@@ -673,6 +861,10 @@ describe('PostgreSQL picture attachment contract', () => {
     expect(
       await sql`select count(*)::int as count from picture_attachment_outbox where destination='asset-delete'`
     ).toEqual([{ count: 1 }]);
+    expect(await remove(2)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 2, pictureAssetId: null },
+    });
   });
   it('counts abandoned publication leases toward the same finite retry budget', async () => {
     const i = await begin();

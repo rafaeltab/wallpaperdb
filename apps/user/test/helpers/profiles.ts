@@ -52,6 +52,7 @@ export function controlledProfiles(overrides: Partial<ProfilePolicy> = {}) {
   const wallpaperOwners = new Map<string, string>();
   const imports = new Map<string, NonNullable<ProfileSnapshot['importJob']>>();
   const assets = new Map<string, NonNullable<ProfileSnapshot['asset']>>();
+  const pendingAttachments = new Set<string>();
   const transitions: RecordedTransition[] = [];
   const creations: CreateProfile[] = [];
   const identityReads: string[] = [];
@@ -174,6 +175,7 @@ export function controlledProfiles(overrides: Partial<ProfilePolicy> = {}) {
         break;
       }
     }
+    pendingAttachments.delete(profile.id);
     profile.version++;
     profile.updatedAt = now;
     transitions.push(structuredClone({ profileId: profile.id, at: now, mutation }));
@@ -235,6 +237,7 @@ export function controlledProfiles(overrides: Partial<ProfilePolicy> = {}) {
           }),
           asset: query.assetId ? (assets.get(query.assetId) ?? null) : null,
           importJob: imports.get(current.id) ?? null,
+          pendingAttachment: pendingAttachments.has(current.id),
         });
         const decision = decide(snapshot);
         if (decision._tag === 'Rejected') return { outcome: decision, changed: false };
@@ -308,6 +311,7 @@ export function controlledProfiles(overrides: Partial<ProfilePolicy> = {}) {
       if (assets.has(asset.id)) throw new Error('Picture is already staged');
       assets.set(asset.id, structuredClone({ ...asset, state: 'staged' }));
     },
+    beginAttachment: (profileId: string) => pendingAttachments.add(profileId),
     publishWallpaper: (wallpaperId: string, profileId: string) => {
       if (!wallpaperOwners.has(wallpaperId)) wallpaperOwners.set(wallpaperId, profileId);
     },

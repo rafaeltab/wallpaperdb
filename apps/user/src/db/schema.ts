@@ -159,7 +159,11 @@ export const pictureAttachmentIntents = pgTable(
     state: jsonb('state').$type<PictureAttachment>().notNull(),
   },
   (t) => [
-    uniqueIndex('picture_attachment_request_identity').on(t.profileId, t.key),
+    uniqueIndex('picture_attachment_request_identity').on(
+      t.profileId,
+      t.key,
+      sql`(${t.state}->>'expectedVersion')`
+    ),
     uniqueIndex('picture_attachment_asset_identity').on(t.assetId),
   ]
 );

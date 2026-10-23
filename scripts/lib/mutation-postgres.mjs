@@ -384,6 +384,8 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 		return {
 			name,
 			image,
+			operationDeadline: deadline,
+			cleanupMs,
 			timings,
 			close,
 			get containerIds() {

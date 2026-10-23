@@ -154,6 +154,14 @@ export async function runStage({
 			throw new Error(
 				"Fixture setup consumed the stage budget without mutation progress",
 			);
+		const executionDeadline = Date.now() + remaining;
+		if (postgres)
+			summary.shutdown = {
+				executionDeadline,
+				runnerGraceMs,
+				fixtureCleanupMs: fixture.cleanupMs,
+				fixtureDeadlineOffsetMs: fixture.operationDeadline - (start + budgetMs),
+			};
 		workerStarted = true;
 		const result = await runBounded(
 			process.execPath,
@@ -176,9 +184,7 @@ export async function runStage({
 					WALLPAPERDB_MUTATION_PLAN: plan,
 					WALLPAPERDB_MUTATION_GATE: unit ? gate : "",
 					WALLPAPERDB_MUTATION_FAILURE_FILE: fixtureFailure,
-					WALLPAPERDB_MUTATION_EXECUTION_DEADLINE: String(
-						Date.now() + remaining,
-					),
+					WALLPAPERDB_MUTATION_EXECUTION_DEADLINE: String(executionDeadline),
 				},
 			},
 		);

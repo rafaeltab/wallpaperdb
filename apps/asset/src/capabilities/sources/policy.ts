@@ -14,6 +14,18 @@ export interface SourcePolicy {
   readonly retention: { readonly evidenceMs: number; readonly candidateMs: number };
   readonly temporaryInput: { readonly maxBytes: number; readonly abandonedMs: number };
 }
+export interface SourceOperations {
+  readonly readLifetimeMs: number;
+  readonly reclamationTimeoutMs: number;
+}
+/** One owner for operational normalization, shared by trusted configuration and
+ * direct capability/adapter consumers. These ceilings do not qualify capacity. */
+export function resolveSourceOperations(input: Partial<SourceOperations> = {}): SourceOperations {
+  return {
+    readLifetimeMs: input.readLifetimeMs ?? 300000,
+    reclamationTimeoutMs: input.reclamationTimeoutMs ?? 5000,
+  };
+}
 export const initialSourcePolicies = {
   wallpaper: {
     maxActiveSources: 16,

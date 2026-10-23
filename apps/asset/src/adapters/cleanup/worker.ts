@@ -82,7 +82,7 @@ export function cleanupWorkerLayer(options: Options) {
                   { msgID: `cleanup-notification:${id}`, timeout: 5000 }
                 )
               );
-              yield* store.alerted(alert.id);
+              yield* store.alerted(alert.id, alert.notificationId);
             }
             return progress.failed === 0;
           }).pipe(

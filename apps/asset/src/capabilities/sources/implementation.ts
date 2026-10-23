@@ -14,7 +14,7 @@ import {
   type SourceFacts,
   type SourcesPort,
 } from './contract.js';
-import type { SourcePolicy } from './policy.js';
+import { resolveSourceOperations, type SourcePolicy } from './policy.js';
 const unavailable = { kind: 'unavailable' } as const;
 const nonterminal = (candidate: Candidate) =>
   !['accepted', 'rejected', 'cancelled'].includes(candidate.status);
@@ -82,6 +82,7 @@ export function sourcesLayer(configuration: {
   readonly types: Readonly<Record<string, SourcePolicy>>;
   readonly readLifetimeMs?: number;
 }) {
+  const operations = resolveSourceOperations(configuration);
   return Layer.effect(
     Sources,
     Effect.gen(function* () {
@@ -484,7 +485,7 @@ export function sourcesLayer(configuration: {
         }),
         original: Effect.fn('asset.sources.original')(function* (owner, assetId, sourceId) {
           const readId = crypto.randomUUID();
-          const lifetimeMs = configuration.readLifetimeMs ?? 300000;
+          const lifetimeMs = operations.readLifetimeMs;
           const startedAt = yield* Clock.currentTimeMillis;
           const facts = yield* store.transact(assetId, null, (state) => {
             const facts = owns(owner, state)

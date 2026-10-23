@@ -115,7 +115,11 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
           status: () => Effect.succeed({ kind: 'unavailable' }),
           cancel: () => Effect.succeed({ kind: 'unavailable' }),
           upload: () => Effect.succeed({ kind: 'rejected', reason: 'byte-digest-conflict' }),
-          accept: () => Effect.succeed({ kind: 'rejected', reason: 'source-set-conflict' }),
+          accept: (owner, assetId, candidateId, intent) =>
+            Effect.sync(() => {
+              calls.push({ owner, assetId, candidateId, intent });
+              return { kind: 'rejected' as const, reason: 'source-set-conflict' };
+            }),
           original: () => Effect.succeed({ kind: 'unavailable' }),
         })
       ),
@@ -265,6 +269,51 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
       status: 409,
       type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/source-set-conflict.md',
     });
+    const pictureIntent = {
+      operation: 'replace-set',
+      expectedSourceSetRevision: '9007199254740993',
+    };
+    const pictureCandidate = await app.inject({
+      method: 'POST',
+      url: '/assets/picture_1/source-candidates',
+      headers: { authorization: 'Bearer owner', 'idempotency-key': 'picture-edit' },
+      payload: pictureIntent,
+    });
+    expect(pictureCandidate.statusCode).toBe(201);
+    expect(calls.at(-1)).toMatchObject({
+      owner: { namespace: 'clerk', subject: 'owner' },
+      assetId: 'picture_1',
+      intent: { ...pictureIntent, idempotencyKey: 'picture-edit' },
+    });
+    const pictureConflict = await app.inject({
+      method: 'POST',
+      url: '/assets/picture_1/source-candidates/candidate_picture/accept',
+      headers: { authorization: 'Bearer owner' },
+      payload: pictureIntent,
+    });
+    expect(pictureConflict.statusCode).toBe(409);
+    expect(calls.at(-1)).toMatchObject({
+      owner: { namespace: 'clerk', subject: 'owner' },
+      assetId: 'picture_1',
+      candidateId: 'candidate_picture',
+      intent: pictureIntent,
+    });
+    for (const invalid of [
+      { ...pictureIntent, expectedSourceSetRevision: 3 },
+      { ...pictureIntent, expectedSourceSetRevision: '01' },
+      { ...pictureIntent, profileRevision: '2' },
+      { ...pictureIntent, owner: 'another-owner' },
+    ])
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/assets/picture_1/source-candidates/candidate_picture/accept',
+            headers: { authorization: 'Bearer owner' },
+            payload: invalid,
+          })
+        ).statusCode
+      ).toBe(400);
     const malformed = await app.inject({
       method: 'POST',
       url: '/assets/asset_1/source-candidates',

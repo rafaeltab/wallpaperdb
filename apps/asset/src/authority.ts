@@ -127,6 +127,17 @@ function canonical(value: unknown): string {
 }
 export function parseAuthority(input: unknown) {
   const parsed = schema.parse(input);
+  const picture = parsed.assetTypes.picture;
+  if (
+    picture &&
+    (picture.maxActiveSources !== 1 ||
+      picture.operations.some((operation) => !['add', 'replace-set'].includes(operation)) ||
+      picture.admission.squareSize === undefined ||
+      picture.admission.sourceModels.some(
+        (model) => !['sdr-webp', 'animated-sdr-webp'].includes(model)
+      ))
+  )
+    throw new Error('Picture policy requires one canonical WebP Source and full-set replacement');
   const namespaces = new Set(
     Object.values(parsed.identityProviders).map((entry) => entry.ownerNamespace)
   );

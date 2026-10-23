@@ -294,6 +294,7 @@ export function controlledProfiles(overrides: Partial<ProfilePolicy> = {}) {
     return result.profile;
   }
   return {
+    store,
     run,
     ensure,
     transitions,

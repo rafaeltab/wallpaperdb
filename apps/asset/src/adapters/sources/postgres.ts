@@ -151,6 +151,9 @@ export function sourcePostgresLayer(options: Options) {
                     })
                   : null;
               const priorSources = initial?.sources.map((source) => source.sourceId) ?? [];
+              const priorCandidates = new Map(
+                initial?.candidates.map((candidate) => [candidate.candidateId, candidate.status])
+              );
               const changed = decide(() => {
                 const changed = change(initial);
                 if (changed.state && (!asset || asset.deletedAt !== null))
@@ -174,6 +177,7 @@ export function sourcePostgresLayer(options: Options) {
               }
               if (changed.state && asset) {
                 for (const candidate of changed.state.candidates) {
+                  if (priorCandidates.get(candidate.candidateId) === candidate.status) continue;
                   const terminal = ['accepted', 'rejected', 'cancelled'].includes(candidate.status);
                   const inputExpiry = Math.min(
                     Date.parse(candidate.expiresAt),

@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Clock, Effect, ManagedRuntime } from 'effect';
 import { TestClock } from 'effect/testing';
+import { createServer, connect, type Socket } from 'node:net';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { activateLifecycle, lifecyclePostgresLayer } from '../src/adapters/lifecycle/index.js';
@@ -29,6 +30,87 @@ const options = () => ({
   maxAttempts: 2,
   retryDelayMs: 1,
   leaseMs: 1000,
+});
+
+it('replays cleanup completion after a lost real COMMIT response without losing its compact identity', async () => {
+  const assetId = crypto.randomUUID(),
+    candidateId = crypto.randomUUID(),
+    id = `candidate:${candidateId}`;
+  await pool.query(
+    "INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject) VALUES ($1, 'wallpaper', 'wallpaper', 'clerk', 'commit')",
+    [assetId]
+  );
+  await pool.query(
+    "INSERT INTO source_cleanup (id, asset_id, application_id, target, due_at) VALUES ($1, $2, 'wallpaper', $3, '2000-01-01')",
+    [id, assetId, JSON.stringify({ kind: 'candidate', candidateId })]
+  );
+  const direct = ManagedRuntime.make(cleanupPostgresLayer(options()));
+  const sockets = new Set<Socket>(),
+    upstreamUrl = new URL(container.getConnectionUri());
+  let dropCommit = true,
+    dropped = false;
+  const proxy = createServer((client) => {
+    const upstream = connect({ host: upstreamUrl.hostname, port: Number(upstreamUrl.port) });
+    sockets.add(client);
+    sockets.add(upstream);
+    client.on('error', () => upstream.destroy());
+    upstream.on('error', () => client.destroy());
+    client.on('close', () => {
+      sockets.delete(client);
+      upstream.destroy();
+    });
+    upstream.on('close', () => {
+      sockets.delete(upstream);
+      client.destroy();
+    });
+    client.pipe(upstream);
+    let buffered = Buffer.alloc(0);
+    upstream.on('data', (chunk) => {
+      buffered = Buffer.concat([buffered, chunk]);
+      while (buffered.length >= 5) {
+        const length = 1 + buffered.readInt32BE(1);
+        if (buffered.length < length) return;
+        const frame = buffered.subarray(0, length);
+        buffered = buffered.subarray(length);
+        if (dropCommit && frame[0] === 67 && frame.subarray(5).equals(Buffer.from('COMMIT\0'))) {
+          dropCommit = false;
+          dropped = true;
+          client.destroy();
+          upstream.destroy();
+          return;
+        }
+        client.write(frame);
+      }
+    });
+  });
+  await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+  const address = proxy.address();
+  if (!address || typeof address === 'string') throw new Error('Missing proxy');
+  const proxyUrl = new URL(upstreamUrl);
+  proxyUrl.hostname = '127.0.0.1';
+  proxyUrl.port = String(address.port);
+  const ambiguous = ManagedRuntime.make(
+    cleanupPostgresLayer({ ...options(), databaseUrl: proxyUrl.toString() })
+  );
+  try {
+    const [work] = await direct.runPromise(CleanupStore.use((store) => store.claim(100)));
+    if (!work || work.id !== id) throw new Error('Expected exact fixture claim');
+    await expect(
+      ambiguous.runPromise(CleanupStore.use((store) => store.completed(work)))
+    ).rejects.toBeDefined();
+    expect(dropped).toBe(true);
+    const committed = (await pool.query('SELECT * FROM source_cleanup WHERE id=$1', [id])).rows;
+    expect(committed[0]).toMatchObject({ status: 'completed', due_at: new Date('2000-01-01') });
+    await ambiguous.runPromise(CleanupStore.use((store) => store.completed(work)));
+    expect((await pool.query('SELECT * FROM source_cleanup WHERE id=$1', [id])).rows).toEqual(
+      committed
+    );
+  } finally {
+    await ambiguous.dispose();
+    await direct.dispose();
+    for (const socket of sockets) socket.destroy();
+    await new Promise<void>((resolve) => proxy.close(() => resolve()));
+  }
 });
 
 it('honors the exact recorded seven-day and thirty-day evidence boundaries and finishes empty terminal Assets', async () => {

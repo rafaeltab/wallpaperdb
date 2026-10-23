@@ -20,7 +20,37 @@ import {
   type WorkflowPublication,
 } from '../src/capabilities/creation/index.js';
 import { assetWorkflowLayer, recoverConfirmation } from '../src/adapters/asset-workflow/index.js';
-async function startBroker() {
+type Release = () => unknown | Promise<unknown>;
+type Defer = (release: Release) => void;
+async function withResources(run: (defer: Defer) => Promise<void>) {
+  const releases: Release[] = [];
+  const errors: unknown[] = [];
+  try {
+    await run((release) => releases.push(release));
+  } catch (error) {
+    errors.push(error);
+  } finally {
+    for (const release of releases.reverse()) {
+      try {
+        await release();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+  }
+  if (errors.length) throw new AggregateError(errors, 'Wallpaper workflow test or cleanup failed');
+}
+async function closeInbox(inbox: ReturnType<typeof createServer>) {
+  if (!inbox.listening) return;
+  try {
+    inbox.closeAllConnections();
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      inbox.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+}
+async function startBroker(defer: Defer) {
   const configuration = {
     port: 4222,
     http: 8222,
@@ -59,9 +89,12 @@ async function startBroker() {
     .withExposedPorts(4222, 8222)
     .withWaitStrategy(Wait.forHttp('/healthz', 8222))
     .start();
+  defer(() => container.stop());
   const url = `nats://${container.getHost()}:${container.getMappedPort(4222)}`;
   const operator = await connect({ servers: url, user: 'operator', pass: 'operator-test' });
+  defer(() => operator.close());
   const legacy = await connect({ servers: url });
+  defer(() => legacy.close());
   return { container, url, operator, legacy };
 }
 async function setupStreams(
@@ -94,144 +127,147 @@ async function setupStreams(
   });
   return { manager, publicManager };
 }
-it('uses protected application credentials, persists publication acknowledgements and resumes its durable result consumer', async () => {
-  propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
-  const { container, url, operator, legacy } = await startBroker();
-  const calls: unknown[] = [];
-  const publicationTraces: string[] = [];
-  const confirmationTraces: string[] = [];
-  const completed: string[] = [];
-  const notices: unknown[] = [];
-  let alerted = false;
-  const inbox = createServer(async (request, response) => {
-    if (request.headers.authorization !== 'Bearer test') {
-      response.writeHead(401).end();
-      return;
-    }
-    const chunks: Buffer[] = [];
-    for await (const chunk of request) chunks.push(Buffer.from(chunk));
-    notices.push(JSON.parse(Buffer.concat(chunks).toString()));
-    response.writeHead(200).end();
-  });
-  inbox.listen(0, '127.0.0.1');
-  await once(inbox, 'listening');
-  const inboxAddress = inbox.address();
-  if (!inboxAddress || typeof inboxAddress === 'string') throw new Error('Missing inbox address');
-  let runtime: ManagedRuntime.ManagedRuntime<WorkflowHealth | Creation, unknown> | undefined;
-  const event = {
-    specversion: '1.0',
-    traceparent: '00-11111111111111111111111111111111-2222222222222222-01',
-    id: 'creation-event',
-    source: 'https://wallpaperdb/wallpaper',
-    type: 'asset.command.create',
-    time: '2026-10-22T00:00:00.000Z',
-    datacontenttype: 'application/json',
-    data: {
-      commandId: 'command-1',
-      applicationReference: 'wallpaper-1',
-      assetType: 'wallpaper',
-      ownerSubject: 'creator',
-    },
-  };
-  const records: WorkflowPublication[] = [
-    {
+it('uses protected application credentials, persists publication acknowledgements and resumes its durable result consumer', () =>
+  withResources(async (defer) => {
+    propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
+    defer(() => propagation.disable());
+    const { url, operator, legacy } = await startBroker(defer);
+    const calls: unknown[] = [];
+    const publicationTraces: string[] = [];
+    const confirmationTraces: string[] = [];
+    const completed: string[] = [];
+    const notices: unknown[] = [];
+    let alerted = false;
+    const inbox = createServer(async (request, response) => {
+      if (request.headers.authorization !== 'Bearer test') {
+        response.writeHead(401).end();
+        return;
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      notices.push(JSON.parse(Buffer.concat(chunks).toString()));
+      response.writeHead(200).end();
+    });
+    defer(() => closeInbox(inbox));
+    inbox.listen(0, '127.0.0.1');
+    await once(inbox, 'listening');
+    const inboxAddress = inbox.address();
+    if (!inboxAddress || typeof inboxAddress === 'string') throw new Error('Missing inbox address');
+    let runtime: ManagedRuntime.ManagedRuntime<WorkflowHealth | Creation, unknown> | undefined;
+    defer(() => runtime?.dispose());
+    const event = {
+      specversion: '1.0',
+      traceparent: '00-11111111111111111111111111111111-2222222222222222-01',
       id: 'creation-event',
-      wallpaperId: 'wallpaper-1',
-      destination: 'asset-create',
-      event,
-      leaseId: 'lease-create',
-      attempts: 0,
-    },
-    {
-      id: 'publication-event',
-      wallpaperId: 'wallpaper-1',
-      destination: 'publication',
-      event: {
-        ...event,
-        id: 'publication-event',
-        type: 'wallpaper.published',
-        data: {
-          wallpaperId: 'wallpaper-1',
-          assetId: 'asset-1',
-          firstSourceId: 'source-1',
-          initialAnalysisSourceId: 'source-1',
-          contributorId: 'creator',
-        },
+      source: 'https://wallpaperdb/wallpaper',
+      type: 'asset.command.create',
+      time: '2026-10-22T00:00:00.000Z',
+      datacontenttype: 'application/json',
+      data: {
+        commandId: 'command-1',
+        applicationReference: 'wallpaper-1',
+        assetType: 'wallpaper',
+        ownerSubject: 'creator',
       },
-      leaseId: 'lease-publication',
-      attempts: 0,
-    },
-  ];
-  let claimed = false;
-  const delivery = Layer.succeed(WorkflowDelivery, {
-    claim: () =>
-      Effect.sync(() => {
-        if (claimed) return [];
-        claimed = true;
-        return records;
-      }),
-    complete: (p) =>
-      Effect.gen(function* () {
-        const span = yield* Effect.currentSpan;
-        publicationTraces.push(span.traceId);
-        completed.push(p.id);
-      }).pipe(Effect.orDie),
-    failed: () => Effect.die('Unexpected publication failure'),
-    quarantine: () => Effect.die('Unexpected quarantine'),
-    recover: () => Effect.succeed(false),
-    alerts: () =>
-      Effect.succeed(
-        alerted ? [] : [{ id: 'retained-record', scope: 'outbox', reason: 'exhausted' }]
-      ),
-    alerted: () =>
-      Effect.sync(() => {
-        alerted = true;
-      }),
-    retainedConfirmation: () => Effect.succeed(null),
-    confirmationRecovered: () => Effect.void,
-  });
-  const creation = Layer.succeed(Creation, {
-    list: () => Effect.succeed([]),
-    begin: () => Effect.succeed({ kind: 'unavailable' }),
-    get: () => Effect.succeed({ kind: 'unavailable' }),
-    expectSource: () => Effect.succeed({ kind: 'unavailable' }),
-    assetResult: (result) =>
-      Effect.sync(() => {
-        calls.push(result);
-        return 'applied' as const;
-      }).pipe(
-        Effect.tap(() =>
-          Effect.currentSpan.pipe(
-            Effect.tap((span) => Effect.sync(() => confirmationTraces.push(span.traceId))),
-            Effect.orDie
+    };
+    const records: WorkflowPublication[] = [
+      {
+        id: 'creation-event',
+        wallpaperId: 'wallpaper-1',
+        destination: 'asset-create',
+        event,
+        leaseId: 'lease-create',
+        attempts: 0,
+      },
+      {
+        id: 'publication-event',
+        wallpaperId: 'wallpaper-1',
+        destination: 'publication',
+        event: {
+          ...event,
+          id: 'publication-event',
+          type: 'wallpaper.published',
+          data: {
+            wallpaperId: 'wallpaper-1',
+            assetId: 'asset-1',
+            firstSourceId: 'source-1',
+            initialAnalysisSourceId: 'source-1',
+            contributorId: 'creator',
+          },
+        },
+        leaseId: 'lease-publication',
+        attempts: 0,
+      },
+    ];
+    let claimed = false;
+    const delivery = Layer.succeed(WorkflowDelivery, {
+      claim: () =>
+        Effect.sync(() => {
+          if (claimed) return [];
+          claimed = true;
+          return records;
+        }),
+      complete: (p) =>
+        Effect.gen(function* () {
+          const span = yield* Effect.currentSpan;
+          publicationTraces.push(span.traceId);
+          completed.push(p.id);
+        }).pipe(Effect.orDie),
+      failed: () => Effect.die('Unexpected publication failure'),
+      quarantine: () => Effect.die('Unexpected quarantine'),
+      recover: () => Effect.succeed(false),
+      alerts: () =>
+        Effect.succeed(
+          alerted ? [] : [{ id: 'retained-record', scope: 'outbox', reason: 'exhausted' }]
+        ),
+      alerted: () =>
+        Effect.sync(() => {
+          alerted = true;
+        }),
+      retainedConfirmation: () => Effect.succeed(null),
+      confirmationRecovered: () => Effect.void,
+    });
+    const creation = Layer.succeed(Creation, {
+      list: () => Effect.succeed([]),
+      begin: () => Effect.succeed({ kind: 'unavailable' }),
+      get: () => Effect.succeed({ kind: 'unavailable' }),
+      expectSource: () => Effect.succeed({ kind: 'unavailable' }),
+      assetResult: (result) =>
+        Effect.sync(() => {
+          calls.push(result);
+          return 'applied' as const;
+        }).pipe(
+          Effect.tap(() =>
+            Effect.currentSpan.pipe(
+              Effect.tap((span) => Effect.sync(() => confirmationTraces.push(span.traceId))),
+              Effect.orDie
+            )
           )
-        )
-      ),
-    sourceAccepted: (confirmation) =>
-      Effect.sync(() => {
-        calls.push(confirmation);
-        return 'applied' as const;
-      }).pipe(
-        Effect.tap(() =>
-          Effect.currentSpan.pipe(
-            Effect.tap((span) => Effect.sync(() => confirmationTraces.push(span.traceId))),
-            Effect.orDie
+        ),
+      sourceAccepted: (confirmation) =>
+        Effect.sync(() => {
+          calls.push(confirmation);
+          return 'applied' as const;
+        }).pipe(
+          Effect.tap(() =>
+            Effect.currentSpan.pipe(
+              Effect.tap((span) => Effect.sync(() => confirmationTraces.push(span.traceId))),
+              Effect.orDie
+            )
           )
-        )
-      ),
-  });
-  const options = {
-    natsUrl: url,
-    ownerNamespace: 'authors',
-    credential: { user: 'wallpaper-client', password: 'application-test' },
-    identityProviders: [],
-    operatorNotification: { url: `http://127.0.0.1:${inboxAddress.port}/events`, token: 'test' },
-    maxAttempts: 3,
-    retryDelayMs: 10,
-    pollMs: 10,
-    shutdownTimeoutMs: 3000,
-  };
-  try {
+        ),
+    });
+    const options = {
+      natsUrl: url,
+      ownerNamespace: 'authors',
+      credential: { user: 'wallpaper-client', password: 'application-test' },
+      identityProviders: [],
+      operatorNotification: { url: `http://127.0.0.1:${inboxAddress.port}/events`, token: 'test' },
+      maxAttempts: 3,
+      retryDelayMs: 10,
+      pollMs: 10,
+      shutdownTimeoutMs: 3000,
+    };
     const { manager, publicManager } = await setupStreams(operator, legacy);
     const start = () =>
       ManagedRuntime.make(
@@ -324,65 +360,61 @@ it('uses protected application credentials, persists publication acknowledgement
           (await manager.consumers.info('ASSET_RESULTS', 'results_wallpaper')).num_ack_pending
       )
       .toBe(0);
-  } finally {
-    await runtime?.dispose();
-    await operator.close();
-    await legacy.close();
-    inbox.closeAllConnections();
-    await new Promise<void>((resolve) => inbox.close(() => resolve()));
-    await container.stop();
-    propagation.disable();
-  }
-});
+  }));
 
-it('keeps recovered confirmations closed on protected redelivery and routes abandoned-lease recovery through the real outbox', async () => {
-  const { container, url, operator, legacy } = await startBroker();
-  const postgres = await new GenericContainer('postgres:16-alpine')
-    .withEnvironment({ POSTGRES_PASSWORD: 'test', POSTGRES_DB: 'wallpaper' })
-    .withExposedPorts(5432)
-    .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
-    .start();
-  const databaseUrl = `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`;
-  const pool = new Pool({ connectionString: databaseUrl });
-  const notices: { recoveryId: string; recoveryScope: string }[] = [];
-  const inbox = createServer(async (request, response) => {
-    if (request.headers.authorization !== 'Bearer test') {
-      response.writeHead(401).end();
-      return;
-    }
-    const chunks: Buffer[] = [];
-    for await (const chunk of request) chunks.push(Buffer.from(chunk));
-    notices.push(JSON.parse(Buffer.concat(chunks).toString()));
-    response.writeHead(200).end();
-  });
-  inbox.listen(0, '127.0.0.1');
-  await once(inbox, 'listening');
-  const address = inbox.address();
-  if (!address || typeof address === 'string') throw new Error('Missing inbox');
-  const persistence = workflowPostgresLayer({
-    databaseUrl,
-    maxAttempts: 1,
-    retryDelayMs: 0,
-    leaseMs: 60_000,
-  });
-  const services = creationLayer('authors').pipe(Layer.provideMerge(persistence));
-  const storage = ManagedRuntime.make(services);
-  const start = () =>
-    ManagedRuntime.make(
-      assetWorkflowLayer({
-        natsUrl: url,
-        ownerNamespace: 'authors',
-        credential: { user: 'wallpaper-client', password: 'application-test' },
-        identityProviders: [],
-        operatorNotification: { url: `http://127.0.0.1:${address.port}/events`, token: 'test' },
-        maxAttempts: 1,
-        retryDelayMs: 10,
-        pollMs: 10,
-        shutdownTimeoutMs: 3000,
-      }).pipe(Layer.provideMerge(services))
-    );
-  let worker: ReturnType<typeof start> | undefined;
-  try {
+it('keeps recovered confirmations closed on protected redelivery and routes abandoned-lease recovery through the real outbox', () =>
+  withResources(async (defer) => {
+    const { url, operator, legacy } = await startBroker(defer);
+    const postgres = await new GenericContainer('postgres:16-alpine')
+      .withEnvironment({ POSTGRES_PASSWORD: 'test', POSTGRES_DB: 'wallpaper' })
+      .withExposedPorts(5432)
+      .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
+      .start();
+    defer(() => postgres.stop());
+    const databaseUrl = `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`;
+    const pool = new Pool({ connectionString: databaseUrl });
+    defer(() => pool.end());
+    const notices: { recoveryId: string; recoveryScope: string }[] = [];
+    const inbox = createServer(async (request, response) => {
+      if (request.headers.authorization !== 'Bearer test') {
+        response.writeHead(401).end();
+        return;
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      notices.push(JSON.parse(Buffer.concat(chunks).toString()));
+      response.writeHead(200).end();
+    });
+    defer(() => closeInbox(inbox));
+    inbox.listen(0, '127.0.0.1');
+    await once(inbox, 'listening');
+    const address = inbox.address();
+    if (!address || typeof address === 'string') throw new Error('Missing inbox');
+    const persistence = workflowPostgresLayer({
+      databaseUrl,
+      maxAttempts: 1,
+      retryDelayMs: 0,
+      leaseMs: 60_000,
+    });
+    const services = creationLayer('authors').pipe(Layer.provideMerge(persistence));
+    const storage = ManagedRuntime.make(services);
+    defer(() => storage.dispose());
+    const start = () =>
+      ManagedRuntime.make(
+        assetWorkflowLayer({
+          natsUrl: url,
+          ownerNamespace: 'authors',
+          credential: { user: 'wallpaper-client', password: 'application-test' },
+          identityProviders: [],
+          operatorNotification: { url: `http://127.0.0.1:${address.port}/events`, token: 'test' },
+          maxAttempts: 1,
+          retryDelayMs: 10,
+          pollMs: 10,
+          shutdownTimeoutMs: 3000,
+        }).pipe(Layer.provideMerge(services))
+      );
+    let worker: ReturnType<typeof start> | undefined;
+    defer(() => worker?.dispose());
     await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
     const { manager } = await setupStreams(operator, legacy);
     const nextClaim = async () => {
@@ -511,15 +543,4 @@ it('keeps recovered confirmations closed on protected redelivery and routes aban
       JSON.parse((await manager.streams.getMessage('ASSET_COMMANDS', { seq: 1 })).string())
     ).toEqual(lost.event);
     expect((await manager.streams.info('ASSET_COMMANDS')).state.messages).toBe(1);
-  } finally {
-    await worker?.dispose();
-    await storage.dispose();
-    await operator.close();
-    await legacy.close();
-    inbox.closeAllConnections();
-    await new Promise<void>((resolve) => inbox.close(() => resolve()));
-    await pool.end();
-    await postgres.stop();
-    await container.stop();
-  }
-});
+  }));

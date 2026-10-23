@@ -19,6 +19,7 @@ import {
   type SourceBytesPort,
   type SourceFacts,
   type MandatoryInspectionPort,
+  resolveSourceOperations,
 } from '../../capabilities/sources/index.js';
 const factsSchema = z.object({
   model: z.string(),
@@ -49,6 +50,7 @@ const candidateKey = (id: string) => `asset-layout-1/private/candidates/${id}/in
 const sourceKey = (asset: string, source: string) =>
   `asset-layout-1/assets/${asset}/sources/${source}/original`;
 export function sourceStorageLayer(options: Options) {
+  const operations = resolveSourceOperations(options);
   return Layer.effectContext(
     Effect.gen(function* () {
       const client = yield* Effect.acquireRelease(
@@ -152,7 +154,7 @@ export function sourceStorageLayer(options: Options) {
               body.destroy();
             }
           }),
-        read: (sourceId, assetId, lifetimeMs = 300000) =>
+        read: (sourceId, assetId, lifetimeMs = operations.readLifetimeMs) =>
           run('read-original', async (signal) => {
             const deadline = Date.now() + lifetimeMs;
             const body = await get(
@@ -267,7 +269,7 @@ export function sourceStorageLayer(options: Options) {
             run('reclaim', async (signal) => {
               const deadline = AbortSignal.any([
                 signal,
-                AbortSignal.timeout(options.reclamationTimeoutMs ?? 5000),
+                AbortSignal.timeout(operations.reclamationTimeoutMs),
               ]);
               const keys =
                 target.kind === 'candidate'

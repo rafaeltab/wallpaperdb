@@ -24,4 +24,9 @@ export {
   type SourceAcceptanceOutboxPort,
 } from './contract.js';
 export { sourcesLayer } from './implementation.js';
-export { initialSourcePolicies, type SourcePolicy } from './policy.js';
+export {
+  initialSourcePolicies,
+  resolveSourceOperations,
+  type SourcePolicy,
+  type SourceOperations,
+} from './policy.js';

@@ -288,6 +288,7 @@ export function sourcesLayer(configuration: {
               status: 'awaiting-bytes',
               expiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
               orphanExpiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
+              temporaryExpiresAt: new Date(now + policy.temporaryInput.abandonedMs).toISOString(),
               layout: 'asset-layout-1',
             };
             state.candidates.push(created);

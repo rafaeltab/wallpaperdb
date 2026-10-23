@@ -76,7 +76,7 @@ export function cleanupWorkerLayer(options: Options) {
                   JSON.stringify({
                     id,
                     kind: 'cleanup-quarantine',
-                    subject: 'asset.cleanup',
+                    subject: `asset.cleanup.${alert.id}`,
                     reason: 'exhausted',
                   }),
                   { msgID: `cleanup-notification:${id}`, timeout: 5000 }

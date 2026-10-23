@@ -1,7 +1,8 @@
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Effect, ManagedRuntime } from 'effect';
+import { Clock, Effect, ManagedRuntime } from 'effect';
+import { TestClock } from 'effect/testing';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { activateLifecycle, lifecyclePostgresLayer } from '../src/adapters/lifecycle/index.js';
@@ -28,6 +29,144 @@ const options = () => ({
   maxAttempts: 2,
   retryDelayMs: 1,
   leaseMs: 1000,
+});
+
+it('honors the exact recorded seven-day and thirty-day evidence boundaries and finishes empty terminal Assets', async () => {
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({ ...options(), revision: 'cleanup-1' })
+  );
+  const sources = ManagedRuntime.make(sourcePostgresLayer(options()));
+  const cleanup = ManagedRuntime.make(cleanupPostgresLayer(options()));
+  const clockRuntime = ManagedRuntime.make(TestClock.layer());
+  const clock = await clockRuntime.runPromise(Clock.Clock);
+  const targets: { assetId: string; sourceId: string }[] = [];
+  try {
+    for (const [assetType, evidenceExpiresAt] of [
+      ['wallpaper', '2030-01-01T00:00:00Z'],
+      ['picture', '2030-01-24T00:00:00Z'],
+    ]) {
+      const command = {
+        revision: 'cleanup-1',
+        applicationId: 'wallpaper',
+        canonical: crypto.randomUUID(),
+        correlation: { commandId: crypto.randomUUID(), applicationReference: '' },
+        decision: {
+          kind: 'create' as const,
+          assetType: assetType!,
+          owner: { namespace: 'clerk', subject: 'exact-expiry' },
+        },
+        context: { occurrence: { source: 'https://test/wallpaper', id: crypto.randomUUID() } },
+      };
+      const created = await lifecycle.runPromise(
+        LifecycleStore.use((store) => store.accept(command))
+      );
+      if (created.outcome !== 'created') throw new Error('Expected Asset');
+      const assetId = created.assetId,
+        sourceId = crypto.randomUUID();
+      targets.push({ assetId, sourceId });
+      await sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact(assetId, null, (state) => {
+            if (!state) throw new Error('Expected Asset');
+            state.sources = [
+              {
+                sourceId,
+                layout: 'asset-layout-1',
+                facts: {
+                  digest: 'a'.repeat(64),
+                  byteLength: 4,
+                  mimeType: 'image/png',
+                  model: 'sdr-png',
+                  width: 2,
+                  height: 2,
+                },
+              },
+            ];
+            return { state, result: undefined };
+          })
+        )
+      );
+      await sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact(assetId, null, (state) => {
+            if (!state) throw new Error('Expected Asset');
+            state.sources = [];
+            return {
+              state,
+              result: undefined,
+              retirement: { sourceId, evidenceExpiresAt: evidenceExpiresAt! },
+            };
+          })
+        )
+      );
+    }
+    const claim = () =>
+      cleanup.runPromise(
+        CleanupStore.use((store) => store.claim(100)).pipe(
+          Effect.provideService(Clock.Clock, clock)
+        )
+      );
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2029-12-31T23:59:59.999Z')));
+    expect(await claim()).toEqual([]);
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2030-01-01T00:00:00Z')));
+    const wallpaper = await claim();
+    expect(wallpaper.map((work) => work.target)).toEqual([{ kind: 'source', ...targets[0] }]);
+    for (const work of wallpaper)
+      await cleanup.runPromise(CleanupStore.use((store) => store.completed(work)));
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2030-01-23T23:59:59.999Z')));
+    expect(await claim()).toEqual([]);
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2030-01-24T00:00:00Z')));
+    const picture = await claim();
+    expect(picture.map((work) => work.target)).toEqual([{ kind: 'source', ...targets[1] }]);
+    for (const work of picture)
+      await cleanup.runPromise(CleanupStore.use((store) => store.completed(work)));
+    const empty = await lifecycle.runPromise(
+      LifecycleStore.use((store) =>
+        store.accept({
+          revision: 'cleanup-1',
+          applicationId: 'wallpaper',
+          canonical: crypto.randomUUID(),
+          correlation: { commandId: crypto.randomUUID(), applicationReference: '' },
+          decision: {
+            kind: 'create',
+            assetType: 'picture',
+            owner: { namespace: 'clerk', subject: 'empty' },
+          },
+          context: { occurrence: { source: 'https://test/wallpaper', id: 'empty' } },
+        })
+      )
+    );
+    if (empty.outcome !== 'created') throw new Error('Expected empty Asset');
+    await lifecycle.runPromise(
+      LifecycleStore.use((store) =>
+        store.accept({
+          revision: 'cleanup-1',
+          applicationId: 'wallpaper',
+          canonical: crypto.randomUUID(),
+          correlation: { commandId: crypto.randomUUID(), applicationReference: '' },
+          decision: {
+            kind: 'delete',
+            assetId: empty.assetId,
+            evidenceRetentionMsByType: { picture: 2592000000 },
+          },
+          context: { occurrence: { source: 'https://test/wallpaper', id: 'empty-delete' } },
+        })
+      )
+    );
+    expect(await claim()).toEqual([]);
+    expect(
+      (
+        await pool.query('SELECT cleanup_pending FROM asset_deletions WHERE asset_id=$1', [
+          empty.assetId,
+        ])
+      ).rows
+    ).toEqual([{ cleanup_pending: false }]);
+  } finally {
+    await clockRuntime.dispose();
+    await cleanup.dispose();
+    await sources.dispose();
+    await lifecycle.dispose();
+  }
 });
 
 it('bounds failed and abandoned claims, fences stale completion and recovers deliberately across restart', async () => {

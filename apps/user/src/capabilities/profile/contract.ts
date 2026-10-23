@@ -116,6 +116,7 @@ export interface PictureAsset {
 
 export interface ProfileSnapshot {
   readonly profile: OwnerProfile;
+  readonly pendingAttachment: boolean;
   readonly observedAt: Date;
   readonly targetClaim: {
     profileId: string;
@@ -167,7 +168,9 @@ export interface ProfileQuery {
  * A locked owner snapshot and a pure decision form one transaction. observedAt
  * is captured after acquiring the transaction locks and is never before query.now. The adapter
  * commits each accepted transition with its handle claims, picture state and
- * durable event. A rejected or unchanged decision writes nothing. A handle
+ * durable event. A picture removal also fences pending attachment and persists the
+ * former Asset's stable deletion command, without contacting Asset or the broker.
+ * A rejected or unchanged decision writes nothing. A handle
  * conflict is a rejection; unrelated persistence failures are typed failures.
  * The decision must not escape its scope or perform external effects.
  */

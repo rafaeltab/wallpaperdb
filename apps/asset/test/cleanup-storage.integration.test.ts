@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { createServer, request } from 'node:http';
+import { HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -14,6 +16,137 @@ const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3Tes
 const tester = new Tester().withS3().withS3Bucket('cleanup-private');
 beforeAll(() => tester.setup(), 60000);
 afterAll(() => tester.destroy());
+
+it.each([
+  'upload',
+  'prepare',
+] as const)('fences a real delayed %s and reconciles a lost reclamation response across both candidate paths', async (phase) => {
+  const s3 = tester.getS3();
+  const upstream = new URL(s3.endpoints.fromHost);
+  let entered!: () => void,
+    release = () => {};
+  const held = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  let delayed = false,
+    lost = false;
+  const candidateId = `delayed-${phase}`,
+    sourceId = `late-${phase}`;
+  const proxy = createServer((incoming, outgoing) => {
+    const forward = () => {
+      const forwarded = request(
+        {
+          hostname: upstream.hostname,
+          port: upstream.port,
+          path: incoming.url,
+          method: incoming.method,
+          headers: incoming.headers,
+        },
+        (response) => {
+          if (
+            incoming.headers['x-amz-meta-reclaimed'] === 'true' &&
+            response.statusCode === 200 &&
+            !lost
+          ) {
+            lost = true;
+            response.resume();
+            response.once('end', () => outgoing.destroy());
+          } else {
+            outgoing.writeHead(response.statusCode ?? 502, response.headers);
+            response.pipe(outgoing);
+          }
+        }
+      );
+      forwarded.on('error', () => outgoing.destroy());
+      incoming.pipe(forwarded);
+    };
+    const suffix =
+      phase === 'upload' ? `/candidates/${candidateId}/input` : `/sources/${sourceId}/original`;
+    if (
+      !delayed &&
+      incoming.method === 'PUT' &&
+      incoming.headers['if-none-match'] === '*' &&
+      incoming.url?.split('?')[0]?.endsWith(suffix)
+    ) {
+      delayed = true;
+      release = forward;
+      entered();
+    } else forward();
+  });
+  await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+  const address = proxy.address();
+  if (!address || typeof address === 'string') throw new Error('Missing proxy');
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: `http://127.0.0.1:${address.port}`,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'cleanup-private',
+    })
+  );
+  const bytes = new Uint8Array([8, 7, 6, 5]),
+    digest = createHash('sha256').update(bytes).digest('hex');
+  const facts = {
+    digest,
+    byteLength: 4,
+    model: 'sdr-png',
+    mimeType: 'image/png',
+    width: 2,
+    height: 2,
+  };
+  let pending: Promise<unknown> | undefined;
+  try {
+    const canonicalKey = `asset-layout-1/private/candidates/${candidateId}/canonical`;
+    await tester.s3
+      .getS3Client()
+      .send(new PutObjectCommand({ Bucket: 'cleanup-private', Key: canonicalKey, Body: bytes }));
+    if (phase === 'prepare')
+      await runtime.runPromise(
+        SourceBytes.use((storage) => storage.put(candidateId, bytes, digest))
+      );
+    pending = runtime.runPromise(
+      SourceBytes.use((storage) =>
+        phase === 'upload'
+          ? storage.put(candidateId, bytes, digest)
+          : storage.prepare(candidateId, sourceId, 'asset', facts)
+      )
+    );
+    void pending.catch(() => undefined);
+    await held;
+    await runtime.runPromise(
+      CleanupBytes.use((cleanup) => cleanup.reclaim({ kind: 'candidate', candidateId }))
+    );
+    await runtime.runPromise(
+      CleanupBytes.use((cleanup) => cleanup.reclaim({ kind: 'source', assetId: 'asset', sourceId }))
+    );
+    expect(lost).toBe(true);
+    release();
+    await expect(pending).rejects.toBeDefined();
+    for (const key of [
+      canonicalKey,
+      `asset-layout-1/private/candidates/${candidateId}/input`,
+      `asset-layout-1/assets/asset/sources/${sourceId}/original`,
+    ]) {
+      const head = await tester.s3
+        .getS3Client()
+        .send(new HeadObjectCommand({ Bucket: 'cleanup-private', Key: key }));
+      expect(head.ContentLength).toBe(0);
+      expect(head.Metadata).toEqual({ reclaimed: 'true' });
+    }
+    expect(
+      await runtime.runPromise(
+        Effect.exit(SourceBytes.use((storage) => storage.read(sourceId, 'asset')))
+      )
+    ).toMatchObject({ _tag: 'Failure' });
+  } finally {
+    release();
+    await pending?.catch(() => undefined);
+    await runtime.dispose();
+    proxy.closeAllConnections();
+    await new Promise<void>((resolve) => proxy.close(() => resolve()));
+  }
+});
 
 it('bounds an unopened consumer and reports storage stream closure after cancellation or EOF', async () => {
   const s3 = tester.getS3();

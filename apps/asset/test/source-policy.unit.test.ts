@@ -9,6 +9,7 @@ describe('typed Source admission configuration', () => {
     expect(authority.assetTypes.wallpaper).toMatchObject({
       maxActiveSources: 16,
       maxCandidates: 2,
+      aspectRatioTolerance: 0.03,
       admission: {
         maxBytes: 52428800,
         maxPixels: 100000000,
@@ -25,4 +26,22 @@ describe('typed Source admission configuration', () => {
     expect(parseAuthority(changed).identity).not.toBe(authority.identity);
     expect(() => parseAuthority({ ...raw, assetTypes: { wallpaper: {} } })).toThrow();
   });
+});
+
+it('activates a tolerance edit as a distinct effective policy and rejects invalid tolerances', () => {
+  const raw = authorityFixture(),
+    original = parseAuthority(raw);
+  raw.assetTypes.wallpaper.aspectRatioTolerance = 0.02;
+  expect(parseAuthority(raw).identity).not.toBe(original.identity);
+  for (const tolerance of [-0.01, 1.01, Infinity, NaN]) {
+    expect(() =>
+      parseAuthority({
+        ...raw,
+        assetTypes: {
+          ...raw.assetTypes,
+          wallpaper: { ...raw.assetTypes.wallpaper, aspectRatioTolerance: tolerance },
+        },
+      })
+    ).toThrow();
+  }
 });

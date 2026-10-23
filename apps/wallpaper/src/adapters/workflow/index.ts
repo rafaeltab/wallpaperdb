@@ -21,6 +21,16 @@ interface Options {
   readonly retryDelayMs: number;
   readonly leaseMs: number;
 }
+class WorkflowDecisionDefect {
+  constructor(readonly cause: unknown) {}
+}
+function decide<A>(transition: () => A): A {
+  try {
+    return transition();
+  } catch (cause) {
+    throw new WorkflowDecisionDefect(cause);
+  }
+}
 export function workflowPostgresLayer(options: Options) {
   return Layer.effectContext(
     Effect.gen(function* () {
@@ -48,6 +58,11 @@ export function workflowPostgresLayer(options: Options) {
           try: run,
           catch: (cause) => new WorkflowFailure({ operation, cause }),
         }).pipe(
+          Effect.catchTag('WorkflowFailure', (failure) =>
+            failure.cause instanceof WorkflowDecisionDefect
+              ? Effect.die(failure.cause.cause)
+              : Effect.fail(failure)
+          ),
           Effect.tapError((error) =>
             Effect.logError('Wallpaper persistence unavailable', { operation, cause: error.cause })
           ),
@@ -194,7 +209,7 @@ export function workflowPostgresLayer(options: Options) {
                 )
                 .for('update');
               const current = rows[0]?.state ?? null;
-              const changed = transition(current ? structuredClone(current) : null);
+              const changed = decide(() => transition(current ? structuredClone(current) : null));
               if (changed.wallpaper) {
                 if (current?.attentionRequired) changed.wallpaper.attentionRequired = true;
                 await tx

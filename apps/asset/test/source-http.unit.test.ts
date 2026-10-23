@@ -30,6 +30,8 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
             ),
         }),
         Layer.succeed(Sources, {
+          selectDefault: () => Effect.succeed({ kind: 'unavailable' }),
+          withdraw: () => Effect.succeed({ kind: 'unavailable' }),
           policy: () =>
             Effect.succeed({
               kind: 'policy',
@@ -216,6 +218,8 @@ it('closes the exact original stream when the browser cancels the response', asy
           verify: () => Effect.succeed({ namespace: 'clerk', subject: 'owner' }),
         }),
         Layer.succeed(Sources, {
+          selectDefault: () => Effect.succeed({ kind: 'unavailable' }),
+          withdraw: () => Effect.succeed({ kind: 'unavailable' }),
           policy: () => Effect.die('unused'),
           list: () => Effect.die('unused'),
           create: () => Effect.die('unused'),

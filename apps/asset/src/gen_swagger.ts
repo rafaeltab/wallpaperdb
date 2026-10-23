@@ -22,6 +22,8 @@ import { AuthorAuthentication } from './adapters/authors/index.js';
 const sourceServices = Layer.merge(
   Layer.succeed(AuthorAuthentication, { verify: () => Effect.succeed(null) }),
   Layer.succeed(Sources, {
+    selectDefault: () => Effect.succeed({ kind: 'unavailable' }),
+    withdraw: () => Effect.succeed({ kind: 'unavailable' }),
     policy: () => Effect.die('Documentation only'),
     list: () => Effect.die('Documentation only'),
     create: () => Effect.die('Documentation only'),

@@ -158,7 +158,6 @@ export function controlledProfiles(overrides: Partial<ProfilePolicy> = {}) {
         claims.delete(mutation.handle);
         break;
       case 'picture': {
-        pendingAttachments.delete(profile.id);
         if (profile.pictureAssetId) {
           const previous = assets.get(profile.pictureAssetId);
           if (previous)
@@ -176,6 +175,7 @@ export function controlledProfiles(overrides: Partial<ProfilePolicy> = {}) {
         break;
       }
     }
+    pendingAttachments.delete(profile.id);
     profile.version++;
     profile.updatedAt = now;
     transitions.push(structuredClone({ profileId: profile.id, at: now, mutation }));

@@ -340,7 +340,19 @@ it('bounds failed and abandoned claims, fences stale completion and recovers del
     await pool.query("UPDATE source_cleanup SET available_at='2000-01-01' WHERE id=$1", [first.id]);
     const [retried] = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
     if (!retried) throw new Error('Expected current retry');
-    await cleanup.runPromise(CleanupStore.use((store) => store.failed(retried)));
+    // Lose the final claim without reporting failure. Restart must quarantine it,
+    // observe that committed transition, and return no reclaimable work.
+    await pool.query("UPDATE source_cleanup SET available_at='2000-01-01' WHERE id=$1", [first.id]);
+    await cleanup.dispose();
+    cleanup = ManagedRuntime.make(cleanupPostgresLayer(options()));
+    expect(await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)))).toEqual([]);
+    expect(
+      (
+        await pool.query('SELECT status, attempts, lease_id FROM source_cleanup WHERE id=$1', [
+          first.id,
+        ])
+      ).rows
+    ).toEqual([{ status: 'quarantined', attempts: 2, lease_id: null }]);
     const [currentAlert] = await cleanup.runPromise(
       CleanupStore.use((store) => store.pendingAlerts())
     );

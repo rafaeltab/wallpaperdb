@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   index,
   integer,
   jsonb,
@@ -144,6 +145,7 @@ export const ownedAssets = pgTable(
   {
     id: text('id').primaryKey(),
     applicationId: text('application_id').notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     assetType: text('asset_type').notNull(),
     ownerNamespace: text('owner_namespace').notNull(),
     ownerSubject: text('owner_subject').notNull(),
@@ -234,4 +236,16 @@ export const sourceAcceptanceOutbox = pgTable('source_acceptance_outbox', {
   leaseId: text('lease_id'),
   notifiedAt: timestamp('notified_at', { withTimezone: true }),
   quarantineId: text('quarantine_id').notNull().default(sql`gen_random_uuid()`),
+});
+
+/** Durable local responsibilities, not a public delivery event contract. The
+ * compact terminal fence in owned_assets survives completion and byte expiry. */
+export const assetDeletions = pgTable('asset_deletions', {
+  assetId: text('asset_id').primaryKey(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }).notNull(),
+  sourceSetRevision: text('source_set_revision').notNull(),
+  deliveryRevision: text('delivery_revision').notNull(),
+  evidenceExpiresAt: timestamp('evidence_expires_at', { withTimezone: true }).notNull(),
+  capabilitiesPending: boolean('capabilities_pending').notNull().default(true),
+  cleanupPending: boolean('cleanup_pending').notNull().default(true),
 });

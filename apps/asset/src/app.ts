@@ -63,6 +63,7 @@ function authorityComposition(config: Config) {
     leaseMs: 30000,
   });
   const lifecycle = lifecycleLayer({
+    assetTypes: authority.assetTypes,
     revision: authority.identity,
     applications: Object.fromEntries(
       Object.entries(authority.applications).map(

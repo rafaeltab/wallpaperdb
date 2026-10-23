@@ -43,11 +43,19 @@ export function lifecycleLayer(policy: LifecyclePolicy) {
             : undefined;
           let decision: Acceptance['decision'];
           if ('invalid' in command) decision = { kind: 'reject', reason: 'malformed-command' };
-          else if (
-            !application?.allowedOperations.includes(command.operation) ||
-            command.operation === 'delete'
-          )
+          else if (!application?.allowedOperations.includes(command.operation))
             decision = { kind: 'reject', reason: 'forbidden-operation' };
+          else if (command.operation === 'delete')
+            decision = {
+              kind: 'delete',
+              assetId: command.assetId,
+              evidenceRetentionMsByType: Object.fromEntries(
+                Object.entries(policy.assetTypes).map(([type, policy]) => [
+                  type,
+                  policy.retention.evidenceMs,
+                ])
+              ),
+            };
           else if (!application.allowedTypes.includes(command.assetType))
             decision = { kind: 'reject', reason: 'unsupported-type' };
           else

@@ -9,7 +9,7 @@ import {
   attachmentOutbox,
   attachmentQuarantine,
 } from '../../db/schema.js';
-import type { AttachmentQuery } from './store.js';
+import type { AttachmentQuery } from './types.js';
 export function makeDelivery(
   query: AttachmentQuery,
   options: { readonly maxAttempts: number; readonly retryDelayMs: number; readonly leaseMs: number }
@@ -40,8 +40,9 @@ export function makeDelivery(
           ...inbox.map((row) => ({
             id: row.id,
             scope: 'confirmation' as const,
-            reason:
-              row.reason === 'invalid-confirmation' ? ('invalid' as const) : ('exhausted' as const),
+            reason: ['invalid-confirmation', 'rejected-confirmation'].includes(row.reason)
+              ? ('invalid' as const)
+              : ('exhausted' as const),
           })),
         ];
       }),

@@ -9,6 +9,8 @@ import {
 import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
 
+import { parseAttachmentConfig, readAttachmentConfig } from './attachment-config.js';
+
 loadEnv();
 
 const configSchema = z
@@ -36,6 +38,7 @@ const configSchema = z
     profilePictureImportTimeoutMs: z.number().int().positive(),
     profilePictureImportHosts: z.array(z.string().min(1)).min(1),
     userAssetServiceToken: z.string().min(1).optional(),
+    attachmentWorkflow: z.unknown().transform(parseAttachmentConfig).optional(),
   })
   .superRefine((config, context) => {
     if (config.profileHandleMinLength > config.profileHandleMaxLength) {
@@ -96,6 +99,9 @@ export function loadConfig(): Config {
       .map((host) => host.trim().toLowerCase())
       .filter(Boolean),
     userAssetServiceToken: process.env.USER_MEDIA_SERVICE_TOKEN,
+    attachmentWorkflow: process.env.USER_ASSET_WORKFLOW_FILE
+      ? readAttachmentConfig(process.env.USER_ASSET_WORKFLOW_FILE)
+      : undefined,
   };
 
   return configSchema.parse(raw);

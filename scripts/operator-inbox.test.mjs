@@ -7,9 +7,11 @@ import test from "node:test";
 import { createOperatorInbox } from "./operator-inbox.mjs";
 
 for (const kind of [
+	"command-quarantine",
 	"result-quarantine",
 	"source-confirmation-quarantine",
 	"wallpaper-workflow-quarantine",
+	"cleanup-quarantine",
 ])
 	test(`${kind} receipts require credentials, survive restart and deduplicate delivery`, async () => {
 		const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));
@@ -31,8 +33,24 @@ for (const kind of [
 			id: "a".repeat(64),
 			applicationId: "user",
 			kind,
-			subject: "asset.results.user",
+			subject:
+				kind === "cleanup-quarantine"
+					? "asset.cleanup.candidate:candidate_test"
+					: "asset.results.user",
 			reason: "exhausted",
+			...(kind === "cleanup-quarantine"
+				? {
+						context: {
+							occurrence: {
+								source: "https://wallpaperdb/asset/authors",
+								id: "cancelled-candidate",
+							},
+							correlationId: "cleanup-request",
+							traceparent:
+								"00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+						},
+					}
+				: {}),
 		};
 		const operator = {
 			authorization: `Basic ${Buffer.from("operator:test-inbox-token").toString("base64")}`,
@@ -48,6 +66,16 @@ for (const kind of [
 					})
 				).status,
 				401,
+			);
+			assert.equal(
+				(
+					await fetch(`${url}/events`, {
+						method: "POST",
+						headers: { authorization: "Bearer test-inbox-token" },
+						body: JSON.stringify({ ...notice, kind: "unknown-quarantine" }),
+					})
+				).status,
+				400,
 			);
 			for (let delivery = 0; delivery < 2; delivery++)
 				assert.equal(

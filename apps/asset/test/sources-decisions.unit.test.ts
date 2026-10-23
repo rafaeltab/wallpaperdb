@@ -17,6 +17,28 @@ import {
 import { initialSourcePolicies, type SourcePolicy } from '../src/capabilities/sources/index.js';
 const owner = { namespace: 'clerk', subject: 'owner' };
 const intent = { operation: 'add' as const, expectedSourceSetRevision: '0' };
+
+it('records private temporary-input expiry separately and preserves it through configuration replay', async () => {
+  const policy = structuredClone(initialSourcePolicies.wallpaper);
+  policy.temporaryInput.abandonedMs = 1000;
+  const clockRuntime = ManagedRuntime.make(TestClock.layer());
+  await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-10-23T00:00:00Z')));
+  const f = fixture(policy, await clockRuntime.runPromise(Clock.Clock));
+  try {
+    await create(f, 'temporary-policy');
+    const candidate = structuredClone(f.state.candidates[0]!);
+    expect(candidate.temporaryExpiresAt).toBe('2026-10-23T00:00:01.000Z');
+    expect(candidate.orphanExpiresAt).toBe('2026-10-24T00:00:00.000Z');
+    const next = structuredClone(policy);
+    next.temporaryInput.abandonedMs = 86400000;
+    f.activate(next)();
+    await create(f, 'temporary-policy');
+    expect(f.state.candidates[0]).toEqual(candidate);
+  } finally {
+    await f.close();
+    await clockRuntime.dispose();
+  }
+});
 function fixture(
   policy: SourcePolicy = initialSourcePolicies.wallpaper,
   clock?: Clock.Clock,
@@ -54,6 +76,7 @@ function fixture(
     });
   let ambiguousCommit = false;
   const store: SourceStorePort = {
+    releaseRead: () => Effect.void,
     transact: (assetId, revision, change) =>
       Effect.suspend(() => {
         if (revision !== null && revision !== activeRevision)
@@ -95,6 +118,7 @@ function fixture(
             yield bytes;
           })(),
           close: () => Effect.void,
+          closed: Effect.void,
         }),
     }),
     Layer.succeed(MandatoryInspection, { inspect: () => inspect() })

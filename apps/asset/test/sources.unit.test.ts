@@ -30,6 +30,7 @@ it('keeps private bytes outside membership until immutable preparation and first
   const confirmations: unknown[] = [];
   const objects = new Map<string, Uint8Array>();
   const store: SourceStorePort = {
+    releaseRead: () => Effect.void,
     transact: (_id, _revision, change) =>
       Effect.sync(() => {
         const changed = change(structuredClone(state));
@@ -63,6 +64,7 @@ it('keeps private bytes outside membership until immutable preparation and first
                   yield bytes;
                 })(),
                 close: () => Effect.void,
+                closed: Effect.void,
               }),
           }),
           Layer.succeed(MandatoryInspection, {

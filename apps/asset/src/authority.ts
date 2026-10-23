@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { AssetIdentifierSchema, OwnerValueSchema } from '@wallpaperdb/events/schemas';
 import { z } from 'zod';
+import { resolveSourceOperations } from './capabilities/sources/index.js';
 
 const credential = z
   .object({ user: AssetIdentifierSchema, password: z.string().min(1), revision: OwnerValueSchema })
@@ -96,6 +97,14 @@ const schema = z
     ),
     identityProviders: z.record(AssetIdentifierSchema, provider),
     assetTypes: z.record(AssetIdentifierSchema, sourcePolicy),
+    sourceOperations: z
+      .object({
+        readLifetimeMs: positive.max(3600000).optional(),
+        reclamationTimeoutMs: positive.max(30000).optional(),
+      })
+      .strict()
+      .default({})
+      .transform(resolveSourceOperations),
     delivery: z
       .object({
         maxAttempts: z.number().int().min(1).max(100),

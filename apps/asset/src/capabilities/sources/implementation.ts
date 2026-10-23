@@ -1,5 +1,5 @@
 import { Clock, Effect, Layer } from 'effect';
-import type { Owner } from '../lifecycle/index.js';
+import type { Owner, CommandContext } from '../lifecycle/index.js';
 import {
   Sources,
   SourceStore,
@@ -14,7 +14,7 @@ import {
   type SourceFacts,
   type SourcesPort,
 } from './contract.js';
-import type { SourcePolicy } from './policy.js';
+import { resolveSourceOperations, type SourcePolicy } from './policy.js';
 const unavailable = { kind: 'unavailable' } as const;
 const nonterminal = (candidate: Candidate) =>
   !['accepted', 'rejected', 'cancelled'].includes(candidate.status);
@@ -80,44 +80,57 @@ function similarAspectRatios(facts: readonly SourceFacts[], tolerance: number): 
 export function sourcesLayer(configuration: {
   readonly revision: string;
   readonly types: Readonly<Record<string, SourcePolicy>>;
+  readonly readLifetimeMs?: number;
 }) {
+  const operations = resolveSourceOperations(configuration);
   return Layer.effect(
     Sources,
     Effect.gen(function* () {
       const store = yield* SourceStore;
       const storage = yield* SourceBytes;
       const inspection = yield* MandatoryInspection;
+      const scope = yield* Effect.scope;
       const modify = (
         owner: Owner,
         assetId: string,
         revision: string | null,
-        change: (state: SourceState) => SourceOutcome
+        change: (state: SourceState) => SourceOutcome,
+        context?: CommandContext
       ) =>
         store.transact<SourceOutcome>(assetId, revision, (state) => ({
           state,
           result: owns(owner, state) ? change(state) : unavailable,
+          cleanupContext: context,
         }));
       const candidate = (
         owner: Owner,
         assetId: string,
         id: string,
         change: (state: SourceState, candidate: Candidate) => SourceOutcome,
-        revision: string | null = null
+        revision: string | null = null,
+        context?: CommandContext
       ) =>
-        modify(owner, assetId, revision, (state) => {
-          const found = state.candidates.find((c) => c.candidateId === id);
-          if (!found) return unavailable;
-          const wasPending = nonterminal(found);
-          const outcome = change(state, found);
-          if (wasPending && !nonterminal(found)) state.nonterminalCandidateCount--;
-          return outcome;
-        });
+        modify(
+          owner,
+          assetId,
+          revision,
+          (state) => {
+            const found = state.candidates.find((c) => c.candidateId === id);
+            if (!found) return unavailable;
+            const wasPending = nonterminal(found);
+            const outcome = change(state, found);
+            if (wasPending && !nonterminal(found)) state.nonterminalCandidateCount--;
+            return outcome;
+          },
+          context
+        );
       const changeSource = Effect.fn('asset.sources.change')(function* (
         owner: Owner,
         assetId: string,
         sourceId: string,
         expectedRevision: string,
-        operation: 'select-default' | 'withdraw'
+        operation: 'select-default' | 'withdraw',
+        context?: CommandContext
       ) {
         if (!validRevision(expectedRevision))
           return { kind: 'rejected', reason: 'malformed-source-change' } as const;
@@ -164,6 +177,7 @@ export function sourcesLayer(configuration: {
               },
               ...(operation === 'withdraw'
                 ? {
+                    cleanupContext: context,
                     retirement: {
                       sourceId,
                       evidenceExpiresAt: new Date(now + policy.retention.evidenceMs).toISOString(),
@@ -177,8 +191,8 @@ export function sourcesLayer(configuration: {
       return Sources.of({
         selectDefault: (owner, assetId, sourceId, revision) =>
           changeSource(owner, assetId, sourceId, revision, 'select-default'),
-        withdraw: (owner, assetId, sourceId, revision) =>
-          changeSource(owner, assetId, sourceId, revision, 'withdraw'),
+        withdraw: (owner, assetId, sourceId, revision, context) =>
+          changeSource(owner, assetId, sourceId, revision, 'withdraw', context),
         policy: (owner, type) => {
           const selected = Object.hasOwn(configuration.types, type)
             ? configuration.types[type]
@@ -286,6 +300,7 @@ export function sourcesLayer(configuration: {
               status: 'awaiting-bytes',
               expiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
               orphanExpiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
+              temporaryExpiresAt: new Date(now + policy.temporaryInput.abandonedMs).toISOString(),
               layout: 'asset-layout-1',
             };
             state.candidates.push(created);
@@ -295,13 +310,20 @@ export function sourcesLayer(configuration: {
         }),
         status: (owner, assetId, id) =>
           candidate(owner, assetId, id, (_state, found) => result(found)),
-        cancel: (owner, assetId, id) =>
-          candidate(owner, assetId, id, (_state, found) => {
-            if (found.status === 'accepted') return reject('already-accepted');
-            found.status = 'cancelled';
-            return result(found);
-          }),
-        upload: Effect.fn('asset.sources.upload')(function* (owner, assetId, id, bytes) {
+        cancel: (owner, assetId, id, context) =>
+          candidate(
+            owner,
+            assetId,
+            id,
+            (_state, found) => {
+              if (found.status === 'accepted') return reject('already-accepted');
+              found.status = 'cancelled';
+              return result(found);
+            },
+            null,
+            context
+          ),
+        upload: Effect.fn('asset.sources.upload')(function* (owner, assetId, id, bytes, context) {
           const authorized = yield* candidate(owner, assetId, id, (_state, found) => result(found));
           if (authorized.kind !== 'candidate') return authorized;
           if (['cancelled', 'rejected'].includes(authorized.candidate.status)) return authorized;
@@ -336,50 +358,68 @@ export function sourcesLayer(configuration: {
           }).pipe(Effect.onInterrupt(() => Effect.sync(bytes.cancel)));
           if (!input) return reject('encoded-size-limit');
           const uploadedAt = yield* Clock.currentTimeMillis;
-          const reserved = yield* candidate(owner, assetId, id, (_state, found) => {
-            if (found.digest && found.digest !== input.digest)
-              return reject('byte-digest-conflict');
-            if (
-              found.status === 'accepted' ||
-              found.status === 'ready' ||
-              found.status === 'cancelled' ||
-              found.status === 'rejected'
-            )
+          const reserved = yield* candidate(
+            owner,
+            assetId,
+            id,
+            (_state, found) => {
+              if (found.digest && found.digest !== input.digest)
+                return reject('byte-digest-conflict');
+              if (
+                found.status === 'accepted' ||
+                found.status === 'ready' ||
+                found.status === 'cancelled' ||
+                found.status === 'rejected'
+              )
+                return result(found);
+              if (Date.parse(found.expiresAt) <= uploadedAt) {
+                found.status = 'rejected';
+                found.reason = 'candidate-expired';
+                return result(found);
+              }
+              found.digest = input.digest;
+              found.status = 'inspecting';
               return result(found);
-            if (Date.parse(found.expiresAt) <= uploadedAt) {
-              found.status = 'rejected';
-              found.reason = 'candidate-expired';
-              return result(found);
-            }
-            found.digest = input.digest;
-            found.status = 'inspecting';
-            return result(found);
-          });
+            },
+            null,
+            context
+          );
           if (reserved.kind !== 'candidate' || reserved.candidate.status !== 'inspecting')
             return reserved;
           yield* storage.put(id, input.buffer, input.digest);
           const inspected = yield* inspection.inspect(id, selected);
-          return yield* candidate(owner, assetId, id, (_state, found) => {
-            if (found.status !== 'inspecting') return result(found);
-            const facts =
-              inspected.kind === 'verified'
-                ? { ...inspected.facts, digest: input.digest, byteLength: input.buffer.byteLength }
-                : undefined;
-            const reason =
-              inspected.kind === 'rejected'
-                ? inspected.reason
-                : facts
-                  ? policyRejection(facts, selected)
-                  : 'inspection-failed';
-            if (reason) {
-              found.status = 'rejected';
-              found.reason = reason;
-            } else {
-              found.facts = facts;
-              found.status = 'ready';
-            }
-            return result(found);
-          });
+          return yield* candidate(
+            owner,
+            assetId,
+            id,
+            (_state, found) => {
+              if (found.status !== 'inspecting') return result(found);
+              const facts =
+                inspected.kind === 'verified'
+                  ? {
+                      ...inspected.facts,
+                      digest: input.digest,
+                      byteLength: input.buffer.byteLength,
+                    }
+                  : undefined;
+              const reason =
+                inspected.kind === 'rejected'
+                  ? inspected.reason
+                  : facts
+                    ? policyRejection(facts, selected)
+                    : 'inspection-failed';
+              if (reason) {
+                found.status = 'rejected';
+                found.reason = reason;
+              } else {
+                found.facts = facts;
+                found.status = 'ready';
+              }
+              return result(found);
+            },
+            null,
+            context
+          );
         }),
         accept: Effect.fn('asset.sources.accept')(function* (owner, assetId, id, intent) {
           if (!validRevision(intent.expectedSourceSetRevision))
@@ -421,7 +461,7 @@ export function sourcesLayer(configuration: {
               current.status = 'rejected';
               state.nonterminalCandidateCount--;
               current.reason = reason;
-              return { state, result: result(current) };
+              return { state, result: result(current), cleanupContext: context };
             }
             if (state.sourceSetRevision !== intent.expectedSourceSetRevision)
               return { state, result: reject('source-set-conflict') };
@@ -455,6 +495,7 @@ export function sourcesLayer(configuration: {
             return {
               state,
               result: result(current),
+              cleanupContext: context,
               ...(replaced
                 ? {
                     retirement: {
@@ -480,15 +521,54 @@ export function sourcesLayer(configuration: {
           });
         }),
         original: Effect.fn('asset.sources.original')(function* (owner, assetId, sourceId) {
-          const facts = yield* store.transact(assetId, null, (state) => ({
-            state,
-            result: owns(owner, state)
+          const readId = crypto.randomUUID();
+          const lifetimeMs = operations.readLifetimeMs;
+          const startedAt = yield* Clock.currentTimeMillis;
+          const facts = yield* store.transact(assetId, null, (state) => {
+            const facts = owns(owner, state)
               ? state.sources.find((s) => s.sourceId === sourceId)?.facts
-              : undefined,
-          }));
+              : undefined;
+            return {
+              state,
+              result: facts,
+              ...(facts
+                ? {
+                    readProtection: {
+                      readId,
+                      sourceId,
+                      expiresAt: new Date(startedAt + lifetimeMs).toISOString(),
+                    },
+                  }
+                : {}),
+            };
+          });
           if (!facts) return unavailable;
-          const opened = yield* storage.read(sourceId, assetId);
-          return { kind: 'original' as const, facts, ...opened };
+          const release = store.releaseRead(readId).pipe(
+            Effect.catch((error) =>
+              Effect.logError('Read protection release remains bounded by its recorded expiry', {
+                operation: error.operation,
+              })
+            )
+          );
+          const elapsed = (yield* Clock.currentTimeMillis) - startedAt;
+          if (elapsed >= lifetimeMs) {
+            yield* release;
+            return unavailable;
+          }
+          const opened = yield* storage
+            .read(sourceId, assetId, Math.min(lifetimeMs, lifetimeMs - elapsed))
+            .pipe(Effect.onError(() => release));
+          if ((yield* Clock.currentTimeMillis) >= startedAt + lifetimeMs) {
+            yield* opened.close().pipe(Effect.ensuring(release));
+            return unavailable;
+          }
+          yield* opened.closed.pipe(Effect.ensuring(release), Effect.forkIn(scope));
+          return {
+            kind: 'original' as const,
+            facts,
+            bytes: opened.bytes,
+            close: () => opened.close().pipe(Effect.ensuring(release)),
+          };
         }),
       });
     })

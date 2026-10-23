@@ -248,3 +248,49 @@ export const assetDeletions = pgTable('asset_deletions', {
   capabilitiesPending: boolean('capabilities_pending').notNull().default(true),
   cleanupPending: boolean('cleanup_pending').notNull().default(true),
 });
+
+/** Exact identities remain as compact replay fences after their image facts are
+ * purged. A null deadline is a current Source, never eligible for reclamation. */
+export const sourceCleanup = pgTable(
+  'source_cleanup',
+  {
+    id: text('id').primaryKey(),
+    assetId: text('asset_id').notNull(),
+    applicationId: text('application_id').notNull(),
+    context: jsonb('context').$type<import('../capabilities/lifecycle/index.js').CommandContext>(),
+    target: jsonb('target')
+      .notNull()
+      .$type<import('../capabilities/cleanup/index.js').CleanupTarget>(),
+    dueAt: timestamp('due_at', { withTimezone: true }),
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+    leaseId: text('lease_id'),
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
+    notificationId: text('notification_id').notNull().default(sql`gen_random_uuid()::text`),
+  },
+  (table) => [
+    index('source_cleanup_ready').on(table.status, table.dueAt, table.availableAt),
+    index('source_cleanup_asset').on(table.assetId),
+    check(
+      'source_cleanup_status',
+      sql`${table.status} IN ('pending', 'reclaiming', 'completed', 'quarantined')`
+    ),
+    check('source_cleanup_attempts', sql`${table.attempts} >= 0`),
+  ]
+);
+
+/** Finite, non-renewable read protection is independent of serving authority. */
+export const sourceReads = pgTable(
+  'source_reads',
+  {
+    id: text('id').primaryKey(),
+    assetId: text('asset_id').notNull(),
+    sourceId: text('source_id').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index('source_reads_identity').on(table.assetId, table.sourceId, table.expiresAt),
+    index('source_reads_expiry').on(table.expiresAt),
+  ]
+);

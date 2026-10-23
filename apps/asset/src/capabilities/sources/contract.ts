@@ -41,6 +41,7 @@ export interface Candidate extends CandidateIntent {
     | 'cancelled';
   readonly expiresAt: string;
   readonly orphanExpiresAt: string;
+  readonly temporaryExpiresAt?: string;
   readonly layout: 'asset-layout-1';
   digest?: string;
   facts?: SourceFacts;
@@ -107,8 +108,15 @@ export interface SourceStorePort {
         readonly sourceId: string;
         readonly evidenceExpiresAt: string;
       };
+      readonly readProtection?: {
+        readonly readId: string;
+        readonly sourceId: string;
+        readonly expiresAt: string;
+      };
+      readonly cleanupContext?: CommandContext;
     }
   ) => Effect.Effect<A, SourceFailure>;
+  readonly releaseRead: (readId: string) => Effect.Effect<void, SourceFailure>;
 }
 export class SourceStore extends Context.Service<SourceStore, SourceStorePort>()(
   'asset/sources/Store'
@@ -130,9 +138,14 @@ export interface SourceBytesPort {
   ) => Effect.Effect<void, SourceFailure>;
   readonly read: (
     sourceId: string,
-    assetId: string
+    assetId: string,
+    lifetimeMs?: number
   ) => Effect.Effect<
-    { readonly bytes: AsyncIterable<Uint8Array>; readonly close: () => Effect.Effect<void> },
+    {
+      readonly bytes: AsyncIterable<Uint8Array>;
+      readonly close: () => Effect.Effect<void>;
+      readonly closed: Effect.Effect<void>;
+    },
     SourceFailure
   >;
 }
@@ -168,7 +181,8 @@ export interface SourcesPort {
     owner: Owner,
     assetId: string,
     sourceId: string,
-    expectedSourceSetRevision: string
+    expectedSourceSetRevision: string,
+    context?: CommandContext
   ) => Effect.Effect<SourceChangeOutcome, SourceFailure>;
   readonly policy: (
     owner: Owner,
@@ -212,13 +226,15 @@ export interface SourcesPort {
   readonly cancel: (
     owner: Owner,
     assetId: string,
-    candidateId: string
+    candidateId: string,
+    context?: CommandContext
   ) => Effect.Effect<SourceOutcome, SourceFailure>;
   readonly upload: (
     owner: Owner,
     assetId: string,
     candidateId: string,
-    bytes: SourceUpload
+    bytes: SourceUpload,
+    context?: CommandContext
   ) => Effect.Effect<SourceOutcome, SourceFailure>;
   readonly accept: (
     owner: Owner,

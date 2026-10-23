@@ -11,6 +11,8 @@ import {
 } from '@aws-sdk/client-s3';
 import { Context, Effect, Layer } from 'effect';
 import { z } from 'zod';
+import { CleanupBytes, CleanupFailure } from '../../capabilities/cleanup/index.js';
+import { observeCleanup } from '../cleanup/index.js';
 import {
   SourceBytes,
   MandatoryInspection,
@@ -18,6 +20,7 @@ import {
   type SourceBytesPort,
   type SourceFacts,
   type MandatoryInspectionPort,
+  resolveSourceOperations,
 } from '../../capabilities/sources/index.js';
 const factsSchema = z.object({
   model: z.string(),
@@ -42,11 +45,13 @@ interface Options {
   readonly accessKeyId: string;
   readonly secretAccessKey: string;
   readonly bucket: string;
+  readonly reclamationTimeoutMs?: number;
 }
 const candidateKey = (id: string) => `asset-layout-1/private/candidates/${id}/input`;
 const sourceKey = (asset: string, source: string) =>
   `asset-layout-1/assets/${asset}/sources/${source}/original`;
 export function sourceStorageLayer(options: Options) {
+  const operations = resolveSourceOperations(options);
   return Layer.effectContext(
     Effect.gen(function* () {
       const client = yield* Effect.acquireRelease(
@@ -121,6 +126,10 @@ export function sourceStorageLayer(options: Options) {
         );
         if (!(object.Body instanceof Readable)) throw new Error('Unavailable Source body');
         const body = object.Body;
+        if (object.Metadata?.reclaimed === 'true') {
+          body.destroy();
+          throw new Error('Reclaimed Source bytes');
+        }
         streams.add(body);
         body.once('close', () => streams.delete(body));
         return body;
@@ -146,11 +155,28 @@ export function sourceStorageLayer(options: Options) {
               body.destroy();
             }
           }),
-        read: (sourceId, assetId) =>
+        read: (sourceId, assetId, lifetimeMs = operations.readLifetimeMs) =>
           run('read-original', async (signal) => {
-            const body = await get(sourceKey(assetId, sourceId), signal);
+            const deadline = Date.now() + lifetimeMs;
+            const body = await get(
+              sourceKey(assetId, sourceId),
+              AbortSignal.any([signal, AbortSignal.timeout(lifetimeMs)])
+            );
+            const timer = setTimeout(
+              () => body.destroy(new Error('Source read lifetime elapsed')),
+              Math.max(1, deadline - Date.now())
+            );
+            timer.unref();
+            body.on('error', () => undefined);
+            const closed = new Promise<void>((resolve) => {
+              body.once('close', () => {
+                clearTimeout(timer);
+                resolve();
+              });
+            });
             return {
               bytes: body,
+              closed: Effect.promise(() => closed),
               close: () =>
                 Effect.sync(() => {
                   body.destroy();
@@ -237,7 +263,68 @@ export function sourceStorageLayer(options: Options) {
             }
           }),
       };
-      return Context.make(SourceBytes, storage).pipe(Context.add(MandatoryInspection, inspection));
+      return Context.make(SourceBytes, storage).pipe(
+        Context.add(MandatoryInspection, inspection),
+        Context.add(CleanupBytes, {
+          reclaim: (target, work) => {
+            const reclamation = run('reclaim', async (signal) => {
+              const deadline = AbortSignal.any([
+                signal,
+                AbortSignal.timeout(operations.reclamationTimeoutMs),
+              ]);
+              const keys =
+                target.kind === 'candidate'
+                  ? [
+                      candidateKey(target.candidateId),
+                      `asset-layout-1/private/candidates/${target.candidateId}/canonical`,
+                    ]
+                  : [sourceKey(target.assetId, target.sourceId)];
+              // Atomic replacement leaves no gap for a delayed conditional writer.
+              // Empty fences survive metadata purge because identities are never reused.
+              for (const key of keys) {
+                try {
+                  await client.send(
+                    new PutObjectCommand({
+                      Bucket: options.bucket,
+                      Key: key,
+                      Body: new Uint8Array(),
+                      ContentLength: 0,
+                      Metadata: { reclaimed: 'true' },
+                    }),
+                    { abortSignal: deadline }
+                  );
+                } catch (cause) {
+                  const head = await client
+                    .send(
+                      new HeadObjectCommand({
+                        Bucket: options.bucket,
+                        Key: key,
+                      }),
+                      { abortSignal: deadline }
+                    )
+                    .catch(() => null);
+                  if (head?.Metadata?.reclaimed !== 'true' || head.ContentLength !== 0) throw cause;
+                }
+              }
+            }).pipe(
+              Effect.mapError(
+                (error) =>
+                  new CleanupFailure({
+                    operation: error.operation,
+                    cause: error.cause,
+                  })
+              )
+            );
+            return work
+              ? observeCleanup(
+                  'asset.cleanup.reclaim-bytes',
+                  work,
+                  reclamation.pipe(Effect.as('reclaimed'))
+                ).pipe(Effect.asVoid)
+              : reclamation;
+          },
+        })
+      );
     })
   );
 }

@@ -148,6 +148,7 @@ export function sourcePostgresLayer(options: Options) {
                 for (const candidate of changed.state.candidates) {
                   if (priorCandidates.get(candidate.candidateId) === candidate.status) continue;
                   const terminal = ['accepted', 'rejected', 'cancelled'].includes(candidate.status);
+                  const context = changed.cleanupContext ?? candidate.context;
                   const inputExpiry = Math.min(
                     Date.parse(candidate.expiresAt),
                     Date.parse(candidate.temporaryExpiresAt ?? candidate.expiresAt)
@@ -159,6 +160,7 @@ export function sourcePostgresLayer(options: Options) {
                     .insert(sourceCleanup)
                     .values({
                       id: `candidate:${candidate.candidateId}`,
+                      context,
                       assetId,
                       applicationId: asset.applicationId,
                       target: { kind: 'candidate', candidateId: candidate.candidateId },
@@ -168,6 +170,7 @@ export function sourcePostgresLayer(options: Options) {
                       target: sourceCleanup.id,
                       set: {
                         dueAt: sql`least(${sourceCleanup.dueAt}, ${inputDue})`,
+                        ...(terminal ? { context } : {}),
                       },
                     });
                   const sourceDue =
@@ -180,6 +183,7 @@ export function sourcePostgresLayer(options: Options) {
                         );
                   const sourceWork = tx.insert(sourceCleanup).values({
                     id: `source:${candidate.sourceId}`,
+                    context,
                     assetId,
                     applicationId: asset.applicationId,
                     target: { kind: 'source', assetId, sourceId: candidate.sourceId },
@@ -190,7 +194,7 @@ export function sourcePostgresLayer(options: Options) {
                   )
                     await sourceWork.onConflictDoUpdate({
                       target: sourceCleanup.id,
-                      set: { dueAt: null },
+                      set: { dueAt: null, context },
                     });
                   else if (candidate.status === 'accepted') await sourceWork.onConflictDoNothing();
                   else
@@ -198,6 +202,7 @@ export function sourcePostgresLayer(options: Options) {
                       target: sourceCleanup.id,
                       set: {
                         dueAt: sql`least(${sourceCleanup.dueAt}, ${sourceDue})`,
+                        ...(terminal ? { context } : {}),
                       },
                     });
                 }
@@ -251,6 +256,7 @@ export function sourcePostgresLayer(options: Options) {
                     .insert(sourceCleanup)
                     .values({
                       id: `source:${sourceId}`,
+                      context: changed.cleanupContext,
                       assetId,
                       applicationId: asset.applicationId,
                       target: { kind: 'source', assetId, sourceId },
@@ -258,7 +264,7 @@ export function sourcePostgresLayer(options: Options) {
                     })
                     .onConflictDoUpdate({
                       target: sourceCleanup.id,
-                      set: { dueAt: new Date(evidenceExpiresAt) },
+                      set: { dueAt: new Date(evidenceExpiresAt), context: changed.cleanupContext },
                     });
                 }
                 await tx

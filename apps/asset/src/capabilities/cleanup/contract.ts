@@ -1,4 +1,5 @@
 import { Context, Data, type Effect } from 'effect';
+import type { CommandContext } from '../lifecycle/index.js';
 
 export class CleanupFailure extends Data.TaggedError('CleanupFailure')<{
   readonly operation: string;
@@ -9,6 +10,8 @@ export type CleanupTarget =
   | { readonly kind: 'source'; readonly assetId: string; readonly sourceId: string };
 export interface CleanupWork {
   readonly id: string;
+  readonly assetId: string;
+  readonly context?: CommandContext;
   readonly leaseId: string;
   readonly attempts: number;
   readonly target: CleanupTarget;
@@ -28,6 +31,10 @@ export class CleanupStore extends Context.Service<
         readonly id: string;
         readonly applicationId: string;
         readonly notificationId: string;
+        readonly assetId: string;
+        readonly target: CleanupTarget;
+        readonly attempts: number;
+        readonly context?: CommandContext;
       }[],
       CleanupFailure
     >;
@@ -49,6 +56,9 @@ export class Cleanup extends Context.Service<
 export class CleanupBytes extends Context.Service<
   CleanupBytes,
   {
-    readonly reclaim: (target: CleanupTarget) => Effect.Effect<void, CleanupFailure>;
+    readonly reclaim: (
+      target: CleanupTarget,
+      work?: CleanupWork
+    ) => Effect.Effect<void, CleanupFailure>;
   }
 >()('asset/cleanup/Bytes') {}

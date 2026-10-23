@@ -113,6 +113,7 @@ export interface SourceStorePort {
         readonly sourceId: string;
         readonly expiresAt: string;
       };
+      readonly cleanupContext?: CommandContext;
     }
   ) => Effect.Effect<A, SourceFailure>;
   readonly releaseRead: (readId: string) => Effect.Effect<void, SourceFailure>;
@@ -180,7 +181,8 @@ export interface SourcesPort {
     owner: Owner,
     assetId: string,
     sourceId: string,
-    expectedSourceSetRevision: string
+    expectedSourceSetRevision: string,
+    context?: CommandContext
   ) => Effect.Effect<SourceChangeOutcome, SourceFailure>;
   readonly policy: (
     owner: Owner,
@@ -224,13 +226,15 @@ export interface SourcesPort {
   readonly cancel: (
     owner: Owner,
     assetId: string,
-    candidateId: string
+    candidateId: string,
+    context?: CommandContext
   ) => Effect.Effect<SourceOutcome, SourceFailure>;
   readonly upload: (
     owner: Owner,
     assetId: string,
     candidateId: string,
-    bytes: SourceUpload
+    bytes: SourceUpload,
+    context?: CommandContext
   ) => Effect.Effect<SourceOutcome, SourceFailure>;
   readonly accept: (
     owner: Owner,

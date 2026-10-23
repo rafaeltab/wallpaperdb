@@ -235,7 +235,8 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
             owner,
             request.params.assetId,
             request.params.sourceId,
-            body.data.expectedSourceSetRevision
+            body.data.expectedSourceSetRevision,
+            requestContext(request)
           ),
         (result) => outcome(reply, result)
       );
@@ -293,7 +294,12 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
         request,
         reply,
         (sources, owner) =>
-          sources.cancel(owner, request.params.assetId, request.params.candidateId),
+          sources.cancel(
+            owner,
+            request.params.assetId,
+            request.params.candidateId,
+            requestContext(request)
+          ),
         (result) => outcome(reply, result)
       )
   );
@@ -318,7 +324,8 @@ export function registerSourceRoutes(app: FastifyInstance, execution: SourceExec
               cancel: () => {
                 body.destroy();
               },
-            })
+            }),
+            requestContext(request)
           ),
         (result) => {
           if (!body.readableEnded) {

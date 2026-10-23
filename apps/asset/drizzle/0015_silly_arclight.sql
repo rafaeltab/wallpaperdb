@@ -1,0 +1,1 @@
+ALTER TABLE "source_cleanup" ADD COLUMN "context" jsonb;

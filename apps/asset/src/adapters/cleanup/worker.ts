@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { Cause, Context, Effect, Fiber, Layer, Ref } from 'effect';
 import { connect } from 'nats';
 import { Cleanup, CleanupFailure, CleanupStore } from '../../capabilities/cleanup/index.js';
+import { observeCleanup } from './telemetry.js';
 
 export class CleanupHealth extends Context.Service<
   CleanupHealth,
@@ -70,17 +71,23 @@ export function cleanupWorkerLayer(options: Options) {
               const id = createHash('sha256')
                 .update(`cleanup:${alert.notificationId}`)
                 .digest('hex');
-              yield* broker('notify-quarantine', () =>
-                connection.jetstream().publish(
-                  'asset.operator.notifications',
-                  JSON.stringify({
-                    id,
-                    kind: 'cleanup-quarantine',
-                    subject: `asset.cleanup.${alert.id}`,
-                    reason: 'exhausted',
-                  }),
-                  { msgID: `cleanup-notification:${id}`, timeout: 5000 }
-                )
+              yield* observeCleanup(
+                'asset.cleanup.notify-quarantine',
+                alert,
+                broker('notify-quarantine', () =>
+                  connection.jetstream().publish(
+                    'asset.operator.notifications',
+                    JSON.stringify({
+                      id,
+                      kind: 'cleanup-quarantine',
+                      subject: `asset.cleanup.${alert.id}`,
+                      reason: 'exhausted',
+                      ...(alert.context ? { context: alert.context } : {}),
+                    }),
+                    { msgID: `cleanup-notification:${id}`, timeout: 5000 }
+                  )
+                ).pipe(Effect.as('notified')),
+                { 'event.id': id, 'cleanup.notification_id': alert.notificationId }
               );
               yield* store.alerted(alert.id, alert.notificationId);
             }

@@ -206,6 +206,8 @@
                 "vitest.integration.config.ts",
                 "test/integration/**",
                 "test/fixtures/crap/**",
+                "$TURBO_ROOT$/infra/package.json",
+                "$TURBO_ROOT$/infra/vitest.config.ts",
                 "$TURBO_ROOT$/apps/gateway/package.json",
                 "$TURBO_ROOT$/apps/gateway/vitest.config.ts",
                 "$TURBO_ROOT$/apps/asset/package.json",

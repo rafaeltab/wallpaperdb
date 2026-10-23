@@ -1,13 +1,20 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "strict": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
-    "skipLibCheck": true,
-    "types": ["node"]
-  },
-  "include": ["crap.config.mts", "test/integration/**/*.ts", "vitest.integration.config.ts", "apps/*/vitest*.ts", "packages/*/vitest*.ts"]
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"strict": true,
+		"noEmit": true,
+		"allowImportingTsExtensions": true,
+		"skipLibCheck": true,
+		"types": ["node"]
+	},
+	"include": [
+		"crap.config.mts",
+		"test/integration/**/*.ts",
+		"vitest.integration.config.ts",
+		"vitest.config.ts",
+		"apps/*/vitest*.ts",
+		"packages/*/vitest*.ts"
+	]
 }

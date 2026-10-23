@@ -10,7 +10,6 @@ export default defineBaseConfig({
         hookTimeout: 30000,
         maxConcurrency: 1,
         fileParallelism: true, // Disabled - with 80GB Docker memory, parallel execution should work
-        retry: 3,
         coverage: {
             provider: 'v8',
             include: ['src/**/*.ts'],

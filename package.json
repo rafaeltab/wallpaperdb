@@ -15,7 +15,8 @@
         "coverage:merge": "node scripts/merge-coverage.mjs",
         "test:integration": "vitest run --config vitest.integration.config.ts",
         "check-types": "tsc --project tsconfig.tooling.json",
-        "lint": "biome lint test"
+        "lint": "biome lint test",
+        "format": "biome format --write test/integration/*.ts vitest*.ts tsconfig.tooling.json"
     },
     "peerDependencies": {
         "graphql": "16.12.0"

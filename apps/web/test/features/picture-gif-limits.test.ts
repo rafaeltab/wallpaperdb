@@ -30,7 +30,7 @@ it.each([
       maxOutputBytes: 5242880, animation: { available: true },
       encoding: { staticQuality: 85, animationQuality: 85 },
     }, new AbortController().signal);
-    if (accepted) await processed;
+    if (accepted) await expect(processed).resolves.toMatchObject({ type: 'image/webp', size: encoded.size });
     else await expect(processed).rejects.toThrow('decoded byte limit');
   } finally { source.dispose(); }
 });

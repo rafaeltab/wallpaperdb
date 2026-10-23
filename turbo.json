@@ -9,6 +9,7 @@
         "packages/test-logger/src/**"
     ],
     "tasks": {
+        "//#format": { "cache": false },
         "start": {
             "cache": false,
             "persistent": true
@@ -228,6 +229,7 @@
                 "package.json",
                 "pnpm-lock.yaml",
                 "tsconfig.tooling.json",
+                "vitest.config.ts",
                 "apps/*/vitest*.ts",
                 "packages/*/vitest*.ts",
                 "apps/*/package.json",

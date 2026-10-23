@@ -80,6 +80,15 @@ export type SourceOutcome =
   | { readonly kind: 'candidate'; readonly candidate: Candidate }
   | { readonly kind: 'unavailable' }
   | { readonly kind: 'rejected'; readonly reason: string };
+export type SourceChangeOutcome =
+  | {
+      readonly kind: 'changed';
+      readonly sourceSetRevision: string;
+      readonly deliveryRevision: string;
+      readonly defaultSourceId: string;
+    }
+  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'rejected'; readonly reason: string };
 /** Serializes one Asset. The callback is pure, receives a detached state, and cannot
  * escape transaction resources. State, immutable Source metadata, cleanup deadlines,
  * initial analysis provenance and confirmation outbox commit together. Retirement records
@@ -149,6 +158,18 @@ export interface SourceUpload extends AsyncIterable<Uint8Array> {
   readonly cancel: () => void;
 }
 export interface SourcesPort {
+  readonly selectDefault: (
+    owner: Owner,
+    assetId: string,
+    sourceId: string,
+    expectedSourceSetRevision: string
+  ) => Effect.Effect<SourceChangeOutcome, SourceFailure>;
+  readonly withdraw: (
+    owner: Owner,
+    assetId: string,
+    sourceId: string,
+    expectedSourceSetRevision: string
+  ) => Effect.Effect<SourceChangeOutcome, SourceFailure>;
   readonly policy: (
     owner: Owner,
     type: string

@@ -13,6 +13,7 @@ export {
   type SourceState,
   type SourceConfirmation,
   type SourceOutcome,
+  type SourceChangeOutcome,
   type SourceStorePort,
   type SourceBytesPort,
   type MandatoryInspectionPort,

@@ -1,7 +1,7 @@
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
-import { Sources } from '../src/capabilities/sources/index.js';
+import { Sources, SourceFailure } from '../src/capabilities/sources/index.js';
 import { AuthorAuthentication } from '../src/adapters/authors/index.js';
 import { AssetDelivery } from '../src/capabilities/delivery/index.js';
 import { Availability } from '../src/capabilities/availability/index.js';
@@ -30,6 +30,36 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
             ),
         }),
         Layer.succeed(Sources, {
+          selectDefault: (owner, assetId, sourceId, revision) =>
+            Effect.sync(() => {
+              calls.push({ operation: 'select-default', owner, assetId, sourceId, revision });
+              return sourceId === 'missing'
+                ? { kind: 'unavailable' as const }
+                : {
+                    kind: 'changed' as const,
+                    sourceSetRevision: '9007199254740994',
+                    deliveryRevision: '9007199254740994',
+                    defaultSourceId: sourceId,
+                  };
+            }),
+          withdraw: (owner, assetId, sourceId, revision) =>
+            sourceId === 'failed'
+              ? Effect.fail(new SourceFailure({ operation: 'test', cause: 'Private failure' }))
+              : Effect.sync(() => {
+                  calls.push({ operation: 'withdraw', owner, assetId, sourceId, revision });
+                  return sourceId === 'default'
+                    ? { kind: 'rejected' as const, reason: 'default-source-withdrawal' }
+                    : sourceId === 'last'
+                      ? { kind: 'rejected' as const, reason: 'last-source-withdrawal' }
+                      : sourceId === 'stale'
+                        ? { kind: 'rejected' as const, reason: 'source-set-conflict' }
+                        : {
+                            kind: 'changed' as const,
+                            sourceSetRevision: '4',
+                            deliveryRevision: '4',
+                            defaultSourceId: 'next',
+                          };
+                }),
           policy: () =>
             Effect.succeed({
               kind: 'policy',
@@ -125,6 +155,70 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
       hasPendingCandidates: false,
       nextCandidateCursor: '0:candidate_previous',
     });
+    for (const request of [
+      {
+        method: 'PUT' as const,
+        url: '/assets/asset_1/default-source',
+        payload: { sourceId: 'next', expectedSourceSetRevision: '9007199254740993' },
+      },
+      {
+        method: 'DELETE' as const,
+        url: '/assets/asset_1/sources/previous',
+        payload: { expectedSourceSetRevision: '3' },
+      },
+    ]) {
+      expect((await app.inject(request)).statusCode).toBe(401);
+      const response = await app.inject({ ...request, headers: { authorization: 'Bearer owner' } });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.json()).toMatchObject({
+        defaultSourceId: 'next',
+        sourceSetRevision: request.method === 'PUT' ? '9007199254740994' : '4',
+      });
+      expect(calls.pop()).toEqual({
+        operation: request.method === 'PUT' ? 'select-default' : 'withdraw',
+        owner: { namespace: 'clerk', subject: 'owner' },
+        assetId: 'asset_1',
+        sourceId: request.method === 'PUT' ? 'next' : 'previous',
+        revision: request.method === 'PUT' ? '9007199254740993' : '3',
+      });
+      for (const payload of [
+        { expectedSourceSetRevision: 3 },
+        { expectedSourceSetRevision: '03' },
+        { ...request.payload, owner: { subject: 'other' } },
+        { ...request.payload, assetType: 'picture' },
+      ])
+        expect(
+          (await app.inject({ ...request, payload, headers: { authorization: 'Bearer owner' } }))
+            .statusCode
+        ).toBe(400);
+    }
+    for (const [sourceId, expected] of [
+      ['default', 409],
+      ['last', 409],
+      ['stale', 409],
+      ['failed', 503],
+    ] as const) {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: `/assets/asset_1/sources/${sourceId}`,
+        headers: { authorization: 'Bearer owner' },
+        payload: { expectedSourceSetRevision: '3' },
+      });
+      expect(response.statusCode).toBe(expected);
+      expect(response.headers['content-type']).toContain('application/problem+json');
+      expect(response.json()).toMatchObject({ status: expected });
+      expect(response.body).not.toContain('Private failure');
+      if (sourceId !== 'failed') calls.pop();
+    }
+    const missing = await app.inject({
+      method: 'PUT',
+      url: '/assets/asset_1/default-source',
+      headers: { authorization: 'Bearer owner' },
+      payload: { sourceId: 'missing', expectedSourceSetRevision: '3' },
+    });
+    expect(missing.statusCode).toBe(404);
+    calls.pop();
     const created = await app.inject({
       method: 'POST',
       url: '/assets/asset_1/source-candidates',
@@ -216,6 +310,8 @@ it('closes the exact original stream when the browser cancels the response', asy
           verify: () => Effect.succeed({ namespace: 'clerk', subject: 'owner' }),
         }),
         Layer.succeed(Sources, {
+          selectDefault: () => Effect.succeed({ kind: 'unavailable' }),
+          withdraw: () => Effect.succeed({ kind: 'unavailable' }),
           policy: () => Effect.die('unused'),
           list: () => Effect.die('unused'),
           create: () => Effect.die('unused'),

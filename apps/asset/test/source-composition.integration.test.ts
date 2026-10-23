@@ -349,6 +349,159 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
       },
     });
     replacementMessage?.ack();
+    const addition = { operation: 'add', expectedSourceSetRevision: '2' };
+    const proposed = await app.inject({
+      method: 'POST',
+      url: `/assets/${created.assetId}/source-candidates`,
+      headers: { ...headers, 'idempotency-key': 'default-next' },
+      payload: addition,
+    });
+    expect(proposed.statusCode).toBe(201);
+    const nextCandidate = proposed.json<{ candidateId: string }>().candidateId;
+    await app.inject({
+      method: 'PUT',
+      url: `/assets/${created.assetId}/source-candidates/${nextCandidate}/bytes`,
+      headers: { ...headers, 'content-type': 'application/octet-stream' },
+      payload: png,
+    });
+    const added = await app.inject({
+      method: 'POST',
+      url: `/assets/${created.assetId}/source-candidates/${nextCandidate}/accept`,
+      headers,
+      payload: addition,
+    });
+    expect(added.statusCode).toBe(200);
+    const nextSource = added.json<{ sourceId: string }>().sourceId;
+    const selected = await Promise.all(
+      Array.from({ length: 2 }, () =>
+        app.inject({
+          method: 'PUT',
+          url: `/assets/${created.assetId}/default-source`,
+          headers,
+          payload: { sourceId: nextSource, expectedSourceSetRevision: '3' },
+        })
+      )
+    );
+    expect(selected.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+    const before = (
+      await app.inject({ url: `/assets/${created.assetId}/sources`, headers })
+    ).json();
+    expect(before).toMatchObject({
+      defaultSourceId: nextSource,
+      sourceSetRevision: '4',
+      deliveryRevision: '4',
+    });
+    // Fail the final state write after retirement has been attempted. Both must roll back.
+    await pool.query(
+      "ALTER TABLE asset_source_state ADD CONSTRAINT source_withdrawal_rollback CHECK (state->>'sourceSetRevision' <> '5')"
+    );
+    const withdraw = () =>
+      app.inject({
+        method: 'DELETE',
+        url: `/assets/${created.assetId}/sources/${winner.sourceId}`,
+        headers,
+        payload: { expectedSourceSetRevision: '4' },
+      });
+    try {
+      expect((await withdraw()).statusCode).toBe(503);
+      expect(
+        (await app.inject({ url: `/assets/${created.assetId}/sources`, headers })).json()
+      ).toEqual(before);
+      expect(
+        (
+          await pool.query('SELECT evidence_expires_at FROM immutable_sources WHERE id = $1', [
+            winner.sourceId,
+          ])
+        ).rows
+      ).toEqual([{ evidence_expires_at: null }]);
+      expect(
+        (
+          await app.inject({
+            url: `/assets/${created.assetId}/sources/${winner.sourceId}/original`,
+            headers,
+          })
+        ).rawPayload
+      ).toEqual(replacementPng);
+    } finally {
+      await pool.query('ALTER TABLE asset_source_state DROP CONSTRAINT source_withdrawal_rollback');
+    }
+    expect((await withdraw()).json()).toEqual({
+      defaultSourceId: nextSource,
+      sourceSetRevision: '5',
+      deliveryRevision: '5',
+    });
+    expect(
+      (
+        await app.inject({
+          url: `/assets/${created.assetId}/sources/${winner.sourceId}/original`,
+          headers,
+        })
+      ).statusCode
+    ).toBe(404);
+    expect(
+      (
+        await app.inject({
+          url: `/assets/${created.assetId}/sources/${nextSource}/original`,
+          headers,
+        })
+      ).rawPayload
+    ).toEqual(png);
+    const withdrawn = await pool.query(
+      'SELECT evidence_expires_at FROM immutable_sources WHERE id = $1',
+      [winner.sourceId]
+    );
+    expect(withdrawn.rows[0]?.evidence_expires_at).toBeInstanceOf(Date);
+    expect((await withdraw()).statusCode).toBe(409);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/assets/${created.assetId}/source-candidates/${winner.candidateId}/accept`,
+          headers,
+          payload: replacementIntent,
+        })
+      ).json()
+    ).toMatchObject({ status: 'accepted', sourceSetRevision: '2' });
+    expect(
+      (
+        await pool.query('SELECT evidence_expires_at FROM immutable_sources WHERE id = $1', [
+          winner.sourceId,
+        ])
+      ).rows
+    ).toEqual(withdrawn.rows);
+    expect(
+      (
+        await pool.query('SELECT state FROM asset_source_state WHERE asset_id = $1', [
+          created.assetId,
+        ])
+      ).rows[0]?.state
+    ).toMatchObject({
+      sourceSetRevision: '5',
+      deliveryRevision: '5',
+      defaultSourceId: nextSource,
+      initialAnalysisSourceId: sourceId,
+      sources: [{ sourceId: nextSource }],
+    });
+    // Default/withdrawal are synchronous local mutations, not new candidate acceptance facts.
+    const nextMessage = await consumer.next({ expires: 5000 });
+    expect(nextMessage?.json()).toMatchObject({
+      type: 'asset.source.accepted',
+      data: {
+        assetId: created.assetId,
+        sourceId: nextSource,
+        sourceSetRevision: '3',
+        initialAnalysisSourceId: sourceId,
+      },
+    });
+    nextMessage?.ack();
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::int AS count FROM source_acceptance_outbox WHERE confirmation->>'assetId' = $1",
+          [created.assetId]
+        )
+      ).rows
+    ).toEqual([{ count: 3 }]);
     expect(await publisher.runPromise(SourceConfirmationHealth.use((s) => s.check()))).toBe(true);
   } finally {
     await app.close();

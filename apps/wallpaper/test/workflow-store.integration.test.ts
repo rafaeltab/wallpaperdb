@@ -14,7 +14,7 @@ import {
   type WorkflowPublication,
 } from '../src/capabilities/creation/index.js';
 import { workflowPostgresLayer } from '../src/adapters/workflow/index.js';
-import { recoverConfirmation } from '../src/adapters/asset-workflow/index.js';
+import { decodeConfirmation, recoverConfirmation } from '../src/adapters/asset-workflow/index.js';
 let container: StartedTestContainer;
 const databaseUrl = () =>
   `postgresql://postgres:test@${container.getHost()}:${container.getMappedPort(5432)}/wallpaper`;
@@ -471,6 +471,99 @@ it('skips an independently locked Wallpaper while claiming another Wallpaper', a
   } finally {
     await holder.query('ROLLBACK');
     holder.release();
+    await runtime.dispose();
+  }
+});
+
+it('retains concurrent first-Source registrations across restart and atomically publishes the confirmed first Default once', async () => {
+  const layer = () =>
+    creationLayer('authors').pipe(
+      Layer.provideMerge(
+        workflowPostgresLayer({
+          databaseUrl: databaseUrl(),
+          maxAttempts: 3,
+          retryDelayMs: 1,
+          leaseMs: 20,
+        })
+      )
+    );
+  let runtime = ManagedRuntime.make(layer());
+  const owner = { namespace: 'authors', subject: 'concurrent-initial-owner' };
+  try {
+    const result = await runtime.runPromise(
+      Creation.use((c) => c.begin(owner, 'concurrent-initial'))
+    );
+    if (result.kind !== 'wallpaper') throw new Error('Expected Wallpaper');
+    const w = result.wallpaper;
+    await runtime.runPromise(
+      Creation.use((c) =>
+        c.assetResult({
+          wallpaperId: w.id,
+          commandId: w.commandId,
+          creationEventId: w.creationEventId,
+          outcome: 'created',
+          assetId: 'asset-concurrent-initial',
+        })
+      )
+    );
+    await Promise.all(
+      ['one', 'two'].map((id) =>
+        runtime.runPromise(
+          Creation.use((c) =>
+            c.expectSource(owner, w.id, {
+              candidateId: `candidate-${id}`,
+              intentId: `intent-${id}`,
+            })
+          )
+        )
+      )
+    );
+    await runtime.dispose();
+    runtime = ManagedRuntime.make(layer());
+    const raw = {
+      specversion: '1.0',
+      id: 'accepted-first-default',
+      source: 'https://wallpaperdb/asset',
+      type: 'asset.source.accepted',
+      time: '2026-10-23T00:00:00Z',
+      datacontenttype: 'application/json',
+      causationsource: 'https://wallpaperdb/asset/authors',
+      causationid: 'author-accept',
+      correlationid: 'intent-one',
+      data: {
+        assetId: 'asset-concurrent-initial',
+        assetType: 'wallpaper',
+        candidateId: 'candidate-one',
+        sourceId: 'source-one',
+        defaultSourceId: 'source-one',
+        initialAnalysisSourceId: 'source-one',
+        sourceSetRevision: '1',
+        deliveryRevision: '1',
+      },
+    };
+    const decoded = decodeConfirmation(new TextEncoder().encode(JSON.stringify(raw)));
+    if (decoded.kind !== 'source') throw new Error('Invalid protected confirmation');
+    expect(
+      (
+        await Promise.all(
+          [1, 2, 3].map(() =>
+            runtime.runPromise(Creation.use((c) => c.sourceAccepted(decoded.confirmation)))
+          )
+        )
+      ).sort()
+    ).toEqual(['applied', 'ignored', 'ignored']);
+    expect(await runtime.runPromise(Creation.use((c) => c.get(owner, w.id)))).toMatchObject({
+      wallpaper: {
+        state: 'published',
+        assetId: 'asset-concurrent-initial',
+        sourceId: 'source-one',
+      },
+    });
+    const publications = await runtime.runPromise(WorkflowDelivery.use((d) => d.claim()));
+    expect(
+      publications.filter((p) => p.wallpaperId === w.id && p.destination === 'publication')
+    ).toHaveLength(1);
+  } finally {
     await runtime.dispose();
   }
 });

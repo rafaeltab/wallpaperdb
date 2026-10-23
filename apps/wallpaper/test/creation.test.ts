@@ -37,6 +37,7 @@ function setup() {
           state: 'creating-asset',
           assetId: null,
           intent: null,
+          sourceIntents: [],
           sourceId: null,
           initialAnalysisSourceId: null,
           createdAt: '2026-10-22T00:00:00.000Z',
@@ -120,7 +121,7 @@ it('keeps Wallpaper identity separate from its confirmed Asset and publishes its
   }
 });
 
-it('fences changed source intents, unrelated Assets and stale creation confirmations', async () => {
+it('retains competing registered first-Source intents while fencing unregistered and unrelated confirmations', async () => {
   const s = setup();
   try {
     const result = await s.run((c) => c.begin(owner, 'intent-fences'));
@@ -161,7 +162,11 @@ it('fences changed source intents, unrelated Assets and stale creation confirmat
       initialAnalysisSourceId: 'source-1',
       occurrenceId: 'event-1',
     };
-    expect(await s.run((c) => c.sourceAccepted(accepted))).toBe('ignored');
+    expect(
+      await s.run((c) =>
+        c.sourceAccepted({ ...accepted, candidateId: 'unregistered', intentId: 'unregistered' })
+      )
+    ).toBe('ignored');
     expect(
       await s.run((c) =>
         c.sourceAccepted({
@@ -173,11 +178,21 @@ it('fences changed source intents, unrelated Assets and stale creation confirmat
       )
     ).toBe('ignored');
     expect(s.events).toEqual([]);
+    expect(await s.run((c) => c.sourceAccepted(accepted))).toBe('applied');
+    expect(await s.run((c) => c.sourceAccepted(accepted))).toBe('ignored');
     expect(
       await s.run((c) =>
         c.sourceAccepted({ ...accepted, candidateId: 'candidate-2', intentId: 'intent-2' })
       )
-    ).toBe('applied');
+    ).toBe('ignored');
+    expect(s.events).toHaveLength(1);
+    expect(await s.run((c) => c.get(owner, w.id))).toMatchObject({
+      wallpaper: {
+        state: 'published',
+        sourceId: 'source-1',
+        intent: { candidateId: 'candidate-1', intentId: 'intent-1' },
+      },
+    });
   } finally {
     await s.close();
   }

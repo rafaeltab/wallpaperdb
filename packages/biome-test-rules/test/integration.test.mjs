@@ -51,6 +51,9 @@ function isolatedRepository() {
 		".npmrc",
 		"scripts/mise-shell.sh",
 		"scripts/toolchain.mjs",
+		"mutation.inventory.json",
+		"scripts/mutation.mjs",
+		"scripts/lib/mutation-catalog.mjs",
 	]) {
 		if (!existsSync(join(repository, name))) continue;
 		mkdirSync(dirname(join(directory, name)), { recursive: true });
@@ -63,7 +66,7 @@ function isolatedRepository() {
 	for (const workspace of workspaces) {
 		const target = join(directory, workspace);
 		mkdirSync(target, { recursive: true });
-		for (const file of ["package.json", "biome.json"])
+		for (const file of ["package.json", "biome.json", "mutation.config.json"])
 			if (existsSync(join(repository, workspace, file)))
 				copyFileSync(join(repository, workspace, file), join(target, file));
 		if (existsSync(join(repository, workspace, "node_modules")))
@@ -449,6 +452,10 @@ test("rule-test cache tracks copied configuration and ignore policy", async (con
 		"infra/biome.json",
 		".gitignore",
 		"crap.config.mts",
+		"mutation.inventory.json",
+		"scripts/mutation.mjs",
+		"scripts/lib/mutation-catalog.mjs",
+		"packages/profile-markdown/mutation.config.json",
 		// Present after the independent locked-toolchain change lands.
 		...[
 			"mise.toml",
@@ -471,21 +478,24 @@ test("rule-test cache tracks copied configuration and ignore policy", async (con
 					config,
 					path.endsWith(".mjs") || path === "crap.config.mts"
 						? readFileSync(config, "utf8") + "\n// Collector policy changed.\n"
-						: [
-									"mise.toml",
-									"mise.lock",
-									".npmrc",
-									"scripts/mise-shell.sh",
-								].includes(path)
-							? readFileSync(config, "utf8") +
-								"\n# Fixture toolchain policy changed.\n"
-							: path === ".gitignore"
+						: path === "mutation.inventory.json" ||
+								path.endsWith("/mutation.config.json")
+							? readFileSync(config, "utf8") + "\n"
+							: [
+										"mise.toml",
+										"mise.lock",
+										".npmrc",
+										"scripts/mise-shell.sh",
+									].includes(path)
 								? readFileSync(config, "utf8") +
-									"\napps/docs/src/ignored.test.ts\n"
-								: JSON.stringify({
-										files: { includes: ["*.json"] },
-										linter: { rules: { preset: "none" } },
-									}),
+									"\n# Fixture toolchain policy changed.\n"
+								: path === ".gitignore"
+									? readFileSync(config, "utf8") +
+										"\napps/docs/src/ignored.test.ts\n"
+									: JSON.stringify({
+											files: { includes: ["*.json"] },
+											linter: { rules: { preset: "none" } },
+										}),
 				);
 				gitFixture(directory, ["add", "--", path]);
 				makeRuleTests(directory);
@@ -494,4 +504,23 @@ test("rule-test cache tracks copied configuration and ignore policy", async (con
 				rmSync(directory, { recursive: true, force: true });
 			}
 		});
+});
+
+test("mutation inventory records the isolated Biome plugin limitation", () => {
+	const result = spawnSync("make", ["test-mutation", "ARGS=--inventory"], {
+		cwd: repository,
+		env: makeEnvironment(repository),
+		encoding: "utf8",
+		timeout: 30_000,
+	});
+	assert.equal(result.status, 0, result.stdout + result.stderr);
+	const entry = JSON.parse(result.stdout).workspaces[
+		"packages/biome-test-rules"
+	];
+	assert.equal(entry.decision, "excluded");
+	assert.match(entry.reason, /Biome/);
+	assert.equal(
+		entry.followUp,
+		"https://github.com/rafaeltab/wallpaperdb/issues/445",
+	);
 });

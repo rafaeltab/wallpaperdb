@@ -35,7 +35,32 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
               policy: initialSourcePolicies.wallpaper,
               revision: 'revision-1',
             }),
-          list: () => Effect.succeed({ kind: 'unavailable' }),
+          list: () =>
+            Effect.succeed({
+              kind: 'found',
+              asset: {
+                assetId: 'asset_1',
+                assetType: 'wallpaper',
+                sourceSetRevision: '1',
+                deliveryRevision: '1',
+                defaultSourceId: 'source_1',
+                sources: [],
+                candidates: [
+                  {
+                    candidateId: 'candidate_saved',
+                    sourceId: 'source_reserved',
+                    idempotencyKey: 'private-key',
+                    operation: 'add',
+                    expectedSourceSetRevision: '1',
+                    status: 'rejected',
+                    reason: 'aspect-ratio-limit',
+                    layout: 'asset-layout-1',
+                    expiresAt: '2026-10-24T00:00:00Z',
+                    orphanExpiresAt: '2026-10-24T00:00:00Z',
+                  },
+                ],
+              },
+            }),
           create: (owner, assetId, intent) =>
             Effect.sync(() => {
               calls.push({ owner, assetId, intent });
@@ -69,6 +94,22 @@ it('authenticates byte-free discovery and preserves candidate intent/revision/id
     });
     expect(policy.statusCode).toBe(200);
     expect(policy.json()).toMatchObject({ revision: 'revision-1', policy: { maxCandidates: 2 } });
+    const saved = await app.inject({
+      url: '/assets/asset_1/sources',
+      headers: { authorization: 'Bearer owner' },
+    });
+    expect(saved.json()).toMatchObject({
+      candidates: [
+        { candidateId: 'candidate_saved', status: 'rejected', reason: 'aspect-ratio-limit' },
+      ],
+    });
+    for (const privateValue of [
+      'private-key',
+      'source_reserved',
+      'asset-layout-1',
+      'orphanExpiresAt',
+    ])
+      expect(saved.body).not.toContain(privateValue);
     const created = await app.inject({
       method: 'POST',
       url: '/assets/asset_1/source-candidates',

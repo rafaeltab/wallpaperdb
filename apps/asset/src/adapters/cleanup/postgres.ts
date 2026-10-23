@@ -255,7 +255,11 @@ export function cleanupPostgresLayer(options: Options) {
         pendingAlerts: () =>
           run('pending-alerts', (db) =>
             db
-              .select({ id: sourceCleanup.id, applicationId: sourceCleanup.applicationId })
+              .select({
+                id: sourceCleanup.id,
+                applicationId: sourceCleanup.applicationId,
+                notificationId: sourceCleanup.notificationId,
+              })
               .from(sourceCleanup)
               .where(and(eq(sourceCleanup.status, 'quarantined'), isNull(sourceCleanup.notifiedAt)))
               .limit(100)
@@ -277,6 +281,7 @@ export function cleanupPostgresLayer(options: Options) {
                 leaseId: null,
                 availableAt: new Date(),
                 notifiedAt: null,
+                notificationId: randomUUID(),
               })
               .where(and(eq(sourceCleanup.id, id), eq(sourceCleanup.status, 'quarantined')))
               .returning({ id: sourceCleanup.id });

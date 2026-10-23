@@ -7,7 +7,9 @@ import {
   primaryKey,
   text,
   timestamp,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 /**
  * Wallpapers table - stores metadata from wallpaper.uploaded events
@@ -127,3 +129,72 @@ export const catalogTargets = pgTable('catalog_targets', {
   id: text('id').primaryKey(),
   acceptedAt: timestamp('accepted_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const assetConfiguration = pgTable(
+  'asset_configuration',
+  {
+    id: integer('id').primaryKey(),
+    revision: text('revision').notNull(),
+  },
+  (table) => [check('asset_configuration_singleton', sql`${table.id} = 1`)]
+);
+
+export const ownedAssets = pgTable(
+  'owned_assets',
+  {
+    id: text('id').primaryKey(),
+    applicationId: text('application_id').notNull(),
+    assetType: text('asset_type').notNull(),
+    ownerNamespace: text('owner_namespace').notNull(),
+    ownerSubject: text('owner_subject').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check('owned_assets_application_id', sql`${table.applicationId} ~ '^[A-Za-z0-9_-]{1,64}$'`),
+    check('owned_assets_type', sql`${table.assetType} ~ '^[A-Za-z0-9_-]{1,64}$'`),
+    check('owned_assets_namespace', sql`octet_length(${table.ownerNamespace}) BETWEEN 1 AND 256`),
+    check('owned_assets_subject', sql`octet_length(${table.ownerSubject}) BETWEEN 1 AND 256`),
+  ]
+);
+
+export const assetCommands = pgTable(
+  'asset_commands',
+  {
+    applicationId: text('application_id').notNull(),
+    commandId: text('command_id').notNull(),
+    canonical: text('canonical').notNull(),
+    result: jsonb('result').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.applicationId, table.commandId] }),
+    check('asset_commands_identity', sql`octet_length(${table.commandId}) BETWEEN 1 AND 128`),
+  ]
+);
+
+export const assetResultOutbox = pgTable(
+  'asset_result_outbox',
+  {
+    id: text('id').primaryKey(),
+    context: jsonb('context')
+      .notNull()
+      .$type<import('../capabilities/lifecycle/index.js').CommandContext>(),
+    applicationId: text('application_id').notNull(),
+    commandId: text('command_id').notNull(),
+    payloadDigest: text('payload_digest').notNull(),
+    result: jsonb('result').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+    leaseId: text('lease_id'),
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('asset_result_outbox_ready').on(table.status, table.availableAt),
+    check(
+      'asset_result_outbox_status',
+      sql`${table.status} IN ('pending', 'publishing', 'published', 'quarantined')`
+    ),
+    check('asset_result_outbox_attempts', sql`${table.attempts} >= 0`),
+  ]
+);

@@ -6,6 +6,17 @@ export {
 
 export { AssetReferenceSchema, type AssetReference } from "./asset-reference.js";
 export {
+  AssetIdentifierSchema,
+  OwnerValueSchema,
+  CreateAssetSchema,
+  DeleteAssetSchema,
+  AssetRejectionReasonSchema,
+  AssetCommandResultSchema,
+  type CreateAsset,
+  type DeleteAsset,
+  type AssetCommandResult,
+} from "./asset-commands.js";
+export {
   COLOR_ANCHORS,
   COLOR_MEASUREMENT_VERSION,
   COLOR_REFERENCE_COMMIT,

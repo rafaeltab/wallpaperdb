@@ -1,3 +1,11 @@
 {
-  "publicModules": ["http", "adapters/assets", "adapters/catalog", "adapters/events"]
+  "publicModules": [
+    "http",
+    "adapters/assets",
+    "adapters/catalog",
+    "adapters/events",
+    "adapters/lifecycle",
+    "adapters/commands",
+    "adapters/authors"
+  ]
 }

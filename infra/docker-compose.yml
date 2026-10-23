@@ -117,10 +117,8 @@ services:
     image: nats:2-alpine
     restart: unless-stopped
     command:
-      - "-js"
-      - "-m"
-      - "8222"
-      - "--store_dir=/data"
+      - "-c"
+      - "/etc/nats/asset.conf"
     ports:
       - "${NATS_HOST_PORT:-4222}:4222"
       # Monitoring port removed — accessible via Caddy at /nats in Phase 8.
@@ -128,6 +126,7 @@ services:
       # - "8222:8222"
     volumes:
       - nats-data:/data
+      - ./nats/.generated.conf:/etc/nats/asset.conf:ro
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8222/healthz"]
       interval: 10s
@@ -146,6 +145,23 @@ services:
       - ./nats/init:/scripts:ro
     entrypoint: ["/scripts/setup-streams.sh"]
     restart: on-failure
+
+  asset-operator-inbox:
+    image: node:22.22.3-alpine
+    restart: unless-stopped
+    command: ["node", "/scripts/operator-inbox.mjs"]
+    environment:
+      OPERATOR_INBOX_CONFIG: /config/authority.json
+      OPERATOR_INBOX_DATA: /data
+    volumes:
+      - ../scripts/operator-inbox.mjs:/scripts/operator-inbox.mjs:ro
+      - ../apps/asset/.authority.json:/config/authority.json:ro
+      - asset-operator-receipts:/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3012/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # pgAdmin - Database Administration
   pgadmin:
@@ -212,6 +228,7 @@ services:
       retries: 5
 
 volumes:
+  asset-operator-receipts:
   postgres-data:
   seaweedfs-data:
   opensearch-data:

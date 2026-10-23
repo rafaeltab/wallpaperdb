@@ -51,6 +51,7 @@ function isolatedRepository() {
 		".npmrc",
 		"scripts/mise-shell.sh",
 		"scripts/toolchain.mjs",
+		"scripts/crap.mts",
 		"mutation.inventory.json",
 		"scripts/mutation.mjs",
 		"scripts/lib/mutation-catalog.mjs",
@@ -187,10 +188,6 @@ test("unit coverage combines with the CRAP JavaScript rule inventory", () => {
 import { test } from 'node:test';
 import { measured } from '../src/measurement.js';
 test('executes measured source', () => assert.equal(measured(), 42));`,
-		);
-		copyFileSync(
-			join(repository, "scripts/crap.mts"),
-			join(directory, "scripts/crap.mts"),
 		);
 		gitFixture(directory, ["add", "--", "."]);
 		makeRuleTests(directory);
@@ -452,6 +449,7 @@ test("rule-test cache tracks copied configuration and ignore policy", async (con
 		"infra/biome.json",
 		".gitignore",
 		"crap.config.mts",
+		"scripts/crap.mts",
 		"mutation.inventory.json",
 		"scripts/mutation.mjs",
 		"scripts/lib/mutation-catalog.mjs",
@@ -476,8 +474,11 @@ test("rule-test cache tracks copied configuration and ignore policy", async (con
 				const config = join(directory, path);
 				writeFileSync(
 					config,
-					path.endsWith(".mjs") || path === "crap.config.mts"
-						? readFileSync(config, "utf8") + "\n// Collector policy changed.\n"
+					path.endsWith(".mjs") || path.endsWith(".mts")
+						? readFileSync(config, "utf8") +
+								(path === "scripts/crap.mts"
+									? "\nthrow new Error('Collector changed after caching');\n"
+									: "\n// Collector policy changed.\n")
 						: path === "mutation.inventory.json" ||
 								path.endsWith("/mutation.config.json")
 							? readFileSync(config, "utf8") + "\n"

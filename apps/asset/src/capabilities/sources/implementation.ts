@@ -9,6 +9,7 @@ import {
   type Candidate,
   type CandidateIntent,
   type SourceOutcome,
+  type SourceChangeOutcome,
   type SourceState,
   type SourceFacts,
   type SourcesPort,
@@ -111,7 +112,73 @@ export function sourcesLayer(configuration: {
           if (wasPending && !nonterminal(found)) state.nonterminalCandidateCount--;
           return outcome;
         });
+      const changeSource = Effect.fn('asset.sources.change')(function* (
+        owner: Owner,
+        assetId: string,
+        sourceId: string,
+        expectedRevision: string,
+        operation: 'select-default' | 'withdraw'
+      ) {
+        if (!validRevision(expectedRevision))
+          return { kind: 'rejected', reason: 'malformed-source-change' } as const;
+        const now = yield* Clock.currentTimeMillis;
+        return yield* store.transact<SourceChangeOutcome>(
+          assetId,
+          configuration.revision,
+          (state) => {
+            if (!owns(owner, state)) return { state, result: unavailable };
+            const policy = configuration.types[state.asset.assetType];
+            if (!policy || state.asset.assetType !== 'wallpaper')
+              return { state, result: { kind: 'rejected', reason: 'unsupported-operation' } };
+            if (state.sourceSetRevision !== expectedRevision)
+              return { state, result: { kind: 'rejected', reason: 'source-set-conflict' } };
+            if (!state.sources.some((source) => source.sourceId === sourceId))
+              return { state, result: { kind: 'rejected', reason: 'unavailable-source' } };
+            if (operation === 'withdraw') {
+              if (state.sources.length === 1)
+                return { state, result: { kind: 'rejected', reason: 'last-source-withdrawal' } };
+              if (state.defaultSourceId === sourceId)
+                return { state, result: { kind: 'rejected', reason: 'default-source-withdrawal' } };
+              state.sources = state.sources.filter((source) => source.sourceId !== sourceId);
+            } else if (state.defaultSourceId === sourceId) {
+              return {
+                state,
+                result: {
+                  kind: 'changed',
+                  sourceSetRevision: state.sourceSetRevision,
+                  deliveryRevision: state.deliveryRevision,
+                  defaultSourceId: sourceId,
+                },
+              };
+            } else state.defaultSourceId = sourceId;
+            state.sourceSetRevision = (BigInt(state.sourceSetRevision) + 1n).toString();
+            state.deliveryRevision = (BigInt(state.deliveryRevision) + 1n).toString();
+            if (!state.defaultSourceId) throw new Error('Active Source set requires a Default');
+            return {
+              state,
+              result: {
+                kind: 'changed',
+                sourceSetRevision: state.sourceSetRevision,
+                deliveryRevision: state.deliveryRevision,
+                defaultSourceId: state.defaultSourceId,
+              },
+              ...(operation === 'withdraw'
+                ? {
+                    retirement: {
+                      sourceId,
+                      evidenceExpiresAt: new Date(now + policy.retention.evidenceMs).toISOString(),
+                    },
+                  }
+                : {}),
+            };
+          }
+        );
+      });
       return Sources.of({
+        selectDefault: (owner, assetId, sourceId, revision) =>
+          changeSource(owner, assetId, sourceId, revision, 'select-default'),
+        withdraw: (owner, assetId, sourceId, revision) =>
+          changeSource(owner, assetId, sourceId, revision, 'withdraw'),
         policy: (owner, type) => {
           const selected = Object.hasOwn(configuration.types, type)
             ? configuration.types[type]

@@ -123,6 +123,11 @@
         "unit"
       ]
     },
+    "packages/biome-test-rules": {
+      "decision": "excluded",
+      "reason": "Biome plugins execute in an isolated runtime; CLI subprocesses and the Node algorithm contracts have no validated native Vitest mutation activation.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
     "packages/core": {
       "decision": "excluded",
       "reason": "The unit database health probe opens an unowned localhost:59999 PostgreSQL endpoint. Control this external input before enabling mutations. Integration container ownership/reset and subprocess activation also remain unvalidated.",

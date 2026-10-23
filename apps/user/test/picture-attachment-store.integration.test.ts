@@ -236,6 +236,89 @@ describe('PostgreSQL picture attachment contract', () => {
       data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
     });
   });
+  it.each([
+    'creating',
+    'awaiting-source',
+  ])('removes an empty Profile during %s and durably deletes a late-created Asset', async (state) => {
+    const first = await begin();
+    if (state === 'awaiting-source') await created(first);
+    expect(await remove(1)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 2, pictureAssetId: null },
+    });
+    if (state === 'creating') expect(await created(first)).toBe('applied');
+    expect(await confirm(first)).toBe('ignored');
+    expect(
+      await runtime.runPromise(
+        PictureAttachments.use((s) => s.get({ profileId: 'owner' }, first.id))
+      )
+    ).toMatchObject({
+      attachment: { state: 'conflicted', assetId: 'asset-A', deletion: 'pending' },
+    });
+    expect(
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+    ).toMatchObject([
+      {
+        event: {
+          id: first.deletionEventId,
+          data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+        },
+      },
+    ]);
+    expect(await remove(2)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 2, pictureAssetId: null },
+    });
+  });
+  it.each([
+    'outbox_events',
+    'picture_attachment_outbox',
+  ])('rolls back unlink, intent and delete duty when %s cannot commit', async (table) => {
+    const first = await begin();
+    await created(first);
+    await register(first);
+    await confirm(first);
+    await sql.unsafe(
+      "create function reject_unlink_write() returns trigger language plpgsql as $$ begin raise exception 'intentional unlink write failure'; end $$"
+    );
+    await sql.unsafe(
+      `create trigger reject_unlink_write before insert on ${table} for each row execute function reject_unlink_write()`
+    );
+    try {
+      await expect(remove(2)).rejects.toMatchObject({ _tag: 'ProfileUnavailable' });
+      expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+        { picture_asset_id: 'asset-A', version: 2 },
+      ]);
+      expect(
+        await runtime.runPromise(
+          PictureAttachments.use((s) => s.get({ profileId: 'owner' }, first.id))
+        )
+      ).toMatchObject({
+        attachment: { state: 'attached', deletion: 'none' },
+      });
+      expect(
+        await sql`select id from picture_attachment_outbox where destination='asset-delete'`
+      ).toEqual([]);
+    } finally {
+      await sql.unsafe(
+        `drop trigger reject_unlink_write on ${table};drop function reject_unlink_write()`
+      );
+    }
+    expect(await remove(2)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 3, pictureAssetId: null },
+    });
+    expect(
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+    ).toMatchObject([
+      {
+        event: {
+          id: first.deletionEventId,
+          data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+        },
+      },
+    ]);
+  });
   it('rolls back the intent and Profile together when its event cannot commit', async () => {
     const i = await begin();
     await created(i);

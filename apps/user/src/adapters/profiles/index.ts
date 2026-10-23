@@ -287,6 +287,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                       .where(eq(profilePictureAssets.id, query.assetId))
                       .for('update')
                   : [];
+                const attachment = await selectedAttachment(tx, current.id);
                 const observedAt = new Date(Math.max(query.now.getTime(), Date.now()));
                 const profile = await ownerProfile(tx, current, policy, observedAt);
                 const eligibleHandles = (
@@ -298,7 +299,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                     'creating-asset',
                     'awaiting-source',
                     'accepting-source',
-                  ].includes((await selectedAttachment(tx, current.id))?.state ?? ''),
+                  ].includes(attachment?.state ?? ''),
                   observedAt,
                   eligibleHandles,
                   targetClaim: targetClaim ?? null,

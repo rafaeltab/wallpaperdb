@@ -29,12 +29,34 @@ async function assertProblem(response, expected) {
 }
 
 for (const kind of [
+	"command-quarantine",
 	"result-quarantine",
 	"source-confirmation-quarantine",
 	"wallpaper-workflow-quarantine",
+	"cleanup-quarantine",
 ])
 	test(`${kind} receipts require credentials, survive restart and deduplicate delivery`, async () => {
-		const receipt = { ...notice, kind };
+		const receipt = {
+			...notice,
+			kind,
+			subject:
+				kind === "cleanup-quarantine"
+					? "asset.cleanup.candidate:candidate_test"
+					: notice.subject,
+			...(kind === "cleanup-quarantine"
+				? {
+						context: {
+							occurrence: {
+								source: "https://wallpaperdb/asset/authors",
+								id: "cancelled-candidate",
+							},
+							correlationId: "cleanup-request",
+							traceparent:
+								"00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+						},
+					}
+				: {}),
+		};
 		const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));
 		let server;
 		async function start() {

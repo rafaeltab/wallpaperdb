@@ -249,3 +249,32 @@ export const assetDeletions = pgTable('asset_deletions', {
   capabilitiesPending: boolean('capabilities_pending').notNull().default(true),
   cleanupPending: boolean('cleanup_pending').notNull().default(true),
 });
+
+/** Exact identities remain as compact replay fences after their image facts are
+ * purged. A null deadline is a current Source, never eligible for reclamation. */
+export const sourceCleanup = pgTable(
+  'source_cleanup',
+  {
+    id: text('id').primaryKey(),
+    assetId: text('asset_id').notNull(),
+    applicationId: text('application_id').notNull(),
+    target: jsonb('target')
+      .notNull()
+      .$type<import('../capabilities/cleanup/index.js').CleanupTarget>(),
+    dueAt: timestamp('due_at', { withTimezone: true }),
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+    leaseId: text('lease_id'),
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('source_cleanup_ready').on(table.status, table.dueAt, table.availableAt),
+    index('source_cleanup_asset').on(table.assetId),
+    check(
+      'source_cleanup_status',
+      sql`${table.status} IN ('pending', 'reclaiming', 'completed', 'quarantined')`
+    ),
+    check('source_cleanup_attempts', sql`${table.attempts} >= 0`),
+  ]
+);

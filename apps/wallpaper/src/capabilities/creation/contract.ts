@@ -122,23 +122,27 @@ export interface WorkflowPublication {
   /** Earlier claimed attempts; the current claim has already consumed its durable attempt. */
   readonly attempts: number;
 }
+export type WorkflowAlert =
+  | {
+      readonly id: string;
+      readonly scope: 'outbox';
+      readonly reason: 'exhausted';
+      readonly quarantineId: string;
+    }
+  | {
+      readonly id: string;
+      readonly scope: 'confirmation';
+      readonly reason: 'invalid' | 'exhausted';
+    };
 /** Leased claims survive restart and consume the finite budget even when abandoned.
  * Publication is complete only after broker PubAck.
  * Exhausted attempts remain quarantined with their original identity, never reset
- * by an HTTP retry. Recovery is available only to trusted operator composition. */
+ * by an HTTP retry. Deliberate recovery renews the durable quarantine identity;
+ * notification retries retain it. Acknowledgement only closes the matching active
+ * quarantine. Recovery is available only to trusted operator composition. */
 export interface WorkflowDeliveryPort {
-  readonly alerts: () => Effect.Effect<
-    readonly {
-      readonly id: string;
-      readonly scope: 'outbox' | 'confirmation';
-      readonly reason: 'invalid' | 'exhausted';
-    }[],
-    WorkflowFailure
-  >;
-  readonly alerted: (
-    id: string,
-    scope: 'outbox' | 'confirmation'
-  ) => Effect.Effect<void, WorkflowFailure>;
+  readonly alerts: () => Effect.Effect<readonly WorkflowAlert[], WorkflowFailure>;
+  readonly alerted: (alert: WorkflowAlert) => Effect.Effect<void, WorkflowFailure>;
   readonly retainedConfirmation: (id: string) => Effect.Effect<string | null, WorkflowFailure>;
   readonly confirmationRecovered: (id: string) => Effect.Effect<void, WorkflowFailure>;
   readonly claim: () => Effect.Effect<readonly WorkflowPublication[], WorkflowFailure>;

@@ -1,6 +1,10 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { Server } from 'node:http';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -11,12 +15,15 @@ import { propagation } from '@opentelemetry/api';
 import { GenericContainer, Wait } from 'testcontainers';
 import { AckPolicy, connect, RetentionPolicy, DiscardPolicy, StorageType } from 'nats';
 import { expect, it } from 'vitest';
+import { z } from 'zod';
 import {
   Creation,
   creationLayer,
   WorkflowStore,
   WorkflowDelivery,
   WorkflowHealth,
+  WorkflowFailure,
+  type WorkflowDeliveryPort,
   type WorkflowPublication,
 } from '../src/capabilities/creation/index.js';
 import { assetWorkflowLayer, recoverConfirmation } from '../src/adapters/asset-workflow/index.js';
@@ -218,7 +225,16 @@ it('uses protected application credentials, persists publication acknowledgement
       recover: () => Effect.succeed(false),
       alerts: () =>
         Effect.succeed(
-          alerted ? [] : [{ id: 'retained-record', scope: 'outbox', reason: 'exhausted' }]
+          alerted
+            ? []
+            : [
+                {
+                  id: 'retained-record',
+                  scope: 'outbox',
+                  reason: 'exhausted',
+                  quarantineId: 'retained-quarantine',
+                },
+              ]
         ),
       alerted: () =>
         Effect.sync(() => {
@@ -360,6 +376,314 @@ it('uses protected application credentials, persists publication acknowledgement
           (await manager.consumers.info('ASSET_RESULTS', 'results_wallpaper')).num_ack_pending
       )
       .toBe(0);
+  }));
+
+it('renews exhausted publication notices through the durable deduplicating inbox and completes the original event', () =>
+  withResources(async (defer) => {
+    const { url, operator, legacy } = await startBroker(defer);
+    const postgres = await new GenericContainer('postgres:16-alpine')
+      .withEnvironment({ POSTGRES_PASSWORD: 'test', POSTGRES_DB: 'wallpaper' })
+      .withExposedPorts(5432)
+      .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
+      .start();
+    defer(() => postgres.stop());
+    const databaseUrl = `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`;
+    const pool = new Pool({ connectionString: databaseUrl });
+    defer(() => pool.end());
+    await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+    const directory = await mkdtemp(join(tmpdir(), 'wallpaper-quarantine-receipts-'));
+    defer(() => rm(directory, { recursive: true, force: true }));
+    const { createOperatorInbox } = await import(
+      new URL('../../../scripts/operator-inbox.mjs', import.meta.url).href
+    );
+    const openInbox = async () => {
+      const inbox: Server = await createOperatorInbox({ directory, token: 'test' });
+      defer(() => closeInbox(inbox));
+      inbox.listen(0, '127.0.0.1');
+      await once(inbox, 'listening');
+      const address = inbox.address();
+      if (!address || typeof address === 'string') throw new Error('Missing operator inbox');
+      return { inbox, address: `http://127.0.0.1:${address.port}` };
+    };
+    let inbox = await openInbox();
+    const receipts = async () => {
+      const response = await fetch(`${inbox.address}/receipts`, {
+        headers: { Authorization: `Basic ${Buffer.from('operator:test').toString('base64')}` },
+      });
+      expect(response.status).toBe(200);
+      return z
+        .array(
+          z.object({
+            notice: z.object({
+              id: z.string(),
+              applicationId: z.literal('wallpaper'),
+              kind: z.literal('wallpaper-workflow-quarantine'),
+              subject: z.string(),
+              reason: z.enum(['exhausted', 'invalid']),
+              recoveryId: z.string(),
+              recoveryScope: z.string(),
+            }),
+            receivedAt: z.string(),
+          })
+        )
+        .parse(await response.json());
+    };
+    const services = () =>
+      creationLayer('authors').pipe(
+        Layer.provideMerge(
+          workflowPostgresLayer({
+            databaseUrl,
+            maxAttempts: 3,
+            retryDelayMs: 0,
+            leaseMs: 60_000,
+          })
+        )
+      );
+    let storage = ManagedRuntime.make(services());
+    defer(() => storage.dispose());
+    let delivery = await storage.runPromise(WorkflowDelivery);
+    let creation = await storage.runPromise(Creation);
+    const failures: WorkflowPublication[] = [];
+    const completions: WorkflowPublication[] = [];
+    const acknowledgements: Parameters<WorkflowDeliveryPort['alerted']>[] = [];
+    let failAcknowledgement = true;
+    let holdAcknowledgements = false;
+    const start = () => {
+      const current = delivery;
+      return ManagedRuntime.make(
+        assetWorkflowLayer({
+          natsUrl: url,
+          ownerNamespace: 'authors',
+          credential: { user: 'wallpaper-client', password: 'application-test' },
+          identityProviders: [],
+          operatorNotification: { url: `${inbox.address}/events`, token: 'test' },
+          maxAttempts: 3,
+          retryDelayMs: 0,
+          pollMs: 10,
+          shutdownTimeoutMs: 3000,
+        }).pipe(
+          Layer.provideMerge(
+            Layer.merge(
+              Layer.succeed(Creation, creation),
+              Layer.succeed(WorkflowDelivery, {
+                ...current,
+                failed: (p) =>
+                  current.failed(p).pipe(
+                    Effect.andThen(
+                      Effect.sync(() => {
+                        failures.push(p);
+                      })
+                    )
+                  ),
+                complete: (p) =>
+                  current.complete(p).pipe(
+                    Effect.andThen(
+                      Effect.sync(() => {
+                        completions.push(p);
+                      })
+                    )
+                  ),
+                alerted: (...args) =>
+                  Effect.suspend(() => {
+                    acknowledgements.push(args);
+                    // The real HTTP receiver accepted the notice. Only the local acknowledgement failure is injected.
+                    if (failAcknowledgement || holdAcknowledgements) {
+                      failAcknowledgement = false;
+                      return Effect.fail(
+                        new WorkflowFailure({
+                          operation: 'test-alert-acknowledgement',
+                          cause: 'injected',
+                        })
+                      );
+                    }
+                    return current.alerted(...args);
+                  }),
+              })
+            )
+          )
+        )
+      );
+    };
+    let worker: ReturnType<typeof start> | undefined;
+    defer(() => worker?.dispose());
+    const { manager, publicManager } = await setupStreams(operator, legacy);
+    const originalConfig = (await publicManager.streams.info('WALLPAPER')).config;
+    await publicManager.streams.update('WALLPAPER', { max_msg_size: 128 });
+    const owner = { namespace: 'authors', subject: 'renewed-publication-owner' };
+    const wallpaper = await storage.runPromise(WorkflowStore.use((s) => s.begin(owner, 'renewed')));
+    worker = start();
+    await worker.runPromise(WorkflowHealth);
+    await expect.poll(() => completions.map((p) => p.id)).toEqual([wallpaper.creationEventId]);
+    expect((await manager.streams.info('ASSET_COMMANDS')).state.messages).toBe(1);
+    const command = completions[0];
+    if (!command) throw new Error('Expected creation command');
+    expect(
+      JSON.parse((await manager.streams.getMessage('ASSET_COMMANDS', { seq: 1 })).string())
+    ).toEqual(command.event);
+    const result = {
+      specversion: '1.0',
+      id: 'renewed-result',
+      source: 'https://wallpaperdb/asset',
+      type: 'asset.command.result',
+      time: wallpaper.createdAt,
+      datacontenttype: 'application/json',
+      causationsource: 'https://wallpaperdb/wallpaper',
+      causationid: wallpaper.creationEventId,
+      correlationid: wallpaper.id,
+      data: {
+        commandId: wallpaper.commandId,
+        applicationReference: wallpaper.id,
+        outcome: 'created',
+        assetId: 'renewed-asset',
+      },
+    };
+    await operator.jetstream().publish('asset.results.wallpaper', JSON.stringify(result));
+    await expect
+      .poll(() => storage.runPromise(creation.list(owner)))
+      .toEqual([expect.objectContaining({ state: 'awaiting-source', assetId: 'renewed-asset' })]);
+    await storage.runPromise(
+      creation.expectSource(owner, wallpaper.id, {
+        candidateId: 'renewed-candidate',
+        intentId: 'renewed-intent',
+      })
+    );
+    await operator.jetstream().publish(
+      'asset.results.wallpaper',
+      JSON.stringify({
+        ...result,
+        id: 'renewed-source',
+        type: 'asset.source.accepted',
+        causationsource: 'https://wallpaperdb/asset/authors',
+        causationid: 'accept-renewed',
+        correlationid: 'renewed-intent',
+        data: {
+          assetId: 'renewed-asset',
+          assetType: 'wallpaper',
+          candidateId: 'renewed-candidate',
+          sourceId: 'renewed-source',
+          defaultSourceId: 'renewed-source',
+          initialAnalysisSourceId: 'renewed-source',
+          sourceSetRevision: '1',
+          deliveryRevision: '1',
+        },
+      })
+    );
+    const receipt = expect.objectContaining({
+      notice: expect.objectContaining({
+        applicationId: 'wallpaper',
+        kind: 'wallpaper-workflow-quarantine',
+        reason: 'exhausted',
+        recoveryScope: 'outbox',
+      }),
+    });
+    await expect.poll(receipts, { timeout: 5000 }).toEqual([receipt]);
+    await expect.poll(() => storage.runPromise(delivery.alerts())).toEqual([]);
+    await worker.dispose();
+    expect(acknowledgements.length).toBeGreaterThanOrEqual(2);
+    expect(acknowledgements[1]).toEqual(acknowledgements[0]);
+    expect(failures.map((p) => p.attempts)).toEqual([0, 1, 2]);
+    expect((await publicManager.streams.info('WALLPAPER')).state.messages).toBe(0);
+    const original = failures[0];
+    if (!original) throw new Error('Expected failed publication');
+    const firstReceipt = (await receipts())[0];
+    expect(firstReceipt?.notice.recoveryId).toBe(original.id);
+    expect(
+      await storage.runPromise(WorkflowStore.use((s) => s.begin(owner, 'renewed')))
+    ).toMatchObject({ attentionRequired: true });
+    holdAcknowledgements = true;
+    expect(await storage.runPromise(delivery.recover(original.id))).toBe(true);
+    worker = start();
+    await worker.runPromise(WorkflowHealth);
+    await expect.poll(receipts, { timeout: 5000 }).toEqual([receipt, receipt]);
+    await worker.dispose();
+    const pending = await storage.runPromise(delivery.alerts());
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).not.toEqual(acknowledgements[0]?.[0]);
+    const twoReceipts = await receipts();
+    expect(twoReceipts[0]).toEqual(firstReceipt);
+    expect(twoReceipts[1]?.notice.id).not.toBe(firstReceipt?.notice.id);
+    expect(failures.map((p) => p.attempts)).toEqual([0, 1, 2, 0, 1, 2]);
+    expect(
+      failures.every(
+        (p) => p.id === original.id && JSON.stringify(p.event) === JSON.stringify(original.event)
+      )
+    ).toBe(true);
+    await closeInbox(inbox.inbox);
+    inbox = await openInbox();
+    expect(await receipts()).toEqual(twoReceipts);
+    await storage.dispose();
+    storage = ManagedRuntime.make(services());
+    delivery = await storage.runPromise(WorkflowDelivery);
+    creation = await storage.runPromise(Creation);
+    expect(await storage.runPromise(delivery.alerts())).toEqual(pending);
+    const [stale] = acknowledgements;
+    if (!stale) throw new Error('Expected first occurrence acknowledgement');
+    await storage.runPromise(delivery.alerted(...stale));
+    expect(await storage.runPromise(delivery.alerts())).toEqual(pending);
+    holdAcknowledgements = false;
+    worker = start();
+    await worker.runPromise(WorkflowHealth);
+    await expect.poll(() => storage.runPromise(delivery.alerts())).toEqual([]);
+    await worker.dispose();
+    expect(acknowledgements.at(-1)).toEqual([pending[0]]);
+    expect(await receipts()).toEqual(twoReceipts);
+    expect(await storage.runPromise(delivery.claim())).toEqual([]);
+    await publicManager.streams.update('WALLPAPER', originalConfig);
+    expect(await storage.runPromise(delivery.recover(original.id))).toBe(true);
+    worker = start();
+    await worker.runPromise(WorkflowHealth);
+    await expect
+      .poll(() => completions.map((p) => p.id))
+      .toEqual([wallpaper.creationEventId, original.id]);
+    expect(
+      JSON.parse((await publicManager.streams.getMessage('WALLPAPER', { seq: 1 })).string())
+    ).toEqual(original.event);
+    expect((await publicManager.streams.info('WALLPAPER')).state.messages).toBe(1);
+    expect(await storage.runPromise(creation.list(owner))).toEqual([
+      expect.objectContaining({
+        id: wallpaper.id,
+        assetId: 'renewed-asset',
+        state: 'published',
+        sourceId: 'renewed-source',
+        attentionRequired: false,
+      }),
+    ]);
+    expect(await storage.runPromise(delivery.recover(original.id))).toBe(false);
+    expect(await receipts()).toEqual(twoReceipts);
+    const invalid = 'not-json';
+    const invalidIdentity = createHash('sha256').update(invalid).digest('hex');
+    const invalidRecovery = createHash('sha256').update(invalidIdentity).digest('hex');
+    await operator.jetstream().publish('asset.results.wallpaper', invalid);
+    const notice = (id: string, reason: 'invalid' | 'exhausted') =>
+      expect.objectContaining({
+        notice: {
+          id: createHash('sha256').update(`wallpaper:confirmation:${id}`).digest('hex'),
+          applicationId: 'wallpaper',
+          kind: 'wallpaper-workflow-quarantine',
+          subject: 'asset.results.wallpaper',
+          reason,
+          recoveryId: id,
+          recoveryScope: 'confirmation',
+        },
+      });
+    await expect.poll(receipts).toEqual([...twoReceipts, notice(invalidRecovery, 'invalid')]);
+    // A retained exhausted-confirmation fixture checks the unchanged receipt contract.
+    await storage.runPromise(
+      delivery.quarantine(
+        'compatibility-exhausted',
+        JSON.stringify(result),
+        'confirmation-exhausted'
+      )
+    );
+    const exhaustedRecovery = createHash('sha256').update('compatibility-exhausted').digest('hex');
+    await expect
+      .poll(receipts)
+      .toEqual([
+        ...twoReceipts,
+        notice(invalidRecovery, 'invalid'),
+        notice(exhaustedRecovery, 'exhausted'),
+      ]);
+    await expect.poll(() => storage.runPromise(delivery.alerts())).toEqual([]);
   }));
 
 it('keeps recovered confirmations closed on protected redelivery and routes abandoned-lease recovery through the real outbox', () =>

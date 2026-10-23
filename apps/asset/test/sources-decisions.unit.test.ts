@@ -1,4 +1,5 @@
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Clock, Effect, Layer, ManagedRuntime } from 'effect';
+import { TestClock } from 'effect/testing';
 import { describe, expect, it } from 'vitest';
 import {
   Sources,
@@ -16,7 +17,7 @@ import {
 import { initialSourcePolicies, type SourcePolicy } from '../src/capabilities/sources/index.js';
 const owner = { namespace: 'clerk', subject: 'owner' };
 const intent = { operation: 'add' as const, expectedSourceSetRevision: '0' };
-function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
+function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper, clock?: Clock.Clock) {
   let state: SourceState = {
     asset: { id: 'asset_one', applicationId: 'wallpaper', assetType: 'wallpaper', owner },
     sourceSetRevision: '0',
@@ -106,7 +107,10 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
   let current = initialRuntime;
   return {
     call: <A, E>(f: (s: SourcesPort) => Effect.Effect<A, E>, signal?: AbortSignal) =>
-      current.runPromise(Sources.use(f), { signal }),
+      current.runPromise(
+        clock ? Sources.use(f).pipe(Effect.provideService(Clock.Clock, clock)) : Sources.use(f),
+        { signal }
+      ),
     get state() {
       return state;
     },
@@ -832,7 +836,10 @@ it('bounds each discovery page while preserving continuation, exact old status a
 });
 
 it('replaces the Default at the count limit only after preparation while retaining first analysis provenance', async () => {
-  const f = fixture({ ...initialSourcePolicies.wallpaper, maxActiveSources: 1 });
+  const clockRuntime = ManagedRuntime.make(TestClock.layer());
+  await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-10-23T00:00:00.000Z')));
+  const clock = await clockRuntime.runPromise(Clock.clockWith(Effect.succeed));
+  const f = fixture({ ...initialSourcePolicies.wallpaper, maxActiveSources: 1 }, clock);
   try {
     const first = await create(f, 'first');
     await upload(f, first);
@@ -886,19 +893,20 @@ it('replaces the Default at the count limit only after preparation while retaini
       candidate: { status: 'accepted' },
     });
     expect(f.confirmations).toHaveLength(2);
-    expect(f.retirements).toEqual([
-      { sourceId: previous.sourceId, evidenceExpiresAt: expect.any(String) },
-    ]);
-    const deadline = f.retirements[0]?.evidenceExpiresAt;
-    expect(Date.parse(deadline ?? '') - Date.now()).toBeGreaterThan(604799000);
+    const deadline = '2026-10-30T00:00:00.000Z';
+    expect(f.retirements).toEqual([{ sourceId: previous.sourceId, evidenceExpiresAt: deadline }]);
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-11-06T00:00:00.000Z')));
     f.activate({
       ...initialSourcePolicies.wallpaper,
       retention: { evidenceMs: 1, candidateMs: 86400000 },
     })();
-    await f.call((s) => s.accept(owner, 'asset_one', id, replacement));
+    expect(await f.call((s) => s.accept(owner, 'asset_one', id, replacement))).toMatchObject({
+      candidate: { status: 'accepted', sourceSetRevision: '2' },
+    });
     expect(f.retirements).toEqual([{ sourceId: previous.sourceId, evidenceExpiresAt: deadline }]);
   } finally {
     await f.close();
+    await clockRuntime.dispose();
   }
 });
 

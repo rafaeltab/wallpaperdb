@@ -23,6 +23,7 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
     deliveryRevision: '0',
     sources: [],
     candidates: [],
+    nonterminalCandidateCount: 0,
     defaultSourceId: null,
     initialAnalysisSourceId: null,
   };
@@ -713,11 +714,15 @@ it('recovers stopped additional inspection by same-digest replay while fencing c
     await upload(f, first);
     await f.call((s) => s.accept(owner, 'asset_one', first, intent));
     const original = await f.call((s) => s.list(owner, 'asset_one'));
+    expect(original).toMatchObject({ asset: { hasPendingCandidates: false } });
     const next = await create(f, 'stopped-inspection', '1');
     f.setInspect(() =>
       Effect.fail(new SourceFailure({ operation: 'inspect', cause: 'owned inspection stopped' }))
     );
     await expect(upload(f, next)).rejects.toBeDefined();
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { hasPendingCandidates: true },
+    });
     expect(await f.call((s) => s.status(owner, 'asset_one', next))).toMatchObject({
       candidate: { status: 'inspecting' },
     });
@@ -753,6 +758,71 @@ it('recovers stopped additional inspection by same-digest replay while fencing c
     if (recovered.kind !== 'found') throw new Error('Expected Sources');
     expect(recovered.asset.sources[0]).toEqual(original.asset.sources[0]);
     expect(recovered.asset.sources).toHaveLength(2);
+    expect(recovered.asset.hasPendingCandidates).toBe(false);
+  } finally {
+    await f.close();
+  }
+});
+it('bounds each discovery page while preserving continuation, exact old status and pending initial-work detection', async () => {
+  const f = fixture();
+  try {
+    const pending = await create(f, 'pending');
+    const history: string[] = [];
+    for (let n = 0; n < 70; n++) {
+      const id = await create(f, `cancelled-${n}`);
+      history.push(id);
+      await f.call((s) => s.cancel(owner, 'asset_one', id));
+    }
+    const discovered: string[] = [];
+    let cursor: string | undefined;
+    let appended: string | undefined;
+    do {
+      const page = await f.call((s) => s.list(owner, 'asset_one', cursor));
+      if (page.kind !== 'found') throw new Error('Expected owner discovery');
+      expect(page.asset.candidates.length).toBeLessThanOrEqual(32);
+      expect(page.asset.hasPendingCandidates).toBe(true);
+      discovered.push(...page.asset.candidates.map((c) => c.candidateId));
+      cursor = page.asset.nextCandidateCursor;
+      if (!appended) {
+        const added = await create(f, 'appended-after-first-page');
+        appended = added;
+        await f.call((s) => s.cancel(owner, 'asset_one', added));
+      }
+    } while (cursor);
+    expect(discovered).toEqual([...history].reverse().concat(pending));
+    expect(new Set(discovered).size).toBe(71);
+    expect(await f.call((s) => s.status(owner, 'asset_one', pending))).toMatchObject({
+      candidate: { candidateId: pending, status: 'awaiting-bytes' },
+    });
+    expect(
+      await f.call((s) => s.list({ ...owner, subject: 'other' }, 'asset_one', history[0]))
+    ).toEqual({ kind: 'unavailable' });
+    expect(await f.call((s) => s.list(owner, 'asset_one', 'missing-candidate'))).toEqual({
+      kind: 'unavailable',
+    });
+    const latest = await f.call((s) => s.list(owner, 'asset_one'));
+    expect(latest).toMatchObject({
+      asset: {
+        candidates: [
+          expect.objectContaining({ candidateId: appended }),
+          ...Array.from({ length: 31 }, () => expect.anything()),
+        ],
+        hasPendingCandidates: true,
+      },
+    });
+    expect(await f.call((s) => s.list(owner, 'asset_one', '0:wrong-identity'))).toEqual({
+      kind: 'unavailable',
+    });
+    const terminal = history[0];
+    if (!terminal) throw new Error('Missing retained history');
+    await f.call((s) => s.cancel(owner, 'asset_one', terminal));
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { hasPendingCandidates: true },
+    });
+    await f.call((s) => s.cancel(owner, 'asset_one', pending));
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { hasPendingCandidates: false },
+    });
   } finally {
     await f.close();
   }

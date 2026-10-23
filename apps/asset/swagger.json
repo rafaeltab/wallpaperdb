@@ -331,12 +331,17 @@
     "/assets/{assetId}/sources": {
       "get": {
         "tags": ["Sources"],
-        "security": [
-          {
-            "ownerSession": []
-          }
-        ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "in": "query",
+            "name": "candidateCursor",
+            "required": false
+          },
           {
             "schema": {
               "type": "string"
@@ -344,6 +349,11 @@
             "in": "path",
             "name": "assetId",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "ownerSession": []
           }
         ],
         "responses": {

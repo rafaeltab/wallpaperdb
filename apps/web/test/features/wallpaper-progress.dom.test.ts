@@ -21,3 +21,9 @@ it('sends the captured current revision and independent correlation for an addit
  expect(JSON.parse(String(requests[0]?.options.body))).toEqual({operation:'add',expectedSourceSetRevision:'1'});
  expect(new Headers(requests[0]?.options.headers).get('X-Correlation-Id')).toBe('independent');
 });
+it('keeps candidate continuation opaque and preserves pending work outside the returned page',async()=>{
+ const {ownedSources}=await import('@/features/wallpaper-creation/adapters/http');const requests:string[]=[];
+ vi.stubGlobal('fetch',vi.fn(async(url:string)=>{requests.push(url);return new Response(JSON.stringify({sourceSetRevision:'1',sources:[],candidates:[],hasPendingCandidates:true,nextCandidateCursor:'12:candidate-before'}),{headers:{'Content-Type':'application/json'}});}));
+ expect(await ownedSources('asset',new AbortController().signal,'44:candidate-after')).toMatchObject({hasPendingCandidates:true,nextCandidateCursor:'12:candidate-before',candidates:[]});
+ expect(requests).toEqual(['/asset/assets/asset/sources?candidateCursor=44%3Acandidate-after']);
+});

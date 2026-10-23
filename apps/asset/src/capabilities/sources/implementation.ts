@@ -158,6 +158,8 @@ export function sourcesLayer(configuration: {
             if (input.operation !== 'add') return reject('unsupported-operation');
             if (input.expectedSourceSetRevision !== state.sourceSetRevision)
               return reject('source-set-conflict');
+            if (state.sources.length >= policy.maxActiveSources)
+              return reject('source-count-limit');
             if (
               state.candidates.filter(
                 (c) =>

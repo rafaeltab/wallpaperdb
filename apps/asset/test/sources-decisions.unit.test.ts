@@ -608,3 +608,101 @@ it('compares the full active set rather than chaining pairwise similar Sources',
     await f.close();
   }
 });
+
+it('bounds concurrent preparation and acceptance and refuses preparation at the active Source limit', async () => {
+  const f = fixture({ ...initialSourcePolicies.wallpaper, maxActiveSources: 2 });
+  try {
+    const prepared = await Promise.all(
+      ['one', 'two', 'three'].map((key) =>
+        f.call((s) => s.create(owner, 'asset_one', { ...intent, idempotencyKey: key }))
+      )
+    );
+    expect(prepared.filter((o) => o.kind === 'candidate')).toHaveLength(2);
+    expect(prepared).toContainEqual({ kind: 'rejected', reason: 'candidate-count-limit' });
+    const ids = prepared.flatMap((o) => (o.kind === 'candidate' ? [o.candidate.candidateId] : []));
+    for (const id of ids) await upload(f, id);
+    const outcomes = await Promise.all(
+      ids.map((id) => f.call((s) => s.accept(owner, 'asset_one', id, intent)))
+    );
+    expect(
+      outcomes.filter((o) => o.kind === 'candidate' && o.candidate.status === 'accepted')
+    ).toHaveLength(1);
+    expect(outcomes).toContainEqual({ kind: 'rejected', reason: 'source-set-conflict' });
+    const stale = ids.find((_, i) => outcomes[i]?.kind === 'rejected');
+    if (!stale) throw new Error('Expected stale candidate');
+    await f.call((s) => s.cancel(owner, 'asset_one', stale));
+    const next = await create(f, 'next', '1');
+    await upload(f, next);
+    await f.call((s) =>
+      s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+    );
+    expect(
+      await f.call((s) =>
+        s.create(owner, 'asset_one', {
+          ...intent,
+          expectedSourceSetRevision: '2',
+          idempotencyKey: 'full',
+        })
+      )
+    ).toEqual({ kind: 'rejected', reason: 'source-count-limit' });
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: { sourceSetRevision: '2' },
+    });
+  } finally {
+    await f.close();
+  }
+});
+it.each([
+  'count',
+  'ratio',
+])('rechecks effective %s policy at acceptance without withdrawing existing Sources', async (limit) => {
+  const f = fixture();
+  try {
+    const first = await create(f, 'first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    f.setInspect(() =>
+      Effect.succeed({
+        kind: 'verified',
+        facts: {
+          width: 102,
+          height: 100,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          byteLength: 4,
+          digest: 'ignored',
+        },
+      })
+    );
+    const next = await create(f, 'next', '1');
+    await upload(f, next);
+    const policy = {
+      ...initialSourcePolicies.wallpaper,
+      ...(limit === 'count' ? { maxActiveSources: 1 } : { aspectRatioTolerance: 0.01 }),
+    };
+    const useNew = f.activate(policy);
+    await expect(
+      f.call((s) =>
+        s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+      )
+    ).rejects.toBeDefined();
+    useNew();
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', next, { ...intent, expectedSourceSetRevision: '1' })
+      )
+    ).toMatchObject(
+      limit === 'count'
+        ? { kind: 'rejected', reason: 'source-count-limit' }
+        : { candidate: { status: 'rejected', reason: 'aspect-ratio-limit' } }
+    );
+    expect(await f.call((s) => s.list(owner, 'asset_one'))).toMatchObject({
+      asset: {
+        sourceSetRevision: '1',
+        sources: [expect.objectContaining({ facts: expect.objectContaining({ width: 100 }) })],
+      },
+    });
+  } finally {
+    await f.close();
+  }
+});

@@ -55,7 +55,7 @@ const cases: ReadonlyArray<{
     },
   },
   {
-    id: 'accepted transition exposes committed state and one occurrence',
+    id: 'each accepted transition advances the version and appends one occurrence',
     async check(f) {
       await seed(f.store);
       const events = await f.occurrences();
@@ -76,6 +76,41 @@ const cases: ReadonlyArray<{
         version: 2,
       });
       expect(await f.occurrences(), 'exactly one accepted occurrence').toBe(events + 1);
+      expect(
+        await run(
+          f.store.transact(query, (snapshot) => {
+            expect(snapshot.profile.version, 'subsequent locked version').toBe(2);
+            return {
+              _tag: 'Change',
+              mutation: {
+                type: 'details',
+                displayName: 'Katherine',
+                biographyMarkdown: 'Another biography',
+              },
+            };
+          })
+        ),
+        'subsequent accepted transition'
+      ).toMatchObject({
+        changed: true,
+        outcome: {
+          _tag: 'Success',
+          profile: {
+            displayName: 'Katherine',
+            biographyMarkdown: 'Another biography',
+            version: 3,
+          },
+        },
+      });
+      expect(
+        await run(f.store.read(query.profileId, now)),
+        'subsequent committed state'
+      ).toMatchObject({
+        displayName: 'Katherine',
+        biographyMarkdown: 'Another biography',
+        version: 3,
+      });
+      expect(await f.occurrences(), 'one occurrence for each accepted transition').toBe(events + 2);
     },
   },
   {
@@ -154,11 +189,20 @@ const cases: ReadonlyArray<{
   {
     id: 'mutating a read result cannot change persisted state',
     async check(f) {
-      const before = structuredClone(await seed(f.store));
+      await seed(f.store);
+      await run(
+        f.store.transact({ ...query, handle: 'grace' }, () => ({
+          _tag: 'Change',
+          mutation: { type: 'handle', handle: 'grace', scheduledAliases: [] },
+        }))
+      );
+      const before = structuredClone(await run(f.store.read(query.profileId, now)));
+      expect(before).toMatchObject({ handle: 'grace', lastHandleChangedAt: now });
       const read = await run(f.store.read(query.profileId, now));
-      if (!read) throw new Error('fixture creation failed');
+      if (!read?.lastHandleChangedAt) throw new Error('fixture Handle change failed');
       read.displayName = 'uncommitted';
-      read.updatedAt.setUTCFullYear(2099);
+      for (const date of [read.createdAt, read.updatedAt, read.lastHandleChangedAt])
+        date.setUTCFullYear(2099);
       expect(await run(f.store.read(query.profileId, now)), 'detached read').toEqual(before);
     },
   },

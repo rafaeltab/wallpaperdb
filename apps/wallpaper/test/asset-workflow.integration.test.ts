@@ -1,5 +1,10 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { workflowPostgresLayer } from '../src/adapters/workflow/index.js';
 import { once } from 'node:events';
 import { core } from '@opentelemetry/sdk-node';
 import { propagation } from '@opentelemetry/api';
@@ -8,13 +13,14 @@ import { AckPolicy, connect, RetentionPolicy, DiscardPolicy, StorageType } from 
 import { expect, it } from 'vitest';
 import {
   Creation,
+  creationLayer,
+  WorkflowStore,
   WorkflowDelivery,
   WorkflowHealth,
   type WorkflowPublication,
 } from '../src/capabilities/creation/index.js';
-import { assetWorkflowLayer } from '../src/adapters/asset-workflow/index.js';
-it('uses protected application credentials, persists publication acknowledgements and resumes its durable result consumer', async () => {
-  propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
+import { assetWorkflowLayer, recoverConfirmation } from '../src/adapters/asset-workflow/index.js';
+async function startBroker() {
   const configuration = {
     port: 4222,
     http: 8222,
@@ -56,6 +62,41 @@ it('uses protected application credentials, persists publication acknowledgement
   const url = `nats://${container.getHost()}:${container.getMappedPort(4222)}`;
   const operator = await connect({ servers: url, user: 'operator', pass: 'operator-test' });
   const legacy = await connect({ servers: url });
+  return { container, url, operator, legacy };
+}
+async function setupStreams(
+  operator: Awaited<ReturnType<typeof connect>>,
+  legacy: Awaited<ReturnType<typeof connect>>
+) {
+  const manager = await operator.jetstreamManager();
+  const publicManager = await legacy.jetstreamManager();
+  for (const [name, subjects] of [
+    ['ASSET_COMMANDS', ['asset.commands.wallpaper.create']],
+    ['ASSET_RESULTS', ['asset.results.wallpaper']],
+  ] as const)
+    await manager.streams.add({
+      name,
+      subjects: [...subjects],
+      storage: StorageType.File,
+      retention: RetentionPolicy.Limits,
+      discard: DiscardPolicy.New,
+    });
+  await manager.consumers.add('ASSET_RESULTS', {
+    durable_name: 'results_wallpaper',
+    filter_subject: 'asset.results.wallpaper',
+    ack_policy: AckPolicy.Explicit,
+    max_ack_pending: 4,
+  });
+  await publicManager.streams.add({
+    name: 'WALLPAPER',
+    subjects: ['wallpaper.>'],
+    storage: StorageType.File,
+  });
+  return { manager, publicManager };
+}
+it('uses protected application credentials, persists publication acknowledgements and resumes its durable result consumer', async () => {
+  propagation.setGlobalPropagator(new core.W3CTraceContextPropagator());
+  const { container, url, operator, legacy } = await startBroker();
   const calls: unknown[] = [];
   const publicationTraces: string[] = [];
   const confirmationTraces: string[] = [];
@@ -191,30 +232,7 @@ it('uses protected application credentials, persists publication acknowledgement
     shutdownTimeoutMs: 3000,
   };
   try {
-    const manager = await operator.jetstreamManager();
-    const publicManager = await legacy.jetstreamManager();
-    for (const [name, subjects] of [
-      ['ASSET_COMMANDS', ['asset.commands.wallpaper.create']],
-      ['ASSET_RESULTS', ['asset.results.wallpaper']],
-    ] as const)
-      await manager.streams.add({
-        name,
-        subjects: [...subjects],
-        storage: StorageType.File,
-        retention: RetentionPolicy.Limits,
-        discard: DiscardPolicy.New,
-      });
-    await manager.consumers.add('ASSET_RESULTS', {
-      durable_name: 'results_wallpaper',
-      filter_subject: 'asset.results.wallpaper',
-      ack_policy: AckPolicy.Explicit,
-      max_ack_pending: 4,
-    });
-    await publicManager.streams.add({
-      name: 'WALLPAPER',
-      subjects: ['wallpaper.>'],
-      storage: StorageType.File,
-    });
+    const { manager, publicManager } = await setupStreams(operator, legacy);
     const start = () =>
       ManagedRuntime.make(
         assetWorkflowLayer(options).pipe(Layer.provideMerge(creation), Layer.provide(delivery))
@@ -314,5 +332,194 @@ it('uses protected application credentials, persists publication acknowledgement
     await new Promise<void>((resolve) => inbox.close(() => resolve()));
     await container.stop();
     propagation.disable();
+  }
+});
+
+it('keeps recovered confirmations closed on protected redelivery and routes abandoned-lease recovery through the real outbox', async () => {
+  const { container, url, operator, legacy } = await startBroker();
+  const postgres = await new GenericContainer('postgres:16-alpine')
+    .withEnvironment({ POSTGRES_PASSWORD: 'test', POSTGRES_DB: 'wallpaper' })
+    .withExposedPorts(5432)
+    .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
+    .start();
+  const databaseUrl = `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`;
+  const pool = new Pool({ connectionString: databaseUrl });
+  const notices: { recoveryId: string; recoveryScope: string }[] = [];
+  const inbox = createServer(async (request, response) => {
+    if (request.headers.authorization !== 'Bearer test') {
+      response.writeHead(401).end();
+      return;
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    notices.push(JSON.parse(Buffer.concat(chunks).toString()));
+    response.writeHead(200).end();
+  });
+  inbox.listen(0, '127.0.0.1');
+  await once(inbox, 'listening');
+  const address = inbox.address();
+  if (!address || typeof address === 'string') throw new Error('Missing inbox');
+  const persistence = workflowPostgresLayer({
+    databaseUrl,
+    maxAttempts: 1,
+    retryDelayMs: 0,
+    leaseMs: 60_000,
+  });
+  const services = creationLayer('authors').pipe(Layer.provideMerge(persistence));
+  const storage = ManagedRuntime.make(services);
+  const start = () =>
+    ManagedRuntime.make(
+      assetWorkflowLayer({
+        natsUrl: url,
+        ownerNamespace: 'authors',
+        credential: { user: 'wallpaper-client', password: 'application-test' },
+        identityProviders: [],
+        operatorNotification: { url: `http://127.0.0.1:${address.port}/events`, token: 'test' },
+        maxAttempts: 1,
+        retryDelayMs: 10,
+        pollMs: 10,
+        shutdownTimeoutMs: 3000,
+      }).pipe(Layer.provideMerge(services))
+    );
+  let worker: ReturnType<typeof start> | undefined;
+  try {
+    await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+    const { manager } = await setupStreams(operator, legacy);
+    const nextClaim = async () => {
+      let publications: readonly WorkflowPublication[] = [];
+      await expect
+        .poll(
+          async () => {
+            publications = await storage.runPromise(WorkflowDelivery.use((s) => s.claim()));
+            return publications.length;
+          },
+          { timeout: 1000 }
+        )
+        .toBe(1);
+      const [publication] = publications;
+      if (!publication) throw new Error('Missing publication');
+      return publication;
+    };
+    const owner = { namespace: 'authors', subject: 'broker-recovery' };
+    const completed = await storage.runPromise(
+      WorkflowStore.use((s) => s.begin(owner, 'completed'))
+    );
+    const command = await nextClaim();
+    await storage.runPromise(WorkflowDelivery.use((s) => s.complete(command)));
+    await storage.runPromise(
+      Creation.use((c) =>
+        c.assetResult({
+          wallpaperId: completed.id,
+          commandId: completed.commandId,
+          creationEventId: completed.creationEventId,
+          outcome: 'created',
+          assetId: 'retained-asset',
+        })
+      )
+    );
+    const payload = JSON.stringify({
+      specversion: '1.0',
+      id: 'completed-result',
+      source: 'https://wallpaperdb/asset',
+      type: 'asset.command.result',
+      time: completed.createdAt,
+      datacontenttype: 'application/json',
+      causationsource: 'https://wallpaperdb/wallpaper',
+      causationid: completed.creationEventId,
+      correlationid: completed.id,
+      data: {
+        commandId: completed.commandId,
+        applicationReference: completed.id,
+        outcome: 'created',
+        assetId: 'retained-asset',
+      },
+    });
+    const identity = createHash('sha256').update(payload).digest('hex');
+    const recoveryId = createHash('sha256').update(identity).digest('hex');
+    await storage.runPromise(
+      WorkflowDelivery.use((s) =>
+        s.quarantine(identity, payload, 'confirmation-exhausted', {
+          kind: 'wallpaper',
+          id: completed.id,
+        })
+      )
+    );
+    expect(await storage.runPromise(recoverConfirmation(recoveryId))).toBe(true);
+    const abandoned = await storage.runPromise(
+      WorkflowStore.use((s) =>
+        s.begin(owner, 'abandoned', {
+          traceparent: '00-11111111111111111111111111111111-2222222222222222-01',
+        })
+      )
+    );
+    const lost = await nextClaim();
+    await pool.query('UPDATE wallpaper_workflow_outbox SET available_at=$1 WHERE id=$2', [
+      new Date(0),
+      lost.id,
+    ]);
+    await storage.dispose();
+    await operator.jetstream().publish('asset.results.wallpaper', payload);
+    const consumer = await operator.jetstream().consumers.get('ASSET_RESULTS', 'results_wallpaper');
+    const first = await consumer.next({ expires: 1000 });
+    if (!first) throw new Error('Missing delivery');
+    first.nak();
+    await operator.flush();
+    worker = start();
+    await worker.runPromise(WorkflowHealth);
+    await expect
+      .poll(async () => {
+        const info = await manager.consumers.info('ASSET_RESULTS', 'results_wallpaper');
+        return info.num_pending + info.num_ack_pending;
+      })
+      .toBe(0);
+    expect(await worker.runPromise(Creation.use((c) => c.list(owner)))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: completed.id,
+          attentionRequired: false,
+          assetId: 'retained-asset',
+        }),
+      ])
+    );
+    await expect
+      .poll(() => notices)
+      .toEqual([
+        expect.objectContaining({
+          recoveryId: abandoned.creationEventId,
+          recoveryScope: 'outbox',
+          reason: 'exhausted',
+          applicationId: 'wallpaper',
+        }),
+      ]);
+    expect(
+      await worker.runPromise(WorkflowDelivery.use((s) => s.retainedConfirmation(recoveryId)))
+    ).toBeNull();
+    expect(await worker.runPromise(WorkflowDelivery.use((s) => s.recover(lost.id)))).toBe(true);
+    await expect
+      .poll(
+        async () =>
+          (await pool.query('SELECT status FROM wallpaper_workflow_outbox WHERE id=$1', [lost.id]))
+            .rows[0]?.status
+      )
+      .toBe('published');
+    expect(await worker.runPromise(Creation.use((c) => c.list(owner)))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: abandoned.id, attentionRequired: false }),
+      ])
+    );
+    expect(
+      JSON.parse((await manager.streams.getMessage('ASSET_COMMANDS', { seq: 1 })).string())
+    ).toEqual(lost.event);
+    expect((await manager.streams.info('ASSET_COMMANDS')).state.messages).toBe(1);
+  } finally {
+    await worker?.dispose();
+    await storage.dispose();
+    await operator.close();
+    await legacy.close();
+    inbox.closeAllConnections();
+    await new Promise<void>((resolve) => inbox.close(() => resolve()));
+    await pool.end();
+    await postgres.stop();
+    await container.stop();
   }
 });

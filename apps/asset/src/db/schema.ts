@@ -280,3 +280,18 @@ export const sourceCleanup = pgTable(
     check('source_cleanup_attempts', sql`${table.attempts} >= 0`),
   ]
 );
+
+/** Finite, non-renewable read protection is independent of serving authority. */
+export const sourceReads = pgTable(
+  'source_reads',
+  {
+    id: text('id').primaryKey(),
+    assetId: text('asset_id').notNull(),
+    sourceId: text('source_id').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index('source_reads_identity').on(table.assetId, table.sourceId, table.expiresAt),
+    index('source_reads_expiry').on(table.expiresAt),
+  ]
+);

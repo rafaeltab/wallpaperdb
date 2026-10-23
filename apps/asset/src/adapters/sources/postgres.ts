@@ -22,6 +22,7 @@ import {
   immutableSources,
   sourceAcceptanceOutbox,
   sourceCleanup,
+  sourceReads,
 } from '../../db/schema.js';
 interface Options {
   readonly databaseUrl: string;
@@ -107,6 +108,10 @@ export function sourcePostgresLayer(options: Options) {
           Effect.withSpan(`asset.sources.database.${operation}`)
         );
       const store: SourceStorePort = {
+        releaseRead: (id) =>
+          run('release-read', async (db) => {
+            await db.delete(sourceReads).where(eq(sourceReads.id, id));
+          }),
         transact: (assetId, revision, change) =>
           run('transact', (db) =>
             db.transaction(async (tx) => {
@@ -150,8 +155,24 @@ export function sourcePostgresLayer(options: Options) {
                 const changed = change(initial);
                 if (changed.state && (!asset || asset.deletedAt !== null))
                   throw new Error('Unavailable Asset cannot accept Source state');
+                if (
+                  changed.readProtection &&
+                  !initial?.sources.some(
+                    (source) => source.sourceId === changed.readProtection?.sourceId
+                  )
+                )
+                  throw new Error('Read protection requires active membership');
                 return changed;
               });
+              if (changed.readProtection) {
+                const protection = changed.readProtection;
+                await tx.insert(sourceReads).values({
+                  id: protection.readId,
+                  assetId,
+                  sourceId: protection.sourceId,
+                  expiresAt: new Date(protection.expiresAt),
+                });
+              }
               if (changed.state && asset) {
                 for (const candidate of changed.state.candidates) {
                   const terminal = ['accepted', 'rejected', 'cancelled'].includes(candidate.status);

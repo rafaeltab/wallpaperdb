@@ -30,6 +30,93 @@ const options = () => ({
   leaseMs: 1000,
 });
 
+it('serializes accepted read protection with membership and releases it without restoring retired eligibility', async () => {
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({ ...options(), revision: 'cleanup-1' })
+  );
+  const sources = ManagedRuntime.make(sourcePostgresLayer(options()));
+  const cleanup = ManagedRuntime.make(cleanupPostgresLayer(options()));
+  try {
+    const created = await lifecycle.runPromise(
+      LifecycleStore.use((store) =>
+        store.accept({
+          revision: 'cleanup-1',
+          applicationId: 'wallpaper',
+          canonical: 'read',
+          correlation: { commandId: crypto.randomUUID(), applicationReference: 'read' },
+          decision: {
+            kind: 'create',
+            assetType: 'wallpaper',
+            owner: { namespace: 'clerk', subject: 'reader' },
+          },
+          context: { occurrence: { source: 'https://test/wallpaper', id: 'read-create' } },
+        })
+      )
+    );
+    if (created.outcome !== 'created') throw new Error('Expected Asset');
+    const assetId = created.assetId;
+    const sourceId = `source_${crypto.randomUUID()}`;
+    const facts = {
+      digest: 'a'.repeat(64),
+      byteLength: 4,
+      mimeType: 'image/png',
+      model: 'sdr-png',
+      width: 2,
+      height: 2,
+    };
+    await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(assetId, null, (state) => {
+          if (!state) throw new Error('Expected Asset');
+          state.sources = [{ sourceId, facts, layout: 'asset-layout-1' }];
+          return { state, result: undefined };
+        })
+      )
+    );
+    await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(assetId, null, (state) => ({
+          state,
+          result: undefined,
+          readProtection: { readId: 'active-read', sourceId, expiresAt: '2099-01-01T00:00:00Z' },
+        }))
+      )
+    );
+    await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(assetId, null, (state) => {
+          if (!state) throw new Error('Expected Asset');
+          state.sources = [];
+          return {
+            state,
+            result: undefined,
+            retirement: { sourceId, evidenceExpiresAt: '2000-01-01T00:00:00Z' },
+          };
+        })
+      )
+    );
+    expect(await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)))).toEqual([]);
+    await sources.runPromise(SourceStore.use((store) => store.releaseRead('active-read')));
+    const work = await cleanup.runPromise(CleanupStore.use((store) => store.claim(100)));
+    expect(work.map((item) => item.target)).toEqual([{ kind: 'source', assetId, sourceId }]);
+    await cleanup.runPromise(CleanupStore.use((store) => store.completed(work[0]!)));
+    expect(
+      (await pool.query('SELECT id FROM immutable_sources WHERE id = $1', [sourceId])).rows
+    ).toEqual([]);
+    expect(
+      (
+        await pool.query('SELECT command_id FROM asset_commands WHERE application_id = $1', [
+          'wallpaper',
+        ])
+      ).rows.length
+    ).toBeGreaterThan(0);
+  } finally {
+    await cleanup.dispose();
+    await sources.dispose();
+    await lifecycle.dispose();
+  }
+});
+
 it('records bounded orphan work atomically, protects current membership and reclaims after restart without moving deadlines', async () => {
   const lifecycle = ManagedRuntime.make(
     lifecyclePostgresLayer({ ...options(), revision: 'cleanup-1' })

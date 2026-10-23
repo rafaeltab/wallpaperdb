@@ -15,6 +15,51 @@ const tester = new Tester().withS3().withS3Bucket('cleanup-private');
 beforeAll(() => tester.setup(), 60000);
 afterAll(() => tester.destroy());
 
+it('bounds an unopened consumer and reports storage stream closure after cancellation or EOF', async () => {
+  const s3 = tester.getS3();
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: s3.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'cleanup-private',
+    })
+  );
+  const bytes = new Uint8Array([5, 6, 7, 8]);
+  const digest = createHash('sha256').update(bytes).digest('hex');
+  try {
+    await runtime.runPromise(
+      Effect.gen(function* () {
+        const storage = yield* SourceBytes;
+        yield* storage.put('read-input', bytes, digest);
+        yield* storage.prepare('read-input', 'read-source', 'read-asset', {
+          digest,
+          byteLength: 4,
+          model: 'sdr-png',
+          mimeType: 'image/png',
+          width: 2,
+          height: 2,
+        });
+        const idle = yield* storage.read('read-source', 'read-asset', 30);
+        yield* idle.closed.pipe(Effect.timeout('2 seconds'));
+        const cancelled = yield* storage.read('read-source', 'read-asset', 1000);
+        yield* cancelled.close();
+        yield* cancelled.closed.pipe(Effect.timeout('2 seconds'));
+        const eof = yield* storage.read('read-source', 'read-asset', 1000);
+        const chunks: Uint8Array[] = [];
+        yield* Effect.promise(async () => {
+          for await (const chunk of eof.bytes) chunks.push(chunk);
+        });
+        yield* eof.closed.pipe(Effect.timeout('2 seconds'));
+        expect(Buffer.concat(chunks)).toEqual(Buffer.from(bytes));
+      })
+    );
+  } finally {
+    await runtime.dispose();
+  }
+});
+
 it('reclaims exact bytes replayably and fences a late conditional write without touching a newer identity', async () => {
   const s3 = tester.getS3();
   const runtime = ManagedRuntime.make(

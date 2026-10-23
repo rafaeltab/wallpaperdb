@@ -21,14 +21,14 @@ const intent = { operation: 'add' as const, expectedSourceSetRevision: '0' };
 it('records private temporary-input expiry separately and preserves it through configuration replay', async () => {
   const policy = structuredClone(initialSourcePolicies.wallpaper);
   policy.temporaryInput.abandonedMs = 1000;
-  const f = fixture(policy);
+  const clockRuntime = ManagedRuntime.make(TestClock.layer());
+  await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-10-23T00:00:00Z')));
+  const f = fixture(policy, await clockRuntime.runPromise(Clock.Clock));
   try {
-    const before = Date.now();
     await create(f, 'temporary-policy');
     const candidate = structuredClone(f.state.candidates[0]!);
-    expect(Date.parse(candidate.temporaryExpiresAt!)).toBeGreaterThanOrEqual(before + 1000);
-    expect(Date.parse(candidate.temporaryExpiresAt!)).toBeLessThan(before + 2000);
-    expect(Date.parse(candidate.orphanExpiresAt)).toBeGreaterThan(before + 80000000);
+    expect(candidate.temporaryExpiresAt).toBe('2026-10-23T00:00:01.000Z');
+    expect(candidate.orphanExpiresAt).toBe('2026-10-24T00:00:00.000Z');
     const next = structuredClone(policy);
     next.temporaryInput.abandonedMs = 86400000;
     f.activate(next)();
@@ -36,6 +36,7 @@ it('records private temporary-input expiry separately and preserves it through c
     expect(f.state.candidates[0]).toEqual(candidate);
   } finally {
     await f.close();
+    await clockRuntime.dispose();
   }
 });
 function fixture(

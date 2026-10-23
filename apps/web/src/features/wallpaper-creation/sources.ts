@@ -171,11 +171,11 @@ export function createWallpaperSourceBatch<TFile>(
           if (!asset || wallpaper.state === 'failed')
             throw new Error('Wallpaper is waiting for its Asset. Retry this saved request.');
           for (const row of rows) {
-            if (blockedInitial && row.id !== blockedInitial) break;
             if (row.status !== 'pending') {
               if (blockedInitial === row.id) break;
               continue;
             }
+            if (blockedInitial && row.id !== blockedInitial) continue;
             signal.throwIfAborted();
             update(row.id, { status: 'uploading' });
             let receipt = row.receipt;

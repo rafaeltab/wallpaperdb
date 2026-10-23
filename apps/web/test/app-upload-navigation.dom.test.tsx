@@ -16,8 +16,8 @@ vi.mock('@tanstack/react-query-devtools', () => ({ ReactQueryDevtools: () => nul
 vi.mock('@tanstack/router-devtools', () => ({ TanStackRouterDevtools: () => null }));
 
 describe('App upload notification navigation', () => {
-  afterEach(() => {
-    act(() => toast.dismiss());
+  afterEach(async () => {
+    await act(() => toast.dismiss());
     cleanup();
     vi.unstubAllGlobals();
   });

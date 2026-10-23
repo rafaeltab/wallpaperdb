@@ -66,7 +66,7 @@ describe('UserMenu', () => {
     expect(screen.getByText('John Doe')).toBeInTheDocument();
   });
 
-  it('uses WallpaperDB owner pictures and generated avatars without returning to the Clerk image', () => {
+  it('uses WallpaperDB owner pictures and generated avatars without returning to the Clerk image', async () => {
     (useAuth as Mock).mockReturnValue({ isSignedIn: true, isLoaded: true, userId: 'user_123' });
     (useUser as Mock).mockReturnValue({
       user: { fullName: 'Ada Lovelace', imageUrl: 'https://clerk.example/avatar.png' },
@@ -78,7 +78,7 @@ describe('UserMenu', () => {
       </QueryClientProvider>
     );
     expect(screen.getByRole('img')).toHaveTextContent('AL');
-    act(() =>
+    await act(() =>
       client.setQueryData(profileQueryKey('user_123'), {
         id: 'user_123',
         displayName: 'Ada Lovelace',
@@ -89,7 +89,7 @@ describe('UserMenu', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading profile picture');
     expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', '/asset/profile-pictures/owner_picture');
     expect(screen.getByTestId('user-menu-trigger')).toHaveAccessibleName("Ada Lovelace's profile picture Ada Lovelace");
-    act(() =>
+    await act(() =>
       client.setQueryData(profileQueryKey('user_123'), {
         id: 'user_123',
         displayName: 'Ada Lovelace',

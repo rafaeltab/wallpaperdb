@@ -43,7 +43,7 @@ describe('Biography Markdown', () => {
       await act(async () => vi.advanceTimersByTimeAsync(delay));
     expect(request).toHaveBeenCalledTimes(4);
     for (let count = 1; count <= 3; count += 1) {
-      act(() =>
+      await act(() =>
         client.setQueryData(profileQueryKey(profileId), profile, { updatedAt: Date.now() + count })
       );
       await act(async () => vi.advanceTimersByTimeAsync(10000));
@@ -68,7 +68,7 @@ describe('Biography Markdown', () => {
         ],
       },
     });
-    act(() => client.setQueryData(profileQueryKey(profileId), { ...profile, version: 8 }));
+    await act(() => client.setQueryData(profileQueryKey(profileId), { ...profile, version: 8 }));
     await act(async () => vi.advanceTimersByTimeAsync(1));
     expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/asset/own.webp');
     expect(request).toHaveBeenCalledTimes(5);

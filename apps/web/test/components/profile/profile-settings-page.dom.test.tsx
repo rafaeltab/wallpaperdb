@@ -120,7 +120,7 @@ describe('ProfileSettingsPage', () => {
       await waitFor(() => expect(opener).toHaveFocus());
     }
     await user.click(screen.getByRole('button', { name: 'Schedule removal for @first-name' }));
-    act(() => queryClient.setQueryData(profileQueryKey(profile.id), { ...profile, aliases: [], version: 2 }));
+    await act(() => queryClient.setQueryData(profileQueryKey(profile.id), { ...profile, aliases: [], version: 2 }));
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.getByRole('dialog', { name: 'Previous handles' })).toHaveFocus());
     expect(userApi.scheduleAliasRemoval).not.toHaveBeenCalled();

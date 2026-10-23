@@ -160,7 +160,7 @@ describe('ProfilePicture', () => {
     );
   });
 
-  it('adopts matching owner pictures and removals immediately while allowing newer public versions to win', () => {
+  it('adopts matching owner pictures and removals immediately while allowing newer public versions to win', async () => {
     vi.stubEnv('VITE_ASSET_URL', '/asset');
     const client = new QueryClient();
     const owner: Profile = {
@@ -181,7 +181,7 @@ describe('ProfilePicture', () => {
     );
     const rendered = render(view(1));
     expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', '/asset/profile-pictures/owner_picture');
-    act(() =>
+    await act(() =>
       client.setQueryData(profileQueryKey(profile.id), {
         ...owner,
         version: 3,

@@ -298,7 +298,7 @@ describe('Profile picture settings', () => {
     const zoom = await screen.findByRole('slider', { name: 'Zoom' });
     zoom.focus();
     await user.keyboard('{ArrowRight}');
-    act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, version: 2 }));
+    await act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, version: 2 }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
     const command = vi.mocked(userApi.uploadPicture).mock.calls[0][0];
@@ -759,7 +759,7 @@ describe('Profile picture settings', () => {
     const user = userEvent.setup();
     const picture = new File(['png'], 'portrait.png', { type: 'image/png' });
     await user.upload(screen.getByLabelText('Choose picture'), picture);
-    act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, version: 2 }));
+    await act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, version: 2 }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
     expect(userApi.uploadPicture).toHaveBeenCalledWith({

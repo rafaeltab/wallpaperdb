@@ -308,3 +308,38 @@ for (const [headState, name] of [
 		assert.doesNotMatch(output, /branch:/);
 	});
 }
+
+test("setup generates Wallpaper connection addresses and the Bruno ingress URL", (t) => {
+	const f = fixture(t);
+	f.prepare(f.main);
+	const service = join(f.main, "apps", "wallpaper");
+	const api = join(f.main, "api", "environments");
+	mkdirSync(service, { recursive: true });
+	mkdirSync(api, { recursive: true });
+	writeFileSync(
+		join(service, ".env.example"),
+		[
+			"DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb_wallpaper",
+			"NATS_URL=nats://localhost:4222",
+			"OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318",
+			"OTEL_SERVICE_NAME=wallpaper",
+			"",
+		].join("\n"),
+	);
+	writeFileSync(
+		join(api, "local.bru.example"),
+		"vars {\n  wallpaperBaseUrl: http://localhost:3010\n}\n",
+	);
+	f.run("setup-worktree.mjs", f.main);
+	assert.deepEqual(readValues(join(service, ".env")), {
+		DATABASE_URL:
+			"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_wallpaper",
+		NATS_URL: "nats://nats:4222",
+		OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4318",
+		OTEL_SERVICE_NAME: "wallpaper",
+	});
+	assert.match(
+		readFileSync(join(api, "local.bru"), "utf8"),
+		/wallpaperBaseUrl: http:\/\/localhost:8000\/wallpaper/,
+	);
+});

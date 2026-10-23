@@ -1,0 +1,310 @@
+import { createConnection, createServer, type Socket } from 'node:net';
+import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
+import { Cause, Effect, Exit, ManagedRuntime } from 'effect';
+import { Pool } from 'pg';
+import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { dependencyProbeLayer } from '../src/adapters/dependencies/index.js';
+import { AvailabilityProbe } from '../src/capabilities/availability/index.js';
+
+describe('dependency probe with PostgreSQL and NATS', () => {
+  let postgres: StartedTestContainer;
+  let nats: StartedNatsContainer;
+  let admin: Pool;
+  const runtimes: Array<ManagedRuntime.ManagedRuntime<AvailabilityProbe, unknown>> = [];
+
+  beforeAll(async () => {
+    postgres = await new GenericContainer('postgres:16-alpine')
+      .withEnvironment({ POSTGRES_PASSWORD: 'test', POSTGRES_DB: 'wallpaper' })
+      .withExposedPorts(5432)
+      .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
+      .start();
+    nats = await createNatsContainer({ enableJetStream: false });
+    admin = new Pool({ connectionString: databaseUrl() });
+  });
+
+  afterEach(async () => {
+    await Promise.all(runtimes.splice(0).map((runtime) => runtime.dispose()));
+  });
+
+  afterAll(async () => {
+    await admin?.end();
+    await nats?.stop();
+    await postgres?.stop();
+  });
+
+  function databaseUrl(port = postgres.getMappedPort(5432)) {
+    return `postgresql://postgres:test@${postgres.getHost()}:${port}/wallpaper`;
+  }
+
+  async function activeDatabaseConnections() {
+    const { rows } = await admin.query<{ count: number }>(
+      "SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname = 'wallpaper' AND pid <> pg_backend_pid()"
+    );
+    return rows[0]?.count;
+  }
+
+  it('reports live dependencies without requiring a database schema or JetStream', async () => {
+    const runtime = ManagedRuntime.make(
+      dependencyProbeLayer({
+        databaseUrl: databaseUrl(),
+        natsUrl: nats.getConnectionUrl(),
+        serviceName: 'wallpaper-dependency-test',
+        otelHealthy: true,
+      })
+    );
+    runtimes.push(runtime);
+
+    expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual({
+      database: true,
+      nats: true,
+      otel: true,
+    });
+    expect(await activeDatabaseConnections()).toBe(1);
+    const natsConnections = async () => {
+      const response = await fetch(
+        `http://${nats.getHost()}:${nats.getContainer().getMappedPort(8222)}/connz`
+      );
+      return response.json();
+    };
+    expect(await natsConnections()).toMatchObject({ num_connections: 1 });
+    await runtime.dispose();
+    await expect.poll(activeDatabaseConnections).toBe(0);
+    await expect.poll(natsConnections).toMatchObject({ num_connections: 0 });
+  });
+
+  it('authenticates with the percent-encoded credentials from its configured broker URL', async () => {
+    const user = 'wallpaper-client';
+    const password = 'broker-private-marker:/@%';
+    const protectedBroker = await createNatsContainer({
+      enableJetStream: false,
+      additionalArgs: ['--user', user, '--pass', password],
+    });
+    const url = new URL(protectedBroker.getConnectionUrl());
+    url.username = encodeURIComponent(user);
+    url.password = encodeURIComponent(password);
+    const runtime = ManagedRuntime.make(
+      dependencyProbeLayer({
+        databaseUrl: databaseUrl(),
+        natsUrl: url.toString(),
+        serviceName: 'wallpaper-authenticated-broker-test',
+        otelHealthy: true,
+      })
+    );
+    try {
+      expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual({
+        database: true,
+        nats: true,
+        otel: true,
+      });
+    } finally {
+      await runtime.dispose();
+      await protectedBroker.stop();
+    }
+  });
+
+  it('marks a stalled broker unavailable and closes the outstanding network work', async () => {
+    const address = new URL(nats.getConnectionUrl());
+    const proxy = await databaseProxy(address.hostname, Number(address.port));
+    const runtime = ManagedRuntime.make(
+      dependencyProbeLayer({
+        databaseUrl: databaseUrl(),
+        natsUrl: `nats://127.0.0.1:${proxy.port}`,
+        serviceName: 'wallpaper-stalled-broker-test',
+        otelHealthy: true,
+        healthTimeoutMs: 100,
+      })
+    );
+    runtimes.push(runtime);
+    try {
+      expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual({
+        database: true,
+        nats: true,
+        otel: true,
+      });
+      proxy.block();
+      const startedAt = Date.now();
+      expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual({
+        database: true,
+        nats: false,
+        otel: true,
+      });
+      expect(Date.now() - startedAt).toBeLessThan(1000);
+    } finally {
+      await runtime.dispose();
+      await proxy.close();
+    }
+  });
+
+  it('bounds a stalled database probe by destroying its connection and permits recovery', async () => {
+    const proxy = await databaseProxy(postgres.getHost(), postgres.getMappedPort(5432));
+    const runtime = ManagedRuntime.make(
+      dependencyProbeLayer({
+        databaseUrl: databaseUrl(proxy.port),
+        natsUrl: nats.getConnectionUrl(),
+        serviceName: 'wallpaper-stalled-dependency-test',
+        otelHealthy: true,
+        healthTimeoutMs: 100,
+      })
+    );
+    runtimes.push(runtime);
+    try {
+      expect(
+        await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
+      ).toMatchObject({ database: true });
+      proxy.block();
+      const startedAt = Date.now();
+      expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual({
+        database: false,
+        nats: true,
+        otel: true,
+      });
+      expect(Date.now() - startedAt).toBeLessThan(1000);
+      await expect.poll(activeDatabaseConnections).toBe(0);
+      proxy.unblock();
+      expect(
+        await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
+      ).toMatchObject({ database: true });
+    } finally {
+      await proxy.close();
+      await runtime.dispose();
+    }
+  });
+
+  it('cancels a blocked probe without leaving a PostgreSQL session behind', async () => {
+    const proxy = await databaseProxy(postgres.getHost(), postgres.getMappedPort(5432));
+    const runtime = ManagedRuntime.make(
+      dependencyProbeLayer({
+        databaseUrl: databaseUrl(proxy.port),
+        natsUrl: nats.getConnectionUrl(),
+        serviceName: 'wallpaper-interrupted-dependency-test',
+        otelHealthy: true,
+      })
+    );
+    runtimes.push(runtime);
+    const controller = new AbortController();
+    try {
+      await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()));
+      proxy.block();
+      const pending = runtime.runPromiseExit(
+        AvailabilityProbe.use((probe) => probe.inspect()),
+        {
+          signal: controller.signal,
+        }
+      );
+      await expect.poll(proxy.hasBlockedTraffic).toBe(true);
+      controller.abort();
+      const result = await pending;
+      expect(Exit.isFailure(result) && Cause.hasInterruptsOnly(result.cause)).toBe(true);
+      await expect.poll(activeDatabaseConnections).toBe(0);
+    } finally {
+      controller.abort();
+      await proxy.close();
+      await runtime.dispose();
+    }
+  });
+
+  it('keeps PostgreSQL lazy and reports database and telemetry unavailability independently', async () => {
+    const runtime = ManagedRuntime.make(
+      dependencyProbeLayer({
+        databaseUrl: `${databaseUrl()}_missing`,
+        natsUrl: nats.getConnectionUrl(),
+        serviceName: 'wallpaper-unavailable-dependency-test',
+        otelHealthy: false,
+      })
+    );
+    runtimes.push(runtime);
+    await runtime.runPromise(AvailabilityProbe);
+    expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual({
+      database: false,
+      nats: true,
+      otel: false,
+    });
+    await expect.poll(activeDatabaseConnections).toBe(0);
+  });
+
+  it('fails startup through the typed channel when NATS cannot connect', async () => {
+    const result = await Effect.runPromise(
+      AvailabilityProbe.pipe(
+        Effect.provide(
+          dependencyProbeLayer({
+            databaseUrl: databaseUrl(),
+            natsUrl: 'nats://127.0.0.1:1',
+            serviceName: 'wallpaper-failed-startup-test',
+            otelHealthy: true,
+          })
+        ),
+        Effect.match({
+          onFailure: (failure) => failure._tag,
+          onSuccess: () => 'unexpected-success',
+        })
+      )
+    );
+    expect(result).toBe('DependencyStartupFailure');
+  });
+  it('refuses cleartext NATS when the configured URL requires TLS', async () => {
+    const url = new URL(nats.getConnectionUrl());
+    url.protocol = 'tls:';
+    const result = await Effect.runPromise(
+      AvailabilityProbe.pipe(
+        Effect.provide(
+          dependencyProbeLayer({
+            databaseUrl: databaseUrl(),
+            natsUrl: url.toString(),
+            serviceName: 'wallpaper-tls-required',
+            otelHealthy: true,
+          })
+        ),
+        Effect.result
+      )
+    );
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure') expect(result.failure._tag).toBe('DependencyStartupFailure');
+  });
+});
+
+/** Forward real PostgreSQL traffic, with an optional network stall after authentication. */
+async function databaseProxy(host: string, port: number) {
+  let blocked = false;
+  let blockedTraffic = false;
+  const sockets = new Set<Socket>();
+  const server = createServer((incoming) => {
+    const outgoing = createConnection({ host, port });
+    sockets.add(incoming);
+    sockets.add(outgoing);
+    incoming.on('data', (data) => {
+      if (blocked) blockedTraffic = true;
+      else outgoing.write(data);
+    });
+    outgoing.pipe(incoming);
+    incoming.on('error', () => outgoing.destroy());
+    outgoing.on('error', () => incoming.destroy());
+    incoming.on('close', () => {
+      sockets.delete(incoming);
+      outgoing.destroy();
+    });
+    outgoing.on('close', () => {
+      sockets.delete(outgoing);
+      incoming.destroy();
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Proxy did not bind a TCP port');
+  return {
+    port: address.port,
+    block: () => {
+      blocked = true;
+    },
+    unblock: () => {
+      blocked = false;
+    },
+    hasBlockedTraffic: () => blockedTraffic,
+    close: async () => {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
+    },
+  };
+}

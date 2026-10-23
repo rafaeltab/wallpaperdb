@@ -175,9 +175,11 @@
       "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
     },
     "packages/url-ipv4-resolver": {
-      "decision": "excluded",
-      "reason": "The resolver suite uses live DNS for example.com; deterministic resolver inputs must be validated before repeated mutation execution.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ]
     },
     "packages/vitest-config": {
       "decision": "excluded",

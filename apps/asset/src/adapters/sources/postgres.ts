@@ -155,11 +155,10 @@ export function sourcePostgresLayer(options: Options) {
                 const changed = change(initial);
                 if (changed.state && (!asset || asset.deletedAt !== null))
                   throw new Error('Unavailable Asset cannot accept Source state');
+                const protection = changed.readProtection;
                 if (
-                  changed.readProtection &&
-                  !initial?.sources.some(
-                    (source) => source.sourceId === changed.readProtection?.sourceId
-                  )
+                  protection &&
+                  !initial?.sources.some((source) => source.sourceId === protection.sourceId)
                 )
                   throw new Error('Read protection requires active membership');
                 return changed;
@@ -176,10 +175,12 @@ export function sourcePostgresLayer(options: Options) {
               if (changed.state && asset) {
                 for (const candidate of changed.state.candidates) {
                   const terminal = ['accepted', 'rejected', 'cancelled'].includes(candidate.status);
+                  const inputExpiry = Math.min(
+                    Date.parse(candidate.expiresAt),
+                    Date.parse(candidate.temporaryExpiresAt ?? candidate.expiresAt)
+                  );
                   const inputDue = new Date(
-                    terminal
-                      ? Math.min(Date.now(), Date.parse(candidate.expiresAt))
-                      : candidate.expiresAt
+                    terminal ? Math.min(Date.now(), inputExpiry) : inputExpiry
                   );
                   await tx
                     .insert(sourceCleanup)

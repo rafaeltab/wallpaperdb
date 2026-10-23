@@ -33,6 +33,7 @@ it('uses verified Creator identity, returns durable progress and hides private w
             state: 'creating-asset',
             assetId: null,
             intent: null,
+            sourceIntents: [],
             sourceId: null,
             initialAnalysisSourceId: null,
           },

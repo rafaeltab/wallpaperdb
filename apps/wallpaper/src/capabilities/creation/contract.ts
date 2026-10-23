@@ -30,6 +30,7 @@ export interface Wallpaper {
   state: 'creating-asset' | 'awaiting-source' | 'accepting-source' | 'published' | 'failed';
   assetId: string | null;
   intent: SourceIntent | null;
+  sourceIntents: SourceIntent[];
   sourceId: string | null;
   initialAnalysisSourceId: string | null;
 }

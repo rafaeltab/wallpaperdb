@@ -117,7 +117,7 @@ export const pictureAttachmentsLayer = Layer.effect(
           .pipe(Effect.withSpan('pictures.attachment.cancel')),
       assetResult: (result) =>
         store
-          .change<'applied' | 'ignored'>(
+          .change<'applied' | 'ignored' | 'requires-attention'>(
             { kind: 'intent', id: result.attachmentId },
             ({ intent, profile }) => {
               if (!intent) return { result: 'ignored' };
@@ -125,6 +125,14 @@ export const pictureAttachmentsLayer = Layer.effect(
                 result.commandId === intent.deleteCommandId &&
                 result.causationId === intent.deletionEventId
               ) {
+                if (
+                  intent.deletion === 'pending' &&
+                  result.outcome === 'rejected' &&
+                  (result.assetId === null || result.assetId === intent.assetId)
+                ) {
+                  intent.attentionRequired = true;
+                  return { intent, result: 'requires-attention' };
+                }
                 if (
                   intent.deletion !== 'pending' ||
                   result.assetId !== intent.assetId ||
@@ -179,6 +187,8 @@ export const pictureAttachmentsLayer = Layer.effect(
               )
                 return { result: 'ignored' };
               if (
+                intent.sourceIntent?.candidateId !== c.candidateId ||
+                intent.sourceIntent?.intentId !== c.intentId ||
                 !profile ||
                 profile.pictureIntentId !== intent.id ||
                 profile.version !== intent.expectedVersion ||

@@ -153,6 +153,27 @@ export async function configureDevelopment(
     { mode: 0o600 }
   );
   await chmod(workflowPath, 0o600);
+  const user = authority.applications.user?.credentials[0];
+  if (!user) throw new Error('User application credential is required');
+  const userWorkflow = join(root, 'apps/user/.workflow.json');
+  await mkdir(join(root, 'apps/user'), { recursive: true });
+  await writeFile(
+    userWorkflow,
+    JSON.stringify(
+      {
+        credential: { user: user.user, password: user.password },
+        operatorNotification: {
+          url: authority.operatorNotification.url,
+          token: authority.operatorNotification.token,
+        },
+        ...authority.delivery,
+      },
+      null,
+      2
+    ) + '\n',
+    { mode: 0o600 }
+  );
+  await chmod(userWorkflow, 0o600);
   return authority.identity;
 }
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {

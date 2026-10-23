@@ -75,6 +75,7 @@ export async function createHttpApp<E>(
     readonly logger?: boolean;
     readonly signal?: AbortSignal;
     readonly shutdownTimeoutMs?: number;
+    readonly configure?: (app: FastifyInstance) => Promise<void>;
   } = {}
 ): Promise<FastifyInstance> {
   const runtime = ManagedRuntime.make(executionLayer.pipe(Layer.provide(services)));
@@ -155,6 +156,7 @@ export async function createHttpApp<E>(
     });
     registerProfileRoutes(app, execution);
     await registerPictureRoutes(app, execution, config);
+    await options.configure?.(app);
     app.get('/health', { config: { skipAuth: true } }, (request, reply) =>
       execution.run(
         Availability.use((service) => service.health(app.connectionsState.isShuttingDown)).pipe(
@@ -207,3 +209,5 @@ export async function createHttpApp<E>(
     throw error;
   }
 }
+
+export { registerAttachmentHttp } from './picture-attachments.js';

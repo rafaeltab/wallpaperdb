@@ -7,6 +7,8 @@ import {
   AttachmentFailure,
   type PictureAttachment,
   type AttachmentStore as Store,
+  type AttachmentSnapshot,
+  type AttachmentTransition,
 } from '../../capabilities/picture-attachments/index.js';
 import {
   profiles,
@@ -19,11 +21,21 @@ import { Database, databaseDiagnostic } from '../database/index.js';
 import { appendProfileEvent } from '../profiles/index.js';
 import { persistAttachment } from './transaction.js';
 import { makeDelivery } from './delivery.js';
-export type AttachmentDatabase = Parameters<Parameters<Database['run']>[0]>[0];
-export type AttachmentQuery = <A>(
-  operation: string,
-  run: (db: AttachmentDatabase) => Promise<A>
-) => Effect.Effect<A, AttachmentFailure>;
+import type { AttachmentQuery } from './types.js';
+class AttachmentDecisionDefect {
+  constructor(readonly cause: unknown) {}
+}
+class AttachmentInvariant extends Error {}
+function decideAttachment<A>(
+  decide: (snapshot: AttachmentSnapshot) => AttachmentTransition<A>,
+  snapshot: AttachmentSnapshot
+): AttachmentTransition<A> {
+  try {
+    return decide(snapshot);
+  } catch (cause) {
+    throw new AttachmentDecisionDefect(cause);
+  }
+}
 export function attachmentPostgresLayer(options: {
   readonly maxAttempts: number;
   readonly retryDelayMs: number;
@@ -35,8 +47,22 @@ export function attachmentPostgresLayer(options: {
       const query: AttachmentQuery = (operation, run) =>
         Effect.tryPromise({
           try: (signal) => database.run(run, signal),
-          catch: (cause) => new AttachmentFailure({ operation, cause: databaseDiagnostic(cause) }),
+          catch: (cause) =>
+            new AttachmentFailure({
+              operation,
+              cause:
+                cause instanceof AttachmentDecisionDefect || cause instanceof AttachmentInvariant
+                  ? cause
+                  : databaseDiagnostic(cause),
+            }),
         }).pipe(
+          Effect.catchTag('AttachmentFailure', (failure) =>
+            failure.cause instanceof AttachmentDecisionDefect
+              ? Effect.die(failure.cause.cause)
+              : failure.cause instanceof AttachmentInvariant
+                ? Effect.die(failure.cause)
+                : Effect.fail(failure)
+          ),
           Effect.tapError((error) =>
             Effect.logError('Picture attachment persistence unavailable', {
               operation,
@@ -65,7 +91,7 @@ export function attachmentPostgresLayer(options: {
               const profileId =
                 selector.kind === 'begin' ? selector.profileId : selected?.profileId;
               if (!profileId)
-                return decide({
+                return decideAttachment(decide, {
                   intent: null,
                   previous: null,
                   profile: null,
@@ -78,7 +104,7 @@ export function attachmentPostgresLayer(options: {
                 .where(eq(profiles.id, profileId))
                 .for('update');
               if (!profile)
-                return decide({
+                return decideAttachment(decide, {
                   intent: null,
                   previous: null,
                   profile: null,
@@ -145,7 +171,8 @@ export function attachmentPostgresLayer(options: {
                       )
                       .limit(1)
                   : [];
-              const changed = decide(
+              const changed = decideAttachment(
+                decide,
                 structuredClone({
                   intent: before ?? draft,
                   previous: previous?.state ?? null,
@@ -189,7 +216,9 @@ export function attachmentPostgresLayer(options: {
                   profile.pictureAssetId !== null ||
                   intent.assetId !== changed.attach.assetId
                 )
-                  throw new Error('Attachment decision violated locked Profile identity');
+                  throw new AttachmentInvariant(
+                    'Attachment decision violated locked Profile identity'
+                  );
                 const now = new Date();
                 const [updated] = await tx
                   .update(profiles)
@@ -200,7 +229,7 @@ export function attachmentPostgresLayer(options: {
                   })
                   .where(eq(profiles.id, profileId))
                   .returning();
-                if (!updated) throw new Error('Locked Profile disappeared');
+                if (!updated) throw new AttachmentInvariant('Locked Profile disappeared');
                 await tx
                   .update(profilePictureImports)
                   .set({ status: 'complete', sourceUrl: null, leaseToken: null, leaseUntil: null })

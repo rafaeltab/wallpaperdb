@@ -19,6 +19,7 @@
     "test": "vitest run",
     "test:unit": "vitest run --config vitest.unit.config.ts --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts --coverage",
+    "test:attachment-fixture": "tsx test/fixtures/attachment-server.ts",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",

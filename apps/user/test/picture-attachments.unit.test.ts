@@ -191,6 +191,30 @@ describe('Initial picture attachment', () => {
     expect(retry.kind).toBe('attachment');
     expect(await c.source()).toBe('applied');
   });
+  it('fences a late accepted candidate after a different edit becomes current', async () => {
+    const c = controlled();
+    const i = await c.begin();
+    await c.created(i);
+    await c.run((s) =>
+      s.expectSource({ profileId: 'owner' }, i.id, {
+        candidateId: 'candidate-A',
+        intentId: 'edit-A',
+      })
+    );
+    await c.run((s) =>
+      s.expectSource({ profileId: 'owner' }, i.id, {
+        candidateId: 'candidate-B',
+        intentId: 'edit-B',
+      })
+    );
+    expect(await c.source()).toBe('ignored');
+    expect(c.profile().pictureAssetId).toBeNull();
+    expect(c.intents.get(i.id)?.state).toBe('conflicted');
+    expect(c.obligations.get(i.deletionEventId)).toEqual({
+      operation: 'delete',
+      assetId: 'asset-A',
+    });
+  });
   it('fences cancellation before a late create and durably deletes precisely that orphan', async () => {
     const c = controlled();
     const i = await c.begin();
@@ -227,6 +251,29 @@ describe('Initial picture attachment', () => {
       )
     ).toBe('applied');
     expect(c.intents.get(i.id)?.deletion).toBe('complete');
+  });
+  it('retains a rejected orphan deletion for operator attention rather than silently completing it', async () => {
+    const c = controlled();
+    const i = await c.begin();
+    await c.created(i);
+    await c.run((s) => s.cancel({ profileId: 'owner' }, i.id));
+    expect(
+      await c.run((s) =>
+        s.assetResult({
+          attachmentId: i.id,
+          commandId: i.deleteCommandId,
+          causationId: i.deletionEventId,
+          outcome: 'rejected',
+          assetId: 'asset-A',
+        })
+      )
+    ).toBe('requires-attention');
+    expect(c.intents.get(i.id)).toMatchObject({
+      state: 'cancelled',
+      deletion: 'pending',
+      attentionRequired: true,
+    });
+    expect(c.profile().pictureAssetId).toBeNull();
   });
   it('abandons a superseded intent without letting its late result attach or delete the next picture', async () => {
     const c = controlled();

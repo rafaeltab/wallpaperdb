@@ -23,6 +23,10 @@ import { AvailabilityProbe, availabilityLayer } from './capabilities/availabilit
 import { createHttpApp } from './http/index.js';
 import { Workers, workerLayer } from './workers.js';
 import { tracingLayer } from './runtime.js';
+import { attachmentPostgresLayer } from './adapters/picture-attachments/store.js';
+import { attachmentBrokerLayer } from './adapters/picture-attachments/index.js';
+import { pictureAttachmentsLayer } from './capabilities/picture-attachments/index.js';
+import { registerAttachmentHttp } from './http/index.js';
 import { monitorLayer } from './monitor.js';
 
 export interface AppOptions {
@@ -198,6 +202,24 @@ export function createApp(config: Config, options: AppOptions = {}) {
       userAssetServiceToken: config.userAssetServiceToken,
     },
     userLayer(config, options),
-    options
+    {
+      ...options,
+      configure: config.attachmentWorkflow
+        ? async (app) => {
+            const workflow = config.attachmentWorkflow;
+            if (!workflow) return;
+            const persistence = attachmentPostgresLayer({ ...workflow, leaseMs: 30000 }).pipe(
+              Layer.provide(databaseLayer({ databaseUrl: config.databaseUrl }))
+            );
+            const attachments = pictureAttachmentsLayer.pipe(Layer.provide(persistence));
+            const services = attachmentBrokerLayer({ ...workflow, natsUrl: config.natsUrl }).pipe(
+              Layer.provideMerge(attachments),
+              Layer.provide(persistence),
+              Layer.provideMerge(tracingLayer)
+            );
+            await registerAttachmentHttp(app, services, true);
+          }
+        : undefined,
+    }
   );
 }

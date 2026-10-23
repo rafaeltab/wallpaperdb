@@ -173,6 +173,8 @@ export interface AttachmentDelivery {
     scope: 'outbox' | 'confirmation'
   ) => Effect.Effect<void, AttachmentFailure>;
   readonly retainedConfirmation: (id: string) => Effect.Effect<string | null, AttachmentFailure>;
+  /** Closes a recovered confirmation and reconciles its intent's remaining attention
+   * in one local transaction. Repeated quarantine cannot reopen a recovered record. */
   readonly confirmationRecovered: (id: string) => Effect.Effect<void, AttachmentFailure>;
 }
 export const AttachmentDelivery = Context.Service<AttachmentDelivery>(

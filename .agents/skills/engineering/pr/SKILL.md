@@ -38,7 +38,7 @@ When creating or updating a PR body, put a separate `Closes #123` line in the Su
 
 Check the PR's base against the repository's default branch. GitHub applies closing keywords only to PRs targeting that branch. For stacked PRs or other bases, carry the closing references into the PR that delivers the completed work to the default branch. Report that merging an intermediate PR will leave the issues open; keep the intended base.
 
-After publishing or editing the body, verify that GitHub's `closingIssuesReferences` contains every intended issue for a PR targeting the default branch. Fix missing or incorrect references before claiming the issues will close on merge.
+After publishing or editing the body, verify that GitHub's `closingIssuesReferences` exactly matches the intended issue set for a PR targeting the default branch. Compare canonical repository identities and issue numbers. Correct missing or unintended closing references and verify again before claiming completion; report any mismatch that remains unresolved.
 
 See [GitHub's issue-linking rules](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue).
 

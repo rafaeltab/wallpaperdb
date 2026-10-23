@@ -1,0 +1,2 @@
+DROP INDEX "picture_attachment_request_identity";--> statement-breakpoint
+CREATE UNIQUE INDEX "picture_attachment_request_identity" ON "picture_attachment_intents" USING btree ("profile_id","request_key",("state"->>'expectedVersion'));

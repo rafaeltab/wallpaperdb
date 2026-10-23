@@ -1,4 +1,4 @@
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Cause, Effect, Exit, Layer, ManagedRuntime } from 'effect';
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
@@ -176,6 +176,56 @@ it('rolls back a conflicting Asset attachment and leaves both prior states intac
         expect.objectContaining({ id: second.id, assetId: null }),
       ])
     );
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('preserves pure transition defects after rollback and keeps database failures typed', async () => {
+  const runtime = recoveryRuntime();
+  const defect = new Error('unique-wallpaper-transition-defect');
+  const owner = { namespace: 'authors', subject: 'defect-owner' };
+  try {
+    const wallpaper = await runtime.runPromise(WorkflowStore.use((s) => s.begin(owner, 'defect')));
+    const exit = await runtime.runPromiseExit(
+      WorkflowStore.use((s) =>
+        s.change({ kind: 'wallpaper', id: wallpaper.id }, (current) => {
+          if (!current) throw new Error('Missing Wallpaper');
+          current.assetId = 'must-not-commit';
+          throw defect;
+        })
+      )
+    );
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (!Exit.isFailure(exit)) throw new Error('Expected transition defect');
+    expect(Cause.hasDies(exit.cause)).toBe(true);
+    expect(Cause.squash(exit.cause)).toBe(defect);
+    expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([wallpaper]);
+    const pending = await runtime.runPromise(WorkflowDelivery.use((s) => s.claim()));
+    expect(pending.map((p) => p.id)).toEqual([wallpaper.creationEventId]);
+
+    await pool.query(
+      'ALTER TABLE wallpaper_intents ADD CONSTRAINT reject_test_asset CHECK (asset_id IS NULL)'
+    );
+    try {
+      const failure = await runtime.runPromise(
+        WorkflowStore.use((s) =>
+          s.change({ kind: 'wallpaper', id: wallpaper.id }, (current) => {
+            if (!current) throw new Error('Missing Wallpaper');
+            return { wallpaper: { ...current, assetId: 'rejected-by-database' }, result: true };
+          })
+        ).pipe(Effect.flip)
+      );
+      expect(failure).toMatchObject({ _tag: 'WorkflowFailure', operation: 'transition' });
+      expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([
+        wallpaper,
+      ]);
+      expect(await pool.query('SELECT id FROM wallpaper_workflow_outbox')).toMatchObject({
+        rows: [{ id: wallpaper.creationEventId }],
+      });
+    } finally {
+      await pool.query('ALTER TABLE wallpaper_intents DROP CONSTRAINT reject_test_asset');
+    }
   } finally {
     await runtime.dispose();
   }

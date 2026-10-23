@@ -355,19 +355,56 @@ it('quarantines exhausted confirmation responsibility and exposes deliberate ope
       const claimedPublication = publication;
       await sources.runPromise(SourceAcceptanceOutbox.use((o) => o.failed(claimedPublication)));
     }
-    expect(
-      (await sources.runPromise(SourceAcceptanceOutbox.use((o) => o.pendingAlerts()))).some(
-        (c) => c.id === id
-      )
-    ).toBe(true);
+    const outbox = await sources.runPromise(SourceAcceptanceOutbox);
+    const firstAlert = (await sources.runPromise(outbox.pendingAlerts())).find((c) => c.id === id);
+    if (!firstAlert) throw new Error('Expected first quarantine');
+    await sources.runPromise(outbox.alerted(firstAlert));
     expect(
       await runOperator(['recover-source-confirmation', '--id', id, '--authority-file', path])
     ).toEqual({ recovered: true });
-    expect(
-      (await sources.runPromise(SourceAcceptanceOutbox.use((o) => o.claim(100)))).find(
-        (p) => p.id === id
-      )?.attempts
-    ).toBe(1);
+    // A delayed first-cycle acknowledgement cannot acknowledge the renewed duty,
+    // either before or after that duty exhausts its fresh finite budget.
+    await sources.runPromise(outbox.alerted(firstAlert));
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      let publication: import('../src/capabilities/sources/index.js').SourcePublication | undefined;
+      await expect
+        .poll(async () => {
+          publication = (await sources.runPromise(outbox.claim(100))).find((p) => p.id === id);
+          return publication?.attempts;
+        })
+        .toBe(attempt);
+      if (!publication) throw new Error('Expected renewed publication');
+      await sources.runPromise(outbox.failed(publication));
+    }
+    const renewed = (await sources.runPromise(outbox.pendingAlerts())).find((c) => c.id === id);
+    expect(renewed).toMatchObject({ ...firstAlert, quarantineId: expect.any(String) });
+    if (!renewed) throw new Error('Expected renewed quarantine');
+    expect(renewed.quarantineId).not.toBe(firstAlert.quarantineId);
+    const restarted = ManagedRuntime.make(
+      sourcePostgresLayer({
+        databaseUrl: container.getConnectionUri(),
+        maxAttempts: 3,
+        retryDelayMs: 1,
+        leaseMs: 1000,
+      })
+    );
+    try {
+      const restartedOutbox = await restarted.runPromise(SourceAcceptanceOutbox);
+      expect(
+        (await restarted.runPromise(restartedOutbox.pendingAlerts())).find((c) => c.id === id)
+      ).toEqual(renewed);
+      await restarted.runPromise(restartedOutbox.alerted(firstAlert));
+      expect(
+        (await restarted.runPromise(restartedOutbox.pendingAlerts())).find((c) => c.id === id)
+      ).toEqual(renewed);
+      await restarted.runPromise(restartedOutbox.alerted(renewed));
+      expect(
+        (await restarted.runPromise(restartedOutbox.pendingAlerts())).find((c) => c.id === id)
+      ).toBeUndefined();
+      expect(await restarted.runPromise(restartedOutbox.claim(100))).toEqual([]);
+    } finally {
+      await restarted.dispose();
+    }
   } finally {
     if (previous === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previous;

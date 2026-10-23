@@ -229,4 +229,5 @@ export const sourceAcceptanceOutbox = pgTable('source_acceptance_outbox', {
   availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
   leaseId: text('lease_id'),
   notifiedAt: timestamp('notified_at', { withTimezone: true }),
+  quarantineId: text('quarantine_id').notNull().default(sql`gen_random_uuid()`),
 });

@@ -278,14 +278,20 @@ export function sourcePostgresLayer(options: Options) {
                   )
                 )
                 .limit(100)
-            ).map((row) => row.confirmation)
+            ).map((row) => ({ ...row.confirmation, quarantineId: row.quarantineId }))
           ),
-        alerted: (id) =>
+        alerted: (alert) =>
           run('confirm-alert', async (db) => {
             await db
               .update(sourceAcceptanceOutbox)
               .set({ notifiedAt: new Date() })
-              .where(eq(sourceAcceptanceOutbox.id, id));
+              .where(
+                and(
+                  eq(sourceAcceptanceOutbox.id, alert.id),
+                  eq(sourceAcceptanceOutbox.quarantineId, alert.quarantineId),
+                  eq(sourceAcceptanceOutbox.status, 'quarantined')
+                )
+              );
           }),
         recover: (id) =>
           Effect.gen(function* () {
@@ -321,6 +327,7 @@ export function sourcePostgresLayer(options: Options) {
                     availableAt: new Date(),
                     leaseId: null,
                     notifiedAt: null,
+                    quarantineId: randomUUID(),
                   })
                   .where(
                     and(

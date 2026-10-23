@@ -151,6 +151,7 @@ export interface AttachmentPublication {
  * work is quarantined. Only trusted operator composition may reset quarantined work. */
 export interface AttachmentDelivery {
   readonly claim: () => Effect.Effect<readonly AttachmentPublication[], AttachmentFailure>;
+  /** Matching-lease completion and remaining attention commit together; stale leases do nothing. */
   readonly complete: (p: AttachmentPublication) => Effect.Effect<void, AttachmentFailure>;
   readonly failed: (p: AttachmentPublication) => Effect.Effect<void, AttachmentFailure>;
   readonly quarantine: (

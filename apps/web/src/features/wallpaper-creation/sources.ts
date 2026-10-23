@@ -15,6 +15,7 @@ export interface OwnedSources {
   readonly candidates: readonly ManagedCandidate[];
 }
 export interface SourceBatchApi<TFile> {
+  readonly identifier: () => string;
   readonly begin: (key: string, signal: AbortSignal) => Promise<WallpaperStatus>;
   readonly wallpaper: (id: string, signal: AbortSignal) => Promise<WallpaperStatus>;
   readonly list: (asset: string, signal: AbortSignal) => Promise<OwnedSources>;
@@ -48,11 +49,10 @@ export interface SourceBatchApi<TFile> {
   readonly wait: (signal: AbortSignal) => Promise<void>;
 }
 export class SourceIntakeError extends Error {
-  constructor(
-    message: string,
-    readonly restartCandidate = false
-  ) {
+  readonly restartCandidate: boolean;
+  constructor(message: string, restartCandidate = false) {
     super(message);
+    this.restartCandidate = restartCandidate;
   }
 }
 interface Receipt {
@@ -85,10 +85,20 @@ export function createWallpaperSourceBatch<TFile>(
     readonly rows: typeof rows;
     readonly busy: boolean;
     readonly wallpaperId?: string;
+    readonly assetId?: string;
   } = { rows, busy };
   const listeners = new Set<() => void>();
   const publish = () => {
-    current = { rows, busy, ...(wallpaper ? { wallpaperId: wallpaper.wallpaperId } : {}) };
+    current = {
+      rows,
+      busy,
+      ...(wallpaper
+        ? {
+            wallpaperId: wallpaper.wallpaperId,
+            ...(wallpaper.assetId ? { assetId: wallpaper.assetId } : {}),
+          }
+        : {}),
+    };
     for (const listener of listeners) listener();
   };
   const update = (id: string, change: Partial<SourceUploadRow<TFile>>) => {
@@ -96,6 +106,7 @@ export function createWallpaperSourceBatch<TFile>(
     publish();
   };
   let running: Promise<void> | undefined;
+  let blockedInitial: string | undefined;
   const batch = {
     getSnapshot: () => current,
     subscribe(listener: () => void) {
@@ -105,14 +116,33 @@ export function createWallpaperSourceBatch<TFile>(
       };
     },
     addFiles(files: readonly { readonly value: TFile; readonly name: string }[]) {
-      if (busy) return;
+      if (busy || files.length + rows.length > 16) return false;
       rows = [
         ...rows,
-        ...files
-          .slice(0, Math.max(0, 16 - rows.length))
-          .map((file) => ({ ...file, id: crypto.randomUUID(), status: 'pending' as const })),
+        ...files.map((file) => ({ ...file, id: api.identifier(), status: 'pending' as const })),
       ];
       publish();
+      return true;
+    },
+    resume(file: { readonly value: TFile; readonly name: string }, candidate: ManagedCandidate) {
+      if (busy || rows.length >= 16 || candidate.status === 'accepted') return false;
+      rows = [
+        ...rows,
+        {
+          ...file,
+          id: api.identifier(),
+          status: 'pending',
+          restart: ['rejected', 'cancelled'].includes(candidate.status),
+          receipt: {
+            key: api.identifier(),
+            revision: candidate.expectedSourceSetRevision,
+            initial: candidate.expectedSourceSetRevision === '0',
+            candidate,
+          },
+        },
+      ];
+      publish();
+      return true;
     },
     retry(id: string) {
       if (busy) return;
@@ -120,7 +150,7 @@ export function createWallpaperSourceBatch<TFile>(
       if (row && (row.status === 'failed' || row.status === 'confirming'))
         update(id, { status: 'pending', message: undefined });
     },
-    run(signal = new AbortController().signal): Promise<void> {
+    run(signal: AbortSignal): Promise<void> {
       if (running) return running;
       busy = true;
       publish();
@@ -139,7 +169,11 @@ export function createWallpaperSourceBatch<TFile>(
           if (!asset || wallpaper.state === 'failed')
             throw new Error('Wallpaper is waiting for its Asset. Retry this saved request.');
           for (const row of rows) {
-            if (row.status !== 'pending') continue;
+            if (blockedInitial && row.id !== blockedInitial) break;
+            if (row.status !== 'pending') {
+              if (blockedInitial === row.id) break;
+              continue;
+            }
             signal.throwIfAborted();
             update(row.id, { status: 'uploading' });
             let receipt = row.receipt;
@@ -149,8 +183,17 @@ export function createWallpaperSourceBatch<TFile>(
                 await api.cancel(asset, receipt.candidate.candidateId, signal);
               if (!receipt || row.restart) {
                 const saved = await api.list(asset, signal);
+                if (
+                  saved.sources.length === 0 &&
+                  saved.candidates.some(
+                    (candidate) => !['accepted', 'rejected', 'cancelled'].includes(candidate.status)
+                  )
+                )
+                  throw new Error(
+                    'An initial Source is still pending. Resume its saved candidate before selecting another file.'
+                  );
                 receipt = {
-                  key: crypto.randomUUID(),
+                  key: api.identifier(),
                   revision: saved.sourceSetRevision,
                   initial: saved.sources.length === 0,
                 };
@@ -160,6 +203,7 @@ export function createWallpaperSourceBatch<TFile>(
                 ? await api.status(asset, receipt.candidate.candidateId, signal)
                 : await api.create(asset, receipt.key, receipt.revision, signal);
               receipt.candidate = candidate;
+              const currentReceipt = receipt;
               const waitForInspection = async () => {
                 for (
                   let i = 0;
@@ -168,7 +212,7 @@ export function createWallpaperSourceBatch<TFile>(
                 ) {
                   await api.wait(signal);
                   candidate = await api.status(asset, candidate.candidateId, signal);
-                  receipt.candidate = candidate;
+                  currentReceipt.candidate = candidate;
                 }
               };
               await waitForInspection();
@@ -179,6 +223,7 @@ export function createWallpaperSourceBatch<TFile>(
               }
               if (['rejected', 'cancelled'].includes(candidate.status)) {
                 definitiveFailure = true;
+                if (blockedInitial === row.id) blockedInitial = undefined;
                 update(row.id, {
                   status: 'failed',
                   restart: true,
@@ -213,6 +258,7 @@ export function createWallpaperSourceBatch<TFile>(
               }
               if (candidate.status === 'rejected' || candidate.status === 'cancelled') {
                 definitiveFailure = true;
+                if (blockedInitial === row.id) blockedInitial = undefined;
                 update(row.id, {
                   status: 'failed',
                   restart: true,
@@ -225,9 +271,13 @@ export function createWallpaperSourceBatch<TFile>(
                   status: 'confirming',
                   message: 'Progress is saved. Check again to resume this file.',
                 });
-                if (receipt.initial) break;
+                if (receipt.initial) {
+                  blockedInitial = row.id;
+                  break;
+                }
                 continue;
               }
+              if (blockedInitial === row.id) blockedInitial = undefined;
               update(row.id, {
                 status: 'accepted',
                 sourceId: candidate.sourceId,
@@ -242,6 +292,16 @@ export function createWallpaperSourceBatch<TFile>(
               }
             } catch (error) {
               const restart = error instanceof SourceIntakeError && error.restartCandidate;
+              if (restart && receipt?.initial && receipt.candidate && !signal.aborted) {
+                try {
+                  await api.cancel(asset, receipt.candidate.candidateId, signal);
+                  receipt.candidate = { ...receipt.candidate, status: 'cancelled' };
+                  definitiveFailure = true;
+                  if (blockedInitial === row.id) blockedInitial = undefined;
+                } catch {
+                  /* An ambiguous cancellation must retain the initial intake fence. */
+                }
+              }
               update(row.id, {
                 status: signal.aborted ? 'confirming' : 'failed',
                 restart,
@@ -251,6 +311,7 @@ export function createWallpaperSourceBatch<TFile>(
                     ? error.message
                     : 'Source progress is saved. Retry this file.',
               });
+              if (receipt?.initial && !definitiveFailure) blockedInitial = row.id;
               if (signal.aborted || (receipt?.initial && !definitiveFailure)) break;
             }
           }

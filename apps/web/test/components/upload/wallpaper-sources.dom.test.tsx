@@ -1,0 +1,27 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, expect, it, vi } from 'vitest';
+import { WallpaperSources } from '@/components/upload/wallpaper-sources';
+import { browserSourceBatchApi, ownedSources } from '@/features/wallpaper-creation/adapters/http';
+vi.mock('@clerk/react', () => ({ useAuth: () => ({ userId: 'owner' }) }));
+vi.mock('@/features/wallpaper-creation/adapters/http', () => ({ browserSourceBatchApi: vi.fn(), ownedSources: vi.fn(), downloadSourceOriginal: vi.fn() }));
+afterEach(cleanup);
+it('shows independent initial outcomes and retries the failed file while keeping the saved Wallpaper', async () => {
+  const wallpaper={wallpaperId:'saved-one',assetId:'asset-one',sourceId:null,state:'awaiting-source' as const,createdAt:'now'};
+  let revision=0, attempts=0;
+  const uploads:string[]=[];
+  vi.mocked(ownedSources).mockImplementation(async()=>({sourceSetRevision:String(revision),sources:[],candidates:[]}));
+  vi.mocked(browserSourceBatchApi).mockReturnValue({identifier:()=>crypto.randomUUID(),begin:async()=>wallpaper,wallpaper:async()=>({...wallpaper,state:'published',sourceId:'source-one'}),list:async()=>({sourceSetRevision:String(revision),sources:revision?[{sourceId:'source-one'}]:[],candidates:[]}),create:async(_asset,key,expected)=>({candidateId:key,status:'awaiting-bytes',expectedSourceSetRevision:expected}),status:async()=>{throw new Error('Must create fresh rejected candidate');},upload:async(_asset,id,file)=>{uploads.push(file.name);return {candidateId:id,status:file.name==='bad.png'&&++attempts===1?'rejected':'ready',expectedSourceSetRevision:String(revision)};},expectSource:async()=>{},accept:async(_asset,id,expected)=>{revision++;return {candidateId:id,status:'accepted',sourceId:`source-${revision}`,expectedSourceSetRevision:expected};},cancel:async()=>{},wait:async()=>{}});
+  const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
+  const view=render(<QueryClientProvider client={client}><WallpaperSources /></QueryClientProvider>);
+  const user=userEvent.setup();
+  await user.upload(screen.getByLabelText('Choose initial Sources for one Wallpaper'),[new File(['bad'],'bad.png',{type:'image/png'}),new File(['good'],'good.png',{type:'image/png'})]);
+  await screen.findByText('Retry bad.png');
+  await waitFor(()=>expect(screen.getAllByTestId('source-upload-outcome')[1]).toHaveTextContent('Source accepted'));
+  expect(screen.getByText('Saved Wallpaper: saved-one')).toBeInTheDocument();
+  await user.click(screen.getByRole('button',{name:'Retry bad.png'}));
+  await waitFor(()=>expect(screen.queryByText('Retry bad.png')).not.toBeInTheDocument());
+  expect(uploads).toEqual(['bad.png','good.png','bad.png']);
+  view.unmount();client.clear();
+});

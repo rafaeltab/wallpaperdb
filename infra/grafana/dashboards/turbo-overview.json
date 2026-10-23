@@ -1,0 +1,1138 @@
+{
+  "uid": "wallpaperdb-turbo",
+  "id": null,
+  "title": "WallpaperDB Turbo",
+  "description": "Completed Turbo run summaries: run wall elapsed, timed-task elapsed and attempt-weighted cache rates. Selected-window estimates are distinct from persistent lifetime totals. Metadata only.",
+  "tags": [
+    "wallpaperdb",
+    "turbo",
+    "builds"
+  ],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 0,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scope and reading",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "description": "",
+      "options": {
+        "mode": "markdown",
+        "content": "Completed run summaries only. Run panels use **host only**; task panels also use package/task. Attempt = task node with valid execution timing; skipped/untimed nodes are excluded. Window totals are **Prometheus increase estimates**, placed at collection time, not exact run completion time. MISS = execution elapsed; HIT = cache-hit handling elapsed, including legitimate **0 ms**. Parallel task elapsed can exceed run wall time. Neither is CPU time or saved compute. Gaps mean unavailable data, not zero; ratios and means are undefined with zero attempts. Lifetime values ignore the time picker and cover persisted exporter state only. Freshness is pipeline/exporter liveness, not proof every Turbo invocation produced a summary."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Runs \u00b7 window estimate",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Selected-window estimated increase, not an exact event ledger. Missing series are unavailable, not zero. Run totals ignore package/task filters.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum (increase(wallpaperdb_turbo_runs_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"}[$__range]))",
+          "refId": "A",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Run wall elapsed \u00b7 window estimate",
+      "type": "stat",
+      "gridPos": {
+        "x": 4,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Selected-window estimated increase, not an exact event ledger. Missing series are unavailable, not zero. Run totals ignore package/task filters.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum (increase(wallpaperdb_turbo_run_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"}[$__range]))",
+          "refId": "A",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Task elapsed \u00b7 window estimate",
+      "type": "stat",
+      "gridPos": {
+        "x": 8,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Selected tasks, all hits and misses. Sum of elapsed handling/execution, not wall time or CPU time.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum (increase(wallpaperdb_turbo_task_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}[$__range]))",
+          "refId": "A",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Cache hits / attempts \u00b7 window",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Attempt-weighted ratio of selected-window counter increases. A missing hit series becomes 0% only when observed attempts > 0. No attempts remains undefined.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "100 * ((sum (increase(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\",cache_status=\"hit\"}[$__range]))) or (0 * (sum (increase(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}[$__range]))))) / (sum (increase(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}[$__range])) > 0)",
+          "refId": "A",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "title": "Collector age \u00b7 now",
+      "type": "stat",
+      "gridPos": {
+        "x": 16,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Age of latest exported heartbeat value at selected range end. Under 60s expected; over 120s stale. A missing heartbeat is No data, not healthy. Independent of package/task filters.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "time() - max (wallpaperdb_turbo_collector_heartbeat_seconds{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"})",
+          "refId": "A",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 120
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 7,
+      "title": "Recorded runs \u00b7 lifetime",
+      "type": "stat",
+      "gridPos": {
+        "x": 20,
+        "y": 3,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Instant cumulative total since persistent collection state was created. Ignores dashboard window; host filter only. State deletion resets this lifetime.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum (wallpaperdb_turbo_runs_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"})",
+          "refId": "A",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 8,
+      "title": "Mean run wall duration \u00b7 rolling",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Rate-weighted histogram mean per outcome over $__rate_interval. No observations means gaps, never a zero-duration run. Host filter only.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "(sum by (outcome) (rate(wallpaperdb_turbo_run_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"}[$__rate_interval]))) / (sum by (outcome) (rate(wallpaperdb_turbo_run_duration_seconds_count{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"}[$__rate_interval])) > 0)",
+          "refId": "A",
+          "legendFormat": "{{outcome}}",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 6,
+            "spanNulls": false,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Mean task elapsed \u00b7 MISS vs HIT",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 7,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Selected tasks. MISS measures execution; HIT measures cache-hit handling and may be 0 ms. Not the original cached build duration. Undefined without observations in the rolling interval.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "(sum by (cache_status) (rate(wallpaperdb_turbo_task_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}[$__rate_interval]))) / (sum by (cache_status) (rate(wallpaperdb_turbo_task_duration_seconds_count{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}[$__rate_interval])) > 0)",
+          "refId": "A",
+          "legendFormat": "{{cache_status}}",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 6,
+            "spanNulls": false,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Recorded throughput \u00b7 rolling rates",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 7,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Separate run and task rates per second. Runs use host only; tasks use selected package/task. Rolling $__rate_interval, not counts. Legend is not a sum of overlapping windows.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (outcome) (rate(wallpaperdb_turbo_runs_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"}[$__rate_interval]))",
+          "refId": "A",
+          "legendFormat": "runs/s \u00b7 {{outcome}}",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (cache_status) (rate(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}[$__rate_interval]))",
+          "refId": "B",
+          "legendFormat": "tasks/s \u00b7 {{cache_status}}",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 6,
+            "spanNulls": false,
+            "showPoints": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "title": "Per package / task \u00b7 selected-window estimates",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 16,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Attempt-weighted cache fraction and duration means over selected-window increases, plus MISS/HIT elapsed sums. Untimed task nodes are excluded. Blank mean = no observations; zero HIT mean is valid. Increases may be fractional due to boundary extrapolation. Sort by attempts to find busy tasks.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (package,task) (increase(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}[$__range]))",
+          "refId": "A",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "100 * ((sum by (package,task) (increase(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\",cache_status=\"hit\"}[$__range]))) or (0 * (sum by (package,task) (increase(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}[$__range]))))) / (sum by (package,task) (increase(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}[$__range])) > 0)",
+          "refId": "B",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "(sum by (package,task) (increase(wallpaperdb_turbo_task_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\",cache_status=\"miss\"}[$__range]))) / (sum by (package,task) (increase(wallpaperdb_turbo_task_duration_seconds_count{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\",cache_status=\"miss\"}[$__range])) > 0)",
+          "refId": "C",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "(sum by (package,task) (increase(wallpaperdb_turbo_task_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\",cache_status=\"hit\"}[$__range]))) / (sum by (package,task) (increase(wallpaperdb_turbo_task_duration_seconds_count{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\",cache_status=\"hit\"}[$__range])) > 0)",
+          "refId": "D",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (package,task) (increase(wallpaperdb_turbo_task_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\",cache_status=\"miss\"}[$__range]))",
+          "refId": "E",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by (package,task) (increase(wallpaperdb_turbo_task_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\",cache_status=\"hit\"}[$__range]))",
+          "refId": "F",
+          "legendFormat": "",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Attempts \u00b7 est."
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hit %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MISS mean"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HIT mean"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MISS elapsed \u00b7 est."
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HIT elapsed \u00b7 est."
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Attempts \u00b7 est.",
+            "desc": true
+          }
+        ],
+        "footer": {
+          "show": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "package": 0,
+              "task": 1,
+              "Value #A": 2,
+              "Value #B": 3,
+              "Value #C": 4,
+              "Value #D": 5,
+              "Value #E": 6,
+              "Value #F": 7
+            },
+            "renameByName": {
+              "Value #A": "Attempts \u00b7 est.",
+              "Value #B": "Hit %",
+              "Value #C": "MISS mean",
+              "Value #D": "HIT mean",
+              "Value #E": "MISS elapsed \u00b7 est.",
+              "Value #F": "HIT elapsed \u00b7 est."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Persistent totals / means \u00b7 lifetime, not window",
+      "type": "stat",
+      "gridPos": {
+        "x": 16,
+        "y": 14,
+        "w": 8,
+        "h": 10
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Instant cumulative counts, histogram sums and sum/count means from the one persistent exporter per host. Ignores selected window. Uses host and, for task measures, package/task. No recorded observations means undefined mean. State deletion starts a new collection lifetime.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum (wallpaperdb_turbo_run_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"})",
+          "refId": "A",
+          "legendFormat": "Run wall elapsed",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum (wallpaperdb_turbo_task_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"})",
+          "refId": "B",
+          "legendFormat": "Task elapsed",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum (wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"})",
+          "refId": "C",
+          "legendFormat": "Timed task attempts",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "100 * ((sum (wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\",cache_status=\"hit\"})) or (0 * (sum (wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"})))) / (sum (wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}) > 0)",
+          "refId": "D",
+          "legendFormat": "Cache hit fraction",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "(sum (wallpaperdb_turbo_run_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"})) / (sum (wallpaperdb_turbo_run_duration_seconds_count{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"}) > 0)",
+          "refId": "E",
+          "legendFormat": "Mean run wall",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "(sum (wallpaperdb_turbo_task_duration_seconds_sum{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"})) / (sum (wallpaperdb_turbo_task_duration_seconds_count{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\",task=~\"${task:regex}\"}) > 0)",
+          "refId": "F",
+          "legendFormat": "Mean task elapsed",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Run wall elapsed"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Task elapsed"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Timed task attempts"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cache hit fraction"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mean run wall"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mean task elapsed"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "orientation": "horizontal"
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Prometheus datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "current": {},
+        "options": []
+      },
+      {
+        "name": "host",
+        "label": "Host",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(wallpaperdb_turbo_collector_heartbeat_seconds{service_name=\"wallpaperdb-turbo\"}, host_name)",
+        "query": {
+          "query": "label_values(wallpaperdb_turbo_collector_heartbeat_seconds{service_name=\"wallpaperdb-turbo\"}, host_name)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "package",
+        "label": "Package",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"}, package)",
+        "query": {
+          "query": "label_values(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\"}, package)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "task",
+        "label": "Task",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\"}, task)",
+        "query": {
+          "query": "label_values(wallpaperdb_turbo_tasks_total{service_name=\"wallpaperdb-turbo\",host_name=~\"${host:regex}\",package=~\"${package:regex}\"}, task)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      }
+    ]
+  }
+}

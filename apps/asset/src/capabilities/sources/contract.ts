@@ -60,6 +60,8 @@ export interface SourceState {
   initialAnalysisSourceId: string | null;
   sources: AcceptedSource[];
   candidates: Candidate[];
+  /** Includes expired records until their durable status becomes terminal. */
+  nonterminalCandidateCount: number;
 }
 export interface SourceConfirmation {
   readonly context: CommandContext;
@@ -150,7 +152,8 @@ export interface SourcesPort {
   >;
   readonly list: (
     owner: Owner,
-    assetId: string
+    assetId: string,
+    candidateCursor?: string
   ) => Effect.Effect<
     | {
         readonly kind: 'found';
@@ -159,6 +162,8 @@ export interface SourcesPort {
           readonly assetType: string;
           readonly sources: readonly AcceptedSource[];
           readonly candidates: readonly Candidate[];
+          readonly hasPendingCandidates: boolean;
+          readonly nextCandidateCursor?: string;
           readonly defaultSourceId: string | null;
           readonly sourceSetRevision: string;
           readonly deliveryRevision: string;

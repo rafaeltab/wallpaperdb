@@ -398,6 +398,7 @@ it('serializes concurrent per-Asset preparation without dropping a candidate or 
           s.transact(created.assetId, 'revision-concurrent', (state) => {
             if (!state) throw new Error('Missing Asset');
             if (state.candidates.length === 2) return { state, result: 'full' };
+            state.nonterminalCandidateCount++;
             state.candidates.push({
               candidateId: id,
               sourceId: `source-${id}`,

@@ -132,9 +132,13 @@ function fixture(policy: SourcePolicy = initialSourcePolicies.wallpaper) {
     close: () => Promise.all(runtimes.map((r) => r.dispose())),
   };
 }
-async function create(f: ReturnType<typeof fixture>, key: string) {
+async function create(f: ReturnType<typeof fixture>, key: string, revision = '0') {
   const result = await f.call((s) =>
-    s.create(owner, 'asset_one', { ...intent, idempotencyKey: key })
+    s.create(owner, 'asset_one', {
+      ...intent,
+      expectedSourceSetRevision: revision,
+      idempotencyKey: key,
+    })
   );
   if (result.kind !== 'candidate') throw new Error(JSON.stringify(result));
   return result.candidate.candidateId;
@@ -479,6 +483,37 @@ it('rechecks the activated operation policy atomically for a retained ready cand
     expect(f.state.sources).toEqual([]);
     expect(f.state.sourceSetRevision).toBe('0');
     expect(f.confirmations).toEqual([]);
+  } finally {
+    await f.close();
+  }
+});
+
+it('adds independent Sources after first acceptance while preserving the Default and initial analysis identity', async () => {
+  const f = fixture();
+  try {
+    const first = await create(f, 'first');
+    await upload(f, first);
+    await f.call((s) => s.accept(owner, 'asset_one', first, intent));
+    const original = await f.call((s) => s.list(owner, 'asset_one'));
+    const second = await create(f, 'second', '1');
+    await upload(f, second, [5, 6]);
+    expect(
+      await f.call((s) =>
+        s.accept(owner, 'asset_one', second, { ...intent, expectedSourceSetRevision: '1' })
+      )
+    ).toMatchObject({ candidate: { status: 'accepted', sourceSetRevision: '2' } });
+    const current = await f.call((s) => s.list(owner, 'asset_one'));
+    if (original.kind !== 'found' || current.kind !== 'found') throw new Error('Expected Sources');
+    expect(current.asset).toMatchObject({
+      assetId: 'asset_one',
+      sourceSetRevision: '2',
+      deliveryRevision: '2',
+      defaultSourceId: original.asset.defaultSourceId,
+    });
+    expect(current.asset.sources).toHaveLength(2);
+    expect(current.asset.sources[0]).toEqual(original.asset.sources[0]);
+    expect(f.confirmations).toHaveLength(2);
+    expect(f.confirmations[1]?.initialAnalysisSourceId).toBe(original.asset.defaultSourceId);
   } finally {
     await f.close();
   }

@@ -44,3 +44,6 @@ coverage
 **/.auth/
 **/test-results/
 **/playwright-report/
+
+# Generated Wallpaper application credentials
+apps/wallpaper/.workflow.json

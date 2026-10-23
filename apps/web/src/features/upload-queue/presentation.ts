@@ -1,19 +1,24 @@
 import type { FileStatus } from './contract';
 export function acceptedUploads<T extends { type: string; size: number }>(
   selected: readonly T[],
-  maxFiles?: number
+  maxFiles?: number,
+  maxBytes?: number
 ): { files: T[]; rejectionMessage: string | null } {
   const supported = new Set(['image/jpeg', 'image/png', 'image/webp']);
-  const maxBytes = 50 * 1024 * 1024;
   const unsupported = selected.some((file) => !supported.has(file.type));
-  const oversized = selected.some((file) => supported.has(file.type) && file.size > maxBytes);
-  const files = selected.filter((file) => supported.has(file.type) && file.size <= maxBytes);
+  const oversized = selected.some(
+    (file) => supported.has(file.type) && maxBytes !== undefined && file.size > maxBytes
+  );
+  const files = selected.filter(
+    (file) => supported.has(file.type) && (maxBytes === undefined || file.size <= maxBytes)
+  );
   return {
     files: maxFiles === undefined ? files : files.slice(0, Math.max(0, maxFiles)),
     rejectionMessage:
       [
         unsupported && 'Only JPEG, PNG, and WebP images are supported.',
-        oversized && 'Images must be 50 MiB or smaller.',
+        oversized &&
+          `Images must be ${maxBytes === undefined ? 0 : maxBytes / (1024 * 1024)} MiB or smaller.`,
         maxFiles !== undefined &&
           maxFiles <= 0 &&
           files.length > 0 &&
@@ -32,7 +37,12 @@ export function queuePresentation(state: {
   const isUploading = state.files.some(
     (file) => file.status === 'pending' || file.status === 'uploading'
   );
-  const isComplete = hasFiles && !isUploading && !state.isPaused && !state.isStopped;
+  const isComplete =
+    hasFiles &&
+    !isUploading &&
+    !state.files.some((file) => file.status === 'confirming') &&
+    !state.isPaused &&
+    !state.isStopped;
   const hasFailures = state.files.some((file) => file.status === 'failed');
   const hasFailuresOrDuplicates =
     hasFailures || state.files.some((file) => file.status === 'duplicate');

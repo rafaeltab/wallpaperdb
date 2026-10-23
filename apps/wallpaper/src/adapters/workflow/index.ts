@@ -1,0 +1,493 @@
+import { WallpaperPublishedSchema } from '@wallpaperdb/events/schemas';
+import { randomUUID, createHash } from 'node:crypto';
+import { Context, Effect, Layer } from 'effect';
+import { and, eq, lte, or, sql, isNull, ne } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import {
+  WorkflowStore,
+  WorkflowDelivery,
+  WorkflowFailure,
+  type Wallpaper,
+  type WorkflowStorePort,
+  type WorkflowDeliveryPort,
+  type WorkflowPublication,
+} from '../../capabilities/creation/index.js';
+import { wallpaperIntents, workflowOutbox, workflowQuarantine } from '../../db/schema.js';
+import { decodeConfirmation } from '../asset-workflow/index.js';
+interface Options {
+  readonly databaseUrl: string;
+  readonly maxAttempts: number;
+  readonly retryDelayMs: number;
+  readonly leaseMs: number;
+}
+export function workflowPostgresLayer(options: Options) {
+  return Layer.effectContext(
+    Effect.gen(function* () {
+      const pool = yield* Effect.acquireRelease(
+        Effect.sync(() => {
+          const p = new Pool({
+            connectionString: options.databaseUrl,
+            max: 10,
+            connectionTimeoutMillis: 2000,
+            statement_timeout: 5000,
+            idle_in_transaction_session_timeout: 5000,
+          });
+          p.on('error', (cause) => {
+            void Effect.runPromise(
+              Effect.logError('Wallpaper idle database connection failed', { cause })
+            );
+          });
+          return p;
+        }),
+        (p) => Effect.promise(() => p.end())
+      );
+      const db = drizzle(pool);
+      const query = <A>(operation: string, run: () => Promise<A>) =>
+        Effect.tryPromise({
+          try: run,
+          catch: (cause) => new WorkflowFailure({ operation, cause }),
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logError('Wallpaper persistence unavailable', { operation, cause: error.cause })
+          ),
+          Effect.withSpan(`wallpaper.persistence.${operation}`)
+        );
+      type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+      type Target = NonNullable<Parameters<WorkflowDeliveryPort['quarantine']>[3]>;
+      const targetOf = (payload: string): Target | undefined => {
+        const decoded = decodeConfirmation(new TextEncoder().encode(payload));
+        if (decoded.kind === 'created')
+          return { kind: 'wallpaper', id: decoded.result.wallpaperId };
+        if (decoded.kind === 'source') return { kind: 'asset', id: decoded.confirmation.assetId };
+        return undefined;
+      };
+      // All writers acquire the Wallpaper before its delivery rows, as store.change does.
+      const lockWallpaper = async (tx: Transaction, target: Target, skipLocked = false) => {
+        const [row] = await tx
+          .select()
+          .from(wallpaperIntents)
+          .where(
+            target.kind === 'wallpaper'
+              ? eq(wallpaperIntents.id, target.id)
+              : eq(wallpaperIntents.assetId, target.id)
+          )
+          .for('update', skipLocked ? { skipLocked: true } : {});
+        return row;
+      };
+      const reconcileAttention = async (tx: Transaction, w: Wallpaper) => {
+        const confirmations = await tx
+          .select({ payload: workflowQuarantine.payload })
+          .from(workflowQuarantine)
+          .where(isNull(workflowQuarantine.recoveredAt));
+        const retained = confirmations.some(({ payload }) => {
+          const target = targetOf(payload);
+          return target?.kind === 'wallpaper'
+            ? target.id === w.id
+            : target?.kind === 'asset' && target.id === w.assetId;
+        });
+        const outstanding = await tx
+          .select({ status: workflowOutbox.status })
+          .from(workflowOutbox)
+          .where(and(eq(workflowOutbox.wallpaperId, w.id), ne(workflowOutbox.status, 'published')));
+        // Trusted recovery reopens an outbox occurrence. Keep raised attention until it completes.
+        w.attentionRequired =
+          retained ||
+          outstanding.some((p) => p.status === 'quarantined') ||
+          (w.attentionRequired === true && outstanding.length > 0);
+        await tx.update(wallpaperIntents).set({ state: w }).where(eq(wallpaperIntents.id, w.id));
+      };
+      const store: WorkflowStorePort = {
+        list: (owner) =>
+          query('list', async () => {
+            const rows = await db
+              .select({ state: wallpaperIntents.state })
+              .from(wallpaperIntents)
+              .where(
+                and(
+                  eq(wallpaperIntents.ownerNamespace, owner.namespace),
+                  eq(wallpaperIntents.contributorId, owner.subject)
+                )
+              )
+              .orderBy(sql`${wallpaperIntents.state}->>'createdAt' desc`)
+              .limit(100);
+            return rows.map((row) => row.state);
+          }),
+        begin: (owner, key, trace) =>
+          query('begin', () =>
+            db.transaction(async (tx) => {
+              const id = `wlp_${randomUUID()}`;
+              const creationEventId = randomUUID();
+              const createdAt = new Date().toISOString();
+              const wallpaper: Wallpaper = {
+                id,
+                owner,
+                key,
+                commandId: randomUUID(),
+                creationEventId,
+                createdAt,
+                state: 'creating-asset',
+                assetId: null,
+                intent: null,
+                sourceId: null,
+                initialAnalysisSourceId: null,
+              };
+              const inserted = await tx
+                .insert(wallpaperIntents)
+                .values({
+                  id,
+                  ownerNamespace: owner.namespace,
+                  contributorId: owner.subject,
+                  key,
+                  state: wallpaper,
+                })
+                .onConflictDoNothing()
+                .returning();
+              if (inserted.length) {
+                await tx.insert(workflowOutbox).values({
+                  id: creationEventId,
+                  wallpaperId: id,
+                  destination: 'asset-create',
+                  event: {
+                    specversion: '1.0',
+                    id: creationEventId,
+                    source: 'https://wallpaperdb/wallpaper',
+                    type: 'asset.command.create',
+                    time: createdAt,
+                    datacontenttype: 'application/json',
+                    correlationid: id,
+                    ...trace,
+                    data: {
+                      commandId: wallpaper.commandId,
+                      applicationReference: id,
+                      assetType: 'wallpaper',
+                      ownerSubject: owner.subject,
+                    },
+                  },
+                });
+                return wallpaper;
+              }
+              const rows = await tx
+                .select()
+                .from(wallpaperIntents)
+                .where(
+                  and(
+                    eq(wallpaperIntents.ownerNamespace, owner.namespace),
+                    eq(wallpaperIntents.contributorId, owner.subject),
+                    eq(wallpaperIntents.key, key)
+                  )
+                );
+              if (!rows[0]) throw new Error('Creation identity reservation missing');
+              return rows[0].state;
+            })
+          ),
+        change: (selector, transition) =>
+          query('transition', () =>
+            db.transaction(async (tx) => {
+              const rows = await tx
+                .select()
+                .from(wallpaperIntents)
+                .where(
+                  selector.kind === 'wallpaper'
+                    ? eq(wallpaperIntents.id, selector.id)
+                    : eq(wallpaperIntents.assetId, selector.id)
+                )
+                .for('update');
+              const current = rows[0]?.state ?? null;
+              const changed = transition(current ? structuredClone(current) : null);
+              if (changed.wallpaper) {
+                if (current?.attentionRequired) changed.wallpaper.attentionRequired = true;
+                await tx
+                  .update(wallpaperIntents)
+                  .set({ state: changed.wallpaper, assetId: changed.wallpaper.assetId })
+                  .where(eq(wallpaperIntents.id, changed.wallpaper.id));
+                if (changed.publication) {
+                  const { id, ...data } = changed.publication;
+                  await tx
+                    .insert(workflowOutbox)
+                    .values({
+                      id,
+                      wallpaperId: changed.wallpaper.id,
+                      destination: 'publication',
+                      event: {
+                        specversion: '1.0',
+                        id,
+                        source: 'https://wallpaperdb/wallpaper',
+                        type: 'wallpaper.published',
+                        time: new Date().toISOString(),
+                        datacontenttype: 'application/json',
+                        correlationid: changed.wallpaper.id,
+                        causationid: data.causationId,
+                        causationsource: 'https://wallpaperdb/asset',
+                        ...data.trace,
+                        data: WallpaperPublishedSchema.parse({
+                          wallpaperId: data.wallpaperId,
+                          contributorId: data.contributorId,
+                          assetId: data.assetId,
+                          firstSourceId: data.sourceId,
+                          initialAnalysisSourceId: data.initialAnalysisSourceId,
+                        }),
+                      },
+                    })
+                    .onConflictDoNothing();
+                }
+              }
+              if (changed.wallpaper?.attentionRequired)
+                await reconcileAttention(tx, changed.wallpaper);
+              return changed.result;
+            })
+          ),
+      };
+      const delivery: WorkflowDeliveryPort = {
+        alerts: () =>
+          query('alerts', async () => {
+            const outbox = await db
+              .select({ id: workflowOutbox.id })
+              .from(workflowOutbox)
+              .where(
+                and(eq(workflowOutbox.status, 'quarantined'), isNull(workflowOutbox.notifiedAt))
+              )
+              .limit(10);
+            const inbox = await db
+              .select({ id: workflowQuarantine.id, reason: workflowQuarantine.reason })
+              .from(workflowQuarantine)
+              .where(
+                and(isNull(workflowQuarantine.notifiedAt), isNull(workflowQuarantine.recoveredAt))
+              )
+              .limit(10);
+            return [
+              ...outbox.map((row) => ({
+                id: row.id,
+                scope: 'outbox' as const,
+                reason: 'exhausted' as const,
+              })),
+              ...inbox.map((row) => ({
+                id: row.id,
+                scope: 'confirmation' as const,
+                reason:
+                  row.reason === 'invalid-confirmation'
+                    ? ('invalid' as const)
+                    : ('exhausted' as const),
+              })),
+            ];
+          }),
+        alerted: (id, scope) =>
+          query('alerted', async () => {
+            if (scope === 'outbox')
+              await db
+                .update(workflowOutbox)
+                .set({ notifiedAt: new Date() })
+                .where(eq(workflowOutbox.id, id));
+            else
+              await db
+                .update(workflowQuarantine)
+                .set({ notifiedAt: new Date() })
+                .where(eq(workflowQuarantine.id, id));
+          }),
+        retainedConfirmation: (id) =>
+          query('retained-confirmation', async () => {
+            const rows = await db
+              .select({ payload: workflowQuarantine.payload })
+              .from(workflowQuarantine)
+              .where(and(eq(workflowQuarantine.id, id), isNull(workflowQuarantine.recoveredAt)));
+            return rows[0]?.payload ?? null;
+          }),
+        confirmationRecovered: (id) =>
+          query('confirmation-recovered', () =>
+            db.transaction(async (tx) => {
+              const [confirmation] = await tx
+                .select()
+                .from(workflowQuarantine)
+                .where(eq(workflowQuarantine.id, id));
+              if (!confirmation) return;
+              const target = targetOf(confirmation.payload);
+              const record = target ? await lockWallpaper(tx, target) : undefined;
+              const recovered = await tx
+                .update(workflowQuarantine)
+                .set({ recoveredAt: new Date() })
+                .where(and(eq(workflowQuarantine.id, id), isNull(workflowQuarantine.recoveredAt)))
+                .returning({ id: workflowQuarantine.id });
+              if (record && recovered.length) await reconcileAttention(tx, record.state);
+            })
+          ),
+
+        claim: () =>
+          query('claim', () =>
+            db.transaction(async (tx) => {
+              const now = new Date();
+              const eligible = and(
+                or(eq(workflowOutbox.status, 'pending'), eq(workflowOutbox.status, 'leased')),
+                lte(workflowOutbox.availableAt, now)
+              );
+              const candidates = await tx
+                .select({ id: workflowOutbox.id, wallpaperId: workflowOutbox.wallpaperId })
+                .from(workflowOutbox)
+                .where(eligible)
+                .limit(10);
+              const publications: WorkflowPublication[] = [];
+              for (const candidate of candidates) {
+                const record = await lockWallpaper(
+                  tx,
+                  { kind: 'wallpaper', id: candidate.wallpaperId },
+                  true
+                );
+                if (!record) continue;
+                const [row] = await tx
+                  .select()
+                  .from(workflowOutbox)
+                  .where(and(eq(workflowOutbox.id, candidate.id), eligible))
+                  .for('update', { skipLocked: true });
+                if (!row) continue;
+                if (row.attempts >= options.maxAttempts) {
+                  await tx
+                    .update(workflowOutbox)
+                    .set({ status: 'quarantined', leaseId: null })
+                    .where(eq(workflowOutbox.id, row.id));
+                  await tx
+                    .update(wallpaperIntents)
+                    .set({ state: { ...record.state, attentionRequired: true } })
+                    .where(eq(wallpaperIntents.id, record.id));
+                  continue;
+                }
+                const leaseId = randomUUID();
+                await tx
+                  .update(workflowOutbox)
+                  .set({
+                    status: 'leased',
+                    attempts: row.attempts + 1,
+                    leaseId,
+                    availableAt: new Date(Date.now() + options.leaseMs),
+                  })
+                  .where(eq(workflowOutbox.id, row.id));
+                publications.push({
+                  id: row.id,
+                  wallpaperId: row.wallpaperId,
+                  destination: row.destination,
+                  event: row.event,
+                  leaseId,
+                  attempts: row.attempts,
+                });
+              }
+              return publications;
+            })
+          ),
+        complete: (p) =>
+          query('complete', () =>
+            db.transaction(async (tx) => {
+              const matching = and(
+                eq(workflowOutbox.id, p.id),
+                eq(workflowOutbox.leaseId, p.leaseId),
+                eq(workflowOutbox.status, 'leased')
+              );
+              const [publication] = await tx
+                .select({ wallpaperId: workflowOutbox.wallpaperId })
+                .from(workflowOutbox)
+                .where(matching);
+              if (!publication) return;
+              const record = await lockWallpaper(tx, {
+                kind: 'wallpaper',
+                id: publication.wallpaperId,
+              });
+              if (!record) return;
+              const completed = await tx
+                .update(workflowOutbox)
+                .set({ status: 'published', leaseId: null })
+                .where(matching)
+                .returning({ id: workflowOutbox.id });
+              if (completed.length) await reconcileAttention(tx, record.state);
+            })
+          ),
+        failed: (p) =>
+          query('failed', () =>
+            db.transaction(async (tx) => {
+              const matching = and(
+                eq(workflowOutbox.id, p.id),
+                eq(workflowOutbox.leaseId, p.leaseId),
+                eq(workflowOutbox.status, 'leased')
+              );
+              const [publication] = await tx
+                .select({ wallpaperId: workflowOutbox.wallpaperId })
+                .from(workflowOutbox)
+                .where(matching);
+              if (!publication) return;
+              const record = await lockWallpaper(tx, {
+                kind: 'wallpaper',
+                id: publication.wallpaperId,
+              });
+              if (!record) return;
+              const [leased] = await tx
+                .select({ attempts: workflowOutbox.attempts })
+                .from(workflowOutbox)
+                .where(matching)
+                .for('update');
+              if (!leased) return;
+              const exhausted = leased.attempts >= options.maxAttempts;
+              await tx
+                .update(workflowOutbox)
+                .set({
+                  status: exhausted ? 'quarantined' : 'pending',
+                  leaseId: null,
+                  availableAt: new Date(Date.now() + options.retryDelayMs),
+                })
+                .where(matching);
+              if (exhausted)
+                await tx
+                  .update(wallpaperIntents)
+                  .set({ state: { ...record.state, attentionRequired: true } })
+                  .where(eq(wallpaperIntents.id, record.id));
+            })
+          ),
+        quarantine: (id, payload, reason, target) =>
+          query('quarantine', () =>
+            db.transaction(async (tx) => {
+              const record = target ? await lockWallpaper(tx, target) : undefined;
+              await tx
+                .insert(workflowQuarantine)
+                .values({
+                  id: createHash('sha256').update(id).digest('hex'),
+                  payload: payload.slice(0, 16384),
+                  reason,
+                })
+                .onConflictDoNothing();
+              if (record) {
+                const [confirmation] = await tx
+                  .select({ recoveredAt: workflowQuarantine.recoveredAt })
+                  .from(workflowQuarantine)
+                  .where(eq(workflowQuarantine.id, createHash('sha256').update(id).digest('hex')));
+                if (confirmation?.recoveredAt === null)
+                  await tx
+                    .update(wallpaperIntents)
+                    .set({ state: { ...record.state, attentionRequired: true } })
+                    .where(eq(wallpaperIntents.id, record.id));
+              }
+            })
+          ),
+        recover: (id) =>
+          query('recover', () =>
+            db.transaction(async (tx) => {
+              const [publication] = await tx
+                .select({ wallpaperId: workflowOutbox.wallpaperId })
+                .from(workflowOutbox)
+                .where(and(eq(workflowOutbox.id, id), eq(workflowOutbox.status, 'quarantined')));
+              if (!publication) return false;
+              if (!(await lockWallpaper(tx, { kind: 'wallpaper', id: publication.wallpaperId })))
+                return false;
+              const rows = await tx
+                .update(workflowOutbox)
+                .set({
+                  status: 'pending',
+                  attempts: 0,
+                  availableAt: new Date(),
+                  leaseId: null,
+                  notifiedAt: null,
+                })
+                .where(and(eq(workflowOutbox.id, id), eq(workflowOutbox.status, 'quarantined')))
+                .returning({ id: workflowOutbox.id });
+              return rows.length === 1;
+            })
+          ),
+      };
+      return Context.make(WorkflowStore, store).pipe(Context.add(WorkflowDelivery, delivery));
+    })
+  );
+}

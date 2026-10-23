@@ -784,9 +784,30 @@ async function main() {
 			});
 			const deadline = Date.now() + readyTimeout;
 			phase = "infrastructure startup";
-			await run("docker", compose("infra", "up", "-d"), {
-				timeout: deadline - Date.now(),
-			});
+			await run(
+				"docker",
+				compose(
+					"infra",
+					"up",
+					"-d",
+					"--wait",
+					"--wait-timeout",
+					String(Math.max(1, Math.ceil((deadline - Date.now()) / 1000))),
+					"postgres",
+					"redis",
+					"seaweedfs",
+					"opensearch",
+					"nats",
+					"lgtm",
+					"asset-operator-inbox",
+				),
+				{ timeout: deadline - Date.now() },
+			);
+			await run(
+				"docker",
+				compose("infra", "run", "--rm", "--no-deps", "nats-setup"),
+				{ timeout: deadline - Date.now() },
+			);
 			phase = "application startup";
 			await run("docker", compose("apps", "up", "-d", "--no-build"), {
 				timeout: deadline - Date.now(),

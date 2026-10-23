@@ -29,6 +29,64 @@ export async function uniquePng(page: Page, width = 1280, height = 720) {
   };
 }
 
+/** Arrange public catalogue pixels through the retained legacy pipeline. New
+ * Wallpaper creation and Owner Source acceptance have their own upload journey. */
+export async function arrangeLegacyCatalogueWallpaper(
+  page: Page,
+  picture: { name: string; mimeType: string; buffer: Buffer },
+) {
+  return page.evaluate(
+    async ({ name, mimeType, base64 }) => {
+      const clerk: unknown = Reflect.get(window, "Clerk");
+      if (typeof clerk !== "object" || clerk === null || !("session" in clerk))
+        throw new Error("Catalogue fixture requires the signed-in Owner");
+      const session = clerk.session;
+      if (
+        typeof session !== "object" ||
+        session === null ||
+        !("getToken" in session) ||
+        typeof session.getToken !== "function"
+      )
+        throw new Error("Catalogue fixture requires an active Owner session");
+      const token: unknown = await session.getToken();
+      if (typeof token !== "string" || !token)
+        throw new Error("Catalogue fixture authentication is unavailable");
+      const bytes = Uint8Array.from(atob(base64), (value) =>
+        value.charCodeAt(0),
+      );
+      const form = new FormData();
+      form.append("file", new Blob([bytes], { type: mimeType }), name);
+      const response = await fetch("/ingestor/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!response.ok)
+        throw new Error(
+          `Legacy catalogue fixture failed (HTTP ${response.status})`,
+        );
+      const receipt: unknown = await response.json();
+      if (
+        typeof receipt !== "object" ||
+        receipt === null ||
+        !("id" in receipt) ||
+        typeof receipt.id !== "string" ||
+        !receipt.id.startsWith("wlpr_")
+      )
+        throw new Error(
+          "Legacy catalogue fixture returned no Wallpaper identity",
+        );
+      return receipt.id;
+    },
+    {
+      name: picture.name,
+      mimeType: picture.mimeType,
+      base64: picture.buffer.toString("base64"),
+    },
+  );
+}
+
 export async function waitForWallpaper(page: Page, wallpaperId: string) {
   // Poll the public projection before opening the cached details query. This
   // waits for the real ingestion -> variants -> Asset -> Gateway delivery chain.

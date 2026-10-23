@@ -18,6 +18,7 @@ function snapshot<TFile>(state: UploadQueueState<TFile>): UploadQueueSnapshot<TF
     total: state.files.length,
     pending: 0,
     uploading: 0,
+    confirming: 0,
     success: 0,
     failed: 0,
     duplicate: 0,
@@ -85,7 +86,9 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
   }
 
   function settle(id: string, result: UploadResult) {
-    if (result.success && result.response) {
+    if (result.pending && result.response) {
+      updateFile(id, { status: 'confirming', response: result.response, error: undefined });
+    } else if (result.success && result.response) {
       rateLimitRetries.delete(id);
       updateFile(id, {
         status: result.isDuplicate ? 'duplicate' : 'success',
@@ -217,6 +220,16 @@ export function createUploadQueue<TFile>(dependencies: UploadQueueDependencies<T
         state = initialState<TFile>();
       }
       publish();
+    },
+    resumeConfirming() {
+      state = {
+        ...state,
+        files: state.files.map((file) =>
+          file.status === 'confirming' ? { ...file, status: 'pending' } : file
+        ),
+      };
+      publish();
+      processNext();
     },
     retryFailed() {
       for (const file of state.files) {

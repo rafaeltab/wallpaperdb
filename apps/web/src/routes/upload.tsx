@@ -4,7 +4,7 @@ import { AlertCircle, Check, Copy, FileImage, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UploadAuthGate } from '@/components/upload-auth-gate';
 import { UploadActionButtons } from '@/components/upload/upload-action-buttons';
-import { UploadDropZone } from '@/components/upload/upload-drop-zone';
+import { WallpaperUploadSelection } from '@/components/upload/upload-admission';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { MAX_FILES_PER_BATCH, useUploadQueue } from '@/contexts/upload-queue-context';
@@ -29,6 +29,8 @@ function getStatusIcon(status: string) {
       return <div className="h-4 w-4 rounded-full border-2 border-muted-foreground" />;
     case 'uploading':
       return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
+    case 'confirming':
+      return <Loader2 aria-label="Awaiting confirmation" className="h-4 w-4 text-primary" />;
     case 'success':
       return <Check className="h-4 w-4 text-green-500" />;
     case 'failed':
@@ -48,6 +50,7 @@ export function UploadPage() {
     addFiles,
     clearCompleted,
     retryFailed,
+    resumeConfirming,
     cancelAll,
     stopQueue,
     resumeQueue,
@@ -98,8 +101,9 @@ export function UploadPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <RecentCreations />
             {/* Drop Zone */}
-            <UploadDropZone
+            <WallpaperUploadSelection
               onFilesSelected={handleFilesSelected}
               maxFiles={MAX_FILES_PER_BATCH - state.files.length}
               disabled={isUploading}
@@ -127,6 +131,12 @@ export function UploadPage() {
 
                 {/* Status Summary */}
                 <div data-testid="upload-status-summary" className="flex flex-wrap gap-2">
+                  {counts.confirming > 0 && (
+                    <span className="text-sm">
+                      {counts.confirming} awaiting durable confirmation. Check recent creations
+                      above.
+                    </span>
+                  )}
                   {counts.success > 0 && (
                     <span
                       data-testid="upload-success-count"
@@ -199,6 +209,8 @@ export function UploadPage() {
 
                 {/* Action Buttons */}
                 <UploadActionButtons
+                  hasConfirming={counts.confirming > 0}
+                  onResumeConfirming={resumeConfirming}
                   isRunning={isRunning}
                   isPaused={state.isPaused}
                   isStopped={state.isStopped}
@@ -218,3 +230,4 @@ export function UploadPage() {
     </UploadAuthGate>
   );
 }
+import { RecentCreations } from '@/components/upload/recent-creations';

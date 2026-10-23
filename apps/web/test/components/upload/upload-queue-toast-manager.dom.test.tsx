@@ -108,7 +108,7 @@ describe('UploadQueueToastManager', () => {
 
   afterEach(async () => {
     try {
-      act(() => toast.dismiss());
+      await act(() => toast.dismiss());
       cleanup();
       if (vi.isFakeTimers()) {
         // Drain Sonner's deferred publication and exit callbacks after unmounting.

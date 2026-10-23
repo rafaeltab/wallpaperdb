@@ -219,7 +219,7 @@ describe('Biography settings', () => {
     const { client } = renderPage();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Edit biography' }));
     expect(screen.getByRole('button', { name: 'Save biography' })).toBeDisabled();
-    act(() =>
+    await act(() =>
       client.setQueryData(profileQueryKey(profile.id), {
         ...profile,
         biographyMarkdown: 'Fresh Biography',
@@ -251,7 +251,7 @@ describe('Biography settings', () => {
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.clear(editor);
     await user.type(editor, 'My draft');
-    act(() => client.setQueryData(profileQueryKey(profile.id), remote));
+    await act(() => client.setQueryData(profileQueryKey(profile.id), remote));
     await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await waitFor(() =>
       expect(userApi.updateProfile).toHaveBeenCalledWith(

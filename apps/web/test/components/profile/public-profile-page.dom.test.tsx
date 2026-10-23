@@ -92,7 +92,7 @@ describe('PublicProfilePage', () => {
     expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument();
   });
 
-  it('renders authoritative owner Biography Markdown immediately and accepts a newer public projection', () => {
+  it('renders authoritative owner Biography Markdown immediately and accepts a newer public projection', async () => {
     const profile = {
       id: 'user_ada',
       handle: 'ada',
@@ -117,7 +117,7 @@ describe('PublicProfilePage', () => {
     );
     const rendered = render(view(1));
     expect(screen.getByText('Owner Biography').tagName).toBe('STRONG');
-    act(() =>
+    await act(() =>
       client.setQueryData(profileQueryKey(profile.id), {
         ...owner,
         biographyMarkdown: '**Saved Biography**',
@@ -127,7 +127,7 @@ describe('PublicProfilePage', () => {
     expect(screen.getByText('Saved Biography').tagName).toBe('STRONG');
     rendered.rerender(view(4));
     expect(screen.getByText('Projected Biography').tagName).toBe('STRONG');
-    act(() =>
+    await act(() =>
       client.setQueryData(profileQueryKey(profile.id), { ...owner, id: 'another_user', version: 5 })
     );
     expect(screen.queryByText('Owner Biography')).not.toBeInTheDocument();

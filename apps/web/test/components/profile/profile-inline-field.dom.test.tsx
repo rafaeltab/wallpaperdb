@@ -230,7 +230,7 @@ describe('production inline profile fields', () => {
     const { client } = renderField('handle');
     await act(async () => vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000));
     const changedAt = expired ? Date.now() - (7 * 24 + 1) * 60 * 60 * 1000 : Date.now();
-    act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, handle: 'new-ada', version: 2, lastHandleChangedAt: new Date(changedAt).toISOString() }));
+    await act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, handle: 'new-ada', version: 2, lastHandleChangedAt: new Date(changedAt).toISOString() }));
     await flush();
     const edit = screen.getByRole('button', { name: 'Edit profile handle' });
     if (expired) {

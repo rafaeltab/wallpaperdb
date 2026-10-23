@@ -11,6 +11,7 @@ import {
   WorkflowStore,
   WorkflowDelivery,
   type Wallpaper,
+  type WorkflowPublication,
 } from '../src/capabilities/creation/index.js';
 import { workflowPostgresLayer } from '../src/adapters/workflow/index.js';
 import { recoverConfirmation } from '../src/adapters/asset-workflow/index.js';
@@ -236,7 +237,17 @@ function sourceEvent(w: Wallpaper) {
 }
 const quarantineId = (id: string) => createHash('sha256').update(id).digest('hex');
 async function claim(runtime: ReturnType<typeof recoveryRuntime>) {
-  const [p] = await runtime.runPromise(WorkflowDelivery.use((s) => s.claim()));
+  let publications: readonly WorkflowPublication[] = [];
+  await expect
+    .poll(
+      async () => {
+        publications = await runtime.runPromise(WorkflowDelivery.use((s) => s.claim()));
+        return publications.length;
+      },
+      { timeout: 1000 }
+    )
+    .toBe(1);
+  const [p] = publications;
   if (!p) throw new Error('Expected publication claim');
   return p;
 }

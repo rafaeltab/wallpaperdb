@@ -119,9 +119,11 @@ export interface WorkflowPublication {
   readonly destination: string;
   readonly event: Readonly<Record<string, unknown>>;
   readonly leaseId: string;
+  /** Earlier claimed attempts; the current claim has already consumed its durable attempt. */
   readonly attempts: number;
 }
-/** Leased claims survive restart. Publication is complete only after broker PubAck.
+/** Leased claims survive restart and consume the finite budget even when abandoned.
+ * Publication is complete only after broker PubAck.
  * Exhausted attempts remain quarantined with their original identity, never reset
  * by an HTTP retry. Recovery is available only to trusted operator composition. */
 export interface WorkflowDeliveryPort {

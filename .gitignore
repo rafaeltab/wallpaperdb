@@ -47,3 +47,4 @@ coverage
 
 # Generated Wallpaper application credentials
 apps/wallpaper/.workflow.json
+apps/user/.workflow.json

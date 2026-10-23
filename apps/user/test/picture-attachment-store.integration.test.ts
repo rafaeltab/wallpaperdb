@@ -39,6 +39,7 @@ describe('PostgreSQL picture attachment contract', () => {
   });
   beforeEach(async () => {
     await sql`truncate profiles,handle_claims,outbox_events cascade`;
+    await sql`truncate picture_attachment_quarantine`;
     await sql`insert into profiles(id,display_name,handle) values ('owner','Owner','owner')`;
     await sql`insert into handle_claims(handle,profile_id,kind) values ('owner','owner','profile')`;
   });
@@ -138,6 +139,81 @@ describe('PostgreSQL picture attachment contract', () => {
       );
     }
     expect(await confirm(i)).toBe('applied');
+  });
+  it('recovers exhausted duplicate Source confirmation without leaving completed attachment in attention', async () => {
+    const i = await begin();
+    await created(i);
+    await register(i);
+    expect(await confirm(i)).toBe('applied');
+    const payload = JSON.stringify({
+      specversion: '1.0',
+      id: 'accepted-A',
+      source: 'https://wallpaperdb/asset',
+      type: 'asset.source.accepted',
+      time: '2026-10-23T00:00:00.000Z',
+      datacontenttype: 'application/json',
+      causationsource: 'https://wallpaperdb/asset/authors',
+      causationid: 'accept-A',
+      correlationid: 'edit-A',
+      data: {
+        assetId: 'asset-A',
+        assetType: 'picture',
+        candidateId: 'candidate-A',
+        sourceId: 'source-A',
+        defaultSourceId: 'source-A',
+        initialAnalysisSourceId: 'source-A',
+        sourceSetRevision: '1',
+        deliveryRevision: '1',
+      },
+    });
+    const quarantine = () =>
+      runtime.runPromise(
+        AttachmentDelivery.use((d) =>
+          d.quarantine('duplicate-source-A', payload, 'confirmation-exhausted', {
+            kind: 'asset',
+            id: 'asset-A',
+          })
+        )
+      );
+    const status = () =>
+      runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)));
+    await quarantine();
+    expect(await status()).toMatchObject({
+      kind: 'attachment',
+      attachment: { state: 'attached', attentionRequired: true },
+    });
+    const alert = (await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).find(
+      (a) => a.scope === 'confirmation'
+    );
+    if (!alert) throw new Error('Missing exhausted confirmation alert');
+    expect(
+      await runAttachmentOperator(['recover-confirmation', alert.id], {
+        databaseUrl,
+        maxAttempts: 2,
+        retryDelayMs: 1,
+      })
+    ).toEqual({ recovered: true });
+    expect(await status()).toMatchObject({
+      kind: 'attachment',
+      attachment: { state: 'attached', attentionRequired: false },
+    });
+    await quarantine();
+    expect(await status()).toMatchObject({
+      kind: 'attachment',
+      attachment: { state: 'attached', attentionRequired: false },
+    });
+    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual([]);
+    expect(
+      await runAttachmentOperator(['recover-confirmation', alert.id], {
+        databaseUrl,
+        maxAttempts: 2,
+        retryDelayMs: 1,
+      })
+    ).toEqual({ recovered: false });
+    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+      { picture_asset_id: 'asset-A', version: 2 },
+    ]);
+    expect(await sql`select count(*)::int as count from outbox_events`).toEqual([{ count: 1 }]);
   });
   it('serializes cancellation and late creation with one exact durable orphan-delete command', async () => {
     const i = await begin();

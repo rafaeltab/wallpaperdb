@@ -10,6 +10,14 @@ import {
   attachmentQuarantine,
 } from '../../db/schema.js';
 import type { AttachmentQuery } from './types.js';
+import { decodeConfirmation } from './translation.js';
+type ConfirmationTarget = NonNullable<Parameters<AttachmentDelivery['quarantine']>[3]>;
+function confirmationTarget(payload: string): ConfirmationTarget | undefined {
+  const decoded = decodeConfirmation(new TextEncoder().encode(payload));
+  if (decoded.kind === 'result') return { kind: 'intent', id: decoded.result.attachmentId };
+  if (decoded.kind === 'source') return { kind: 'asset', id: decoded.confirmation.assetId };
+  return undefined;
+}
 export function makeDelivery(
   query: AttachmentQuery,
   options: { readonly maxAttempts: number; readonly retryDelayMs: number; readonly leaseMs: number }
@@ -68,12 +76,65 @@ export function makeDelivery(
         return rows[0]?.payload ?? null;
       }),
     confirmationRecovered: (id) =>
-      query('confirmation-recovered', async (db) => {
-        await db
-          .update(attachmentQuarantine)
-          .set({ recoveredAt: new Date() })
-          .where(eq(attachmentQuarantine.id, id));
-      }),
+      query('confirmation-recovered', (db) =>
+        db.transaction(async (tx) => {
+          const [confirmation] = await tx
+            .select()
+            .from(attachmentQuarantine)
+            .where(eq(attachmentQuarantine.id, id));
+          if (!confirmation) return;
+          const target = confirmationTarget(confirmation.payload);
+          const [record] = target
+            ? await tx
+                .select()
+                .from(pictureAttachmentIntents)
+                .where(
+                  target.kind === 'intent'
+                    ? eq(pictureAttachmentIntents.id, target.id)
+                    : eq(pictureAttachmentIntents.assetId, target.id)
+                )
+                .for('update')
+            : [];
+          const recovered = await tx
+            .update(attachmentQuarantine)
+            .set({ recoveredAt: new Date() })
+            .where(and(eq(attachmentQuarantine.id, id), isNull(attachmentQuarantine.recoveredAt)))
+            .returning({ id: attachmentQuarantine.id });
+          if (!record || recovered.length === 0) return;
+          const pending = await tx
+            .select({ payload: attachmentQuarantine.payload })
+            .from(attachmentQuarantine)
+            .where(isNull(attachmentQuarantine.recoveredAt));
+          const otherConfirmation = pending.some(({ payload }) => {
+            const other = confirmationTarget(payload);
+            return other?.kind === 'intent'
+              ? other.id === record.id
+              : other?.kind === 'asset' && other.id === record.assetId;
+          });
+          const outbox = await tx
+            .select({ id: attachmentOutbox.id })
+            .from(attachmentOutbox)
+            .where(
+              and(
+                eq(attachmentOutbox.attachmentId, record.id),
+                eq(attachmentOutbox.status, 'quarantined')
+              )
+            )
+            .limit(1);
+          await tx
+            .update(pictureAttachmentIntents)
+            .set({
+              state: {
+                ...record.state,
+                attentionRequired:
+                  otherConfirmation ||
+                  outbox.length > 0 ||
+                  (record.state.deletion === 'pending' && record.state.attentionRequired === true),
+              },
+            })
+            .where(eq(pictureAttachmentIntents.id, record.id));
+        })
+      ),
 
     claim: () =>
       query('claim', (db) =>
@@ -179,7 +240,11 @@ export function makeDelivery(
               )
               .for('update');
             const w = rows[0]?.state;
-            if (w)
+            const [confirmation] = await tx
+              .select({ recoveredAt: attachmentQuarantine.recoveredAt })
+              .from(attachmentQuarantine)
+              .where(eq(attachmentQuarantine.id, createHash('sha256').update(id).digest('hex')));
+            if (w && confirmation?.recoveredAt === null)
               await tx
                 .update(pictureAttachmentIntents)
                 .set({ state: { ...w, attentionRequired: true } })

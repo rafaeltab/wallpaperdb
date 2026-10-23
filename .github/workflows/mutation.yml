@@ -37,6 +37,11 @@ on:
         description: Compare the Redis pilot with isolated per-mutation containers
         type: boolean
         default: false
+      postgres_fixture:
+        description: PostgreSQL fixture mode; compare runs four cold ProfileStore samples on one runner
+        type: choice
+        options: [reused, isolated, compare]
+        default: reused
       reset_failure:
         description: Inject a Redis reset failure to verify diagnostics and owned cleanup
         type: boolean
@@ -66,6 +71,7 @@ jobs:
       SELECT_FILES: ${{ inputs.files }}
       IMPORT_RUN: ${{ inputs.import_run }}
       MUTATION_REDIS_ISOLATED: ${{ inputs.isolated_redis && '1' || '0' }}
+      POSTGRES_FIXTURE: ${{ inputs.postgres_fixture || 'reused' }}
       RESET_FAILURE_INPUT: ${{ inputs.reset_failure }}
     steps:
       - uses: actions/checkout@v4
@@ -121,6 +127,12 @@ jobs:
           [[ "$QUANTUM" =~ ^[0-9]+$ ]] && (( QUANTUM >= 1 && QUANTUM <= 600 )) || exit 1
           case "$SCOPE" in all|changed) ;; *) exit 1 ;; esac
           [[ "$BASE" =~ ^([a-f0-9]{40}|origin/main)$ ]] || exit 1
+          case "$POSTGRES_FIXTURE" in
+            reused) export MUTATION_POSTGRES_ISOLATED=0 ;;
+            isolated) export MUTATION_POSTGRES_ISOLATED=1 ;;
+            compare) ;;
+            *) exit 1 ;;
+          esac
           args=(--scope "$SCOPE" --base "$BASE" --budget "$BUDGET" --quantum "$QUANTUM")
           if [[ "$EVENT_NAME" == pull_request ]]; then
             unset GH_TOKEN GITHUB_TOKEN
@@ -141,6 +153,65 @@ jobs:
           fi
           if [[ -n "$IMPORT_RUN" ]]; then args+=(--baseline /tmp/mutation-import/checkpoint.json --offline); fi
           if [[ "$RESET_FAILURE_INPUT" == true ]]; then export MUTATION_REDIS_RESET_FAILURE=1; fi
+          if [[ "$POSTGRES_FIXTURE" == compare ]]; then
+            # A diagnostic comparison has one fixed source/suite scope and four
+            # cold invocations. No imported/remote or prior-sample conclusions.
+            [[ "$EVENT_NAME" == workflow_dispatch && "$SCOPE" == all &&
+               "$SELECT_SUITE" == all && "$SELECT_PACKAGE" == user &&
+               "$SELECT_FILES" == src/adapters/profiles/index.ts &&
+               -z "$IMPORT_RUN" && "$RESET_FAILURE_INPUT" != true ]] || exit 1
+            (( BUDGET >= 24 )) || exit 1
+            sample_budget=$(( BUDGET / 4 ))
+            args+=(--offline)
+            for (( index=0; index<${#args[@]}; index++ )); do
+              if [[ "${args[index]}" == --budget ]]; then args[index+1]=$sample_budget; fi
+            done
+            comparison="$RUNNER_TEMP/wallpaperdb-postgres-comparison"
+            mkdir -p "$comparison"
+            common=$(git rev-parse --path-format=absolute --git-common-dir)
+            comparison_status=0
+            comparison_start=$SECONDS
+            for sample in isolated-1 reused-1 reused-2 isolated-2; do
+              case "$sample" in
+                isolated-*) export MUTATION_POSTGRES_ISOLATED=1 ;;
+                reused-*) export MUTATION_POSTGRES_ISOLATED=0 ;;
+              esac
+              # These are this fresh hosted checkout's diagnostic caches only.
+              rm -rf -- "$common/mutation/v1/user" "$common/mutation/repository-v1" reports/mutation apps/user/reports/mutation
+              destination="$comparison/$sample"
+              mkdir -p "$destination"
+              sample_start=$SECONDS
+              set +e
+              make test-mutation ARGS="${args[*]}" > "$destination/execution.log" 2>&1
+              sample_status=$?
+              set -e
+              sample_elapsed=$(( SECONDS - sample_start ))
+              if [[ -d reports/mutation ]]; then cp -R reports/mutation "$destination/coordinator"; fi
+              if [[ -d apps/user/reports/mutation ]]; then cp -R apps/user/reports/mutation "$destination/user"; fi
+              jq -n --arg sample "$sample" --arg commit "$(git rev-parse HEAD)" \
+                --arg base "$BASE" --arg runner "$RUNNER_NAME" \
+                --arg image_os "${ImageOS:-unknown}" --arg image_version "${ImageVersion:-unknown}" \
+                --arg isolation "$MUTATION_POSTGRES_ISOLATED" \
+                --argjson budget "$sample_budget" --argjson elapsed "$sample_elapsed" \
+                --argjson status "$sample_status" \
+                '{sample:$sample,commit:$commit,base:$base,runner:$runner,imageOS:$image_os,imageVersion:$image_version,isolated:$isolation,budgetSeconds:$budget,wholeCommandSeconds:$elapsed,exitStatus:$status,cache:"cold; remote/import disabled"}' \
+                > "$destination/invocation.json"
+              report="$destination/coordinator/summary.json"
+              if [[ ! -f "$report" ]]; then
+                comparison_status=1
+              else
+                jq -r --arg sample "$sample" '"- \($sample): \(.outcome), \(.processed)/\(.total) processed, \(.elapsedSeconds)s coordinator elapsed; full baseline complete: \(.fullBaselineComplete)."' "$report" >> "$GITHUB_STEP_SUMMARY"
+                if [[ "$sample_status" != 0 ]] &&
+                   ! { [[ "$sample_status" == 2 ]] && [[ "$(jq -r .outcome "$report")" == incomplete ]]; }; then
+                  comparison_status=1
+                fi
+              fi
+            done
+            docker ps -a --filter name=wallpaperdb-mutation- --format '{{.ID}} {{.Names}}' > "$comparison/remaining-containers.txt"
+            if [[ -s "$comparison/remaining-containers.txt" ]]; then comparison_status=1; fi
+            echo "Comparison whole elapsed: $(( SECONDS - comparison_start )) seconds; aggregate coordinator budget: $(( sample_budget * 4 )) seconds. Timings are inclusive and must not be summed." >> "$GITHUB_STEP_SUMMARY"
+            exit "$comparison_status"
+          fi
           # Every forwarded value above is one validated shell word. Make owns
           # dependency preparation and invokes the uncached coordinator directly.
           set +e
@@ -182,5 +253,6 @@ jobs:
             packages/*/reports/mutation/*/summary.json
             packages/*/reports/mutation/*/mutation.json
             packages/*/reports/mutation/*/mutation.html
+            ${{ runner.temp }}/wallpaperdb-postgres-comparison/
           if-no-files-found: warn
           retention-days: 30

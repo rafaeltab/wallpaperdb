@@ -1,9 +1,14 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { ProfileStore } from '../src/capabilities/profile/index.js';
+import {
+  Identities,
+  Profiles,
+  ProfileStore,
+  profilesLayer,
+} from '../src/capabilities/profile/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
 import { runAttachmentOperator } from '../scripts/attachment-operator.js';
 import { profilePolicy } from './helpers/profiles.js';
@@ -90,6 +95,27 @@ describe('PostgreSQL picture attachment contract', () => {
         })
       )
     );
+  const remove = async (expectedVersion: number) => {
+    const owner = ManagedRuntime.make(
+      profilesLayer(profilePolicy).pipe(
+        Layer.provide(
+          Layer.merge(
+            profileStoreLayer(profilePolicy).pipe(Layer.provide(databaseLayer({ databaseUrl }))),
+            Layer.succeed(Identities, {
+              getIdentity: () => Effect.die('Unexpected identity lookup'),
+            })
+          )
+        )
+      )
+    );
+    try {
+      return await owner.runPromise(
+        Profiles.use((p) => p.adoptPicture({ profileId: 'owner' }, null, expectedVersion))
+      );
+    } finally {
+      await owner.dispose();
+    }
+  };
   const sourceConfirmation = () => ({
     specversion: '1.0',
     id: 'accepted-A',
@@ -135,6 +161,37 @@ describe('PostgreSQL picture attachment contract', () => {
       profile: { pictureAssetId: 'asset-A', version: 2 },
       change: { type: 'picture-changed', after: 'asset-A', asset: null },
     });
+  });
+  it('unlinks the Profile and commits the former Asset deletion locally without any delivery dependency', async () => {
+    const i = await begin();
+    await created(i);
+    await register(i);
+    expect(await confirm(i)).toBe('applied');
+    expect(await remove(1)).toMatchObject({ _tag: 'Rejected', reason: 'version-conflict' });
+    expect(await remove(2)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 3, pictureAssetId: null },
+    });
+    expect(
+      await runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)))
+    ).toMatchObject({
+      kind: 'attachment',
+      attachment: { state: 'cancelled', assetId: 'asset-A', deletion: 'pending' },
+    });
+    const [deletion] =
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`;
+    expect(deletion.event).toMatchObject({
+      id: i.deletionEventId,
+      correlationid: i.id,
+      data: { commandId: i.deleteCommandId, applicationReference: i.id, assetId: 'asset-A' },
+    });
+    expect(await remove(3)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 3, pictureAssetId: null },
+    });
+    expect(
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+    ).toEqual([deletion]);
   });
   it('rolls back the intent and Profile together when its event cannot commit', async () => {
     const i = await begin();

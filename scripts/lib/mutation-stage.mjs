@@ -44,7 +44,7 @@ export async function runStage({
 	signal,
 }) {
 	const start = performance.now();
-	const postgres = config.fixture === "postgres";
+	const postgres = config.fixture === "postgres-owned";
 	const fixtureCleanupMs = postgres
 		? Math.max(1, Math.floor(graceMs / 2))
 		: Math.max(100, graceMs / 2);

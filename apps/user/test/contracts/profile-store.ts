@@ -1,6 +1,10 @@
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
-import type { ProfileDecision, ProfileStore } from '../../src/capabilities/profile/index.js';
+import type {
+  ProfileDecision,
+  ProfileSnapshot,
+  ProfileStore,
+} from '../../src/capabilities/profile/index.js';
 
 export interface ProfileStoreFixture {
   store: ProfileStore;
@@ -118,6 +122,28 @@ const cases: ReadonlyArray<{
     async check(f) {
       const before = structuredClone(await seed(f.store));
       const other = await seed(f.store, 'contract-other', 'occupied');
+      const readClaim = async (handle: string): Promise<ProfileSnapshot['targetClaim']> => {
+        let claim: ProfileSnapshot['targetClaim'] = null;
+        await run(
+          f.store.transact({ ...query, handle }, (snapshot) => {
+            claim = structuredClone(snapshot.targetClaim);
+            return { _tag: 'Unchanged' };
+          })
+        );
+        return claim;
+      };
+      const originalClaim = await readClaim('ada');
+      const occupiedClaim = await readClaim('occupied');
+      expect(originalClaim, 'owner claim seeded').toMatchObject({
+        profileId: query.profileId,
+        kind: 'profile',
+        expiresAt: null,
+      });
+      expect(occupiedClaim, 'conflicting claim seeded').toMatchObject({
+        profileId: 'contract-other',
+        kind: 'profile',
+        expiresAt: null,
+      });
       const events = await f.occurrences();
       expect(
         await run(
@@ -133,20 +159,8 @@ const cases: ReadonlyArray<{
       });
       expect(await run(f.store.read(query.profileId, now)), 'owner rollback').toEqual(before);
       expect(await run(f.store.read('contract-other', now)), 'other owner intact').toEqual(other);
-      await run(
-        f.store.transact({ ...query, handle: 'ada' }, (snapshot) => {
-          expect(snapshot.targetClaim?.profileId, 'owner claim intact').toBe(query.profileId);
-          return { _tag: 'Unchanged' };
-        })
-      );
-      await run(
-        f.store.transact({ ...query, handle: 'occupied' }, (snapshot) => {
-          expect(snapshot.targetClaim?.profileId, 'conflicting claim intact').toBe(
-            'contract-other'
-          );
-          return { _tag: 'Unchanged' };
-        })
-      );
+      expect(await readClaim('ada'), 'owner claim intact').toEqual(originalClaim);
+      expect(await readClaim('occupied'), 'conflicting claim intact').toEqual(occupiedClaim);
       expect(await f.occurrences(), 'no rejected occurrence').toBe(events);
     },
   },

@@ -67,3 +67,4 @@ export {
   ProfileUpdatedEventSchema,
   type ProfileUpdatedEvent,
 } from "./profile-updated.js";
+export { AssetSourceAcceptedSchema, type AssetSourceAccepted } from "./asset-source-accepted.js";

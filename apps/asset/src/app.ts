@@ -32,6 +32,15 @@ import {
   OperatorNotificationHealth,
 } from './adapters/commands/index.js';
 
+import { lifecycleSourceInspectionLayer } from './source-lifecycle.js';
+import { sourcesLayer } from './capabilities/sources/index.js';
+import {
+  sourcePostgresLayer,
+  sourceStorageLayer,
+  sourceConfirmationsLayer,
+  SourceConfirmationHealth,
+} from './adapters/sources/index.js';
+
 class AuthorityHealth extends Context.Service<
   AuthorityHealth,
   { readonly check: () => Effect.Effect<boolean>; readonly identity: () => Effect.Effect<boolean> }
@@ -45,6 +54,7 @@ function authorityComposition(config: Config) {
         identity: () => Effect.succeed(true),
       }),
       authors: undefined,
+      sourceAuthors: undefined,
     };
   const persistence = lifecyclePostgresLayer({
     databaseUrl: config.databaseUrl,
@@ -66,6 +76,24 @@ function authorityComposition(config: Config) {
   const commands = protectedCommandsLayer(commandOptions).pipe(
     Layer.provide(Layer.merge(lifecycle, persistence))
   );
+  const sourcePersistence = sourcePostgresLayer({
+    databaseUrl: config.databaseUrl,
+    ...authority.delivery,
+    leaseMs: 30000,
+  });
+  const sourceStorage = sourceStorageLayer({
+    endpoint: config.s3Endpoint,
+    region: config.s3Region,
+    accessKeyId: config.s3AccessKeyId,
+    secretAccessKey: config.s3SecretAccessKey,
+    bucket: config.s3Bucket,
+  });
+  const sources = sourcesLayer({ revision: authority.identity, types: authority.assetTypes }).pipe(
+    Layer.provide(Layer.merge(sourcePersistence, sourceStorage))
+  );
+  const sourcePublisher = sourceConfirmationsLayer(commandOptions).pipe(
+    Layer.provide(sourcePersistence)
+  );
   const notifications = operatorWebhookLayer({
     ...commandOptions,
     target: authority.operatorNotification,
@@ -77,17 +105,22 @@ function authorityComposition(config: Config) {
       const command = yield* ProtectedCommandHealth;
       const notification = yield* OperatorNotificationHealth;
       const identity = yield* AuthorAuthenticationHealth;
+      const sourceConfirmation = yield* SourceConfirmationHealth;
       return {
         identity: identity.check,
         check: () =>
-          Effect.all([command.check(), notification.check()]).pipe(
+          Effect.all([command.check(), notification.check(), sourceConfirmation.check()]).pipe(
             Effect.map((values) => values.every(Boolean))
           ),
       };
     })
-  ).pipe(Layer.provide(Layer.mergeAll(commands, notifications, authentication)));
-  const authors = Layer.merge(lifecycle, authentication);
-  return { operations, authors };
+  ).pipe(Layer.provide(Layer.mergeAll(commands, notifications, authentication, sourcePublisher)));
+  const inspectedLifecycle = lifecycleSourceInspectionLayer.pipe(
+    Layer.provide(Layer.merge(lifecycle, sources))
+  );
+  const authors = Layer.merge(inspectedLifecycle, authentication);
+  const sourceAuthors = Layer.merge(sources, authentication);
+  return { operations, authors, sourceAuthors };
 }
 
 interface AppOptions {
@@ -188,6 +221,6 @@ export function createApp(config: Config, options: AppOptions = {}): Promise<Fas
   return createHttpApp(
     { nodeEnv: config.nodeEnv, port: config.port },
     assetLayer(config, options, authority),
-    { ...options, authorServices: authority.authors }
+    { ...options, authorServices: authority.authors, sourceServices: authority.sourceAuthors }
   );
 }

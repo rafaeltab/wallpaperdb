@@ -32,6 +32,28 @@ const provider = z
     (value) => new URL(value.jwksUrl).origin === new URL(value.issuer).origin,
     'Issuer and JWKS must share an origin'
   );
+const positive = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+const sourcePolicy = z
+  .object({
+    maxActiveSources: positive,
+    maxCandidates: positive,
+    operations: z.array(z.enum(['add', 'replace-one', 'replace-set'])).min(1),
+    admission: z
+      .object({
+        maxBytes: positive,
+        maxPixels: positive,
+        maxAxis: positive,
+        squareSize: positive.optional(),
+        // HDR classes remain disabled until an exact mandatory-inspection adapter is qualified.
+        sourceModels: z
+          .array(z.enum(['sdr-jpeg', 'sdr-png', 'sdr-webp', 'animated-sdr-webp']))
+          .min(1),
+      })
+      .strict(),
+    retention: z.object({ evidenceMs: positive, candidateMs: positive }).strict(),
+    temporaryInput: z.object({ maxBytes: positive, abandonedMs: positive }).strict(),
+  })
+  .strict();
 const schema = z
   .object({
     revision: OwnerValueSchema,
@@ -72,8 +94,7 @@ const schema = z
         .strict()
     ),
     identityProviders: z.record(AssetIdentifierSchema, provider),
-    // Later Source tickets extend each type's policy. Empty creation has no processing defaults.
-    assetTypes: z.record(AssetIdentifierSchema, z.object({}).strict()),
+    assetTypes: z.record(AssetIdentifierSchema, sourcePolicy),
     delivery: z
       .object({
         maxAttempts: z.number().int().min(1).max(100),

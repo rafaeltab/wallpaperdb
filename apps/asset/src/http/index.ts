@@ -12,6 +12,8 @@ import { registerAuthorRoutes, type AuthorExecution as AuthorExecutionPort } fro
 import { AuthorAuthentication } from '../adapters/authors/index.js';
 import { Lifecycle } from '../capabilities/lifecycle/index.js';
 import { tracingLayer } from '../runtime.js';
+import { Sources } from '../capabilities/sources/index.js';
+import { registerSourceRoutes, type SourceExecution as SourceExecutionPort } from './sources.js';
 
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -91,7 +93,27 @@ const authorExecutionLayer = Layer.effect(
     };
   })
 );
-export async function createHttpApp<E, EAuthor = never>(
+const SourceExecution = Context.Service<SourceExecutionPort>('asset/http/SourceExecution');
+const sourceExecutionLayer = Layer.effect(
+  SourceExecution,
+  Effect.gen(function* () {
+    yield* AuthorAuthentication;
+    yield* Sources;
+    const fibers = yield* FiberSet.make();
+    const run = yield* FiberSet.runtimePromise(fibers)<AuthorAuthentication | Sources>();
+    return {
+      run: <A, E>(
+        effect: Effect.Effect<A, E, AuthorAuthentication | Sources>,
+        headers: IncomingHttpHeaders,
+        signal?: AbortSignal
+      ) => {
+        const parent = trace.getSpan(propagation.extract(context.active(), headers))?.spanContext();
+        return run(parent ? OtelTracer.withSpanContext(effect, parent) : effect, { signal });
+      },
+    };
+  })
+);
+export async function createHttpApp<E, EAuthor = never, ESource = never>(
   config: HttpConfig,
   services: Layer.Layer<Availability | AssetDelivery, E>,
   options: {
@@ -99,6 +121,7 @@ export async function createHttpApp<E, EAuthor = never>(
     readonly signal?: AbortSignal;
     readonly shutdownTimeoutMs?: number;
     readonly authorServices?: Layer.Layer<AuthorAuthentication | Lifecycle, EAuthor>;
+    readonly sourceServices?: Layer.Layer<AuthorAuthentication | Sources, ESource>;
   } = {}
 ): Promise<FastifyInstance> {
   const authorExecution = options.authorServices
@@ -106,9 +129,16 @@ export async function createHttpApp<E, EAuthor = never>(
     : Layer.succeed(AuthorExecution, {
         run: () => Promise.reject(new Error('Author services are not configured')),
       });
-  const graph = Layer.merge(executionLayer.pipe(Layer.provide(services)), authorExecution).pipe(
-    Layer.provide(tracingLayer)
-  );
+  const sourceExecution = options.sourceServices
+    ? sourceExecutionLayer.pipe(Layer.provide(options.sourceServices))
+    : Layer.succeed(SourceExecution, {
+        run: () => Promise.reject(new Error('Sources are not configured')),
+      });
+  const graph = Layer.mergeAll(
+    executionLayer.pipe(Layer.provide(services)),
+    authorExecution,
+    sourceExecution
+  ).pipe(Layer.provide(tracingLayer));
   const runtime = ManagedRuntime.make(graph);
   const app = Fastify({
     logger: options.logger ?? false,
@@ -171,11 +201,12 @@ export async function createHttpApp<E, EAuthor = never>(
           ? [/^https?:\/\/localhost:\d+$/, /^https?:\/\/127\.0\.0\.1:\d+$/]
           : false,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Correlation-ID'],
       credentials: true,
     });
     await registerOpenAPI(app, {
       title: 'WallpaperDB Asset API',
+      securitySchemes: { ownerSession: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
       version: '1.0.0',
       description: 'Delivers original and resized wallpapers and current Profile pictures.',
       servers:
@@ -285,10 +316,13 @@ export async function createHttpApp<E, EAuthor = never>(
       }
     );
     registerDeliveryRoutes(app, run);
-    registerAuthorRoutes(
-      app,
-      options.authorServices ? await runtime.runPromise(AuthorExecution) : undefined
-    );
+    if (options.sourceServices)
+      registerSourceRoutes(app, await runtime.runPromise(SourceExecution));
+    else
+      registerAuthorRoutes(
+        app,
+        options.authorServices ? await runtime.runPromise(AuthorExecution) : undefined
+      );
     await app.ready();
     app.connectionsState.connectionsInitialized = true;
     return app;

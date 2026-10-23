@@ -229,6 +229,126 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
     });
     expect(JSON.stringify(event)).not.toMatch(/bucket|layout|storageKey|ownerSubject/);
     message?.ack();
+    const replacementIntent = {
+      operation: 'replace-one',
+      expectedSourceSetRevision: '1',
+      targetSourceId: sourceId,
+    };
+    const candidates: string[] = [];
+    const replacementPng = await sharp({
+      create: { width: 8, height: 6, channels: 3, background: 'blue' },
+    })
+      .png()
+      .toBuffer();
+    for (const key of ['replacement-a', 'replacement-b']) {
+      const proposed = await app.inject({
+        method: 'POST',
+        url: `/assets/${created.assetId}/source-candidates`,
+        headers: { ...headers, 'idempotency-key': key },
+        payload: replacementIntent,
+      });
+      expect(proposed.statusCode).toBe(201);
+      const replacementId = proposed.json<{ candidateId: string }>().candidateId;
+      candidates.push(replacementId);
+      expect(
+        (
+          await app.inject({
+            method: 'PUT',
+            url: `/assets/${created.assetId}/source-candidates/${replacementId}/bytes`,
+            headers: { ...headers, 'content-type': 'application/octet-stream' },
+            payload: replacementPng,
+          })
+        ).json()
+      ).toMatchObject({ status: 'ready' });
+    }
+    expect(
+      (
+        await app.inject({
+          url: `/assets/${created.assetId}/sources/${sourceId}/original`,
+          headers,
+        })
+      ).rawPayload
+    ).toEqual(png);
+    const race = await Promise.all(
+      candidates.map((replacementId) =>
+        app.inject({
+          method: 'POST',
+          url: `/assets/${created.assetId}/source-candidates/${replacementId}/accept`,
+          headers,
+          payload: replacementIntent,
+        })
+      )
+    );
+    expect(race.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+    const winner = race
+      .find((response) => response.statusCode === 200)
+      ?.json<{ candidateId: string; sourceId: string }>();
+    if (!winner) throw new Error('Expected replacement winner');
+    expect(winner.sourceId).not.toBe(sourceId);
+    expect(
+      (await app.inject({ url: `/assets/${created.assetId}/sources`, headers })).json()
+    ).toMatchObject({
+      assetId: created.assetId,
+      sourceSetRevision: '2',
+      deliveryRevision: '2',
+      defaultSourceId: winner.sourceId,
+      sources: [{ sourceId: winner.sourceId }],
+    });
+    expect(
+      (
+        await app.inject({
+          url: `/assets/${created.assetId}/sources/${sourceId}/original`,
+          headers,
+        })
+      ).statusCode
+    ).toBe(404);
+    expect(
+      (
+        await app.inject({
+          url: `/assets/${created.assetId}/sources/${winner.sourceId}/original`,
+          headers,
+        })
+      ).rawPayload
+    ).toEqual(replacementPng);
+    const retirement = await pool.query<{ evidence_expires_at: Date }>(
+      'SELECT evidence_expires_at FROM immutable_sources WHERE id = $1',
+      [sourceId]
+    );
+    const deadline = retirement.rows[0]?.evidence_expires_at;
+    expect(deadline).toBeInstanceOf(Date);
+    expect((deadline?.getTime() ?? 0) - Date.now()).toBeGreaterThan(604790000);
+    // An old callback is fenced; a winner replay cannot reset retirement or create a third membership revision.
+    const replay = await Promise.all(
+      candidates.map((replacementId) =>
+        app.inject({
+          method: 'POST',
+          url: `/assets/${created.assetId}/source-candidates/${replacementId}/accept`,
+          headers,
+          payload: replacementIntent,
+        })
+      )
+    );
+    expect(replay.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+    expect(
+      (
+        await pool.query('SELECT evidence_expires_at FROM immutable_sources WHERE id = $1', [
+          sourceId,
+        ])
+      ).rows
+    ).toEqual(retirement.rows);
+    const replacementMessage = await consumer.next({ expires: 5000 });
+    expect(replacementMessage?.json()).toMatchObject({
+      type: 'asset.source.accepted',
+      data: {
+        assetId: created.assetId,
+        sourceId: winner.sourceId,
+        initialAnalysisSourceId: sourceId,
+        defaultSourceId: winner.sourceId,
+        sourceSetRevision: '2',
+        deliveryRevision: '2',
+      },
+    });
+    replacementMessage?.ack();
     expect(await publisher.runPromise(SourceConfirmationHealth.use((s) => s.check()))).toBe(true);
   } finally {
     await app.close();

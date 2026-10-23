@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Context, Effect, Layer } from 'effect';
 import {
   AttachmentStore,
@@ -122,7 +122,8 @@ export function attachmentPostgresLayer(options: {
                   selector.kind === 'begin'
                     ? and(
                         eq(pictureAttachmentIntents.profileId, profileId),
-                        eq(pictureAttachmentIntents.key, selector.key)
+                        eq(pictureAttachmentIntents.key, selector.key),
+                        sql`${pictureAttachmentIntents.state}->>'expectedVersion' = ${String(selector.expectedVersion)}`
                       )
                     : eq(pictureAttachmentIntents.id, selected?.id ?? '')
                 )

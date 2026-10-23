@@ -53,9 +53,9 @@ describe('PostgreSQL picture attachment contract', () => {
     await sql?.end();
     await container?.stop();
   });
-  const begin = async (key = 'first') => {
+  const begin = async (key = 'first', expectedVersion = 1) => {
     const result = await runtime.runPromise(
-      PictureAttachments.use((s) => s.begin({ profileId: 'owner' }, key, 1))
+      PictureAttachments.use((s) => s.begin({ profileId: 'owner' }, key, expectedVersion))
     );
     if (result.kind !== 'attachment') throw new Error(result.kind);
     return result.attachment;
@@ -192,6 +192,49 @@ describe('PostgreSQL picture attachment contract', () => {
     expect(
       await sql`select event from picture_attachment_outbox where destination='asset-delete'`
     ).toEqual([deletion]);
+  });
+  it('gives a reused request key a fresh identity after unlink and fences every old completion from the later picture', async () => {
+    const first = await begin();
+    await created(first);
+    await register(first);
+    await confirm(first);
+    await remove(2);
+    const [next, retry] = await Promise.all([begin('first', 3), begin('first', 3)]);
+    expect(next.id).not.toBe(first.id);
+    expect(retry.id).toBe(next.id);
+    expect((await begin('first', 1)).id).toBe(first.id);
+    expect(next.commandId).not.toBe(first.commandId);
+    await created(next, 'asset-B');
+    await register(next);
+    expect(await confirm({ ...next, assetId: 'asset-B' })).toBe('applied');
+    expect(await created(first)).toBe('ignored');
+    expect(await confirm(first)).toBe('ignored');
+    await runtime.dispose();
+    runtime = ManagedRuntime.make(layer());
+    const deleted = () =>
+      runtime.runPromise(
+        PictureAttachments.use((s) =>
+          s.assetResult({
+            attachmentId: first.id,
+            commandId: first.deleteCommandId,
+            causationId: first.deletionEventId,
+            assetId: 'asset-A',
+            outcome: 'deleted',
+          })
+        )
+      );
+    expect(await deleted()).toBe('applied');
+    expect(await deleted()).toBe('ignored');
+    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+      { picture_asset_id: 'asset-B', version: 4 },
+    ]);
+    const deletion =
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`;
+    expect(deletion).toHaveLength(1);
+    expect(deletion[0].event).toMatchObject({
+      id: first.deletionEventId,
+      data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+    });
   });
   it('rolls back the intent and Profile together when its event cannot commit', async () => {
     const i = await begin();

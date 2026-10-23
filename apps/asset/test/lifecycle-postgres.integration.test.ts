@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -308,7 +309,6 @@ it('rolls back terminal state and all responsibilities if the deletion result ca
 
 it('resolves a lost real PostgreSQL COMMIT response by replay without resetting terminal obligations', async () => {
   const { createServer, connect } = await import('node:net');
-  const { once } = await import('node:events');
   const sockets = new Set<import('node:net').Socket>();
   const upstreamUrl = new URL(container.getConnectionUri());
   let dropCommit = false;
@@ -400,5 +400,64 @@ it('resolves a lost real PostgreSQL COMMIT response by replay without resetting 
     await ambiguous.dispose();
     for (const socket of sockets) socket.destroy();
     await new Promise<void>((resolve) => proxy.close(() => resolve()));
+  }
+});
+
+it('fences obsolete deletion workers and retains recorded terminal outcomes independently of purgeable Source facts', async () => {
+  const created = await runtime.runPromise(LifecycleStore.use((s) => s.accept(input)));
+  if (created.outcome !== 'created') throw new Error('Expected Asset');
+  const deletion: Acceptance = {
+    ...input,
+    canonical: 'configuration-delete',
+    correlation: { commandId: 'configuration-delete', applicationReference: '' },
+    decision: {
+      kind: 'delete',
+      assetId: created.assetId,
+      evidenceRetentionMsByType: { picture: 2592000000 },
+    },
+  };
+  const deleted = await runtime.runPromise(LifecycleStore.use((s) => s.accept(deletion)));
+  const obligations = (
+    await pool.query('SELECT * FROM asset_deletions WHERE asset_id=$1', [created.assetId])
+  ).rows;
+  await pool.query('DELETE FROM asset_source_state WHERE asset_id=$1', [created.assetId]);
+  await pool.query('DELETE FROM immutable_sources WHERE asset_id=$1', [created.assetId]);
+  await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-2'));
+  const current = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      revision: 'revision-2',
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  try {
+    await expect(
+      runtime.runPromise(LifecycleStore.use((s) => s.accept(deletion)))
+    ).rejects.toThrow();
+    expect(
+      await current.runPromise(
+        LifecycleStore.use((s) =>
+          s.accept({
+            ...deletion,
+            revision: 'revision-2',
+            decision: { kind: 'reject', reason: 'forbidden-operation' },
+          })
+        )
+      )
+    ).toEqual(deleted);
+    expect(
+      await current.runPromise(
+        LifecycleStore.use((s) => s.accept({ ...input, revision: 'revision-2' }))
+      )
+    ).toEqual(created);
+    expect(await current.runPromise(LifecycleStore.use((s) => s.find(created.assetId)))).toBeNull();
+    expect(
+      (await pool.query('SELECT * FROM asset_deletions WHERE asset_id=$1', [created.assetId])).rows
+    ).toEqual(obligations);
+  } finally {
+    await current.dispose();
+    await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-1'));
   }
 });

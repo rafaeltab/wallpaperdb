@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -378,7 +379,7 @@ it('reclaims an ambiguous real broker publication after process restart with the
     );
   let storeRuntime = persistence();
   try {
-    await storeRuntime.runPromise(
+    const created = await storeRuntime.runPromise(
       LifecycleStore.use((store) =>
         store.accept({
           revision: authority.identity,
@@ -396,8 +397,40 @@ it('reclaims an ambiguous real broker publication after process restart with the
         })
       )
     );
+    if (created.outcome !== 'created') throw new Error('Expected Asset');
+    const creationPublications = await storeRuntime.runPromise(
+      ResultOutbox.use((outbox) => outbox.claim(10))
+    );
+    for (const publication of creationPublications) {
+      const encodedCreation = encodeAssetResult(publication);
+      await operator
+        .jetstream()
+        .publish(encodedCreation.subject, JSON.stringify(encodedCreation.event), {
+          msgID: publication.id,
+        });
+      await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.published(publication)));
+    }
+    await storeRuntime.runPromise(
+      LifecycleStore.use((store) =>
+        store.accept({
+          revision: authority.identity,
+          applicationId: 'user',
+          canonical: '["delete","ambiguous"]',
+          correlation: { commandId: 'ambiguous-delete-publication', applicationReference: '' },
+          context: {
+            occurrence: { source: 'https://example.test/application', id: 'ambiguous-delete-1' },
+          },
+          decision: {
+            kind: 'delete',
+            assetId: created.assetId,
+            evidenceRetentionMsByType: { picture: 2592000000 },
+          },
+        })
+      )
+    );
     const first = (await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1))))[0];
     if (!first) throw new Error('Missing committed publication');
+    expect(first.result).toMatchObject({ outcome: 'deleted', assetId: created.assetId });
     const encoded = encodeAssetResult(first);
     const initial = await operator
       .jetstream()
@@ -429,6 +462,9 @@ it('reclaims an ambiguous real broker publication after process restart with the
     expect(await storeRuntime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toEqual(
       []
     );
+    expect(
+      await storeRuntime.runPromise(LifecycleStore.use((store) => store.find(created.assetId)))
+    ).toBeNull();
   } finally {
     await storeRuntime.dispose();
   }
@@ -438,7 +474,6 @@ it('reclaims an ambiguous real broker publication after process restart with the
 
 it('quarantines deletion during finite dependency failure, routes its actual notice and deletes only after deliberate recovery', async () => {
   const { createServer } = await import('node:http');
-  const { once } = await import('node:events');
   const received: unknown[] = [];
   const server = createServer(async (request, response) => {
     if (request.headers.authorization !== 'Bearer operator-test-token') {

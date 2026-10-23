@@ -11,6 +11,7 @@ import { connect } from 'nats';
 import { Pool } from 'pg';
 import { GenericContainer, Wait } from 'testcontainers';
 import { expect, it } from 'vitest';
+import { z } from 'zod';
 import { parseAuthority } from '../src/authority.js';
 import {
   operatorWebhookLayer,
@@ -39,31 +40,36 @@ it('routes each renewed Source quarantine to the durable operator inbox while pr
   const authority = parseAuthority(authorityFixture());
   const cleanups: Array<() => Promise<unknown>> = [];
   const cleanupFailures: unknown[] = [];
-  const directory = await mkdtemp(join(tmpdir(), 'source-quarantine-receipts-'));
-  cleanups.push(() => rm(directory, { recursive: true, force: true }));
-  const { createOperatorInbox } = await import(
-    new URL('../../../scripts/operator-inbox.mjs', import.meta.url).href
-  );
-  const server: Server = await createOperatorInbox({ directory, token: 'operator-inbox-token' });
-  cleanups.push(async () => {
-    server.closeAllConnections();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  });
   try {
+    const directory = await mkdtemp(join(tmpdir(), 'source-quarantine-receipts-'));
+    cleanups.push(() => rm(directory, { recursive: true, force: true }));
+    const { createOperatorInbox } = await import(
+      new URL('../../../scripts/operator-inbox.mjs', import.meta.url).href
+    );
+    const server: Server = await createOperatorInbox({ directory, token: 'operator-inbox-token' });
+    cleanups.push(async () => {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    });
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('Missing operator address');
-    const received = async (): Promise<unknown[]> => {
+    const received = async () => {
       const response = await fetch(`http://127.0.0.1:${address.port}/receipts`, {
         headers: {
           authorization: `Basic ${Buffer.from('operator:operator-inbox-token').toString('base64')}`,
         },
       });
       expect(response.status).toBe(200);
-      const receipts: unknown = await response.json();
-      if (!Array.isArray(receipts)) throw new Error('Expected operator receipts');
-      return receipts;
+      return z
+        .array(
+          z.object({
+            notice: z.object({ id: z.string() }).passthrough(),
+            receivedAt: z.string(),
+          })
+        )
+        .parse(await response.json());
     };
     const postgres = await new PostgreSqlContainer('postgres:16-alpine').start();
     cleanups.push(() => postgres.stop());
@@ -267,7 +273,7 @@ it('routes each renewed Source quarantine to the durable operator inbox while pr
     await renewed.dispose();
     const receipts = await received();
     expect(receipts[0]).toEqual(firstReceipt);
-    expect(receipts[1]).not.toEqual(firstReceipt);
+    expect(receipts[1]?.notice.id).not.toBe(receipts[0]?.notice.id);
     expect((await manager.streams.info('ASSET_OPERATIONS')).state.messages).toBe(2);
     expect(failures.map((publication) => publication.attempts)).toEqual([1, 2, 3, 1, 2, 3]);
     await manager.streams.update('ASSET_RESULTS', originalConfig);

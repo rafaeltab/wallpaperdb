@@ -1,3 +1,5 @@
+import { crc32 } from 'node:zlib';
+
 /** Container declarations matter even when a decoder exposes only an SDR primary. */
 export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
   const isoGainMapHeader = Buffer.from('urn:iso:std:iso:ts:21496:-1\0');
@@ -47,11 +49,27 @@ export function checkEncodedPolicy(bytes: Buffer, picture: boolean): void {
   }
   if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
     let offset = 8;
+    let seenCicp = false;
+    let seenImage = false;
     while (offset + 12 <= bytes.length) {
       const size = bytes.readUInt32BE(offset);
       if (size > bytes.length - offset - 12) invalid();
       const kind = bytes.toString('ascii', offset + 4, offset + 8);
-      if (kind === 'cICP' || kind === 'acTL') unsupported();
+      if (kind === 'acTL') unsupported();
+      if (kind === 'PLTE' || kind === 'IDAT') seenImage = true;
+      if (kind === 'cICP') {
+        if (seenCicp || seenImage || size !== 4) invalid();
+        if (
+          crc32(bytes.subarray(offset + 4, offset + 8 + size)) !==
+          bytes.readUInt32BE(offset + 8 + size)
+        )
+          invalid();
+        // Only the established full-range sRGB declaration is supported.
+        // https://www.w3.org/TR/png-3/#11cICP
+        if (!bytes.subarray(offset + 8, offset + 12).equals(Buffer.from([1, 13, 0, 1])))
+          unsupported();
+        seenCicp = true;
+      }
       offset += size + 12;
       if (kind === 'IEND') {
         if (offset !== bytes.length) invalid();

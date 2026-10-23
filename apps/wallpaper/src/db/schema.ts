@@ -28,6 +28,7 @@ export const wallpaperIntents = pgTable(
 export const workflowOutbox = pgTable(
   'wallpaper_workflow_outbox',
   {
+    quarantineId: text('quarantine_id').notNull().default(sql`gen_random_uuid()`),
     notifiedAt: timestamp('notified_at', { withTimezone: true }),
     id: text('id').primaryKey(),
     wallpaperId: text('wallpaper_id')

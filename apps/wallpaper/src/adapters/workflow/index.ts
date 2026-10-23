@@ -286,7 +286,7 @@ export function workflowPostgresLayer(options: Options) {
         alerts: () =>
           query('alerts', async (db) => {
             const outbox = await db
-              .select({ id: workflowOutbox.id })
+              .select({ id: workflowOutbox.id, quarantineId: workflowOutbox.quarantineId })
               .from(workflowOutbox)
               .where(
                 and(eq(workflowOutbox.status, 'quarantined'), isNull(workflowOutbox.notifiedAt))
@@ -302,6 +302,7 @@ export function workflowPostgresLayer(options: Options) {
             return [
               ...outbox.map((row) => ({
                 id: row.id,
+                quarantineId: row.quarantineId,
                 scope: 'outbox' as const,
                 reason: 'exhausted' as const,
               })),
@@ -315,18 +316,26 @@ export function workflowPostgresLayer(options: Options) {
               })),
             ];
           }),
-        alerted: (id, scope) =>
+        alerted: (alert) =>
           query('alerted', async (db) => {
-            if (scope === 'outbox')
+            if (alert.scope === 'outbox')
               await db
                 .update(workflowOutbox)
                 .set({ notifiedAt: new Date() })
-                .where(eq(workflowOutbox.id, id));
+                .where(
+                  and(
+                    eq(workflowOutbox.id, alert.id),
+                    eq(workflowOutbox.quarantineId, alert.quarantineId),
+                    eq(workflowOutbox.status, 'quarantined')
+                  )
+                );
             else
               await db
                 .update(workflowQuarantine)
                 .set({ notifiedAt: new Date() })
-                .where(eq(workflowQuarantine.id, id));
+                .where(
+                  and(eq(workflowQuarantine.id, alert.id), isNull(workflowQuarantine.recoveredAt))
+                );
           }),
         retainedConfirmation: (id) =>
           query('retained-confirmation', async (db) => {
@@ -524,6 +533,7 @@ export function workflowPostgresLayer(options: Options) {
                   availableAt: new Date(),
                   leaseId: null,
                   notifiedAt: null,
+                  quarantineId: randomUUID(),
                 })
                 .where(and(eq(workflowOutbox.id, id), eq(workflowOutbox.status, 'quarantined')))
                 .returning({ id: workflowOutbox.id });

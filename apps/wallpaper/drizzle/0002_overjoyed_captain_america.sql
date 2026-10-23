@@ -1,0 +1,1 @@
+ALTER TABLE "wallpaper_workflow_outbox" ADD COLUMN "quarantine_id" text DEFAULT gen_random_uuid() NOT NULL;

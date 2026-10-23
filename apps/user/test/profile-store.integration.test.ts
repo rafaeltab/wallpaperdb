@@ -6,6 +6,9 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
+import { eventStoreLayer } from '../src/adapters/events/index.js';
+import { MaintenanceStore } from '../src/capabilities/maintenance/index.js';
+import { profileStoreContract } from './contracts/profile-store.js';
 import {
   Identities,
   Profiles,
@@ -30,7 +33,9 @@ const testLayer = (databaseUrl: string, settings: ProfilePolicy = policy) =>
   profilesLayer(settings).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
-        profileStoreLayer(settings).pipe(Layer.provide(databaseLayer({ databaseUrl }))),
+        Layer.mergeAll(profileStoreLayer(settings), eventStoreLayer()).pipe(
+          Layer.provide(databaseLayer({ databaseUrl }))
+        ),
         Layer.succeed(Identities, {
           getIdentity: () =>
             Effect.succeed({
@@ -47,7 +52,10 @@ const testLayer = (databaseUrl: string, settings: ProfilePolicy = policy) =>
 describe('PostgreSQL profile transactions', () => {
   let database: StartedPostgreSqlContainer;
   let sql: ReturnType<typeof postgres>;
-  let runtime: ManagedRuntime.ManagedRuntime<Profiles | ProfileStore | Identities, unknown>;
+  let runtime: ManagedRuntime.ManagedRuntime<
+    Profiles | ProfileStore | Identities | MaintenanceStore,
+    unknown
+  >;
   beforeAll(async () => {
     database = await new PostgreSqlContainer('postgres:16-alpine').start();
     const databaseUrl = database.getConnectionUri().replace('localhost', '127.0.0.1');
@@ -73,6 +81,18 @@ describe('PostgreSQL profile transactions', () => {
         return yield* use(yield* Profiles);
       })
     );
+
+  describe('shared ProfileStore contract', () => {
+    profileStoreContract(async () => ({
+      store: await runtime.runPromise(ProfileStore),
+      occurrences: () =>
+        runtime.runPromise(
+          MaintenanceStore.use((events) => events.pendingEvents()).pipe(
+            Effect.map((events) => events.length)
+          )
+        ),
+    }));
+  });
 
   it('retains a removed picture for the configured seven days measured from retirement', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });

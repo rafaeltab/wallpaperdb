@@ -124,7 +124,7 @@ export function cleanupPostgresLayer(options: Options) {
         claim: (limit) =>
           Effect.gen(function* () {
             const now = new Date(yield* Clock.currentTimeMillis);
-            const claimed = yield* run('claim', async (db) => {
+            const transitions = yield* run('claim', async (db) => {
               const expiredReads = await db
                 .select({ id: sourceReads.id })
                 .from(sourceReads)
@@ -168,9 +168,12 @@ export function cleanupPostgresLayer(options: Options) {
                 )
                 .orderBy(asc(sourceCleanup.dueAt), asc(sourceCleanup.id))
                 .limit(Math.max(1, Math.min(100, limit)));
-              const result: CleanupWork[] = [];
+              const result: (
+                | { readonly outcome: 'claimed'; readonly work: CleanupWork }
+                | { readonly outcome: 'quarantined'; readonly work: ReturnType<typeof identity> }
+              )[] = [];
               for (const candidate of candidates) {
-                const work = await db.transaction(async (tx) => {
+                const transition = await db.transaction(async (tx) => {
                   await tx
                     .select()
                     .from(ownedAssets)
@@ -227,7 +230,7 @@ export function cleanupPostgresLayer(options: Options) {
                       .update(sourceCleanup)
                       .set({ status: 'quarantined', leaseId: null })
                       .where(eq(sourceCleanup.id, row.id));
-                    return null;
+                    return { outcome: 'quarantined' as const, work: identity(row) };
                   }
                   if (record) {
                     const state = record.state;
@@ -272,14 +275,26 @@ export function cleanupPostgresLayer(options: Options) {
                       availableAt: new Date(now.getTime() + options.leaseMs),
                     })
                     .where(eq(sourceCleanup.id, row.id));
-                  return { ...identity(row), leaseId, attempts: row.attempts + 1 };
+                  return {
+                    outcome: 'claimed' as const,
+                    work: { ...identity(row), leaseId, attempts: row.attempts + 1 },
+                  };
                 });
-                if (work) result.push(work);
+                if (transition) result.push(transition);
               }
               return result;
             });
-            for (const work of claimed)
-              yield* observeCleanup('asset.cleanup.claim', work, Effect.succeed('claimed'));
+            const claimed: CleanupWork[] = [];
+            for (const transition of transitions) {
+              yield* observeCleanup(
+                transition.outcome === 'quarantined'
+                  ? 'asset.cleanup.quarantine'
+                  : 'asset.cleanup.claim',
+                transition.work,
+                Effect.succeed(transition.outcome)
+              );
+              if (transition.outcome === 'claimed') claimed.push(transition.work);
+            }
             return claimed;
           }),
         completed: (work) =>

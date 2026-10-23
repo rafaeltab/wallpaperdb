@@ -832,18 +832,23 @@ describe('PostgreSQL picture attachment contract', () => {
       profileStoreLayer(profilePolicy).pipe(Layer.provide(databaseLayer({ databaseUrl })))
     );
     try {
-      await profileRuntime.runPromise(
-        ProfileStore.use((s) =>
-          s.transact({ profileId: 'owner', now: new Date() }, () => ({
-            _tag: 'Change',
-            mutation: {
-              type: 'details',
-              displayName: 'New name',
-              biographyMarkdown: 'Changed Biography',
-            },
-          }))
+      expect(
+        await profileRuntime.runPromise(
+          ProfileStore.use((s) =>
+            s.transact({ profileId: 'owner', now: new Date() }, () => ({
+              _tag: 'Change',
+              mutation: {
+                type: 'details',
+                displayName: 'New name',
+                biographyMarkdown: 'Changed Biography',
+              },
+            }))
+          )
         )
-      );
+      ).toMatchObject({
+        outcome: { _tag: 'Success', profile: { version: 2 } },
+        changed: true,
+      });
     } finally {
       await profileRuntime.dispose();
     }
@@ -856,6 +861,10 @@ describe('PostgreSQL picture attachment contract', () => {
     expect(
       await sql`select count(*)::int as count from picture_attachment_outbox where destination='asset-delete'`
     ).toEqual([{ count: 1 }]);
+    expect(await remove(2)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 2, pictureAssetId: null },
+    });
   });
   it('counts abandoned publication leases toward the same finite retry budget', async () => {
     const i = await begin();

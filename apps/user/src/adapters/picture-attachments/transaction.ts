@@ -8,6 +8,14 @@ import {
 import type { Database } from '../database/index.js';
 type Db = Parameters<Parameters<Database['run']>[0]>[0];
 type Transaction = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+export function isPendingAttachment(intent: PictureAttachment | null): boolean {
+  return (
+    intent !== null &&
+    ['creating-asset', 'awaiting-source', 'accepting-source'].includes(intent.state)
+  );
+}
+
 /** The caller owns the Profile row lock. These writes share its local transaction. */
 export async function persistAttachment(
   tx: Transaction,
@@ -86,11 +94,7 @@ export async function fencePendingAttachment(
 ) {
   const intent = await selectedAttachment(tx, profileId);
   const removed = intent?.state === 'attached' && intent.assetId === formerAssetId;
-  if (
-    !intent ||
-    (!removed && !['creating-asset', 'awaiting-source', 'accepting-source'].includes(intent.state))
-  )
-    return;
+  if (!intent || (!removed && !isPendingAttachment(intent))) return;
   intent.state = removed ? 'cancelled' : 'conflicted';
   if (intent.assetId) intent.deletion = 'pending';
   await persistAttachment(tx, intent);

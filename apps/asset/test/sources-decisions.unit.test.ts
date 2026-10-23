@@ -42,17 +42,18 @@ it('records private temporary-input expiry separately and preserves it through c
 function fixture(
   policy: SourcePolicy = initialSourcePolicies.wallpaper,
   clock?: Clock.Clock,
-  assetType = 'wallpaper'
+  assetType = 'wallpaper',
+  initialSources: SourceState['sources'] = []
 ) {
   let state: SourceState = {
     asset: { id: 'asset_one', applicationId: 'wallpaper', assetType, owner },
-    sourceSetRevision: '0',
-    deliveryRevision: '0',
-    sources: [],
+    sourceSetRevision: initialSources.length ? '1' : '0',
+    deliveryRevision: initialSources.length ? '1' : '0',
+    sources: structuredClone(initialSources),
     candidates: [],
     nonterminalCandidateCount: 0,
-    defaultSourceId: null,
-    initialAnalysisSourceId: null,
+    defaultSourceId: initialSources[0]?.sourceId ?? null,
+    initialAnalysisSourceId: initialSources[0]?.sourceId ?? null,
   };
   let activeRevision = 'one';
   const confirmations: SourceConfirmation[] = [];
@@ -1501,6 +1502,55 @@ describe('canonical picture replacement', () => {
       expect(f.state.sourceSetRevision).toBe('1');
     } finally {
       await f.close();
+    }
+  });
+  it('retires every prior accepted Source with one fixed thirty-day deadline', async () => {
+    const clockRuntime = ManagedRuntime.make(TestClock.layer());
+    await clockRuntime.runPromise(TestClock.setTime(Date.parse('2026-10-23T00:00:00Z')));
+    const facts = {
+      width: 512,
+      height: 512,
+      model: 'sdr-webp',
+      mimeType: 'image/webp',
+      byteLength: 4,
+      digest: 'a'.repeat(64),
+    };
+    const f = fixture(
+      initialSourcePolicies.picture,
+      await clockRuntime.runPromise(Clock.Clock),
+      'picture',
+      [
+        { sourceId: 'prior-a', layout: 'asset-layout-1', facts },
+        {
+          sourceId: 'prior-b',
+          layout: 'asset-layout-1',
+          facts: { ...facts, model: 'sdr-png', mimeType: 'image/png' },
+        },
+      ]
+    );
+    f.setInspect(() => Effect.succeed({ kind: 'verified', facts }));
+    try {
+      const id = await propose(f, 'whole-set');
+      expect(await f.call((s) => s.accept(owner, 'asset_one', id, replacement))).toMatchObject({
+        candidate: { status: 'accepted', sourceSetRevision: '2' },
+      });
+      expect(f.state.sources).toHaveLength(1);
+      expect(f.retirements).toEqual([
+        { sourceId: 'prior-a', evidenceExpiresAt: '2026-11-22T00:00:00.000Z' },
+        { sourceId: 'prior-b', evidenceExpiresAt: '2026-11-22T00:00:00.000Z' },
+      ]);
+      expect(f.state.initialAnalysisSourceId).toBe('prior-a');
+      await clockRuntime.runPromise(TestClock.adjust(10000));
+      f.activate({
+        ...initialSourcePolicies.picture,
+        retention: { ...initialSourcePolicies.picture.retention, evidenceMs: 86400000 },
+      })();
+      await f.call((s) => s.accept(owner, 'asset_one', id, replacement));
+      expect(f.retirements).toHaveLength(2);
+      expect(f.retirements[0]?.evidenceExpiresAt).toBe('2026-11-22T00:00:00.000Z');
+    } finally {
+      await f.close();
+      await clockRuntime.dispose();
     }
   });
 });

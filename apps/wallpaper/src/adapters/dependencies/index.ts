@@ -218,9 +218,9 @@ function brokerWorker(options: ConnectionOptions) {
 }
 
 async function checkDatabase(pool: Pool, signal: AbortSignal): Promise<boolean> {
-  let connectionFailed = false;
-  const recordError = () => {
-    connectionFailed = true;
+  let connectionFailure: Error | undefined;
+  const recordError = (cause: Error) => {
+    connectionFailure ??= cause;
   };
   // Take error ownership in the checkout callback, before yielding to a Promise continuation.
   const client = await new Promise<PoolClient>((resolve, reject) => {
@@ -245,7 +245,9 @@ async function checkDatabase(pool: Pool, signal: AbortSignal): Promise<boolean> 
       return false;
     }
     await client.query('SELECT 1');
-    return !connectionFailed && !signal.aborted;
+    // pg can finish the query before emitting an independent fatal client error.
+    if (connectionFailure) throw connectionFailure;
+    return !signal.aborted;
   } catch (cause) {
     queryFailed = true;
     throw cause;
@@ -253,7 +255,7 @@ async function checkDatabase(pool: Pool, signal: AbortSignal): Promise<boolean> 
     signal.removeEventListener('abort', cancel);
     if (!released) {
       released = true;
-      client.release(queryFailed || connectionFailed || signal.aborted);
+      client.release(queryFailed || connectionFailure !== undefined || signal.aborted);
     }
     // release restores pg-pool's idle listener before this listener is removed.
     client.removeListener('error', recordError);

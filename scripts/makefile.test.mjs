@@ -12,6 +12,7 @@ for (const selector of [
 	"SCRIPT",
 	"ARGS",
 	"FORCE",
+	"CI_CONCURRENCY",
 ]) {
 	delete env[selector];
 }
@@ -371,6 +372,10 @@ test("force applies to ordinary CI checks and type checks", () => {
 	assert.doesNotMatch(ci, /run test:e2e/);
 	assert.match(
 		ci,
+		/run build lint check-types test:unit test:integration .*--concurrency=4/,
+	);
+	assert.match(
+		output("ci", "CI_CONCURRENCY=1"),
 		/run build lint check-types test:unit test:integration .*--concurrency=1/,
 	);
 	const scopedCi = output("ci", "PACKAGE=web");

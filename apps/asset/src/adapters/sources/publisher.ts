@@ -6,6 +6,7 @@ import {
   SourceFailure,
   type SourceConfirmation,
 } from '../../capabilities/sources/index.js';
+import { assetBrokerTransport } from '../nats.js';
 import { observeWorkflow } from '../commands/index.js';
 import { encodeSourceConfirmation } from './confirmation.js';
 export class SourceConfirmationHealth extends Context.Service<
@@ -55,7 +56,7 @@ export function sourceConfirmationsLayer(options: Options) {
         const connection = yield* Effect.acquireRelease(
           broker('connect', () =>
             connect({
-              servers: options.url,
+              ...assetBrokerTransport(options.url),
               user: app.serviceUser,
               pass: options.credential.password,
               inboxPrefix: '_ASSET_INBOX.service',

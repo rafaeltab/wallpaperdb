@@ -171,6 +171,16 @@ jobs:
           fi
           if [[ -n "$IMPORT_RUN" ]]; then args+=(--baseline /tmp/mutation-import/checkpoint.json --offline); fi
           if [[ "$RESET_FAILURE_INPUT" == true ]]; then export MUTATION_REDIS_RESET_FAILURE=1; fi
+          if [[ "$NATS_FIXTURE" == reset-failure ]]; then
+            # Fixed cold native failure exercise. No checkpoint import, remote
+            # restoration or previous report may bypass its execution path.
+            args+=(--offline)
+            common=$(git rev-parse --path-format=absolute --git-common-dir)
+            rm -rf -- "$common/mutation/v1/color-extractor" "$common/mutation/repository-v1" reports/mutation apps/color-extractor/reports/mutation
+            # The reset counter selects the fault boundary. Acceptance must still
+            # establish actual completed native work from the retained raw plan,
+            # runner timings and invalidated report, rather than infer it here.
+          fi
           if [[ "$POSTGRES_FIXTURE" == compare || "$NATS_FIXTURE" == compare ]]; then
             # A diagnostic comparison has one fixed source/suite scope and four
             # cold invocations. No imported/remote or prior-sample conclusions.

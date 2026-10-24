@@ -5,6 +5,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -273,11 +274,30 @@ async function main() {
 						);
 			summary.elapsedSeconds =
 				Math.round((performance.now() - invocationStart) / 100) / 10;
+			summary.shutdown = result.shutdown;
+			if (
+				result.shutdown &&
+				(!result.shutdown.confirmed || result.shutdown.failure)
+			)
+				summary.invalidWorkerResults = true;
 			Object.assign(
 				summary,
 				existsSync(progress) ? json(progress) : { total: null },
 			);
 			summary.outcome = result.outcome;
+			if (summary.invalidWorkerResults) {
+				summary.discardedProgress = {
+					completed: summary.completed,
+					executed: summary.executed,
+				};
+				summary.completed = 0;
+				summary.executed = 0;
+				for (const extension of ["json", "html"]) {
+					const file = join(run, `mutation.${extension}`);
+					if (existsSync(file))
+						renameSync(file, join(run, `invalid-mutation.${extension}`));
+				}
+			}
 			if (
 				summary.errors ||
 				(result.outcome === "completed" && !existsSync(complete))
@@ -336,7 +356,11 @@ async function main() {
 			]) {
 				const file = join(run, name),
 					destination = join(output, name);
-				if (existsSync(file)) copyFileSync(file, destination);
+				if (
+					existsSync(file) &&
+					!(summary.invalidWorkerResults && name !== "summary.json")
+				)
+					copyFileSync(file, destination);
 				else rmSync(destination, { force: true });
 			}
 			await new Promise((resolve) => setImmediate(resolve));

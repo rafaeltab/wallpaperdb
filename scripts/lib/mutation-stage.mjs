@@ -190,6 +190,10 @@ export async function runStage({
 				},
 			},
 		);
+		summary.shutdown = { ...summary.shutdown, runner: result.shutdown };
+		const shutdownFailed =
+			!result.shutdown?.confirmed || Boolean(result.shutdown.failure);
+		if (shutdownFailed) summary.invalidWorkerResults = true;
 		Object.assign(summary, existsSync(progress) ? json(progress) : {});
 		summary.elapsedSeconds = (performance.now() - start) / 1000;
 		summary.outcome = result.outcome;
@@ -210,8 +214,9 @@ export async function runStage({
 			summary.fixtureError ??=
 				"Owned fixture reset failed in the test worker; stage results are not reusable";
 		}
-		if (fixture?.failure || resetFailed || cleanupFailed) {
-			summary.invalidFixtureResults = true;
+		if (fixture?.failure || resetFailed || cleanupFailed || shutdownFailed) {
+			if (fixture?.failure || resetFailed || cleanupFailed)
+				summary.invalidFixtureResults = true;
 			summary.discardedProgress = {
 				completed: summary.completed,
 				executed: summary.executed,
@@ -238,7 +243,8 @@ export async function runStage({
 			existsSync(plan) &&
 			!fixture?.failure &&
 			!resetFailed &&
-			!cleanupFailed
+			!cleanupFailed &&
+			!shutdownFailed
 		) {
 			const planned = json(plan);
 			report = mergeReports([
@@ -348,6 +354,8 @@ export async function runStage({
 					];
 				}),
 			);
+			if (config.fixture === "nats-owned")
+				summary.clients.scope = "nats-helper-only";
 		}
 		summary.elapsedSeconds = (performance.now() - start) / 1000;
 		writeFileSync(join(run, "summary.json"), JSON.stringify(summary, null, 2));
@@ -357,7 +365,10 @@ export async function runStage({
 			"mutation.json",
 			"mutation.html",
 		]) {
-			if (existsSync(join(run, name)))
+			if (
+				existsSync(join(run, name)) &&
+				!(summary.invalidWorkerResults && name !== "summary.json")
+			)
 				copyFileSync(join(run, name), join(output, name));
 			else rmSync(join(output, name), { force: true });
 		}

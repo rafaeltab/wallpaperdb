@@ -1,5 +1,6 @@
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
-import { Cause, Effect, Exit, ManagedRuntime } from 'effect';
+import { Cause, Effect, Exit, Layer, ManagedRuntime } from 'effect';
+import { TestClock } from 'effect/testing';
 import { Pool } from 'pg';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -56,6 +57,42 @@ describe('dependency probe with PostgreSQL and NATS', () => {
     return rows[0]?.count;
   }
 
+  // Advance the deadline only after real broker work stalls. Cold worker loading is
+  // host scheduling, not a promise that replacement startup finishes within 100ms.
+  async function stalledBrokerInspection(
+    runtime: ManagedRuntime.ManagedRuntime<AvailabilityProbe | TestClock.TestClock, unknown>,
+    proxy: Awaited<ReturnType<typeof dependencyProxy>>,
+    phase: 'traffic' | 'connection'
+  ) {
+    const controller = new AbortController();
+    let settled = false;
+    const pending = runtime.runPromise(
+      AvailabilityProbe.use((probe) => probe.inspect()),
+      {
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(1000)]),
+      }
+    );
+    void pending.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      }
+    );
+    try {
+      if (phase === 'traffic') await expect.poll(proxy.hasBlockedTraffic).toBe(true);
+      else await proxy.waitForConnection();
+      await runtime.runPromise(TestClock.adjust(99));
+      expect(settled).toBe(false);
+      await runtime.runPromise(TestClock.adjust(1));
+      return await pending;
+    } finally {
+      controller.abort();
+      await Promise.allSettled([pending]);
+    }
+  }
+
   it('reports live dependencies without requiring a database schema or JetStream', async () => {
     const runtime = ManagedRuntime.make(
       dependencyProbeLayer({
@@ -106,7 +143,7 @@ describe('dependency probe with PostgreSQL and NATS', () => {
         serviceName: 'wallpaper-authenticated-broker-test',
         otelHealthy: true,
         healthTimeoutMs: 100,
-      })
+      }).pipe(Layer.provideMerge(TestClock.layer()))
     );
     runtimes.push(runtime);
     expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual({
@@ -115,9 +152,7 @@ describe('dependency probe with PostgreSQL and NATS', () => {
       otel: true,
     });
     proxy.block();
-    expect(
-      await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
-    ).toMatchObject({ nats: false });
+    expect(await stalledBrokerInspection(runtime, proxy, 'traffic')).toMatchObject({ nats: false });
     await expect.poll(proxy.socketCount).toBe(0);
     proxy.unblock();
     expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual({
@@ -139,7 +174,7 @@ describe('dependency probe with PostgreSQL and NATS', () => {
         serviceName: 'wallpaper-stalled-broker-test',
         otelHealthy: true,
         healthTimeoutMs: 100,
-      })
+      }).pipe(Layer.provideMerge(TestClock.layer()))
     );
     runtimes.push(runtime);
     try {
@@ -151,13 +186,11 @@ describe('dependency probe with PostgreSQL and NATS', () => {
       for (let cycle = 0; cycle < 2; cycle++) {
         proxy.block();
         const startedAt = Date.now();
-        expect(await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))).toEqual(
-          {
-            database: true,
-            nats: false,
-            otel: true,
-          }
-        );
+        expect(await stalledBrokerInspection(runtime, proxy, 'traffic')).toEqual({
+          database: true,
+          nats: false,
+          otel: true,
+        });
         expect(Date.now() - startedAt).toBeLessThan(1000);
         await expect.poll(proxy.socketCount).toBe(0);
         proxy.unblock();
@@ -340,23 +373,23 @@ describe('dependency probe with PostgreSQL and NATS', () => {
         serviceName: 'wallpaper-failed-broker-acquisition-test',
         otelHealthy: true,
         healthTimeoutMs: 100,
-      })
+      }).pipe(Layer.provideMerge(TestClock.layer()))
     );
     runtimes.push(runtime);
     try {
       await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()));
       proxy.block();
-      expect(
-        await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
-      ).toMatchObject({ nats: false });
+      expect(await stalledBrokerInspection(runtime, proxy, 'traffic')).toMatchObject({
+        nats: false,
+      });
       await expect.poll(proxy.socketCount).toBe(0);
       proxy.unblock();
       proxy.pause();
       for (let cycle = 0; cycle < 2; cycle++) {
         const startedAt = Date.now();
-        expect(
-          await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
-        ).toMatchObject({ nats: false });
+        expect(await stalledBrokerInspection(runtime, proxy, 'connection')).toMatchObject({
+          nats: false,
+        });
         expect(Date.now() - startedAt).toBeLessThan(1000);
         await expect.poll(proxy.socketCount).toBe(0);
       }
@@ -386,15 +419,15 @@ describe('dependency probe with PostgreSQL and NATS', () => {
         serviceName: 'wallpaper-broker-acquisition-shutdown-test',
         otelHealthy: true,
         healthTimeoutMs: 100,
-      })
+      }).pipe(Layer.provideMerge(TestClock.layer()))
     );
     runtimes.push(runtime);
     try {
       await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()));
       proxy.block();
-      expect(
-        await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
-      ).toMatchObject({ nats: false });
+      expect(await stalledBrokerInspection(runtime, proxy, 'traffic')).toMatchObject({
+        nats: false,
+      });
       await expect.poll(proxy.socketCount).toBe(0);
       proxy.unblock();
       proxy.pause();

@@ -1930,6 +1930,9 @@ importers:
       '@types/node':
         specifier: ^26.0.1
         version: 26.0.1
+      '@vitest/coverage-v8':
+        specifier: 5.0.2
+        version: 5.0.2(patch_hash=2a0b789d33ad6844e89b9a7ef5316430dc762b83d0fb740bdc0a4eb7c538c587)(@vitest/browser@5.0.2)(vitest@5.0.2)
       tsx:
         specifier: ^4.22.4
         version: 4.22.4

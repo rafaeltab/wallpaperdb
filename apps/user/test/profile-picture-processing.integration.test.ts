@@ -177,7 +177,8 @@ describe('Profile picture processing', () => {
     } else input = Buffer.concat([canonical, privateChunks]);
     input.writeUInt32LE(input.length - 8, 4);
     expect(input.length).toBeLessThan(limits.maxBytes);
-    vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=96');
+    // Retain runner preloads while constraining the actual encoder child heap.
+    vi.stubEnv('NODE_OPTIONS', `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=96`);
     try {
       const result = await processProfilePicture(input, limits, animatedPolicy);
       const metadata = await sharp(result.bytes, { animated: true }).metadata();
@@ -261,7 +262,8 @@ describe('Profile picture processing', () => {
       Buffer.from('002c00000000010001000002024401003b', 'hex'),
     ]);
     expect(input.length).toBeLessThan(limits.maxBytes);
-    vi.stubEnv('NODE_OPTIONS', '--max-old-space-size=96');
+    // Retain runner preloads while constraining the actual encoder child heap.
+    vi.stubEnv('NODE_OPTIONS', `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=96`);
     try {
       const result = await processProfilePicture(input, limits, {
         ...policy,

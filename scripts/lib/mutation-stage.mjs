@@ -4,6 +4,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -11,7 +12,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { runBounded } from "./mutation-process.mjs";
-import { FixtureCleanupError, redisFixture } from "./mutation-fixture.mjs";
+import { FixtureCleanupError, mutationFixture } from "./mutation-fixture.mjs";
 import { readMutationTimings } from "./mutation-timings.mjs";
 import {
 	mutationContext,
@@ -43,6 +44,13 @@ export async function runStage({
 	signal,
 }) {
 	const start = performance.now();
+	const postgres = config.fixture === "postgres-owned";
+	const fixtureCleanupMs = postgres
+		? Math.max(1, Math.floor(graceMs / 2))
+		: Math.max(100, graceMs / 2);
+	const runnerGraceMs = postgres
+		? graceMs - fixtureCleanupMs
+		: fixtureCleanupMs;
 	const cwd = join(root, workspace);
 	const contextConfig = { ...config, sourceFiles };
 	const context = mutationContext(root, workspace, suite, contextConfig);
@@ -65,6 +73,7 @@ export async function runStage({
 		gate = join(run, "gate.json");
 	const fixtureFailure = join(run, "fixture-failure.json");
 	const runnerTimings = join(run, "runner-timings.jsonl");
+	const clientTimings = join(run, "client-timings.jsonl");
 	if (unit)
 		writeFileSync(
 			gate,
@@ -108,19 +117,34 @@ export async function runStage({
 	};
 	let report;
 	let fixture;
+	let fixtureClosed = false;
+	let cleanupFailed = false;
+	const closeFixture = async () => {
+		if (!fixture || fixtureClosed) return;
+		fixtureClosed = true;
+		try {
+			await fixture.close();
+		} catch (error) {
+			cleanupFailed = true;
+			summary.invalidFixtureResults = true;
+			summary.outcome = "failed";
+			summary.cleanupError = error.message;
+		}
+	};
 	let workerStarted = false;
 	try {
 		sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
 		options.tempDirName = sandbox;
 		writeFileSync(join(run, "stryker.json"), JSON.stringify(options));
-		if (config.fixture === "redis-owned-reuse")
-			fixture = await redisFixture(
-				cwd,
-				config.fixtureImage,
-				start + budgetMs,
-				Math.max(100, graceMs / 2),
-				signal,
-			);
+		fixture = await mutationFixture(
+			cwd,
+			config,
+			// PostgreSQL may finish an in-flight reset while the native runner drains.
+			// This uses the reserved runner grace, leaving fixture cleanup separate.
+			start + budgetMs + (postgres ? runnerGraceMs : 0),
+			fixtureCleanupMs,
+			signal,
+		);
 		const remaining = budgetMs - (performance.now() - start);
 		if (shouldCancel()) {
 			summary.outcome = "cancelled";
@@ -130,6 +154,14 @@ export async function runStage({
 			throw new Error(
 				"Fixture setup consumed the stage budget without mutation progress",
 			);
+		const executionDeadline = Date.now() + remaining;
+		if (postgres)
+			summary.shutdown = {
+				executionDeadline,
+				runnerGraceMs,
+				fixtureCleanupMs: fixture.cleanupMs,
+				fixtureDeadlineOffsetMs: fixture.operationDeadline - (start + budgetMs),
+			};
 		workerStarted = true;
 		const result = await runBounded(
 			process.execPath,
@@ -141,25 +173,26 @@ export async function runStage({
 			{
 				cwd,
 				budgetMs: remaining,
-				graceMs: fixture ? Math.max(100, graceMs / 2) : graceMs,
+				graceMs: fixture ? runnerGraceMs : graceMs,
 				failureSignal: fixture?.failureSignal,
 				env: {
 					...process.env,
 					...fixture?.env,
 					WALLPAPERDB_MUTATION_PROGRESS: progress,
 					WALLPAPERDB_MUTATION_TIMINGS: runnerTimings,
+					WALLPAPERDB_MUTATION_CLIENT_TIMINGS: clientTimings,
 					WALLPAPERDB_MUTATION_PLAN: plan,
 					WALLPAPERDB_MUTATION_GATE: unit ? gate : "",
 					WALLPAPERDB_MUTATION_FAILURE_FILE: fixtureFailure,
-					WALLPAPERDB_MUTATION_EXECUTION_DEADLINE: String(
-						Date.now() + remaining,
-					),
+					WALLPAPERDB_MUTATION_EXECUTION_DEADLINE: String(executionDeadline),
 				},
 			},
 		);
 		Object.assign(summary, existsSync(progress) ? json(progress) : {});
 		summary.elapsedSeconds = (performance.now() - start) / 1000;
 		summary.outcome = result.outcome;
+		// Resource disposal is part of the evidence, before checkpoint publication.
+		await closeFixture();
 		if (
 			summary.errors ||
 			(result.outcome === "completed" && !existsSync(complete))
@@ -175,6 +208,21 @@ export async function runStage({
 			summary.fixtureError ??=
 				"Owned fixture reset failed in the test worker; stage results are not reusable";
 		}
+		if (fixture?.failure || resetFailed || cleanupFailed) {
+			summary.invalidFixtureResults = true;
+			summary.discardedProgress = {
+				completed: summary.completed,
+				executed: summary.executed,
+			};
+			summary.completed = 0;
+			summary.executed = 0;
+			// Retain raw native diagnostics privately, never as an authoritative report.
+			for (const extension of ["json", "html"]) {
+				const file = join(run, `mutation.${extension}`);
+				if (existsSync(file))
+					renameSync(file, join(run, `invalid-mutation.${extension}`));
+			}
+		}
 		const after = mutationContext(root, workspace, suite, contextConfig);
 		if (after.key !== context.key || after.inputDigest !== context.inputDigest)
 			throw new Error(
@@ -184,7 +232,12 @@ export async function runStage({
 			existsSync(incrementalFile) &&
 			(existsSync(complete) ||
 				readFileSync(incrementalFile, "utf8") !== initial);
-		if (existsSync(plan) && !fixture?.failure && !resetFailed) {
+		if (
+			existsSync(plan) &&
+			!fixture?.failure &&
+			!resetFailed &&
+			!cleanupFailed
+		) {
 			const planned = json(plan);
 			report = mergeReports([
 				planned,
@@ -257,24 +310,44 @@ export async function runStage({
 		}
 		summary.outcome = "failed";
 		summary.error = error.message;
+		if (config.fixture) {
+			summary.invalidFixtureResults = true;
+			return { summary, context };
+		}
 		throw error;
 	} finally {
 		if (fixture) {
-			try {
-				await fixture.close();
-			} catch (error) {
-				summary.outcome = "failed";
-				summary.cleanupError = error.message;
-			}
+			await closeFixture();
 			summary.fixture = {
 				name: fixture.name,
 				image: fixture.image,
 				containerIds: fixture.containerIds,
+				boundaries: fixture.boundaries,
 				...fixture.timings,
 			};
 		}
 		if (sandbox) rmSync(sandbox, { recursive: true, force: true });
 		Object.assign(summary, readMutationTimings(runnerTimings));
+		if (existsSync(clientTimings)) {
+			const entries = readFileSync(clientTimings, "utf8")
+				.trim()
+				.split("\n")
+				.filter(Boolean)
+				.map(JSON.parse);
+			summary.clients = Object.fromEntries(
+				["created", "disposed"].map((phase) => {
+					const samples = entries.filter((entry) => entry.phase === phase);
+					return [
+						phase,
+						{
+							count: samples.length,
+							seconds: samples.reduce((sum, entry) => sum + entry.seconds, 0),
+						},
+					];
+				}),
+			);
+		}
+		summary.elapsedSeconds = (performance.now() - start) / 1000;
 		writeFileSync(join(run, "summary.json"), JSON.stringify(summary, null, 2));
 		for (const name of [
 			"summary.json",

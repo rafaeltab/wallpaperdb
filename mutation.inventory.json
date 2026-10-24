@@ -82,10 +82,11 @@
       "decision": "enabled",
       "mechanism": "native-vitest-node",
       "stages": [
-        "unit"
+        "unit",
+        "integration"
       ],
       "limitations": {
-        "reason": "PostgreSQL, S3 and picture-worker fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "reason": "PostgreSQL pilot includes only profile-store operation tests. Database lifetime/cancellation suites retain independent containers. Other PostgreSQL, S3 and picture-worker fixtures need separate ownership/reset validation. Built subprocess output remains unvalidated.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },

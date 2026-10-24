@@ -1,3 +1,4 @@
+import { assetBrokerTransport } from '../nats.js';
 import { createHash } from 'node:crypto';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context as otelContext, propagation, trace } from '@opentelemetry/api';
@@ -326,7 +327,7 @@ export function protectedCommandsLayer(
         const connection = yield* Effect.acquireRelease(
           broker('connect', () =>
             connect({
-              servers: options.url,
+              ...assetBrokerTransport(options.url),
               user: application.serviceUser,
               pass: options.credential.password,
               inboxPrefix: '_ASSET_INBOX.service',

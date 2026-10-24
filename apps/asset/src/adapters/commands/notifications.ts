@@ -1,3 +1,4 @@
+import { assetBrokerTransport } from '../nats.js';
 import { createHash } from 'node:crypto';
 import { Cause, Context, Effect, Fiber, Layer, Ref, Stream } from 'effect';
 import { connect, type JsMsg, type NatsConnection } from 'nats';
@@ -170,7 +171,7 @@ export function operatorWebhookLayer(options: NotificationOptions) {
         const connection = yield* Effect.acquireRelease(
           operation('connect-notifications', () =>
             connect({
-              servers: options.url,
+              ...assetBrokerTransport(options.url),
               user: application.serviceUser,
               pass: options.credential.password,
               inboxPrefix: '_ASSET_INBOX.service',

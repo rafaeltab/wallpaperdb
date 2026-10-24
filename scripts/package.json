@@ -32,6 +32,7 @@
 		"@biomejs/biome": "^2.3.8",
 		"@types/istanbul-lib-coverage": "2.0.6",
 		"@types/node": "^26.0.1",
+		"@vitest/coverage-v8": "5.0.2",
 		"tsx": "^4.22.4",
 		"typescript": "^5.7.2",
 		"vitest": "5.0.2"

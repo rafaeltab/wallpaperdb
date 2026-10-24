@@ -5,11 +5,13 @@ import {
 	mkdirSync,
 	copyFileSync,
 	readFileSync,
+	realpathSync,
+	symlinkSync,
 	writeFileSync,
 	rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { resolve } from "node:path";
 
@@ -217,6 +219,133 @@ test("Docker builds discover the managed plugin with an explicit host configurat
 		);
 		assert.equal(compose.status, 0, compose.stderr);
 		assert.equal(compose.stdout.trim(), "command-forwarding");
+	} finally {
+		rmSync(directory, { recursive: true, force: true });
+	}
+});
+
+test("Asset integration retains invocation tool trust through Make and strict Turbo", () => {
+	const directory = mkdtempSync(join(tmpdir(), "wallpaperdb-turbo-toolchain-"));
+	try {
+		const home = join(directory, "home");
+		const checkout = join(directory, "checkout");
+		mkdirSync(join(home, ".local/share/mise"), { recursive: true });
+		// Share public installed binaries, never the user's configuration or trust.
+		const installs = dirname(
+			dirname(dirname(dirname(realpathSync(process.execPath)))),
+		);
+		symlinkSync(installs, join(home, ".local/share/mise/installs"));
+		mkdirSync(join(checkout, "scripts/toolchain-bin"), { recursive: true });
+		for (const name of [
+			"Makefile",
+			"mise.toml",
+			"mise.lock",
+			"pnpm-lock.yaml",
+			"turbo.json",
+			"scripts/mise-shell.sh",
+			"scripts/toolchain.mjs",
+			"scripts/docker-config.mjs",
+			"scripts/toolchain-bin/docker",
+			"scripts/docker-validation.mjs",
+			"scripts/lib/docker-queue.mjs",
+		]) {
+			mkdirSync(dirname(join(checkout, name)), { recursive: true });
+			copyFileSync(name, join(checkout, name));
+		}
+		const manifest = JSON.parse(readFileSync("package.json", "utf8"));
+		writeFileSync(
+			join(checkout, "package.json"),
+			JSON.stringify({
+				name: "toolchain-fixture",
+				private: true,
+				packageManager: manifest.packageManager,
+			}),
+		);
+		writeFileSync(
+			join(checkout, "pnpm-workspace.yaml"),
+			"packages:\n  - packages/*\n",
+		);
+		const configuration = JSON.parse(readFileSync("turbo.json", "utf8"));
+		const packages = new Set(["@wallpaperdb/asset", "@wallpaperdb/control"]);
+		for (const task of Object.keys(configuration.tasks)) {
+			if (task.startsWith("@")) packages.add(task.split("#")[0]);
+		}
+		for (const name of packages) {
+			const path = join(checkout, "packages", name.split("/")[1]);
+			mkdirSync(path, { recursive: true });
+			writeFileSync(
+				join(path, "package.json"),
+				JSON.stringify({
+					name,
+					scripts: { "test:integration": `node ../../probe.mjs ${name}` },
+				}),
+			);
+		}
+		writeFileSync(
+			join(checkout, "compose.yml"),
+			"services:\n  toolchain-proof:\n    image: alpine:3\n",
+		);
+		writeFileSync(
+			join(checkout, "probe.mjs"),
+			`import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
+assert.equal(process.env.TOOLCHAIN_PRIVATE_SENTINEL, undefined);
+assert.equal(process.env.DATABASE_URL, undefined);
+const keys = ['MISE_TRUSTED_CONFIG_PATHS', 'MISE_LOCKED', 'MISE_AUTO_INSTALL'];
+if (process.argv[2] === '@wallpaperdb/asset') {
+  const result = spawnSync('docker', ['compose', '-f', '../../compose.yml', 'config', '--format', 'json'], {
+    encoding: 'utf8', timeout: 10000,
+    env: Object.fromEntries(['PATH', 'HOME', 'DOCKER_CONFIG', ...keys].map(key => [key, process.env[key]])),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).services['toolchain-proof'].image, 'alpine:3');
+  assert.deepEqual(keys.map(key => process.env[key]), [resolve('../..'), 'true', 'false']);
+} else {
+  assert.deepEqual(keys.map(key => process.env[key]), [undefined, undefined, undefined]);
+}
+console.log('toolchain boundary passed for ' + process.argv[2]);
+`,
+		);
+		const result = spawnSync(
+			"timeout",
+			[
+				"--kill-after=5",
+				"30",
+				"make",
+				"test-integration",
+				`TURBO=${resolve("node_modules/.bin/turbo")}`,
+				"TURBO_FLAGS=--filter=@wallpaperdb/asset --filter=@wallpaperdb/control --env-mode=strict",
+			],
+			{
+				cwd: checkout,
+				encoding: "utf8",
+				env: {
+					PATH: process.env.PATH,
+					HOME: home,
+					// Startup may persist trust here. The task's default HOME stays untrusted.
+					MISE_STATE_DIR: join(directory, "startup-state"),
+					MISE_TRUSTED_CONFIG_PATHS: checkout,
+					MISE_LOCKED: "true",
+					MISE_AUTO_INSTALL: "false",
+					TOOLCHAIN_PRIVATE_SENTINEL: "synthetic-must-not-pass",
+					DATABASE_URL: "synthetic-must-not-pass",
+					TURBO_TELEMETRY_DISABLED: "1",
+					DOCKER_VALIDATION_TIMEOUT: "5",
+					// Compose config needs no daemon; use an isolated fixture queue.
+					DOCKER_VALIDATION_LOCK_FILE: join(directory, "docker.lock"),
+				},
+			},
+		);
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.match(
+			result.stdout,
+			/toolchain boundary passed for @wallpaperdb\/asset/,
+		);
+		assert.match(
+			result.stdout,
+			/toolchain boundary passed for @wallpaperdb\/control/,
+		);
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}

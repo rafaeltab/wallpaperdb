@@ -273,6 +273,23 @@
             ],
             "outputs": []
         },
+        "@wallpaperdb/asset#test:integration": {
+            "cache": true,
+            "inputs": [
+                "$TURBO_DEFAULT$"
+            ],
+            "outputs": [
+                "coverage/integration/**"
+            ],
+            "dependsOn": [
+                "^build"
+            ],
+            "passThroughEnv": [
+                "MISE_TRUSTED_CONFIG_PATHS",
+                "MISE_LOCKED",
+                "MISE_AUTO_INSTALL"
+            ]
+        },
         "@wallpaperdb/web#test:integration": {
             "dependsOn": [
                 "^build"

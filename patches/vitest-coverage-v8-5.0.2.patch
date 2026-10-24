@@ -1,0 +1,378 @@
+diff --git a/dist/index.js b/dist/index.js
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,7 +1,7 @@
+ import assert from 'node:assert';
+ import { randomUUID } from 'node:crypto';
+-import { existsSync } from 'node:fs';
+-import { readdir, readFile, rm } from 'node:fs/promises';
++import { existsSync, rmSync } from 'node:fs';
++import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
+ import inspector from 'node:inspector/promises';
+ import { resolve } from 'node:path';
+ import { fileURLToPath } from 'node:url';
+@@ -13,23 +13,56 @@
+ const mod = {
+ 	extendedContextCoverageDir: undefined,
+ 	session: null,
++	previousEnvironment: undefined,
++	environmentCleanup: undefined,
++	releaseExtendedContext() {
++		if (!this.previousEnvironment) return;
++		if (this.environmentCleanup) process.off("exit", this.environmentCleanup);
++		this.environmentCleanup = undefined;
++		for (const [key, value] of Object.entries(this.previousEnvironment)) {
++			if (value === undefined) delete process.env[key];
++			else process.env[key] = value;
++		}
++		this.previousEnvironment = undefined;
++		const directory = this.extendedContextCoverageDir;
++		this.extendedContextCoverageDir = undefined;
++		if (directory) rmSync(directory, { recursive: true, force: true });
++	},
+ 	async startCoverage({ isolate, autoAttachSubprocess, reportsDirectory }) {
+ 		if (isolate === false && enabled) {
++			// Report cleanup can run between watch iterations of a reused worker.
++			if (this.extendedContextCoverageDir) await mkdir(this.extendedContextCoverageDir, { recursive: true });
+ 			return;
+ 		}
+ 		enabled = true;
+-		if (autoAttachSubprocess) {
+-			this.extendedContextCoverageDir = resolve(reportsDirectory, "tmp", randomUUID());
+-			process.env.NODE_V8_COVERAGE = this.extendedContextCoverageDir;
++		try {
++			if (autoAttachSubprocess) {
++				this.previousEnvironment = { NODE_V8_COVERAGE: process.env.NODE_V8_COVERAGE, NODE_OPTIONS: process.env.NODE_OPTIONS };
++				// Non-isolated workers keep their profiler between suites. Their
++				// source state must still end with the worker's own isolate.
++				this.environmentCleanup = () => this.releaseExtendedContext();
++				process.once("exit", this.environmentCleanup);
++				this.extendedContextCoverageDir = resolve(reportsDirectory, "tmp", randomUUID());
++				await mkdir(this.extendedContextCoverageDir, { recursive: true });
++				process.env.NODE_V8_COVERAGE = this.extendedContextCoverageDir;
++				const preload = fileURLToPath(new URL("./subprocess.cjs", import.meta.url));
++				process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS || ""} --require=${JSON.stringify(preload)}`;
++			}
++			this.session ||= new inspector.Session();
++			const session = this.session;
++			session.connect();
++			await session.post("Profiler.enable");
++			await session.post("Profiler.startPreciseCoverage", {
++				callCount: true,
++				detailed: true
++			});
++		} catch (error) {
++			this.session?.disconnect();
++			this.session = null;
++			enabled = false;
++			await this.releaseExtendedContext();
++			throw error;
+ 		}
+-		this.session ||= new inspector.Session();
+-		const session = this.session;
+-		session.connect();
+-		await session.post("Profiler.enable");
+-		await session.post("Profiler.startPreciseCoverage", {
+-			callCount: true,
+-			detailed: true
+-		});
+ 	},
+ 	async takeCoverage(options) {
+ 		if (provider === "stackblitz") {
+@@ -48,23 +81,45 @@
+ 				result.push(entry);
+ 			}
+ 		}
+-		if (this.extendedContextCoverageDir && existsSync(this.extendedContextCoverageDir)) {
+-			const filenames = await readdir(this.extendedContextCoverageDir);
+-			const contents = await Promise.all(filenames.filter((filename) => filename.endsWith(".json")).map(async (filename) => {
+-				const path = `${this.extendedContextCoverageDir}/${filename}`;
+-				const content = await readFile(path, "utf8");
+-				await rm(path);
+-				return content;
+-			}));
+-			for (const content of contents) {
+-				const json = JSON.parse(content);
+-				for (const entry of json.result) {
+-					if (filterResult(entry)) {
++		if (this.extendedContextCoverageDir) {
++			try {
++				const filenames = await readdir(this.extendedContextCoverageDir);
++				for (const filename of filenames.filter(name => /^error-.*\.json$/.test(name))) {
++					throw new Error(`Subprocess coverage collection failed: ${await readFile(resolve(this.extendedContextCoverageDir, filename), "utf8")}`);
++				}
++				for (const filename of filenames.filter(name => /^coverage-.*\.json$/.test(name))) {
++					const identity = /^coverage-(\d+)-\d+-(\d+)\.json$/.exec(filename);
++					if (!identity) throw new Error(`Unknown subprocess coverage identity: ${filename}`);
++					const path = resolve(this.extendedContextCoverageDir, filename);
++					const json = JSON.parse(await readFile(path, "utf8"));
++					for (const entry of json.result) {
++						if (!filterResult(entry)) continue;
++						const sourcePath = resolve(this.extendedContextCoverageDir, `source-${identity[1]}-${identity[2]}-${entry.scriptId}.json`);
++						// Do not guess a loader's output using native TS stripping. Keep
++						// missing provenance visible until the provider's include filter.
++						const source = existsSync(sourcePath) ? JSON.parse(await readFile(sourcePath, "utf8")) : undefined;
++						if (source && (source.url !== entry.url || source.scriptId !== entry.scriptId || String(source.pid) !== identity[1] || String(source.threadId) !== identity[2])) {
++							throw new Error(`Mismatched subprocess coverage source: ${entry.url}`);
++						}
++						if (source) {
++							source.map = json["source-map-cache"]?.[entry.url]?.data || null;
++							if (source.sourceMapURL?.startsWith("data:")) {
++								const match = /^data:application\/json(?:;charset=[^;,]+)?(;base64)?,(.*)$/s.exec(source.sourceMapURL);
++								if (!match) throw new Error(`Unsupported subprocess source map: ${entry.url}`);
++								source.map = JSON.parse(match[1] ? Buffer.from(match[2], "base64").toString("utf8") : decodeURIComponent(match[2]));
++							}
++							if (source.sourceMapURL && !source.map) throw new Error(`Missing subprocess source map: ${entry.url}`);
++						}
++						entry.executedSource = source;
+ 						entry.startOffset = 0;
+ 						entry.isExtendedContext = true;
+ 						result.push(entry);
+ 					}
++					await rm(path);
+ 				}
++			} catch (error) {
++				await this.releaseExtendedContext();
++				throw error;
+ 			}
+ 		}
+ 		const coverageFilesDirectory = options?.coverageFilesDirectory;
+@@ -79,10 +134,15 @@
+ 		if (!session) {
+ 			throw new Error("V8 provider missing inspector session.");
+ 		}
+-		await session.post("Profiler.stopPreciseCoverage");
+-		await session.post("Profiler.disable");
+-		session.disconnect();
+-		this.session = null;
++		try {
++			await session.post("Profiler.stopPreciseCoverage");
++			await session.post("Profiler.disable");
++		} finally {
++			session.disconnect();
++			this.session = null;
++			enabled = false;
++			await this.releaseExtendedContext();
++		}
+ 	},
+ 	async getProvider() {
+ 		return loadProvider();
+diff --git a/dist/provider.js b/dist/provider.js
+--- a/dist/provider.js
++++ b/dist/provider.js
+@@ -1,3 +1,4 @@
++import { createHash } from 'node:crypto';
+ import { existsSync, promises } from 'node:fs';
+ import { fileURLToPath } from 'node:url';
+ import { mergeScriptCovs } from '@bcoe/v8-coverage';
+@@ -40,55 +41,76 @@
+ 			}
+ 		}
+ 	}
++	async cleanAfterRun() {
++		try {
++			// Also covers workers terminated without JavaScript exit callbacks.
++			if (this.options.autoAttachSubprocess) await promises.rm(`${this.options.reportsDirectory}/tmp`, { recursive: true, force: true });
++		} finally {
++			await super.cleanAfterRun();
++		}
++	}
+ 	createCoverageMap() {
+ 		return libCoverage.createCoverageMap({});
+ 	}
+ 	async generateCoverage({ allTestsRun }) {
+-		const start = debug.enabled ? performance.now() : 0;
+-		const coverageMap = this.createCoverageMap();
+-		const mergedScripts = new Map();
+-		const autoAttachSubprocess = this.options.autoAttachSubprocess;
+-		await this.readCoverageFiles({
+-			onFileRead(coverage) {
+-				for (const script of coverage.result) {
+-					const previous = mergedScripts.get(script.url);
+-					const merged = mergeScriptCovs(previous ? [previous, script] : [script]);
+-					const startOffset = previous?.startOffset || script.startOffset || 0;
+-					const isExtendedContext = previous?.isExtendedContext || script.isExtendedContext;
+-					merged.startOffset ||= startOffset;
+-					if (autoAttachSubprocess && isExtendedContext) {
+-						merged.isExtendedContext = true;
++		try {
++			const start = debug.enabled ? performance.now() : 0;
++			const coverageMap = this.createCoverageMap();
++			const mergedScripts = new Map();
++			const autoAttachSubprocess = this.options.autoAttachSubprocess;
++			await this.readCoverageFiles({
++				onFileRead(coverage) {
++					for (const script of coverage.result) {
++						// V8 ranges belong to emitted code, not a source URL. Vite and
++						// subprocess loaders can execute the same URL in different coordinates.
++						const source = script.executedSource;
++						const representation = source ? createHash("sha256").update(JSON.stringify([source.code, source.map])).digest("hex") : script.isExtendedContext ? "missing-source" : "vite";
++						const key = JSON.stringify([script.url, script.startOffset || 0, representation]);
++						const previous = mergedScripts.get(key);
++						const merged = mergeScriptCovs(previous ? [previous, script] : [script]);
++						const startOffset = previous?.startOffset || script.startOffset || 0;
++						const isExtendedContext = previous?.isExtendedContext || script.isExtendedContext;
++						merged.startOffset ||= startOffset;
++						if (autoAttachSubprocess && isExtendedContext) {
++							merged.isExtendedContext = true;
++						}
++						if (source) merged.executedSource = source;
++						mergedScripts.set(key, merged);
+ 					}
+-					mergedScripts.set(merged.url, merged);
+-				}
+-			},
+-			onFinished: async (project, environment) => {
+-				// Source maps can change based on projectName and transform mode.
+-				// Coverage transform re-uses source maps so we need to separate transforms from each other.
+-				const converted = await this.convertCoverage({ result: Array.from(mergedScripts.values()) }, project, environment);
+-				coverageMap.merge(converted);
+-				mergedScripts.clear();
+-			},
+-			onDebug: debug
+-		});
+-		// Include untested files when all tests were run (not a single file re-run)
+-		// or if previous results are preserved by "cleanOnRerun: false"
+-		if (this.options.include != null && (allTestsRun || !this.options.cleanOnRerun)) {
+-			const coveredFiles = coverageMap.files();
+-			const untestedCoverage = await this.getCoverageMapForUncoveredFiles(coveredFiles);
+-			coverageMap.merge(untestedCoverage);
+-		}
+-		coverageMap.filter((filename) => {
+-			const exists = existsSync(filename);
+-			if (this.options.excludeAfterRemap) {
+-				return exists && this.isIncluded(filename);
+-			}
+-			return exists;
+-		});
+-		if (debug.enabled) {
+-			debug(`Generate coverage total time ${(performance.now() - start).toFixed()} ms`);
+-		}
+-		return coverageMap;
++				},
++				onFinished: async (project, environment) => {
++					// Source maps can change based on projectName and transform mode.
++					// Coverage transform re-uses source maps so we need to separate transforms from each other.
++					const converted = await this.convertCoverage({ result: Array.from(mergedScripts.values()) }, project, environment);
++					coverageMap.merge(converted);
++					mergedScripts.clear();
++				},
++				onDebug: debug
++			});
++			// Include untested files when all tests were run (not a single file re-run)
++			// or if previous results are preserved by "cleanOnRerun: false"
++			if (this.options.include != null && (allTestsRun || !this.options.cleanOnRerun)) {
++				const coveredFiles = coverageMap.files();
++				const untestedCoverage = await this.getCoverageMapForUncoveredFiles(coveredFiles);
++				coverageMap.merge(untestedCoverage);
++			}
++			coverageMap.filter((filename) => {
++				const exists = existsSync(filename);
++				if (this.options.excludeAfterRemap) {
++					return exists && this.isIncluded(filename);
++				}
++				return exists;
++			});
++			if (debug.enabled) {
++				debug(`Generate coverage total time ${(performance.now() - start).toFixed()} ms`);
++			}
++			return coverageMap;
++		} catch (error) {
++			// Embedded source provenance has the same finite lifetime as raw
++			// coverage. Conversion failure must release both files and report lock.
++			await this.cleanAfterRun();
++			throw error;
++		}
+ 	}
+ 	async generateReports(coverageMap, allTestsRun) {
+ 		if (provider === "stackblitz") {
+@@ -150,11 +172,12 @@
+ 		}
+ 		return coverageMap;
+ 	}
+-	async remapCoverage(filename, wrapperLength, result, functions) {
++	async remapCoverage(filename, wrapperLength, result, functions, strict = false) {
+ 		let ast;
+ 		try {
+ 			ast = await parseAstAsync(result.code);
+ 		} catch (error) {
++			if (strict) throw new Error(`Failed to parse executed subprocess coverage source: ${filename}`, { cause: error });
+ 			this.ctx.logger.error(`Failed to parse ${filename}. Excluding it from coverage.\n`, error);
+ 			return {};
+ 		}
+@@ -289,15 +312,19 @@
+ 				index += chunk.length;
+ 				debug("Converting %d/%d", index, scriptCoverages.length);
+ 			}
+-			await Promise.all(chunk.map(async ({ url, functions, startOffset, isExtendedContext }) => {
++			await Promise.all(chunk.map(async ({ url, functions, startOffset, isExtendedContext, executedSource }) => {
+ 				let timeout;
+ 				let start;
+ 				if (debug.enabled) {
+ 					start = performance.now();
+ 					timeout = setTimeout(() => debug(c.bgRed(`File "${fileURLToPath(url)}" is taking longer than 3s`)), 3e3);
+ 				}
+-				const sources = await this.getSources(url, onTransform, functions, isExtendedContext);
+-				coverageMap.merge(await this.remapCoverage(url, startOffset, sources, functions));
++				if (isExtendedContext && !executedSource) throw new Error(`Missing executed subprocess coverage source: ${url}`);
++				const sources = executedSource
++					? await this.getSources(url, async () => executedSource, functions)
++					: await this.getSources(url, onTransform, functions, isExtendedContext);
++				if (executedSource && functions.some(fn => fn.ranges.some(range => range.endOffset > sources.code.length))) throw new Error(`Incompatible subprocess coverage offsets: ${url}`);
++				coverageMap.merge(await this.remapCoverage(url, startOffset, sources, functions, !!executedSource));
+ 				if (debug.enabled) {
+ 					clearTimeout(timeout);
+ 					const diff = performance.now() - start;
+diff --git a/dist/subprocess.cjs b/dist/subprocess.cjs
+new file mode 100644
+--- /dev/null
++++ b/dist/subprocess.cjs
+@@ -0,0 +1,48 @@
++// Loaded only by descendants of an auto-attached coverage worker. This uses a
++// local inspector Session, never an inspector port. Each isolate owns its files.
++const { Session } = require('node:inspector');
++const { writeFileSync, renameSync } = require('node:fs');
++const { join } = require('node:path');
++const { threadId } = require('node:worker_threads');
++const directory = process.env.NODE_V8_COVERAGE;
++if (directory) {
++  const session = new Session();
++  const prefix = `source-${process.pid}-${threadId}-`;
++  let bytes = 0;
++  let scripts = 0;
++  function write(name, value) {
++    const path = join(directory, name);
++    writeFileSync(`${path}.tmp`, JSON.stringify(value), { mode: 0o600 });
++    renameSync(`${path}.tmp`, path);
++  }
++  function fail(error) {
++    write(`error-${process.pid}-${threadId}.json`, { error: String(error) });
++    session.disconnect();
++  }
++  session.connect();
++  session.on('Debugger.scriptParsed', ({ params }) => {
++    // Match the provider's early native-coverage filter. No dependencies,
++    // builtins, virtual Vite modules, or non-file scripts are retained.
++    if (!params.url.startsWith('file://') || params.url.includes('/node_modules/')
++      || params.url.includes('/@id/@vitest/') || params.url.includes('/@vite/client')) return;
++    session.post('Debugger.getScriptSource', { scriptId: params.scriptId }, (error, result) => {
++      if (error) return fail(error);
++      // Bound retained code per isolate. Exceeding the bound invalidates the
++      // report visibly; it must never turn executed code into uncovered code.
++      bytes += Buffer.byteLength(result.scriptSource);
++      if (++scripts > 8192 || bytes > 64 * 1024 * 1024) return fail('Subprocess coverage source limit exceeded');
++      try {
++        write(`${prefix}${params.scriptId}.json`, {
++          pid: process.pid, threadId, scriptId: params.scriptId,
++          url: params.url, code: result.scriptSource, sourceMapURL: params.sourceMapURL || null,
++        });
++      } catch (error) {
++        fail(error);
++      }
++    });
++  });
++  session.post('Debugger.enable', {}, error => { if (error) fail(error); });
++  // The Session owns no event-loop handle. Let isolate teardown release it:
++  // disconnecting in an exit listener discards Node's detailed native ranges
++  // before NODE_V8_COVERAGE is flushed.
++}

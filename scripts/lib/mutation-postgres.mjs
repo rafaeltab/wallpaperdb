@@ -31,7 +31,12 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 	const ids = new Set();
 	const boundaries = [];
 	const recordBoundary = (event, details = {}) => {
-		if (boundaries.length === 64) boundaries.shift();
+		if (boundaries.length === 64) {
+			const empty = boundaries.findIndex(
+				(entry) => !entry.backends?.length && !entry.failed,
+			);
+			boundaries.splice(Math.max(0, empty), 1);
+		}
 		boundaries.push({
 			event,
 			at: Date.now(),

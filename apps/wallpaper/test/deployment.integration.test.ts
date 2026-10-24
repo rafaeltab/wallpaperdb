@@ -299,7 +299,9 @@ describe('deployed Wallpaper service', () => {
     });
     services.push(service);
     const startedAt = Date.now();
-    await proxy.waitForConnection();
+    // Child module loading precedes the production two-second acquisition deadline.
+    // Observe it within this test's existing total startup bound, including cold imports.
+    await proxy.waitForConnection(AbortSignal.timeout(4000));
     expect(proxy.unidentifiedSocketCount()).toBeGreaterThan(0);
     expect(await clientNames()).not.toContain('wallpaper');
     expect(await service.waitForExit()).toEqual({ code: 1, signal: null });

@@ -104,9 +104,9 @@ export async function dependencyProxy(host: string, port: number) {
             count + Number(sockets.has(client.incoming)) + Number(sockets.has(client.outgoing)),
           0
         ),
-    waitForConnection: async () => {
+    waitForConnection: async (signal: AbortSignal = AbortSignal.timeout(1000)) => {
       if (sockets.size > 0) return;
-      await once(server, 'connection', { signal: AbortSignal.timeout(1000) });
+      await once(server, 'connection', { signal });
     },
     pause: () => {
       paused = true;

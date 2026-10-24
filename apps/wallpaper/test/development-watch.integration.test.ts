@@ -2,10 +2,10 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/pr
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { createNatsContainer } from '@wallpaperdb/testcontainers';
 import { GenericContainer, Wait } from 'testcontainers';
 import { describe, expect, it, vi } from 'vitest';
 import { startDevelopmentWatcher } from './fixtures/development-watcher.js';
+import { syntheticWorkflow } from './fixtures/synthetic-workflow.js';
 
 describe('Wallpaper development watch entry', () => {
   it('restarts and adopts a private broker-worker-only edit', async () => {
@@ -28,14 +28,19 @@ describe('Wallpaper development watch entry', () => {
         .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
         .start();
       releases.push(() => postgres.stop());
-      const nats = await createNatsContainer({ enableJetStream: false });
-      releases.push(() => nats.stop());
+      const databaseUrl = `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`;
+      const { nats, brokerUrl, workflowFile } = await syntheticWorkflow(
+        root,
+        databaseUrl,
+        (release) => releases.push(release)
+      );
       const port = await availablePort();
       const dockerfile = await readFile('Dockerfile.dev', 'utf8');
       const watcher = startDevelopmentWatcher(dockerfile, directory, {
         PORT: String(port),
-        DATABASE_URL: `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`,
-        NATS_URL: nats.getConnectionUrl(),
+        DATABASE_URL: databaseUrl,
+        NATS_URL: brokerUrl,
+        WALLPAPER_WORKFLOW_FILE: workflowFile,
       });
       releases.push(watcher.stop);
       const health = async () => {
@@ -76,10 +81,9 @@ describe('Wallpaper development watch entry', () => {
       }
       await watcher.stop();
       const connections = async () => {
-        const response = await fetch(
-          `http://${nats.getHost()}:${nats.getContainer().getMappedPort(8222)}/connz`,
-          { signal: AbortSignal.timeout(1000) }
-        );
+        const response = await fetch(`http://${nats.getHost()}:${nats.getMappedPort(8222)}/connz`, {
+          signal: AbortSignal.timeout(1000),
+        });
         return response.json();
       };
       await expect.poll(connections).toMatchObject({ num_connections: 0 });

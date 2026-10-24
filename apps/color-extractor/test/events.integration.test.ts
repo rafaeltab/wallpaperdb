@@ -10,14 +10,37 @@ import { ColorEvents, type ExtractionInput } from '../src/capabilities/extractio
 import { WallpaperColorsExtractedCloudEventSchema } from '@wallpaperdb/events';
 import { measuredImage } from './fixtures/measurements.js';
 import { AckPolicy, RetentionPolicy } from 'nats';
+import { mutationNatsEndpoint } from './mutation-nats-endpoint.js';
 
 const Tester = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
   .with(NatsTesterBuilder)
   .build();
 const tester = new Tester().withNats((nats) => nats.withJetstream()).withStream('WALLPAPER');
-beforeAll(() => tester.setup());
-afterAll(() => tester.destroy());
+const nats = {
+  get config() {
+    return mutationNatsEndpoint.url
+      ? { endpoints: { fromHost: mutationNatsEndpoint.url } }
+      : tester.nats.config;
+  },
+  getConnection: () =>
+    mutationNatsEndpoint.connection
+      ? Promise.resolve(mutationNatsEndpoint.connection)
+      : tester.nats.getConnection(),
+  getJsClient: () =>
+    mutationNatsEndpoint.connection
+      ? Promise.resolve(mutationNatsEndpoint.connection.jetstream())
+      : tester.nats.getJsClient(),
+};
+beforeAll(async () => {
+  if (!mutationNatsEndpoint.url) await tester.setup();
+});
+afterAll(async () => {
+  const started = performance.now();
+  if (mutationNatsEndpoint.withDisposal) await mutationNatsEndpoint.withDisposal(async () => {});
+  else await tester.destroy();
+  mutationNatsEndpoint.recordLifecycle?.('disposed', (performance.now() - started) / 1000);
+});
 const input: ExtractionInput = {
   wallpaperId: 'wallpaper-test',
   fileType: 'image',
@@ -30,7 +53,7 @@ const input: ExtractionInput = {
 it('awaits durable publication and preserves occurrence identity on replay', async () => {
   const runtime = ManagedRuntime.make(
     natsEventsLayer({
-      url: tester.nats.config.endpoints.fromHost,
+      url: nats.config.endpoints.fromHost,
       stream: 'WALLPAPER',
       serviceName: 'events-contract',
     })
@@ -41,7 +64,7 @@ it('awaits durable publication and preserves occurrence identity on replay', asy
     );
     await runtime.runPromise(publish);
     await runtime.runPromise(publish);
-    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    const manager = await (await nats.getConnection()).jetstreamManager();
     expect((await manager.streams.info('WALLPAPER')).state.messages).toBe(1);
     expect((await manager.streams.info('WALLPAPER')).config.retention).toBe(RetentionPolicy.Limits);
     const message = await manager.streams.getMessage('WALLPAPER', {
@@ -69,7 +92,7 @@ it('awaits durable publication and preserves occurrence identity on replay', asy
       ack_policy: AckPolicy.Explicit,
       filter_subject: 'wallpaper.colors.extracted',
     });
-    const consumer = await (await tester.nats.getJsClient()).consumers.get(
+    const consumer = await (await nats.getJsClient()).consumers.get(
       'WALLPAPER',
       'measurement-replay'
     );
@@ -85,12 +108,12 @@ it('awaits durable publication and preserves occurrence identity on replay', asy
 });
 
 it('fits a dense bank and bounded occurrence metadata in the production 64 KiB message limit', async () => {
-  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  const manager = await (await nats.getConnection()).jetstreamManager();
   const { max_msg_size: previous } = (await manager.streams.info('WALLPAPER')).config;
   await manager.streams.update('WALLPAPER', { max_msg_size: 65536 });
   const runtime = ManagedRuntime.make(
     natsEventsLayer({
-      url: tester.nats.config.endpoints.fromHost,
+      url: nats.config.endpoints.fromHost,
       stream: 'WALLPAPER',
       serviceName: 'size-contract',
     })
@@ -134,12 +157,12 @@ it('fits a dense bank and bounded occurrence metadata in the production 64 KiB m
 it('rejects invalid measurements and mismatched original identity before publishing', async () => {
   const runtime = ManagedRuntime.make(
     natsEventsLayer({
-      url: tester.nats.config.endpoints.fromHost,
+      url: nats.config.endpoints.fromHost,
       stream: 'WALLPAPER',
       serviceName: 'validation-contract',
     })
   );
-  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  const manager = await (await nats.getConnection()).jetstreamManager();
   const before = (await manager.streams.info('WALLPAPER')).state.messages;
   try {
     for (const result of [
@@ -169,12 +192,12 @@ it('rejects invalid measurements and mismatched original identity before publish
 it('reports rejected publication as a typed failure without claiming completion', async () => {
   const runtime = ManagedRuntime.make(
     natsEventsLayer({
-      url: tester.nats.config.endpoints.fromHost,
+      url: nats.config.endpoints.fromHost,
       stream: 'WALLPAPER',
       serviceName: 'events-contract',
     })
   );
-  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  const manager = await (await nats.getConnection()).jetstreamManager();
   const { max_msg_size: originalMaxMessageSize } = (await manager.streams.info('WALLPAPER')).config;
   try {
     await manager.streams.update('WALLPAPER', { max_msg_size: 1 });

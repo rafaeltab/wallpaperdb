@@ -98,7 +98,9 @@ export function catalog(root, { package: selected, scope, base }) {
 		for (const [suite, settings] of Object.entries(config.suites)) {
 			if (
 				settings.fixture &&
-				!["redis-owned-reuse", "postgres-owned"].includes(settings.fixture)
+				!["redis-owned-reuse", "postgres-owned", "nats-owned"].includes(
+					settings.fixture,
+				)
 			)
 				throw new Error(`Unsupported mutation fixture: ${settings.fixture}`);
 			const sourceFiles = files

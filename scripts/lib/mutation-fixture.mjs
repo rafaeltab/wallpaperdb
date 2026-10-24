@@ -40,6 +40,10 @@ export async function mutationFixture(
 			signal,
 		);
 	}
+	if (config.fixture === "nats-owned") {
+		const { natsFixture } = await import("./mutation-nats.mjs");
+		return natsFixture(cwd, config.fixtureImage, deadline, cleanupMs, signal);
+	}
 	throw new Error(`Unsupported mutation fixture: ${config.fixture}`);
 }
 

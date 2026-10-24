@@ -5,6 +5,17 @@
         "configFile": "vitest.mutation.config.ts",
         "related": false
       }
+    },
+    "integration": {
+      "sourceRoots": ["src/adapters/events/broker.ts"],
+      "vitest": {
+        "configFile": "vitest.mutation.integration.config.ts",
+        "related": false
+      },
+      "timeoutMS": 10000,
+      "fixture": "nats-owned",
+      "fixtureImage": "nats:2.10-alpine@sha256:b83efabe3e7def1e0a4a31ec6e078999bb17c80363f881df35edc70fcb6bb927",
+      "environmentKeys": ["MUTATION_NATS_ISOLATED", "MUTATION_NATS_RESET_FAILURE"]
     }
   }
 }

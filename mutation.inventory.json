@@ -21,10 +21,11 @@
       "decision": "enabled",
       "mechanism": "native-vitest-node",
       "stages": [
-        "unit"
+        "unit",
+        "integration"
       ],
       "limitations": {
-        "reason": "S3, NATS and image-worker fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "reason": "NATS candidate includes only durable publication/replay in events.integration.test.ts, with isolated per-execution containers pending its own acceptance. Size/configuration/rejection and other NATS lifetime/network suites stay independent. S3/image-worker ownership/reset and built subprocess activation remain unvalidated.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },

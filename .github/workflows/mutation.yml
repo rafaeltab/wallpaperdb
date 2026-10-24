@@ -42,6 +42,11 @@ on:
         type: choice
         options: [reused, isolated, compare]
         default: reused
+      nats_fixture:
+        description: NATS publication fixture; reuse requires separate acceptance, compare is a fixed cold scope
+        type: choice
+        options: [isolated, reused, compare, reset-failure]
+        default: isolated
       reset_failure:
         description: Inject a Redis reset failure to verify diagnostics and owned cleanup
         type: boolean
@@ -72,6 +77,7 @@ jobs:
       IMPORT_RUN: ${{ inputs.import_run }}
       MUTATION_REDIS_ISOLATED: ${{ inputs.isolated_redis && '1' || '0' }}
       POSTGRES_FIXTURE: ${{ inputs.postgres_fixture || 'reused' }}
+      NATS_FIXTURE: ${{ inputs.nats_fixture || 'isolated' }}
       RESET_FAILURE_INPUT: ${{ inputs.reset_failure }}
     steps:
       - uses: actions/checkout@v4
@@ -133,6 +139,18 @@ jobs:
             compare) ;;
             *) exit 1 ;;
           esac
+          case "$NATS_FIXTURE" in
+            isolated) export MUTATION_NATS_ISOLATED=1 ;;
+            reused|compare) export MUTATION_NATS_ISOLATED=0 ;;
+            reset-failure)
+              [[ "$EVENT_NAME" == workflow_dispatch && "$SCOPE" == all &&
+                 "$SELECT_SUITE" == all && "$SELECT_PACKAGE" == color-extractor &&
+                 "$SELECT_FILES" == src/adapters/events/broker.ts &&
+                 -z "$IMPORT_RUN" && "$RESET_FAILURE_INPUT" != true &&
+                 "$POSTGRES_FIXTURE" != compare ]] || exit 1
+              export MUTATION_NATS_ISOLATED=0 MUTATION_NATS_RESET_FAILURE=after-progress ;;
+            *) exit 1 ;;
+          esac
           args=(--scope "$SCOPE" --base "$BASE" --budget "$BUDGET" --quantum "$QUANTUM")
           if [[ "$EVENT_NAME" == pull_request ]]; then
             unset GH_TOKEN GITHUB_TOKEN
@@ -153,31 +171,41 @@ jobs:
           fi
           if [[ -n "$IMPORT_RUN" ]]; then args+=(--baseline /tmp/mutation-import/checkpoint.json --offline); fi
           if [[ "$RESET_FAILURE_INPUT" == true ]]; then export MUTATION_REDIS_RESET_FAILURE=1; fi
-          if [[ "$POSTGRES_FIXTURE" == compare ]]; then
+          if [[ "$POSTGRES_FIXTURE" == compare || "$NATS_FIXTURE" == compare ]]; then
             # A diagnostic comparison has one fixed source/suite scope and four
             # cold invocations. No imported/remote or prior-sample conclusions.
             [[ "$EVENT_NAME" == workflow_dispatch && "$SCOPE" == all &&
-               "$SELECT_SUITE" == all && "$SELECT_PACKAGE" == user &&
-               "$SELECT_FILES" == src/adapters/profiles/index.ts &&
+               "$SELECT_SUITE" == all &&
                -z "$IMPORT_RUN" && "$RESET_FAILURE_INPUT" != true ]] || exit 1
+            if [[ "$POSTGRES_FIXTURE" == compare ]]; then
+              [[ "$NATS_FIXTURE" == isolated && "$SELECT_PACKAGE" == user &&
+                 "$SELECT_FILES" == src/adapters/profiles/index.ts ]] || exit 1
+              family=postgres
+            else
+              [[ "$SELECT_PACKAGE" == color-extractor &&
+                 "$SELECT_FILES" == src/adapters/events/broker.ts ]] || exit 1
+              family=nats
+            fi
             (( BUDGET >= 24 )) || exit 1
             sample_budget=$(( BUDGET / 4 ))
             args+=(--offline)
             for (( index=0; index<${#args[@]}; index++ )); do
               if [[ "${args[index]}" == --budget ]]; then args[index+1]=$sample_budget; fi
             done
-            comparison="$RUNNER_TEMP/wallpaperdb-postgres-comparison"
+            comparison="$RUNNER_TEMP/wallpaperdb-$family-comparison"
             mkdir -p "$comparison"
             common=$(git rev-parse --path-format=absolute --git-common-dir)
             comparison_status=0
             comparison_start=$SECONDS
             for sample in isolated-1 reused-1 reused-2 isolated-2; do
               case "$sample" in
-                isolated-*) export MUTATION_POSTGRES_ISOLATED=1 ;;
-                reused-*) export MUTATION_POSTGRES_ISOLATED=0 ;;
+                isolated-*) isolation=1 ;;
+                reused-*) isolation=0 ;;
               esac
+              if [[ "$family" == postgres ]]; then export MUTATION_POSTGRES_ISOLATED=$isolation;
+              else export MUTATION_NATS_ISOLATED=$isolation; fi
               # These are this fresh hosted checkout's diagnostic caches only.
-              rm -rf -- "$common/mutation/v1/user" "$common/mutation/repository-v1" reports/mutation apps/user/reports/mutation
+              rm -rf -- "$common/mutation/v1/$SELECT_PACKAGE" "$common/mutation/repository-v1" reports/mutation "apps/$SELECT_PACKAGE/reports/mutation"
               destination="$comparison/$sample"
               mkdir -p "$destination"
               sample_start=$SECONDS
@@ -187,11 +215,11 @@ jobs:
               set -e
               sample_elapsed=$(( SECONDS - sample_start ))
               if [[ -d reports/mutation ]]; then cp -R reports/mutation "$destination/coordinator"; fi
-              if [[ -d apps/user/reports/mutation ]]; then cp -R apps/user/reports/mutation "$destination/user"; fi
+              if [[ -d "apps/$SELECT_PACKAGE/reports/mutation" ]]; then cp -R "apps/$SELECT_PACKAGE/reports/mutation" "$destination/$SELECT_PACKAGE"; fi
               jq -n --arg sample "$sample" --arg commit "$(git rev-parse HEAD)" \
                 --arg base "$BASE" --arg runner "$RUNNER_NAME" \
                 --arg image_os "${ImageOS:-unknown}" --arg image_version "${ImageVersion:-unknown}" \
-                --arg isolation "$MUTATION_POSTGRES_ISOLATED" \
+                --arg isolation "$isolation" \
                 --argjson budget "$sample_budget" --argjson elapsed "$sample_elapsed" \
                 --argjson status "$sample_status" \
                 '{sample:$sample,commit:$commit,base:$base,runner:$runner,imageOS:$image_os,imageVersion:$image_version,isolated:$isolation,budgetSeconds:$budget,wholeCommandSeconds:$elapsed,exitStatus:$status,cache:"cold; remote/import disabled"}' \
@@ -255,6 +283,9 @@ jobs:
             packages/*/reports/mutation/*/mutation.html
             apps/user/reports/mutation/integration/run-*/*.json
             apps/user/reports/mutation/integration/run-*/*.jsonl
+            apps/color-extractor/reports/mutation/integration/run-*/*.json
+            apps/color-extractor/reports/mutation/integration/run-*/*.jsonl
             ${{ runner.temp }}/wallpaperdb-postgres-comparison/
+            ${{ runner.temp }}/wallpaperdb-nats-comparison/
           if-no-files-found: warn
           retention-days: 30

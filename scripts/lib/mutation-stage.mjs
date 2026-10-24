@@ -44,11 +44,13 @@ export async function runStage({
 	signal,
 }) {
 	const start = performance.now();
-	const postgres = config.fixture === "postgres-owned";
-	const fixtureCleanupMs = postgres
+	const drainingFixture = ["postgres-owned", "nats-owned"].includes(
+		config.fixture,
+	);
+	const fixtureCleanupMs = drainingFixture
 		? Math.max(1, Math.floor(graceMs / 2))
 		: Math.max(100, graceMs / 2);
-	const runnerGraceMs = postgres
+	const runnerGraceMs = drainingFixture
 		? graceMs - fixtureCleanupMs
 		: fixtureCleanupMs;
 	const cwd = join(root, workspace);
@@ -139,9 +141,9 @@ export async function runStage({
 		fixture = await mutationFixture(
 			cwd,
 			config,
-			// PostgreSQL may finish an in-flight reset while the native runner drains.
+			// These fixtures may finish an in-flight reset while the native runner drains.
 			// This uses the reserved runner grace, leaving fixture cleanup separate.
-			start + budgetMs + (postgres ? runnerGraceMs : 0),
+			start + budgetMs + (drainingFixture ? runnerGraceMs : 0),
 			fixtureCleanupMs,
 			signal,
 		);
@@ -155,7 +157,7 @@ export async function runStage({
 				"Fixture setup consumed the stage budget without mutation progress",
 			);
 		const executionDeadline = Date.now() + remaining;
-		if (postgres)
+		if (drainingFixture)
 			summary.shutdown = {
 				executionDeadline,
 				runnerGraceMs,

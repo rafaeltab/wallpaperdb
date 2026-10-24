@@ -3,6 +3,7 @@ import { Cause, Context, Effect, Fiber, Layer, Ref } from 'effect';
 import { connect } from 'nats';
 import { Cleanup, CleanupFailure, CleanupStore } from '../../capabilities/cleanup/index.js';
 import { observeCleanup } from './telemetry.js';
+import { assetBrokerTransport } from '../nats.js';
 
 export class CleanupHealth extends Context.Service<
   CleanupHealth,
@@ -41,7 +42,7 @@ export function cleanupWorkerLayer(options: Options) {
         const connection = yield* Effect.acquireRelease(
           broker('connect', () =>
             connect({
-              servers: options.url,
+              ...assetBrokerTransport(options.url),
               user: application.serviceUser,
               pass: options.credential.password,
               inboxPrefix: '_ASSET_INBOX.service',

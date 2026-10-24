@@ -15,12 +15,8 @@ const exec = promisify(execFile);
 async function caller(mode: string, url: string, directory: string, ca?: string) {
   // Only this disposable child trusts the fixture CA. Parent/OS trust is unchanged.
   const environment = Object.fromEntries(
-    Object.entries(process.env).filter(
-      ([key]) =>
-        key !== 'NODE_EXTRA_CA_CERTS' &&
-        key !== 'NODE_OPTIONS' &&
-        !key.startsWith('DOTENV_') &&
-        !key.startsWith('OTEL_')
+    Object.entries(process.env).filter(([key]) =>
+      ['PATH', 'TMPDIR', 'TMP', 'TEMP', 'SystemRoot'].includes(key)
     )
   );
   const result = await exec(
@@ -47,11 +43,17 @@ async function caller(mode: string, url: string, directory: string, ca?: string)
   );
   return result;
 }
-it('refuses plaintext INFO before authenticating when protected callers select TLS', async () => {
+it.each([
+  {
+    label: 'protected callers',
+    modes: ['sources', 'commands', 'notifications', 'operator', 'events'],
+  },
+  { label: 'cleanup', modes: ['cleanup'] },
+])('$label refuses plaintext INFO before authenticating when selecting TLS', async ({ modes }) => {
   const directory = await mkdtemp(join(tmpdir(), 'asset-broker-selection-'));
   const sockets = new Set<Socket>();
   let authentications = 0;
-  let sourceCredentialLeaks = 0;
+  let serviceCredentialLeaks = 0;
   const server = createServer((socket) => {
     sockets.add(socket);
     socket.once('close', () => sockets.delete(socket));
@@ -64,7 +66,7 @@ it('refuses plaintext INFO before authenticating when protected callers select T
         authentications++;
         // Only synthetic fixture credentials are inspected, never printed or persisted.
         if (data.includes('asset-service_user') && data.includes('service-secret'))
-          sourceCredentialLeaks++;
+          serviceCredentialLeaks++;
 
         socket.end("-ERR 'Controlled plaintext authentication rejection'\r\n");
       }
@@ -78,11 +80,11 @@ it('refuses plaintext INFO before authenticating when protected callers select T
     await once(server, 'listening');
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('Missing protocol fixture');
-    for (const mode of ['sources', 'commands', 'notifications', 'operator', 'events']) {
+    for (const mode of modes) {
       const before = authentications;
       expect(await caller(mode, `tls://127.0.0.1:${address.port}`, directory)).toBe(false);
-      if (mode === 'sources')
-        expect(sourceCredentialLeaks, 'Source leaked synthetic service authentication').toBe(0);
+      if (mode === 'sources' || mode === 'cleanup')
+        expect(serviceCredentialLeaks, `${mode} leaked synthetic service authentication`).toBe(0);
       expect(authentications - before, `${mode} sent authentication to plaintext INFO`).toBe(0);
     }
   } finally {
@@ -92,76 +94,82 @@ it('refuses plaintext INFO before authenticating when protected callers select T
   }
 });
 
-it('accepts the selected trusted TLS broker with default verification and preserves ordinary plaintext callers', async () => {
-  const releases: Array<() => Promise<unknown>> = [];
-  const failures: unknown[] = [];
-  try {
-    const directory = await mkdtemp(join(tmpdir(), 'asset-broker-trust-'));
-    releases.push(() => rm(directory, { recursive: true, force: true }));
-    const cert = join(directory, 'localhost.crt');
-    const key = join(directory, 'localhost.key');
-    await exec('openssl', [
-      'req',
-      '-x509',
-      '-newkey',
-      'rsa:2048',
-      '-nodes',
-      '-sha256',
-      '-days',
-      '1',
-      '-subj',
-      '/CN=localhost',
-      '-addext',
-      'subjectAltName=DNS:localhost,IP:127.0.0.1',
-      '-keyout',
-      key,
-      '-out',
-      cert,
-    ]);
-    const authority = parseAuthority(authorityFixture());
-    await writeFile(join(directory, 'authority.json'), JSON.stringify(authorityFixture()), {
-      mode: 0o600,
-    });
-    for (const tls of [true, false]) {
-      const config = JSON.parse(renderBrokerConfiguration(authority));
-      if (tls) config.tls = { cert_file: '/cert.crt', key_file: '/cert.key' };
-      const container = await new GenericContainer('nats:2.10-alpine')
-        .withCopyContentToContainer([
-          { content: JSON.stringify(config), target: '/asset.conf' },
-          { content: await readFile(cert), target: '/cert.crt' },
-          { content: await readFile(key), target: '/cert.key' },
-        ])
-        .withCommand(['-c', '/asset.conf'])
-        .withExposedPorts(4222)
-        .withWaitStrategy(Wait.forLogMessage('Server is ready'))
-        .start();
-      releases.push(() => container.stop());
-      const url = `${tls ? 'tls' : 'nats'}://${container.getHost()}:${container.getMappedPort(4222)}`;
-      if (tls) {
-        expect(await caller('operator', url, directory)).toBe(false);
-        expect(await caller('sources', url, directory)).toBe(false);
-      } else expect(await caller('operator', url.replace('nats://', ''), directory)).toBe(true);
-      for (const mode of [
-        'operator',
-        'commands',
-        'notifications',
-        'sources',
-        'legacy-setup',
-        'events',
-      ])
-        expect(await caller(mode, url, directory, tls ? cert : undefined), mode).toBe(true);
-      await container.stop();
-    }
-  } catch (error) {
-    failures.push(error);
-  } finally {
-    for (const release of releases.reverse()) {
-      try {
-        await release();
-      } catch (error) {
-        failures.push(error);
+it.each([
+  {
+    label: 'protected callers',
+    modes: ['operator', 'commands', 'notifications', 'sources', 'legacy-setup', 'events'],
+  },
+  { label: 'cleanup', modes: ['cleanup'] },
+])(
+  '$label accepts trusted TLS with default verification and preserves protected plaintext',
+  async ({ modes }) => {
+    const releases: Array<() => Promise<unknown>> = [];
+    const failures: unknown[] = [];
+    try {
+      const directory = await mkdtemp(join(tmpdir(), 'asset-broker-trust-'));
+      releases.push(() => rm(directory, { recursive: true, force: true }));
+      const cert = join(directory, 'localhost.crt');
+      const key = join(directory, 'localhost.key');
+      await exec('openssl', [
+        'req',
+        '-x509',
+        '-newkey',
+        'rsa:2048',
+        '-nodes',
+        '-sha256',
+        '-days',
+        '1',
+        '-subj',
+        '/CN=localhost',
+        '-addext',
+        'subjectAltName=DNS:localhost,IP:127.0.0.1',
+        '-keyout',
+        key,
+        '-out',
+        cert,
+      ]);
+      const authority = parseAuthority(authorityFixture());
+      await writeFile(join(directory, 'authority.json'), JSON.stringify(authorityFixture()), {
+        mode: 0o600,
+      });
+      for (const tls of [true, false]) {
+        const config = JSON.parse(renderBrokerConfiguration(authority));
+        if (tls) config.tls = { cert_file: '/cert.crt', key_file: '/cert.key' };
+        const container = await new GenericContainer('nats:2.10-alpine')
+          .withCopyContentToContainer([
+            { content: JSON.stringify(config), target: '/asset.conf' },
+            { content: await readFile(cert), target: '/cert.crt' },
+            { content: await readFile(key), target: '/cert.key' },
+          ])
+          .withCommand(['-c', '/asset.conf'])
+          .withExposedPorts(4222)
+          .withWaitStrategy(Wait.forLogMessage('Server is ready'))
+          .start();
+        releases.push(() => container.stop());
+        const url = `${tls ? 'tls' : 'nats'}://${container.getHost()}:${container.getMappedPort(4222)}`;
+        if (tls) {
+          expect(await caller('operator', url, directory)).toBe(false);
+          for (const mode of modes.filter((mode) => mode !== 'legacy-setup' && mode !== 'events'))
+            expect(
+              await caller(mode, url, directory),
+              `${mode} accepted an untrusted certificate`
+            ).toBe(false);
+        } else expect(await caller('operator', url.replace('nats://', ''), directory)).toBe(true);
+        for (const mode of modes)
+          expect(await caller(mode, url, directory, tls ? cert : undefined), mode).toBe(true);
+        await container.stop();
+      }
+    } catch (error) {
+      failures.push(error);
+    } finally {
+      for (const release of releases.reverse()) {
+        try {
+          await release();
+        } catch (error) {
+          failures.push(error);
+        }
       }
     }
+    if (failures.length) throw new AggregateError(failures, 'Broker trust contract failed');
   }
-  if (failures.length) throw new AggregateError(failures, 'Broker trust contract failed');
-});
+);

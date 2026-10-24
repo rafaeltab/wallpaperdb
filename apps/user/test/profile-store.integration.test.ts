@@ -163,6 +163,41 @@ describe('PostgreSQL profile transactions', () => {
       vi.useRealTimers();
     }
   });
+  it('returns a Handle collision without partial writes when another profile owns the Handle', async () => {
+    const store = await runtime.runPromise(ProfileStore);
+    const now = new Date('2040-01-01T00:00:00.000Z');
+    const winner = await runtime.runPromise(
+      store.create({
+        profileId: 'winner',
+        displayName: 'Ada',
+        handle: 'ada',
+        imageUrl: null,
+        now,
+      })
+    );
+    expect(winner).toMatchObject({ id: 'winner', handle: 'ada', version: 1 });
+    expect(
+      await runtime.runPromise(
+        store.create({
+          profileId: 'challenger',
+          displayName: 'Grace',
+          handle: 'ada',
+          imageUrl: 'https://img.clerk.com/challenger',
+          now,
+        })
+      )
+    ).toBeNull();
+    expect(await runtime.runPromise(store.read('winner', now))).toEqual(winner);
+    expect(await runtime.runPromise(store.read('challenger', now))).toBeNull();
+    expect(await sql`select id from profiles`).toEqual([{ id: 'winner' }]);
+    expect(await sql`select handle, profile_id, kind from handle_claims`).toEqual([
+      { handle: 'ada', profile_id: 'winner', kind: 'profile' },
+    ]);
+    expect(await sql`select profile_id from profile_picture_imports`).toEqual([]);
+    expect(await sql`select aggregate_id, subject from outbox_events`).toEqual([
+      { aggregate_id: 'winner', subject: 'profile.created' },
+    ]);
+  });
   it('does not disguise an unrelated unique constraint failure as a Handle collision', async () => {
     await sql.unsafe(
       `create function reject_outbox_identity() returns trigger language plpgsql as $$ begin raise exception using errcode = '23505', constraint = 'outbox_events_pkey', message = 'outbox identity collision'; end $$`

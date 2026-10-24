@@ -243,7 +243,9 @@ describe('deployed Wallpaper service', () => {
       proxy.pauseNewConnections();
       const [unavailable] = await Promise.all([
         readiness(),
-        expect.poll(proxy.unidentifiedSocketCount).toBeGreaterThan(0),
+        (async () => {
+          await expect.poll(proxy.unidentifiedSocketCount).toBeGreaterThan(0);
+        })(),
       ]);
       expect(unavailable).toMatchObject({ status: 503, body: { ready: false } });
       await expect.poll(proxy.unidentifiedSocketCount).toBe(0);

@@ -110,6 +110,84 @@ test("operator receipts require credentials, survive restart and deduplicate del
 	}
 });
 
+test("optional result recovery targets are validated without rejecting legacy notices", async (t) => {
+	const releases = [];
+	t.after(async () => {
+		const failures = [];
+		for (const release of releases.reverse()) {
+			try {
+				await release();
+			} catch (error) {
+				failures.push(error);
+			}
+		}
+		if (failures.length)
+			throw new AggregateError(failures, "Recovery notice HTTP cleanup failed");
+	});
+	const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));
+	releases.push(() => rm(directory, { recursive: true, force: true }));
+	const server = await createOperatorInbox({
+		directory,
+		token: "test-inbox-token",
+	});
+	releases.push(async () => {
+		server.closeAllConnections();
+		await new Promise((resolve) => server.close(resolve));
+	});
+	server.listen(0, "127.0.0.1");
+	await once(server, "listening");
+	const url = `http://127.0.0.1:${server.address().port}`;
+	const deliver = (value) =>
+		fetch(`${url}/events`, {
+			method: "POST",
+			headers: application,
+			body: JSON.stringify(value),
+		});
+	const valid = [
+		notice,
+		{ ...notice, id: "b".repeat(64), resultId: "f".repeat(64) },
+		{
+			...notice,
+			id: "c".repeat(64),
+			kind: "command-quarantine",
+			subject: "asset.commands.user.create",
+		},
+	];
+	for (const value of valid) {
+		const response = await deliver(value);
+		assert.equal(response.status, 200);
+		assert.equal(await response.text(), "");
+	}
+	for (const resultId of [
+		null,
+		42,
+		{},
+		[],
+		["f".repeat(64)],
+		"",
+		"f".repeat(63),
+		"F".repeat(64),
+		"g".repeat(64),
+	]) {
+		await assertProblem(
+			await deliver({ ...notice, id: "d".repeat(64), resultId }),
+			{
+				type: "https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-operator-notice.md",
+				title: "Invalid operator notice",
+				status: 400,
+				detail: "A valid operator notice is required.",
+			},
+		);
+	}
+	const receipts = await (
+		await fetch(`${url}/receipts`, { headers: operator })
+	).json();
+	assert.deepEqual(
+		receipts.map((receipt) => receipt.notice),
+		valid,
+	);
+});
+
 test("operator HTTP errors disclose only safe Problem Details", async (t) => {
 	const directory = await mkdtemp(join(tmpdir(), "asset-operator-inbox-"));
 	const server = await createOperatorInbox({

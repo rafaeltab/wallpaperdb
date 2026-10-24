@@ -79,6 +79,82 @@ it('delivers durable operator notices to the configured HTTP destination and qua
   );
 });
 
+it('validates optional result recovery targets before HTTP delivery while preserving command and legacy result notices', async () => {
+  const received: unknown[] = [];
+  await withOperatorNotificationFixture(
+    async (request, response) => {
+      if (request.headers.authorization !== 'Bearer operator-inbox-token') {
+        response.writeHead(401).end();
+        return;
+      }
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(Buffer.from(chunk));
+      received.push(JSON.parse(Buffer.concat(chunks).toString()));
+      response.writeHead(200).end();
+    },
+    async ({ runtime, operator, authority }) => {
+      await runtime.runPromise(OperatorNotificationHealth);
+      const result = {
+        id: 'a'.repeat(64),
+        kind: 'result-quarantine',
+        subject: 'asset.results.user',
+        reason: 'exhausted',
+      };
+      const valid = [
+        result, // Existing retained notices and the synthetic proof omit the new field.
+        { ...result, id: 'b'.repeat(64), resultId: 'f'.repeat(64) },
+        {
+          id: 'c'.repeat(64),
+          kind: 'command-quarantine',
+          subject: 'asset.commands.user.create',
+          reason: 'invalid',
+        },
+      ];
+      for (const notice of valid)
+        await operator.jetstream().publish('asset.operator.notifications', JSON.stringify(notice));
+      await expect
+        .poll(() => received, { timeout: 3000 })
+        .toEqual(valid.map((notice) => ({ ...notice, applicationId: 'user' })));
+
+      const malformed = [
+        null,
+        42,
+        {},
+        [],
+        ['f'.repeat(64)],
+        '',
+        'f'.repeat(63),
+        'F'.repeat(64),
+        'g'.repeat(64),
+      ];
+      for (const resultId of malformed)
+        await operator
+          .jetstream()
+          .publish('asset.operator.notifications', JSON.stringify({ ...result, resultId }));
+      const manager = await operator.jetstreamManager();
+      await expect
+        .poll(async () => (await manager.streams.info('ASSET_QUARANTINE')).state.messages, {
+          timeout: 3000,
+        })
+        .toBe(malformed.length);
+      expect(received).toEqual(valid.map((notice) => ({ ...notice, applicationId: 'user' })));
+      for (let index = 0; index < malformed.length; index++) {
+        const stored = await manager.streams.getMessage('ASSET_QUARANTINE', { seq: index + 1 });
+        const event = JSON.parse(stored.string());
+        expect(event.type).toBe('asset.notification.quarantined');
+        expect(JSON.parse(Buffer.from(event.data.encoded, 'base64').toString())).toEqual({
+          ...result,
+          resultId: malformed[index],
+        });
+        await expect(recoverQuarantine(operator, authority, 'user', index + 1)).rejects.toThrow();
+      }
+      expect((await manager.streams.info('ASSET_OPERATIONS')).state.messages).toBe(
+        valid.length + malformed.length
+      );
+    }
+  );
+});
+
 it('unwinds the HTTP listener, broker and authenticated connection when provisioning setup fails', async () => {
   const setupFailure = new Error('controlled setup failure after real broker provisioning');
   let verifyReleased: (() => Promise<void>) | undefined;

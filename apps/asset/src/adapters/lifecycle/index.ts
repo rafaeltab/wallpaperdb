@@ -252,6 +252,7 @@ export function lifecyclePostgresLayer(options: PostgresOptions) {
             db
               .select({
                 id: assetResultOutbox.id,
+                notificationOccurrence: assetResultOutbox.notificationOccurrence,
                 applicationId: assetResultOutbox.applicationId,
                 context: assetResultOutbox.context,
               })
@@ -264,12 +265,19 @@ export function lifecyclePostgresLayer(options: PostgresOptions) {
               )
               .limit(Math.max(1, Math.min(limit, 100)))
           ),
-        alerted: (id) =>
+        alerted: (alert) =>
           run('confirm-result-alert', async (db) => {
             await db
               .update(assetResultOutbox)
               .set({ notifiedAt: new Date() })
-              .where(eq(assetResultOutbox.id, id));
+              .where(
+                and(
+                  eq(assetResultOutbox.id, alert.id),
+                  eq(assetResultOutbox.notificationOccurrence, alert.notificationOccurrence),
+                  eq(assetResultOutbox.status, 'quarantined'),
+                  isNull(assetResultOutbox.notifiedAt)
+                )
+              );
           }),
         recover: (id) =>
           run('recover-result', async (db) => {
@@ -281,6 +289,7 @@ export function lifecyclePostgresLayer(options: PostgresOptions) {
                 availableAt: new Date(),
                 leaseId: null,
                 notifiedAt: null,
+                notificationOccurrence: randomUUID(),
               })
               .where(and(eq(assetResultOutbox.id, id), eq(assetResultOutbox.status, 'quarantined')))
               .returning({ id: assetResultOutbox.id });

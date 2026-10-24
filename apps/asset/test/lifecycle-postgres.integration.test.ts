@@ -127,7 +127,12 @@ it('stops result publication after a durable finite budget and requires delibera
   }
   expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toEqual([]);
   expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.pendingAlerts(10)))).toEqual([
-    { id: lastId, applicationId: 'user', context: input.context },
+    {
+      id: lastId,
+      notificationOccurrence: expect.any(String),
+      applicationId: 'user',
+      context: input.context,
+    },
   ]);
   expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.recover(lastId)))).toBe(true);
   expect(
@@ -170,4 +175,106 @@ it('rolls back Asset and command acceptance when the outbox write fails, then sa
     await runtime.runPromise(LifecycleStore.use((store) => store.accept(input)))
   ).toMatchObject({ outcome: 'created' });
   expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toHaveLength(1);
+});
+
+it('retains each quarantine occurrence through retries and restart, rotates only accepted recovery, and fences old acknowledgements', async () => {
+  await runtime.runPromise(LifecycleStore.use((store) => store.accept(input)));
+  const exhaust = async () => {
+    let original: import('../src/capabilities/lifecycle/index.js').ResultPublication | undefined;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      let claimed: readonly import('../src/capabilities/lifecycle/index.js').ResultPublication[] =
+        [];
+      await expect
+        .poll(
+          async () => {
+            claimed = await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)));
+            return claimed.length;
+          },
+          { timeout: 1000 }
+        )
+        .toBe(1);
+      const publication = claimed[0];
+      if (!publication) throw new Error('Missing result');
+      original ??= publication;
+      expect(publication.id).toBe(original.id);
+      expect(publication.result).toEqual(original.result);
+      expect(publication.attempts).toBe(attempt);
+      await runtime.runPromise(ResultOutbox.use((outbox) => outbox.failed(publication)));
+    }
+    const alerts = await runtime.runPromise(ResultOutbox.use((outbox) => outbox.pendingAlerts(1)));
+    expect(alerts).toHaveLength(1);
+    const alert = alerts[0];
+    if (!alert) throw new Error('Missing alert');
+    return alert;
+  };
+  const first = await exhaust();
+  expect(first).toHaveProperty('notificationOccurrence', expect.any(String));
+  await runtime.dispose();
+  runtime = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      revision: 'revision-1',
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.pendingAlerts(1)))).toEqual([
+    first,
+  ]);
+  await runtime.runPromise(ResultOutbox.use((outbox) => outbox.alerted(first)));
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.pendingAlerts(1)))).toEqual(
+    []
+  );
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.recover('missing')))).toBe(
+    false
+  );
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.recover(first.id)))).toBe(
+    true
+  );
+  // Inspect the persisted field to verify rejected recovery does not rotate it
+  // while pending, when the alert-reading port intentionally returns no work.
+  const occurrence = async () =>
+    (
+      await pool.query('SELECT notification_occurrence FROM asset_result_outbox WHERE id = $1', [
+        first.id,
+      ])
+    ).rows[0].notification_occurrence;
+  const renewedOccurrence = await occurrence();
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.recover(first.id)))).toBe(
+    false
+  );
+  expect(await occurrence()).toBe(renewedOccurrence);
+  // Even a matching current occurrence cannot be acknowledged outside quarantine.
+  await runtime.runPromise(
+    ResultOutbox.use((outbox) =>
+      outbox.alerted({ ...first, notificationOccurrence: renewedOccurrence })
+    )
+  );
+  await runtime.runPromise(ResultOutbox.use((outbox) => outbox.alerted(first)));
+  const second = await exhaust();
+  expect(second.id).toBe(first.id);
+  expect(second.notificationOccurrence).not.toBe(first.notificationOccurrence);
+  expect(second.notificationOccurrence).toBe(renewedOccurrence);
+  await runtime.runPromise(ResultOutbox.use((outbox) => outbox.alerted(first)));
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.pendingAlerts(1)))).toEqual([
+    second,
+  ]);
+  await runtime.runPromise(ResultOutbox.use((outbox) => outbox.alerted(second)));
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.pendingAlerts(1)))).toEqual(
+    []
+  );
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.recover(second.id)))).toBe(
+    true
+  );
+  const [publication] = await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)));
+  if (!publication) throw new Error('Missing recovered result');
+  expect(publication.id).toBe(first.id);
+  await runtime.runPromise(ResultOutbox.use((outbox) => outbox.published(publication)));
+  const terminalOccurrence = await occurrence();
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.recover(second.id)))).toBe(
+    false
+  );
+  expect(await occurrence()).toBe(terminalOccurrence);
+  expect(await runtime.runPromise(ResultOutbox.use((outbox) => outbox.claim(1)))).toEqual([]);
 });

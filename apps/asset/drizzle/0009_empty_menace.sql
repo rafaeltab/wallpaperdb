@@ -1,0 +1,1 @@
+ALTER TABLE "asset_result_outbox" ADD COLUMN "notification_occurrence" uuid DEFAULT gen_random_uuid() NOT NULL;

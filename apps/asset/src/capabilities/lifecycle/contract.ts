@@ -70,21 +70,23 @@ export interface ResultPublication {
   readonly occurredAt: string;
   readonly attempts: number;
 }
+/** Notification identity is independent of the business result. It is durable
+ * through retries/restart and renewed atomically only by accepted recovery. */
+export interface ResultAlert {
+  readonly id: string;
+  readonly notificationOccurrence: string;
+  readonly applicationId: string;
+  readonly context: CommandContext;
+}
 /** Claims are leased across replicas. Results retain stable occurrence identity
  * through ambiguous publication and restart. Failure increments a durable finite
- * attempt counter; exhausted work remains inspectable until operator recovery. */
+ * attempt counter; exhausted work remains inspectable until operator recovery.
+ * Acknowledgements match both the duty and its current unresolved quarantine occurrence. */
 export interface ResultOutboxPort {
   readonly pendingAlerts: (
     limit: number
-  ) => Effect.Effect<
-    readonly {
-      readonly id: string;
-      readonly applicationId: string;
-      readonly context: CommandContext;
-    }[],
-    LifecycleFailure
-  >;
-  readonly alerted: (id: string) => Effect.Effect<void, LifecycleFailure>;
+  ) => Effect.Effect<readonly ResultAlert[], LifecycleFailure>;
+  readonly alerted: (alert: ResultAlert) => Effect.Effect<void, LifecycleFailure>;
   /** Only trusted operator composition exposes deliberate recovery. Replaying a command does not reset exhausted publication attempts. */
   readonly recover: (id: string) => Effect.Effect<boolean, LifecycleFailure>;
   readonly claim: (limit: number) => Effect.Effect<readonly ResultPublication[], LifecycleFailure>;

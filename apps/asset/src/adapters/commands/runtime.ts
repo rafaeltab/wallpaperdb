@@ -295,6 +295,7 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
             'asset.operator.notifications',
             JSON.stringify({
               id: noticeId,
+              resultId: alert.id,
               kind: 'result-quarantine',
               subject: `asset.results.${alert.applicationId}`,
               reason: 'exhausted',

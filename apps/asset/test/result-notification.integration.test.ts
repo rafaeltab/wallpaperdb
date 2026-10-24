@@ -1,7 +1,9 @@
+import { execFile } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { promisify } from 'node:util';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -26,6 +28,9 @@ import {
   type ResultPublication,
 } from '../src/capabilities/lifecycle/index.js';
 import { withOperatorNotificationFixture } from './fixtures/operator-notification.js';
+import { authorityFixture } from './fixtures/authority.js';
+
+const exec = promisify(execFile);
 
 it('routes distinct retained result-quarantine receipts across two finite exhaustion/recovery cycles and delivers the original result', async () => {
   const releases: Array<() => Promise<unknown>> = [];
@@ -76,6 +81,43 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
         try {
           const postgres = await new PostgreSqlContainer('postgres:16-alpine').start();
           owned.push(() => postgres.stop());
+          const authorityPath = join(directory, 'authority.json');
+          await writeFile(authorityPath, JSON.stringify(authorityFixture()), { mode: 0o600 });
+          // Run the actual CLI in an isolated cwd so dotenv cannot load private checkout files.
+          const recoverResult = async (id: string) => {
+            const invocation = exec(
+              process.execPath,
+              [
+                '--import',
+                resolve('node_modules/tsx/dist/loader.mjs'),
+                resolve('scripts/operator.ts'),
+                'recover-result',
+                '--authority-file',
+                authorityPath,
+                '--id',
+                id,
+              ],
+              {
+                cwd: directory,
+                env: {
+                  PATH: process.env.PATH,
+                  HOME: process.env.HOME,
+                  TMPDIR: process.env.TMPDIR,
+                  DATABASE_URL: postgres.getConnectionUri(),
+                },
+                timeout: 10000,
+              }
+            );
+            const { stdout } = await invocation;
+            const outcome = z.object({ recovered: z.boolean() }).parse(JSON.parse(stdout));
+            console.info('Receipt-based recover-result CLI completed and reaped', {
+              pid: invocation.child.pid,
+              exitCode: invocation.child.exitCode,
+              id,
+              ...outcome,
+            });
+            return outcome;
+          };
           const pool = new Pool({ connectionString: postgres.getConnectionUri() });
           owned.push(() => pool.end());
           await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
@@ -191,7 +233,9 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
             return z
               .array(
                 z.object({
-                  notice: z.object({ id: z.string() }).passthrough(),
+                  notice: z
+                    .object({ id: z.string(), resultId: z.string().regex(/^[a-f0-9]{64}$/) })
+                    .passthrough(),
                   receivedAt: z.string(),
                 })
               )
@@ -221,6 +265,7 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
             }),
           ]);
           const [firstReceipt] = await receipts();
+          if (!firstReceipt) throw new Error('Missing first authenticated receipt');
           await dispatcher.dispose();
           await receiver.stop();
           receiver = await startReceiver();
@@ -230,12 +275,24 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
           const before = acknowledgements;
           await expect.poll(() => acknowledgements, { timeout: 3000 }).toBeGreaterThan(before);
           expect(await receipts()).toEqual([firstReceipt]);
+          const visible = await fetch(`${receiver.url}/`, {
+            headers: {
+              authorization: `Basic ${Buffer.from('operator:operator-inbox-token').toString('base64')}`,
+            },
+            signal: AbortSignal.timeout(1000),
+          });
+          expect(visible.status).toBe(200);
+          expect(await visible.text()).toContain(firstReceipt.notice.resultId);
           expect((await manager.streams.info('ASSET_OPERATIONS')).state.messages).toBe(2); // Original and explicit webhook recovery replay.
           holdAcknowledgements = false;
           await expect.poll(alerts, { timeout: 3000 }).toEqual([]);
           await dispatcher.dispose();
-          expect(await capability.runPromise(outbox.recover(first.id))).toBe(true);
-          expect(await capability.runPromise(outbox.recover(first.id))).toBe(false);
+          expect(firstReceipt.notice.resultId).toBe(first.id);
+          expect(firstReceipt.notice.id).not.toBe(firstReceipt.notice.resultId);
+          expect(await recoverResult(firstReceipt.notice.id)).toEqual({ recovered: false });
+          expect(await alerts()).toEqual([]);
+          expect(await recoverResult(firstReceipt.notice.resultId)).toEqual({ recovered: true });
+          expect(await recoverResult(firstReceipt.notice.resultId)).toEqual({ recovered: false });
           holdAcknowledgements = true;
           dispatcher = startDispatcher();
           await dispatcher.runPromise(ProtectedCommandHealth);
@@ -244,10 +301,30 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
           if (!second) throw new Error('Missing renewed quarantine');
           expect(second.id).toBe(first.id);
           expect(second.notificationOccurrence).not.toBe(first.notificationOccurrence);
+          const beforeReceiverRestart = await receipts();
+          await receiver.stop();
+          receiver = await startReceiver();
           const secondReceipts = await receipts();
+          expect(secondReceipts).toEqual(beforeReceiverRestart);
+          const secondReceipt = secondReceipts[1];
+          if (!secondReceipt) throw new Error('Missing renewed authenticated receipt');
           expect(secondReceipts[0]).toEqual(firstReceipt);
-          expect(secondReceipts[1].notice.id).not.toBe(firstReceipt.notice.id);
-          expect(secondReceipts[1].notice).toMatchObject({
+          expect(secondReceipt.notice.id).not.toBe(firstReceipt.notice.id);
+          expect(secondReceipt.notice.resultId).toBe(firstReceipt.notice.resultId);
+          expect(secondReceipt.notice.resultId).toBe(first.id);
+          const renewedVisible = await fetch(`${receiver.url}/`, {
+            headers: {
+              authorization: `Basic ${Buffer.from('operator:operator-inbox-token').toString('base64')}`,
+            },
+            signal: AbortSignal.timeout(1000),
+          });
+          expect(renewedVisible.status).toBe(200);
+          const rendered = await renewedVisible.text();
+          for (const receipt of secondReceipts) {
+            expect(rendered).toContain(receipt.notice.id);
+            expect(rendered).toContain(receipt.notice.resultId);
+          }
+          expect(secondReceipt.notice).toMatchObject({
             applicationId: 'user',
             kind: 'result-quarantine',
             subject: 'asset.results.user',
@@ -262,7 +339,8 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
           expect(await alerts()).toEqual([second]);
           await dispatcher.dispose();
           await manager.streams.update('ASSET_RESULTS', { subjects: ['asset.results.user'] });
-          expect(await capability.runPromise(outbox.recover(second.id))).toBe(true);
+          expect(await recoverResult(secondReceipt.notice.resultId)).toEqual({ recovered: true });
+          expect(await recoverResult(secondReceipt.notice.resultId)).toEqual({ recovered: false });
           holdAcknowledgements = false;
           dispatcher = startDispatcher();
           await dispatcher.runPromise(ProtectedCommandHealth);
@@ -285,8 +363,8 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
           message?.ack();
           await application.flush();
           await expect
-            .poll(() => capability.runPromise(outbox.recover(first.id)), { timeout: 1000 })
-            .toBe(false);
+            .poll(() => recoverResult(secondReceipt.notice.resultId), { timeout: 1000 })
+            .toEqual({ recovered: false });
           expect(await capability.runPromise(outbox.claim(1))).toEqual([]);
           expect(await receipts()).toHaveLength(2);
           expect(claims).toHaveLength(7);
@@ -295,7 +373,8 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
             firstOccurrence: first.notificationOccurrence,
             secondOccurrence: second.notificationOccurrence,
             firstReceiptId: firstReceipt.notice.id,
-            secondReceiptId: secondReceipts[1].notice.id,
+            secondReceiptId: secondReceipt.notice.id,
+            receiptRecoveryId: secondReceipt.notice.resultId,
             retainedReceipts: (await receipts()).length,
             controlledHttpRejections: httpFailures,
             originalResultClaims: claims.length,

@@ -1184,8 +1184,8 @@ importers:
         version: 3.25.1(zod@3.25.76)
     devDependencies:
       '@biomejs/biome':
-        specifier: ^2.3.8
-        version: 2.3.10
+        specifier: 2.6.2
+        version: 2.6.2
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3

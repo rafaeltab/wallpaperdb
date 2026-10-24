@@ -14,6 +14,7 @@ import {
   PictureAttachments,
   pictureAttachmentsLayer,
   type PictureAttachment,
+  type AttachmentPublication,
 } from '../src/capabilities/picture-attachments/index.js';
 describe('PostgreSQL picture attachment contract', () => {
   let container: StartedPostgreSqlContainer;
@@ -111,6 +112,131 @@ describe('PostgreSQL picture attachment contract', () => {
       deliveryRevision: '1',
     },
   });
+  const creationConfirmation = (i: PictureAttachment) =>
+    JSON.stringify({
+      ...sourceConfirmation(),
+      type: 'asset.command.result',
+      causationsource: 'https://wallpaperdb/user',
+      causationid: i.creationEventId,
+      data: {
+        commandId: i.commandId,
+        applicationReference: i.id,
+        outcome: 'created',
+        assetId: 'asset-A',
+      },
+    });
+  const status = (i: PictureAttachment) =>
+    runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)));
+  const claimPublication = async (id: string) => {
+    const publication = (await runtime.runPromise(AttachmentDelivery.use((d) => d.claim()))).find(
+      (p) => p.id === id
+    );
+    if (!publication) throw new Error(`Missing publication ${id}`);
+    return publication;
+  };
+  const exhaustPublication = async (id: string) => {
+    const first = await claimPublication(id);
+    await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(first)));
+    await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${id}`;
+    const second = await claimPublication(id);
+    await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
+    return first;
+  };
+  it.each([
+    ['creation', 'creation-outbox'],
+    ['rejected-creation', 'creation-outbox'],
+    ['source', 'creation-outbox'],
+    ['source', 'confirmation'],
+    ['deletion', 'creation-outbox'],
+    ['deletion', 'deletion-outbox'],
+    ['deletion', 'confirmation'],
+  ])('preserves %s progress and independent %s attention until that duty actually closes', async (transition, duty) => {
+    const i = await begin();
+    if (!transition.includes('creation')) await created(i);
+    if (transition === 'source') await register(i);
+    if (transition === 'deletion')
+      await runtime.runPromise(
+        PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id))
+      );
+    const publicationId = duty === 'deletion-outbox' ? i.deletionEventId : i.creationEventId;
+    let original: AttachmentPublication | undefined;
+    if (duty === 'confirmation')
+      await runtime.runPromise(
+        AttachmentDelivery.use((d) =>
+          d.quarantine('retained-create', creationConfirmation(i), 'confirmation-exhausted', {
+            kind: 'intent',
+            id: i.id,
+          })
+        )
+      );
+    else original = await exhaustPublication(publicationId);
+    expect(await status(i)).toMatchObject({ attachment: { attentionRequired: true } });
+    expect(
+      transition === 'source'
+        ? await confirm(i)
+        : transition === 'creation'
+          ? await created(i)
+          : await runtime.runPromise(
+              PictureAttachments.use((s) =>
+                s.assetResult({
+                  attachmentId: i.id,
+                  commandId: transition === 'deletion' ? i.deleteCommandId : i.commandId,
+                  causationId: transition === 'deletion' ? i.deletionEventId : i.creationEventId,
+                  outcome: transition === 'deletion' ? 'deleted' : 'rejected',
+                  assetId: transition === 'deletion' ? 'asset-A' : null,
+                })
+              )
+            )
+    ).toBe('applied');
+    const completed = {
+      state:
+        transition === 'source'
+          ? 'attached'
+          : transition === 'deletion'
+            ? 'cancelled'
+            : transition === 'rejected-creation'
+              ? 'failed'
+              : 'awaiting-source',
+      ...(transition === 'deletion' ? { deletion: 'complete' } : {}),
+    };
+    expect(await status(i)).toMatchObject({
+      attachment: { ...completed, attentionRequired: true },
+    });
+    const alerts = await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()));
+    const alert = alerts.find(
+      (a) => a.scope === (duty === 'confirmation' ? 'confirmation' : 'outbox')
+    );
+    if (!alert) throw new Error('Ordinary transition erased the retained duty');
+    expect(
+      await runAttachmentOperator(
+        [duty === 'confirmation' ? 'recover-confirmation' : 'recover-outbox', alert.id],
+        { databaseUrl, maxAttempts: 2, retryDelayMs: 1 }
+      )
+    ).toEqual({ recovered: true });
+    if (duty !== 'confirmation') {
+      if (transition === 'source') {
+        await runtime.dispose();
+        runtime = ManagedRuntime.make(layer());
+      }
+      expect(await status(i)).toMatchObject({ attachment: { attentionRequired: true } });
+      const recovered = await claimPublication(publicationId);
+      expect(recovered.event).toEqual(original?.event);
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(recovered)));
+    }
+    expect(await status(i)).toMatchObject({
+      attachment: { ...completed, attentionRequired: false },
+    });
+    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+      {
+        picture_asset_id: transition === 'source' ? 'asset-A' : null,
+        version: transition === 'source' ? 2 : 1,
+      },
+    ]);
+    expect(await sql`select count(*)::int as count from outbox_events`).toEqual([
+      { count: transition === 'source' ? 1 : 0 },
+    ]);
+    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual([]);
+  });
   it('atomically reserves command identity, replays through restart and attaches only after the required registered Source', async () => {
     const [a, b] = await Promise.all([begin(), begin()]);
     expect(a.id).toBe(b.id);
@@ -140,6 +266,7 @@ describe('PostgreSQL picture attachment contract', () => {
     const i = await begin();
     await created(i);
     await register(i);
+    await exhaustPublication(i.creationEventId);
     await sql.unsafe(
       `create function reject_attachment_event() returns trigger language plpgsql as $$ begin raise exception 'intentional event failure'; end $$`
     );
@@ -153,13 +280,122 @@ describe('PostgreSQL picture attachment contract', () => {
       ]);
       expect(
         await runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)))
-      ).toMatchObject({ kind: 'attachment', attachment: { state: 'accepting-source' } });
+      ).toMatchObject({
+        kind: 'attachment',
+        attachment: { state: 'accepting-source', attentionRequired: true },
+      });
     } finally {
       await sql.unsafe(
         'drop trigger reject_attachment_event on outbox_events;drop function reject_attachment_event()'
       );
     }
     expect(await confirm(i)).toBe('applied');
+    expect(await status(i)).toMatchObject({
+      attachment: { state: 'attached', attentionRequired: true },
+    });
+  });
+  it('clears publication attention while ordinary orphan deletion is pending, preserving rejected-deletion attention until a successful result', async () => {
+    const i = await begin();
+    await created(i);
+    await runtime.runPromise(PictureAttachments.use((s) => s.cancel({ profileId: 'owner' }, i.id)));
+    await exhaustPublication(i.creationEventId);
+    expect(
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.recover(i.creationEventId)))
+    ).toBe(true);
+    expect(await status(i)).toMatchObject({
+      attachment: { deletion: 'pending', attentionRequired: true },
+    });
+    const publication = await claimPublication(i.creationEventId);
+    await runtime.runPromise(AttachmentDelivery.use((d) => d.complete(publication)));
+    expect(await status(i)).toMatchObject({
+      attachment: { deletion: 'pending', attentionRequired: false },
+    });
+    expect(
+      await runtime.runPromise(
+        PictureAttachments.use((s) =>
+          s.assetResult({
+            attachmentId: i.id,
+            commandId: i.deleteCommandId,
+            causationId: i.deletionEventId,
+            assetId: 'asset-A',
+            outcome: 'rejected',
+          })
+        )
+      )
+    ).toBe('requires-attention');
+    await runtime.dispose();
+    runtime = ManagedRuntime.make(layer());
+    const retained = creationConfirmation(i);
+    await runtime.runPromise(
+      AttachmentDelivery.use((d) =>
+        d.quarantine('old-create', retained, 'confirmation-exhausted', { kind: 'intent', id: i.id })
+      )
+    );
+    const alert = (await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).find(
+      (a) => a.scope === 'confirmation'
+    );
+    if (!alert) throw new Error('Missing retained confirmation');
+    expect(
+      await runAttachmentOperator(['recover-confirmation', alert.id], {
+        databaseUrl,
+        maxAttempts: 2,
+        retryDelayMs: 1,
+      })
+    ).toEqual({ recovered: true });
+    expect(await status(i)).toMatchObject({
+      attachment: { deletion: 'pending', attentionRequired: true },
+    });
+    expect(
+      await runtime.runPromise(
+        PictureAttachments.use((s) =>
+          s.assetResult({
+            attachmentId: i.id,
+            commandId: i.deleteCommandId,
+            causationId: i.deletionEventId,
+            assetId: 'asset-A',
+            outcome: 'deleted',
+          })
+        )
+      )
+    ).toBe('applied');
+    expect(await status(i)).toMatchObject({
+      attachment: { deletion: 'complete', attentionRequired: false },
+    });
+  });
+  it.each([
+    'exhaustion',
+    'recovery',
+  ])('serializes ordinary Source attachment with concurrent publication %s', async (operation) => {
+    const i = await begin();
+    await created(i);
+    await register(i);
+    const first = await claimPublication(i.creationEventId);
+    await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(first)));
+    await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${first.id}`;
+    const second = await claimPublication(i.creationEventId);
+    if (operation === 'recovery') {
+      await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
+      expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.recover(second.id)))).toBe(
+        true
+      );
+    }
+    const current = operation === 'recovery' ? await claimPublication(second.id) : second;
+    const [outcome] = await Promise.all([
+      confirm(i),
+      runtime.runPromise(
+        AttachmentDelivery.use((d) =>
+          operation === 'recovery' ? d.complete(current) : d.failed(current)
+        )
+      ),
+    ]);
+    expect(outcome).toBe('applied');
+    expect(await status(i)).toMatchObject({
+      attachment: { state: 'attached', attentionRequired: operation === 'exhaustion' },
+    });
+    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+      { picture_asset_id: 'asset-A', version: 2 },
+    ]);
+    expect(await sql`select count(*)::int as count from outbox_events`).toEqual([{ count: 1 }]);
   });
   it.each([
     'source',

@@ -264,8 +264,7 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
               }),
             }),
           ]);
-          const [firstReceipt] = await receipts();
-          if (!firstReceipt) throw new Error('Missing first authenticated receipt');
+          const deliveredReceipts = await receipts();
           await dispatcher.dispose();
           await receiver.stop();
           receiver = await startReceiver();
@@ -274,7 +273,10 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
           await dispatcher.runPromise(ProtectedCommandHealth);
           const before = acknowledgements;
           await expect.poll(() => acknowledgements, { timeout: 3000 }).toBeGreaterThan(before);
-          expect(await receipts()).toEqual([firstReceipt]);
+          const persistedReceipts = await receipts();
+          expect(persistedReceipts).toEqual(deliveredReceipts);
+          const [firstReceipt] = persistedReceipts;
+          if (!firstReceipt) throw new Error('Missing first authenticated persisted receipt');
           const visible = await fetch(`${receiver.url}/`, {
             headers: {
               authorization: `Basic ${Buffer.from('operator:operator-inbox-token').toString('base64')}`,

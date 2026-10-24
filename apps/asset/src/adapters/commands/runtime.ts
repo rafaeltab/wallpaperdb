@@ -105,19 +105,17 @@ const quarantine = Effect.fn('asset.commands.quarantine')(function* (
     })
   );
   yield* broker('notify-quarantine', () =>
-    connection
-      .jetstream()
-      .publish(
-        'asset.operator.notifications',
-        JSON.stringify({
-          id,
-          kind: 'command-quarantine',
-          subject: message.subject,
-          reason,
-          ...(context ? { context } : {}),
-        }),
-        { msgID: `notification:${id}`, timeout: 5000 }
-      )
+    connection.jetstream().publish(
+      'asset.operator.notifications',
+      JSON.stringify({
+        id,
+        kind: 'command-quarantine',
+        subject: message.subject,
+        reason,
+        ...(context ? { context } : {}),
+      }),
+      { msgID: `notification:${id}`, timeout: 5000 }
+    )
   );
 });
 export function observeWorkflow<A extends string, E, R>(
@@ -274,13 +272,16 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
   }
   const alerts = yield* outbox.pendingAlerts(1);
   for (const alert of alerts) {
+    const noticeId = createHash('sha256')
+      .update(JSON.stringify([alert.id, alert.notificationOccurrence]))
+      .digest('hex');
     const connection = connections.get(alert.applicationId);
     if (!connection) return false;
     yield* observeWorkflow(
       'asset.commands.notify-result-quarantine',
       alert.context,
       {
-        'event.id': alert.id,
+        'event.id': noticeId,
         'event.causation_id': alert.context.occurrence.id,
         'event.causation_source': alert.context.occurrence.source,
         'application.id': alert.applicationId,
@@ -293,16 +294,16 @@ const dispatch = Effect.fn('asset.commands.dispatch-results')(function* (
           connection.jetstream().publish(
             'asset.operator.notifications',
             JSON.stringify({
-              id: alert.id,
+              id: noticeId,
               kind: 'result-quarantine',
               subject: `asset.results.${alert.applicationId}`,
               reason: 'exhausted',
               context: alert.context,
             }),
-            { msgID: `result-notification:${alert.id}`, timeout: 5000 }
+            { msgID: `result-notification:${noticeId}`, timeout: 5000 }
           )
         );
-        yield* outbox.alerted(alert.id);
+        yield* outbox.alerted(alert);
         return 'notified';
       })
     );

@@ -7,6 +7,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uuid,
   check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
@@ -188,6 +189,7 @@ export const assetResultOutbox = pgTable(
     availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
     leaseId: text('lease_id'),
     notifiedAt: timestamp('notified_at', { withTimezone: true }),
+    notificationOccurrence: uuid('notification_occurrence').notNull().defaultRandom(),
   },
   (table) => [
     index('asset_result_outbox_ready').on(table.status, table.availableAt),

@@ -12,6 +12,7 @@ export {
   type LifecycleStorePort,
   type ResultOutboxPort,
   type ResultPublication,
+  type ResultAlert,
   type LifecyclePolicy,
   type LifecyclePort,
   type AssetInspection,

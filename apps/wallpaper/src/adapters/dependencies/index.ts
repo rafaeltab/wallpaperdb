@@ -119,8 +119,21 @@ export function dependencyProbeLayer(config: DependencyProbeConfig) {
 }
 
 async function checkDatabase(pool: Pool, signal: AbortSignal): Promise<boolean> {
-  const client: PoolClient = await pool.connect();
+  let connectionFailed = false;
+  const recordError = () => {
+    connectionFailed = true;
+  };
+  // Take error ownership in the checkout callback, before yielding to a Promise continuation.
+  const client = await new Promise<PoolClient>((resolve, reject) => {
+    pool.connect((cause, acquired) => {
+      if (cause) return reject(cause);
+      if (!acquired) return reject(new Error('Database checkout returned no client'));
+      acquired.on('error', recordError);
+      resolve(acquired);
+    });
+  });
   let released = false;
+  let queryFailed = false;
   const cancel = () => {
     if (released) return;
     released = true;
@@ -133,9 +146,17 @@ async function checkDatabase(pool: Pool, signal: AbortSignal): Promise<boolean> 
       return false;
     }
     await client.query('SELECT 1');
-    return true;
+    return !connectionFailed && !signal.aborted;
+  } catch (cause) {
+    queryFailed = true;
+    throw cause;
   } finally {
     signal.removeEventListener('abort', cancel);
-    if (!released) client.release();
+    if (!released) {
+      released = true;
+      client.release(queryFailed || connectionFailed || signal.aborted);
+    }
+    // release restores pg-pool's idle listener before this listener is removed.
+    client.removeListener('error', recordError);
   }
 }

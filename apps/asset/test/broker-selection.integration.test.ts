@@ -51,6 +51,7 @@ it('refuses plaintext INFO before authenticating when protected callers select T
   const directory = await mkdtemp(join(tmpdir(), 'asset-broker-selection-'));
   const sockets = new Set<Socket>();
   let authentications = 0;
+  let sourceCredentialLeaks = 0;
   const server = createServer((socket) => {
     sockets.add(socket);
     socket.once('close', () => sockets.delete(socket));
@@ -61,6 +62,10 @@ it('refuses plaintext INFO before authenticating when protected callers select T
     socket.on('data', (data) => {
       if (data.includes('CONNECT ')) {
         authentications++;
+        // Only synthetic fixture credentials are inspected, never printed or persisted.
+        if (data.includes('asset-service_user') && data.includes('service-secret'))
+          sourceCredentialLeaks++;
+
         socket.end("-ERR 'Controlled plaintext authentication rejection'\r\n");
       }
     });
@@ -73,9 +78,11 @@ it('refuses plaintext INFO before authenticating when protected callers select T
     await once(server, 'listening');
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('Missing protocol fixture');
-    for (const mode of ['commands', 'notifications', 'operator', 'events']) {
+    for (const mode of ['sources', 'commands', 'notifications', 'operator', 'events']) {
       const before = authentications;
       expect(await caller(mode, `tls://127.0.0.1:${address.port}`, directory)).toBe(false);
+      if (mode === 'sources')
+        expect(sourceCredentialLeaks, 'Source leaked synthetic service authentication').toBe(0);
       expect(authentications - before, `${mode} sent authentication to plaintext INFO`).toBe(0);
     }
   } finally {
@@ -130,9 +137,18 @@ it('accepts the selected trusted TLS broker with default verification and preser
         .start();
       releases.push(() => container.stop());
       const url = `${tls ? 'tls' : 'nats'}://${container.getHost()}:${container.getMappedPort(4222)}`;
-      if (tls) expect(await caller('operator', url, directory)).toBe(false);
-      else expect(await caller('operator', url.replace('nats://', ''), directory)).toBe(true);
-      for (const mode of ['operator', 'commands', 'notifications', 'legacy-setup', 'events'])
+      if (tls) {
+        expect(await caller('operator', url, directory)).toBe(false);
+        expect(await caller('sources', url, directory)).toBe(false);
+      } else expect(await caller('operator', url.replace('nats://', ''), directory)).toBe(true);
+      for (const mode of [
+        'operator',
+        'commands',
+        'notifications',
+        'sources',
+        'legacy-setup',
+        'events',
+      ])
         expect(await caller(mode, url, directory, tls ? cert : undefined), mode).toBe(true);
       await container.stop();
     }

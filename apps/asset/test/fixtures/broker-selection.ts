@@ -10,6 +10,11 @@ import {
   operatorWebhookLayer,
   OperatorNotificationHealth,
 } from '../../src/adapters/commands/index.js';
+import {
+  sourceConfirmationsLayer,
+  SourceConfirmationHealth,
+} from '../../src/adapters/sources/index.js';
+import { SourceAcceptanceOutbox } from '../../src/capabilities/sources/index.js';
 import { natsEventsLayer, EventsHealth } from '../../src/adapters/events/index.js';
 
 const [mode, url, path] = process.argv.slice(2);
@@ -48,6 +53,28 @@ try {
     );
     try {
       await runtime.runPromise(ProtectedCommandHealth);
+    } finally {
+      await runtime.dispose();
+    }
+  } else if (mode === 'sources') {
+    const runtime = ManagedRuntime.make(
+      sourceConfirmationsLayer(options).pipe(
+        Layer.provide(
+          Layer.succeed(SourceAcceptanceOutbox, {
+            claim: () => Effect.succeed([]),
+            pendingAlerts: () => Effect.succeed([]),
+            published: () => Effect.void,
+            failed: () => Effect.void,
+            alerted: () => Effect.void,
+            recover: () => Effect.succeed(false),
+          })
+        )
+      )
+    );
+    try {
+      const health = await runtime.runPromise(SourceConfirmationHealth);
+      if (!(await runtime.runPromise(health.check())))
+        throw new Error('Source publisher unavailable');
     } finally {
       await runtime.dispose();
     }

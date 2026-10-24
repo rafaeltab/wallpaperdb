@@ -24,6 +24,7 @@ coverage
 **/.env*.local
 apps/asset/.authority.json
 apps/wallpaper/.workflow.json
+apps/user/.workflow.json
 infra/nats/.generated.conf
 
 # Agent / local sandbox artifacts (can contain nested worktrees and gigabytes of data)

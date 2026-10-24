@@ -22,6 +22,11 @@ const loader = require.resolve("tsx");
 const fixtures = fileURLToPath(
 	new URL("./fixtures/coverage-v8/", import.meta.url),
 );
+const subprocessTimeout = 15000;
+// The test awaits two bounded processes in sequence. Leave another process
+// budget for Vitest startup, coverage reporting and collector shutdown.
+const fixtureTestTimeout = 2 * subprocessTimeout;
+const fixtureRunTimeout = fixtureTestTimeout + subprocessTimeout;
 
 function runFixture({
 	subprocess = true,
@@ -45,6 +50,7 @@ function runFixture({
 		config,
 		`export default {test: {
 		isolate: ${isolate}, experimental: {viteModuleRunner: ${!nativeOnly}}, include: ['fixture.test.ts'], pool: ${JSON.stringify(pool)}, maxWorkers: 1,
+		${subprocess ? `testTimeout: ${fixtureTestTimeout},` : ""}
 		coverage: { enabled: true, provider: 'v8', autoAttachSubprocess: ${subprocess},
 			include: ${JSON.stringify(nativeOnly ? ["native.ts"] : ["subject.ts", "native.ts"])}, reporter: ['json'], reportsDirectory: ${JSON.stringify(reports)} }
 	}}`,
@@ -84,10 +90,10 @@ function runFixture({
 			${
 				subprocess
 					? `
-			const child = spawnSync(process.execPath, ['--import', ${JSON.stringify(loader)}, 'child.mjs'], {cwd: ${JSON.stringify(directory)}, encoding: 'utf8', timeout: 15000${missingProvenance ? ", env: {...process.env, NODE_OPTIONS: ''}" : constrainedHeap ? ", env: {...process.env, NODE_OPTIONS: (process.env.NODE_OPTIONS || '') + ' --max-old-space-size=96'}" : ""}});
+			const child = spawnSync(process.execPath, ['--import', ${JSON.stringify(loader)}, 'child.mjs'], {cwd: ${JSON.stringify(directory)}, encoding: 'utf8', timeout: ${subprocessTimeout}${missingProvenance ? ", env: {...process.env, NODE_OPTIONS: ''}" : constrainedHeap ? ", env: {...process.env, NODE_OPTIONS: (process.env.NODE_OPTIONS || '') + ' --max-old-space-size=96'}" : ""}});
 			expect(child.stderr, child.stdout).toBe('');
 			expect(child.status).toBe(0);
-			const native = spawnSync(process.execPath, ['--input-type=module', '-e', "import { nativeSelect } from './native.ts'; if(nativeSelect(true)!=='native-executed') throw Error('native sentinel')"], {cwd: ${JSON.stringify(directory)}, encoding: 'utf8', timeout: 15000});
+			const native = spawnSync(process.execPath, ['--input-type=module', '-e', "import { nativeSelect } from './native.ts'; if(nativeSelect(true)!=='native-executed') throw Error('native sentinel')"], {cwd: ${JSON.stringify(directory)}, encoding: 'utf8', timeout: ${subprocessTimeout}});
 			expect(native.status, native.stderr).toBe(0);
 			`
 					: ""
@@ -103,7 +109,7 @@ function runFixture({
 			{
 				cwd: resolve("."),
 				encoding: "utf8",
-				timeout: 30000,
+				timeout: fixtureRunTimeout,
 				env: { ...process.env, NODE_V8_COVERAGE: undefined },
 			},
 		);

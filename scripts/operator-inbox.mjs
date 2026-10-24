@@ -27,6 +27,11 @@ function isNotice(value) {
 		(!Object.hasOwn(value, "resultId") ||
 			(typeof value.resultId === "string" &&
 				/^[a-f0-9]{64}$/.test(value.resultId))) &&
+		(!Object.hasOwn(value, "sourceConfirmationId") ||
+			(typeof value.sourceConfirmationId === "string" &&
+				/^source-accepted:source_[a-f0-9-]{36}$/.test(
+					value.sourceConfirmationId,
+				))) &&
 		/^[A-Za-z0-9_-]{1,64}$/.test(value.applicationId) &&
 		[
 			"command-quarantine",

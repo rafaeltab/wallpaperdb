@@ -132,6 +132,7 @@ export function sourceConfirmationsLayer(options: Options) {
                       'asset.operator.notifications',
                       JSON.stringify({
                         id,
+                        sourceConfirmationId: confirmation.id,
                         kind: 'source-confirmation-quarantine',
                         subject: `asset.results.${confirmation.applicationId}`,
                         reason: 'exhausted',

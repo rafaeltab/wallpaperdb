@@ -79,7 +79,7 @@ it('delivers durable operator notices to the configured HTTP destination and qua
   );
 });
 
-it('validates optional result recovery targets before HTTP delivery while preserving command and legacy result notices', async () => {
+it('validates optional recovery targets before HTTP delivery while preserving command and legacy notices', async () => {
   const received: unknown[] = [];
   await withOperatorNotificationFixture(
     async (request, response) => {
@@ -109,6 +109,13 @@ it('validates optional result recovery targets before HTTP delivery while preser
           subject: 'asset.commands.user.create',
           reason: 'invalid',
         },
+        {
+          ...result,
+          id: 'd'.repeat(64),
+          kind: 'source-confirmation-quarantine',
+          sourceConfirmationId: 'source-accepted:source_01234567-89ab-cdef-0123-456789abcdef',
+        },
+        { ...result, id: 'e'.repeat(64), kind: 'source-confirmation-quarantine' },
       ];
       for (const notice of valid)
         await operator.jetstream().publish('asset.operator.notifications', JSON.stringify(notice));
@@ -127,29 +134,49 @@ it('validates optional result recovery targets before HTTP delivery while preser
         'F'.repeat(64),
         'g'.repeat(64),
       ];
-      for (const resultId of malformed)
-        await operator
-          .jetstream()
-          .publish('asset.operator.notifications', JSON.stringify({ ...result, resultId }));
+      const malformedSources = [
+        null,
+        42,
+        {},
+        [],
+        ['source-accepted:source_01234567-89ab-cdef-0123-456789abcdef'],
+        '',
+        'f'.repeat(64),
+        'source-accepted:source_recovery',
+        'source_01234567-89ab-cdef-0123-456789abcdef',
+        'source-accepted:source_01234567-89AB-cdef-0123-456789abcdef',
+        'source-accepted:source_01234567-89ab-cdef-0123-456789abcdeg',
+        'source-accepted:source_01234567-89ab-cdef-0123-456789abcde',
+        'source-accepted:source_01234567-89ab-cdef-0123-456789abcdef0',
+      ];
+      const rejected = [
+        ...malformed.map((resultId) => ({ ...result, resultId })),
+        ...malformedSources.map((sourceConfirmationId) => ({
+          ...result,
+          kind: 'source-confirmation-quarantine',
+          sourceConfirmationId,
+        })),
+      ];
+      for (const notice of rejected)
+        await operator.jetstream().publish('asset.operator.notifications', JSON.stringify(notice));
       const manager = await operator.jetstreamManager();
       await expect
         .poll(async () => (await manager.streams.info('ASSET_QUARANTINE')).state.messages, {
           timeout: 3000,
         })
-        .toBe(malformed.length);
+        .toBe(rejected.length);
       expect(received).toEqual(valid.map((notice) => ({ ...notice, applicationId: 'user' })));
-      for (let index = 0; index < malformed.length; index++) {
+      for (let index = 0; index < rejected.length; index++) {
         const stored = await manager.streams.getMessage('ASSET_QUARANTINE', { seq: index + 1 });
         const event = JSON.parse(stored.string());
         expect(event.type).toBe('asset.notification.quarantined');
-        expect(JSON.parse(Buffer.from(event.data.encoded, 'base64').toString())).toEqual({
-          ...result,
-          resultId: malformed[index],
-        });
+        expect(JSON.parse(Buffer.from(event.data.encoded, 'base64').toString())).toEqual(
+          rejected[index]
+        );
         await expect(recoverQuarantine(operator, authority, 'user', index + 1)).rejects.toThrow();
       }
       expect((await manager.streams.info('ASSET_OPERATIONS')).state.messages).toBe(
-        valid.length + malformed.length
+        valid.length + rejected.length
       );
     }
   );

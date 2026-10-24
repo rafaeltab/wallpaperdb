@@ -112,7 +112,7 @@ for (const kind of ["result-quarantine", "source-confirmation-quarantine"])
 		}
 	});
 
-test("optional result recovery targets are validated without rejecting legacy notices", async (t) => {
+test("optional recovery targets are validated without rejecting legacy notices", async (t) => {
 	const releases = [];
 	t.after(async () => {
 		const failures = [];
@@ -154,6 +154,14 @@ test("optional result recovery targets are validated without rejecting legacy no
 			kind: "command-quarantine",
 			subject: "asset.commands.user.create",
 		},
+		{
+			...notice,
+			id: "e".repeat(64),
+			kind: "source-confirmation-quarantine",
+			sourceConfirmationId:
+				"source-accepted:source_01234567-89ab-cdef-0123-456789abcdef",
+		},
+		{ ...notice, id: "f".repeat(64), kind: "source-confirmation-quarantine" },
 	];
 	for (const value of valid) {
 		const response = await deliver(value);
@@ -181,6 +189,36 @@ test("optional result recovery targets are validated without rejecting legacy no
 			},
 		);
 	}
+	for (const sourceConfirmationId of [
+		null,
+		42,
+		{},
+		[],
+		["source-accepted:source_01234567-89ab-cdef-0123-456789abcdef"],
+		"",
+		"f".repeat(64),
+		"source-accepted:source_recovery",
+		"source_01234567-89ab-cdef-0123-456789abcdef",
+		"source-accepted:source_01234567-89AB-cdef-0123-456789abcdef",
+		"source-accepted:source_01234567-89ab-cdef-0123-456789abcdeg",
+		"source-accepted:source_01234567-89ab-cdef-0123-456789abcde",
+		"source-accepted:source_01234567-89ab-cdef-0123-456789abcdef0",
+	]) {
+		await assertProblem(
+			await deliver({
+				...notice,
+				kind: "source-confirmation-quarantine",
+				sourceConfirmationId,
+			}),
+			{
+				type: "https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-operator-notice.md",
+				title: "Invalid operator notice",
+				status: 400,
+				detail: "A valid operator notice is required.",
+			},
+		);
+	}
+
 	const receipts = await (
 		await fetch(`${url}/receipts`, { headers: operator })
 	).json();

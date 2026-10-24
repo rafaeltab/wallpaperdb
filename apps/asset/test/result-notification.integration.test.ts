@@ -316,7 +316,9 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
             }
           }
         }
-        if (errors.length) throw new AggregateError(errors, 'Result notification contract failed');
+        if (errors.length === 1) throw errors[0];
+        if (errors.length > 1)
+          throw new AggregateError(errors, 'Result notification contract failed');
       }
     );
   } catch (error) {
@@ -330,5 +332,6 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
       }
     }
   }
-  if (failures.length) throw new AggregateError(failures, 'Result notification fixture failed');
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) throw new AggregateError(failures, 'Result notification fixture failed');
 });

@@ -1,16 +1,19 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { dependencyProxy } from './fixtures/dependency-proxy.js';
 
 describe('deployed Wallpaper service skeleton', () => {
   let postgres: StartedTestContainer;
   let nats: StartedNatsContainer;
   let directory: string;
+  const proxies: Array<Awaited<ReturnType<typeof dependencyProxy>>> = [];
+  const services: Array<ReturnType<typeof startArtifact>> = [];
 
   beforeAll(async () => {
     await import('../esbuild.config.js');
@@ -23,12 +26,23 @@ describe('deployed Wallpaper service skeleton', () => {
     nats = await createNatsContainer({ enableJetStream: false });
   });
 
+  afterEach(async () => {
+    const results = await Promise.allSettled([
+      ...services.splice(0).map((service) => service.stop()),
+      ...proxies.splice(0).map((proxy) => proxy.close()),
+    ]);
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length) throw new AggregateError(failures.map((result) => result.reason));
+  });
+
   afterAll(async () => {
-    await Promise.all([
+    const results = await Promise.allSettled([
       nats?.stop(),
       postgres?.stop(),
       directory ? rm(directory, { recursive: true, force: true }) : Promise.resolve(),
     ]);
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length) throw new AggregateError(failures.map((result) => result.reason));
   });
 
   const connections = async () => {
@@ -78,6 +92,73 @@ describe('deployed Wallpaper service skeleton', () => {
     } finally {
       await service.stop();
     }
+  });
+
+  it('recovers readiness after RTT and pre-INFO timeouts in the bundled process and shuts down concurrent work', async () => {
+    const address = new URL(nats.getConnectionUrl());
+    const proxy = await dependencyProxy(address.hostname, Number(address.port));
+    proxies.push(proxy);
+    const port = await availablePort();
+    const service = startArtifact(directory, {
+      PORT: String(port),
+      DATABASE_URL: `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`,
+      NATS_URL: `nats://127.0.0.1:${proxy.port}`,
+    });
+    services.push(service);
+    const readiness = async () => {
+      const response = await fetch(`http://127.0.0.1:${port}/ready`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      return { status: response.status, body: await response.json() };
+    };
+    await vi.waitFor(async () => expect(await readiness()).toMatchObject({ status: 200 }), {
+      timeout: 10000,
+    });
+    const threadCount = async () => (await readdir(`/proc/${service.child.pid}/task`)).length;
+    const healthyThreads = await threadCount();
+    for (let cycle = 0; cycle < 2; cycle++) {
+      proxy.block();
+      expect(await readiness()).toMatchObject({ status: 503, body: { ready: false } });
+      await expect.poll(proxy.socketCount).toBe(0);
+      proxy.unblock();
+      proxy.pause();
+      expect(await readiness()).toMatchObject({ status: 503, body: { ready: false } });
+      await expect.poll(proxy.socketCount).toBe(0);
+      expect(await threadCount()).toBeLessThanOrEqual(healthyThreads);
+      proxy.resume();
+      expect(await readiness()).toMatchObject({ status: 200, body: { ready: true } });
+      expect(proxy.socketCount()).toBe(2);
+      expect(await threadCount()).toBe(healthyThreads);
+    }
+    proxy.block();
+    const concurrent = Array.from({ length: 3 }, readiness);
+    await expect.poll(proxy.hasBlockedTraffic).toBe(true);
+    service.child.kill('SIGTERM');
+    const stopping = Promise.allSettled([service.waitForExit(), ...concurrent]);
+    // Broker work has its own two-second bound; HTTP retains its existing five-second drain.
+    await expect.poll(proxy.socketCount, { timeout: 3000 }).toBe(0);
+    const results = await stopping;
+    expect(results[0]).toMatchObject({ status: 'fulfilled', value: { code: 0, signal: null } });
+    await expect.poll(proxy.socketCount).toBe(0);
+    await expect.poll(connections).toMatchObject({ num_connections: 0 });
+  });
+
+  it('reaps the bundled worker when initial acquisition stalls before broker INFO', async () => {
+    const address = new URL(nats.getConnectionUrl());
+    const proxy = await dependencyProxy(address.hostname, Number(address.port));
+    proxies.push(proxy);
+    proxy.pause();
+    const service = startArtifact(directory, {
+      PORT: String(await availablePort()),
+      DATABASE_URL: `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`,
+      NATS_URL: `nats://127.0.0.1:${proxy.port}`,
+    });
+    services.push(service);
+    const startedAt = Date.now();
+    expect(await service.waitForExit()).toEqual({ code: 1, signal: null });
+    expect(Date.now() - startedAt).toBeLessThan(4000);
+    await expect.poll(proxy.socketCount).toBe(0);
+    await expect.poll(connections).toMatchObject({ num_connections: 0 });
   });
 
   it('rejects malformed configuration without serving requests or exposing the supplied value', async () => {
@@ -136,6 +217,7 @@ function startArtifact(directory: string, environment: Record<string, string>) {
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+  console.info('Owned Wallpaper artifact process', { pid: child.pid });
   child.stdout.on('data', (chunk: Buffer) => {
     output = (output + chunk.toString()).slice(-65536);
   });

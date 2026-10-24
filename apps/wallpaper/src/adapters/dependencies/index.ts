@@ -1,6 +1,7 @@
+import { Worker } from 'node:worker_threads';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
-import { Effect, Layer, Schema } from 'effect';
-import { connect } from 'nats';
+import { Effect, Layer, Schema, Semaphore } from 'effect';
+import type { ConnectionOptions } from 'nats';
 import { Pool, type PoolClient } from 'pg';
 import { AvailabilityProbe } from '../../capabilities/availability/index.js';
 
@@ -44,28 +45,7 @@ export function dependencyProbeLayer(config: DependencyProbeConfig) {
       );
       const nats = yield* Effect.acquireRelease(
         Effect.tryPromise({
-          try: () => {
-            const url = new URL(config.natsUrl);
-            const credentials =
-              url.username || url.password
-                ? {
-                    user: decodeURIComponent(url.username),
-                    pass: decodeURIComponent(url.password),
-                  }
-                : {};
-            url.username = '';
-            url.password = '';
-            return connect({
-              servers: url.toString(),
-              ...credentials,
-              name: config.serviceName,
-              timeout: 2000,
-              pingInterval: 1000,
-              maxPingOut: 2,
-              maxReconnectAttempts: 5,
-              ...(url.protocol === 'tls:' ? { tls: {} } : {}),
-            });
-          },
+          try: () => startBroker(config),
           catch: (cause) => new DependencyStartupFailure({ cause }),
         }).pipe(
           Effect.tapError((error) =>
@@ -74,24 +54,14 @@ export function dependencyProbeLayer(config: DependencyProbeConfig) {
         ),
         (connection) => Effect.promise(() => connection.close())
       );
+      const brokerChecks = yield* Semaphore.make(1);
       const probe: AvailabilityProbe = {
         inspect: Effect.fn('dependencies.inspect')(function* () {
           const broker = yield* Effect.tryPromise({
-            try: async (signal) => {
-              const cancel = () => {
-                void nats.close();
-              };
-              signal.addEventListener('abort', cancel, { once: true });
-              try {
-                if (signal.aborted || nats.isClosed()) return false;
-                await nats.rtt();
-                return true;
-              } finally {
-                signal.removeEventListener('abort', cancel);
-              }
-            },
+            try: (signal) => nats.inspect(signal),
             catch: (cause) => cause,
           }).pipe(
+            brokerChecks.withPermit,
             Effect.timeout(config.healthTimeoutMs ?? 2000),
             Effect.catch((cause) =>
               Effect.logError('NATS health check failed', { cause }).pipe(Effect.as(false))
@@ -116,6 +86,135 @@ export function dependencyProbeLayer(config: DependencyProbeConfig) {
       return probe;
     })
   );
+}
+
+async function startBroker(config: DependencyProbeConfig) {
+  const broker = brokerProbe(brokerOptions(config));
+  const deadline = setTimeout(() => void broker.close(), 2000);
+  try {
+    await broker.start();
+    return broker;
+  } catch (cause) {
+    await broker.close();
+    throw cause;
+  } finally {
+    clearTimeout(deadline);
+  }
+}
+
+function brokerOptions(config: DependencyProbeConfig): ConnectionOptions {
+  const url = new URL(config.natsUrl);
+  const credentials =
+    url.username || url.password
+      ? { user: decodeURIComponent(url.username), pass: decodeURIComponent(url.password) }
+      : {};
+  url.username = '';
+  url.password = '';
+  return {
+    servers: url.toString(),
+    ...credentials,
+    name: config.serviceName,
+    timeout: 2000,
+    pingInterval: 1000,
+    maxPingOut: 2,
+    maxReconnectAttempts: 5,
+    ...(url.protocol === 'tls:' ? { tls: {} } : {}),
+  };
+}
+
+function brokerProbe(options: ConnectionOptions) {
+  let current = brokerWorker(options);
+  let stopped = false;
+  return {
+    start: () => current.ready,
+    async inspect(signal: AbortSignal): Promise<boolean> {
+      if (stopped || signal.aborted) return false;
+      if (current.closed) {
+        await current.close();
+        if (stopped || signal.aborted) return false;
+        current = brokerWorker(options);
+      }
+      const active = current;
+      const cancel = () => void active.close();
+      signal.addEventListener('abort', cancel, { once: true });
+      try {
+        if (signal.aborted) cancel();
+        await active.ready;
+        await active.inspect();
+        return !stopped && !signal.aborted && !active.closed;
+      } catch (cause) {
+        await active.close();
+        throw cause;
+      } finally {
+        signal.removeEventListener('abort', cancel);
+        if (stopped || signal.aborted) await active.close();
+      }
+    },
+    async close() {
+      stopped = true;
+      await current.close();
+    },
+  };
+}
+
+/** Termination owns native sockets even when nats.connect has not received INFO.
+ * The SDK's acquisition timeout alone cannot release that pre-INFO transport. */
+function brokerWorker(options: ConnectionOptions) {
+  const source = import.meta.url.endsWith('.ts');
+  const worker = new Worker(
+    new URL(source ? './broker-worker.ts' : './broker-worker.mjs', import.meta.url),
+    {
+      workerData: options,
+      execArgv: source ? ['--experimental-strip-types'] : [],
+    }
+  );
+  let connected = () => {};
+  let connectionFailed = (_cause: unknown) => {};
+  const ready = new Promise<void>((resolve, reject) => {
+    connected = resolve;
+    connectionFailed = reject;
+  });
+  let request: { resolve: () => void; reject: (cause: unknown) => void } | undefined;
+  let closed = false;
+  let termination: Promise<void> | undefined;
+  function close() {
+    if (!termination) {
+      closed = true;
+      const cause = new Error('NATS probe worker closed');
+      connectionFailed(cause);
+      request?.reject(cause);
+      termination = worker.terminate().then(() => undefined);
+    }
+    return termination;
+  }
+  function fail(cause: unknown) {
+    connectionFailed(cause);
+    request?.reject(cause);
+    void close();
+  }
+  worker.on('message', (message: unknown) => {
+    if (message === 'connected') connected();
+    else if (message === 'healthy') request?.resolve();
+    else fail(message instanceof Error ? message : new Error('Invalid NATS probe worker response'));
+  });
+  worker.on('error', fail);
+  worker.once('exit', (code) => fail(new Error(`NATS probe worker exited (${code})`)));
+  return {
+    ready,
+    get closed() {
+      return closed;
+    },
+    inspect() {
+      if (closed) return Promise.reject(new Error('NATS probe worker is closed'));
+      return new Promise<void>((resolve, reject) => {
+        request = { resolve, reject };
+        worker.postMessage('inspect');
+      }).finally(() => {
+        request = undefined;
+      });
+    },
+    close,
+  };
 }
 
 async function checkDatabase(pool: Pool, signal: AbortSignal): Promise<boolean> {

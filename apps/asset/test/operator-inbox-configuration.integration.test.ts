@@ -75,6 +75,10 @@ it('mounts only the selected notification token into the actual Compose inbox an
       PATH: process.env.PATH,
       HOME: process.env.HOME,
       DOCKER_CONFIG: process.env.DOCKER_CONFIG,
+      // Preserve CI's invocation-scoped trust and locked tool selection.
+      MISE_TRUSTED_CONFIG_PATHS: process.env.MISE_TRUSTED_CONFIG_PATHS,
+      MISE_LOCKED: process.env.MISE_LOCKED,
+      MISE_AUTO_INSTALL: process.env.MISE_AUTO_INSTALL,
     };
     const compose = (...action: string[]) =>
       exec('docker', [...args, ...action], { env: environment, timeout: 30000 });

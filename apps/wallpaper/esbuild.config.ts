@@ -20,7 +20,10 @@ function externalizeExceptWorkspaces() {
 }
 
 await build({
-  entryPoints: ['src/index.ts'],
+  entryPoints: {
+    index: 'src/index.ts',
+    'broker-worker': 'src/adapters/dependencies/broker-worker.ts',
+  },
   platform: 'node',
   target: ['node22'],
   bundle: true,

@@ -29,7 +29,7 @@ INFRA_COMPOSE = docker compose -p $(COMPOSE_PROJECT_NAME) -f infra/docker-compos
 APPS_COMPOSE  = docker compose -p $(COMPOSE_PROJECT_NAME) -f infra/docker-compose.apps.yml
 
 TURBO := "$(CURDIR)/node_modules/.bin/turbo"
-CI_CONCURRENCY ?= 1
+CI_CONCURRENCY ?= 4
 
 # PACKAGE is a workspace basename or root; SERVICE selects a Compose app; DB selects a database.
 PACKAGE ?=

@@ -1,3 +1,4 @@
+import { assetBrokerTransport } from '../src/adapters/nats.js';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +23,13 @@ async function usingConnection<A>(
   inboxPrefix: string,
   run: (connection: NatsConnection) => Promise<A>
 ) {
-  const connection = await connect({ servers: url, user, pass, inboxPrefix, timeout: 5000 });
+  const connection = await connect({
+    ...assetBrokerTransport(url),
+    user,
+    pass,
+    inboxPrefix,
+    timeout: 5000,
+  });
   try {
     return await run(connection);
   } finally {

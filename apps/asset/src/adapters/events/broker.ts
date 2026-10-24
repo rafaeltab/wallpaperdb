@@ -1,3 +1,4 @@
+import { assetBrokerTransport } from '../nats.js';
 import { Context, Data, Effect, Layer } from 'effect';
 import { connect, type JetStreamClient, type JetStreamManager, type NatsConnection } from 'nats';
 export interface NatsEventsOptions {
@@ -39,7 +40,11 @@ export function natsEventsLayer(
     Effect.gen(function* () {
       const connection = yield* Effect.acquireRelease(
         broker('connect-events', () =>
-          connect({ servers: options.url, name: options.serviceName, timeout: 5000 })
+          connect({
+            ...assetBrokerTransport(options.url),
+            name: options.serviceName,
+            timeout: 5000,
+          })
         ),
         (connection) =>
           broker('drain-events', () => connection.drain()).pipe(

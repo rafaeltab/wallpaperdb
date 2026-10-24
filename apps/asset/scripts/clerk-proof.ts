@@ -1,3 +1,4 @@
+import { assetBrokerTransport } from '../src/adapters/nats.js';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -145,7 +146,7 @@ try {
   if (!application) throw new Error('Configured User application missing');
   const notificationId = createHash('sha256').update(randomUUID()).digest('hex');
   const service = await connect({
-    servers: brokerUrl,
+    ...assetBrokerTransport(brokerUrl),
     user: application.serviceUser,
     pass: authority.broker.service.password,
     inboxPrefix: '_ASSET_INBOX.service',

@@ -118,6 +118,13 @@ export async function configureDevelopment(
   const brokerPath = join(root, 'infra/nats/.generated.conf');
   await writeFile(brokerPath, renderBrokerConfiguration(authority), { mode: 0o600 });
   await chmod(brokerPath, 0o600);
+  const inboxPath = join(root, 'infra/.operator-inbox.json');
+  await writeFile(
+    inboxPath,
+    `${JSON.stringify({ operatorNotification: { token: authority.operatorNotification.token } })}\n`,
+    { mode: 0o600 }
+  );
+  await chmod(inboxPath, 0o600);
   return authority.identity;
 }
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {

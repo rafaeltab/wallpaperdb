@@ -85,6 +85,7 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
           await writeFile(authorityPath, JSON.stringify(authorityFixture()), { mode: 0o600 });
           // Run the actual CLI in an isolated cwd so dotenv cannot load private checkout files.
           const recoverResult = async (id: string) => {
+            const started = performance.now();
             const invocation = exec(
               process.execPath,
               [
@@ -113,6 +114,7 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
             console.info('Receipt-based recover-result CLI completed and reaped', {
               pid: invocation.child.pid,
               exitCode: invocation.child.exitCode,
+              durationMs: performance.now() - started,
               id,
               ...outcome,
             });
@@ -364,9 +366,8 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
           });
           message?.ack();
           await application.flush();
-          await expect
-            .poll(() => recoverResult(secondReceipt.notice.resultId), { timeout: 1000 })
-            .toEqual({ recovered: false });
+          // Await the CLI's existing process deadline before tearing down its database.
+          expect(await recoverResult(secondReceipt.notice.resultId)).toEqual({ recovered: false });
           expect(await capability.runPromise(outbox.claim(1))).toEqual([]);
           expect(await receipts()).toHaveLength(2);
           expect(claims).toHaveLength(7);

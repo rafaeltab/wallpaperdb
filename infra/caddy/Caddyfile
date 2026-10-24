@@ -15,6 +15,7 @@
 #   /variant-generator/*      → variant-generator:3006 (prefix stripped)
 #   /color-extractor/*        → color-extractor:3007   (prefix stripped)
 #   /tagging/*                → tags:3008              (prefix stripped)
+#   /wallpaper/*              → wallpaper:3010         (prefix stripped)
 #   /user/*                   → user:3009              (prefix stripped)
 #   /web/*                    → web:3005               (prefix kept — Vite base=/web)
 #   /grafana/*                → lgtm:3000              (prefix kept — GF_SERVER_SERVE_FROM_SUB_PATH)
@@ -52,6 +53,10 @@
 
     handle_path /tagging/* {
         reverse_proxy tags:3008
+    }
+
+    handle_path /wallpaper/* {
+        reverse_proxy wallpaper:3010
     }
 
     handle_path /user/* {

@@ -1,0 +1,22 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{wallpaperBaseUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  Check if the wallpaper service shell is healthy.
+
+  Returns 200 if healthy or degraded, 503 if unhealthy or shutting down.
+
+  Response includes status of:
+  - database (PostgreSQL)
+  - nats (message queue)
+  - otel (OpenTelemetry)
+}

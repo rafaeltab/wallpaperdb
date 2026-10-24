@@ -7,9 +7,14 @@ delete mutationNatsEndpoint.url;
 delete mutationNatsEndpoint.connection;
 delete mutationNatsEndpoint.withDisposal;
 delete mutationNatsEndpoint.recordLifecycle;
-const fail = () => {
+type DisposalObservation = {
+  observationFailed: boolean;
+  closeAttempted: boolean;
+  closeCompleted: boolean;
+};
+const fail = (disposal?: DisposalObservation) => {
   const receipt = process.env.WALLPAPERDB_MUTATION_FAILURE_FILE;
-  if (receipt) writeFileSync(receipt, '{"failed":true}');
+  if (receipt) writeFileSync(receipt, JSON.stringify({ failed: true, ...disposal }));
 };
 const url = process.env.WALLPAPERDB_MUTATION_NATS_URL;
 const reset = process.env.WALLPAPERDB_MUTATION_NATS_RESET;
@@ -45,15 +50,25 @@ try {
   mutationNatsEndpoint.connection = connection;
   mutationNatsEndpoint.withDisposal = async (cleanup) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const disposal = { observationFailed: false, closeAttempted: false, closeCompleted: false };
+    const observe = (event: 'close-entry' | 'close-return') => {
+      try {
+        record({ event });
+      } catch {
+        disposal.observationFailed = true;
+      }
+    };
     try {
       await Promise.race([
         (async () => {
           try {
             await cleanup();
           } finally {
-            record({ event: 'close-entry' });
+            observe('close-entry');
+            disposal.closeAttempted = true;
             await connection.close();
-            record({ event: 'close-return' });
+            disposal.closeCompleted = true;
+            observe('close-return');
           }
           // Audit before native worker termination can hide the final client's leak.
           const response = await fetch(new URL('/disposed', reset), {
@@ -62,6 +77,7 @@ try {
             signal: AbortSignal.timeout(1000),
           });
           if (!response.ok) throw new Error('Mutation NATS client disposal audit failed');
+          if (disposal.observationFailed) throw new Error('Mutation NATS lifecycle receipt failed');
         })(),
         new Promise<never>((_, reject) => {
           timer = setTimeout(
@@ -71,12 +87,21 @@ try {
         }),
       ]);
     } catch (error) {
-      fail();
+      try {
+        fail(disposal);
+      } catch {
+        // Keep the original disposal error and still notify the independent controller.
+      }
       await fetch(new URL('/failure', reset), {
         method: 'POST',
         headers: { authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(1000),
       }).catch(() => undefined);
+      if (disposal.observationFailed)
+        throw new AggregateError(
+          [error],
+          `Mutation NATS trace incomplete; closeAttempted=${disposal.closeAttempted}, closeCompleted=${disposal.closeCompleted}`
+        );
       throw error;
     } finally {
       clearTimeout(timer);

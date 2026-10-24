@@ -9,7 +9,13 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { dependencyProxy } from './fixtures/dependency-proxy.js';
+
+const brokerConnections = z.object({
+  num_connections: z.number(),
+  connections: z.array(z.object({ cid: z.number(), name: z.string().optional() })),
+});
 
 describe('deployed Wallpaper service', () => {
   let postgres: StartedTestContainer;
@@ -25,17 +31,26 @@ describe('deployed Wallpaper service', () => {
     await import('../esbuild.config.js');
     directory = await mkdtemp(join(tmpdir(), 'wallpaper-deployment-'));
     postgres = await new GenericContainer('postgres:16-alpine')
+      .withLabels({ 'wallpaperdb.deployment-fixture': directory })
       .withEnvironment({ POSTGRES_PASSWORD: 'test', POSTGRES_DB: 'wallpaper' })
       .withExposedPorts(5432)
       .withWaitStrategy(Wait.forLogMessage('database system is ready to accept connections', 2))
       .start();
     const pool = new Pool({ connectionString: databaseUrl() });
+    const setupFailures: unknown[] = [];
     try {
       await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
-    } finally {
-      await pool.end();
+    } catch (cause) {
+      setupFailures.push(cause);
     }
+    try {
+      await pool.end();
+    } catch (cause) {
+      setupFailures.push(cause);
+    }
+    if (setupFailures.length) throw new AggregateError(setupFailures);
     nats = await new GenericContainer('nats:2.10-alpine')
+      .withLabels({ 'wallpaperdb.deployment-fixture': directory })
       .withCopyContentToContainer([
         {
           target: '/configuration.json',
@@ -78,9 +93,15 @@ describe('deployed Wallpaper service', () => {
         filter_subject: 'asset.results.wallpaper',
         ack_policy: AckPolicy.Explicit,
       });
-    } finally {
-      await operator.close();
+    } catch (cause) {
+      setupFailures.push(cause);
     }
+    try {
+      await operator.close();
+    } catch (cause) {
+      setupFailures.push(cause);
+    }
+    if (setupFailures.length) throw new AggregateError(setupFailures);
     await writeFile(
       join(directory, 'workflow.json'),
       JSON.stringify({
@@ -129,8 +150,15 @@ describe('deployed Wallpaper service', () => {
     const response = await fetch(`http://${nats.getHost()}:${nats.getMappedPort(8222)}/connz`, {
       signal: AbortSignal.timeout(1000),
     });
-    return response.json();
+    expect(response.status).toBe(200);
+    return brokerConnections.parse(await response.json());
   };
+  const sessions = async () =>
+    (await connections()).connections
+      .map(({ cid, name }) => ({ cid, name }))
+      .sort((left, right) => left.cid - right.cid);
+  const clientNames = async () => (await sessions()).map(({ name }) => name).sort();
+  const allClientNames = ['wallpaper', 'wallpaper-asset-workflow', 'wallpaper-publication'];
 
   it('serves operational endpoints and releases all broker sessions on SIGTERM', async () => {
     const port = await availablePort();
@@ -140,49 +168,47 @@ describe('deployed Wallpaper service', () => {
       NATS_URL: brokerUrl(),
       WALLPAPER_WORKFLOW_FILE: join(directory, 'workflow.json'),
     });
+    services.push(service);
     const url = `http://127.0.0.1:${port}`;
-    try {
-      await vi.waitFor(
-        async () => {
-          expect(service.exit(), service.output()).toBeUndefined();
-          const ready = await fetch(`${url}/ready`, { signal: AbortSignal.timeout(1000) });
-          expect(ready.status).toBe(200);
-          expect(await ready.json()).toMatchObject({ ready: true });
-        },
-        { timeout: 10000 }
-      );
-      const health = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
-      expect(health.status).toBe(200);
-      expect(await health.json()).toMatchObject({
-        status: 'healthy',
-        checks: { database: true, nats: true, otel: true },
-      });
-      const wallpaper = await fetch(`${url}/wallpaper`, { signal: AbortSignal.timeout(1000) });
-      expect(wallpaper.status).toBe(404);
-      await wallpaper.arrayBuffer();
-      await expect.poll(connections).toMatchObject({ num_connections: 3 });
-      service.child.kill('SIGTERM');
-      expect(await service.waitForExit()).toEqual({ code: 0, signal: null });
-      await expect.poll(connections).toMatchObject({ num_connections: 0 });
-      await expect(
-        fetch(`${url}/ready`, { signal: AbortSignal.timeout(1000) })
-      ).rejects.toMatchObject({
-        cause: { code: 'ECONNREFUSED' },
-      });
-    } finally {
-      await service.stop();
-    }
+    await vi.waitFor(
+      async () => {
+        expect(service.exit(), service.output()).toBeUndefined();
+        const ready = await fetch(`${url}/ready`, { signal: AbortSignal.timeout(1000) });
+        expect(ready.status).toBe(200);
+        expect(await ready.json()).toMatchObject({ ready: true });
+      },
+      { timeout: 10000 }
+    );
+    const health = await fetch(`${url}/health`, { signal: AbortSignal.timeout(3000) });
+    expect(health.status).toBe(200);
+    expect(await health.json()).toMatchObject({
+      status: 'healthy',
+      checks: { database: true, nats: true, otel: true },
+    });
+    const wallpaper = await fetch(`${url}/wallpaper`, { signal: AbortSignal.timeout(1000) });
+    expect(wallpaper.status).toBe(404);
+    await wallpaper.arrayBuffer();
+    await expect.poll(connections).toMatchObject({ num_connections: 3 });
+    service.child.kill('SIGTERM');
+    expect(await service.waitForExit()).toEqual({ code: 0, signal: null });
+    await expect.poll(connections).toMatchObject({ num_connections: 0 });
+    await expect(
+      fetch(`${url}/ready`, { signal: AbortSignal.timeout(1000) })
+    ).rejects.toMatchObject({
+      cause: { code: 'ECONNREFUSED' },
+    });
   });
 
   it('recovers readiness after RTT and pre-INFO timeouts in the bundled process and shuts down concurrent work', async () => {
-    const address = new URL(nats.getConnectionUrl());
+    const address = new URL(brokerUrl());
     const proxy = await dependencyProxy(address.hostname, Number(address.port));
     proxies.push(proxy);
     const port = await availablePort();
     const service = startArtifact(directory, {
       PORT: String(port),
-      DATABASE_URL: `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`,
+      DATABASE_URL: databaseUrl(),
       NATS_URL: `nats://127.0.0.1:${proxy.port}`,
+      WALLPAPER_WORKFLOW_FILE: join(directory, 'workflow.json'),
     });
     services.push(service);
     const readiness = async () => {
@@ -194,51 +220,93 @@ describe('deployed Wallpaper service', () => {
     await vi.waitFor(async () => expect(await readiness()).toMatchObject({ status: 200 }), {
       timeout: 10000,
     });
+    await expect.poll(clientNames).toEqual(allClientNames);
+    const workflowSessions = (await sessions()).filter(({ name }) => name !== 'wallpaper');
+    const workflowSockets =
+      proxy.socketCountFor('wallpaper-asset-workflow') +
+      proxy.socketCountFor('wallpaper-publication');
+    expect(workflowSockets).toBeGreaterThan(0);
+    const healthySockets = proxy.socketCount();
+    expect(proxy.socketCountFor('wallpaper')).toBeGreaterThan(0);
+    expect(proxy.unidentifiedSocketCount()).toBe(0);
     const threadCount = async () => (await readdir(`/proc/${service.child.pid}/task`)).length;
     const healthyThreads = await threadCount();
     for (let cycle = 0; cycle < 2; cycle++) {
-      proxy.block();
+      proxy.block('wallpaper');
       expect(await readiness()).toMatchObject({ status: 503, body: { ready: false } });
-      await expect.poll(proxy.socketCount).toBe(0);
+      await expect.poll(() => proxy.socketCountFor('wallpaper')).toBe(0);
+      await expect.poll(sessions).toEqual(workflowSessions);
+      expect(proxy.socketCount()).toBe(workflowSockets);
+      await expect.poll(threadCount).toBe(healthyThreads - 1);
       proxy.unblock();
-      proxy.pause();
-      expect(await readiness()).toMatchObject({ status: 503, body: { ready: false } });
-      await expect.poll(proxy.socketCount).toBe(0);
-      expect(await threadCount()).toBeLessThanOrEqual(healthyThreads);
+      // Established workflow clients keep working; a new worker has no CONNECT name before INFO.
+      proxy.pauseNewConnections();
+      const [unavailable] = await Promise.all([
+        readiness(),
+        expect.poll(proxy.unidentifiedSocketCount).toBeGreaterThan(0),
+      ]);
+      expect(unavailable).toMatchObject({ status: 503, body: { ready: false } });
+      await expect.poll(proxy.unidentifiedSocketCount).toBe(0);
+      await expect.poll(sessions).toEqual(workflowSessions);
+      expect(proxy.socketCount()).toBe(workflowSockets);
+      await expect.poll(threadCount).toBe(healthyThreads - 1);
       proxy.resume();
       expect(await readiness()).toMatchObject({ status: 200, body: { ready: true } });
-      expect(proxy.socketCount()).toBe(2);
+      await expect.poll(clientNames).toEqual(allClientNames);
+      expect((await sessions()).filter(({ name }) => name !== 'wallpaper')).toEqual(
+        workflowSessions
+      );
+      expect(proxy.socketCount()).toBe(healthySockets);
       expect(await threadCount()).toBe(healthyThreads);
+      console.info('Bundled health recovery', {
+        cycle,
+        healthyThreads,
+        healthySockets,
+        workflowSessions,
+      });
     }
-    proxy.block();
+    proxy.block('wallpaper');
     const concurrent = Array.from({ length: 3 }, readiness);
     await expect.poll(proxy.hasBlockedTraffic).toBe(true);
     service.child.kill('SIGTERM');
     const stopping = Promise.allSettled([service.waitForExit(), ...concurrent]);
     // Broker work has its own two-second bound; HTTP retains its existing five-second drain.
-    await expect.poll(proxy.socketCount, { timeout: 3000 }).toBe(0);
+    await expect.poll(() => proxy.socketCountFor('wallpaper'), { timeout: 3000 }).toBe(0);
     const results = await stopping;
     expect(results[0]).toMatchObject({ status: 'fulfilled', value: { code: 0, signal: null } });
     await expect.poll(proxy.socketCount).toBe(0);
     await expect.poll(connections).toMatchObject({ num_connections: 0 });
+    await expect(readdir(`/proc/${service.child.pid}/task`)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(
+      fetch(`http://127.0.0.1:${port}/ready`, { signal: AbortSignal.timeout(1000) })
+    ).rejects.toMatchObject({ cause: { code: 'ECONNREFUSED' } });
   });
 
   it('reaps the bundled worker when initial acquisition stalls before broker INFO', async () => {
-    const address = new URL(nats.getConnectionUrl());
+    const address = new URL(brokerUrl());
     const proxy = await dependencyProxy(address.hostname, Number(address.port));
     proxies.push(proxy);
     proxy.pause();
     const service = startArtifact(directory, {
       PORT: String(await availablePort()),
-      DATABASE_URL: `postgresql://postgres:test@${postgres.getHost()}:${postgres.getMappedPort(5432)}/wallpaper`,
+      DATABASE_URL: databaseUrl(),
       NATS_URL: `nats://127.0.0.1:${proxy.port}`,
+      WALLPAPER_WORKFLOW_FILE: join(directory, 'workflow.json'),
     });
     services.push(service);
     const startedAt = Date.now();
+    await proxy.waitForConnection();
+    expect(proxy.unidentifiedSocketCount()).toBeGreaterThan(0);
+    expect(await clientNames()).not.toContain('wallpaper');
     expect(await service.waitForExit()).toEqual({ code: 1, signal: null });
     expect(Date.now() - startedAt).toBeLessThan(4000);
     await expect.poll(proxy.socketCount).toBe(0);
     await expect.poll(connections).toMatchObject({ num_connections: 0 });
+    await expect(readdir(`/proc/${service.child.pid}/task`)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
   });
 
   it('rejects malformed configuration without serving requests or exposing the supplied value', async () => {
@@ -247,22 +315,20 @@ describe('deployed Wallpaper service', () => {
       PORT: String(port),
       DATABASE_URL: databaseUrl(),
       NATS_URL: brokerUrl(),
+      WALLPAPER_WORKFLOW_FILE: join(directory, 'workflow.json'),
       // Enum validation includes this input in its raw diagnostic. Only NODE_ENV is malformed.
       NODE_ENV: 'https://wallpaper:private-configuration-marker@database.example/wallpaper',
     });
-    try {
-      expect(await service.waitForExit()).toEqual({ code: 1, signal: null });
-      expect(service.output()).toContain('Invalid wallpaper configuration');
-      expect(service.output()).not.toContain('private-configuration-marker');
-      await expect(
-        fetch(`http://127.0.0.1:${port}/ready`, {
-          signal: AbortSignal.timeout(1000),
-        })
-      ).rejects.toMatchObject({ cause: { code: 'ECONNREFUSED' } });
-      expect(await connections()).toMatchObject({ num_connections: 0 });
-    } finally {
-      await service.stop();
-    }
+    services.push(service);
+    expect(await service.waitForExit()).toEqual({ code: 1, signal: null });
+    expect(service.output()).toContain('Invalid wallpaper configuration');
+    expect(service.output()).not.toContain('private-configuration-marker');
+    await expect(
+      fetch(`http://127.0.0.1:${port}/ready`, {
+        signal: AbortSignal.timeout(1000),
+      })
+    ).rejects.toMatchObject({ cause: { code: 'ECONNREFUSED' } });
+    expect(await connections()).toMatchObject({ num_connections: 0 });
   });
 });
 
@@ -282,16 +348,12 @@ async function availablePort() {
 
 function startArtifact(directory: string, environment: Record<string, string>) {
   let output = '';
+  let closed = false;
+  let stopping: Promise<void> | undefined;
   let exit: { readonly code: number | null; readonly signal: NodeJS.Signals | null } | undefined;
   const child = spawn(process.execPath, [resolve('dist/index.mjs')], {
     cwd: directory,
     env: {
-      ...Object.fromEntries(
-        Object.entries(process.env).filter(
-          ([name]) =>
-            !name.startsWith('OTEL_') && !name.startsWith('DOTENV_') && name !== 'NODE_OPTIONS'
-        )
-      ),
       NODE_ENV: 'production',
       ...environment,
     },
@@ -307,12 +369,15 @@ function startArtifact(directory: string, environment: Record<string, string>) {
   child.once('exit', (code, signal) => {
     exit = { code, signal };
   });
+  child.once('close', () => {
+    closed = true;
+  });
   child.once('error', (error) => {
     output += error.message;
     exit = { code: null, signal: null };
   });
   const waitForExit = async () => {
-    await vi.waitFor(() => expect(exit, output).toBeDefined(), { timeout: 10000 });
+    await vi.waitFor(() => expect(closed, output).toBe(true), { timeout: 10000 });
     return exit;
   };
   return {
@@ -320,9 +385,12 @@ function startArtifact(directory: string, environment: Record<string, string>) {
     output: () => output,
     exit: () => exit,
     waitForExit,
-    stop: async () => {
-      if (!exit) child.kill('SIGKILL');
-      await waitForExit();
+    stop: () => {
+      stopping ??= (async () => {
+        if (!exit) child.kill('SIGKILL');
+        await waitForExit();
+      })();
+      return stopping;
     },
   };
 }

@@ -401,7 +401,10 @@ it('quarantines exhausted confirmation responsibility and exposes deliberate ope
       expect(
         (await restarted.runPromise(restartedOutbox.pendingAlerts())).find((c) => c.id === id)
       ).toBeUndefined();
-      expect(await restarted.runPromise(restartedOutbox.claim(100))).toEqual([]);
+      // Other contracts share this database, so their expired leases remain claimable.
+      expect(
+        (await restarted.runPromise(restartedOutbox.claim(100))).find((p) => p.id === id)
+      ).toBeUndefined();
     } finally {
       await restarted.dispose();
     }

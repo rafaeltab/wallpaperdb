@@ -151,11 +151,11 @@ services:
     restart: unless-stopped
     command: ["node", "/scripts/operator-inbox.mjs"]
     environment:
-      OPERATOR_INBOX_CONFIG: /config/authority.json
+      OPERATOR_INBOX_CONFIG: /config/operator-inbox.json
       OPERATOR_INBOX_DATA: /data
     volumes:
       - ../scripts/operator-inbox.mjs:/scripts/operator-inbox.mjs:ro
-      - ../apps/asset/.authority.json:/config/authority.json:ro
+      - ./.operator-inbox.json:/config/operator-inbox.json:ro
       - asset-operator-receipts:/data
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:3012/health"]

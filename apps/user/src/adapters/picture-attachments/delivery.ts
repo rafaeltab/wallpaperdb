@@ -3,7 +3,6 @@ import { and, eq, lte, or, isNull } from 'drizzle-orm';
 import type {
   AttachmentDelivery,
   AttachmentPublication,
-  PictureAttachment,
 } from '../../capabilities/picture-attachments/index.js';
 import {
   profiles,
@@ -12,14 +11,7 @@ import {
   attachmentQuarantine,
 } from '../../db/schema.js';
 import type { AttachmentDatabase, AttachmentQuery } from './types.js';
-import { decodeConfirmation } from './translation.js';
-type ConfirmationTarget = NonNullable<Parameters<AttachmentDelivery['quarantine']>[3]>;
-function confirmationTarget(payload: string): ConfirmationTarget | undefined {
-  const decoded = decodeConfirmation(new TextEncoder().encode(payload));
-  if (decoded.kind === 'result') return { kind: 'intent', id: decoded.result.attachmentId };
-  if (decoded.kind === 'source') return { kind: 'asset', id: decoded.confirmation.assetId };
-  return undefined;
-}
+import { confirmationTarget, reconcileAttention, type ConfirmationTarget } from './attention.js';
 type AttachmentTransaction = Parameters<Parameters<AttachmentDatabase['transaction']>[0]>[0];
 /** Delivery writers use the same Profile -> intent -> outbox order as attachment transitions. */
 async function lockIntent(
@@ -48,38 +40,6 @@ async function lockIntent(
     .where(eq(pictureAttachmentIntents.id, selected.id))
     .for('update');
   return intent;
-}
-/** The caller holds the intent row lock while closing its durable delivery obligation. */
-async function reconcileAttention(tx: AttachmentTransaction, intent: PictureAttachment) {
-  const pending = await tx
-    .select({ payload: attachmentQuarantine.payload })
-    .from(attachmentQuarantine)
-    .where(isNull(attachmentQuarantine.recoveredAt));
-  const otherConfirmation = pending.some(({ payload }) => {
-    const other = confirmationTarget(payload);
-    return other?.kind === 'intent'
-      ? other.id === intent.id
-      : other?.kind === 'asset' && other.id === intent.assetId;
-  });
-  const outbox = await tx
-    .select({ id: attachmentOutbox.id })
-    .from(attachmentOutbox)
-    .where(
-      and(eq(attachmentOutbox.attachmentId, intent.id), eq(attachmentOutbox.status, 'quarantined'))
-    )
-    .limit(1);
-  await tx
-    .update(pictureAttachmentIntents)
-    .set({
-      state: {
-        ...intent,
-        attentionRequired:
-          otherConfirmation ||
-          outbox.length > 0 ||
-          (intent.deletion === 'pending' && intent.attentionRequired === true),
-      },
-    })
-    .where(eq(pictureAttachmentIntents.id, intent.id));
 }
 export function makeDelivery(
   query: AttachmentQuery,
@@ -190,10 +150,7 @@ export function makeDelivery(
                 .update(attachmentOutbox)
                 .set({ status: 'quarantined', leaseId: null })
                 .where(eq(attachmentOutbox.id, row.id));
-              await tx
-                .update(pictureAttachmentIntents)
-                .set({ state: { ...intent.state, attentionRequired: true } })
-                .where(eq(pictureAttachmentIntents.id, intent.id));
+              await reconcileAttention(tx, intent.state);
               continue;
             }
             const leaseId = randomUUID();
@@ -257,11 +214,7 @@ export function makeDelivery(
             })
             .where(and(eq(attachmentOutbox.id, p.id), eq(attachmentOutbox.leaseId, p.leaseId)))
             .returning({ id: attachmentOutbox.id });
-          if (exhausted && changed.length)
-            await tx
-              .update(pictureAttachmentIntents)
-              .set({ state: { ...intent.state, attentionRequired: true } })
-              .where(eq(pictureAttachmentIntents.id, intent.id));
+          if (exhausted && changed.length) await reconcileAttention(tx, intent.state);
         })
       ),
     quarantine: (id, payload, reason, target) =>
@@ -290,20 +243,34 @@ export function makeDelivery(
         })
       ),
     recover: (id) =>
-      query('recover', async (db) => {
-        const rows = await db
-          .update(attachmentOutbox)
-          .set({
-            status: 'pending',
-            attempts: 0,
-            availableAt: new Date(),
-            leaseId: null,
-            notifiedAt: null,
-          })
-          .where(and(eq(attachmentOutbox.id, id), eq(attachmentOutbox.status, 'quarantined')))
-          .returning({ id: attachmentOutbox.id });
-        return rows.length === 1;
-      }),
+      query('recover', (db) =>
+        db.transaction(async (tx) => {
+          const [publication] = await tx
+            .select({ attachmentId: attachmentOutbox.attachmentId })
+            .from(attachmentOutbox)
+            .where(and(eq(attachmentOutbox.id, id), eq(attachmentOutbox.status, 'quarantined')));
+          if (!publication) return false;
+          const intent = await lockIntent(tx, { kind: 'intent', id: publication.attachmentId });
+          if (!intent) return false;
+          const rows = await tx
+            .update(attachmentOutbox)
+            .set({
+              status: 'pending',
+              attempts: 0,
+              availableAt: new Date(),
+              leaseId: null,
+              notifiedAt: null,
+            })
+            .where(and(eq(attachmentOutbox.id, id), eq(attachmentOutbox.status, 'quarantined')))
+            .returning({ id: attachmentOutbox.id });
+          if (!rows.length) return false;
+          intent.state.attentionPublications = [
+            ...new Set([...(intent.state.attentionPublications ?? []), id]),
+          ];
+          await reconcileAttention(tx, intent.state);
+          return true;
+        })
+      ),
   };
 
   return delivery;

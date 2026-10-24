@@ -5,6 +5,7 @@ import {
   pictureAttachmentIntents,
   pictureAttachmentSlots,
 } from '../../db/schema.js';
+import { reconcileAttention } from './attention.js';
 import type { Database } from '../database/index.js';
 type Db = Parameters<Parameters<Database['run']>[0]>[0];
 type Transaction = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -61,6 +62,7 @@ export async function persistAttachment(
       })
       .onConflictDoNothing();
   }
+  await reconcileAttention(tx, intent);
 }
 /** Profile concurrency belongs to User. A winning Profile mutation permanently
  * fences an unfinished attachment and records its orphan-delete duty immediately,

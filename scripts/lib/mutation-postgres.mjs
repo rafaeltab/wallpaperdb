@@ -117,12 +117,17 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 		clients.delete(sql);
 	};
 	const disconnectAll = () => Promise.all([...clients].map(disconnect));
-	const applicationClients = () =>
-		admin`select pid, usename, application_name, state, backend_start
+	const databaseBackends = () =>
+		admin`select pid, backend_type, usename, application_name, state, backend_start
 			from pg_stat_activity where datname = 'mutation' order by pid`;
 	const verifyNoClients = async (boundary) => {
-		const active = await applicationClients();
-		recordBoundary("client-audit", { boundary, clients: [...active] });
+		const backends = await databaseBackends();
+		const active = backends.filter((row) => row.backend_type === "client backend");
+		recordBoundary("client-audit", {
+			boundary,
+			backends: [...backends],
+			clients: active,
+		});
 		if (!active.length) return;
 		const error = new Error(
 			`${boundary} leaked ${active.length} PostgreSQL clients`,
@@ -134,12 +139,16 @@ export async function postgresFixture(cwd, image, deadline, cleanupMs, signal) {
 		while (performance.now() + 25 < observationDeadline && !operation.aborted) {
 			try {
 				await delay(25, undefined, { signal: operation });
-				const observed = await applicationClients();
+				const observed = await databaseBackends();
+				const clients = observed.filter(
+					(row) => row.backend_type === "client backend",
+				);
 				recordBoundary("client-audit-followup", {
 					boundary,
-					clients: [...observed],
+					backends: [...observed],
+					clients,
 				});
-				if (!observed.length) break;
+				if (!clients.length) break;
 			} catch {
 				break;
 			}

@@ -209,6 +209,9 @@ export async function coordinate() {
 			baselines.set(context.key, restoreBaseline(context));
 		return baselines.get(context.key);
 	};
+	// Failed visits cannot supply current evidence or a later unit gate.
+	const readEvidence = (context) =>
+		invalidStages.has(context.key) ? null : readBaseline(context);
 	let cancelled = false;
 	const cancellation = new AbortController();
 	const cancel = () => {
@@ -333,7 +336,7 @@ export async function coordinate() {
 			);
 			const unit =
 				job.suite === "integration" && unitJob
-					? current(unitJob, readBaseline)
+					? current(unitJob, readEvidence)
 					: null;
 			const unitMutants = [...resultIndex(unit?.report).values()];
 			const unitIncomplete =
@@ -372,7 +375,7 @@ export async function coordinate() {
 					))
 			)
 				continue;
-			const before = current(job, readBaseline);
+			const before = current(job, readEvidence);
 			let releaseLock;
 			let result;
 			try {
@@ -413,10 +416,13 @@ export async function coordinate() {
 				releaseLock?.();
 			}
 			summary.stages.push(result.summary);
-			if (result.summary.invalidFixtureResults)
+			if (
+				result.summary.invalidFixtureResults ||
+				result.summary.invalidWorkerResults
+			)
 				invalidStages.add(job.context.key);
 			baselines.delete(job.context.key);
-			const after = current(job, readBaseline);
+			const after = current(job, readEvidence);
 			const unitResults = resultIndex(unit?.report);
 			const selectedEvidence = (state) =>
 				[...resultIndex(state?.report)]
@@ -464,8 +470,6 @@ export async function coordinate() {
 			const publicationStart = performance.now();
 			// Preserve valid snapshots for later reuse, while this invocation's failed
 			// infrastructure leaves integration and combined conclusions pending.
-			const readEvidence = (context) =>
-				invalidStages.has(context.key) ? null : readBaseline(context);
 			summary.workspaces = summarize(full.jobs, false, full.jobs, readEvidence);
 			const selected = summarize(jobs, true, full.jobs, readEvidence);
 			summary.selectedWorkspaces = selected;

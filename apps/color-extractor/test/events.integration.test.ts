@@ -39,7 +39,7 @@ afterAll(async () => {
   const started = performance.now();
   if (mutationNatsEndpoint.withDisposal) await mutationNatsEndpoint.withDisposal(async () => {});
   else await tester.destroy();
-  mutationNatsEndpoint.recordLifecycle?.('disposed', (performance.now() - started) / 1000);
+  await mutationNatsEndpoint.recordLifecycle?.('disposed', (performance.now() - started) / 1000);
 });
 const input: ExtractionInput = {
   wallpaperId: 'wallpaper-test',

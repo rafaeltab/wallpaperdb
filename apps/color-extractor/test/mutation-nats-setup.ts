@@ -19,6 +19,23 @@ const fail = (disposal?: DisposalObservation) => {
 const url = process.env.WALLPAPERDB_MUTATION_NATS_URL;
 const reset = process.env.WALLPAPERDB_MUTATION_NATS_RESET;
 const token = process.env.WALLPAPERDB_MUTATION_NATS_TOKEN;
+const reportFailure = async (disposal?: DisposalObservation) => {
+  try {
+    fail(disposal);
+  } catch {
+    // Receipt storage cannot prevent independent controller notification.
+  }
+  try {
+    if (reset && token)
+      await fetch(new URL('/failure', reset), {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(1000),
+      });
+  } catch {
+    // The original failure remains authoritative if notification also fails.
+  }
+};
 try {
   if (!url || !reset || !token) throw new Error('Missing owned mutation NATS endpoint');
   const response = await fetch(reset, {
@@ -87,16 +104,7 @@ try {
         }),
       ]);
     } catch (error) {
-      try {
-        fail(disposal);
-      } catch {
-        // Keep the original disposal error and still notify the independent controller.
-      }
-      await fetch(new URL('/failure', reset), {
-        method: 'POST',
-        headers: { authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(1000),
-      }).catch(() => undefined);
+      await reportFailure(disposal);
       if (disposal.observationFailed)
         throw new AggregateError(
           [error],
@@ -108,10 +116,25 @@ try {
     }
   };
   if (timings)
-    mutationNatsEndpoint.recordLifecycle = (phase, seconds) => record({ phase, seconds });
-  mutationNatsEndpoint.recordLifecycle?.('created', (performance.now() - started) / 1000);
+    mutationNatsEndpoint.recordLifecycle = async (phase, seconds) => {
+      try {
+        record({ phase, seconds });
+      } catch (error) {
+        // Startup owns created-phase cleanup. Disposed runs after that boundary.
+        if (phase === 'disposed') await reportFailure();
+        throw error;
+      }
+    };
+  await mutationNatsEndpoint.recordLifecycle?.('created', (performance.now() - started) / 1000);
 } catch (error) {
-  fail();
-  await mutationNatsEndpoint.connection?.close();
+  const failures = [error];
+  try {
+    await mutationNatsEndpoint.connection?.close();
+  } catch (closeError) {
+    failures.push(closeError);
+  }
+  await reportFailure();
+  if (failures.length > 1)
+    throw new AggregateError(failures, 'Mutation NATS startup cleanup failed');
   throw error;
 }

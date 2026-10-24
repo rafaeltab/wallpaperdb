@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, onTestFinished } from 'vitest';
 import { OperatorNotificationHealth, recoverQuarantine } from '../src/adapters/commands/index.js';
 import { withOperatorNotificationFixture } from './fixtures/operator-notification.js';
 
@@ -90,6 +90,24 @@ it('unwinds the HTTP listener, broker and authenticated connection when provisio
       },
       {
         afterProvision: async ({ server, operator, container }) => {
+          // Keep this regression test bounded even if fixture ownership regresses.
+          onTestFinished(async () => {
+            const released = await Promise.allSettled([
+              operator.close(),
+              container.stop(),
+              new Promise<void>((resolve, reject) => {
+                if (!server.listening) return resolve();
+                server.closeAllConnections();
+                server.close((error) => (error ? reject(error) : resolve()));
+              }),
+            ]);
+            const errors = released.flatMap((result) =>
+              result.status === 'rejected' ? [result.reason] : []
+            );
+            if (errors.length)
+              throw new AggregateError(errors, 'Regression fixture safety cleanup failed');
+          });
+
           verifyReleased = async () => {
             expect(server.listening).toBe(false);
             expect(operator.isClosed()).toBe(true);
@@ -113,6 +131,24 @@ it('attempts every release after teardown rejection and retains the original tes
     await withOperatorNotificationFixture(
       (_request, response) => response.end(),
       async ({ server, operator, wallpaperOperator, container, runtime }) => {
+        // Keep this regression test bounded even if fixture ownership regresses.
+        onTestFinished(async () => {
+          const released = await Promise.allSettled([
+            operator.close(),
+            container.stop(),
+            new Promise<void>((resolve, reject) => {
+              if (!server.listening) return resolve();
+              server.closeAllConnections();
+              server.close((error) => (error ? reject(error) : resolve()));
+            }),
+          ]);
+          const errors = released.flatMap((result) =>
+            result.status === 'rejected' ? [result.reason] : []
+          );
+          if (errors.length)
+            throw new AggregateError(errors, 'Regression fixture safety cleanup failed');
+        });
+
         await runtime.runPromise(OperatorNotificationHealth);
         verifyReleased = async () => {
           expect(server.listening).toBe(false);

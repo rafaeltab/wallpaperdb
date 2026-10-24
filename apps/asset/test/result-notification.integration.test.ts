@@ -134,6 +134,7 @@ it('routes distinct retained result-quarantine receipts across two finite exhaus
           });
           const capability = ManagedRuntime.make(
             lifecycleLayer({
+              assetTypes: authority.assetTypes,
               revision: authority.identity,
               applications: authority.applications,
             }).pipe(Layer.provideMerge(persistence))

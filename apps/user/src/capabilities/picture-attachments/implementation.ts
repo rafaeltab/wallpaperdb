@@ -130,6 +130,7 @@ export const pictureAttachmentsLayer = Layer.effect(
                   result.outcome === 'rejected' &&
                   (result.assetId === null || result.assetId === intent.assetId)
                 ) {
+                  intent.deletionRejected = true;
                   intent.attentionRequired = true;
                   return { intent, result: 'requires-attention' };
                 }
@@ -140,7 +141,7 @@ export const pictureAttachmentsLayer = Layer.effect(
                 )
                   return { result: 'ignored' };
                 intent.deletion = 'complete';
-                intent.attentionRequired = false;
+                delete intent.deletionRejected;
                 return { intent, result: 'applied' };
               }
               if (
@@ -164,7 +165,6 @@ export const pictureAttachmentsLayer = Layer.effect(
                   orphan(intent, 'conflicted');
                 else intent.state = 'awaiting-source';
               } else if (!terminal(intent)) intent.state = 'failed';
-              intent.attentionRequired = false;
               return { intent, result: 'applied' };
             }
           )
@@ -197,7 +197,6 @@ export const pictureAttachmentsLayer = Layer.effect(
                 return { intent: orphan(intent, 'conflicted'), result: 'ignored' };
               intent.state = 'attached';
               intent.sourceId = c.sourceId;
-              intent.attentionRequired = false;
               return {
                 intent,
                 attach: {

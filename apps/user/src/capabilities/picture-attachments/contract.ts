@@ -32,6 +32,10 @@ export interface PictureAttachment {
   sourceIntent: SourceIntent | null;
   sourceId: string | null;
   deletion: 'none' | 'pending' | 'complete';
+  /** Retained publication duties remain open through operator reset until PubAck. */
+  attentionPublications?: readonly string[];
+  /** A rejected deletion needs a successful result independently of delivery recovery. */
+  deletionRejected?: boolean;
   attentionRequired?: boolean;
 }
 export interface AttachmentProfile {
@@ -129,6 +133,8 @@ export interface AttachmentTransition<A> {
  * detached intent unless the owner/key was already reserved. The callback is pure.
  * Intent changes, current-intent selection, Profile attachment/version and its event,
  * and stable create/orphan-delete outbox obligations commit in one transaction.
+ * Every intent write reconciles attention against retained confirmations, publication
+ * duties and rejected deletion under those locks, without blocking valid attachment.
  * Attachment is permitted only for the selected intent at its expected Profile version
  * with no current picture. Intent, key, Asset and command identities are never reused.
  * No external resource participates in this transaction. */

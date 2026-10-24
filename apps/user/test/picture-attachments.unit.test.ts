@@ -153,6 +153,44 @@ function controlled() {
   };
 }
 describe('Initial picture attachment', () => {
+  it.each([
+    'creation',
+    'source',
+    'deletion',
+  ])('does not dismiss independently recorded attention when applying a %s result', async (transition) => {
+    const c = controlled();
+    const i = await c.begin();
+    if (transition !== 'creation') await c.created(i);
+    if (transition === 'source')
+      await c.run((s) =>
+        s.expectSource({ profileId: 'owner' }, i.id, {
+          candidateId: 'candidate-A',
+          intentId: 'edit-A',
+        })
+      );
+    if (transition === 'deletion') await c.run((s) => s.cancel({ profileId: 'owner' }, i.id));
+    const retained = c.intents.get(i.id);
+    if (!retained) throw new Error('Missing controlled attachment');
+    // The Store supplies attention from another retained delivery responsibility.
+    retained.attentionRequired = true;
+    expect(
+      transition === 'creation'
+        ? await c.created(i)
+        : transition === 'source'
+          ? await c.source()
+          : await c.run((s) =>
+              s.assetResult({
+                attachmentId: i.id,
+                commandId: i.deleteCommandId,
+                causationId: i.deletionEventId,
+                outcome: 'deleted',
+                assetId: 'asset-A',
+              })
+            )
+    ).toBe('applied');
+    expect(c.intents.get(i.id)?.attentionRequired).toBe(true);
+    expect(c.profile().pictureAssetId).toBe(transition === 'source' ? 'asset-A' : null);
+  });
   it('requires the registered Source confirmation and commits User attachment separately from Asset acceptance', async () => {
     const c = controlled();
     const i = await c.begin();

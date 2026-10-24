@@ -154,7 +154,10 @@ export interface AttachmentPublication {
   readonly attempts: number;
 }
 /** PubAck completes publication. Leases and finite attempts survive restart; exhausted
- * work is quarantined. Only trusted operator composition may reset quarantined work. */
+ * work is quarantined. Only trusted operator composition may reset quarantined work.
+ * Recovery atomically renews its quarantine occurrence and finite attempt budget,
+ * preserving the original business publication. Notification retries retain that
+ * occurrence through restart; acknowledgements affect only its unresolved state. */
 export interface AttachmentDelivery {
   readonly claim: () => Effect.Effect<readonly AttachmentPublication[], AttachmentFailure>;
   /** Matching-lease completion and remaining attention commit together; stale leases do nothing. */
@@ -170,6 +173,7 @@ export interface AttachmentDelivery {
   readonly alerts: () => Effect.Effect<
     readonly {
       readonly id: string;
+      readonly quarantineId: string;
       readonly scope: 'outbox' | 'confirmation';
       readonly reason: 'invalid' | 'exhausted';
     }[],
@@ -177,7 +181,8 @@ export interface AttachmentDelivery {
   >;
   readonly alerted: (
     id: string,
-    scope: 'outbox' | 'confirmation'
+    scope: 'outbox' | 'confirmation',
+    quarantineId: string
   ) => Effect.Effect<void, AttachmentFailure>;
   readonly retainedConfirmation: (id: string) => Effect.Effect<string | null, AttachmentFailure>;
   /** Closes a recovered confirmation and reconciles its intent's remaining attention

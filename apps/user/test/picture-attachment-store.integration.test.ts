@@ -143,6 +143,97 @@ describe('PostgreSQL picture attachment contract', () => {
     return first;
   };
   it.each([
+    'pending',
+    'quarantined',
+  ])('ignores an earlier notification acknowledgement while renewed work is %s', async (phase) => {
+    const i = await begin();
+    await exhaustPublication(i.creationEventId);
+    const [alert] = await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()));
+    if (!alert) throw new Error('Missing exhausted publication alert');
+    const stale: Parameters<AttachmentDelivery['alerted']> = [
+      alert.id,
+      alert.scope,
+      alert.quarantineId,
+    ];
+    await runtime.runPromise(AttachmentDelivery.use((d) => d.alerted(...stale)));
+    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.recover(alert.id)))).toBe(true);
+    if (phase === 'quarantined') await exhaustPublication(i.creationEventId);
+    await runtime.runPromise(AttachmentDelivery.use((d) => d.alerted(...stale)));
+    if (phase === 'pending') await exhaustPublication(i.creationEventId);
+    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toHaveLength(1);
+    expect(await status(i)).toMatchObject({ attachment: { attentionRequired: true } });
+  });
+  it('leaves a recovered confirmation closed when its delayed notification acknowledgement arrives', async () => {
+    const i = await begin();
+    await created(i);
+    await runtime.runPromise(
+      AttachmentDelivery.use((d) =>
+        d.quarantine('recovered-ack', creationConfirmation(i), 'confirmation-exhausted', {
+          kind: 'intent',
+          id: i.id,
+        })
+      )
+    );
+    const [alert] = await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()));
+    if (!alert) throw new Error('Missing confirmation alert');
+    expect(
+      await runAttachmentOperator(['recover-confirmation', alert.id], {
+        databaseUrl,
+        maxAttempts: 2,
+        retryDelayMs: 1,
+      })
+    ).toEqual({ recovered: true });
+    await runtime.runPromise(
+      AttachmentDelivery.use((d) => d.alerted(alert.id, alert.scope, alert.quarantineId))
+    );
+    expect(
+      await sql`select notified_at from picture_attachment_quarantine where id=${alert.id}`
+    ).toEqual([{ notified_at: null }]);
+    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual([]);
+    expect(await status(i)).toMatchObject({
+      attachment: { attentionRequired: false, state: 'awaiting-source' },
+    });
+  });
+  it('rolls back occurrence renewal and attempt reset together when recovery cannot commit', async () => {
+    const i = await begin();
+    await exhaustPublication(i.creationEventId);
+    const before = await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()));
+    await sql`alter table picture_attachment_outbox add constraint reject_recovery check (status != 'pending')`;
+    try {
+      await expect(
+        runAttachmentOperator(['recover-outbox', i.creationEventId], {
+          databaseUrl,
+          maxAttempts: 2,
+          retryDelayMs: 1,
+        })
+      ).rejects.toThrow();
+    } finally {
+      await sql`alter table picture_attachment_outbox drop constraint reject_recovery`;
+    }
+    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()))).toEqual(before);
+    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.claim()))).toEqual([]);
+    expect(await status(i)).toMatchObject({ attachment: { attentionRequired: true } });
+    expect(
+      await runAttachmentOperator(['recover-outbox', i.creationEventId], {
+        databaseUrl,
+        maxAttempts: 2,
+        retryDelayMs: 1,
+      })
+    ).toEqual({ recovered: true });
+    const first = await claimPublication(i.creationEventId);
+    expect(first.attempts).toBe(0);
+    await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(first)));
+    await sql`update picture_attachment_outbox set available_at=now()-interval '1 second' where id=${i.creationEventId}`;
+    const second = await claimPublication(i.creationEventId);
+    expect(second.attempts).toBe(1);
+    expect(second.event).toEqual(first.event);
+    await runtime.runPromise(AttachmentDelivery.use((d) => d.failed(second)));
+    const renewed = await runtime.runPromise(AttachmentDelivery.use((d) => d.alerts()));
+    expect(renewed).toHaveLength(1);
+    expect(renewed).not.toEqual(before);
+    expect(await runtime.runPromise(AttachmentDelivery.use((d) => d.claim()))).toEqual([]);
+  });
+  it.each([
     ['creation', 'creation-outbox'],
     ['rejected-creation', 'creation-outbox'],
     ['source', 'creation-outbox'],
@@ -610,6 +701,7 @@ describe('PostgreSQL picture attachment contract', () => {
         id: i.creationEventId,
         scope: 'outbox',
         reason: 'exhausted',
+        quarantineId: expect.any(String),
       });
       expect(
         await runAttachmentOperator(['recover-outbox', i.creationEventId], {
@@ -858,6 +950,7 @@ describe('PostgreSQL picture attachment contract', () => {
       id: i.deletionEventId,
       scope: 'outbox',
       reason: 'exhausted',
+      quarantineId: expect.any(String),
     });
   });
   it('serializes cancellation and late creation with one exact durable orphan-delete command', async () => {
@@ -922,6 +1015,7 @@ describe('PostgreSQL picture attachment contract', () => {
       id: i.creationEventId,
       scope: 'outbox',
       reason: 'exhausted',
+      quarantineId: expect.any(String),
     });
     expect(
       await runtime.runPromise(PictureAttachments.use((s) => s.get({ profileId: 'owner' }, i.id)))
@@ -943,6 +1037,7 @@ describe('PostgreSQL picture attachment contract', () => {
       id: i.creationEventId,
       scope: 'outbox',
       reason: 'exhausted',
+      quarantineId: expect.any(String),
     });
     expect(
       await runAttachmentOperator(['recover-outbox', i.creationEventId], {

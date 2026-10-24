@@ -49,7 +49,7 @@ export function makeDelivery(
     alerts: () =>
       query('alerts', async (db) => {
         const outbox = await db
-          .select({ id: attachmentOutbox.id })
+          .select({ id: attachmentOutbox.id, quarantineId: attachmentOutbox.quarantineId })
           .from(attachmentOutbox)
           .where(
             and(eq(attachmentOutbox.status, 'quarantined'), isNull(attachmentOutbox.notifiedAt))
@@ -65,11 +65,13 @@ export function makeDelivery(
         return [
           ...outbox.map((row) => ({
             id: row.id,
+            quarantineId: row.quarantineId,
             scope: 'outbox' as const,
             reason: 'exhausted' as const,
           })),
           ...inbox.map((row) => ({
             id: row.id,
+            quarantineId: row.id,
             scope: 'confirmation' as const,
             reason: ['invalid-confirmation', 'rejected-confirmation'].includes(row.reason)
               ? ('invalid' as const)
@@ -77,18 +79,32 @@ export function makeDelivery(
           })),
         ];
       }),
-    alerted: (id, scope) =>
+    alerted: (id, scope, quarantineId) =>
       query('alerted', async (db) => {
         if (scope === 'outbox')
           await db
             .update(attachmentOutbox)
             .set({ notifiedAt: new Date() })
-            .where(eq(attachmentOutbox.id, id));
+            .where(
+              and(
+                eq(attachmentOutbox.id, id),
+                eq(attachmentOutbox.quarantineId, quarantineId),
+                eq(attachmentOutbox.status, 'quarantined'),
+                isNull(attachmentOutbox.notifiedAt)
+              )
+            );
         else
           await db
             .update(attachmentQuarantine)
             .set({ notifiedAt: new Date() })
-            .where(eq(attachmentQuarantine.id, id));
+            .where(
+              and(
+                eq(attachmentQuarantine.id, id),
+                eq(attachmentQuarantine.id, quarantineId),
+                isNull(attachmentQuarantine.recoveredAt),
+                isNull(attachmentQuarantine.notifiedAt)
+              )
+            );
       }),
     retainedConfirmation: (id) =>
       query('retained-confirmation', async (db) => {
@@ -260,6 +276,7 @@ export function makeDelivery(
               availableAt: new Date(),
               leaseId: null,
               notifiedAt: null,
+              quarantineId: randomUUID(),
             })
             .where(and(eq(attachmentOutbox.id, id), eq(attachmentOutbox.status, 'quarantined')))
             .returning({ id: attachmentOutbox.id });

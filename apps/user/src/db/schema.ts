@@ -176,6 +176,7 @@ export const attachmentOutbox = pgTable(
     attempts: integer('attempts').notNull().default(0),
     availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
     leaseId: text('lease_id'),
+    quarantineId: text('quarantine_id').notNull().default(sql`gen_random_uuid()`),
     notifiedAt: timestamp('notified_at', { withTimezone: true }),
   },
   (t) => [

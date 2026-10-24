@@ -17,22 +17,50 @@ test("seeded base user can upload committed fixtures through the browser UI", as
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
   await expect(page.getByTestId("upload-page")).toBeVisible();
 
-  const creating = page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/wallpaper/wallpapers") &&
-      response.request().method() === "POST" &&
-      response.status() === 202,
-  );
-  await page.getByTestId("file-input").setInputFiles(uploadFixturePaths[0]);
-  const receipt: unknown = await (await creating).json();
-  if (
-    typeof receipt !== "object" ||
-    receipt === null ||
-    !("wallpaperId" in receipt) ||
-    typeof receipt.wallpaperId !== "string"
-  )
-    throw new Error("Missing durable Wallpaper receipt");
-  const id = receipt.wallpaperId;
+  const creating = page
+    .waitForResponse(
+      (response) =>
+        response.url().endsWith("/wallpaper/wallpapers") &&
+        response.request().method() === "POST" &&
+        response.status() === 202,
+    )
+    .then(async (response) => {
+      const receipt: unknown = await response.json();
+      if (
+        typeof receipt !== "object" ||
+        receipt === null ||
+        !("wallpaperId" in receipt) ||
+        typeof receipt.wallpaperId !== "string"
+      )
+        throw new Error("Missing durable Wallpaper receipt");
+      return receipt.wallpaperId;
+    });
+  // The 202 starts an asynchronous workflow. Observe this creation's actual
+  // publication before checking UI completion, and register before selecting
+  // the file so an immediate publication cannot race the observer.
+  const publishing = page.waitForResponse(async (response) => {
+    const path = new URL(response.url()).pathname;
+    if (
+      response.request().method() !== "GET" ||
+      response.status() !== 200 ||
+      !path.startsWith("/wallpaper/wallpapers/")
+    )
+      return false;
+    if (path !== `/wallpaper/wallpapers/${encodeURIComponent(await creating)}`)
+      return false;
+    const status: unknown = await response.json();
+    return (
+      typeof status === "object" &&
+      status !== null &&
+      "state" in status &&
+      status.state === "published"
+    );
+  });
+  const [id] = await Promise.all([
+    creating,
+    publishing,
+    page.getByTestId("file-input").setInputFiles(uploadFixturePaths[0]),
+  ]);
 
   await expect(page.getByTestId("upload-progress-status")).toHaveText(
     "Upload complete",

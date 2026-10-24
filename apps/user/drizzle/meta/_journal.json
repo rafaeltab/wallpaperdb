@@ -92,6 +92,13 @@
       "when": 1792757584055,
       "tag": "0012_kind_runaways",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792848467424,
+      "tag": "0013_bizarre_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

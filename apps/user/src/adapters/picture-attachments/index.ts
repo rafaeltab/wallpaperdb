@@ -123,7 +123,10 @@ export function attachmentBrokerLayer(options: Options) {
             );
           }
           for (const alert of yield* delivery.alerts()) {
-            const id = createHash('sha256').update(`user:${alert.scope}:${alert.id}`).digest('hex');
+            const occurrence = alert.scope === 'outbox' ? `:${alert.quarantineId}` : '';
+            const id = createHash('sha256')
+              .update(`user:${alert.scope}:${alert.id}${occurrence}`)
+              .digest('hex');
             yield* attempt('notify-operator', async () => {
               const response = await fetch(options.operatorNotification.url, {
                 method: 'POST',
@@ -145,7 +148,7 @@ export function attachmentBrokerLayer(options: Options) {
               await response.body?.cancel();
               if (!response.ok) throw new Error('Operator destination rejected notification');
             });
-            yield* delivery.alerted(alert.id, alert.scope);
+            yield* delivery.alerted(alert.id, alert.scope, alert.quarantineId);
           }
         }),
         sendingHealthy

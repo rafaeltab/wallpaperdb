@@ -61,7 +61,11 @@ export function startDevelopmentWatcher(
               ? { pid: Number(pid), state: fields[0] }
               : undefined;
           } catch (cause) {
-            if (cause instanceof Error && 'code' in cause && cause.code === 'ENOENT')
+            if (
+              cause instanceof Error &&
+              'code' in cause &&
+              (cause.code === 'ENOENT' || cause.code === 'ESRCH')
+            )
               return undefined;
             throw cause;
           }

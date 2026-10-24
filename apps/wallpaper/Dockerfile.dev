@@ -33,4 +33,4 @@ RUN cp scripts/entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh
 WORKDIR /app/apps/wallpaper
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["pnpm", "exec", "tsx", "watch", "src/index.ts"]
+CMD ["pnpm", "exec", "tsx", "watch", "--include", "src/adapters/dependencies/broker-worker.ts", "src/index.ts"]

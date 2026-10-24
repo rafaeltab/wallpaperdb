@@ -17,6 +17,9 @@ import {
 import { SourceAcceptanceOutbox } from '../../src/capabilities/sources/index.js';
 import { natsEventsLayer, EventsHealth } from '../../src/adapters/events/index.js';
 
+import { cleanupWorkerLayer, CleanupHealth } from '../../src/adapters/cleanup/index.js';
+import { Cleanup, CleanupStore } from '../../src/capabilities/cleanup/index.js';
+
 const [mode, url, path] = process.argv.slice(2);
 if (!url || !path) throw new Error('Fixture arguments required');
 const authority = readAuthority(path);
@@ -75,6 +78,30 @@ try {
       const health = await runtime.runPromise(SourceConfirmationHealth);
       if (!(await runtime.runPromise(health.check())))
         throw new Error('Source publisher unavailable');
+    } finally {
+      await runtime.dispose();
+    }
+  } else if (mode === 'cleanup') {
+    const runtime = ManagedRuntime.make(
+      cleanupWorkerLayer(options).pipe(
+        Layer.provide(
+          Layer.merge(
+            Layer.succeed(Cleanup, { run: () => Effect.succeed({ completed: 0, failed: 0 }) }),
+            Layer.succeed(CleanupStore, {
+              claim: () => Effect.succeed([]),
+              completed: () => Effect.void,
+              failed: () => Effect.void,
+              pendingAlerts: () => Effect.succeed([]),
+              alerted: () => Effect.void,
+              recover: () => Effect.succeed(false),
+            })
+          )
+        )
+      )
+    );
+    try {
+      const health = await runtime.runPromise(CleanupHealth);
+      if (!(await runtime.runPromise(health.check()))) throw new Error('Cleanup unavailable');
     } finally {
       await runtime.dispose();
     }

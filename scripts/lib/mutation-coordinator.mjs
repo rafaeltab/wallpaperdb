@@ -408,6 +408,11 @@ export async function coordinate() {
 					budgetMs: visitMs - graceMs,
 					graceMs,
 					output: join(root, job.workspace, "reports/mutation", job.suite),
+				}).catch((error) => {
+					// Finalization can reject before the stage's invalid flags return.
+					invalidStages.add(job.context.key);
+					baselines.delete(job.context.key);
+					throw error;
 				});
 			} catch (error) {
 				if (cancelled && error.name === "AbortError") break;

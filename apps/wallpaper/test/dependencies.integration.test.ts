@@ -136,6 +136,44 @@ describe('dependency probe with PostgreSQL and NATS', () => {
     }
   });
 
+  it('reports a borrowed database connection loss as unavailable and recovers without leaking sessions', async () => {
+    const proxy = await databaseProxy(postgres.getHost(), postgres.getMappedPort(5432));
+    const serviceName = 'wallpaper-disconnected-probe-test';
+    const runtime = ManagedRuntime.make(
+      dependencyProbeLayer({
+        databaseUrl: databaseUrl(proxy.port),
+        natsUrl: nats.getConnectionUrl(),
+        serviceName,
+        otelHealthy: true,
+      })
+    );
+    runtimes.push(runtime);
+    try {
+      expect(
+        await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
+      ).toMatchObject({ database: true });
+      proxy.block();
+      const pending = runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()));
+      await expect.poll(proxy.hasBlockedTraffic).toBe(true);
+      const sessions = await admin.query<{ count: number }>(
+        'SELECT count(*)::int AS count FROM pg_stat_activity WHERE application_name = $1',
+        [serviceName]
+      );
+      expect(sessions.rows).toEqual([{ count: 1 }]);
+      proxy.disconnect();
+      expect(await pending).toEqual({ database: false, nats: true, otel: true });
+      await expect.poll(activeDatabaseConnections).toBe(0);
+      proxy.unblock();
+      expect(
+        await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
+      ).toMatchObject({ database: true });
+      await runtime.dispose();
+      await expect.poll(activeDatabaseConnections).toBe(0);
+    } finally {
+      await Promise.all([runtime.dispose(), proxy.close()]);
+    }
+  });
+
   it('bounds a stalled database probe by destroying its connection and permits recovery', async () => {
     const proxy = await databaseProxy(postgres.getHost(), postgres.getMappedPort(5432));
     const runtime = ManagedRuntime.make(
@@ -204,6 +242,44 @@ describe('dependency probe with PostgreSQL and NATS', () => {
     }
   });
 
+  it('disposes a database connection acquired after inspection was interrupted', async () => {
+    const proxy = await databaseProxy(postgres.getHost(), postgres.getMappedPort(5432));
+    const runtime = ManagedRuntime.make(
+      dependencyProbeLayer({
+        databaseUrl: databaseUrl(proxy.port),
+        natsUrl: nats.getConnectionUrl(),
+        serviceName: 'wallpaper-late-database-test',
+        otelHealthy: true,
+      })
+    );
+    runtimes.push(runtime);
+    const controller = new AbortController();
+    try {
+      await runtime.runPromise(AvailabilityProbe);
+      proxy.pause();
+      const pending = runtime.runPromiseExit(
+        AvailabilityProbe.use((probe) => probe.inspect()),
+        {
+          signal: controller.signal,
+        }
+      );
+      await expect.poll(proxy.socketCount).toBe(2);
+      controller.abort();
+      const result = await pending;
+      expect(Exit.isFailure(result) && Cause.hasInterruptsOnly(result.cause)).toBe(true);
+      proxy.resume();
+      await expect.poll(proxy.socketCount).toBe(0);
+      await expect.poll(activeDatabaseConnections).toBe(0);
+      expect(
+        await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
+      ).toMatchObject({ database: true });
+    } finally {
+      controller.abort();
+      proxy.resume();
+      await Promise.all([runtime.dispose(), proxy.close()]);
+    }
+  });
+
   it('keeps PostgreSQL lazy and reports database and telemetry unavailability independently', async () => {
     const runtime = ManagedRuntime.make(
       dependencyProbeLayer({
@@ -263,15 +339,20 @@ describe('dependency probe with PostgreSQL and NATS', () => {
   });
 });
 
-/** Forward real PostgreSQL traffic, with an optional network stall after authentication. */
+/** Forward real dependency traffic, with controlled stalls and transport loss. */
 async function databaseProxy(host: string, port: number) {
   let blocked = false;
   let blockedTraffic = false;
+  let paused = false;
   const sockets = new Set<Socket>();
   const server = createServer((incoming) => {
     const outgoing = createConnection({ host, port });
     sockets.add(incoming);
     sockets.add(outgoing);
+    if (paused) {
+      incoming.pause();
+      outgoing.pause();
+    }
     incoming.on('data', (data) => {
       if (blocked) blockedTraffic = true;
       else outgoing.write(data);
@@ -295,11 +376,24 @@ async function databaseProxy(host: string, port: number) {
     port: address.port,
     block: () => {
       blocked = true;
+      blockedTraffic = false;
     },
     unblock: () => {
       blocked = false;
     },
     hasBlockedTraffic: () => blockedTraffic,
+    socketCount: () => sockets.size,
+    pause: () => {
+      paused = true;
+      for (const socket of sockets) socket.pause();
+    },
+    resume: () => {
+      paused = false;
+      for (const socket of sockets) socket.resume();
+    },
+    disconnect: () => {
+      for (const socket of sockets) socket.destroy();
+    },
     close: async () => {
       for (const socket of sockets) socket.destroy();
       await new Promise<void>((resolve, reject) =>

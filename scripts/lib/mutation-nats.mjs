@@ -83,20 +83,24 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 			commands.delete(closed);
 		}
 	};
-	const monitor = async (path) => {
+	const monitor = async (path, until = deadline) => {
+		operationSignal().throwIfAborted();
+		const timeout = Math.min(1000, Math.floor(until - performance.now()));
+		if (timeout <= 0) throw new Error("Owned NATS monitoring deadline expired");
 		const response = await fetch(`http://127.0.0.1:${monitorPort}${path}`, {
 			signal: AbortSignal.any([
 				operationSignal(),
-				AbortSignal.timeout(Math.min(1000, remaining())),
+				AbortSignal.timeout(timeout),
 			]),
 		});
 		if (!response.ok) throw new Error("Owned NATS monitoring failed");
 		return response.json();
 	};
-	const verifyNoClients = async (boundary) => {
+	const verifyNoClients = async (boundary, until = deadline) => {
 		await manager.getAccountInfo();
 		const snapshot = await monitor(
 			"/connz?state=open&subs=1&offset=0&limit=1024",
+			until,
 		);
 		const cid = connection.info?.client_id;
 		if (
@@ -291,19 +295,27 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 		closePromise ??= (async () => {
 			const started = performance.now();
 			cleanupDeadline = started + cleanupMs;
-			record("close-start", { resetting });
+			// Execution and runner grace may be exhausted. Final audit uses only
+			// its reserved cleanup portion, leaving time for Docker removal.
+			const teardownMs = Math.min(1000, cleanupMs / 3);
+			const auditDeadline = cleanupDeadline - teardownMs;
+			record("close-start", {
+				resetting,
+				auditBudgetMs: auditDeadline - started,
+				teardownReservedMs: teardownMs,
+			});
 			const timer = setTimeout(
 				() => {
 					lifetime.abort();
 					void disconnect();
 				},
-				Math.max(1, cleanupMs - Math.min(1000, cleanupMs / 3)),
+				Math.max(1, auditDeadline - performance.now()),
 			);
 			let error;
 			try {
 				await resetDone;
 				if (connection && !failure && !operation.aborted)
-					await verifyNoClients("Final mutation");
+					await verifyNoClients("Final mutation", auditDeadline);
 			} catch (cause) {
 				error = cause;
 			}

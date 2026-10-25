@@ -15,6 +15,36 @@ const at = (date: string) => {
 afterEach(() => vi.useRealTimers());
 
 describe('Profiles capability', () => {
+  it('keeps the generated avatar unchanged when there is no custom picture or pending attachment', async () => {
+    const test = controlledProfiles();
+    const before = await test.ensure();
+
+    expect(await test.run((p) => p.adoptPicture(principal, null, 1))).toEqual({
+      _tag: 'Success',
+      profile: before,
+    });
+    expect(test.transitions.map((entry) => entry.mutation.type)).toEqual(['created']);
+  });
+  it('rejects anonymous picture removal while preserving a pending attachment', async () => {
+    const test = controlledProfiles();
+    await test.ensure();
+    test.beginAttachment('owner');
+
+    expect(await test.run((p) => p.adoptPicture({ profileId: '' }, null, 1))).toMatchObject({
+      _tag: 'Rejected',
+      reason: 'unauthorized',
+    });
+    expect(test.transitions.map((entry) => entry.mutation.type)).toEqual(['created']);
+    expect(await test.run((p) => p.adoptPicture(principal, null, 1))).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 2, pictureAssetId: null },
+    });
+    expect(test.transitions.at(-1)?.mutation).toEqual({
+      type: 'picture',
+      asset: null,
+      source: 'remove',
+    });
+  });
   it('keeps picture removal unchanged after an accepted details edit fences pending attachment', async () => {
     const test = controlledProfiles();
     await test.ensure();

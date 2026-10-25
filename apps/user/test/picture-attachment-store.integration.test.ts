@@ -453,12 +453,130 @@ describe('PostgreSQL picture attachment contract', () => {
       data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
     });
   });
+  it('commits only one unlink and former-Asset deletion when removals race at the same Profile version', async () => {
+    const first = await begin();
+    await created(first);
+    await register(first);
+    await confirm(first);
+
+    const results = await Promise.all([remove(2), remove(2)]);
+    expect(results.filter((result) => result._tag === 'Success')).toEqual([
+      expect.objectContaining({
+        profile: expect.objectContaining({ version: 3, pictureAssetId: null }),
+      }),
+    ]);
+    expect(results.filter((result) => result._tag === 'Rejected')).toEqual([
+      expect.objectContaining({ reason: 'version-conflict' }),
+    ]);
+    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+      { picture_asset_id: null, version: 3 },
+    ]);
+    expect(
+      await sql`select payload from outbox_events where payload->'change'->>'after' is null`
+    ).toMatchObject([
+      {
+        payload: {
+          profile: { version: 3 },
+          change: { before: 'asset-A', after: null, source: 'remove' },
+        },
+      },
+    ]);
+    expect(
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+    ).toMatchObject([
+      {
+        event: {
+          id: first.deletionEventId,
+          data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+        },
+      },
+    ]);
+    expect(await status(first)).toMatchObject({
+      attachment: { state: 'cancelled', deletion: 'pending' },
+    });
+  });
+  it('leaves Source acceptance available after a stale picture removal is rejected', async () => {
+    const first = await begin();
+    await created(first);
+    await register(first);
+
+    expect(await remove(2)).toMatchObject({ _tag: 'Rejected', reason: 'version-conflict' });
+    expect(await status(first)).toMatchObject({
+      attachment: { state: 'accepting-source', deletion: 'none' },
+    });
+    expect(
+      await sql`select id from picture_attachment_outbox where destination='asset-delete'`
+    ).toEqual([]);
+    expect(await sql`select id from outbox_events`).toEqual([]);
+    expect(await confirm(first)).toBe('applied');
+    expect(await sql`select picture_asset_id,version from profiles`).toEqual([
+      { picture_asset_id: 'asset-A', version: 2 },
+    ]);
+  });
+  it('keeps an attached picture and its deletion identity intact after an ordinary Profile edit', async () => {
+    const first = await begin();
+    await created(first);
+    await register(first);
+    await confirm(first);
+
+    const owner = ManagedRuntime.make(
+      profileStoreLayer(profilePolicy).pipe(Layer.provide(databaseLayer({ databaseUrl })))
+    );
+    try {
+      expect(
+        await owner.runPromise(
+          ProfileStore.use((store) =>
+            store.transact({ profileId: 'owner', now: new Date() }, () => ({
+              _tag: 'Change',
+              mutation: { type: 'details', displayName: 'Updated owner', biographyMarkdown: '' },
+            }))
+          )
+        )
+      ).toMatchObject({
+        changed: true,
+        outcome: { _tag: 'Success', profile: { pictureAssetId: 'asset-A', version: 3 } },
+      });
+    } finally {
+      await owner.dispose();
+    }
+    expect(await status(first)).toMatchObject({
+      attachment: { state: 'attached', deletion: 'none' },
+    });
+    expect(
+      await sql`select id from picture_attachment_outbox where destination='asset-delete'`
+    ).toEqual([]);
+    expect(await remove(3)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 4, pictureAssetId: null },
+    });
+    expect(
+      await sql`select event from picture_attachment_outbox where destination='asset-delete'`
+    ).toMatchObject([
+      {
+        event: {
+          id: first.deletionEventId,
+          data: { commandId: first.deleteCommandId, assetId: 'asset-A' },
+        },
+      },
+    ]);
+  });
+  it('uses the generated avatar without allocating or deleting an Asset when no attachment has been reserved', async () => {
+    expect(await remove(1)).toMatchObject({
+      _tag: 'Success',
+      profile: { version: 1, pictureAssetId: null },
+    });
+    expect(await sql`select id from picture_attachment_intents`).toEqual([]);
+    expect(await sql`select id from picture_attachment_outbox`).toEqual([]);
+    expect(await sql`select id from outbox_events`).toEqual([]);
+  });
   it.each([
     'creating',
     'awaiting-source',
+    'accepting-source',
   ])('removes an empty Profile during %s and durably deletes a late-created Asset', async (state) => {
     const first = await begin();
-    if (state === 'awaiting-source') await created(first);
+    if (state !== 'creating') await created(first);
+    if (state === 'accepting-source') await register(first);
     expect(await remove(1)).toMatchObject({
       _tag: 'Success',
       profile: { version: 2, pictureAssetId: null },

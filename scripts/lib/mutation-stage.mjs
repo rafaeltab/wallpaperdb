@@ -453,7 +453,12 @@ export async function runStage({
 			};
 			summary.results = resultCounts([...resultIndex(report).values()]);
 			if (summary.results.counts.RuntimeError) summary.outcome = "failed";
-			if (config.fixture === "s3-owned") assertS3Healthy();
+			if (config.fixture === "s3-owned") {
+				// Deliver queued signals after synchronous hashing/merging, before
+				// checking eligibility. Signals arriving after this check can still race.
+				await new Promise((resolve) => setImmediate(resolve));
+				assertS3Healthy();
+			}
 			const checkpoint = publishBaseline(context, report, {
 				discovery,
 				provenance,
@@ -472,14 +477,18 @@ export async function runStage({
 				"Startup/coverage collection exhausted this slice without executing mutations";
 		return { summary, report, context };
 	} catch (error) {
-		const cleanupFailed = error instanceof FixtureCleanupError;
-		if (cleanupFailed) summary.cleanupError = error.message;
+		const startupCleanupFailed = error instanceof FixtureCleanupError;
+		if (startupCleanupFailed) summary.cleanupError = error.message;
+		const hasCleanupFailure =
+			startupCleanupFailed ||
+			(config.fixture === "s3-owned" &&
+				(cleanupFailed || Boolean(summary.cleanupError)));
 		if (config.fixture === "s3-owned" && workerStarted) {
 			summary.invalidFixtureResults = true;
 			quarantineProgress();
 		}
 		if (
-			!cleanupFailed &&
+			!hasCleanupFailure &&
 			(shouldCancel() ||
 				(!workerStarted && performance.now() >= start + budgetMs))
 		) {

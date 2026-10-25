@@ -39,6 +39,7 @@ it('reads exact stored bytes and distinguishes missing objects', async () => {
   // Observe the real application requests after the seed helper has finished.
   // Vitest's default spy forwards every call to the actual SDK implementation.
   const sending = vi.spyOn(S3Client.prototype, 'send');
+  const destroying = vi.spyOn(S3Client.prototype, 'destroy');
   const config = mutationS3Endpoint.config ?? {
     endpoint: tester.getS3().endpoints.fromHost,
     region: 'us-east-1',
@@ -108,10 +109,13 @@ it('reads exact stored bytes and distinguishes missing objects', async () => {
       try {
         // An early production failure can legitimately precede any SDK request.
         if (failures.length === 0) {
-          if (clients.length !== 1 || sockets.size === 0) observationComplete = false;
+          if (clients.length !== 1) observationComplete = false;
           expect(clients).toHaveLength(1);
-          expect(sockets.size).toBeGreaterThan(0);
         }
+        // An idle connection may already have closed. The runtime still owns
+        // the real SDK client's release, independently of live socket count.
+        const released = new Set(destroying.mock.contexts);
+        for (const client of clients) expect(released.has(client)).toBe(true);
         for (const socket of sockets) expect(socket.destroyed).toBe(true);
         for (const agent of agents)
           expect(Object.values(agent.requests).flatMap((entries) => entries ?? [])).toHaveLength(0);
@@ -142,7 +146,16 @@ it('reads exact stored bytes and distinguishes missing objects', async () => {
           failures.push(cause);
         }
       }
-      sending.mockRestore();
+      try {
+        sending.mockRestore();
+      } catch (cause) {
+        failures.push(cause);
+      }
+      try {
+        destroying.mockRestore();
+      } catch (cause) {
+        failures.push(cause);
+      }
     }
   }
   if (failures.length === 1) throw failures[0];

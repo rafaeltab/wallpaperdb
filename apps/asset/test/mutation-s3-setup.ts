@@ -26,16 +26,39 @@ vi.mock('@aws-sdk/client-s3', async (original) => {
     ...sdk,
     S3Client: class extends sdk.S3Client {
       constructor(...args: ConstructorParameters<typeof sdk.S3Client>) {
+        const started = performance.now();
         super(...args);
-        observed.clients.set(this, {
+        const entry = {
           id: observed.clients.size + 1,
           attempted: false,
           returned: false,
           observationFailed: false,
-          sockets: new Map(),
-        });
+          sockets: new Map<Socket, ReturnType<typeof socketState>>(),
+        };
+        observed.clients.set(this, entry);
+        try {
+          record({
+            phase: 'created',
+            sdkClientId: entry.id,
+            seconds: (performance.now() - started) / 1000,
+          });
+        } catch (error) {
+          entry.observationFailed = true;
+          entry.attempted = true;
+          try {
+            super.destroy();
+            entry.returned = true;
+          } catch (cause) {
+            throw new AggregateError(
+              [error, cause],
+              'S3 observation and constructor cleanup failed'
+            );
+          }
+          throw error;
+        }
       }
       override destroy() {
+        const started = performance.now();
         const record = observed.clients.get(this);
         if (!record) throw new Error('Unknown mutation S3 client');
         record.attempted = true;
@@ -46,7 +69,7 @@ vi.mock('@aws-sdk/client-s3', async (original) => {
               ...Object.values(agent.sockets),
               ...Object.values(agent.freeSockets),
             ].flatMap((entries) => entries ?? []))
-              record.sockets.set(socket, socketState(socket));
+              if (!record.sockets.has(socket)) record.sockets.set(socket, socketState(socket));
           }
         } catch (error) {
           record.observationFailed = true;
@@ -55,6 +78,12 @@ vi.mock('@aws-sdk/client-s3', async (original) => {
         // Observation failure cannot skip the actual resource release.
         super.destroy();
         record.returned = true;
+        try {
+          recordDestroy({ sdkClientId: record.id, seconds: (performance.now() - started) / 1000 });
+        } catch (error) {
+          record.observationFailed = true;
+          observationError ??= error;
+        }
         if (observationError) throw observationError;
       }
     },
@@ -69,13 +98,15 @@ const reset = process.env.WALLPAPERDB_MUTATION_S3_RESET;
 const token = process.env.WALLPAPERDB_MUTATION_S3_TOKEN;
 const endpoint = process.env.WALLPAPERDB_MUTATION_S3_ENDPOINT;
 const timings = process.env.WALLPAPERDB_MUTATION_CLIENT_TIMINGS;
+let executionId = 0;
 const record = (entry: object) => {
   if (!timings) throw new Error('Missing mutation S3 observation file');
   appendFileSync(
     timings,
-    `${JSON.stringify({ pid: process.pid, threadId, at: Date.now(), ...entry })}\n`
+    `${JSON.stringify({ execution: executionId, pid: process.pid, threadId, at: Date.now(), ...entry })}\n`
   );
 };
+const recordDestroy = (entry: object) => record({ event: 'sdk-destroy-return', ...entry });
 const notifyFailure = async () => {
   try {
     const receipt = process.env.WALLPAPERDB_MUTATION_FAILURE_FILE;
@@ -178,6 +209,7 @@ try {
   const execution = Number(await response.text());
   if (!Number.isSafeInteger(execution) || execution < 1)
     throw new Error('Invalid S3 execution identity');
+  executionId = execution;
   const started = performance.now();
   const app = connectionConfig('APP');
   const seed = connectionConfig('HELPER');
@@ -262,7 +294,7 @@ try {
       throw error;
     }
   };
-  record({ execution, phase: 'created', seconds: (performance.now() - started) / 1000 });
+  record({ execution, event: 'helper-ready', seconds: (performance.now() - started) / 1000 });
 } catch (error) {
   const failures = [error];
   try {

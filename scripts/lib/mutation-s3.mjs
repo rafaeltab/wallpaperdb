@@ -111,6 +111,8 @@ export async function s3Fixture(
 		disposed = true;
 	let observationError;
 	let auditDeadline;
+	let phase = "startup";
+	const deadlineErrors = new WeakSet();
 	let boundariesDropped = 0;
 	const record = (event, details = {}) => {
 		if (boundaries.length === 128) {
@@ -134,10 +136,111 @@ export async function s3Fixture(
 	};
 	const operationSignal = () =>
 		resetAbort ? AbortSignal.any([operation, resetAbort.signal]) : operation;
+	const diagnostic = (event, details) => {
+		try {
+			record(event, { phase, execution, ...details() });
+		} catch (cause) {
+			observationError ??= cause;
+			failure ??= new Error("Owned S3 controller observation failed", {
+				cause,
+			});
+			abort.abort();
+		}
+	};
+	const httpStatus = (value) => {
+		const status = value?.$metadata?.httpStatusCode;
+		return Number.isSafeInteger(status) && status >= 100 && status <= 599
+			? status
+			: undefined;
+	};
+	const failureDetails = (error, request = {}) => {
+		let category = "unknown";
+		let status = request.httpStatus;
+		for (let cause = error, depth = 0; cause && depth < 4; depth++) {
+			status ??= httpStatus(cause);
+			if (category !== "unknown") {
+				cause = cause.cause;
+				continue;
+			}
+			if (cause === observationError) category = "observation-io";
+			else if (deadlineErrors.has(cause)) category = "operation-deadline";
+			else if (signal?.aborted && cause === signal.reason)
+				category = "parent-cancel";
+			else if (lifetime.signal.aborted && cause === lifetime.signal.reason)
+				category = "lifetime-abort";
+			else if (request.timeout?.aborted && cause === request.timeout.reason)
+				category = "per-request-timeout";
+			else if (cause.name === "AbortError") category = "sdk-abort";
+			else if (cause.name === "CredentialsProviderError")
+				category = "sdk-credentials";
+			else if (cause.name === "ValidationError") category = "sdk-validation";
+			else if (
+				[
+					"ECONNREFUSED",
+					"ECONNRESET",
+					"EPIPE",
+					"ENOTFOUND",
+					"ETIMEDOUT",
+				].includes(cause.code)
+			)
+				category = "network";
+			cause = cause.cause;
+		}
+		return {
+			category:
+				category === "unknown" && status !== undefined
+					? "http-status"
+					: category,
+			httpStatus: status,
+			monotonic: performance.now(),
+			remainingMs: Math.max(0, (auditDeadline ?? deadline) - performance.now()),
+			deadlineExpired: performance.now() >= (auditDeadline ?? deadline),
+			parentAborted: signal?.aborted ?? false,
+			lifetimeAborted: lifetime.signal.aborted,
+			resetAborted: resetAbort?.signal.aborted ?? false,
+			requestTimeoutAborted: request.timeout?.aborted ?? false,
+		};
+	};
+	// Labels and actions stay inside this family; no external diagnostic transport.
+	const observe = async (label, action, request = {}) => {
+		const started = performance.now();
+		const observedPhase = phase;
+		const details = () => ({
+			phase: observedPhase,
+			operation: label,
+			monotonic: performance.now(),
+			elapsedMs: performance.now() - started,
+			remainingMs: Math.max(0, (auditDeadline ?? deadline) - performance.now()),
+		});
+		diagnostic("operation-start", details);
+		let result, error;
+		let failed = false;
+		try {
+			if (observationError && phase !== "cleanup") throw observationError;
+			result = await action();
+		} catch (cause) {
+			failed = true;
+			error = cause;
+		}
+		diagnostic("operation-finish", () => ({
+			...details(),
+			failed,
+			...(failed
+				? failureDetails(error, request)
+				: { httpStatus: httpStatus(result) }),
+		}));
+		if (failed) throw error;
+		if (observationError && phase !== "cleanup") throw observationError;
+		return result;
+	};
 	const remaining = () => {
 		operationSignal().throwIfAborted();
 		const ms = Math.floor((auditDeadline ?? deadline) - performance.now());
-		if (ms <= 0) throw new Error("Mutation S3 operation deadline expired");
+		if (ms <= 0) {
+			const error = new Error("Mutation S3 operation deadline expired");
+			deadlineErrors.add(error);
+			throw error;
+		}
 		return ms;
 	};
 	const docker = async (...args) => {
@@ -169,28 +272,46 @@ export async function s3Fixture(
 			commands.delete(closed);
 		}
 	};
-	const send = async (command) => {
-		let response;
-		try {
-			response = await client.send(command, {
-				abortSignal: AbortSignal.any([
-					operationSignal(),
-					AbortSignal.timeout(Math.min(1000, remaining())),
-				]),
-			});
-		} catch (cause) {
-			const status = cause.$metadata?.httpStatusCode;
-			throw new Error(
-				`Owned S3 storage operation failed${Number.isSafeInteger(status) && status >= 100 && status <= 599 ? ` with HTTP ${status}` : ""}`,
-				{ cause },
-			);
-		}
-		if (
-			response.$metadata.httpStatusCode !== 200 &&
-			response.$metadata.httpStatusCode !== 204
-		)
-			throw new Error("Owned S3 operation returned an unexpected status");
-		return response;
+	const s3Operations = new Map([
+		[sdk.CreateBucketCommand, "create-bucket"],
+		[sdk.ListBucketsCommand, "list-buckets"],
+		[sdk.GetBucketVersioningCommand, "get-bucket-versioning"],
+		[sdk.ListObjectVersionsCommand, "list-object-versions"],
+		[sdk.ListObjectsV2Command, "list-objects"],
+		[sdk.ListMultipartUploadsCommand, "list-multipart-uploads"],
+		[sdk.AbortMultipartUploadCommand, "abort-multipart-upload"],
+		[sdk.DeleteObjectCommand, "delete-object"],
+		[sdk.DeleteBucketCommand, "delete-bucket"],
+	]);
+	const send = (command) => {
+		const request = {};
+		return observe(
+			s3Operations.get(command.constructor) ?? "unknown-s3-operation",
+			async () => {
+				let response;
+				try {
+					const upstream = operationSignal();
+					request.timeout = AbortSignal.timeout(Math.min(1000, remaining()));
+					response = await client.send(command, {
+						abortSignal: AbortSignal.any([upstream, request.timeout]),
+					});
+				} catch (cause) {
+					const status = cause.$metadata?.httpStatusCode;
+					throw new Error(
+						`Owned S3 storage operation failed${Number.isSafeInteger(status) && status >= 100 && status <= 599 ? ` with HTTP ${status}` : ""}`,
+						{ cause },
+					);
+				}
+				request.httpStatus = httpStatus(response);
+				if (
+					response.$metadata.httpStatusCode !== 200 &&
+					response.$metadata.httpStatusCode !== 204
+				)
+					throw new Error("Owned S3 operation returned an unexpected status");
+				return response;
+			},
+			request,
+		);
 	};
 	const bucketState = async () => {
 		const listed = await send(new sdk.ListBucketsCommand({}));
@@ -381,36 +502,47 @@ export async function s3Fixture(
 	const create = async (fixedPort = "") => {
 		const started = performance.now();
 		mountInventoryComplete = false;
-		const created = await docker(
-			"create",
-			"--pull=never",
-			"--name",
-			name,
-			"--label",
-			`wallpaperdb.mutation=${name}`,
-			"--publish",
-			`127.0.0.1:${fixedPort}:9000`,
-			image,
-			"mini",
-			"-dir=/data",
-			"-ip=127.0.0.1",
-			"-ip.bind=0.0.0.0",
-			"-s3.port=9000",
-			"-s3.config=/tmp/mutation-s3.json",
-			"-s3.autoCreateBucket=false",
-			"-s3.allowDeleteBucketNotEmpty=false",
-			"-s3.port.iceberg=0",
-			"-s3.port.lance=0",
-			"-admin.ui=false",
-			"-webdav=false",
-			"-master.telemetry=false",
+		const created = await observe("container-create", () =>
+			docker(
+				"create",
+				"--pull=never",
+				"--name",
+				name,
+				"--label",
+				`wallpaperdb.mutation=${name}`,
+				"--publish",
+				`127.0.0.1:${fixedPort}:9000`,
+				image,
+				"mini",
+				"-dir=/data",
+				"-ip=127.0.0.1",
+				"-ip.bind=0.0.0.0",
+				"-s3.port=9000",
+				"-s3.config=/tmp/mutation-s3.json",
+				"-s3.autoCreateBucket=false",
+				"-s3.allowDeleteBucketNotEmpty=false",
+				"-s3.port.iceberg=0",
+				"-s3.port.lance=0",
+				"-admin.ui=false",
+				"-webdav=false",
+				"-master.telemetry=false",
+			),
 		);
 		if (!/^[a-f0-9]{64}$/.test(created))
 			throw new Error("Owned S3 create returned no container identity");
 		currentContainerId = created;
-		await docker("cp", configFile, `${name}:/tmp/mutation-s3.json`);
-		await docker("start", name);
-		const inspected = await inspectOwned();
+		await observe("config-copy", () =>
+			docker("cp", configFile, `${name}:/tmp/mutation-s3.json`),
+		);
+		await observe("container-start", () => docker("start", name));
+		const inspected = await observe("owned-inspect", inspectOwned);
+		diagnostic("image-identity", () => ({
+			containerId: inspected.Id,
+			imageConfigObserved: /^sha256:[a-f0-9]{64}$/.test(inspected.Image),
+			...(/^sha256:[a-f0-9]{64}$/.test(inspected.Image)
+				? { imageConfigId: inspected.Image }
+				: {}),
+		}));
 		const mapping = inspected.NetworkSettings.Ports["9000/tcp"];
 		if (
 			!Array.isArray(mapping) ||
@@ -427,21 +559,25 @@ export async function s3Fixture(
 			forcePathStyle: true,
 			maxAttempts: 1,
 		});
-		while (true) {
-			remaining();
-			try {
-				const logs = await docker("logs", "--tail", "80", name);
-				if (
-					!logs.includes("All enabled components are running and ready to use:")
-				)
-					throw new Error("S3 startup is not ready");
-				break;
-			} catch {
-				await delay(Math.min(50, remaining()), undefined, {
-					signal: operationSignal(),
-				});
+		await observe("readiness-wait", async () => {
+			while (true) {
+				remaining();
+				try {
+					const logs = await docker("logs", "--tail", "80", name);
+					if (
+						!logs.includes(
+							"All enabled components are running and ready to use:",
+						)
+					)
+						throw new Error("S3 startup is not ready");
+					break;
+				} catch {
+					await delay(Math.min(50, remaining()), undefined, {
+						signal: operationSignal(),
+					});
+				}
 			}
-		}
+		});
 		await send(new sdk.CreateBucketCommand({ Bucket: "assets" }));
 		const state = await bucketState();
 		assertEmpty(state, "startup");
@@ -675,6 +811,7 @@ export async function s3Fixture(
 	};
 	const close = () => {
 		closePromise ??= (async () => {
+			phase = "cleanup";
 			const started = performance.now();
 			cleanupDeadline = started + cleanupMs;
 			auditDeadline = cleanupDeadline - Math.min(1000, cleanupMs / 3);
@@ -772,6 +909,11 @@ export async function s3Fixture(
 					});
 				}
 			}
+			if (error || observationError)
+				diagnostic("cleanup-failure", () => ({
+					failed: true,
+					...failureDetails(error ?? observationError),
+				}));
 			if (observationError)
 				throw new AggregateError(
 					error ? [error, observationError] : [observationError],
@@ -784,10 +926,10 @@ export async function s3Fixture(
 	};
 	try {
 		try {
-			await docker("image", "inspect", image);
+			await observe("image-inspect", () => docker("image", "inspect", image));
 		} catch (error) {
 			if (!error.missingImage) throw error;
-			await docker("pull", image);
+			await observe("image-pull", () => docker("pull", image));
 		}
 		await create();
 		server = createServer((request, response) => {
@@ -887,6 +1029,7 @@ export async function s3Fixture(
 		});
 		server.listen(0, "127.0.0.1");
 		await once(server, "listening");
+		phase = "execution";
 		return {
 			name,
 			image,
@@ -921,6 +1064,10 @@ export async function s3Fixture(
 			},
 		};
 	} catch (error) {
+		diagnostic("startup-failure", () => ({
+			failed: true,
+			...failureDetails(error),
+		}));
 		try {
 			await close();
 		} catch (cleanupError) {

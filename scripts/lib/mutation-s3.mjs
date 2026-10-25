@@ -1006,7 +1006,12 @@ export async function s3Fixture(
 					try {
 						rmSync(directory, { recursive: true, force: true });
 					} catch (cause) {
-						error ??= cause;
+						error ??= new Error(
+							"Owned S3 private configuration cleanup failed",
+							{
+								cause,
+							},
+						);
 					}
 					timings.teardownSeconds = (performance.now() - started) / 1000;
 					recordFinal("closeEnd", "close-end", {

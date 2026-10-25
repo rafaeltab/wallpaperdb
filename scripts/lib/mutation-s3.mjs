@@ -21,6 +21,9 @@ import { promisify } from "node:util";
 import { FixtureCleanupError } from "./mutation-fixture.mjs";
 
 const execute = promisify(execFile);
+// The stock entrypoint drops to seaweed; docker cp creates this 0600 file as root.
+const privateConfigurationEntrypoint =
+	'chown seaweed:seaweed /tmp/mutation-s3.json && exec /entrypoint.sh "$@"';
 
 /** One serial Asset reader owner. No Compose resources or shared reaper. */
 export async function s3Fixture(
@@ -469,6 +472,34 @@ export async function s3Fixture(
 			containerId: container.Id,
 		});
 		mountInventoryComplete = true;
+		// Context from this existing owned inspection, not proof of later liveness.
+		const state = container.State ?? {};
+		const runningObserved = typeof state.Running === "boolean";
+		const oomKilledObserved = typeof state.OOMKilled === "boolean";
+		const exitCodeObserved =
+			Number.isSafeInteger(state.ExitCode) &&
+			state.ExitCode >= 0 &&
+			state.ExitCode <= 255;
+		const statusObserved = [
+			"created",
+			"running",
+			"paused",
+			"restarting",
+			"removing",
+			"exited",
+			"dead",
+		].includes(state.Status);
+		diagnostic("container-state", () => ({
+			containerId: container.Id,
+			runningObserved,
+			oomKilledObserved,
+			exitCodeObserved,
+			statusObserved,
+			...(runningObserved ? { running: state.Running } : {}),
+			...(oomKilledObserved ? { oomKilled: state.OOMKilled } : {}),
+			...(exitCodeObserved ? { exitCode: state.ExitCode } : {}),
+			...(statusObserved ? { status: state.Status } : {}),
+		}));
 		return container;
 	};
 	const stopClient = async () => {
@@ -552,9 +583,14 @@ export async function s3Fixture(
 				name,
 				"--label",
 				`wallpaperdb.mutation=${name}`,
+				"--entrypoint",
+				"/bin/sh",
 				"--publish",
 				`127.0.0.1:${fixedPort}:9000`,
 				image,
+				"-c",
+				privateConfigurationEntrypoint,
+				"mutation-s3",
 				"mini",
 				"-dir=/data",
 				"-ip=127.0.0.1",

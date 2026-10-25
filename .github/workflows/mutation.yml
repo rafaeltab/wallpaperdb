@@ -362,6 +362,8 @@ jobs:
             apps/user/reports/mutation/integration/run-*/*.jsonl
             apps/color-extractor/reports/mutation/integration/run-*/*.json
             apps/color-extractor/reports/mutation/integration/run-*/*.jsonl
+            apps/asset/reports/mutation/integration/run-*/*.json
+            apps/asset/reports/mutation/integration/run-*/*.jsonl
             ${{ runner.temp }}/wallpaperdb-postgres-comparison/
             ${{ runner.temp }}/wallpaperdb-nats-comparison/
             ${{ runner.temp }}/wallpaperdb-s3-comparison/

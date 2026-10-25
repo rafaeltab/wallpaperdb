@@ -8,6 +8,7 @@ export interface MutationS3Config {
 // Setup owns these values for one native execution. Ordinary tests never set them.
 export const mutationS3Endpoint: {
   config?: MutationS3Config;
+  helperClient?: S3Client;
   upload?: (bucket: string, key: string, bytes: Buffer) => Promise<void>;
   dispose?: () => Promise<void>;
   observeApplication?: (

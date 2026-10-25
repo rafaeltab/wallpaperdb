@@ -14,11 +14,18 @@ import { type AssetHealth, s3AssetsLayer } from '../src/adapters/assets/index.js
 import { mutationS3Endpoint } from './mutation-s3-endpoint.js';
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).build();
 const tester = new Tester().withS3().withS3Bucket('assets');
-function applicationAgents(client: S3Client): Agent[] {
+function applicationAgents(client: S3Client, supportedHandler: object, failed: boolean): Agent[] {
   const handler = client.config.requestHandler;
-  if (!('httpHandlerConfigs' in handler) || typeof handler.httpHandlerConfigs !== 'function')
+  if (
+    Object.getPrototypeOf(handler) !== supportedHandler ||
+    !('httpHandlerConfigs' in handler) ||
+    typeof handler.httpHandlerConfigs !== 'function'
+  )
     throw new Error('The real S3 Node transport cannot be observed');
   const config = handler.httpHandlerConfigs();
+  // SDK signing/validation can fail before handle() initializes the known Node
+  // handler. This is valid only after retaining that ordinary production error.
+  if (failed && Object.keys(config).length === 0) return [];
   return ['httpAgent', 'httpsAgent'].map((name) => {
     const agent: unknown = config[name];
     if (!(agent instanceof Agent)) throw new Error('The real S3 agent cannot be observed');
@@ -36,6 +43,9 @@ it('reads exact stored bytes and distinguishes missing objects', async () => {
   if (mutationS3Endpoint.upload)
     await mutationS3Endpoint.upload('assets', 'image', Buffer.from([9, 4, 1]));
   else await tester.s3.uploadObject('assets', 'image', Buffer.from([9, 4, 1]));
+  const helper = mutationS3Endpoint.helperClient ?? tester.s3.getS3Client();
+  const supportedHandler = Object.getPrototypeOf(helper.config.requestHandler);
+  applicationAgents(helper, supportedHandler, false);
   // Observe the real application requests after the seed helper has finished.
   // Vitest's default spy forwards every call to the actual SDK implementation.
   const sending = vi.spyOn(S3Client.prototype, 'send');
@@ -78,7 +88,7 @@ it('reads exact stored bytes and distinguishes missing objects', async () => {
     try {
       try {
         for (const client of clients) {
-          for (const agent of applicationAgents(client)) {
+          for (const agent of applicationAgents(client, supportedHandler, failures.length > 0)) {
             agents.push(agent);
             for (const socket of [
               ...Object.values(agent.sockets),

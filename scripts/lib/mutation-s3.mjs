@@ -85,6 +85,9 @@ export async function s3Fixture(
 	const abort = new AbortController();
 	const commands = new Set(),
 		ids = new Set();
+	const volumes = new Map();
+	let mountInventoryComplete = true;
+	let currentContainerId;
 	const boundaries = [];
 	const finalization = { closeStart: null, finalAudit: null, closeEnd: null };
 	const timings = {
@@ -138,7 +141,7 @@ export async function s3Fixture(
 		return ms;
 	};
 	const docker = async (...args) => {
-		if (closing && !["rm", "ps"].includes(args[0]))
+		if (closing && !["rm", "ps", "volume", "inspect"].includes(args[0]))
 			throw new Error("Owned S3 fixture is closing");
 		const request = execute("docker", args, {
 			encoding: "utf8",
@@ -262,6 +265,49 @@ export async function s3Fixture(
 			upload: UploadId,
 		})),
 	});
+	const assertEmpty = (state, boundary) => {
+		if (
+			state.objects.length ||
+			state.versions.length ||
+			state.deleteMarkers.length ||
+			state.uploads.length ||
+			state.versioning !== "disabled"
+		)
+			throw new Error(`Owned S3 ${boundary} left mutable state`);
+	};
+	const inspectOwned = async () => {
+		const inspected = JSON.parse(await docker("inspect", name));
+		if (!Array.isArray(inspected) || inspected.length !== 1)
+			throw new Error("Owned S3 container inventory is incomplete");
+		const container = inspected[0];
+		if (
+			!/^[a-f0-9]{64}$/.test(container.Id) ||
+			container.Name !== `/${name}` ||
+			container.Config?.Labels?.["wallpaperdb.mutation"] !== name ||
+			(currentContainerId && currentContainerId !== container.Id)
+		)
+			throw new Error("Owned S3 container identity could not be verified");
+		ids.add(container.Id);
+		currentContainerId = container.Id;
+		mountInventoryComplete = false;
+		if (!Array.isArray(container.Mounts) || container.Mounts.length !== 1)
+			throw new Error("Owned S3 mount inventory is incomplete");
+		const mount = container.Mounts[0];
+		if (
+			mount.Type !== "volume" ||
+			mount.Destination !== "/data" ||
+			!/^[a-f0-9]{64}$/.test(mount.Name)
+		)
+			throw new Error("Owned S3 anonymous volume identity is unverified");
+		volumes.set(mount.Name, {
+			name: mount.Name,
+			type: mount.Type,
+			destination: mount.Destination,
+			containerId: container.Id,
+		});
+		mountInventoryComplete = true;
+		return container;
+	};
 	const stopClient = async () => {
 		if (!client) return;
 		const sockets = new Set();
@@ -317,19 +363,25 @@ export async function s3Fixture(
 			if (result !== undefined) error ??= result;
 		if ([...sockets].some((socket) => !socket.destroyed || !socket.closed))
 			error ??= new Error("Owned S3 controller socket remains open");
-		record("controller-disposal", {
-			complete: !error,
-			sockets: [...sockets].map((socket, index) => ({
-				...identities[index],
-				destroyed: socket.destroyed,
-				closed: socket.closed,
-			})),
-		});
+		try {
+			record("controller-disposal", {
+				complete: !error,
+				sockets: [...sockets].map((socket, index) => ({
+					...identities[index],
+					destroyed: socket.destroyed,
+					closed: socket.closed,
+				})),
+			});
+		} catch (cause) {
+			observationError ??= cause;
+			error ??= cause;
+		}
 		if (error) throw error;
 	};
 	const create = async (fixedPort = "") => {
 		const started = performance.now();
-		await docker(
+		mountInventoryComplete = false;
+		const created = await docker(
 			"create",
 			"--pull=never",
 			"--name",
@@ -353,16 +405,12 @@ export async function s3Fixture(
 			"-webdav=false",
 			"-master.telemetry=false",
 		);
+		if (!/^[a-f0-9]{64}$/.test(created))
+			throw new Error("Owned S3 create returned no container identity");
+		currentContainerId = created;
 		await docker("cp", configFile, `${name}:/tmp/mutation-s3.json`);
 		await docker("start", name);
-		const inspected = JSON.parse(await docker("inspect", name))[0];
-		if (
-			!/^[a-f0-9]{64}$/.test(inspected.Id) ||
-			inspected.Name !== `/${name}` ||
-			inspected.Config.Labels["wallpaperdb.mutation"] !== name
-		)
-			throw new Error("Owned S3 container identity could not be verified");
-		ids.add(inspected.Id);
+		const inspected = await inspectOwned();
 		const mapping = inspected.NetworkSettings.Ports["9000/tcp"];
 		if (
 			!Array.isArray(mapping) ||
@@ -396,16 +444,12 @@ export async function s3Fixture(
 		}
 		await send(new sdk.CreateBucketCommand({ Bucket: "assets" }));
 		const state = await bucketState();
-		if (
-			state.objects.length ||
-			state.versions.length ||
-			state.deleteMarkers.length ||
-			state.uploads.length ||
-			state.versioning !== "disabled"
-		)
-			throw new Error("Owned S3 startup left mutable state");
+		assertEmpty(state, "startup");
 		timings.startupSeconds += (performance.now() - started) / 1000;
-		record("backend-started", { containerId: inspected.Id });
+		record("backend-started", {
+			containerId: inspected.Id,
+			volume: volumes.get(inspected.Mounts[0].Name),
+		});
 	};
 	const verifyDisposal = () => {
 		if (!disposed)
@@ -417,7 +461,8 @@ export async function s3Fixture(
 		record("before-reset", { execution, ...summarizeState(state) });
 		if ((process.env.MUTATION_S3_ISOLATED ?? "1") === "1") {
 			await stopClient();
-			await docker("rm", "--force", "--volumes", name);
+			await docker("rm", "--force", "--volumes", currentContainerId);
+			currentContainerId = undefined;
 			await create(String(port));
 		} else {
 			// The selected reader cannot create any of these states. Remove every
@@ -453,14 +498,7 @@ export async function s3Fixture(
 			timings.initializationSeconds += (performance.now() - started) / 1000;
 		}
 		const clean = await bucketState();
-		if (
-			clean.objects.length ||
-			clean.versions.length ||
-			clean.deleteMarkers.length ||
-			clean.uploads.length ||
-			clean.versioning !== "disabled"
-		)
-			throw new Error("Owned S3 reset left mutable state");
+		assertEmpty(clean, "reset");
 		record("after-reset", {
 			execution: execution + 1,
 			...summarizeState(clean),
@@ -565,24 +603,75 @@ export async function s3Fixture(
 		};
 	};
 	const remove = async () => {
+		let error;
 		try {
-			await docker("rm", "--force", "--volumes", name);
+			await inspectOwned();
 		} catch (cause) {
-			if (!cause.missingContainer) throw cause;
+			if (!cause.missingContainer) error = cause;
 		}
-		const remaining = await docker(
-			"ps",
-			"-aq",
-			"--no-trunc",
-			"--filter",
-			`label=wallpaperdb.mutation=${name}`,
-		);
-		if (remaining) throw new Error("Owned S3 container remains after teardown");
-		return {
-			complete: true,
-			scope: "exact-owner-container-label",
-			containerIds: [],
+		// A failed mount observation cannot skip deletion of an independently
+		// verified owned container. Never delete by an unverified name or ID.
+		if (currentContainerId && ids.has(currentContainerId)) {
+			try {
+				await docker("rm", "--force", "--volumes", currentContainerId);
+			} catch (cause) {
+				if (!cause.missingContainer) error ??= cause;
+			}
+		}
+		const audit = {
+			complete: false,
+			scope: "exact-owner-container-label-and-verified-mounts",
+			containersComplete: false,
+			containerIds: null,
+			volumes: { complete: false, owned: [...volumes.values()], present: null },
 		};
+		try {
+			const listed = await docker(
+				"ps",
+				"-aq",
+				"--no-trunc",
+				"--filter",
+				`label=wallpaperdb.mutation=${name}`,
+			);
+			const remaining = listed ? listed.split("\n") : [];
+			if (
+				remaining.some((id) => !/^[a-f0-9]{64}$/.test(id) || !ids.has(id)) ||
+				new Set(remaining).size !== remaining.length
+			)
+				throw new Error("Owned S3 container absence audit is incomplete");
+			audit.containerIds = remaining;
+			audit.containersComplete = true;
+		} catch (cause) {
+			error ??= cause;
+		}
+		try {
+			// One complete bounded listing, even after many isolated executions. Do
+			// not inspect/delete historical volumes or publish unrelated daemon names.
+			const listed = await docker("volume", "ls", "--format", "{{.Name}}");
+			const names = listed ? listed.split("\n") : [];
+			if (
+				names.some((value) => !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(value)) ||
+				new Set(names).size !== names.length
+			)
+				throw new Error("Owned S3 volume absence audit is incomplete");
+			audit.volumes.present = names.filter((value) => volumes.has(value));
+			audit.volumes.complete = mountInventoryComplete;
+		} catch (cause) {
+			error ??= cause;
+		}
+		audit.complete = audit.containersComplete && audit.volumes.complete;
+		const passed =
+			!error &&
+			audit.complete &&
+			audit.containerIds?.length === 0 &&
+			audit.volumes.present?.length === 0;
+		try {
+			record("resource-audit", { ...audit, passed });
+		} catch (cause) {
+			observationError ??= cause;
+			error ??= cause;
+		}
+		return { audit: { ...audit, passed: passed && !error }, error };
 	};
 	const close = () => {
 		closePromise ??= (async () => {
@@ -640,14 +729,26 @@ export async function s3Fixture(
 				server?.closeAllConnections();
 				if (server?.listening)
 					await new Promise((resolve) => server.close(resolve));
+			} catch (cause) {
+				error ??= cause;
+			}
+			try {
 				await stopClient();
+			} catch (cause) {
+				error ??= cause;
+			}
+			try {
 				await Promise.all([...commands]);
 				await resetDone;
 			} catch (cause) {
 				error ??= cause;
 			} finally {
 				try {
-					resources = await remove();
+					const removal = await remove();
+					resources = removal.audit;
+					error ??= removal.error;
+					if (!resources.passed)
+						error ??= new Error("Owned S3 resource audit failed");
 				} catch (cause) {
 					error ??= cause;
 				} finally {
@@ -664,7 +765,9 @@ export async function s3Fixture(
 						teardownSeconds: timings.teardownSeconds,
 						resources: resources ?? {
 							complete: false,
-							scope: "exact-owner-container-label",
+							scope: "exact-owner-container-label-and-verified-mounts",
+							containersComplete: false,
+							volumes: { complete: false },
 						},
 					});
 				}
@@ -757,15 +860,30 @@ export async function s3Fixture(
 					abort.abort();
 				} finally {
 					clearTimeout(timer);
-					record("operation-end", {
-						operation: request.url === "/reset" ? "reset" : "disposed",
-						execution,
-						failed: Boolean(failure),
-					});
-					resetting = false;
-					resetAbort = undefined;
+					try {
+						record("operation-end", {
+							operation: request.url === "/reset" ? "reset" : "disposed",
+							execution,
+							failed: Boolean(failure),
+						});
+					} catch (cause) {
+						observationError ??= cause;
+						failure ??= new Error("Owned S3 controller observation failed", {
+							cause,
+						});
+						abort.abort();
+					} finally {
+						resetting = false;
+						resetAbort = undefined;
+					}
 				}
-			})();
+			})().catch((cause) => {
+				// Attach immediately: even an unexpected response/observer error must
+				// settle the drain promise and stop native work before publication.
+				failure ??= new Error("Owned S3 controller request failed", { cause });
+				abort.abort();
+				response.destroy();
+			});
 		});
 		server.listen(0, "127.0.0.1");
 		await once(server, "listening");

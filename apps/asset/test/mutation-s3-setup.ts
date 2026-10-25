@@ -91,6 +91,7 @@ vi.mock('@aws-sdk/client-s3', async (original) => {
 });
 
 delete mutationS3Endpoint.config;
+delete mutationS3Endpoint.helperClient;
 delete mutationS3Endpoint.upload;
 delete mutationS3Endpoint.dispose;
 delete mutationS3Endpoint.observeApplication;
@@ -221,6 +222,7 @@ try {
     maxAttempts: 1,
   });
   const client = helper;
+  mutationS3Endpoint.helperClient = client;
   let applicationObserved = false;
   mutationS3Endpoint.observeApplication = async (clients, failed, complete) => {
     try {

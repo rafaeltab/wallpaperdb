@@ -5,7 +5,7 @@ import {
 } from '@wallpaperdb/test-utils';
 import { Effect, ManagedRuntime } from 'effect';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { natsEventsLayer } from '../src/adapters/events/index.js';
+import { NatsBroker, natsEventsLayer } from '../src/adapters/events/index.js';
 import { ColorEvents, type ExtractionInput } from '../src/capabilities/extraction/index.js';
 import { WallpaperColorsExtractedCloudEventSchema } from '@wallpaperdb/events';
 import { measuredImage } from './fixtures/measurements.js';
@@ -58,7 +58,10 @@ it('awaits durable publication and preserves occurrence identity on replay', asy
       serviceName: 'events-contract',
     })
   );
+  const failures: unknown[] = [];
+  let connection: NatsBroker['connection'] | undefined;
   try {
+    connection = await runtime.runPromise(Effect.map(NatsBroker, (broker) => broker.connection));
     const publish = Effect.flatMap(ColorEvents, (events) =>
       events.publish({ input, ...measuredImage() })
     );
@@ -102,9 +105,24 @@ it('awaits durable publication and preserves occurrence identity on replay', asy
     expect((await manager.streams.getMessage('WALLPAPER', { seq: message.seq })).data).toEqual(
       message.data
     );
+  } catch (cause) {
+    failures.push(cause);
   } finally {
-    await runtime.dispose();
+    try {
+      await runtime.dispose();
+      if (connection) expect(connection.isClosed()).toBe(true);
+    } catch (cause) {
+      failures.push(cause);
+    } finally {
+      try {
+        await connection?.close();
+      } catch (cause) {
+        failures.push(cause);
+      }
+    }
   }
+  if (failures.length === 1) throw failures[0];
+  if (failures.length > 1) throw new AggregateError(failures, 'Publication/replay or disposal failed');
 });
 
 it('fits a dense bank and bounded occurrence metadata in the production 64 KiB message limit', async () => {

@@ -25,7 +25,7 @@
         "integration"
       ],
       "limitations": {
-        "reason": "NATS candidate includes only durable publication/replay in events.integration.test.ts, with isolated per-execution containers pending its own acceptance. Size/configuration/rejection and other NATS lifetime/network suites stay independent. S3/image-worker ownership/reset and built subprocess activation remain unvalidated.",
+        "reason": "NATS reuse includes only durable publication/replay in events.integration.test.ts. Size/configuration/rejection and other NATS lifetime/network suites stay independent. S3/image-worker ownership/reset and built subprocess activation remain unvalidated.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },

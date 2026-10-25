@@ -43,10 +43,10 @@ on:
         options: [reused, isolated, compare]
         default: reused
       nats_fixture:
-        description: NATS publication fixture; reuse requires separate acceptance, compare is a fixed cold scope
+        description: NATS publication fixture; compare runs the fixed cold publisher scope
         type: choice
         options: [isolated, reused, compare, reset-failure, cancel-after-progress]
-        default: isolated
+        default: reused
       reset_failure:
         description: Inject a Redis reset failure to verify diagnostics and owned cleanup
         type: boolean
@@ -77,7 +77,7 @@ jobs:
       IMPORT_RUN: ${{ inputs.import_run }}
       MUTATION_REDIS_ISOLATED: ${{ inputs.isolated_redis && '1' || '0' }}
       POSTGRES_FIXTURE: ${{ inputs.postgres_fixture || 'reused' }}
-      NATS_FIXTURE: ${{ inputs.nats_fixture || 'isolated' }}
+      NATS_FIXTURE: ${{ inputs.nats_fixture || 'reused' }}
       RESET_FAILURE_INPUT: ${{ inputs.reset_failure }}
     steps:
       - uses: actions/checkout@v4
@@ -196,7 +196,8 @@ jobs:
                "$SELECT_SUITE" == all &&
                -z "$IMPORT_RUN" && "$RESET_FAILURE_INPUT" != true ]] || exit 1
             if [[ "$POSTGRES_FIXTURE" == compare ]]; then
-              [[ "$NATS_FIXTURE" == isolated && "$SELECT_PACKAGE" == user &&
+              [[ ( "$NATS_FIXTURE" == isolated || "$NATS_FIXTURE" == reused ) &&
+                 "$SELECT_PACKAGE" == user &&
                  "$SELECT_FILES" == src/adapters/profiles/index.ts ]] || exit 1
               family=postgres
             else

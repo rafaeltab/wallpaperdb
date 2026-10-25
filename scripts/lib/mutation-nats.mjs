@@ -297,8 +297,8 @@ export async function natsFixture(
 		await verifyNoClients("Previous mutation");
 		const streams = await streamState();
 		record("before-reset", { streams });
-		// Per-execution isolation remains the default until NATS's own acceptance.
-		if (process.env.MUTATION_NATS_ISOLATED !== "0") {
+		// Explicit isolation remains available for the selected operation comparison.
+		if ((process.env.MUTATION_NATS_ISOLATED ?? "0") !== "0") {
 			await disconnect();
 			await docker("rm", "--force", "--volumes", name);
 			await create(String(port), String(monitorPort));

@@ -53,8 +53,6 @@ make test-focused PACKAGE=<workspace> ARGS='<test path>'
 make ci
 ```
 
-Tests that add child Node flags, such as heap limits, must preserve inherited `NODE_OPTIONS`. The [version-pinned V8 provider patch](patches/vitest-coverage-v8-5.0.2.patch) retains actual loader source and maps through a temporary preload; missing provenance deliberately fails reporting because merging different emitted code under one source URL gives incorrect coverage. The [tooling regression](scripts/coverage-v8.test.mjs) participates in the scripts workspace's normal unit suite.
-
 Choose tests using the [testing guidelines](docs/coding-standards/project-organization.md#shared-testing-principles). The focused command builds workspace dependencies and runs selected tests serially. Local `make ci` runs build, lint, type checks, unit tests, integration tests, and non-E2E coverage merging. It reports that browser and container E2E are excluded. Integration tests retain their own containers and browser adapter contracts; install their Chromium dependency with `make run PACKAGE=web SCRIPT=test:browser:install` when needed. Ordinary validation needs only the prerequisites of those checks, without application-stack or E2E credentials.
 
 GitHub Actions is the default place for complete browser and container E2E. Both jobs in the [E2E workflow](.github/workflows/e2e.yml) enforce failures on pull requests and main. Use explicit local E2E for diagnosis or deliberate validation:

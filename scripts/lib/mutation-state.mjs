@@ -83,6 +83,23 @@ function manifests(root) {
 export function mutationContext(root, workspace, suite, config) {
 	if (!/^[a-z][a-z0-9-]*$/.test(suite))
 		throw new Error("Invalid mutation suite");
+	if (config.fixture === "s3-owned") {
+		const diagnosticOrder = process.env.MUTATION_S3_ORDER ?? "native";
+		const diagnosticCancellation = process.env.MUTATION_S3_CANCEL ?? "off";
+		if (!["native", "reverse"].includes(diagnosticOrder))
+			throw new Error("Invalid S3 mutation order");
+		if (!["off", "after-progress"].includes(diagnosticCancellation))
+			throw new Error("Invalid S3 cancellation diagnostic");
+		if (!["0", "1"].includes(process.env.MUTATION_S3_ISOLATED ?? "1"))
+			throw new Error("Invalid S3 isolation mode");
+		for (const key of [
+			"MUTATION_S3_RESET_FAILURE",
+			"MUTATION_S3_DISPOSAL_FAILURE",
+		])
+			if (!["off", "after-progress"].includes(process.env[key] ?? "off"))
+				throw new Error("Invalid S3 failure diagnostic");
+		config = { ...config, diagnosticOrder, diagnosticCancellation };
+	}
 	if (config.fixture === "nats-owned") {
 		const diagnosticOrder = process.env.MUTATION_NATS_ORDER ?? "native";
 		const diagnosticCancellation = process.env.MUTATION_NATS_CANCEL ?? "off";

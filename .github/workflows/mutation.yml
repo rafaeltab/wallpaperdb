@@ -47,6 +47,11 @@ on:
         type: choice
         options: [isolated, reused, compare, reset-failure, cancel-after-progress]
         default: reused
+      s3_fixture:
+        description: Asset S3 reader candidate; isolated until its own acceptance
+        type: choice
+        options: [isolated, reused, compare, reset-failure, disposal-failure, cancel-after-progress]
+        default: isolated
       reset_failure:
         description: Inject a Redis reset failure to verify diagnostics and owned cleanup
         type: boolean
@@ -78,6 +83,7 @@ jobs:
       MUTATION_REDIS_ISOLATED: ${{ inputs.isolated_redis && '1' || '0' }}
       POSTGRES_FIXTURE: ${{ inputs.postgres_fixture || 'reused' }}
       NATS_FIXTURE: ${{ inputs.nats_fixture || 'reused' }}
+      S3_FIXTURE: ${{ inputs.s3_fixture || 'isolated' }}
       RESET_FAILURE_INPUT: ${{ inputs.reset_failure }}
     steps:
       - uses: actions/checkout@v4
@@ -134,6 +140,8 @@ jobs:
           case "$SCOPE" in all|changed) ;; *) exit 1 ;; esac
           [[ "$BASE" =~ ^([a-f0-9]{40}|origin/main)$ ]] || exit 1
           export MUTATION_NATS_ORDER=native MUTATION_NATS_CANCEL=off
+          export MUTATION_S3_ORDER=native MUTATION_S3_CANCEL=off
+          export MUTATION_S3_RESET_FAILURE=off MUTATION_S3_DISPOSAL_FAILURE=off
           unset WALLPAPERDB_MUTATION_PLAN_ORDER
           case "$POSTGRES_FIXTURE" in
             reused) export MUTATION_POSTGRES_ISOLATED=0 ;;
@@ -157,6 +165,26 @@ jobs:
                 [[ "$BUDGET" == 60 && "$QUANTUM" == 60 ]] || exit 1
                 export MUTATION_NATS_CANCEL=after-progress
               fi ;;
+            *) exit 1 ;;
+          esac
+          case "$S3_FIXTURE" in
+            isolated) export MUTATION_S3_ISOLATED=1 ;;
+            reused) export MUTATION_S3_ISOLATED=0 ;;
+            compare|reset-failure|disposal-failure|cancel-after-progress)
+              [[ "$EVENT_NAME" == workflow_dispatch && "$SCOPE" == all &&
+                 "$SELECT_SUITE" == all && "$SELECT_PACKAGE" == asset &&
+                 "$SELECT_FILES" == src/adapters/assets/index.ts &&
+                 -z "$IMPORT_RUN" && "$RESET_FAILURE_INPUT" != true &&
+                 "$POSTGRES_FIXTURE" != compare &&
+                 ( "$NATS_FIXTURE" == isolated || "$NATS_FIXTURE" == reused ) ]] || exit 1
+              export MUTATION_S3_ISOLATED=0
+              case "$S3_FIXTURE" in
+                reset-failure) export MUTATION_S3_RESET_FAILURE=after-progress ;;
+                disposal-failure) export MUTATION_S3_DISPOSAL_FAILURE=after-progress ;;
+                cancel-after-progress)
+                  [[ "$BUDGET" == 60 && "$QUANTUM" == 60 ]] || exit 1
+                  export MUTATION_S3_CANCEL=after-progress ;;
+              esac ;;
             *) exit 1 ;;
           esac
           args=(--scope "$SCOPE" --base "$BASE" --budget "$BUDGET" --quantum "$QUANTUM")
@@ -189,7 +217,12 @@ jobs:
             # instead requires completed/current native timing receipts inside
             # the controller. Raw results establish either observed boundary.
           fi
-          if [[ "$POSTGRES_FIXTURE" == compare || "$NATS_FIXTURE" == compare ]]; then
+          if [[ "$S3_FIXTURE" == reset-failure || "$S3_FIXTURE" == disposal-failure || "$S3_FIXTURE" == cancel-after-progress ]]; then
+            args+=(--offline)
+            common=$(git rev-parse --path-format=absolute --git-common-dir)
+            rm -rf -- "$common/mutation/v1/asset" "$common/mutation/repository-v1" reports/mutation apps/asset/reports/mutation
+          fi
+          if [[ "$POSTGRES_FIXTURE" == compare || "$NATS_FIXTURE" == compare || "$S3_FIXTURE" == compare ]]; then
             # A diagnostic comparison has one fixed source/suite scope and four
             # cold invocations. No imported/remote or prior-sample conclusions.
             [[ "$EVENT_NAME" == workflow_dispatch && "$SCOPE" == all &&
@@ -197,13 +230,17 @@ jobs:
                -z "$IMPORT_RUN" && "$RESET_FAILURE_INPUT" != true ]] || exit 1
             if [[ "$POSTGRES_FIXTURE" == compare ]]; then
               [[ ( "$NATS_FIXTURE" == isolated || "$NATS_FIXTURE" == reused ) &&
+                 ( "$S3_FIXTURE" == isolated || "$S3_FIXTURE" == reused ) &&
                  "$SELECT_PACKAGE" == user &&
                  "$SELECT_FILES" == src/adapters/profiles/index.ts ]] || exit 1
               family=postgres
-            else
+            elif [[ "$NATS_FIXTURE" == compare ]]; then
               [[ "$SELECT_PACKAGE" == color-extractor &&
-                 "$SELECT_FILES" == src/adapters/events/broker.ts ]] || exit 1
+                 "$SELECT_FILES" == src/adapters/events/broker.ts &&
+                 ( "$S3_FIXTURE" == isolated || "$S3_FIXTURE" == reused ) ]] || exit 1
               family=nats
+            else
+              family=s3
             fi
             (( BUDGET >= 24 )) || exit 1
             sample_budget=$(( BUDGET / 4 ))
@@ -222,11 +259,17 @@ jobs:
                 reused-*) isolation=0 ;;
               esac
               if [[ "$family" == postgres ]]; then export MUTATION_POSTGRES_ISOLATED=$isolation;
-              else
+              elif [[ "$family" == nats ]]; then
                 export MUTATION_NATS_ISOLATED=$isolation
                 case "$sample" in
                   *-1) export MUTATION_NATS_ORDER=native ;;
                   *-2) export MUTATION_NATS_ORDER=reverse ;;
+                esac
+              else
+                export MUTATION_S3_ISOLATED=$isolation
+                case "$sample" in
+                  *-1) export MUTATION_S3_ORDER=native ;;
+                  *-2) export MUTATION_S3_ORDER=reverse ;;
                 esac
               fi
               # These are this fresh hosted checkout's diagnostic caches only.
@@ -251,6 +294,10 @@ jobs:
                 > "$destination/invocation.json"
               if [[ "$family" == nats ]]; then
                 jq --arg order "$MUTATION_NATS_ORDER" '. + {planOrder:$order}' \
+                  "$destination/invocation.json" > "$destination/invocation.tmp"
+                mv "$destination/invocation.tmp" "$destination/invocation.json"
+              elif [[ "$family" == s3 ]]; then
+                jq --arg order "$MUTATION_S3_ORDER" '. + {planOrder:$order}' \
                   "$destination/invocation.json" > "$destination/invocation.tmp"
                 mv "$destination/invocation.tmp" "$destination/invocation.json"
               fi
@@ -317,5 +364,6 @@ jobs:
             apps/color-extractor/reports/mutation/integration/run-*/*.jsonl
             ${{ runner.temp }}/wallpaperdb-postgres-comparison/
             ${{ runner.temp }}/wallpaperdb-nats-comparison/
+            ${{ runner.temp }}/wallpaperdb-s3-comparison/
           if-no-files-found: warn
           retention-days: 30

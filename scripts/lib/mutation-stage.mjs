@@ -48,7 +48,7 @@ export async function runStage({
 	signal,
 }) {
 	const start = performance.now();
-	const drainingFixture = ["postgres-owned", "nats-owned"].includes(
+	const drainingFixture = ["postgres-owned", "nats-owned", "s3-owned"].includes(
 		config.fixture,
 	);
 	const fixtureCleanupMs = drainingFixture
@@ -141,7 +141,7 @@ export async function runStage({
 	let workerStarted = false;
 	let cancellationRequested = false;
 	const cancelAfterNativeProgress =
-		config.fixture === "nats-owned" &&
+		["nats-owned", "s3-owned"].includes(config.fixture) &&
 		config.diagnosticCancellation === "after-progress"
 			? async (operationDeadline) => {
 					if (cancellationRequested) return;
@@ -208,6 +208,7 @@ export async function runStage({
 			fixtureCleanupMs,
 			signal,
 			cancelAfterNativeProgress,
+			clientTimings,
 		);
 		const remaining = budgetMs - (performance.now() - start);
 		if (shouldCancel()) {
@@ -248,8 +249,11 @@ export async function runStage({
 					WALLPAPERDB_MUTATION_PLAN: plan,
 					WALLPAPERDB_MUTATION_GATE: unit ? gate : "",
 					// Never inherit another stage's private ordering control.
-					WALLPAPERDB_MUTATION_PLAN_ORDER:
-						config.fixture === "nats-owned" ? config.diagnosticOrder : "native",
+					WALLPAPERDB_MUTATION_PLAN_ORDER: ["nats-owned", "s3-owned"].includes(
+						config.fixture,
+					)
+						? config.diagnosticOrder
+						: "native",
 					WALLPAPERDB_MUTATION_FAILURE_FILE: fixtureFailure,
 					WALLPAPERDB_MUTATION_EXECUTION_DEADLINE: String(executionDeadline),
 				},
@@ -396,7 +400,10 @@ export async function runStage({
 				image: fixture.image,
 				containerIds: fixture.containerIds,
 				boundaries: fixture.boundaries,
-				...(config.fixture === "nats-owned"
+				...(config.fixture === "s3-owned"
+					? { boundariesDropped: fixture.boundariesDropped }
+					: {}),
+				...(["nats-owned", "s3-owned"].includes(config.fixture)
 					? { finalization: fixture.finalization }
 					: {}),
 				...fixture.timings,
@@ -424,6 +431,8 @@ export async function runStage({
 			);
 			if (config.fixture === "nats-owned")
 				summary.clients.scope = "nats-helper-only";
+			if (config.fixture === "s3-owned")
+				summary.clients.scope = "observed-sdk-instances-and-node-agents";
 		}
 		summary.elapsedSeconds = (performance.now() - start) / 1000;
 		writeFileSync(join(run, "summary.json"), JSON.stringify(summary, null, 2));

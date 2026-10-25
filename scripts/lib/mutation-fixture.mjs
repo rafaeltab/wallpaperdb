@@ -27,6 +27,7 @@ export async function mutationFixture(
 	cleanupMs,
 	signal,
 	cancelAfterNativeProgress,
+	clientTimings,
 ) {
 	if (!config.fixture) return undefined;
 	if (config.fixture === "redis-owned-reuse")
@@ -50,6 +51,18 @@ export async function mutationFixture(
 			cleanupMs,
 			signal,
 			cancelAfterNativeProgress,
+		);
+	}
+	if (config.fixture === "s3-owned") {
+		const { s3Fixture } = await import("./mutation-s3.mjs");
+		return s3Fixture(
+			cwd,
+			config.fixtureImage,
+			deadline,
+			cleanupMs,
+			signal,
+			cancelAfterNativeProgress,
+			clientTimings,
 		);
 	}
 	throw new Error(`Unsupported mutation fixture: ${config.fixture}`);

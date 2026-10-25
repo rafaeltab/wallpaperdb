@@ -19,6 +19,7 @@ import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { FixtureCleanupError } from "./mutation-fixture.mjs";
+import { isProcessed, mutationId } from "./mutation-results.mjs";
 
 const execute = promisify(execFile);
 // The stock entrypoint drops to seaweed; docker cp creates this 0600 file as root.
@@ -130,6 +131,7 @@ export async function s3Fixture(
 		closePromise,
 		cleanupDeadline;
 	let closing = false,
+		sealed = false,
 		resetting = false,
 		execution = 0,
 		disposed = true;
@@ -144,6 +146,9 @@ export async function s3Fixture(
 	);
 	let auditWindow;
 	let auditEnd = 0;
+	const runnerTimings = join(dirname(clientTimings), "runner-timings.jsonl");
+	const runnerCalls = new Map();
+	let runnerWindow, activeCall, currentCall;
 	let boundariesDropped = 0;
 	const record = (event, details = {}) => {
 		if (boundaries.length === 128) {
@@ -718,6 +723,153 @@ export async function s3Fixture(
 			...summarizeState(clean),
 		});
 	};
+	// Consume complete new records, without capping the retained cumulative history.
+	const readRunnerCalls = () => {
+		const fd = openSync(
+			runnerTimings,
+			constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+		);
+		let error;
+		try {
+			const before = fstatSync(fd);
+			const offset = runnerWindow?.offset ?? 0;
+			if (
+				!before.isFile() ||
+				!Number.isSafeInteger(before.size) ||
+				before.size < offset ||
+				(runnerWindow &&
+					(before.dev !== runnerWindow.dev || before.ino !== runnerWindow.ino))
+			)
+				throw new Error("Owned S3 runner history identity changed");
+			const length = before.size - offset;
+			if (length > 1024 * 1024)
+				throw new Error("Owned S3 runner observation exceeds its window");
+			const bytes = Buffer.alloc(length);
+			let size = 0;
+			while (size < length) {
+				const count = readSync(fd, bytes, size, length - size, offset + size);
+				if (!count) break;
+				size += count;
+			}
+			const after = fstatSync(fd);
+			if (
+				size !== length ||
+				after.size !== before.size ||
+				after.mtimeMs !== before.mtimeMs ||
+				after.ctimeMs !== before.ctimeMs ||
+				(length && bytes[length - 1] !== 10)
+			)
+				throw new Error("Incomplete S3 runner observation");
+			for (const line of length
+				? bytes.toString("utf8").slice(0, -1).split("\n")
+				: []) {
+				const row = JSON.parse(line);
+				const match =
+					typeof row?.id === "string" &&
+					/^(\d+):(coverageCollectionSeconds|mutationExecutionSeconds):\d+(?:\.\d+)?$/.exec(
+						row.id,
+					);
+				const pid = match && Number(match[1]);
+				if (
+					!match ||
+					row.id.length > 256 ||
+					!Number.isSafeInteger(pid) ||
+					pid < 1 ||
+					row.phase !== match[2] ||
+					!Number.isFinite(row.at) ||
+					row.at <= 0 ||
+					(row.phase === "mutationExecutionSeconds"
+						? typeof row.mutation !== "string" ||
+							!/^\d{1,128}$/.test(row.mutation)
+						: row.mutation !== undefined)
+				)
+					throw new Error("Malformed S3 runner call identity");
+				if (row.seconds === undefined) {
+					if (
+						runnerCalls.has(row.id) ||
+						activeCall ||
+						row.endedAt !== undefined
+					)
+						throw new Error("Ambiguous S3 runner call start");
+					activeCall = {
+						id: row.id,
+						pid,
+						phase: row.phase,
+						mutation: row.mutation,
+						at: row.at,
+						ended: false,
+						execution: null,
+						acknowledged: false,
+					};
+					runnerCalls.set(row.id, activeCall);
+				} else {
+					if (
+						!activeCall ||
+						activeCall.id !== row.id ||
+						activeCall.at !== row.at ||
+						activeCall.mutation !== row.mutation ||
+						!Number.isFinite(row.seconds) ||
+						row.seconds < 0 ||
+						!Number.isFinite(row.endedAt) ||
+						row.endedAt < row.at
+					)
+						throw new Error("Unmatched S3 runner call end");
+					activeCall.ended = true;
+					activeCall = undefined;
+				}
+			}
+			runnerWindow = { dev: before.dev, ino: before.ino, offset: before.size };
+		} catch (cause) {
+			error = cause;
+		} finally {
+			try {
+				closeSync(fd);
+			} catch (cause) {
+				error = error
+					? new AggregateError(
+							[error, cause],
+							"S3 runner observation and descriptor cleanup failed",
+							{ cause: error },
+						)
+					: cause;
+			}
+		}
+		if (error) {
+			observationError ??= error;
+			throw new Error("Owned S3 runner observation failed", { cause: error });
+		}
+	};
+	const bindRunnerCall = () => {
+		readRunnerCalls();
+		if (
+			!activeCall ||
+			activeCall.execution !== null ||
+			activeCall.phase !==
+				(execution === 0
+					? "coverageCollectionSeconds"
+					: "mutationExecutionSeconds")
+		)
+			throw new Error("Missing or ambiguous S3 execution runner binding");
+		currentCall = activeCall;
+		currentCall.execution = execution + 1;
+		try {
+			record("execution-binding", {
+				execution: execution + 1,
+				call: currentCall.id,
+				workerPid: currentCall.pid,
+				phase: currentCall.phase,
+				...(currentCall.mutation === undefined
+					? {}
+					: { nativeMutation: currentCall.mutation }),
+				window: { ...auditWindow },
+			});
+		} catch (cause) {
+			observationError ??= cause;
+			throw new Error("Owned S3 execution binding observation failed", {
+				cause,
+			});
+		}
+	};
 	const beginAuditWindow = () => {
 		const descriptor = openSync(
 			clientTimings,
@@ -757,7 +909,7 @@ export async function s3Fixture(
 		}
 		record("audit-window", { ...auditWindow });
 	};
-	const disposalReceipt = () => {
+	const clientObservations = () => {
 		if (!auditWindow || auditWindow.execution !== execution)
 			throw new Error("Missing S3 current execution observation window");
 		const descriptor = openSync(
@@ -795,8 +947,7 @@ export async function s3Fixture(
 			if (
 				size !== length ||
 				after.size !== before.size ||
-				size === 0 ||
-				buffer[size - 1] !== 10
+				(size > 0 && buffer[size - 1] !== 10)
 			)
 				throw new Error("Incomplete S3 current execution observation");
 			text = buffer.subarray(0, size).toString("utf8");
@@ -804,7 +955,10 @@ export async function s3Fixture(
 		} finally {
 			closeSync(descriptor);
 		}
-		const observations = text.split("\n").filter(Boolean).map(JSON.parse);
+		return text ? text.slice(0, -1).split("\n").map(JSON.parse) : [];
+	};
+	const disposalReceipt = () => {
+		const observations = clientObservations();
 		const rows = observations.filter(
 			(row) => row.execution === execution && row.event === "disposal-audit",
 		);
@@ -820,6 +974,8 @@ export async function s3Fixture(
 			) ||
 			!Number.isSafeInteger(row.pid) ||
 			row.pid <= 0 ||
+			row.pid !== currentCall?.pid ||
+			currentCall.execution !== execution ||
 			!Number.isSafeInteger(row.threadId) ||
 			row.threadId < 0 ||
 			row.scope !== "actual-sdk-instances-and-node-agents" ||
@@ -958,8 +1114,237 @@ export async function s3Fixture(
 		}
 		return { audit: { ...audit, passed: passed && !error }, error };
 	};
-	const close = () => {
+	const pendingExecution = (context) => {
+		const result = context?.result;
+		const shutdown = result?.shutdown;
+		const receipts = shutdown?.receipts;
+		if (
+			result?.outcome !== "budget-exhausted" ||
+			shutdown?.confirmed !== true ||
+			shutdown.failure ||
+			shutdown.platform !== "linux" ||
+			!Number.isSafeInteger(shutdown.pid) ||
+			shutdown.pid < 1 ||
+			shutdown.pgid !== shutdown.pid ||
+			shutdown.sid !== shutdown.pid ||
+			typeof shutdown.startTicks !== "string" ||
+			!/^\d+$/.test(shutdown.startTicks) ||
+			!Number.isSafeInteger(shutdown.leaderPid) ||
+			shutdown.leaderPid < 1 ||
+			!Array.isArray(receipts) ||
+			receipts.length > 24 ||
+			!receipts.some((row) => row.event === "anchor-owned") ||
+			!receipts.some(
+				(row) => row.event === "leader-start" && row.pid === shutdown.leaderPid,
+			) ||
+			!receipts.some(
+				(row) =>
+					row.event === "leader-interrupt-requested" &&
+					row.reason === "budget-exhausted",
+			) ||
+			!receipts.some((row) => row.event === "group-quiescent") ||
+			receipts.some((row) => row.event === "failure") ||
+			typeof context.assertHealthy !== "function" ||
+			typeof context.reports !== "function"
+		)
+			throw new Error("Missing S3 normal-budget owned-group proof");
+		context.assertHealthy();
+		if (
+			failure ||
+			observationError ||
+			abort.signal.aborted ||
+			operation.aborted
+		)
+			throw new Error(
+				"Owned S3 budget finalization has prior failure evidence",
+			);
+		readRunnerCalls();
+		if (
+			!currentCall ||
+			currentCall !== activeCall ||
+			currentCall.execution !== execution ||
+			currentCall.ended ||
+			currentCall.acknowledged ||
+			currentCall.phase !== "mutationExecutionSeconds" ||
+			execution < 2 ||
+			[...runnerCalls.values()].some(
+				(call) =>
+					call !== currentCall &&
+					(!call.ended || !call.acknowledged || call.execution === null),
+			)
+		)
+			throw new Error(
+				"Missing S3 unfinished execution or prior acknowledgement proof",
+			);
+		const nativeIndex = (report) => {
+			const byNative = new Map(),
+				byStable = new Map();
+			if (
+				!report ||
+				typeof report.files !== "object" ||
+				!report.files ||
+				Array.isArray(report.files)
+			)
+				throw new Error("Malformed S3 native report");
+			for (const [name, file] of Object.entries(report.files)) {
+				if (typeof file?.source !== "string" || !Array.isArray(file.mutants))
+					throw new Error("Malformed S3 native source");
+				for (const mutant of file.mutants) {
+					if (
+						typeof mutant?.id !== "string" ||
+						!mutant.id ||
+						mutant.id.length > 256 ||
+						typeof mutant.mutatorName !== "string" ||
+						typeof mutant.replacement !== "string" ||
+						typeof mutant.status !== "string" ||
+						["start", "end"].some((end) =>
+							["line", "column"].some(
+								(key) =>
+									!Number.isSafeInteger(mutant.location?.[end]?.[key]) ||
+									mutant.location[end][key] < 1,
+							),
+						)
+					)
+						throw new Error("Malformed S3 native mutation identity");
+					const stable = mutationId(name, file.source, mutant);
+					if (
+						byNative.has(mutant.id) ||
+						byStable.has(stable) ||
+						mutant.status === "RuntimeError" ||
+						mutant.conflictingStatuses
+					)
+						throw new Error("Ambiguous or failed S3 native result");
+					const row = { stable, mutant };
+					byNative.set(mutant.id, row);
+					byStable.set(stable, row);
+				}
+			}
+			return { byNative, byStable };
+		};
+		const reports = context.reports();
+		const planned = nativeIndex(reports.planned);
+		const partial = reports.partial ? nativeIndex(reports.partial) : undefined;
+		const initial = reports.initial ? nativeIndex(reports.initial) : undefined;
+		for (const report of [reports.partial, reports.initial]) {
+			for (const [name, file] of Object.entries(report?.files ?? {})) {
+				if (
+					reports.planned.files[name] &&
+					file.source !== reports.planned.files[name].source
+				)
+					throw new Error("Owned S3 native report source changed");
+			}
+		}
+		const pending = planned.byNative.get(currentCall.mutation);
+		if (
+			!pending ||
+			pending.mutant.status !== "Pending" ||
+			[initial, partial].some(
+				(index) =>
+					index?.byStable.has(pending.stable) &&
+					index.byStable.get(pending.stable).mutant.status !== "Pending",
+			)
+		)
+			throw new Error(
+				"Owned S3 interrupted mutation is not unaccepted Pending work",
+			);
+		for (const call of runnerCalls.values()) {
+			if (call === currentCall || call.phase === "coverageCollectionSeconds")
+				continue;
+			const identity = planned.byNative.get(call.mutation);
+			const terminal =
+				identity && partial?.byStable.get(identity.stable)?.mutant;
+			if (!terminal || !isProcessed(terminal) || terminal.status === "Timeout")
+				throw new Error("Missing S3 acknowledged native terminal result");
+		}
+		const observations = clientObservations();
+		let thread;
+		const created = new Set();
+		let helperReady = false,
+			application = false;
+		for (const row of observations) {
+			if (
+				!row ||
+				row.execution !== execution ||
+				row.pid !== currentCall.pid ||
+				!Number.isSafeInteger(row.threadId) ||
+				row.threadId < 0 ||
+				(thread !== undefined && row.threadId !== thread) ||
+				!Number.isFinite(row.at) ||
+				row.at <= 0 ||
+				(row.phase === undefined) === (row.event === undefined)
+			)
+				throw new Error("Incomplete S3 interrupted worker observation");
+			thread = row.threadId;
+			if (row.phase === "created" && row.event === undefined) {
+				if (
+					!Number.isSafeInteger(row.sdkClientId) ||
+					row.sdkClientId < 1 ||
+					created.has(row.sdkClientId) ||
+					!Number.isFinite(row.seconds) ||
+					row.seconds < 0
+				)
+					throw new Error("Ambiguous S3 interrupted SDK creation");
+				created.add(row.sdkClientId);
+				if (created.size > 1024)
+					throw new Error(
+						"Owned S3 interrupted SDK observation exceeds its limit",
+					);
+			} else if (row.event === "helper-ready") {
+				if (
+					helperReady ||
+					created.size !== 1 ||
+					!Number.isFinite(row.seconds) ||
+					row.seconds < 0
+				)
+					throw new Error("Incomplete S3 interrupted helper observation");
+				helperReady = true;
+			} else if (row.event === "sdk-destroy-return") {
+				if (
+					!created.has(row.sdkClientId) ||
+					!Number.isFinite(row.seconds) ||
+					row.seconds < 0
+				)
+					throw new Error("Incomplete S3 interrupted SDK release observation");
+			} else if (row.event === "application-observation") {
+				if (
+					application ||
+					row.complete !== true ||
+					typeof row.failed !== "boolean" ||
+					!created.has(row.helperClientId) ||
+					!Array.isArray(row.clientIds) ||
+					new Set(row.clientIds).size !== row.clientIds.length ||
+					row.clientIds.some(
+						(id) => id === row.helperClientId || !created.has(id),
+					) ||
+					(!row.failed && row.clientIds.length !== 1)
+				)
+					throw new Error("Incomplete S3 interrupted application observation");
+				application = true;
+			} else {
+				// Even a completed passing audit cannot replace its controller ACK.
+				throw new Error(
+					"Owned S3 interrupted execution has disposal or unknown observation evidence",
+				);
+			}
+		}
+		context.assertHealthy();
+		return {
+			disposition: "interrupted-pending",
+			execution,
+			call: currentCall.id,
+			nativeMutation: currentCall.mutation,
+			mutation: pending.stable,
+			accepted: false,
+			disposed: false,
+			cooperativeDisposalObserved: false,
+			groupShutdownConfirmed: true,
+			acknowledgedExecutions: execution - 1,
+			observationWindow: { ...auditWindow, end: auditEnd },
+		};
+	};
+	const close = (context) => {
 		closePromise ??= (async () => {
+			sealed = true;
 			phase = "cleanup";
 			const started = performance.now();
 			cleanupDeadline = started + cleanupMs;
@@ -983,14 +1368,28 @@ export async function s3Fixture(
 					);
 				if (!failure && !operation.aborted && client) {
 					recordFinal("finalAudit", "final-audit", { status: "STARTED" });
-					verifyDisposal();
+					let interrupted;
+					if (!disposed) {
+						if (!context) verifyDisposal();
+						try {
+							interrupted = pendingExecution(context);
+						} catch (cause) {
+							throw new Error("Owned S3 pending finalization proof failed", {
+								cause,
+							});
+						}
+					}
+					if (!interrupted) verifyDisposal();
 					const state = await bucketState();
 					recordFinal("finalAudit", "final-audit", {
 						status: "PASSED",
 						execution,
 						disposed,
 						...summarizeState(state),
-						scope: "owned-backend-state-and-acknowledged-sdk-disposal",
+						...(interrupted ? { interrupted } : {}),
+						scope: interrupted
+							? "owned-backend-state-and-stopped-pending-owner"
+							: "owned-backend-state-and-acknowledged-sdk-disposal",
 					});
 				} else
 					recordFinal("finalAudit", "final-audit", {
@@ -1049,6 +1448,15 @@ export async function s3Fixture(
 							},
 						);
 					}
+					if (context) {
+						try {
+							context.assertHealthy();
+							if (failure || observationError || abort.signal.aborted)
+								error ??= new Error("Owned S3 finalization failed after drain");
+						} catch (cause) {
+							error ??= cause;
+						}
+					}
 					timings.teardownSeconds = (performance.now() - started) / 1000;
 					recordFinal("closeEnd", "close-end", {
 						failed: Boolean(error || observationError),
@@ -1099,7 +1507,13 @@ export async function s3Fixture(
 				response.writeHead(404).end();
 				return;
 			}
-			if (request.url === "/failure" || closing || resetting || failure) {
+			if (
+				request.url === "/failure" ||
+				closing ||
+				sealed ||
+				resetting ||
+				failure
+			) {
 				failure ??= new Error(
 					"Owned S3 disposal failed or fixture unavailable",
 				);
@@ -1132,6 +1546,7 @@ export async function s3Fixture(
 						remaining();
 						// The serial worker cannot write this execution until its reset reply.
 						beginAuditWindow();
+						bindRunnerCall();
 						execution++;
 						disposed = false;
 						timings.resets++;
@@ -1141,6 +1556,7 @@ export async function s3Fixture(
 						const audit = disposalReceipt();
 						if (disposed) throw new Error("Duplicate owned S3 disposal");
 						disposed = true;
+						currentCall.acknowledged = true;
 						record("client-audit", { execution, ...audit });
 						response.writeHead(200).end();
 					}

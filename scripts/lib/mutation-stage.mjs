@@ -1,9 +1,14 @@
 import {
 	copyFileSync,
+	closeSync,
+	constants,
 	existsSync,
+	fstatSync,
 	mkdirSync,
 	mkdtempSync,
+	openSync,
 	readFileSync,
+	readSync,
 	renameSync,
 	rmSync,
 	writeFileSync,
@@ -31,6 +36,62 @@ import {
 } from "./mutation-results.mjs";
 
 const json = (file) => JSON.parse(readFileSync(file, "utf8"));
+
+// Only the S3 close proof reads native reports before fixture finalization.
+const s3CloseReport = (file) => {
+	let fd, value, error;
+	try {
+		fd = openSync(
+			file,
+			constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+		);
+		const before = fstatSync(fd);
+		if (
+			!before.isFile() ||
+			!Number.isSafeInteger(before.size) ||
+			before.size > 16 * 1024 * 1024
+		)
+			throw new Error("Owned S3 native report is not a bounded regular file");
+		const bytes = Buffer.alloc(before.size);
+		let size = 0;
+		while (size < bytes.length) {
+			const count = readSync(fd, bytes, size, bytes.length - size, size);
+			if (!count) break;
+			size += count;
+		}
+		const after = fstatSync(fd);
+		if (
+			size !== before.size ||
+			after.size !== before.size ||
+			after.mtimeMs !== before.mtimeMs ||
+			after.ctimeMs !== before.ctimeMs
+		)
+			throw new Error("Owned S3 native report changed during observation");
+		value = JSON.parse(bytes.toString("utf8"));
+	} catch (cause) {
+		error = new Error("Owned S3 native close report observation failed", {
+			cause,
+		});
+	} finally {
+		try {
+			if (fd !== undefined) closeSync(fd);
+		} catch (cause) {
+			const cleanup = new Error(
+				"Owned S3 native report descriptor cleanup failed",
+				{ cause },
+			);
+			error = error
+				? new AggregateError(
+						[error, cleanup],
+						"Owned S3 native report observation and cleanup failed",
+						{ cause: error },
+					)
+				: cleanup;
+		}
+	}
+	if (error) throw error;
+	return value;
+};
 
 /** One native Stryker/Vitest stage, with a private sandbox and report files. */
 export async function runStage({
@@ -126,11 +187,40 @@ export async function runStage({
 	let fixture;
 	let fixtureClosed = false;
 	let cleanupFailed = false;
-	const closeFixture = async () => {
+	const quarantineProgress = () => {
+		summary.discardedProgress ??= {
+			completed: summary.completed,
+			executed: summary.executed,
+		};
+		summary.completed = 0;
+		summary.executed = 0;
+		delete summary.results;
+		report = undefined;
+		for (const extension of ["json", "html"]) {
+			const file = join(run, `mutation.${extension}`);
+			if (existsSync(file))
+				renameSync(file, join(run, `invalid-mutation.${extension}`));
+		}
+	};
+	const assertS3Healthy = () => {
+		if (
+			shouldCancel() ||
+			signal?.aborted ||
+			fixture?.failure ||
+			fixture?.failureSignal.aborted ||
+			existsSync(fixtureFailure) ||
+			summary.errors
+		)
+			throw new Error(
+				"Owned S3 finalization has cancellation or failure evidence",
+			);
+	};
+	const closeFixture = async (s3Context) => {
 		if (!fixture || fixtureClosed) return;
 		fixtureClosed = true;
 		try {
-			await fixture.close();
+			if (config.fixture === "s3-owned") await fixture.close(s3Context);
+			else await fixture.close();
 		} catch (error) {
 			cleanupFailed = true;
 			summary.invalidFixtureResults = true;
@@ -266,8 +356,25 @@ export async function runStage({
 		Object.assign(summary, existsSync(progress) ? json(progress) : {});
 		summary.elapsedSeconds = (performance.now() - start) / 1000;
 		summary.outcome = result.outcome;
+		let s3Reports;
 		// Resource disposal is part of the evidence, before checkpoint publication.
-		await closeFixture();
+		await closeFixture(
+			config.fixture === "s3-owned"
+				? {
+						result,
+						assertHealthy: assertS3Healthy,
+						reports: () =>
+							(s3Reports ??= {
+								planned: s3CloseReport(plan),
+								partial: existsSync(incrementalFile)
+									? s3CloseReport(incrementalFile)
+									: undefined,
+								initial: executionBaseline?.report,
+							}),
+					}
+				: undefined,
+		);
+		if (config.fixture === "s3-owned") assertS3Healthy();
 		if (
 			summary.errors ||
 			(result.outcome === "completed" && !existsSync(complete))
@@ -286,18 +393,8 @@ export async function runStage({
 		if (fixture?.failure || resetFailed || cleanupFailed || shutdownFailed) {
 			if (fixture?.failure || resetFailed || cleanupFailed)
 				summary.invalidFixtureResults = true;
-			summary.discardedProgress = {
-				completed: summary.completed,
-				executed: summary.executed,
-			};
-			summary.completed = 0;
-			summary.executed = 0;
 			// Retain raw native diagnostics privately, never as an authoritative report.
-			for (const extension of ["json", "html"]) {
-				const file = join(run, `mutation.${extension}`);
-				if (existsSync(file))
-					renameSync(file, join(run, `invalid-mutation.${extension}`));
-			}
+			quarantineProgress();
 		}
 		const after = mutationContext(root, workspace, suite, contextConfig);
 		if (after.key !== context.key || after.inputDigest !== context.inputDigest)
@@ -315,10 +412,10 @@ export async function runStage({
 			!cleanupFailed &&
 			!shutdownFailed
 		) {
-			const planned = json(plan);
+			const planned = s3Reports?.planned ?? json(plan);
 			report = mergeReports([
 				planned,
-				...(updated ? [json(incrementalFile)] : []),
+				...(updated ? [s3Reports?.partial ?? json(incrementalFile)] : []),
 			]);
 			// A stage gate is deferral, never evidence of detection or survival.
 			for (const file of Object.values(report.files))
@@ -356,6 +453,7 @@ export async function runStage({
 			};
 			summary.results = resultCounts([...resultIndex(report).values()]);
 			if (summary.results.counts.RuntimeError) summary.outcome = "failed";
+			if (config.fixture === "s3-owned") assertS3Healthy();
 			const checkpoint = publishBaseline(context, report, {
 				discovery,
 				provenance,
@@ -376,19 +474,27 @@ export async function runStage({
 	} catch (error) {
 		const cleanupFailed = error instanceof FixtureCleanupError;
 		if (cleanupFailed) summary.cleanupError = error.message;
+		if (config.fixture === "s3-owned" && workerStarted) {
+			summary.invalidFixtureResults = true;
+			quarantineProgress();
+		}
 		if (
 			!cleanupFailed &&
 			(shouldCancel() ||
 				(!workerStarted && performance.now() >= start + budgetMs))
 		) {
 			summary.outcome = shouldCancel() ? "cancelled" : "budget-exhausted";
-			summary.diagnostic = `Fixture/startup ended without mutation progress: ${error.message}`;
+			summary.diagnostic =
+				config.fixture === "s3-owned" && workerStarted
+					? "Owned S3 execution was quarantined during cancellation"
+					: `Fixture/startup ended without mutation progress: ${error.message}`;
 			return { summary, context };
 		}
 		summary.outcome = "failed";
 		summary.error = error.message;
 		if (config.fixture) {
 			summary.invalidFixtureResults = true;
+			if (config.fixture === "s3-owned") quarantineProgress();
 			return { summary, context };
 		}
 		throw error;

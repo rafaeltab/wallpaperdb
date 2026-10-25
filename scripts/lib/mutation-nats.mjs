@@ -11,7 +11,14 @@ import { FixtureCleanupError } from "./mutation-fixture.mjs";
 const execute = promisify(execFile);
 
 /** One serial publication owner, with a private server and no shared reaper. */
-export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
+export async function natsFixture(
+	cwd,
+	image,
+	deadline,
+	cleanupMs,
+	signal,
+	cancelAfterNativeProgress,
+) {
 	if (!/^nats(?::[a-zA-Z0-9_.-]+)?@sha256:[a-f0-9]{64}$/.test(image))
 		throw new Error("Mutation NATS requires an immutable fixtureImage digest");
 	const { connect } = createRequire(join(cwd, "package.json"))("nats");
@@ -25,6 +32,8 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 	const commands = new Set();
 	const ids = new Set();
 	const boundaries = [];
+	const finalization = { closeStart: null, finalAudit: null, closeEnd: null };
+	let finalizationObservationError;
 	const timings = {
 		startupSeconds: 0,
 		resets: 0,
@@ -44,12 +53,22 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 			);
 			boundaries.splice(Math.max(0, empty), 1);
 		}
-		boundaries.push({
+		const entry = {
 			event,
 			at: Date.now(),
 			remainingMs: Math.floor(deadline - performance.now()),
 			...details,
-		});
+		};
+		boundaries.push(entry);
+		return entry;
+	};
+	const recordFinal = (slot, event, details) => {
+		try {
+			finalization[slot] = record(event, details);
+		} catch (cause) {
+			// Observers cannot skip cleanup or replace an earlier cleanup failure.
+			finalizationObservationError ??= cause;
+		}
 	};
 	const remaining = () => {
 		operation.throwIfAborted();
@@ -141,7 +160,7 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 				subscriptions,
 				pending_bytes,
 			}));
-		record("client-audit", {
+		const audit = {
 			boundary,
 			serverId: snapshot.server_id,
 			controllerCid: cid,
@@ -150,7 +169,26 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 			limit: snapshot.limit,
 			returned: snapshot.num_connections,
 			clients,
-		});
+		};
+		if (boundary === "Final mutation")
+			recordFinal("finalAudit", "final-audit", {
+				status: clients.length ? "FAILED" : "PASSED",
+				startedAt: finalization.finalAudit?.at,
+				...audit,
+				// Names are not identities and do not belong in this fixed receipt.
+				clients: clients
+					.slice(0, 1024)
+					.map(({ cid, subscriptions, pending_bytes }) => ({
+						cid,
+						subscriptions,
+						pending_bytes: Number.isSafeInteger(pending_bytes)
+							? pending_bytes
+							: null,
+					})),
+				clientCount: clients.length,
+				clientsTruncated: clients.length > 1024,
+			});
+		record("client-audit", audit);
 		if (clients.length)
 			throw new Error(`${boundary} leaked ${clients.length} NATS clients`);
 	};
@@ -299,11 +337,6 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 			// its reserved cleanup portion, leaving time for Docker removal.
 			const teardownMs = Math.min(1000, cleanupMs / 3);
 			const auditDeadline = cleanupDeadline - teardownMs;
-			record("close-start", {
-				resetting,
-				auditBudgetMs: auditDeadline - started,
-				teardownReservedMs: teardownMs,
-			});
 			const timer = setTimeout(
 				() => {
 					lifetime.abort();
@@ -313,11 +346,35 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 			);
 			let error;
 			try {
+				recordFinal("closeStart", "close-start", {
+					resetting,
+					auditBudgetMs: auditDeadline - started,
+					teardownReservedMs: teardownMs,
+				});
 				await resetDone;
-				if (connection && !failure && !operation.aborted)
+				if (connection && !failure && !operation.aborted) {
+					recordFinal("finalAudit", "final-audit", { status: "STARTED" });
 					await verifyNoClients("Final mutation", auditDeadline);
+				} else
+					recordFinal("finalAudit", "final-audit", {
+						status: "SKIPPED",
+						reason: failure
+							? "sticky-fixture-failure"
+							: operation.aborted
+								? "operation-aborted"
+								: "no-controller",
+					});
 			} catch (cause) {
 				error = cause;
+				const previous = finalization.finalAudit;
+				recordFinal("finalAudit", "final-audit", {
+					...previous,
+					at: Date.now(),
+					remainingMs: Math.floor(deadline - performance.now()),
+					startedAt: previous?.startedAt ?? previous?.at,
+					status: previous ? "FAILED" : "SKIPPED",
+					reason: previous ? "audit-failed" : "reset-drain-failed",
+				});
 			}
 			closing = true;
 			lifetime.abort();
@@ -339,9 +396,21 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 					clearTimeout(timer);
 					operation.removeEventListener("abort", interrupted);
 					timings.teardownSeconds = (performance.now() - started) / 1000;
-					record("close-end", { failed: Boolean(error) });
+					recordFinal("closeEnd", "close-end", {
+						failed: Boolean(error || finalizationObservationError),
+						observationFailed: Boolean(finalizationObservationError),
+						teardownSeconds: timings.teardownSeconds,
+					});
 				}
 			}
+			if (finalizationObservationError)
+				throw new AggregateError(
+					error
+						? [error, finalizationObservationError]
+						: [finalizationObservationError],
+					error?.message ?? "Owned NATS finalization observation failed",
+					{ cause: error ?? finalizationObservationError },
+				);
 			if (error) throw error;
 		})();
 		return closePromise;
@@ -375,6 +444,7 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 			resetDone = (async () => {
 				const started = performance.now();
 				resetAbort = new AbortController();
+				const operationDeadline = Math.min(deadline, started + 5000);
 				const timer = setTimeout(
 					() => {
 						failure ??= new Error("Owned NATS reset/disposal deadline expired");
@@ -383,7 +453,7 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 						abort.abort();
 						void disconnect();
 					},
-					Math.min(5000, Math.max(1, deadline - performance.now())),
+					Math.max(1, operationDeadline - performance.now()),
 				);
 				try {
 					if (request.url === "/reset") {
@@ -394,6 +464,7 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 						)
 							throw new Error("Requested NATS reset-failure diagnostic");
 						await reset();
+						await cancelAfterNativeProgress?.(operationDeadline);
 						remaining();
 						if (failure) throw failure;
 						timings.resets++;
@@ -429,6 +500,9 @@ export async function natsFixture(cwd, image, deadline, cleanupMs, signal) {
 			},
 			get boundaries() {
 				return [...boundaries];
+			},
+			get finalization() {
+				return structuredClone(finalization);
 			},
 			get failure() {
 				return failure;

@@ -213,13 +213,40 @@ export async function coordinate() {
 	const readEvidence = (context) =>
 		invalidStages.has(context.key) ? null : readBaseline(context);
 	let cancelled = false;
+	let cancellationObservationFailed = false;
 	const cancellation = new AbortController();
-	const cancel = () => {
-		cancelled = true;
-		cancellation.abort();
+	const cancel = (kind) => {
+		try {
+			summary.cancellation ??= {
+				signal: kind,
+				controllerPid: process.pid,
+				at: Date.now(),
+				monotonic: performance.now(),
+			};
+		} catch {
+			cancellationObservationFailed = true;
+		} finally {
+			cancelled = true;
+			cancellation.abort();
+		}
+		try {
+			if (summary.cancellation)
+				summary.cancellation.aborted = cancellation.signal.aborted;
+		} catch {
+			cancellationObservationFailed = true;
+		}
 	};
-	process.on("SIGINT", cancel);
-	process.on("SIGTERM", cancel);
+	const interrupt = () => cancel("SIGINT");
+	const terminate = () => cancel("SIGTERM");
+	const applyCancellation = () => {
+		if (cancellationObservationFailed) {
+			summary.cancellationObservationFailed = true;
+			summary.outcome = "failed";
+		} else if (cancelled && summary.outcome !== "failed")
+			summary.outcome = "cancelled";
+	};
+	process.on("SIGINT", interrupt);
+	process.on("SIGTERM", terminate);
 	let cursor = 0;
 	let preparationReady = true;
 	try {
@@ -473,6 +500,7 @@ export async function coordinate() {
 		delete process.env.GITHUB_TOKEN;
 		try {
 			const publicationStart = performance.now();
+			applyCancellation();
 			// Preserve valid snapshots for later reuse, while this invocation's failed
 			// infrastructure leaves integration and combined conclusions pending.
 			summary.workspaces = summarize(full.jobs, false, full.jobs, readEvidence);
@@ -521,8 +549,7 @@ export async function coordinate() {
 			// Signals received during synchronous publication need an event-loop
 			// turn before their listeners can update the outcome.
 			await new Promise((resolve) => setImmediate(resolve));
-			if (cancelled && summary.outcome !== "failed")
-				summary.outcome = "cancelled";
+			applyCancellation();
 			summary.publicationSeconds =
 				(performance.now() - publicationStart) / 1000;
 			summary.elapsedSeconds =
@@ -532,8 +559,9 @@ export async function coordinate() {
 			atomicJson(join(run, "summary.json"), summary);
 			atomicCopy(join(run, "summary.json"), join(output, "summary.json"));
 			await new Promise((resolve) => setImmediate(resolve));
-			if (cancelled && !["failed", "cancelled"].includes(summary.outcome)) {
-				summary.outcome = "cancelled";
+			const publishedOutcome = summary.outcome;
+			applyCancellation();
+			if (summary.outcome !== publishedOutcome) {
 				atomicJson(join(run, "summary.json"), summary);
 				atomicCopy(join(run, "summary.json"), join(output, "summary.json"));
 			}
@@ -541,8 +569,8 @@ export async function coordinate() {
 				`Mutation ${summary.outcome}: ${summary.processed}/${summary.total} discovered mutations processed; full baseline ${summary.fullBaselineComplete ? "complete" : "incomplete"}; checkpoint ${summary.checkpointSaved ? "saved" : "unavailable"}`,
 			);
 		} finally {
-			process.removeListener("SIGINT", cancel);
-			process.removeListener("SIGTERM", cancel);
+			process.removeListener("SIGINT", interrupt);
+			process.removeListener("SIGTERM", terminate);
 		}
 	}
 	return summary.outcome === "failed"

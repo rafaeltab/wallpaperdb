@@ -26,6 +26,7 @@ export async function mutationFixture(
 	deadline,
 	cleanupMs,
 	signal,
+	cancelAfterNativeProgress,
 ) {
 	if (!config.fixture) return undefined;
 	if (config.fixture === "redis-owned-reuse")
@@ -42,7 +43,14 @@ export async function mutationFixture(
 	}
 	if (config.fixture === "nats-owned") {
 		const { natsFixture } = await import("./mutation-nats.mjs");
-		return natsFixture(cwd, config.fixtureImage, deadline, cleanupMs, signal);
+		return natsFixture(
+			cwd,
+			config.fixtureImage,
+			deadline,
+			cleanupMs,
+			signal,
+			cancelAfterNativeProgress,
+		);
 	}
 	throw new Error(`Unsupported mutation fixture: ${config.fixture}`);
 }

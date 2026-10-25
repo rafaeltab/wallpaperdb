@@ -45,7 +45,7 @@ on:
       nats_fixture:
         description: NATS publication fixture; reuse requires separate acceptance, compare is a fixed cold scope
         type: choice
-        options: [isolated, reused, compare, reset-failure]
+        options: [isolated, reused, compare, reset-failure, cancel-after-progress]
         default: isolated
       reset_failure:
         description: Inject a Redis reset failure to verify diagnostics and owned cleanup
@@ -133,6 +133,8 @@ jobs:
           [[ "$QUANTUM" =~ ^[0-9]+$ ]] && (( QUANTUM >= 1 && QUANTUM <= 600 )) || exit 1
           case "$SCOPE" in all|changed) ;; *) exit 1 ;; esac
           [[ "$BASE" =~ ^([a-f0-9]{40}|origin/main)$ ]] || exit 1
+          export MUTATION_NATS_ORDER=native MUTATION_NATS_CANCEL=off
+          unset WALLPAPERDB_MUTATION_PLAN_ORDER
           case "$POSTGRES_FIXTURE" in
             reused) export MUTATION_POSTGRES_ISOLATED=0 ;;
             isolated) export MUTATION_POSTGRES_ISOLATED=1 ;;
@@ -142,13 +144,19 @@ jobs:
           case "$NATS_FIXTURE" in
             isolated) export MUTATION_NATS_ISOLATED=1 ;;
             reused|compare) export MUTATION_NATS_ISOLATED=0 ;;
-            reset-failure)
+            reset-failure|cancel-after-progress)
               [[ "$EVENT_NAME" == workflow_dispatch && "$SCOPE" == all &&
                  "$SELECT_SUITE" == all && "$SELECT_PACKAGE" == color-extractor &&
                  "$SELECT_FILES" == src/adapters/events/broker.ts &&
                  -z "$IMPORT_RUN" && "$RESET_FAILURE_INPUT" != true &&
                  "$POSTGRES_FIXTURE" != compare ]] || exit 1
-              export MUTATION_NATS_ISOLATED=0 MUTATION_NATS_RESET_FAILURE=after-progress ;;
+              export MUTATION_NATS_ISOLATED=0
+              if [[ "$NATS_FIXTURE" == reset-failure ]]; then
+                export MUTATION_NATS_RESET_FAILURE=after-progress
+              else
+                [[ "$BUDGET" == 60 && "$QUANTUM" == 60 ]] || exit 1
+                export MUTATION_NATS_CANCEL=after-progress
+              fi ;;
             *) exit 1 ;;
           esac
           args=(--scope "$SCOPE" --base "$BASE" --budget "$BUDGET" --quantum "$QUANTUM")
@@ -171,15 +179,15 @@ jobs:
           fi
           if [[ -n "$IMPORT_RUN" ]]; then args+=(--baseline /tmp/mutation-import/checkpoint.json --offline); fi
           if [[ "$RESET_FAILURE_INPUT" == true ]]; then export MUTATION_REDIS_RESET_FAILURE=1; fi
-          if [[ "$NATS_FIXTURE" == reset-failure ]]; then
+          if [[ "$NATS_FIXTURE" == reset-failure || "$NATS_FIXTURE" == cancel-after-progress ]]; then
             # Fixed cold native failure exercise. No checkpoint import, remote
             # restoration or previous report may bypass its execution path.
             args+=(--offline)
             common=$(git rev-parse --path-format=absolute --git-common-dir)
             rm -rf -- "$common/mutation/v1/color-extractor" "$common/mutation/repository-v1" reports/mutation apps/color-extractor/reports/mutation
-            # The reset counter selects the fault boundary. Acceptance must still
-            # establish actual completed native work from the retained raw plan,
-            # runner timings and invalidated report, rather than infer it here.
+            # The reset fault counter alone is not native progress. Cancellation
+            # instead requires completed/current native timing receipts inside
+            # the controller. Raw results establish either observed boundary.
           fi
           if [[ "$POSTGRES_FIXTURE" == compare || "$NATS_FIXTURE" == compare ]]; then
             # A diagnostic comparison has one fixed source/suite scope and four
@@ -213,7 +221,13 @@ jobs:
                 reused-*) isolation=0 ;;
               esac
               if [[ "$family" == postgres ]]; then export MUTATION_POSTGRES_ISOLATED=$isolation;
-              else export MUTATION_NATS_ISOLATED=$isolation; fi
+              else
+                export MUTATION_NATS_ISOLATED=$isolation
+                case "$sample" in
+                  *-1) export MUTATION_NATS_ORDER=native ;;
+                  *-2) export MUTATION_NATS_ORDER=reverse ;;
+                esac
+              fi
               # These are this fresh hosted checkout's diagnostic caches only.
               rm -rf -- "$common/mutation/v1/$SELECT_PACKAGE" "$common/mutation/repository-v1" reports/mutation "apps/$SELECT_PACKAGE/reports/mutation"
               destination="$comparison/$sample"
@@ -234,6 +248,11 @@ jobs:
                 --argjson status "$sample_status" \
                 '{sample:$sample,commit:$commit,base:$base,runner:$runner,imageOS:$image_os,imageVersion:$image_version,isolated:$isolation,budgetSeconds:$budget,wholeCommandSeconds:$elapsed,exitStatus:$status,cache:"cold; remote/import disabled"}' \
                 > "$destination/invocation.json"
+              if [[ "$family" == nats ]]; then
+                jq --arg order "$MUTATION_NATS_ORDER" '. + {planOrder:$order}' \
+                  "$destination/invocation.json" > "$destination/invocation.tmp"
+                mv "$destination/invocation.tmp" "$destination/invocation.json"
+              fi
               report="$destination/coordinator/summary.json"
               if [[ ! -f "$report" ]]; then
                 comparison_status=1

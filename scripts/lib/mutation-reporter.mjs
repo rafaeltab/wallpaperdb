@@ -37,6 +37,9 @@ class ProgressReporter {
 			this.progress.incrementalAnalysisAndSelectionSeconds =
 				(performance.now() - this.planningStart) / 1000;
 		try {
+			const order = process.env.WALLPAPERDB_MUTATION_PLAN_ORDER ?? "native";
+			if (!["native", "reverse"].includes(order))
+				throw new Error("Unsupported mutation plan order");
 			const gatePath = process.env.WALLPAPERDB_MUTATION_GATE;
 			const gate = gatePath
 				? new Set(JSON.parse(readFileSync(gatePath, "utf8")))
@@ -86,6 +89,10 @@ class ProgressReporter {
 						plan.runOptions.testFilter?.length ?? 0;
 				} else if (plan.plan === "EarlyResult") this.progress.reused++;
 			}
+			// Pinned Stryker 10 returns this same array to its executor. Its readonly
+			// public event and later reload grouping do not promise execution order.
+			if (order === "reverse") mutantPlans.reverse();
+			this.progress.planOrder = order;
 			this.progress.total = mutantPlans.length;
 			atomic(process.env.WALLPAPERDB_MUTATION_PLAN, report);
 		} catch (error) {

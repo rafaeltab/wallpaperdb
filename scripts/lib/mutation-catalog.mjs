@@ -138,7 +138,7 @@ export function catalog(root, { package: selected, scope, base }) {
 				id: `${directory}:${suite}`,
 				workspace: directory,
 				suite,
-				config: settings,
+				config: context.config,
 				sourceFiles,
 				mutate,
 				context,

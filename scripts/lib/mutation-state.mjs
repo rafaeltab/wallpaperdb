@@ -83,6 +83,15 @@ function manifests(root) {
 export function mutationContext(root, workspace, suite, config) {
 	if (!/^[a-z][a-z0-9-]*$/.test(suite))
 		throw new Error("Invalid mutation suite");
+	if (config.fixture === "nats-owned") {
+		const diagnosticOrder = process.env.MUTATION_NATS_ORDER ?? "native";
+		const diagnosticCancellation = process.env.MUTATION_NATS_CANCEL ?? "off";
+		if (!["native", "reverse"].includes(diagnosticOrder))
+			throw new Error("Invalid NATS mutation order");
+		if (!["off", "after-progress"].includes(diagnosticCancellation))
+			throw new Error("Invalid NATS cancellation diagnostic");
+		config = { ...config, diagnosticOrder, diagnosticCancellation };
+	}
 	const all = manifests(root),
 		own = [...all.values()].find((m) => m.directory === workspace);
 	if (!own) throw new Error(`Unknown workspace: ${workspace}`);

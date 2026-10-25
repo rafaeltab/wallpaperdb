@@ -11,9 +11,13 @@ import {
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { once } from "node:events";
 import { runBounded } from "./mutation-process.mjs";
 import { FixtureCleanupError, mutationFixture } from "./mutation-fixture.mjs";
-import { readMutationTimings } from "./mutation-timings.mjs";
+import {
+	nativeCancellationWindow,
+	readMutationTimings,
+} from "./mutation-timings.mjs";
 import {
 	mutationContext,
 	restoreBaseline,
@@ -56,6 +60,7 @@ export async function runStage({
 	const cwd = join(root, workspace);
 	const contextConfig = { ...config, sourceFiles };
 	const context = mutationContext(root, workspace, suite, contextConfig);
+	config = context.config;
 	const reuseStart = performance.now();
 	const baseline = restoreBaseline(context);
 	const executionBaseline = restoreBaseline(context, { forExecution: true });
@@ -134,6 +139,62 @@ export async function runStage({
 		}
 	};
 	let workerStarted = false;
+	let cancellationRequested = false;
+	const cancelAfterNativeProgress =
+		config.fixture === "nats-owned" &&
+		config.diagnosticCancellation === "after-progress"
+			? async (operationDeadline) => {
+					if (cancellationRequested) return;
+					const window = nativeCancellationWindow(runnerTimings);
+					if (!window) return;
+					if (
+						!signal ||
+						signal.aborted ||
+						shouldCancel() ||
+						performance.now() >= start + budgetMs
+					)
+						throw new Error(
+							"Cancellation diagnostic has no active controller budget",
+						);
+					const waitMs = Math.min(
+						1000,
+						Math.floor(operationDeadline - performance.now()),
+					);
+					if (waitMs <= 0)
+						throw new Error("Cancellation diagnostic reset deadline expired");
+					cancellationRequested = true;
+					const receipt = {
+						origin: "injected-self",
+						signal: "SIGINT",
+						controllerPid: process.pid,
+						requestedAt: Date.now(),
+						monotonic: performance.now(),
+						operationDeadline,
+						waitMs,
+						...window,
+					};
+					summary.cancellationDiagnostic = receipt;
+					// This independent delivery deadline must survive the intended
+					// coordinator handler aborting the fixture's cancellation signal.
+					const delivery = new AbortController();
+					const timer = setTimeout(() => delivery.abort(), waitMs);
+					const received = once(process, "SIGINT", { signal: delivery.signal });
+					try {
+						process.kill(process.pid, "SIGINT");
+						await received;
+						receipt.deliveredAt = Date.now();
+					} catch (error) {
+						receipt.failed = true;
+						throw new Error("Self-SIGINT diagnostic delivery failed", {
+							cause: error,
+						});
+					} finally {
+						clearTimeout(timer);
+						delivery.abort();
+						await received.catch(() => {});
+					}
+				}
+			: undefined;
 	try {
 		sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
 		options.tempDirName = sandbox;
@@ -146,6 +207,7 @@ export async function runStage({
 			start + budgetMs + (drainingFixture ? runnerGraceMs : 0),
 			fixtureCleanupMs,
 			signal,
+			cancelAfterNativeProgress,
 		);
 		const remaining = budgetMs - (performance.now() - start);
 		if (shouldCancel()) {
@@ -185,6 +247,9 @@ export async function runStage({
 					WALLPAPERDB_MUTATION_CLIENT_TIMINGS: clientTimings,
 					WALLPAPERDB_MUTATION_PLAN: plan,
 					WALLPAPERDB_MUTATION_GATE: unit ? gate : "",
+					// Never inherit another stage's private ordering control.
+					WALLPAPERDB_MUTATION_PLAN_ORDER:
+						config.fixture === "nats-owned" ? config.diagnosticOrder : "native",
 					WALLPAPERDB_MUTATION_FAILURE_FILE: fixtureFailure,
 					WALLPAPERDB_MUTATION_EXECUTION_DEADLINE: String(executionDeadline),
 				},
@@ -331,6 +396,9 @@ export async function runStage({
 				image: fixture.image,
 				containerIds: fixture.containerIds,
 				boundaries: fixture.boundaries,
+				...(config.fixture === "nats-owned"
+					? { finalization: fixture.finalization }
+					: {}),
 				...fixture.timings,
 			};
 		}

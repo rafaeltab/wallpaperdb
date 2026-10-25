@@ -15,7 +15,12 @@
       "timeoutMS": 10000,
       "fixture": "nats-owned",
       "fixtureImage": "nats:2.10-alpine@sha256:b83efabe3e7def1e0a4a31ec6e078999bb17c80363f881df35edc70fcb6bb927",
-      "environmentKeys": ["MUTATION_NATS_ISOLATED", "MUTATION_NATS_RESET_FAILURE"]
+      "environmentKeys": [
+        "MUTATION_NATS_ISOLATED",
+        "MUTATION_NATS_RESET_FAILURE",
+        "MUTATION_NATS_ORDER",
+        "MUTATION_NATS_CANCEL"
+      ]
     }
   }
 }

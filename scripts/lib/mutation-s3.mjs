@@ -15,7 +15,7 @@ import {
 import { Agent, createServer } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { FixtureCleanupError } from "./mutation-fixture.mjs";
@@ -46,38 +46,59 @@ export async function s3Fixture(
 		helper = credentials();
 	const directory = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-s3-"));
 	const configFile = join(directory, "s3.json");
-	writeFileSync(
-		configFile,
-		JSON.stringify({
-			identities: [
-				{
-					name: "controller",
-					credentials: [
-						{ accessKey: admin.accessKeyId, secretKey: admin.secretAccessKey },
-					],
-					actions: ["Admin", "Read", "Write", "List", "Tagging"],
-				},
-				{
-					name: "reader",
-					credentials: [
-						{ accessKey: app.accessKeyId, secretKey: app.secretAccessKey },
-					],
-					actions: ["Read:assets"],
-				},
-				{
-					name: "seed",
-					credentials: [
-						{
-							accessKey: helper.accessKeyId,
-							secretKey: helper.secretAccessKey,
-						},
-					],
-					actions: ["Write:assets"],
-				},
-			],
-		}),
-		{ mode: 0o600 },
-	);
+	try {
+		writeFileSync(
+			configFile,
+			JSON.stringify({
+				identities: [
+					{
+						name: "controller",
+						credentials: [
+							{
+								accessKey: admin.accessKeyId,
+								secretKey: admin.secretAccessKey,
+							},
+						],
+						actions: ["Admin", "Read", "Write", "List", "Tagging"],
+					},
+					{
+						name: "reader",
+						credentials: [
+							{ accessKey: app.accessKeyId, secretKey: app.secretAccessKey },
+						],
+						actions: ["Read:assets"],
+					},
+					{
+						name: "seed",
+						credentials: [
+							{
+								accessKey: helper.accessKeyId,
+								secretKey: helper.secretAccessKey,
+							},
+						],
+						actions: ["Write:assets"],
+					},
+				],
+			}),
+			{ mode: 0o600 },
+		);
+	} catch (cause) {
+		const initializationError = new Error(
+			"Owned S3 private configuration initialization failed",
+			{ cause },
+		);
+		try {
+			rmSync(directory, { recursive: true, force: true });
+		} catch (cleanupCause) {
+			throw new FixtureCleanupError(
+				initializationError,
+				new Error("Owned S3 private configuration cleanup failed", {
+					cause: cleanupCause,
+				}),
+			);
+		}
+		throw initializationError;
+	}
 	const lifetime = new AbortController();
 	const operation = signal
 		? AbortSignal.any([signal, lifetime.signal])
@@ -113,6 +134,13 @@ export async function s3Fixture(
 	let auditDeadline;
 	let phase = "startup";
 	const deadlineErrors = new WeakSet();
+	const sdkFailures = new WeakSet();
+	const controllerTimings = join(
+		dirname(clientTimings),
+		"s3-controller-timings.jsonl",
+	);
+	let auditWindow;
+	let auditEnd = 0;
 	let boundariesDropped = 0;
 	const record = (event, details = {}) => {
 		if (boundaries.length === 128) {
@@ -122,7 +150,7 @@ export async function s3Fixture(
 		const value = { event, at: Date.now(), ...details };
 		boundaries.push(value);
 		appendFileSync(
-			clientTimings,
+			controllerTimings,
 			`${JSON.stringify({ ...value, scope: "s3-controller", pid: process.pid })}\n`,
 		);
 		return value;
@@ -155,6 +183,7 @@ export async function s3Fixture(
 	};
 	const failureDetails = (error, request = {}) => {
 		let category = "unknown";
+		let fallback = "unknown";
 		let status = request.httpStatus;
 		for (let cause = error, depth = 0; cause && depth < 4; depth++) {
 			status ??= httpStatus(cause);
@@ -170,10 +199,15 @@ export async function s3Fixture(
 				category = "lifetime-abort";
 			else if (request.timeout?.aborted && cause === request.timeout.reason)
 				category = "per-request-timeout";
-			else if (cause.name === "AbortError") category = "sdk-abort";
-			else if (cause.name === "CredentialsProviderError")
-				category = "sdk-credentials";
-			else if (cause.name === "ValidationError") category = "sdk-validation";
+			else if (sdkFailures.has(cause) && cause.name === "AbortError")
+				fallback = "sdk-abort";
+			else if (
+				sdkFailures.has(cause) &&
+				cause.name === "CredentialsProviderError"
+			)
+				fallback = "sdk-credentials";
+			else if (sdkFailures.has(cause) && cause.name === "ValidationError")
+				fallback = "sdk-validation";
 			else if (
 				[
 					"ECONNREFUSED",
@@ -183,9 +217,10 @@ export async function s3Fixture(
 					"ETIMEDOUT",
 				].includes(cause.code)
 			)
-				category = "network";
+				fallback = "network";
 			cause = cause.cause;
 		}
+		if (category === "unknown") category = fallback;
 		return {
 			category:
 				category === "unknown" && status !== undefined
@@ -292,10 +327,17 @@ export async function s3Fixture(
 				try {
 					const upstream = operationSignal();
 					request.timeout = AbortSignal.timeout(Math.min(1000, remaining()));
+					request.attempted = true;
 					response = await client.send(command, {
 						abortSignal: AbortSignal.any([upstream, request.timeout]),
 					});
 				} catch (cause) {
+					if (
+						request.attempted &&
+						cause !== null &&
+						(typeof cause === "object" || typeof cause === "function")
+					)
+						sdkFailures.add(cause);
 					const status = cause.$metadata?.httpStatusCode;
 					throw new Error(
 						`Owned S3 storage operation failed${Number.isSafeInteger(status) && status >= 100 && status <= 599 ? ` with HTTP ${status}` : ""}`,
@@ -640,25 +682,89 @@ export async function s3Fixture(
 			...summarizeState(clean),
 		});
 	};
+	const beginAuditWindow = () => {
+		const descriptor = openSync(
+			clientTimings,
+			constants.O_RDONLY |
+				constants.O_CREAT |
+				constants.O_NOFOLLOW |
+				constants.O_NONBLOCK,
+			0o600,
+		);
+		try {
+			const stat = fstatSync(descriptor);
+			if (
+				!stat.isFile() ||
+				!Number.isSafeInteger(stat.size) ||
+				stat.size < auditEnd ||
+				(auditWindow &&
+					(stat.dev !== auditWindow.dev || stat.ino !== auditWindow.ino))
+			)
+				throw new Error("Owned S3 observation identity or history changed");
+			if (stat.size > 0) {
+				const last = Buffer.alloc(1);
+				if (
+					readSync(descriptor, last, 0, 1, stat.size - 1) !== 1 ||
+					last[0] !== 10
+				)
+					throw new Error("Incomplete S3 observation history boundary");
+			}
+			auditWindow = {
+				dev: stat.dev,
+				ino: stat.ino,
+				offset: stat.size,
+				execution: execution + 1,
+			};
+			auditEnd = stat.size;
+		} finally {
+			closeSync(descriptor);
+		}
+		record("audit-window", { ...auditWindow });
+	};
 	const disposalReceipt = () => {
+		if (!auditWindow || auditWindow.execution !== execution)
+			throw new Error("Missing S3 current execution observation window");
 		const descriptor = openSync(
 			clientTimings,
 			constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
 		);
 		let text;
 		try {
-			if (!fstatSync(descriptor).isFile())
-				throw new Error("S3 observation is not a regular file");
+			const before = fstatSync(descriptor);
+			if (
+				!before.isFile() ||
+				before.dev !== auditWindow.dev ||
+				before.ino !== auditWindow.ino ||
+				!Number.isSafeInteger(before.size) ||
+				before.size < auditEnd
+			)
+				throw new Error("Owned S3 observation identity or history changed");
+			const length = before.size - auditWindow.offset;
+			if (length > 1024 * 1024)
+				throw new Error("S3 current execution observation exceeds its limit");
 			const buffer = Buffer.alloc(1024 * 1024 + 1);
 			let size = 0;
-			while (size < buffer.length) {
-				const count = readSync(descriptor, buffer, size, buffer.length - size);
+			while (size < length) {
+				const count = readSync(
+					descriptor,
+					buffer,
+					size,
+					length - size,
+					auditWindow.offset + size,
+				);
 				if (!count) break;
 				size += count;
 			}
-			if (size === buffer.length)
-				throw new Error("S3 observation file exceeds its limit");
+			const after = fstatSync(descriptor);
+			if (
+				size !== length ||
+				after.size !== before.size ||
+				size === 0 ||
+				buffer[size - 1] !== 10
+			)
+				throw new Error("Incomplete S3 current execution observation");
 			text = buffer.subarray(0, size).toString("utf8");
+			auditEnd = before.size;
 		} finally {
 			closeSync(descriptor);
 		}
@@ -670,6 +776,12 @@ export async function s3Fixture(
 			throw new Error("Missing or ambiguous S3 client audit");
 		const row = rows[0];
 		if (
+			observations.some(
+				(entry) =>
+					entry.execution !== execution ||
+					entry.pid !== row.pid ||
+					entry.threadId !== row.threadId,
+			) ||
 			!Number.isSafeInteger(row.pid) ||
 			row.pid <= 0 ||
 			!Number.isSafeInteger(row.threadId) ||
@@ -732,6 +844,7 @@ export async function s3Fixture(
 		return {
 			pid: row.pid,
 			threadId: row.threadId,
+			window: { ...auditWindow, end: auditEnd },
 			clientIds: row.clients.map((entry) => entry.id),
 			complete: true,
 			applicationClientIds: application.clientIds,
@@ -976,6 +1089,8 @@ export async function s3Fixture(
 						await reset();
 						await cancelAfterNativeProgress?.(operationDeadline);
 						remaining();
+						// The serial worker cannot write this execution until its reset reply.
+						beginAuditWindow();
 						execution++;
 						disposed = false;
 						timings.resets++;

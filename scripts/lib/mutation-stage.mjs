@@ -320,10 +320,17 @@ export async function runStage({
 			summary.outcome = "cancelled";
 			return { summary, context };
 		}
-		if (remaining <= 0)
-			throw new Error(
+		if (remaining <= 0) {
+			const exhausted = new Error(
 				"Fixture setup consumed the stage budget without mutation progress",
 			);
+			if (config.fixture === "opensearch-owned")
+				exhausted.interruptionSafe =
+					!fixture.failure &&
+					!fixture.failureSignal.aborted &&
+					!existsSync(fixtureFailure);
+			throw exhausted;
+		}
 		const executionDeadline = Date.now() + remaining;
 		if (drainingFixture)
 			summary.shutdown = {

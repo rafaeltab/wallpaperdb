@@ -411,20 +411,34 @@ export async function opensearchFixture(
 		}
 	};
 	const closeAgent = async () => {
-		const pending = [...sockets].map((socket) =>
-			socket.closed
-				? Promise.resolve()
-				: once(socket, "close", {
+		const pending = [];
+		let error;
+		for (const socket of sockets) {
+			if (socket.closed) continue;
+			try {
+				pending.push(
+					once(socket, "close", {
 						signal: AbortSignal.timeout(Math.min(1000, remaining())),
 					}),
-		);
-		agent.destroy();
-		await Promise.all(pending);
+				);
+			} catch (cause) {
+				error ??= cause;
+			}
+		}
+		// Observation/deadline failure must never skip synchronous destruction.
+		try {
+			agent.destroy();
+		} catch (cause) {
+			error ??= cause;
+		}
+		for (const result of await Promise.allSettled(pending))
+			if (result.status === "rejected") error ??= result.reason;
 		if (
 			[...sockets].some((socket) => !socket.closed || !socket.destroyed) ||
 			Object.values(agent.requests).some((entries) => entries?.length)
 		)
-			throw new Error("Owned OpenSearch controller transport remains open");
+			error ??= new Error("Owned OpenSearch controller transport remains open");
+		if (error) throw error;
 	};
 	const inspectOwned = async (target = container) => {
 		const rows = JSON.parse(await docker("inspect", target));
@@ -1014,11 +1028,16 @@ export async function opensearchFixture(
 					if (
 						candidates.some((id) => !/^[a-f0-9]{64}$/.test(id)) ||
 						new Set(candidates).size !== candidates.length
-					)
-						throw new Error(
+					) {
+						const invalid = new Error(
 							"Owned OpenSearch reconciliation inventory is incomplete",
 						);
-					for (const id of candidates) removalCandidates.add(id);
+						error ??= invalid;
+						record(
+							"cleanup-failure",
+							diagnostic(invalid, "reconcile-owned-container", started),
+						);
+					} else for (const id of candidates) removalCandidates.add(id);
 				} catch (cause) {
 					error ??= cause;
 					record(
@@ -1256,7 +1275,11 @@ export async function opensearchFixture(
 	} catch (cause) {
 		const interruptionSafe =
 			(signal?.aborted === true &&
-				(cause === signal.reason || cause.externalAbort === true)) ||
+				operation.reason === signal.reason &&
+				(cause === signal.reason ||
+					cause.externalAbort === true ||
+					(cause?.name === "AbortError" &&
+						cause.cause === operation.reason))) ||
 			(cause.category === "deadline-expired" && performance.now() >= deadline);
 		record("startup-failure", {
 			...diagnostic(cause, currentOperation, ownerStarted),

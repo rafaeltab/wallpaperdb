@@ -72,6 +72,7 @@ export async function opensearchFixture(
 		teardownSeconds: 0,
 	};
 	let failure, observationError, container, port, baseline, server;
+	let baselineProjection;
 	let phase = "startup",
 		currentOperation = "initialize-owner",
 		boundariesDropped = 0;
@@ -341,7 +342,101 @@ export async function opensearchFixture(
 	};
 	const object = (value) =>
 		value !== null && typeof value === "object" && !Array.isArray(value);
+	const metadataSections = ["aliases", "mappings", "settings", "other"];
+	const failMetadataObservation = () => {
+		observationError ??= new Error(
+			"Owned OpenSearch metadata observation failed",
+		);
+		failure ??= observationError;
+		failureSignal.abort();
+		return observationError;
+	};
+	const projectNonPilot = (value) => {
+		if (!/^[0-9a-f]{64}$/.test(container ?? ""))
+			throw new Error("Owned OpenSearch metadata generation is unbound");
+		const entries = new Map(
+			Object.entries(value).map(([name, entry]) => {
+				const { aliases, mappings, settings, ...other } = entry;
+				return [
+					createHash("sha256").update(name).digest("hex"),
+					{
+						wholeEntry: hash(canonical(entry)),
+						aliases: hash(canonical(aliases)),
+						mappings: hash(canonical(mappings)),
+						settings: hash(canonical(settings)),
+						other: hash(canonical(other)),
+					},
+				];
+			}),
+		);
+		return {
+			containerId: container,
+			count: entries.size,
+			aggregateDigest: hash(canonical(value)),
+			nameSetDigest: hash([...entries.keys()].sort()),
+			entries,
+		};
+	};
+	const projectionSummary = (projection) => ({
+		containerId: projection.containerId,
+		count: projection.count,
+		aggregateDigest: projection.aggregateDigest,
+		nameSetDigest: projection.nameSetDigest,
+	});
+	const nonPilotDelta = (current) => {
+		if (
+			!baselineProjection ||
+			baselineProjection.containerId !== container ||
+			baselineProjection.aggregateDigest !== baseline
+		)
+			throw new Error("Owned OpenSearch metadata projection is unbound");
+		const counts = { added: 0, removed: 0, changed: 0 };
+		const componentCounts = {
+			wholeEntry: 0,
+			aliases: 0,
+			mappings: 0,
+			settings: 0,
+			other: 0,
+		};
+		const samples = [];
+		const names = new Set([
+			...baselineProjection.entries.keys(),
+			...current.entries.keys(),
+		]);
+		for (const nameDigest of [...names].sort()) {
+			const before = baselineProjection.entries.get(nameDigest);
+			const after = current.entries.get(nameDigest);
+			if (before?.wholeEntry === after?.wholeEntry) continue;
+			const kind = !before ? "added" : !after ? "removed" : "changed";
+			counts[kind]++;
+			componentCounts.wholeEntry++;
+			const changedSections = metadataSections.filter((section) => {
+				if (before?.[section] === after?.[section]) return false;
+				componentCounts[section]++;
+				return true;
+			});
+			if (samples.length < 4)
+				samples.push({
+					nameDigest,
+					kind,
+					changedSections,
+					before: before ?? null,
+					after: after ?? null,
+				});
+		}
+		const omittedCount = componentCounts.wholeEntry - samples.length;
+		return {
+			baseline: projectionSummary(baselineProjection),
+			current: projectionSummary(current),
+			counts,
+			componentCounts,
+			samples,
+			omittedCount,
+			truncated: omittedCount > 0,
+		};
+	};
 	const metadata = async () => {
+		const started = performance.now();
 		const value = await backend(
 			"/_all?expand_wildcards=all&allow_no_indices=true",
 		);
@@ -375,11 +470,29 @@ export async function opensearchFixture(
 		const other = Object.fromEntries(
 			Object.entries(value).filter(([key]) => !owned.includes(key)),
 		);
-		if (baseline !== undefined && hash(canonical(other)) !== baseline)
-			throw categoryError(
+		if (baseline !== undefined && hash(canonical(other)) !== baseline) {
+			const error = categoryError(
 				"Owned OpenSearch non-pilot index state changed",
 				"non-pilot-index-state-changed",
 			);
+			// Preserve the drift cause even when its additional observation fails.
+			failure ??= error;
+			let delta = { observationFailed: true };
+			try {
+				delta = nonPilotDelta(projectNonPilot(other));
+			} catch {
+				failMetadataObservation();
+			}
+			try {
+				record("non-pilot-metadata-delta", {
+					...diagnostic(error, "read-index-metadata", started),
+					...delta,
+				});
+			} catch {
+				failMetadataObservation();
+			}
+			throw error;
+		}
 		return { value, owned, other };
 	};
 	const drainTasks = async () => {
@@ -566,6 +679,16 @@ export async function opensearchFixture(
 			if (initial.owned.length)
 				throw new Error("Owned OpenSearch startup contains pilot indices");
 			baseline = hash(canonical(initial.other));
+			try {
+				baselineProjection = projectNonPilot(initial.other);
+				record(
+					"non-pilot-metadata-baseline",
+					projectionSummary(baselineProjection),
+				);
+				if (observationError) throw observationError;
+			} catch {
+				throw failMetadataObservation();
+			}
 			timings.startupSeconds += (performance.now() - started) / 1000;
 			record("backend-started", {
 				containerId: container,
@@ -759,6 +882,7 @@ export async function opensearchFixture(
 			await docker("rm", "--force", "--volumes", container);
 			container = undefined;
 			baseline = undefined;
+			baselineProjection = undefined;
 			await create(String(port));
 		} else {
 			await withinOperation(5000, async () => {

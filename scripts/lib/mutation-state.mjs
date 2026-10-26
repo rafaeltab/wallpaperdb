@@ -83,6 +83,24 @@ function manifests(root) {
 export function mutationContext(root, workspace, suite, config) {
 	if (!/^[a-z][a-z0-9-]*$/.test(suite))
 		throw new Error("Invalid mutation suite");
+	if (config.fixture === "opensearch-owned") {
+		const diagnosticOrder = process.env.MUTATION_OPENSEARCH_ORDER ?? "native";
+		const diagnosticCancellation =
+			process.env.MUTATION_OPENSEARCH_CANCEL ?? "off";
+		if (
+			!["native", "reverse"].includes(diagnosticOrder) ||
+			!["off", "after-progress"].includes(diagnosticCancellation) ||
+			!["0", "1"].includes(process.env.MUTATION_OPENSEARCH_ISOLATED ?? "1") ||
+			[
+				"MUTATION_OPENSEARCH_RESET_FAILURE",
+				"MUTATION_OPENSEARCH_DISPOSAL_FAILURE",
+			].some(
+				(key) => !["off", "after-progress"].includes(process.env[key] ?? "off"),
+			)
+		)
+			throw new Error("Invalid OpenSearch diagnostic controls");
+		config = { ...config, diagnosticOrder, diagnosticCancellation };
+	}
 	if (config.fixture === "s3-owned") {
 		const diagnosticOrder = process.env.MUTATION_S3_ORDER ?? "native";
 		const diagnosticCancellation = process.env.MUTATION_S3_CANCEL ?? "off";

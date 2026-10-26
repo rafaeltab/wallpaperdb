@@ -34,7 +34,10 @@ export function trackedFiles(root) {
 		),
 	].sort();
 }
-export function catalog(root, { package: selected, scope, base }) {
+export function catalog(
+	root,
+	{ package: selected, scope, base, opensearchProfile = false },
+) {
 	const files = trackedFiles(root);
 	const inventory = json(join(root, "mutation.inventory.json"));
 	const directories = workspaceDirectories(root);
@@ -95,7 +98,14 @@ export function catalog(root, { package: selected, scope, base }) {
 			throw new Error(
 				`Mutation stage inventory/configuration disagree: ${directory}`,
 			);
-		for (const [suite, settings] of Object.entries(config.suites)) {
+		for (const [suite, normal] of Object.entries(config.suites)) {
+			const selectedOpenSearch =
+				opensearchProfile &&
+				directory === "apps/gateway" &&
+				suite === "integration";
+			const settings = selectedOpenSearch
+				? json(join(root, directory, "mutation.opensearch.config.json"))
+				: normal;
 			if (
 				settings.fixture &&
 				![
@@ -103,6 +113,7 @@ export function catalog(root, { package: selected, scope, base }) {
 					"postgres-owned",
 					"nats-owned",
 					"s3-owned",
+					"opensearch-owned",
 				].includes(settings.fixture)
 			)
 				throw new Error(`Unsupported mutation fixture: ${settings.fixture}`);
@@ -114,6 +125,14 @@ export function catalog(root, { package: selected, scope, base }) {
 						isMutationSource(file) &&
 						(!settings.sourceRoots ||
 							settings.sourceRoots.some((prefix) => file.startsWith(prefix))),
+				);
+			if (
+				selectedOpenSearch &&
+				JSON.stringify(sourceFiles) !==
+					JSON.stringify(["src/adapters/opensearch/profiles.ts"])
+			)
+				throw new Error(
+					"OpenSearch Profile configuration must select exactly profiles.ts",
 				);
 			const context = mutationContext(root, directory, suite, {
 				...settings,

@@ -52,6 +52,11 @@ on:
         type: choice
         options: [isolated, reused, compare, reset-failure, disposal-failure, cancel-after-progress]
         default: reused
+      opensearch_fixture:
+        description: Explicit fixed Profile discovery pilot; normal Gateway remains Redis
+        type: choice
+        options: ['off', isolated, reused, compare, reset-failure, disposal-failure, cancel-after-progress]
+        default: 'off'
       reset_failure:
         description: Inject a Redis reset failure to verify diagnostics and owned cleanup
         type: boolean
@@ -84,6 +89,7 @@ jobs:
       POSTGRES_FIXTURE: ${{ inputs.postgres_fixture || 'reused' }}
       NATS_FIXTURE: ${{ inputs.nats_fixture || 'reused' }}
       S3_FIXTURE: ${{ inputs.s3_fixture || 'reused' }}
+      OPENSEARCH_FIXTURE: ${{ inputs.opensearch_fixture || 'off' }}
       RESET_FAILURE_INPUT: ${{ inputs.reset_failure }}
     steps:
       - uses: actions/checkout@v4
@@ -142,6 +148,9 @@ jobs:
           export MUTATION_NATS_ORDER=native MUTATION_NATS_CANCEL=off
           export MUTATION_S3_ORDER=native MUTATION_S3_CANCEL=off
           export MUTATION_S3_RESET_FAILURE=off MUTATION_S3_DISPOSAL_FAILURE=off
+          export MUTATION_OPENSEARCH_PROFILE=0 MUTATION_OPENSEARCH_ISOLATED=1
+          export MUTATION_OPENSEARCH_ORDER=native MUTATION_OPENSEARCH_CANCEL=off
+          export MUTATION_OPENSEARCH_RESET_FAILURE=off MUTATION_OPENSEARCH_DISPOSAL_FAILURE=off
           unset WALLPAPERDB_MUTATION_PLAN_ORDER
           case "$POSTGRES_FIXTURE" in
             reused) export MUTATION_POSTGRES_ISOLATED=0 ;;
@@ -187,6 +196,27 @@ jobs:
               esac ;;
             *) exit 1 ;;
           esac
+          case "$OPENSEARCH_FIXTURE" in
+            off) ;;
+            isolated|reused|compare|reset-failure|disposal-failure|cancel-after-progress)
+              [[ "$EVENT_NAME" == workflow_dispatch && "$SCOPE" == all &&
+                 "$SELECT_SUITE" == all && "$SELECT_PACKAGE" == gateway &&
+                 "$SELECT_FILES" == src/adapters/opensearch/profiles.ts &&
+                 -z "$IMPORT_RUN" && "$RESET_FAILURE_INPUT" != true &&
+                 "$POSTGRES_FIXTURE" != compare &&
+                 ( "$NATS_FIXTURE" == isolated || "$NATS_FIXTURE" == reused ) &&
+                 ( "$S3_FIXTURE" == isolated || "$S3_FIXTURE" == reused ) ]] || exit 1
+              export MUTATION_OPENSEARCH_PROFILE=1
+              case "$OPENSEARCH_FIXTURE" in
+                reused|compare) export MUTATION_OPENSEARCH_ISOLATED=0 ;;
+                reset-failure) export MUTATION_OPENSEARCH_ISOLATED=0 MUTATION_OPENSEARCH_RESET_FAILURE=after-progress ;;
+                disposal-failure) export MUTATION_OPENSEARCH_ISOLATED=0 MUTATION_OPENSEARCH_DISPOSAL_FAILURE=after-progress ;;
+                cancel-after-progress)
+                  [[ "$BUDGET" == 60 && "$QUANTUM" == 60 ]] || exit 1
+                  export MUTATION_OPENSEARCH_ISOLATED=0 MUTATION_OPENSEARCH_CANCEL=after-progress ;;
+              esac ;;
+            *) exit 1 ;;
+          esac
           args=(--scope "$SCOPE" --base "$BASE" --budget "$BUDGET" --quantum "$QUANTUM")
           if [[ "$EVENT_NAME" == pull_request ]]; then
             unset GH_TOKEN GITHUB_TOKEN
@@ -222,7 +252,12 @@ jobs:
             common=$(git rev-parse --path-format=absolute --git-common-dir)
             rm -rf -- "$common/mutation/v1/asset" "$common/mutation/repository-v1" reports/mutation apps/asset/reports/mutation
           fi
-          if [[ "$POSTGRES_FIXTURE" == compare || "$NATS_FIXTURE" == compare || "$S3_FIXTURE" == compare ]]; then
+          if [[ "$OPENSEARCH_FIXTURE" == reset-failure || "$OPENSEARCH_FIXTURE" == disposal-failure || "$OPENSEARCH_FIXTURE" == cancel-after-progress ]]; then
+            args+=(--offline)
+            common=$(git rev-parse --path-format=absolute --git-common-dir)
+            rm -rf -- "$common/mutation/v1/gateway" "$common/mutation/repository-v1" reports/mutation apps/gateway/reports/mutation
+          fi
+          if [[ "$POSTGRES_FIXTURE" == compare || "$NATS_FIXTURE" == compare || "$S3_FIXTURE" == compare || "$OPENSEARCH_FIXTURE" == compare ]]; then
             # A diagnostic comparison has one fixed source/suite scope and four
             # cold invocations. No imported/remote or prior-sample conclusions.
             [[ "$EVENT_NAME" == workflow_dispatch && "$SCOPE" == all &&
@@ -239,8 +274,10 @@ jobs:
                  "$SELECT_FILES" == src/adapters/events/broker.ts &&
                  ( "$S3_FIXTURE" == isolated || "$S3_FIXTURE" == reused ) ]] || exit 1
               family=nats
-            else
+            elif [[ "$S3_FIXTURE" == compare ]]; then
               family=s3
+            else
+              family=opensearch
             fi
             (( BUDGET >= 24 )) || exit 1
             sample_budget=$(( BUDGET / 4 ))
@@ -264,6 +301,12 @@ jobs:
                 case "$sample" in
                   *-1) export MUTATION_NATS_ORDER=native ;;
                   *-2) export MUTATION_NATS_ORDER=reverse ;;
+                esac
+              elif [[ "$family" == opensearch ]]; then
+                export MUTATION_OPENSEARCH_ISOLATED=$isolation
+                case "$sample" in
+                  *-1) export MUTATION_OPENSEARCH_ORDER=native ;;
+                  *-2) export MUTATION_OPENSEARCH_ORDER=reverse ;;
                 esac
               else
                 export MUTATION_S3_ISOLATED=$isolation
@@ -298,6 +341,11 @@ jobs:
                 mv "$destination/invocation.tmp" "$destination/invocation.json"
               elif [[ "$family" == s3 ]]; then
                 jq --arg order "$MUTATION_S3_ORDER" '. + {planOrder:$order}' \
+                  "$destination/invocation.json" > "$destination/invocation.tmp"
+                mv "$destination/invocation.tmp" "$destination/invocation.json"
+              fi
+              if [[ "$family" == opensearch ]]; then
+                jq --arg order "$MUTATION_OPENSEARCH_ORDER" '. + {planOrder:$order,variant:"gateway-opensearch-profile-opt-in"}' \
                   "$destination/invocation.json" > "$destination/invocation.tmp"
                 mv "$destination/invocation.tmp" "$destination/invocation.json"
               fi
@@ -359,6 +407,8 @@ jobs:
             packages/*/reports/mutation/*/mutation.json
             packages/*/reports/mutation/*/mutation.html
             apps/user/reports/mutation/integration/run-*/*.json
+            apps/gateway/reports/mutation/integration/run-*/*.json
+            apps/gateway/reports/mutation/integration/run-*/*.jsonl
             apps/user/reports/mutation/integration/run-*/*.jsonl
             apps/color-extractor/reports/mutation/integration/run-*/*.json
             apps/color-extractor/reports/mutation/integration/run-*/*.jsonl
@@ -367,5 +417,6 @@ jobs:
             ${{ runner.temp }}/wallpaperdb-postgres-comparison/
             ${{ runner.temp }}/wallpaperdb-nats-comparison/
             ${{ runner.temp }}/wallpaperdb-s3-comparison/
+            ${{ runner.temp }}/wallpaperdb-opensearch-comparison/
           if-no-files-found: warn
           retention-days: 30

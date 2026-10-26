@@ -30,6 +30,18 @@ export async function mutationFixture(
 	clientTimings,
 ) {
 	if (!config.fixture) return undefined;
+	if (config.fixture === "opensearch-owned") {
+		const { opensearchFixture } = await import("./mutation-opensearch.mjs");
+		return opensearchFixture(
+			cwd,
+			config.fixtureImage,
+			deadline,
+			cleanupMs,
+			signal,
+			cancelAfterNativeProgress,
+			clientTimings,
+		);
+	}
 	if (config.fixture === "redis-owned-reuse")
 		return redisFixture(cwd, config.fixtureImage, deadline, cleanupMs, signal);
 	if (config.fixture === "postgres-owned") {

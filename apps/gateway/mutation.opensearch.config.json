@@ -1,0 +1,18 @@
+{
+	"sourceRoots": ["src/adapters/opensearch/profiles.ts"],
+	"vitest": {
+		"configFile": "vitest.mutation.opensearch.config.ts",
+		"related": false
+	},
+	"timeoutMS": 10000,
+	"fixture": "opensearch-owned",
+	"fixtureImage": "opensearchproject/opensearch:2.11.0@sha256:925060a17ef0374f2b3d94d0f8fb35dffb491701cd4a72fb12a9ca2fed9929d4",
+	"environmentKeys": [
+		"MUTATION_OPENSEARCH_PROFILE",
+		"MUTATION_OPENSEARCH_ISOLATED",
+		"MUTATION_OPENSEARCH_ORDER",
+		"MUTATION_OPENSEARCH_RESET_FAILURE",
+		"MUTATION_OPENSEARCH_DISPOSAL_FAILURE",
+		"MUTATION_OPENSEARCH_CANCEL"
+	]
+}

@@ -155,9 +155,24 @@ export async function coordinate() {
 			"Local diagnostics require --package and a budget of at most 300 seconds including shutdown. Build baselines in CI.",
 		);
 	const root = git(process.cwd(), "rev-parse", "--show-toplevel");
+	const opensearchProfile = process.env.MUTATION_OPENSEARCH_PROFILE === "1";
+	if (![undefined, "0", "1"].includes(process.env.MUTATION_OPENSEARCH_PROFILE))
+		throw new Error("Invalid OpenSearch Profile opt-in");
+	if (
+		opensearchProfile &&
+		(values.inventory ||
+			values.scope !== "all" ||
+			values.suite ||
+			values.package !== "gateway" ||
+			values.files !== "src/adapters/opensearch/profiles.ts")
+	)
+		throw new Error(
+			"OpenSearch Profile requires the fixed all/all/gateway/profiles.ts scope",
+		);
 	const full = catalog(root, {
 		scope: values.inventory ? "all" : values.scope,
 		base: values.base,
+		opensearchProfile,
 	});
 	if (values.inventory) {
 		console.log(JSON.stringify(full.inventory, null, 2));
@@ -185,6 +200,9 @@ export async function coordinate() {
 	let remote = "offline";
 
 	const summary = {
+		...(opensearchProfile
+			? { selectedVariant: "gateway-opensearch-profile-opt-in" }
+			: {}),
 		outcome: "completed",
 		scope: values.files ? "representative" : values.scope,
 		budgetSeconds: budgetMs / 1000,

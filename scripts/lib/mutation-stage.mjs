@@ -37,8 +37,8 @@ import {
 
 const json = (file) => JSON.parse(readFileSync(file, "utf8"));
 
-// Only the S3 close proof reads native reports before fixture finalization.
-const s3CloseReport = (file) => {
+// Owned interrupted-Pending proofs read native reports before finalization.
+const ownedCloseReport = (file, family = "S3") => {
 	let fd, value, error;
 	try {
 		fd = openSync(
@@ -51,7 +51,9 @@ const s3CloseReport = (file) => {
 			!Number.isSafeInteger(before.size) ||
 			before.size > 16 * 1024 * 1024
 		)
-			throw new Error("Owned S3 native report is not a bounded regular file");
+			throw new Error(
+				`Owned ${family} native report is not a bounded regular file`,
+			);
 		const bytes = Buffer.alloc(before.size);
 		let size = 0;
 		while (size < bytes.length) {
@@ -66,24 +68,29 @@ const s3CloseReport = (file) => {
 			after.mtimeMs !== before.mtimeMs ||
 			after.ctimeMs !== before.ctimeMs
 		)
-			throw new Error("Owned S3 native report changed during observation");
+			throw new Error(
+				`Owned ${family} native report changed during observation`,
+			);
 		value = JSON.parse(bytes.toString("utf8"));
 	} catch (cause) {
-		error = new Error("Owned S3 native close report observation failed", {
-			cause,
-		});
+		error = new Error(
+			`Owned ${family} native close report observation failed`,
+			{
+				cause,
+			},
+		);
 	} finally {
 		try {
 			if (fd !== undefined) closeSync(fd);
 		} catch (cause) {
 			const cleanup = new Error(
-				"Owned S3 native report descriptor cleanup failed",
+				`Owned ${family} native report descriptor cleanup failed`,
 				{ cause },
 			);
 			error = error
 				? new AggregateError(
 						[error, cleanup],
-						"Owned S3 native report observation and cleanup failed",
+						`Owned ${family} native report observation and cleanup failed`,
 						{ cause: error },
 					)
 				: cleanup;
@@ -109,9 +116,17 @@ export async function runStage({
 	signal,
 }) {
 	const start = performance.now();
-	const drainingFixture = ["postgres-owned", "nats-owned", "s3-owned"].includes(
+	const finalizedFixture = ["s3-owned", "opensearch-owned"].includes(
 		config.fixture,
 	);
+	const finalizationFamily =
+		config.fixture === "opensearch-owned" ? "OpenSearch" : "S3";
+	const drainingFixture = [
+		"postgres-owned",
+		"nats-owned",
+		"s3-owned",
+		"opensearch-owned",
+	].includes(config.fixture);
 	const fixtureCleanupMs = drainingFixture
 		? Math.max(1, Math.floor(graceMs / 2))
 		: Math.max(100, graceMs / 2);
@@ -202,7 +217,7 @@ export async function runStage({
 				renameSync(file, join(run, `invalid-mutation.${extension}`));
 		}
 	};
-	const assertS3Healthy = () => {
+	const assertFixtureHealthy = () => {
 		if (
 			shouldCancel() ||
 			signal?.aborted ||
@@ -212,14 +227,14 @@ export async function runStage({
 			summary.errors
 		)
 			throw new Error(
-				"Owned S3 finalization has cancellation or failure evidence",
+				`Owned ${finalizationFamily} finalization has cancellation or failure evidence`,
 			);
 	};
 	const closeFixture = async (s3Context) => {
 		if (!fixture || fixtureClosed) return;
 		fixtureClosed = true;
 		try {
-			if (config.fixture === "s3-owned") await fixture.close(s3Context);
+			if (finalizedFixture) await fixture.close(s3Context);
 			else await fixture.close();
 		} catch (error) {
 			cleanupFailed = true;
@@ -231,7 +246,7 @@ export async function runStage({
 	let workerStarted = false;
 	let cancellationRequested = false;
 	const cancelAfterNativeProgress =
-		["nats-owned", "s3-owned"].includes(config.fixture) &&
+		["nats-owned", "s3-owned", "opensearch-owned"].includes(config.fixture) &&
 		config.diagnosticCancellation === "after-progress"
 			? async (operationDeadline) => {
 					if (cancellationRequested) return;
@@ -339,9 +354,11 @@ export async function runStage({
 					WALLPAPERDB_MUTATION_PLAN: plan,
 					WALLPAPERDB_MUTATION_GATE: unit ? gate : "",
 					// Never inherit another stage's private ordering control.
-					WALLPAPERDB_MUTATION_PLAN_ORDER: ["nats-owned", "s3-owned"].includes(
-						config.fixture,
-					)
+					WALLPAPERDB_MUTATION_PLAN_ORDER: [
+						"nats-owned",
+						"s3-owned",
+						"opensearch-owned",
+					].includes(config.fixture)
 						? config.diagnosticOrder
 						: "native",
 					WALLPAPERDB_MUTATION_FAILURE_FILE: fixtureFailure,
@@ -359,22 +376,30 @@ export async function runStage({
 		let s3Reports;
 		// Resource disposal is part of the evidence, before checkpoint publication.
 		await closeFixture(
-			config.fixture === "s3-owned"
+			finalizedFixture
 				? {
 						result,
-						assertHealthy: assertS3Healthy,
+						assertHealthy: assertFixtureHealthy,
 						reports: () =>
 							(s3Reports ??= {
-								planned: s3CloseReport(plan),
+								planned: ownedCloseReport(
+									plan,
+									config.fixture === "opensearch-owned" ? "OpenSearch" : "S3",
+								),
 								partial: existsSync(incrementalFile)
-									? s3CloseReport(incrementalFile)
+									? ownedCloseReport(
+											incrementalFile,
+											config.fixture === "opensearch-owned"
+												? "OpenSearch"
+												: "S3",
+										)
 									: undefined,
 								initial: executionBaseline?.report,
 							}),
 					}
 				: undefined,
 		);
-		if (config.fixture === "s3-owned") assertS3Healthy();
+		if (finalizedFixture) assertFixtureHealthy();
 		if (
 			summary.errors ||
 			(result.outcome === "completed" && !existsSync(complete))
@@ -453,11 +478,11 @@ export async function runStage({
 			};
 			summary.results = resultCounts([...resultIndex(report).values()]);
 			if (summary.results.counts.RuntimeError) summary.outcome = "failed";
-			if (config.fixture === "s3-owned") {
+			if (finalizedFixture) {
 				// Deliver queued signals after synchronous hashing/merging, before
 				// checking eligibility. Signals arriving after this check can still race.
 				await new Promise((resolve) => setImmediate(resolve));
-				assertS3Healthy();
+				assertFixtureHealthy();
 			}
 			const checkpoint = publishBaseline(context, report, {
 				discovery,
@@ -481,9 +506,8 @@ export async function runStage({
 		if (startupCleanupFailed) summary.cleanupError = error.message;
 		const hasCleanupFailure =
 			startupCleanupFailed ||
-			(config.fixture === "s3-owned" &&
-				(cleanupFailed || Boolean(summary.cleanupError)));
-		if (config.fixture === "s3-owned" && workerStarted) {
+			(finalizedFixture && (cleanupFailed || Boolean(summary.cleanupError)));
+		if (finalizedFixture && workerStarted) {
 			summary.invalidFixtureResults = true;
 			quarantineProgress();
 		}
@@ -494,8 +518,8 @@ export async function runStage({
 		) {
 			summary.outcome = shouldCancel() ? "cancelled" : "budget-exhausted";
 			summary.diagnostic =
-				config.fixture === "s3-owned" && workerStarted
-					? "Owned S3 execution was quarantined during cancellation"
+				finalizedFixture && workerStarted
+					? `Owned ${finalizationFamily} execution was quarantined during cancellation`
 					: `Fixture/startup ended without mutation progress: ${error.message}`;
 			return { summary, context };
 		}
@@ -503,7 +527,7 @@ export async function runStage({
 		summary.error = error.message;
 		if (config.fixture) {
 			summary.invalidFixtureResults = true;
-			if (config.fixture === "s3-owned") quarantineProgress();
+			if (finalizedFixture) quarantineProgress();
 			return { summary, context };
 		}
 		throw error;
@@ -515,10 +539,15 @@ export async function runStage({
 				image: fixture.image,
 				containerIds: fixture.containerIds,
 				boundaries: fixture.boundaries,
-				...(config.fixture === "s3-owned"
+				...(config.fixture === "opensearch-owned"
+					? { history: fixture.history }
+					: {}),
+				...(finalizedFixture
 					? { boundariesDropped: fixture.boundariesDropped }
 					: {}),
-				...(["nats-owned", "s3-owned"].includes(config.fixture)
+				...(["nats-owned", "s3-owned", "opensearch-owned"].includes(
+					config.fixture,
+				)
 					? { finalization: fixture.finalization }
 					: {}),
 				...fixture.timings,
@@ -548,6 +577,9 @@ export async function runStage({
 				summary.clients.scope = "nats-helper-only";
 			if (config.fixture === "s3-owned")
 				summary.clients.scope = "observed-sdk-instances-and-node-agents";
+			if (config.fixture === "opensearch-owned")
+				summary.clients.scope =
+					"observed-opensearch-sdk-application-adapter-agents-and-sockets";
 		}
 		summary.elapsedSeconds = (performance.now() - start) / 1000;
 		writeFileSync(join(run, "summary.json"), JSON.stringify(summary, null, 2));

@@ -48,10 +48,10 @@ on:
         options: [isolated, reused, compare, reset-failure, cancel-after-progress]
         default: reused
       s3_fixture:
-        description: Asset S3 reader candidate; isolated until its own acceptance
+        description: Asset S3 reader; reuse the accepted selected serial operation
         type: choice
         options: [isolated, reused, compare, reset-failure, disposal-failure, cancel-after-progress]
-        default: isolated
+        default: reused
       reset_failure:
         description: Inject a Redis reset failure to verify diagnostics and owned cleanup
         type: boolean
@@ -83,7 +83,7 @@ jobs:
       MUTATION_REDIS_ISOLATED: ${{ inputs.isolated_redis && '1' || '0' }}
       POSTGRES_FIXTURE: ${{ inputs.postgres_fixture || 'reused' }}
       NATS_FIXTURE: ${{ inputs.nats_fixture || 'reused' }}
-      S3_FIXTURE: ${{ inputs.s3_fixture || 'isolated' }}
+      S3_FIXTURE: ${{ inputs.s3_fixture || 'reused' }}
       RESET_FAILURE_INPUT: ${{ inputs.reset_failure }}
     steps:
       - uses: actions/checkout@v4

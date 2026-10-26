@@ -678,7 +678,7 @@ export async function s3Fixture(
 		verifyDisposal();
 		const state = await bucketState();
 		record("before-reset", { execution, ...summarizeState(state) });
-		if ((process.env.MUTATION_S3_ISOLATED ?? "1") === "1") {
+		if ((process.env.MUTATION_S3_ISOLATED ?? "0") === "1") {
 			await stopClient();
 			await docker("rm", "--force", "--volumes", currentContainerId);
 			currentContainerId = undefined;

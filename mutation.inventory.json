@@ -65,7 +65,7 @@
         "integration"
       ],
       "limitations": {
-        "reason": "S3 candidate selects only the existing exact-byte/missing-object reader contract with isolated per-mutation SeaweedFS by default. Native activation and reuse correctness/net benefit remain unvalidated under #517. Image subprocesses, lifetime/destructive/network/configuration suites and other PostgreSQL/NATS fixtures remain excluded from mutation integration.",
+        "reason": "S3 selects only the existing exact-byte/missing-object reader contract with a private SeaweedFS backend reused serially by default; isolated per-mutation diagnostics remain available. Scoped acceptance evidence and limits are tracked under #517. Image subprocesses, lifetime/destructive/network/configuration suites and other PostgreSQL/NATS fixtures remain excluded from mutation integration.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },

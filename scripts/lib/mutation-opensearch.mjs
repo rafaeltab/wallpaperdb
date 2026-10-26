@@ -150,6 +150,9 @@ export async function opensearchFixture(
 			"runtime-version",
 			"health-not-ready",
 			"deadline-expired",
+			"index-inventory-shape",
+			"pilot-index-name",
+			"non-pilot-index-state-changed",
 		].includes(error?.category)
 			? error.category
 			: "UNKNOWN",
@@ -353,7 +356,10 @@ export async function opensearchFixture(
 					!object(entry.settings),
 			)
 		)
-			throw new Error("Owned OpenSearch index inventory is incomplete");
+			throw categoryError(
+				"Owned OpenSearch index inventory is incomplete",
+				"index-inventory-shape",
+			);
 		const owned = Object.keys(value).filter((key) =>
 			key.startsWith("gateway_"),
 		);
@@ -362,14 +368,18 @@ export async function opensearchFixture(
 				(key) => !/^gateway_[0-9a-f-]{36}_(profiles|wallpapers)$/.test(key),
 			)
 		)
-			throw new Error(
+			throw categoryError(
 				"Owned OpenSearch index inventory escaped the selected operation",
+				"pilot-index-name",
 			);
 		const other = Object.fromEntries(
 			Object.entries(value).filter(([key]) => !owned.includes(key)),
 		);
 		if (baseline !== undefined && hash(canonical(other)) !== baseline)
-			throw new Error("Owned OpenSearch non-pilot index state changed");
+			throw categoryError(
+				"Owned OpenSearch non-pilot index state changed",
+				"non-pilot-index-state-changed",
+			);
 		return { value, owned, other };
 	};
 	const drainTasks = async () => {
@@ -1088,13 +1098,51 @@ export async function opensearchFixture(
 					);
 					if (present)
 						error ??= new Error("Owned OpenSearch container remains present");
-					else
+					else {
+						const audit = currentCall?.disposalAudit;
+						const ack = currentCall?.disposalAck;
+						const cooperativeDisposalObserved = Boolean(
+							!startupCleanup &&
+								!interrupted &&
+								!error &&
+								!failure &&
+								!observationError &&
+								!signal?.aborted &&
+								!failureSignal.signal.aborted &&
+								finalization.finalAudit?.status === "PASSED" &&
+								finalization.finalAudit.scope ===
+									"owned-backend-and-acknowledged-sdk-disposal" &&
+								execution > 0 &&
+								disposed &&
+								!activeCall &&
+								currentCall?.ended &&
+								currentCall.acknowledged &&
+								currentCall.execution === execution &&
+								calls.get(currentCall.id) === currentCall &&
+								audit?.call === currentCall.id &&
+								audit.execution === execution &&
+								audit.workerPid === currentCall.pid &&
+								audit.dev === auditWindow?.dev &&
+								audit.ino === auditWindow.ino &&
+								audit.start === auditWindow.offset &&
+								audit.end === auditEnd &&
+								ack?.call === currentCall.id &&
+								ack.execution === execution &&
+								ack.audit === audit,
+						);
 						record("owned-resources-absent", {
 							containers: 0,
 							scope: "exact-owner-label",
-							cooperativeDisposalObserved:
-								!startupCleanup && !interrupted && disposed,
+							cooperativeDisposalObserved,
+							cooperativeDisposalStatus: cooperativeDisposalObserved
+								? "OBSERVED_CURRENT_EXECUTION"
+								: startupCleanup
+									? "SKIPPED_NO_APPLICATION"
+									: execution === 0
+										? "UNOBSERVED_NO_BOUND_EXECUTION"
+										: "UNOBSERVED",
 						});
+					}
 				} catch (cause) {
 					error ??= cause;
 					record(
@@ -1189,7 +1237,7 @@ export async function opensearchFixture(
 						if (disposed)
 							throw new Error("Owned OpenSearch duplicate disposal ACK");
 						const rows = observations();
-						verifyAudit(rows);
+						const audit = verifyAudit(rows);
 						const initialization = rows.filter(
 							(row) => row.event === "application-acquired",
 						);
@@ -1203,9 +1251,22 @@ export async function opensearchFixture(
 							);
 						timings.initializationSeconds += initialization[0].seconds;
 						assertHealthy();
+						currentCall.disposalAudit = {
+							call: currentCall.id,
+							execution,
+							workerPid: currentCall.pid,
+							threadId: audit.threadId,
+							dev: auditWindow.dev,
+							ino: auditWindow.ino,
+							start: auditWindow.offset,
+							end: auditEnd,
+						};
 						currentCall.acknowledged = true;
 						disposed = true;
-						record("strict-disposal-ack", { call: currentCall.id });
+						currentCall.disposalAck = record("strict-disposal-ack", {
+							call: currentCall.id,
+							audit: currentCall.disposalAudit,
+						});
 						assertHealthy();
 						outgoing.writeHead(200).end();
 					}

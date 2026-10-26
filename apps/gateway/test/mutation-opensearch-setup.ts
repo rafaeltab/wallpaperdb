@@ -223,10 +223,15 @@ function capture(client: Client, entry: ClientObservation) {
 }
 async function control(path: string) {
 	if (!reset || !token) throw new Error("Missing owned OpenSearch control");
+	// Isolated reset includes a JVM restart capped at120s by the controller.
+	// The native runner still owns the shorter stage deadline and shutdown grace.
+	const recreating =
+		path === "/reset" &&
+		(process.env.MUTATION_OPENSEARCH_ISOLATED ?? "1") === "1";
 	const response = await fetch(new URL(path, reset), {
 		method: "POST",
 		headers: { authorization: `Bearer ${token}` },
-		signal: AbortSignal.timeout(6000),
+		signal: AbortSignal.timeout(recreating ? 121000 : 6000),
 	});
 	try {
 		if (!response.ok) throw new Error("Owned OpenSearch control rejected");

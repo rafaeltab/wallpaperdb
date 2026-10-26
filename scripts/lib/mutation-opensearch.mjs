@@ -58,6 +58,7 @@ export async function opensearchFixture(
 		? AbortSignal.any([signal, lifetime.signal])
 		: lifetime.signal;
 	const ids = new Set(),
+		verifiedOwners = new Set(),
 		commands = new Set(),
 		sockets = new Set();
 	const agent = new Agent({ keepAlive: true, maxSockets: 1 });
@@ -148,6 +149,7 @@ export async function opensearchFixture(
 			"docker-failed",
 			"runtime-version",
 			"health-not-ready",
+			"deadline-expired",
 		].includes(error?.category)
 			? error.category
 			: "UNKNOWN",
@@ -168,8 +170,21 @@ export async function opensearchFixture(
 		if (!closing) operation.throwIfAborted();
 		if (!closing) failureSignal.signal.throwIfAborted();
 		const ms = Math.floor(until - performance.now());
-		if (ms <= 0) throw new Error("Owned OpenSearch operation deadline expired");
+		if (ms <= 0)
+			throw categoryError(
+				"Owned OpenSearch operation deadline expired",
+				"deadline-expired",
+			);
 		return ms;
+	};
+	const withinOperation = async (ms, action) => {
+		const parent = operationDeadline;
+		operationDeadline = Math.min(parent, performance.now() + ms);
+		try {
+			return await action();
+		} finally {
+			operationDeadline = parent;
+		}
 	};
 	const docker = async (...args) => {
 		currentOperation = "docker-" + args[0];
@@ -195,6 +210,10 @@ export async function opensearchFixture(
 				"docker-failed",
 			);
 			sanitized.missing = missing;
+			sanitized.externalAbort =
+				error.name === "AbortError" &&
+				signal?.aborted === true &&
+				operation.reason === signal.reason;
 			record("docker-failure", {
 				...diagnostic(sanitized, currentOperation, started),
 				operation: args[0],
@@ -222,6 +241,10 @@ export async function opensearchFixture(
 		const started = performance.now();
 		const ms = Math.min(1000, remaining());
 		const controller = new AbortController();
+		const requestSignal = AbortSignal.any([
+			controller.signal,
+			...(closing ? [] : [operation]),
+		]);
 		const timeout = setTimeout(() => controller.abort(), ms);
 		let req, closed, observedStatus;
 		try {
@@ -235,10 +258,7 @@ export async function opensearchFixture(
 							: path,
 						method: path.startsWith("/delete/") ? "DELETE" : "GET",
 						agent,
-						signal: AbortSignal.any([
-							controller.signal,
-							...(closing ? [] : [operation]),
-						]),
+						signal: requestSignal,
 					},
 					(response) => {
 						observedStatus = response.statusCode;
@@ -302,6 +322,10 @@ export async function opensearchFixture(
 				Number.isSafeInteger(observedStatus)
 			)
 				error.httpStatus = observedStatus;
+			error.externalAbort =
+				cause?.name === "AbortError" &&
+				signal?.aborted === true &&
+				requestSignal.reason === signal.reason;
 			record("backend-failure", {
 				...diagnostic(error, label, started),
 				requestDeadlineAborted: controller.signal.aborted,
@@ -402,14 +426,21 @@ export async function opensearchFixture(
 		)
 			throw new Error("Owned OpenSearch controller transport remains open");
 	};
-	const inspectOwned = async () => {
-		const rows = JSON.parse(await docker("inspect", container));
+	const inspectOwned = async (target = container) => {
+		const rows = JSON.parse(await docker("inspect", target));
 		const value = rows[0];
 		if (
+			!Array.isArray(rows) ||
 			rows.length !== 1 ||
-			value.Id !== container ||
-			!ids.has(value.Id) ||
-			value.Config?.Labels?.["wallpaperdb.mutation"] !== name ||
+			value.Id !== target ||
+			value.Name !== `/${name}` ||
+			value.Config?.Labels?.["wallpaperdb.mutation"] !== name
+		)
+			throw new Error("Owned OpenSearch container ownership is unverified");
+		// Destructive authority is separate from health/configuration observations.
+		verifiedOwners.add(target);
+		ids.add(target);
+		if (
 			value.Image !== configPin ||
 			value.Config?.User !== "1000" ||
 			!Array.isArray(value.Mounts) ||
@@ -418,102 +449,106 @@ export async function opensearchFixture(
 			throw new Error("Owned OpenSearch container metadata differs");
 		return value;
 	};
-	const create = async (fixedPort) => {
-		const started = performance.now();
-		container = await docker(
-			"create",
-			"--pull=never",
-			"--platform",
-			"linux/amd64",
-			"--name",
-			name,
-			"--label",
-			`wallpaperdb.mutation=${name}`,
-			"--publish",
-			`127.0.0.1:${fixedPort ?? ""}:9200`,
-			"--env",
-			"discovery.type=single-node",
-			"--env",
-			"DISABLE_SECURITY_PLUGIN=true",
-			"--env",
-			"DISABLE_INSTALL_DEMO_CONFIG=true",
-			"--env",
-			"OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m",
-			image,
-		);
-		if (!/^[0-9a-f]{64}$/.test(container))
-			throw new Error("Owned OpenSearch create identity is invalid");
-		ids.add(container);
-		await docker("start", container);
-		const state = await inspectOwned();
-		const mapping = state.NetworkSettings?.Ports?.["9200/tcp"];
-		if (
-			!Array.isArray(mapping) ||
-			mapping.length !== 1 ||
-			mapping[0].HostIp !== "127.0.0.1" ||
-			!/^\d+$/.test(mapping[0].HostPort)
-		)
-			throw new Error("Owned OpenSearch endpoint mapping differs");
-		port = Number(mapping[0].HostPort);
-		while (true) {
-			const attemptStarted = performance.now();
-			try {
-				const root = await backend("/");
-				if (
-					root.version?.distribution !== "opensearch" ||
-					root.version.number !== "2.11.0"
-				)
-					throw categoryError(
-						"Owned OpenSearch runtime version differs",
-						"runtime-version",
+	// Same finite startup ceiling as the ordinary fixture, never an observed cost.
+	// The owning operation/stage deadline can only shorten this allowance.
+	const create = (fixedPort) =>
+		withinOperation(120000, async () => {
+			const started = performance.now();
+			container = await docker(
+				"create",
+				"--pull=never",
+				"--platform",
+				"linux/amd64",
+				"--name",
+				name,
+				"--label",
+				`wallpaperdb.mutation=${name}`,
+				"--publish",
+				`127.0.0.1:${fixedPort ?? ""}:9200`,
+				"--env",
+				"discovery.type=single-node",
+				"--env",
+				"DISABLE_SECURITY_PLUGIN=true",
+				"--env",
+				"DISABLE_INSTALL_DEMO_CONFIG=true",
+				"--env",
+				"OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m",
+				image,
+			);
+			if (!/^[0-9a-f]{64}$/.test(container))
+				throw new Error("Owned OpenSearch create identity is invalid");
+			ids.add(container);
+			await docker("start", container);
+			const state = await inspectOwned();
+			const mapping = state.NetworkSettings?.Ports?.["9200/tcp"];
+			if (
+				!Array.isArray(mapping) ||
+				mapping.length !== 1 ||
+				mapping[0].HostIp !== "127.0.0.1" ||
+				!/^\d+$/.test(mapping[0].HostPort)
+			)
+				throw new Error("Owned OpenSearch endpoint mapping differs");
+			port = Number(mapping[0].HostPort);
+			while (true) {
+				const attemptStarted = performance.now();
+				try {
+					const root = await backend("/");
+					if (
+						root.version?.distribution !== "opensearch" ||
+						root.version.number !== "2.11.0"
+					)
+						throw categoryError(
+							"Owned OpenSearch runtime version differs",
+							"runtime-version",
+						);
+					const health = await backend(
+						"/_cluster/health?wait_for_status=yellow&timeout=500ms",
 					);
-				const health = await backend(
-					"/_cluster/health?wait_for_status=yellow&timeout=500ms",
-				);
-				if (
-					health.timed_out !== false ||
-					!["yellow", "green"].includes(health.status) ||
-					health.number_of_nodes !== 1
-				)
-					throw categoryError(
-						"Owned OpenSearch is not ready",
-						"health-not-ready",
+					if (
+						health.timed_out !== false ||
+						!["yellow", "green"].includes(health.status) ||
+						health.number_of_nodes !== 1
+					)
+						throw categoryError(
+							"Owned OpenSearch is not ready",
+							"health-not-ready",
+						);
+					break;
+				} catch (error) {
+					lastReadinessObservation = diagnostic(
+						error,
+						currentOperation,
+						attemptStarted,
 					);
-				break;
-			} catch (error) {
-				lastReadinessObservation = diagnostic(
-					error,
-					currentOperation,
-					attemptStarted,
-				);
-				record("readiness-observation", lastReadinessObservation);
-				if (
-					![
-						"network-refused",
-						"network-reset",
-						"network-timeout",
-						"request-aborted",
-						"health-not-ready",
-					].includes(error.category) &&
-					!(error.category === "http-rejected" && error.httpStatus === 503)
-				)
-					throw error;
-				await delay(Math.min(50, remaining()), undefined, {
-					signal: operation,
-				});
+					record("readiness-observation", lastReadinessObservation);
+					if (error.externalAbort) throw error;
+					if (
+						![
+							"network-refused",
+							"network-reset",
+							"network-timeout",
+							"request-aborted",
+							"health-not-ready",
+						].includes(error.category) &&
+						!(error.category === "http-rejected" && error.httpStatus === 503)
+					)
+						throw error;
+					await delay(Math.min(50, remaining()), undefined, {
+						signal: operation,
+					});
+				}
 			}
-		}
-		const initial = await metadata();
-		if (initial.owned.length)
-			throw new Error("Owned OpenSearch startup contains pilot indices");
-		baseline = hash(canonical(initial.other));
-		timings.startupSeconds += (performance.now() - started) / 1000;
-		record("backend-started", {
-			containerId: container,
-			imageConfigId: state.Image,
-			baseline,
+			const initial = await metadata();
+			if (initial.owned.length)
+				throw new Error("Owned OpenSearch startup contains pilot indices");
+			baseline = hash(canonical(initial.other));
+			timings.startupSeconds += (performance.now() - started) / 1000;
+			record("backend-started", {
+				containerId: container,
+				imageConfigId: state.Image,
+				baseline,
+			});
 		});
-	};
 	// Read fixed owned regular files completely, retaining identity and append boundaries.
 	const readRows = (
 		file,
@@ -691,8 +726,10 @@ export async function opensearchFixture(
 					: "mutationExecutionSeconds")
 		)
 			throw new Error("Owned OpenSearch native execution binding is missing");
-		await drainTasks();
-		const before = await metadata();
+		const before = await withinOperation(5000, async () => {
+			await drainTasks();
+			return metadata();
+		});
 		record("before-reset", { indices: before.owned });
 		if ((process.env.MUTATION_OPENSEARCH_ISOLATED ?? "1") === "1") {
 			await docker("rm", "--force", "--volumes", container);
@@ -700,13 +737,17 @@ export async function opensearchFixture(
 			baseline = undefined;
 			await create(String(port));
 		} else {
-			for (const index of before.owned) {
-				const deleted = await backend("/delete/" + encodeURIComponent(index));
-				if (deleted.acknowledged !== true)
-					throw new Error("Owned OpenSearch index deletion is unacknowledged");
-			}
+			await withinOperation(5000, async () => {
+				for (const index of before.owned) {
+					const deleted = await backend("/delete/" + encodeURIComponent(index));
+					if (deleted.acknowledged !== true)
+						throw new Error(
+							"Owned OpenSearch index deletion is unacknowledged",
+						);
+				}
+			});
 		}
-		const after = await metadata();
+		const after = await withinOperation(5000, metadata);
 		if (after.owned.length)
 			throw new Error("Owned OpenSearch reset left pilot state");
 		await cancelAfterNativeProgress?.(operationDeadline);
@@ -866,6 +907,7 @@ export async function opensearchFixture(
 	};
 	const close = (context) => {
 		closePromise ??= (async () => {
+			const startupCleanup = context?.startup === true;
 			sealed = true;
 			closing = true;
 			phase = "cleanup";
@@ -873,25 +915,47 @@ export async function opensearchFixture(
 			cleanupDeadline = started + cleanupMs;
 			finalAuditDeadline = cleanupDeadline - Math.min(1000, cleanupMs / 3);
 			let error, interrupted;
-			finalization.closeStart = record("close-start", { disposed });
+			finalization.closeStart = record("close-start", {
+				disposed,
+				startupCleanup,
+			});
 			try {
 				await activeOperation;
-				assertHealthy(context);
-				if (!disposed) interrupted = pending(context);
-				if (baseline !== undefined) {
+				if (!startupCleanup) {
+					assertHealthy(context);
+					// An ACK from the preceding execution does not describe a later call
+					// that started before its reset reached this controller.
+					readCalls();
+					if (disposed) {
+						if (
+							!execution ||
+							activeCall ||
+							[...calls.values()].some(
+								(call) =>
+									!call.ended || !call.acknowledged || call.execution === null,
+							)
+						)
+							throw new Error(
+								"Owned OpenSearch final native calls are not fully acknowledged",
+							);
+					} else interrupted = pending(context);
+				}
+				if (!startupCleanup && baseline !== undefined) {
 					await drainTasks();
 					const state = await metadata();
 					record("final-backend-state", { indices: state.owned });
 				}
-				assertHealthy(context);
+				if (!startupCleanup) assertHealthy(context);
 				await turn();
-				assertHealthy(context);
+				if (!startupCleanup) assertHealthy(context);
 				finalization.finalAudit = record("final-audit", {
-					status: baseline === undefined ? "SKIPPED_BEFORE_READY" : "PASSED",
+					status: startupCleanup ? "SKIPPED_NO_APPLICATION" : "PASSED",
 					disposed,
-					scope: interrupted
-						? "owned-backend-and-stopped-pending-owner"
-						: "owned-backend-and-acknowledged-sdk-disposal",
+					scope: startupCleanup
+						? "startup-no-application"
+						: interrupted
+							? "owned-backend-and-stopped-pending-owner"
+							: "owned-backend-and-acknowledged-sdk-disposal",
 					...(interrupted ? { interrupted } : {}),
 				});
 			} catch (cause) {
@@ -935,18 +999,58 @@ export async function opensearchFixture(
 					);
 				}
 				await Promise.all([...commands]);
-				if (container) {
+				const removalCandidates = new Set();
+				if (typeof container === "string" && /^[a-f0-9]{64}$/.test(container))
+					removalCandidates.add(container);
+				try {
+					const listed = await docker(
+						"ps",
+						"-aq",
+						"--no-trunc",
+						"--filter",
+						`label=wallpaperdb.mutation=${name}`,
+					);
+					const candidates = listed ? listed.split("\n") : [];
+					if (
+						candidates.some((id) => !/^[a-f0-9]{64}$/.test(id)) ||
+						new Set(candidates).size !== candidates.length
+					)
+						throw new Error(
+							"Owned OpenSearch reconciliation inventory is incomplete",
+						);
+					for (const id of candidates) removalCandidates.add(id);
+				} catch (cause) {
+					error ??= cause;
+					record(
+						"cleanup-failure",
+						diagnostic(cause, "reconcile-owned-container", started),
+					);
+				}
+				for (const target of removalCandidates) {
+					let healthy = false;
 					try {
-						await inspectOwned();
+						await inspectOwned(target);
+						healthy = true;
 					} catch (cause) {
+						if (cause.missing) continue;
 						error ??= cause;
 						record(
 							"cleanup-failure",
 							diagnostic(cause, "inspect-owned-container", started),
 						);
 					}
+					if (!verifiedOwners.has(target)) {
+						record("owner-reconciliation", { verified: false, removed: false });
+						continue;
+					}
+					record("owner-reconciliation", {
+						containerId: target,
+						verified: true,
+						healthy,
+					});
 					try {
-						await docker("rm", "--force", "--volumes", container);
+						await docker("rm", "--force", "--volumes", target);
+						record("owned-container-removed", { containerId: target });
 					} catch (cause) {
 						if (!cause.missing) error ??= cause;
 						record(
@@ -969,7 +1073,8 @@ export async function opensearchFixture(
 						record("owned-resources-absent", {
 							containers: 0,
 							scope: "exact-owner-label",
-							cooperativeDisposalObserved: !interrupted && disposed,
+							cooperativeDisposalObserved:
+								!startupCleanup && !interrupted && disposed,
 						});
 				} catch (cause) {
 					error ??= cause;
@@ -994,11 +1099,11 @@ export async function opensearchFixture(
 			// A request/failure/cancel delivered during a drain cannot be erased by successful removal.
 			await turn();
 			try {
-				context?.assertHealthy?.();
+				if (!startupCleanup) context?.assertHealthy?.();
 				if (
 					failure ||
 					observationError ||
-					signal?.aborted ||
+					(!startupCleanup && signal?.aborted) ||
 					failureSignal.signal.aborted
 				)
 					throw new Error("Owned OpenSearch late failure or cancellation");
@@ -1037,7 +1142,13 @@ export async function opensearchFixture(
 			busy = true;
 			activeOperation = (async () => {
 				const started = performance.now();
-				operationDeadline = Math.min(deadline, started + 5000);
+				const recreating =
+					incoming.url === "/reset" &&
+					(process.env.MUTATION_OPENSEARCH_ISOLATED ?? "1") === "1";
+				operationDeadline = Math.min(
+					deadline,
+					started + (recreating ? 120000 : 5000),
+				);
 				const timer = setTimeout(
 					() => safeFailure("Owned OpenSearch reset/disposal deadline expired"),
 					remaining(),
@@ -1143,13 +1254,19 @@ export async function opensearchFixture(
 			},
 		};
 	} catch (cause) {
+		const interruptionSafe =
+			(signal?.aborted === true &&
+				(cause === signal.reason || cause.externalAbort === true)) ||
+			(cause.category === "deadline-expired" && performance.now() >= deadline);
 		record("startup-failure", {
 			...diagnostic(cause, currentOperation, ownerStarted),
+			interruptionSafe,
 			...(lastReadinessObservation ? { lastReadinessObservation } : {}),
 		});
 		const startup = new Error("Owned OpenSearch startup failed", { cause });
+		startup.interruptionSafe = interruptionSafe;
 		try {
-			await close();
+			await close({ startup: true });
 		} catch (cleanup) {
 			throw new FixtureCleanupError(startup, cleanup);
 		}

@@ -507,12 +507,17 @@ export async function runStage({
 		const hasCleanupFailure =
 			startupCleanupFailed ||
 			(finalizedFixture && (cleanupFailed || Boolean(summary.cleanupError)));
+		const unsafeOpenSearchStartup =
+			config.fixture === "opensearch-owned" &&
+			!workerStarted &&
+			error.interruptionSafe !== true;
 		if (finalizedFixture && workerStarted) {
 			summary.invalidFixtureResults = true;
 			quarantineProgress();
 		}
 		if (
 			!hasCleanupFailure &&
+			!unsafeOpenSearchStartup &&
 			(shouldCancel() ||
 				(!workerStarted && performance.now() >= start + budgetMs))
 		) {
@@ -533,7 +538,11 @@ export async function runStage({
 		throw error;
 	} finally {
 		if (fixture) {
-			await closeFixture();
+			await closeFixture(
+				config.fixture === "opensearch-owned" && !workerStarted
+					? { startup: true }
+					: undefined,
+			);
 			summary.fixture = {
 				name: fixture.name,
 				image: fixture.image,

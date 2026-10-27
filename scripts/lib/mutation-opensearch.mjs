@@ -150,6 +150,7 @@ export async function opensearchFixture(
 			"docker-failed",
 			"runtime-version",
 			"health-not-ready",
+			"startup-indices-not-ready",
 			"deadline-expired",
 			"index-inventory-shape",
 			"pilot-index-name",
@@ -626,6 +627,7 @@ export async function opensearchFixture(
 			)
 				throw new Error("Owned OpenSearch endpoint mapping differs");
 			port = Number(mapping[0].HostPort);
+			let initial;
 			while (true) {
 				const attemptStarted = performance.now();
 				try {
@@ -650,6 +652,18 @@ export async function opensearchFixture(
 							"Owned OpenSearch is not ready",
 							"health-not-ready",
 						);
+					const candidate = await metadata();
+					if (candidate.owned.length)
+						throw new Error("Owned OpenSearch startup contains pilot indices");
+					if (
+						!Object.hasOwn(candidate.other, ".opensearch-observability") ||
+						!Object.hasOwn(candidate.other, ".opensearch-sap-log-types-config")
+					)
+						throw categoryError(
+							"Owned OpenSearch startup indices are not ready",
+							"startup-indices-not-ready",
+						);
+					initial = candidate;
 					break;
 				} catch (error) {
 					lastReadinessObservation = diagnostic(
@@ -666,6 +680,7 @@ export async function opensearchFixture(
 							"network-timeout",
 							"request-aborted",
 							"health-not-ready",
+							"startup-indices-not-ready",
 						].includes(error.category) &&
 						!(error.category === "http-rejected" && error.httpStatus === 503)
 					)
@@ -675,9 +690,6 @@ export async function opensearchFixture(
 					});
 				}
 			}
-			const initial = await metadata();
-			if (initial.owned.length)
-				throw new Error("Owned OpenSearch startup contains pilot indices");
 			baseline = hash(canonical(initial.other));
 			try {
 				baselineProjection = projectNonPilot(initial.other);

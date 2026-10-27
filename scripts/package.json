@@ -4,8 +4,15 @@
 	"private": true,
 	"type": "module",
 	"bin": {
+		"wallpaperdb-test": "./prebuilt-tests.mjs",
 		"wallpaperdb-check-architecture": "./check-architecture.mjs",
 		"wallpaperdb-crap": "./crap.mts"
+	},
+	"exports": {
+		"./node-fixture": {
+			"types": "./node-fixture.d.mts",
+			"import": "./node-fixture.mjs"
+		}
 	},
 	"scripts": {
 		"format": "biome format --write .",
@@ -20,7 +27,8 @@
 		"check-types": "tsc --project tsconfig.json",
 		"format:files": "biome format --write",
 		"test:operator-inbox": "node --test operator-inbox.test.mjs",
-		"test:prebuilt-node": "node --test lib/prebuilt-node.test.mjs"
+		"test:prebuilt-node": "node --test lib/prebuilt-node.test.mjs",
+		"test:makefile": "cd .. && node --test scripts/makefile.test.mjs"
 	},
 	"dependencies": {
 		"c8": "12.0.0",

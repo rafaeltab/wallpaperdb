@@ -97,7 +97,7 @@ test: ## Run workspace test scripts (optional PACKAGE)
 test-focused: ## Build dependencies and run selected tests serially (requires PACKAGE; optional ARGS)
 	$(if $(PACKAGE),,$(error test-focused requires PACKAGE, e.g. make test-focused PACKAGE=web))
 	@$(TURBO) run build --filter="$(TURBO_PACKAGE)^..." --concurrency=1
-	@pnpm --filter @wallpaperdb/$(PACKAGE) exec vitest run --maxWorkers=1 --no-file-parallelism $(ARGS)
+	@node scripts/test-focused.mjs "$(PACKAGE)" $(ARGS)
 
 test-unit: ## Run unit tests (no containers; optional PACKAGE)
 	@$(TURBO) run test:unit $(TURBO_FLAGS)
@@ -248,7 +248,7 @@ clean: ## Remove dependencies, build output, caches, and coverage
 	@echo "Cleaning turbo caches..."
 	@rm -rf .turbo apps/*/.turbo packages/*/.turbo
 	@echo "Cleaning coverage reports..."
-	@rm -rf coverage apps/*/coverage packages/*/coverage
+	@rm -rf coverage apps/*/coverage packages/*/coverage .prebuilt-tests
 	@echo "Cleaning TypeScript incremental build cache..."
 	@find . -name "*.tsbuildinfo" -not -path "*/node_modules/*" -delete
 	@echo "Cleaning generated OpenAPI specs..."

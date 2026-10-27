@@ -28,6 +28,7 @@ dist
 *.tsbuildinfo
 coverage
 .nyc_output
+.prebuilt-tests/
 
 # Mutation-testing sandboxes and reports
 .stryker-tmp

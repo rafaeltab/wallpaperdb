@@ -14,6 +14,7 @@ apps/docs/.source
 # Testing
 coverage
 .testcontainers
+.prebuilt-tests
 **/.auth
 **/test-results
 **/playwright-report

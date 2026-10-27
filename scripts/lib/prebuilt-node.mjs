@@ -9,7 +9,7 @@ import {
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, matchesGlob, relative, resolve } from "node:path";
 import ts from "typescript";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -32,6 +32,7 @@ const generatedDirectories = new Set([
 	"test-results",
 	"playwright-report",
 	".mise",
+	".prebuilt-tests",
 ]);
 
 export function emittedName(name) {
@@ -50,23 +51,107 @@ function sourceFiles(root, directory = root) {
 	});
 }
 
-function emit(input, output) {
+function runtimeOptions(input, configurations) {
+	const file = ts.findConfigFile(dirname(input), existsSync);
+	if (!file) return {};
+	if (!configurations.has(file)) {
+		const raw = ts.readConfigFile(file, ts.sys.readFile);
+		if (raw.error)
+			throw new Error(
+				ts.flattenDiagnosticMessageText(raw.error.messageText, "\n"),
+			);
+		const parsed = ts.parseJsonConfigFileContent(
+			raw.config,
+			{ ...ts.sys, readDirectory: () => [] },
+			dirname(file),
+		);
+		const errors = parsed.errors.filter((error) => error.code !== 18003);
+		if (errors.length)
+			throw new Error(
+				errors
+					.map((error) =>
+						ts.flattenDiagnosticMessageText(error.messageText, "\n"),
+					)
+					.join("\n"),
+			);
+		const keys = [
+			"target",
+			"jsx",
+			"jsxFactory",
+			"jsxFragmentFactory",
+			"jsxImportSource",
+			"experimentalDecorators",
+			"emitDecoratorMetadata",
+			"esModuleInterop",
+			"useDefineForClassFields",
+			"verbatimModuleSyntax",
+		];
+		configurations.set(
+			file,
+			Object.fromEntries(
+				keys
+					.filter((key) => parsed.options[key] !== undefined)
+					.map((key) => [key, parsed.options[key]]),
+			),
+		);
+	}
+	return configurations.get(file);
+}
+
+function emit(input, output, compilerOptions) {
+	const manifest = ts.findConfigFile(
+		dirname(input),
+		existsSync,
+		"package.json",
+	);
+	const esm =
+		input.endsWith(".mts") ||
+		(!input.endsWith(".cts") &&
+			manifest &&
+			JSON.parse(readFileSync(manifest, "utf8")).type === "module");
 	const result = ts.transpileModule(readFileSync(input, "utf8"), {
 		fileName: input,
 		reportDiagnostics: true,
 		compilerOptions: {
 			target: ts.ScriptTarget.ES2022,
-			module: input.endsWith(".cts")
-				? ts.ModuleKind.CommonJS
-				: ts.ModuleKind.ES2022,
+			module: esm ? ts.ModuleKind.ES2022 : ts.ModuleKind.CommonJS,
 			sourceMap: true,
 			inlineSources: true,
 			sourceRoot: dirname(input),
-			experimentalDecorators: true,
-			emitDecoratorMetadata: true,
 			esModuleInterop: true,
 			jsx: ts.JsxEmit.ReactJSX,
+			...compilerOptions,
 			rewriteRelativeImportExtensions: true,
+		},
+		transformers: {
+			before: [
+				(context) => {
+					const visit = (node) => {
+						if (
+							esm &&
+							ts.isImportDeclaration(node) &&
+							ts.isStringLiteral(node.moduleSpecifier) &&
+							node.moduleSpecifier.text.endsWith(".json") &&
+							!node.attributes
+						) {
+							return context.factory.updateImportDeclaration(
+								node,
+								node.modifiers,
+								node.importClause,
+								node.moduleSpecifier,
+								context.factory.createImportAttributes([
+									context.factory.createImportAttribute(
+										context.factory.createIdentifier("type"),
+										context.factory.createStringLiteral("json"),
+									),
+								]),
+							);
+						}
+						return ts.visitEachChild(node, visit, context);
+					};
+					return (source) => ts.visitNode(source, visit);
+				},
+			],
 		},
 	});
 	const errors = result.diagnostics.filter(
@@ -112,7 +197,12 @@ function linkModules(input, output, workspaces) {
 }
 
 /** Compile a fresh native Node tree, retaining TypeScript inputs for real builds. */
-export function stageNodeTree({ root, artifacts, aliases = {} }) {
+export function stageNodeTree({
+	root,
+	artifacts,
+	aliases = {},
+	fixtureScripts = {},
+}) {
 	root = resolve(root);
 	mkdirSync(artifacts, { recursive: true });
 	const directory = mkdtempSync(join(artifacts, "run-"));
@@ -130,6 +220,7 @@ export function stageNodeTree({ root, artifacts, aliases = {} }) {
 		workspaces.set(realpathSync(path), dirname(join(tree, name)));
 	}
 	const inventory = [];
+	const configurations = new Map();
 	for (const name of files) {
 		const input = join(root, name);
 		const output = join(
@@ -141,7 +232,7 @@ export function stageNodeTree({ root, artifacts, aliases = {} }) {
 			/\.(?:ts|tsx|mts|cts)$/.test(name) &&
 			!/\.d\.(?:ts|mts|cts)$/.test(name)
 		) {
-			emit(input, output);
+			emit(input, output, runtimeOptions(input, configurations));
 			symlinkSync(input, join(tree, name));
 			inventory.push({
 				source: input,
@@ -155,6 +246,8 @@ export function stageNodeTree({ root, artifacts, aliases = {} }) {
 			for (const field of ["main", "module", "exports", "imports"]) {
 				if (manifest[field]) manifest[field] = runtimePaths(manifest[field]);
 			}
+			if (fixtureScripts[dirname(name)])
+				Object.assign(manifest.scripts, fixtureScripts[dirname(name)]);
 			writeFileSync(output, `${JSON.stringify(manifest, null, 2)}\n`);
 		} else copyFileSync(input, output);
 	}
@@ -166,26 +259,65 @@ export function stageNodeTree({ root, artifacts, aliases = {} }) {
 		);
 	for (const [alias, source] of Object.entries(aliases)) {
 		copyFileSync(join(tree, source), join(tree, alias));
+		copyFileSync(join(tree, `${source}.map`), join(tree, `${alias}.map`));
 	}
+	const aliasInventory = Object.entries(aliases).map(([alias, source]) => {
+		const original = inventory.find(
+			(entry) => entry.emitted === join(tree, source),
+		);
+		if (!original) throw new Error(`Alias has no compiled source: ${source}`);
+		const emitted = join(tree, alias);
+		return {
+			...original,
+			emitted,
+			emittedHash: digest(emitted),
+			mapHash: digest(`${emitted}.map`),
+		};
+	});
 	writeFileSync(
 		join(directory, "inventory.json"),
 		`${JSON.stringify(inventory, null, 2)}\n`,
 	);
-	return { directory, root, tree, inventory };
+	const inputs = files.map((name) => ({
+		file: join(root, name),
+		hash: digest(join(root, name)),
+	}));
+	return { directory, root, tree, inventory, aliasInventory, inputs };
 }
 
 /** Reject changed emissions and conflicting Node map caches before accepting a run. */
-export function auditNodeCoverage(stage, reports) {
+export function auditNodeCoverage(
+	stage,
+	reports,
+	covered = stage.inventory,
+	built = [],
+) {
+	for (const input of stage.inputs) {
+		if (digest(input.file) !== input.hash)
+			throw new Error(`Changed input: ${input.file}`);
+	}
+	const sources = new Set(covered.map((entry) => entry.source));
 	const byEmitted = new Map(
-		stage.inventory.map((entry) => [entry.emitted, entry]),
+		[
+			...covered,
+			...stage.aliasInventory.filter((entry) => sources.has(entry.source)),
+		].map((entry) => [entry.emitted, entry]),
 	);
-	for (const entry of stage.inventory) {
+	for (const entry of [...stage.inventory, ...stage.aliasInventory]) {
 		if (digest(entry.emitted) !== entry.emittedHash)
 			throw new Error(`Changed emitted file: ${entry.emitted}`);
 		if (digest(`${entry.emitted}.map`) !== entry.mapHash)
 			throw new Error(`Changed source map: ${entry.emitted}`);
 		if (digest(entry.source) !== entry.sourceHash)
 			throw new Error(`Changed source input: ${entry.source}`);
+		const map = JSON.parse(readFileSync(`${entry.emitted}.map`, "utf8"));
+		if (
+			map.sourcesContent.length !== 1 ||
+			map.sourcesContent[0] !== readFileSync(entry.source, "utf8")
+		)
+			throw new Error(
+				`Source map does not preserve original content: ${entry.source}`,
+			);
 	}
 	let occurrences = 0;
 	for (const name of readdirSync(join(reports, "raw"))) {
@@ -202,14 +334,26 @@ export function auditNodeCoverage(stage, reports) {
 					`Original TypeScript executed outside emitted tree: ${script.url}`,
 				);
 			}
-			if (!byEmitted.has(file)) continue;
+			if (
+				!byEmitted.has(file) &&
+				!built.some((pattern) => matchesGlob(file, join(stage.tree, pattern)))
+			)
+				continue;
 			if (url.search || url.hash)
 				throw new Error(`Transformed module URL: ${script.url}`);
 			const cached = raw["source-map-cache"]?.[script.url]?.data;
 			const disk = JSON.parse(readFileSync(`${file}.map`, "utf8"));
+			const originalPaths = (map) =>
+				map.sources.map((source) =>
+					source.startsWith("file:")
+						? fileURLToPath(source)
+						: resolve(dirname(file), map.sourceRoot ?? "", source),
+				);
 			if (
 				!cached ||
 				cached.mappings !== disk.mappings ||
+				JSON.stringify(originalPaths(cached)) !==
+					JSON.stringify(originalPaths(disk)) ||
 				JSON.stringify(cached.sourcesContent) !==
 					JSON.stringify(disk.sourcesContent)
 			) {
@@ -228,7 +372,20 @@ export function auditNodeCoverage(stage, reports) {
 	return { occurrences };
 }
 
-/** Stock c8 owns native process collection and all source-map conversion. */
+/** Node collects native profiles; stock c8 owns source-map conversion and reports. */
+export function nativeStdio(stdio = "inherit") {
+	const descriptors =
+		stdio === "inherit"
+			? ["inherit", "inherit", "inherit"]
+			: ["ignore", "pipe", "pipe"];
+	const lease = Number(process.env.WALLPAPERDB_DOCKER_LEASE_FD);
+	if (Number.isSafeInteger(lease) && lease >= 3) {
+		while (descriptors.length <= lease) descriptors.push("ignore");
+		descriptors[lease] = lease;
+	}
+	return descriptors;
+}
+
 export function collectNodeCoverage({
 	cwd,
 	args,
@@ -250,24 +407,23 @@ export function collectNodeCoverage({
 			"temp-directory": join(reports, "raw"),
 		}),
 	);
-	const descriptors =
-		stdio === "inherit"
-			? ["inherit", "inherit", "inherit"]
-			: ["ignore", "pipe", "pipe"];
-	const lease = Number(process.env.WALLPAPERDB_DOCKER_LEASE_FD);
-	if (Number.isSafeInteger(lease) && lease >= 3) {
-		while (descriptors.length <= lease) descriptors.push("ignore");
-		descriptors[lease] = lease;
-	}
-	return spawnSync(
+	const descriptors = nativeStdio(stdio);
+	const raw = join(reports, "raw");
+	mkdirSync(raw, { recursive: true });
+	const execution = spawnSync(process.execPath, args, {
+		cwd,
+		stdio: descriptors,
+		encoding: "utf8",
+		env: {
+			...process.env,
+			NODE_V8_COVERAGE: raw,
+			NODE_DISABLE_COMPILE_CACHE: "1",
+		},
+	});
+	if (execution.error) throw execution.error;
+	const report = spawnSync(
 		process.execPath,
-		[
-			require.resolve("c8/bin/c8.js"),
-			"--config",
-			config,
-			process.execPath,
-			...args,
-		],
+		[require.resolve("c8/bin/c8.js"), "--config", config, "report"],
 		{
 			cwd,
 			stdio: descriptors,
@@ -275,4 +431,10 @@ export function collectNodeCoverage({
 			env: { ...process.env, NODE_DISABLE_COMPILE_CACHE: "1" },
 		},
 	);
+	if (report.error) throw report.error;
+	return {
+		...execution,
+		status:
+			execution.status === 0 ? (report.status ?? 1) : (execution.status ?? 1),
+	};
 }

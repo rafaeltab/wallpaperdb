@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import postgres from 'postgres';
 import { expect, it } from 'vitest';
+import { nodeFixtureArguments } from '@wallpaperdb/scripts/node-fixture';
 
 async function exportFromChild(mode: 'source' | 'database', databaseUrl?: string) {
   const exported: string[] = [];
@@ -24,9 +25,7 @@ async function exportFromChild(mode: 'source' | 'database', databaseUrl?: string
       const child = spawn(
         process.execPath,
         [
-          '--import',
-          'tsx',
-          'test/fixtures/telemetry-privacy.ts',
+          ...nodeFixtureArguments('./fixtures/telemetry-privacy.ts', import.meta.url),
           mode,
           `http://127.0.0.1:${address.port}`,
         ],

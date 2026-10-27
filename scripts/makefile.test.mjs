@@ -303,7 +303,7 @@ test("focused tests select one workspace and serialize dependency builds and tes
 		);
 		assert.ok(
 			focused.includes(
-				`pnpm --filter @wallpaperdb/${workspace} exec vitest run --maxWorkers=1 --no-file-parallelism ${file}`,
+				`node scripts/test-focused.mjs "${workspace}" ${file}`,
 			),
 		);
 		assert.doesNotMatch(

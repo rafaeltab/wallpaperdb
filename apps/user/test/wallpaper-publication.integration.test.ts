@@ -9,6 +9,7 @@ import { Pool } from 'pg';
 import { GenericContainer, Wait } from 'testcontainers';
 import { expect, it } from 'vitest';
 import { z } from 'zod';
+import { nodeFixtureArguments } from '@wallpaperdb/scripts/node-fixture';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import {
   brokerLayer,
@@ -57,7 +58,7 @@ async function publicationServer(
 ) {
   const child = spawn(
     process.execPath,
-    ['--import', 'tsx', 'test/fixtures/ownership-publication-server.ts'],
+    nodeFixtureArguments('../../wallpaper/test/fixtures/ownership-publication-server.ts', import.meta.url),
     {
       cwd: fileURLToPath(new URL('../../wallpaper/', import.meta.url)),
       env: {

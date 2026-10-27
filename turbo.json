@@ -19,6 +19,9 @@
         "COMPOSE_PROJECT_NAME"
     ],
     "globalDependencies": [
+        "scripts/prebuilt-tests*.mjs",
+        "scripts/lib/prebuilt-*.mjs",
+        "scripts/node-fixture.*",
         "packages/vitest-config/src/**",
         "packages/test-logger/src/**"
     ],
@@ -258,6 +261,9 @@
             ],
             "outputs": []
         },
+        "@wallpaperdb/user#test": { "cache": false },
+        "@wallpaperdb/user#test:unit": { "cache": false },
+        "@wallpaperdb/user#test:integration": { "cache": false },
         "@wallpaperdb/scripts#test:unit": {
             "cache": false
         },

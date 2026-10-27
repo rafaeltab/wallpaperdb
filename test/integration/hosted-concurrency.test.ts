@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
-import { createVitest, parseCLI } from 'vitest/node';
+import { createVitest } from 'vitest/node';
+import { parseSourceVitestCommand } from './helpers/source-vitest-command.js';
 
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -67,7 +68,7 @@ test.each([
     const workspace = path.join(repository, 'apps/ingestor');
     const manifest = JSON.parse(await readFile(path.join(workspace, 'package.json'), 'utf8'));
     const runner = await createVitest({
-      ...parseCLI(manifest.scripts['test:integration']).options,
+      ...parseSourceVitestCommand(manifest.scripts['test:integration']).options,
       root,
       config: path.join(workspace, 'vitest.config.ts'),
       watch: false,

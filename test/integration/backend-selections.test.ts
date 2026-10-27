@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
-import { createVitest, parseCLI } from 'vitest/node';
+import { createVitest } from 'vitest/node';
+import { parseSourceVitestCommand } from './helpers/source-vitest-command.js';
 
 const repository = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -39,7 +40,7 @@ test.each([
   const coveragePolicies = [];
   for (const selection of ['unit', 'integration']) {
     expect(manifest.scripts[`test:${selection}`]).toBeTypeOf('string');
-    const { options } = parseCLI(manifest.scripts[`test:${selection}`]);
+    const { options } = parseSourceVitestCommand(manifest.scripts[`test:${selection}`]);
     const runner = await createVitest({ ...options, root, watch: false });
     try {
       const specifications = await runner.globTestSpecifications();
@@ -91,7 +92,7 @@ test.each([
   expect(owned.sort()).toEqual(files.sort());
   expect(coveragePolicies[0]).toEqual(coveragePolicies[1]);
   const full = await createVitest({
-    ...parseCLI(manifest.scripts.test).options,
+    ...parseSourceVitestCommand(manifest.scripts.test).options,
     root,
     watch: false,
   });
@@ -112,7 +113,7 @@ test.each([
   const root = path.join(repository, 'apps', service);
   const manifest = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const runner = await createVitest({
-    ...parseCLI(manifest.scripts.test).options,
+    ...parseSourceVitestCommand(manifest.scripts.test).options,
     root,
     watch: false,
   });
@@ -151,7 +152,7 @@ test.each([
       ['unit', unit],
       ['integration', integration],
     ]) {
-      const { options } = parseCLI(manifest.scripts[`test:${selection}`]);
+      const { options } = parseSourceVitestCommand(manifest.scripts[`test:${selection}`]);
       const runner = await createVitest({
         ...options,
         config: path.resolve(workspace, options.config || 'vitest.config.ts'),

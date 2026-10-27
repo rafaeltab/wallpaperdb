@@ -53,6 +53,9 @@ export async function runPrebuiltTests({
 		);
 	const resolved = await resolveConfig({ ...parsed.options, root: cwd });
 	const config = resolved.test;
+	const enabled = config.coverage.enabled;
+	const reports = resolve(cwd, config.coverage.reportsDirectory);
+	if (enabled) rmSync(reports, { recursive: true, force: true });
 	if (
 		config.browser?.enabled ||
 		config.environment !== "node" ||
@@ -109,65 +112,24 @@ export async function runPrebuiltTests({
 		wrapper,
 		`import configuration from ${JSON.stringify(pathToFileURL(join(stage.tree, emittedName(relative(root, originalConfig)))).href)};\nexport default { ...configuration, root: ${JSON.stringify(stageCwd)}, test: { ...configuration.test, ...${JSON.stringify(nativeConfig)} } };\n`,
 	);
-	const forwarded = [];
-	const filters = new Set(parsed.filter);
-	for (let index = 0; index < args.length; index++) {
-		const arg = args[index];
-		if (
-			arg === "--config" ||
-			arg === "-c" ||
-			arg === "--root" ||
-			arg === "-r"
-		) {
-			index++;
-			continue;
-		}
-		if (arg.startsWith("--config=") || arg.startsWith("--root=")) continue;
-		if (arg.startsWith("--outputFile")) {
-			const separator = arg.indexOf("=");
-			if (separator >= 0)
-				forwarded.push(
-					`${arg.slice(0, separator)}=${resolve(cwd, arg.slice(separator + 1))}`,
-				);
-			else {
-				forwarded.push(arg, resolve(cwd, args[++index]));
-			}
-			continue;
-		}
-		if (arg === "--coverage" || arg.startsWith("--coverage=")) continue;
-		if (arg.startsWith("--coverage.")) {
-			if (
-				!arg.includes("=") &&
-				args[index + 1] &&
-				!filters.has(args[index + 1]) &&
-				!args[index + 1].startsWith("-")
-			)
-				index++;
-			continue;
-		}
-		if (filters.has(arg)) {
-			const filter = isAbsolute(arg)
-				? join(stage.tree, relative(root, arg))
-				: arg;
-			forwarded.push(
-				filter.replace(/\.(tsx?|mts|cts)(?=:|$)/, (extension) =>
-					emittedName(`file${extension}`).slice(4),
-				),
-			);
-		} else forwarded.push(arg);
-	}
+	const filters = parsed.filter.map((value) => {
+		const filter = isAbsolute(value)
+			? join(stage.tree, relative(root, value))
+			: value;
+		return filter.replace(/\.(tsx?|mts|cts)(?=:|$)/, (extension) =>
+			emittedName(`file${extension}`).slice(4),
+		);
+	});
 	const vitestManifest = require.resolve("vitest/package.json");
 	const vitestBin = JSON.parse(readFileSync(vitestManifest, "utf8")).bin.vitest;
-	const command = [
-		resolve(dirname(vitestManifest), vitestBin),
-		"run",
-		"--config",
-		wrapper,
-		...forwarded,
-	];
-	const enabled = config.coverage.enabled;
-	const reports = resolve(cwd, config.coverage.reportsDirectory);
-	if (enabled) rmSync(reports, { recursive: true, force: true });
+	const driver = join(stage.directory, "vitest-runner.mjs");
+	// Let Vitest retain option values separately from positional filters. Its
+	// public CLI action owns execution, failure status and resource cleanup.
+	writeFileSync(
+		driver,
+		`import { createCLI } from ${JSON.stringify(pathToFileURL(require.resolve("vitest/node")).href)};\nconst cli = createCLI();\ncli.parse(${JSON.stringify([process.execPath, resolve(dirname(vitestManifest), vitestBin), "run", ...args])}, { run: false });\ncli.args = ${JSON.stringify(filters)};\ncli.options = { ...cli.options, ...${JSON.stringify({ config: wrapper, root: stageCwd, coverage: { enabled: false }, outputFile: nativeConfig.outputFile })} };\nawait cli.runMatchedCommand();\n`,
+	);
+	const command = [driver];
 	if (!enabled) {
 		const execution = spawnSync(process.execPath, command, {
 			cwd: stageCwd,
@@ -210,6 +172,10 @@ export async function runPrebuiltTests({
 				lcovonly: { projectRoot: cwd },
 			},
 			"check-coverage": Object.keys(thresholds).length > 0,
+			lines: 0,
+			functions: 0,
+			branches: 0,
+			statements: 0,
 			...thresholds,
 			"per-file": thresholds.perFile ?? false,
 		},

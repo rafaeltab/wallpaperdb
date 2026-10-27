@@ -27,7 +27,7 @@
 		"check-types": "tsc --project tsconfig.json",
 		"format:files": "biome format --write",
 		"test:operator-inbox": "node --test operator-inbox.test.mjs",
-		"test:prebuilt-node": "node --test lib/prebuilt-node.test.mjs",
+		"test:prebuilt-node": "node --test lib/prebuilt-*.test.mjs",
 		"test:makefile": "cd .. && node --test scripts/makefile.test.mjs"
 	},
 	"dependencies": {

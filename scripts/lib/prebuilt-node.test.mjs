@@ -1,0 +1,200 @@
+import assert from "node:assert/strict";
+import {
+	mkdtempSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+import {
+	auditNodeCoverage,
+	collectNodeCoverage,
+	stageNodeTree,
+} from "./prebuilt-node.mjs";
+
+function project(t) {
+	const directory = mkdtempSync(join(tmpdir(), "prebuilt-node-"));
+	t.after(() => rmSync(directory, { recursive: true, force: true }));
+	const root = join(directory, "checkout");
+	mkdirSync(join(root, "src"), { recursive: true });
+	writeFileSync(join(root, "package.json"), '{"type":"module"}');
+	return { root, artifacts: join(directory, "artifacts") };
+}
+
+test("staging emits current source with exact external maps and fresh owned output", (t) => {
+	const paths = project(t);
+	const source =
+		"export function choose(value: boolean): number {\n  if (value) return 17;\n  return 31;\n}\n";
+	writeFileSync(join(paths.root, "src/choose.ts"), source);
+	const first = stageNodeTree(paths);
+	const output = join(first.tree, "src/choose.js");
+	assert.match(readFileSync(output, "utf8"), /return 17/);
+	const map = JSON.parse(readFileSync(`${output}.map`, "utf8"));
+	assert.deepEqual(map.sourcesContent, [source]);
+	assert.equal(
+		resolve(map.sourceRoot, map.sources[0]),
+		join(paths.root, "src/choose.ts"),
+	);
+	assert.equal(readFileSync(join(first.tree, "src/choose.ts"), "utf8"), source);
+	writeFileSync(join(paths.root, "src/choose.ts"), source.replace("17", "19"));
+	writeFileSync(
+		join(paths.root, "src/untracked.ts"),
+		"export const added = 23;\n",
+	);
+	const second = stageNodeTree(paths);
+	assert.notEqual(first.tree, second.tree);
+	assert.match(
+		readFileSync(join(second.tree, "src/choose.js"), "utf8"),
+		/return 19/,
+	);
+	assert.match(
+		readFileSync(join(second.tree, "src/untracked.js"), "utf8"),
+		/23/,
+	);
+	assert.match(readFileSync(output, "utf8"), /return 17/);
+});
+
+test("stock c8 collects native children and nested workers without losing zero-hit inventory", (t) => {
+	const paths = project(t);
+	for (const name of ["child", "nested", "worker", "nested-worker", "never"]) {
+		writeFileSync(
+			join(paths.root, `src/${name}.ts`),
+			[
+				"export function choose(value: boolean): number {",
+				"  if (value) return 17;",
+				"  return 31;",
+				"}",
+				"export function unused(): number {",
+				"  return 43;",
+				"}",
+				"",
+			].join("\n"),
+		);
+	}
+	writeFileSync(
+		join(paths.root, "nested.ts"),
+		"import { choose } from './src/nested.js';\nif (choose(true) !== 17) throw Error('nested');\n",
+	);
+	writeFileSync(
+		join(paths.root, "child.ts"),
+		[
+			"import { execFileSync } from 'node:child_process';",
+			"import { fileURLToPath } from 'node:url';",
+			"import { choose } from './src/child.js';",
+			"if (choose(true) !== 17) throw Error('child');",
+			"execFileSync(process.execPath, [fileURLToPath(new URL('./nested.js', import.meta.url))]);",
+		].join("\n"),
+	);
+	writeFileSync(
+		join(paths.root, "nested-worker.ts"),
+		"import { choose } from './src/nested-worker.js';\nif (choose(true) !== 17) throw Error('nested worker');\n",
+	);
+	writeFileSync(
+		join(paths.root, "worker.ts"),
+		[
+			"import { Worker } from 'node:worker_threads';",
+			"import { once } from 'node:events';",
+			"import { choose } from './src/worker.js';",
+			"if (choose(true) !== 17) throw Error('worker');",
+			"const [code] = await once(new Worker(new URL('./nested-worker.js', import.meta.url)), 'exit');",
+			"if (code !== 0) throw Error('nested worker exit');",
+		].join("\n"),
+	);
+	writeFileSync(
+		join(paths.root, "run.ts"),
+		[
+			"import { execFileSync } from 'node:child_process';",
+			"import { Worker } from 'node:worker_threads';",
+			"import { fileURLToPath } from 'node:url';",
+			"import { once } from 'node:events';",
+			"execFileSync(process.execPath, [fileURLToPath(new URL('./child.js', import.meta.url))]);",
+			"const [code] = await once(new Worker(new URL('./worker.js', import.meta.url)), 'exit');",
+			"if (code !== 0) throw Error('worker exit');",
+		].join("\n"),
+	);
+	const stage = stageNodeTree(paths);
+	const reports = join(paths.artifacts, "reports");
+	const result = collectNodeCoverage({
+		cwd: stage.tree,
+		args: [join(stage.tree, "run.js")],
+		reports,
+		coverage: {
+			src: [join(stage.tree, "src")],
+			include: ["src/**/*.js"],
+			exclude: [],
+		},
+	});
+	assert.equal(result.status, 0, result.stderr);
+	const coverage = JSON.parse(
+		readFileSync(join(reports, "coverage-final.json"), "utf8"),
+	);
+	assert.deepEqual(
+		Object.keys(coverage).sort(),
+		["child", "nested", "nested-worker", "never", "worker"]
+			.map((name) => join(paths.root, `src/${name}.ts`))
+			.sort(),
+	);
+	for (const name of ["child", "nested", "worker", "nested-worker"]) {
+		const file = coverage[join(paths.root, `src/${name}.ts`)];
+		const statementHits = (line) =>
+			Object.entries(file.statementMap)
+				.filter(([, span]) => span.start.line === line)
+				.map(([key]) => file.s[key]);
+		assert.deepEqual(statementHits(2), [1], name);
+		assert.deepEqual(statementHits(3), [0], name);
+		assert.deepEqual(statementHits(6), [0], name);
+		assert.ok(
+			Object.values(file.b).some((counts) => counts.includes(0)),
+			name,
+		);
+	}
+	const never = coverage[join(paths.root, "src/never.ts")];
+	assert.ok(Object.values(never.s).every((count) => count === 0));
+	assert.ok(Object.values(never.f).every((count) => count === 0));
+	const observed = new Set();
+	for (const name of readdirSync(join(reports, "raw"))) {
+		const raw = JSON.parse(readFileSync(join(reports, "raw", name), "utf8"));
+		for (const script of raw.result ?? []) {
+			if (!script.url.startsWith("file:")) continue;
+			const path = fileURLToPath(script.url);
+			if (!path.startsWith(join(stage.tree, "src"))) continue;
+			observed.add(path);
+			const length = Math.max(
+				...script.functions.flatMap((fn) =>
+					fn.ranges.map((range) => range.endOffset),
+				),
+			);
+			assert.equal(length, readFileSync(path, "utf8").length, script.url);
+			const cached = raw["source-map-cache"][script.url].data;
+			const disk = JSON.parse(readFileSync(`${path}.map`, "utf8"));
+			assert.deepEqual(cached.sourcesContent, disk.sourcesContent);
+			assert.equal(cached.mappings, disk.mappings);
+		}
+	}
+	assert.equal(observed.size, 4);
+	assert.doesNotThrow(() => auditNodeCoverage(stage, reports));
+	const script = join(stage.tree, "src/child.js");
+	writeFileSync(script, readFileSync(script, "utf8").replace("17", "19"));
+	assert.throws(
+		() => auditNodeCoverage(stage, reports),
+		/Changed emitted file/,
+	);
+});
+
+test("staging rejects two inputs that would execute different code at the same output URL", (t) => {
+	const paths = project(t);
+	writeFileSync(
+		join(paths.root, "src/choose.ts"),
+		"export const chosen: number = 17;\n",
+	);
+	writeFileSync(
+		join(paths.root, "src/choose.js"),
+		"export const chosen = 31;\n",
+	);
+	assert.throws(() => stageNodeTree(paths), /Conflicting output/);
+});

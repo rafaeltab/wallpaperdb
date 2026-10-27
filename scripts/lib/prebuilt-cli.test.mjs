@@ -71,6 +71,70 @@ function passed(paths, label) {
 		.numPassedTests;
 }
 
+for (const [name, args, expected, nested] of [
+	["source filename", ["--exclude", "test/ordinary.test.ts"], ["pass"], false],
+	[
+		"nonmatching generated filename",
+		["--exclude", "test/ordinary.test.js"],
+		["ordinary", "pass"],
+		false,
+	],
+	[
+		"repeated source exclusions and glob",
+		[
+			"--exclude",
+			"test/ordinary.test.ts",
+			"--exclude",
+			"test/nested/*.test.ts",
+		],
+		["pass"],
+		true,
+	],
+])
+	test(`CLI ${name} exclusions remain additive in the source and emitted selections`, async (t) => {
+		const paths = project(t);
+		mkdirSync(join(paths.root, "test/nested"), { recursive: true });
+		writeFileSync(
+			join(paths.root, "vitest.config.ts"),
+			"export default { test: { include: ['test/**/*.test.ts'], exclude: ['test/skip.test.ts', 'test/pass.test.js'] } };\n",
+		);
+		for (const name of [
+			"pass",
+			"ordinary",
+			...(nested ? ["nested/extra"] : []),
+		]) {
+			const dependency = name.includes("/")
+				? "../../src/choose.js"
+				: "../src/choose.js";
+			writeFileSync(
+				join(paths.root, `test/${name}.test.ts`),
+				`import { test, expect } from 'vitest';\nimport { choose } from ${JSON.stringify(dependency)};\ntest(${JSON.stringify(name)}, () => expect(choose(true)).toBe(17));\n`,
+			);
+		}
+		writeFileSync(
+			join(paths.root, "test/skip.test.ts"),
+			"import { test } from 'vitest';\ntest('configured exclusion', () => { throw Error('configured exclusion was lost'); });\n",
+		);
+		const names = (label) =>
+			JSON.parse(readFileSync(join(paths.root, `${label}.json`), "utf8"))
+				.testResults.flatMap((file) =>
+					file.assertionResults
+						.filter((assertion) => assertion.status === "passed")
+						.map((assertion) => assertion.fullName),
+				)
+				.sort();
+		const baseline = original(paths, "original", args);
+		assert.equal(baseline.status, 0, baseline.stderr);
+		assert.deepEqual(names("original"), expected);
+		const result = await runPrebuiltTests({
+			...paths,
+			cwd: paths.root,
+			args: argumentsFor("prebuilt", args),
+		});
+		assert.equal(result.status, 0);
+		assert.deepEqual(names("prebuilt"), expected);
+	});
+
 test("a test-name operand identical to its positional path remains a test name", async (t) => {
 	const paths = project(t);
 	const args = ["choose.test.ts", "--testNamePattern", "choose.test.ts"];

@@ -51,8 +51,11 @@ export async function runPrebuiltTests({
 		throw new Error(
 			"Prebuilt Node tests require a one-shot run; watch/UI/snapshot updates have not been qualified. Use the existing test:watch entrypoint.",
 		);
-	const resolved = await resolveConfig({ ...parsed.options, root: cwd });
+	const { exclude: cliExcludes = [], ...sourceOptions } = parsed.options;
+	const resolved = await resolveConfig({ ...sourceOptions, root: cwd });
 	const config = resolved.test;
+	// CLI excludes add to config policy in the original source filename space.
+	const sourceExcludes = [...config.exclude, ...[cliExcludes].flat()];
 	const enabled = config.coverage.enabled;
 	const reports = resolve(cwd, config.coverage.reportsDirectory);
 	if (enabled) rmSync(reports, { recursive: true, force: true });
@@ -77,10 +80,16 @@ export async function runPrebuiltTests({
 	}
 	const stage = stageNodeTree({ root, artifacts, aliases, fixtureScripts });
 	const stageCwd = join(stage.tree, relative(root, cwd));
-	const included = stage.inventory.filter((entry) => {
+	const candidates = stage.inventory.filter((entry) => {
 		const name = relative(cwd, entry.source);
-		return matches(name, config.include) && !matches(name, config.exclude);
+		return matches(name, config.include);
 	});
+	const included = candidates.filter(
+		(entry) => !matches(relative(cwd, entry.source), sourceExcludes),
+	);
+	const excluded = candidates.filter((entry) =>
+		matches(relative(cwd, entry.source), sourceExcludes),
+	);
 	const originalConfig = resolved.configFile;
 	if (!originalConfig)
 		throw new Error("Prebuilt Node tests require an existing Vitest config");
@@ -88,6 +97,8 @@ export async function runPrebuiltTests({
 	const nativeConfig = {
 		root: stageCwd,
 		include: included.map((entry) => relative(stageCwd, entry.emitted)),
+		exclude: excluded.map((entry) => relative(stageCwd, entry.emitted)),
+		cliExclude: [],
 		setupFiles: config.setupFiles.map((file) =>
 			join(stage.tree, emittedName(relative(root, file))),
 		),
@@ -127,7 +138,7 @@ export async function runPrebuiltTests({
 	// public CLI action owns execution, failure status and resource cleanup.
 	writeFileSync(
 		driver,
-		`import { createCLI } from ${JSON.stringify(pathToFileURL(require.resolve("vitest/node")).href)};\nconst cli = createCLI();\ncli.parse(${JSON.stringify([process.execPath, resolve(dirname(vitestManifest), vitestBin), "run", ...args])}, { run: false });\ncli.args = ${JSON.stringify(filters)};\ncli.options = { ...cli.options, ...${JSON.stringify({ config: wrapper, root: stageCwd, coverage: { enabled: false }, outputFile: nativeConfig.outputFile })} };\nawait cli.runMatchedCommand();\n`,
+		`import { createCLI } from ${JSON.stringify(pathToFileURL(require.resolve("vitest/node")).href)};\nconst cli = createCLI();\ncli.parse(${JSON.stringify([process.execPath, resolve(dirname(vitestManifest), vitestBin), "run", ...args])}, { run: false });\ncli.args = ${JSON.stringify(filters)};\ncli.options = { ...cli.options, ...${JSON.stringify({ config: wrapper, root: stageCwd, coverage: { enabled: false }, outputFile: nativeConfig.outputFile })} };\n// Source exclusions have already selected and mapped the emitted file sets.\ndelete cli.options.exclude;\nawait cli.runMatchedCommand();\n`,
 	);
 	const command = [driver];
 	if (!enabled) {

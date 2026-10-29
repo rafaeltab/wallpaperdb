@@ -1,5 +1,12 @@
-Launch Boat cohort A under issue #557, using scripts/boat-cohorts.json and
-scripts/boat-agent-prompt.md from the inspected prototype branch.
+Use this prompt only for an explicitly authorized Boat cohort A run under issue
+#557, using scripts/boat-cohorts.json and scripts/boat-agent-prompt.md from the
+inspected prototype branch. The first A run did not exercise development stacks.
+It remains incomplete for that measurement. This revised prompt does not authorize
+a replay or cohort B. Retain the old frozen ref and historical evidence unchanged.
+Before another measured launch, record a new infrastructure overlay identity with
+these requirements applied consistently to both compared runs. Recheck the ticket
+pool for the existing experimental drafts without reading their solutions into
+independent implementation contexts.
 
 First verify every qualificationRequired gate has actual recorded evidence. A
 configuration or fixture test does not qualify the Boat path. If any gate is
@@ -30,6 +37,26 @@ and record its owner. Do not ask the product agent to manage the environment.
 Open .boat/launch-ready only after all five source copies and caches are ready,
 then measure their simultaneous implementation phase. Exclude gate waiting from
 iteration timing, but include all preparation/idle VM time in usage accounting.
+
+Require every child to complete CONTRIBUTING.md#live-application-verification and
+the manifest's perIssueCompletionRequired evidence. Each child starts its own
+application through ordinary Make commands after enrollment: local development
+stack in A, remote development stack in B. A remote test-e2e stack cannot satisfy
+A's local-development requirement. Coordinate an observed interval with all five
+development stacks healthy and active, collect host/worker resource samples, and
+record actual overlap duration and any failure to obtain it. Keep those stacks
+running through their live scenarios and preview measurements, then release owned
+resources. This does not authorize serializing heavy VM workloads.
+
+Before accepting each child's completion, inspect its startup/health receipts,
+tested revision, concrete changed-path scenario and observed result, source-edit
+and preview evidence, and PR recording when applicable. Read back the PR evidence
+and verify the uploaded video is playable as required by pr-video-attachment.
+Require a specific reason and nonvisual live evidence for a recording marked
+inapplicable. Passing tests, a draft URL, or disclosure of an unexercised stack is
+insufficient. Repair in-scope gaps during the run or report that ticket and its
+affected measurements as incomplete. Never infer five-stack qualification from
+one worker's earlier smoke test. Preserve failed attempts and their resource cost.
 
 Collect timestamped host CPU/RAM/swap/disk and per-thread overhead, admission and
 readiness durations, source/preview latency, validation results, task hashes,

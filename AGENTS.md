@@ -29,3 +29,7 @@ WallpaperDB uses a multi-context layout rooted at `GLOSSARY-MAP.md`; system-wide
 ### Documentation
 
 Keep documentation for setup pitfalls, domain language, decisions and their rationale, and policies that cannot be inferred from code. Link to source for commands, configuration, APIs, and implementation details. Update the existing authoritative document instead of adding another explanation of the same topic. Track unfinished work in issues; keep temporary handoffs and investigation notes outside the repository.
+
+### Issue verification
+
+Before handing off an implemented issue, follow [live application verification](CONTRIBUTING.md#live-application-verification), including starting the application, exercising the changed behavior, and attaching a PR recording when that behavior can be demonstrated visually. Apply this requirement when delegating implementation and assessing its completion.

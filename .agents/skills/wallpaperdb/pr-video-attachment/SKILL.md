@@ -1,9 +1,11 @@
 ---
 name: pr-video-attachment
-description: Attach a browser recording as a playable video in a GitHub pull request description when creating or updating a PR.
+description: Attach a browser or terminal recording as a playable video in a GitHub pull request description when creating or updating a PR.
 ---
 
 # PR video attachment
+
+Apply the [live application verification policy](../../../../CONTRIBUTING.md#live-application-verification) when deciding which behavior to record and what evidence belongs in the PR.
 
 For a PR-only demonstration, keep the recording outside Git. Use a GitHub CLI version whose `gh pr create` or `gh pr edit` help lists `--attach`; update the CLI or use GitHub's attachment UI if the flag is absent.
 

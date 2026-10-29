@@ -22,6 +22,31 @@ Claim only your selected product issue, verify assignment and project status,
 and follow its accepted scope. Reproduce before repair. Do not claim sibling
 issues. Do not close the prototype, its map, or make an operating-model decision.
 
+For this issue, complete CONTRIBUTING.md#live-application-verification. After the
+enrollment gate opens, start this worktree's development application with ordinary
+Make commands. In A it must run locally; in B it must run on this worktree's Boat
+worker through the existing routing. Use the development stack and source watcher,
+not only the temporary stack created by make test-e2e. The coordinator manages the
+remote environment; you start and exercise the application through Make.
+
+Verify application health and authenticate where needed. Exercise the changed code
+through the running UI, API, or worker with real dependencies and concrete inputs.
+Retain the tested revision, startup/health timestamps, scenario actions, expected
+and observed results, and relevant logs. Also measure one source edit reaching the
+running application and preview without a full reload where HMR applies. Restore
+any temporary probe and confirm its removal. Notify the coordinator when the stack
+is ready so host-resource and overlapping-stack measurements can be collected.
+
+Attach a recording to the draft PR whenever it can demonstrate the changed
+behavior, following the repository's pr-video-attachment skill. A nonvisual change
+still requires live exercise and concrete evidence; explain why a recording has
+no useful demonstration when inapplicable. Keep secrets and private auth artifacts
+out of recordings. Missing startup, scenario, or applicable video leaves the issue
+incomplete. Report a blocker promptly and preserve the draft as incomplete rather
+than substituting passing tests or a statement that no preview was exercised.
+Stop your owned application processes when the coordinator finishes measurement;
+leave worker lifecycle and teardown to the coordinator.
+
 This is an independent implementation. Do not inspect the other cohort's
 checkouts, branches, commits, patches, implementation artifacts, PRs, comments
 containing solutions, or conversations. Do not search broadly through the host's

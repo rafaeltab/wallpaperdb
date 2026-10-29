@@ -18,6 +18,10 @@ Keep capability decisions in capability tests. Test protocol translation and inf
 
 Use `make help` to discover commands. To run a focused test, use `make test-focused PACKAGE=<workspace> ARGS='<file or filter>'`; it builds dependencies and runs tests serially. `make coverage-summary` reads existing coverage, so run the relevant coverage-producing tests first.
 
+## Verify the running application
+
+For every implemented issue, complete [live application verification](../../../../CONTRIBUTING.md#live-application-verification) before handoff. Plan the scenario that exercises the changed code, start the application in the assigned environment, and retain the observed results and applicable PR recording. Assess this evidence separately from automated test results. When coordinating delegated work, require the same evidence from each implementation agent; missing evidence leaves that issue's verification incomplete.
+
 ## Verify defect fixes
 
 Apply this guidance to implementation defects, review feedback, and automated repairs, including CI fixes.

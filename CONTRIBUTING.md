@@ -53,7 +53,7 @@ make test-focused PACKAGE=<workspace> ARGS='<test path>'
 make ci
 ```
 
-Choose tests using the [testing guidelines](docs/coding-standards/project-organization.md#shared-testing-principles). The focused command builds workspace dependencies and runs selected tests serially. Local `make ci` runs build, lint, type checks, unit tests, integration tests, and non-E2E coverage merging. It reports that browser and container E2E are excluded. Integration tests retain their own containers and browser adapter contracts; install their Chromium dependency with `make run PACKAGE=web SCRIPT=test:browser:install` when needed. Ordinary validation needs only the prerequisites of those checks, without application-stack or E2E credentials.
+Choose tests using the [testing guidelines](docs/coding-standards/project-organization.md#shared-testing-principles). The focused command builds workspace dependencies and runs selected tests serially. Local `make ci` runs build, lint, type checks, unit tests, integration tests, and non-E2E coverage merging. It reports that browser and container E2E are excluded. Integration tests retain their own containers and browser adapter contracts; install their Chromium dependency with `make run PACKAGE=web SCRIPT=test:browser:install` when needed. These commands need only their own prerequisites; issue completion also requires [live application verification](#live-application-verification).
 
 Local CI's [task concurrency](Makefile) defaults to four to balance turnaround and resource headroom. Override it with `make ci CI_CONCURRENCY=1` on smaller hosts. The shared Docker queue still admits one validation run at a time.
 
@@ -84,6 +84,16 @@ Browser credentials and owned artifact paths are passed only to the browser suit
 The runner prints the failing phase and original status, reports cleanup failures separately, and retains service logs, command output, and browser failure artifacts in the private temporary directory it prints. Oversized command-output lines are omitted with a marker to keep streamed diagnostics bounded. Captures of configuration or service logs are capped at 1 MiB across stdout and stderr. Exceeding that limit fails the phase, stops its child process, and still attempts owned teardown; incomplete output is discarded. Browser artifacts and authentication state are written directly into that run's diagnostics directory; earlier workspace reports and authentication state remain untouched. It removes the run's temporary diagnostics before reporting success, once all requested tests and cleanup succeed. Use its focused rerun command; inspect retained logs before retrying or manually cleaning a failed owned project. Treat browser reports and traces as private and sanitize excerpts before sharing.
 
 For other scripts use `make run PACKAGE=<workspace> SCRIPT=<script>`. `PACKAGE` selects a workspace, `SERVICE` selects an application container, and `DB` selects a database. Read `make help` instead of maintaining a second command list here.
+
+### Live application verification
+
+Before handing off an implemented issue, start the application from that issue's worktree and exercise the code changed by the issue. Use the repository's Make workflow and the issue's assigned execution environment. Verify application health, then perform a concrete scenario through the running application's UI, API, or worker entry point with its real dependencies. A health check alone does not exercise the change. Automated tests and hosted CI remain required where applicable, but passing them does not replace this step.
+
+For a defect, demonstrate the reported case after the repair and check a neighboring supported case. Preserve the before-repair reproduction from the defect-verification workflow. Record the tested revision, startup command, environment, scenario inputs/actions, expected and observed results, and cleanup in the PR. Keep credentials and private authentication artifacts out of shared evidence. Stop only the stack and processes owned by this verification when finished.
+
+If a recording can demonstrate the changed behavior, attach a concise recording of that actual verification to the PR, including visible UI behavior or a useful terminal demonstration. Show the interaction and resulting behavior at the tested revision. Follow [PR video attachment](.agents/skills/wallpaperdb/pr-video-attachment/SKILL.md) and verify that reviewers can play the uploaded video. For behavior with no useful visual demonstration, explain why a recording is inapplicable and include the observed requests, responses, logs, or measurements that establish the result.
+
+Treat failed startup, an unexercised changed path, or a missing applicable recording as incomplete verification. Investigate and repair setup problems within the agreed scope. If a remaining blocker needs human action or a scope decision, report the exact blocker and keep the work incomplete. A draft PR may preserve progress with those gaps stated explicitly; disclosing a gap does not satisfy the completion requirement.
 
 ## Pull request history
 

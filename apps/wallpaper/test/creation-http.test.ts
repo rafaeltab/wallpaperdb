@@ -166,6 +166,24 @@ it.each(['authentication', 'listing'] as const)(
   }
 );
 
+it('completes a real list request without cancelling successful work', async () => {
+  const fixture = await pendingList('listing');
+  const response = fetch(`${fixture.url}/wallpapers`, { headers: { connection: 'close' } });
+  try {
+    await expect.poll(() => fixture.started).toBe(true);
+    fixture.release();
+    const result = await response;
+    expect(result.status).toBe(200);
+    expect(result.headers.get('cache-control')).toBe('no-store');
+    expect(await result.json()).toEqual({ wallpapers: [] });
+    expect(fixture.released).toBe(false);
+  } finally {
+    fixture.release();
+    await response;
+    await fixture.app.close();
+  }
+});
+
 it('bounds shutdown of a pending real list request and releases its work', async () => {
   const fixture = await pendingList('listing');
   const response = fetch(`${fixture.url}/wallpapers`).catch(() => {});

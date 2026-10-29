@@ -160,6 +160,7 @@ export async function opensearchFixture(
 			"runtime-version",
 			"health-not-ready",
 			"startup-indices-not-ready",
+			"startup-mapping-not-ready",
 			"deadline-expired",
 			"index-inventory-shape",
 			"pilot-index-name",
@@ -690,6 +691,34 @@ export async function opensearchFixture(
 							"Owned OpenSearch startup indices are not ready",
 							"startup-indices-not-ready",
 						);
+					const properties =
+						candidate.other[".opensearch-sap-log-types-config"].mappings
+							.properties;
+					const schemaFields = ["ecs", "ocsf"];
+					// Bundled field documents add these mappings after index creation.
+					const fieldMapping = JSON.stringify(
+						canonical({
+							type: "text",
+							fields: { keyword: { type: "keyword", ignore_above: 256 } },
+						}),
+					);
+					if (
+						!object(properties) ||
+						schemaFields.some(
+							(key) =>
+								Object.hasOwn(properties, key) &&
+								JSON.stringify(canonical(properties[key])) !== fieldMapping,
+						)
+					)
+						throw categoryError(
+							"Owned OpenSearch startup mapping is incompatible",
+							"index-inventory-shape",
+						);
+					if (schemaFields.some((key) => !Object.hasOwn(properties, key)))
+						throw categoryError(
+							"Owned OpenSearch startup mapping is not ready",
+							"startup-mapping-not-ready",
+						);
 					initial = candidate;
 					break;
 				} catch (error) {
@@ -708,6 +737,7 @@ export async function opensearchFixture(
 							"request-aborted",
 							"health-not-ready",
 							"startup-indices-not-ready",
+							"startup-mapping-not-ready",
 						].includes(error.category) &&
 						!(error.category === "http-rejected" && error.httpStatus === 503)
 					)

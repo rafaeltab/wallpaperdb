@@ -1,6 +1,7 @@
 {
   "suites": {
     "unit": {
+      "captureNativeEvidence": true,
       "externalInputs": [
         "apps/web-e2e/fixtures/profile-small.png",
         "apps/web-e2e/fixtures/profile-transparent-p3.png"

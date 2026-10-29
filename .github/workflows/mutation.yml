@@ -183,8 +183,16 @@ jobs:
             apps/*/reports/mutation/*/summary.json
             apps/*/reports/mutation/*/mutation.json
             apps/*/reports/mutation/*/mutation.html
+            apps/*/reports/mutation/*/run-*/native-evidence.jsonl
+            apps/*/reports/mutation/*/run-*/plan.json
+            apps/*/reports/mutation/*/run-*/runner-timings.jsonl
+            apps/*/reports/mutation/*/run-*/mutation.json
             packages/*/reports/mutation/*/summary.json
             packages/*/reports/mutation/*/mutation.json
             packages/*/reports/mutation/*/mutation.html
+            packages/*/reports/mutation/*/run-*/native-evidence.jsonl
+            packages/*/reports/mutation/*/run-*/plan.json
+            packages/*/reports/mutation/*/run-*/runner-timings.jsonl
+            packages/*/reports/mutation/*/run-*/mutation.json
           if-no-files-found: warn
           retention-days: 30

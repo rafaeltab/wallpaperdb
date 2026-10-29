@@ -1,6 +1,7 @@
 {
   "suites": {
     "unit": {
+      "captureNativeEvidence": true,
       "vitest": {
         "configFile": "vitest.config.ts",
         "related": false

@@ -103,6 +103,7 @@ export async function runStage({
 		errors: 0,
 		baselineRestored: Boolean(baseline),
 		checkpointSaved: false,
+		captureNativeEvidence: config.captureNativeEvidence === true,
 		checkpointReuseSeconds,
 		run,
 	};
@@ -148,6 +149,10 @@ export async function runStage({
 					...fixture?.env,
 					WALLPAPERDB_MUTATION_PROGRESS: progress,
 					WALLPAPERDB_MUTATION_TIMINGS: runnerTimings,
+					WALLPAPERDB_MUTATION_NATIVE_EVIDENCE:
+						config.captureNativeEvidence === true
+							? join(run, "native-evidence.jsonl")
+							: "",
 					WALLPAPERDB_MUTATION_PLAN: plan,
 					WALLPAPERDB_MUTATION_GATE: unit ? gate : "",
 					WALLPAPERDB_MUTATION_FAILURE_FILE: fixtureFailure,

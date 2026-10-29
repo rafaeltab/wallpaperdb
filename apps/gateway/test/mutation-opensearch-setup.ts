@@ -233,12 +233,16 @@ async function control(path: string) {
 		headers: { authorization: `Bearer ${token}` },
 		signal: AbortSignal.timeout(recreating ? 121000 : 6000),
 	});
-	try {
-		if (!response.ok) throw new Error("Owned OpenSearch control rejected");
-		return await response.text();
-	} finally {
-		await response.body?.cancel();
+	if (!response.ok) {
+		const error = new Error("Owned OpenSearch control rejected");
+		try {
+			await response.body?.cancel();
+		} catch {
+			// Keep the original HTTP rejection authoritative.
+		}
+		throw error;
 	}
+	return await response.text();
 }
 async function fail() {
 	observed.failed = true;

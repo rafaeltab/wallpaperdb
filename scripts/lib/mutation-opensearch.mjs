@@ -565,6 +565,7 @@ export async function opensearchFixture(
 		if (error) throw error;
 	};
 	const inspectOwned = async (target = container) => {
+		const started = performance.now();
 		const rows = JSON.parse(await docker("inspect", target));
 		const value = rows[0];
 		if (
@@ -583,8 +584,23 @@ export async function opensearchFixture(
 			value.Config?.User !== "1000" ||
 			!Array.isArray(value.Mounts) ||
 			value.Mounts.length
-		)
-			throw new Error("Owned OpenSearch container metadata differs");
+		) {
+			const error = new Error("Owned OpenSearch container metadata differs");
+			try {
+				record("owned-container-metadata-mismatch", {
+					...diagnostic(error, "inspect-owned-container-metadata", started),
+					category: "owned-container-metadata-mismatch",
+					containerId: target,
+					imageConfigMatches: value.Image === configPin,
+					userMatches: value.Config?.User === "1000",
+					mountsIsArray: Array.isArray(value.Mounts),
+					mountsEmpty: Array.isArray(value.Mounts) && value.Mounts.length === 0,
+				});
+			} catch {
+				failMetadataObservation();
+			}
+			throw error;
+		}
 		return value;
 	};
 	// Same finite startup ceiling as the ordinary fixture, never an observed cost.

@@ -53,7 +53,7 @@ concurrency:
 jobs:
   mutation:
     name: Advisory mutation pilot
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Setup, execution, remote transfer, upload and cleanup have finite deadlines.
     # Budget expiry stops the coordinator before upload's separate deadline.
     timeout-minutes: 110
@@ -90,6 +90,10 @@ jobs:
         run: |
           make install
           make build
+      - name: Install Chromium for native browser mutations
+        if: inputs.suite != 'integration' && (inputs.package == '' || contains(format(',{0},', inputs.package), ',web,'))
+        timeout-minutes: 5
+        run: make run PACKAGE=web SCRIPT=test:browser:install
       - name: Import explicitly selected acceptance checkpoint
         if: github.event_name != 'pull_request' && inputs.import_run != ''
         timeout-minutes: 2

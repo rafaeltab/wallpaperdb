@@ -107,19 +107,19 @@
     },
     "apps/web": {
       "decision": "enabled",
-      "mechanism": "native-vitest-node",
+      "mechanism": "native-vitest-node-jsdom-chromium",
       "stages": [
         "unit"
       ],
       "limitations": {
-        "reason": "Only the Node project is enabled. jsdom and real browser execution require a known active mutation before support is claimed.",
+        "reason": "Node, jsdom and page-owned Vitest Chromium projects are configured in one native per-test stage. jsdom and Chromium activation remain pending qualification under #519; configuration alone does not establish support. Image Worker globals lack verified activation and per-test coverage transport and remain excluded under #520.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
     "apps/web-e2e": {
       "decision": "excluded",
-      "reason": "No maintained mutation-compatible behavioral suite.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "Deployed Playwright journeys load separately served application bundles without native Vitest mutant activation, per-test coverage or result transport. The workspace's Node configuration tests do not qualify browser journeys. Supporting them requires owned instrumented serving, browser activation and native selected-test/result transport.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/519"
     },
     "packages/auth": {
       "decision": "enabled",
@@ -160,9 +160,15 @@
       ]
     },
     "packages/react-muuri": {
-      "decision": "excluded",
-      "reason": "Browser and jsdom execution need a known active mutation verified with native runner and framework plugins before support is claimed.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "decision": "enabled",
+      "mechanism": "native-vitest-jsdom",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "The existing jsdom suites are configured for native per-test mutation analysis; activation remains pending qualification under #519. jsdom does not establish real Muuri layout or Chromium behavior.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/519"
+      }
     },
     "packages/test-logger": {
       "decision": "excluded",

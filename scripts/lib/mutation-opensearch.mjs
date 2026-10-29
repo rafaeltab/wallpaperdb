@@ -22,8 +22,17 @@ import { FixtureCleanupError } from "./mutation-fixture.mjs";
 const execute = promisify(execFile);
 const imagePin =
 	"opensearchproject/opensearch:2.11.0@sha256:925060a17ef0374f2b3d94d0f8fb35dffb491701cd4a72fb12a9ca2fed9929d4";
+const manifestPin =
+	"sha256:925060a17ef0374f2b3d94d0f8fb35dffb491701cd4a72fb12a9ca2fed9929d4";
 const configPin =
 	"sha256:ce2416eabaf8969b7d9b59dc83db13efbd465144bb95a57d8f60e94ea40d8801";
+// Docker can expose a config ID or the pinned manifest ID.
+const imageIdKind = (id) =>
+	id === configPin
+		? "config"
+		: id === manifestPin
+			? "manifest"
+			: "unrecognized";
 const source = "src/adapters/opensearch/profiles.ts";
 const hash = (value) =>
 	createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -580,7 +589,7 @@ export async function opensearchFixture(
 		verifiedOwners.add(target);
 		ids.add(target);
 		if (
-			value.Image !== configPin ||
+			imageIdKind(value.Image) === "unrecognized" ||
 			value.Config?.User !== "1000" ||
 			!Array.isArray(value.Mounts) ||
 			value.Mounts.length
@@ -592,6 +601,8 @@ export async function opensearchFixture(
 					category: "owned-container-metadata-mismatch",
 					containerId: target,
 					imageConfigMatches: value.Image === configPin,
+					imageManifestMatches: value.Image === manifestPin,
+					imageIdKind: imageIdKind(value.Image),
 					userMatches: value.Config?.User === "1000",
 					mountsIsArray: Array.isArray(value.Mounts),
 					mountsEmpty: Array.isArray(value.Mounts) && value.Mounts.length === 0,
@@ -720,7 +731,8 @@ export async function opensearchFixture(
 			timings.startupSeconds += (performance.now() - started) / 1000;
 			record("backend-started", {
 				containerId: container,
-				imageConfigId: state.Image,
+				imageId: state.Image,
+				imageIdKind: imageIdKind(state.Image),
 				baseline,
 			});
 		});

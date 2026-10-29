@@ -42,3 +42,13 @@ it('reserves once across independent instances and retains launch claim after re
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+import { storeContract } from './fixtures/store-contract.js';
+storeContract('filesystem store', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'factory-contract-'));
+  return {
+    store: fileStore(directory),
+    reopen: () => fileStore(directory),
+    close: () => rm(directory, { recursive: true, force: true }),
+  };
+});

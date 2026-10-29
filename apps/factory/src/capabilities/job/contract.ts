@@ -3,6 +3,10 @@ export class Unavailable extends Schema.TaggedError<Unavailable>()('Unavailable'
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+export interface Time {
+  now(): Effect.Effect<number, Unavailable>;
+}
+export const Time = Context.Service<Time>('wallpaperdb.factory.Time');
 export interface Intent {
   readonly id: string;
   readonly issue: number;

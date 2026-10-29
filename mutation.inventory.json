@@ -42,7 +42,7 @@
         "integration"
       ],
       "limitations": {
-        "reason": "Normal integration uses the Redis adapter contract and composed admission scenario. The explicit fixed OpenSearch Profile discovery opt-in selects only profiles.ts and its existing seven-case in-process contract, initially isolated; activation/reset/cleanup/benefit acceptance remains pending under #518. It does not add automatic OpenSearch coverage. Other search, NATS and subprocess fixtures remain unvalidated.",
+        "reason": "Normal integration uses the Redis adapter contract and composed admission scenario. The fixed OpenSearch Profile discovery opt-in selects only profiles.ts and its existing seven-case contract, with normal workflow OpenSearch off and selected per-execution isolation diagnostic-only. One valid partial isolated sample established 33 native kills, but repeatable isolated scoring and reuse remain unqualified: reused non-pilot metadata changed after admission, and in-flight isolated reset failed normal-budget finalization. All four comparison samples quarantined integration progress; strict metadata/reset/disposal guards remain fatal. No automatic OpenSearch score, reuse equivalence or repeated inclusive benefit is accepted. Qualification is tracked in https://github.com/rafaeltab/wallpaperdb/issues/559; bounded phase evidence is in #518. Other search, NATS and subprocess fixtures remain unvalidated.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },

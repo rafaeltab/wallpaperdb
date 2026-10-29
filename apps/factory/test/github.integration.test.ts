@@ -34,6 +34,8 @@ it('translates external issue observations and rejects unverified or malformed d
     });
     await host.save({ blockers: [{ number: 573, state: 'open' }], prHead: host.base });
     expect(await Effect.runPromise(verified.inspect(576))).toMatchObject({ blockersReady: true });
+    await host.save({ body: 'Blocked by: #573\nParent: #571', prHead: host.base });
+    expect(await Effect.runPromise(verified.inspect(576))).toMatchObject({ blockersReady: true });
     await host.save({ blockers: [{ number: 573, state: 'open' }], prHead: 'b'.repeat(40) });
     expect(await Effect.runPromise(verified.inspect(576))).toMatchObject({ blockersReady: false });
     await host.save({ githubMalformed: true });

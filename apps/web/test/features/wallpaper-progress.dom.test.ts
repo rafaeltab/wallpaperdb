@@ -78,9 +78,8 @@ it("connects list fetch cancellation to the caller signal", async () => {
 			});
 		}),
 	);
-	const result = recentCreations(controller.signal);
-	const rejected = expect(result).rejects.toMatchObject({ name: "AbortError" });
+	const result = recentCreations(controller.signal).catch((error: unknown) => error);
 	await vi.waitFor(() => expect(received).toBe(controller.signal));
 	controller.abort();
-	await rejected;
+	expect(await result).toMatchObject({ name: "AbortError" });
 });

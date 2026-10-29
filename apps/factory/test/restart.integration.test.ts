@@ -25,7 +25,17 @@ it('a fresh process recovers the durable job and existing external thread withou
     FACTORY_PORT: String(port),
     FACTORY_HOST: '127.0.0.1',
   };
-  const launch = () => spawn(process.execPath, [resolve('dist/main.js')], { env, stdio: 'pipe' });
+  let diagnostics = '';
+  const launch = () => {
+    const process = spawn(globalThis.process.execPath, [resolve('dist/main.js')], {
+      env,
+      stdio: 'pipe',
+    });
+    process.stderr.on('data', (chunk) => {
+      diagnostics += chunk.toString();
+    });
+    return process;
+  };
   const stop = async (child: ChildProcess) => {
     if (child.exitCode !== null) return;
     const exited = once(child, 'exit');
@@ -34,10 +44,16 @@ it('a fresh process recovers the durable job and existing external thread withou
   };
   const origin = `http://127.0.0.1:${port}`;
   const ready = () =>
-    vi.waitFor(async () => expect((await fetch(origin + '/health')).ok).toBe(true), {
-      timeout: 10000,
-      interval: 30,
-    });
+    vi.waitFor(
+      async () => {
+        expect(child.exitCode, diagnostics).toBeNull();
+        expect((await fetch(origin + '/health')).ok).toBe(true);
+      },
+      {
+        timeout: 10000,
+        interval: 30,
+      }
+    );
   let child = launch();
   try {
     await ready();

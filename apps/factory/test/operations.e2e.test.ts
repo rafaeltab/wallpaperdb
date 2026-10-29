@@ -16,11 +16,13 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       FACTORY_BASE: host.base,
       FACTORY_T3_BINARY: host.binary,
       FACTORY_STATE: host.directory + '/state',
-      FACTORY_PORT: '19477',
+      FACTORY_PORT: '0',
     });
     try {
       const page = await browser.newPage();
-      await page.goto('http://127.0.0.1:19477');
+      const address = running.app.server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing listener');
+      await page.goto(`http://127.0.0.1:${address.port}`);
       await page.getByLabel('Selected issue number').fill('576');
       await page.getByLabel('Maintainer execution context').fill('Inspect only. No writes.');
       await page.getByRole('button', { name: 'Start selected issue' }).click();

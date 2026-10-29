@@ -20,22 +20,28 @@ export function githubIssues(config: {
   base: string;
   prerequisites: readonly { issue: number; pr: number; commit: string }[];
 }): Issues {
-  const gh = (args: string[]) =>
-    command('gh', args, config.project).then((text) => JSON.parse(text));
-  async function verifyBlockers(numbers: readonly number[]): Promise<boolean> {
+  const gh = (args: string[], signal?: AbortSignal) =>
+    command('gh', args, config.project, signal).then((text) => JSON.parse(text));
+  async function verifyBlockers(
+    numbers: readonly number[],
+    signal?: AbortSignal
+  ): Promise<boolean> {
     if (numbers.length > 100) return false;
     let blockersReady = true;
     for (const blocker of numbers) {
       const observation = issueSchema.parse(
-        await gh([
-          'issue',
-          'view',
-          String(blocker),
-          '--repo',
-          'rafaeltab/wallpaperdb',
-          '--json',
-          'number,state,author,url,body,labels',
-        ])
+        await gh(
+          [
+            'issue',
+            'view',
+            String(blocker),
+            '--repo',
+            'rafaeltab/wallpaperdb',
+            '--json',
+            'number,state,author,url,body,labels',
+          ],
+          signal
+        )
       );
       if (observation.state === 'CLOSED') continue;
       const verified = config.prerequisites.find((item) => item.issue === blocker);
@@ -46,15 +52,18 @@ export function githubIssues(config: {
       const pr = z
         .object({ headRefOid: z.string(), state: z.enum(['OPEN', 'MERGED', 'CLOSED']) })
         .parse(
-          await gh([
-            'pr',
-            'view',
-            String(verified.pr),
-            '--repo',
-            'rafaeltab/wallpaperdb',
-            '--json',
-            'headRefOid,state',
-          ])
+          await gh(
+            [
+              'pr',
+              'view',
+              String(verified.pr),
+              '--repo',
+              'rafaeltab/wallpaperdb',
+              '--json',
+              'headRefOid,state',
+            ],
+            signal
+          )
         );
       if (pr.headRefOid !== verified.commit || pr.state === 'CLOSED') {
         blockersReady = false;
@@ -63,7 +72,8 @@ export function githubIssues(config: {
       await command(
         'git',
         ['merge-base', '--is-ancestor', verified.commit, config.base],
-        config.project
+        config.project,
+        signal
       );
     }
 
@@ -72,17 +82,20 @@ export function githubIssues(config: {
   return {
     inspect: (number) =>
       Effect.tryPromise({
-        try: async () => {
+        try: async (signal) => {
           const issue = issueSchema.parse(
-            await gh([
-              'issue',
-              'view',
-              String(number),
-              '--repo',
-              'rafaeltab/wallpaperdb',
-              '--json',
-              'number,state,author,url,body,labels',
-            ])
+            await gh(
+              [
+                'issue',
+                'view',
+                String(number),
+                '--repo',
+                'rafaeltab/wallpaperdb',
+                '--json',
+                'number,state,author,url,body,labels',
+              ],
+              signal
+            )
           );
           if (
             issue.number !== number ||
@@ -92,16 +105,19 @@ export function githubIssues(config: {
           const native = z
             .array(blockersSchema)
             .parse(
-              await gh([
-                'api',
-                `repos/rafaeltab/wallpaperdb/issues/${number}/dependencies/blocked_by`,
-                '--paginate',
-                '--slurp',
-              ])
+              await gh(
+                [
+                  'api',
+                  `repos/rafaeltab/wallpaperdb/issues/${number}/dependencies/blocked_by`,
+                  '--paginate',
+                  '--slurp',
+                ],
+                signal
+              )
             )
             .flat();
           const numbers = blockerNumbers(native, issue.body);
-          const blockersReady = await verifyBlockers(numbers);
+          const blockersReady = await verifyBlockers(numbers, signal);
           return {
             open: issue.state === 'OPEN',
             author: issue.author.login,
@@ -119,9 +135,11 @@ export function githubIssues(config: {
 }
 
 function blockerNumbers(native: readonly { number: number }[], body: string): number[] {
-  const section = body.split(/## Blocked by/i)[1]?.split(/\n## /)[0] ?? '';
-  const fallback = [...section.matchAll(/github\.com\/rafaeltab\/wallpaperdb\/issues\/(\d+)/g)].map(
-    (match) => Number(match[1])
+  const sections = body.match(/^(?:#{1,6}\s+)?Blocked by\s*:?.*(?:\n(?!#{1,6}\s)[^\n]*)*/gim) ?? [];
+  const fallback = sections.flatMap((section) =>
+    [
+      ...section.matchAll(/(?:github\.com\/rafaeltab\/wallpaperdb\/issues\/|(?<![\w/])#)(\d+)/g),
+    ].map((match) => Number(match[1]))
   );
   return [...new Set([...native.map((blocker) => blocker.number), ...fallback])];
 }

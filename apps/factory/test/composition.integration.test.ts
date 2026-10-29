@@ -9,16 +9,25 @@ it('validates host configuration before serving and composes the real driving an
     FACTORY_BASE: host.base,
     FACTORY_T3_BINARY: host.binary,
     FACTORY_STATE: host.directory + '/state',
-    FACTORY_PORT: '19476',
+    FACTORY_PORT: '0',
   };
   try {
     await expect(startFactory({ ...configuration, FACTORY_HOST: '0.0.0.0' })).rejects.toThrow();
+    await expect(
+      startFactory({ ...configuration, FACTORY_HOST: '100.97.invalid.test' })
+    ).rejects.toThrow();
     const previous = process.env.FACTORY_FIXTURE;
     process.env.FACTORY_FIXTURE = host.configFile;
     try {
       const running = await startFactory({ ...configuration, FACTORY_HOST: '127.0.0.1' });
       try {
-        expect((await running.app.inject('/api/job')).json()).toEqual({ kind: 'empty' });
+        const second = await startFactory({ ...configuration, FACTORY_HOST: '127.0.0.1' });
+        try {
+          expect((await running.app.inject('/api/job')).json()).toEqual({ kind: 'empty' });
+          expect(running.app.server.address()).not.toEqual(second.app.server.address());
+        } finally {
+          await second.close();
+        }
       } finally {
         await running.close();
       }

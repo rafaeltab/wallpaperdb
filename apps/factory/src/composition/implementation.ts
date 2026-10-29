@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
 import { z } from 'zod';
 import { Execution, Issues, Job, JobLive, JobStore, Time } from '../capabilities/job/index.js';
 import { systemTime } from '../adapters/clock/index.js';
@@ -8,17 +8,24 @@ import { githubIssues } from '../adapters/github/index.js';
 import { t3Execution } from '../adapters/t3/index.js';
 import { operationsServer } from '../http/index.js';
 import { command } from '../platform/index.js';
+import { telemetry } from './telemetry.js';
 
 export async function startFactory(environment: NodeJS.ProcessEnv) {
   const configuration = z
     .object({
       FACTORY_PROJECT: z.string().min(1),
+      FACTORY_OTEL_ENDPOINT: z
+        .string()
+        .url()
+        .refine((value) => /^https?:/.test(value))
+        .optional(),
       FACTORY_T3_PROJECT_ID: z.string().min(1),
       FACTORY_BASE: z.string().regex(/^[a-f0-9]{40}$/),
       FACTORY_T3_BINARY: z.string().startsWith('/'),
       FACTORY_STATE: z.string().startsWith('/'),
       FACTORY_HOST: z
         .string()
+        .ip()
         .default('127.0.0.1')
         .refine(
           (host) =>
@@ -26,7 +33,13 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             host === '::1' ||
             /^100\.(6[4-9]|[789]\d|1[01]\d|12[0-7])\./.test(host)
         ),
-      FACTORY_PORT: z.coerce.number().int().min(1024).max(65535).default(9400),
+      FACTORY_PORT: z.coerce
+        .number()
+        .int()
+        .min(0)
+        .max(65535)
+        .refine((port) => port === 0 || port >= 1024)
+        .default(9400),
       FACTORY_PREREQUISITES: z
         .string()
         .default('[]')
@@ -71,29 +84,49 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       })
     )
   );
-  const runtime = ManagedRuntime.make(JobLive.pipe(Layer.provide(deps)));
+  const runtime = ManagedRuntime.make(
+    JobLive.pipe(
+      Layer.provide(deps),
+      Layer.provideMerge(telemetry(configuration.FACTORY_OTEL_ENDPOINT))
+    )
+  );
   const job = await runtime.runPromise(Job);
+  const requests = new AbortController();
   const app = operationsServer({
     base: configuration.FACTORY_BASE,
     job,
-    run: (effect) => runtime.runPromise(effect),
+    run: (effect) => runtime.runPromise(effect, { signal: requests.signal }),
   });
   try {
-    await app.listen({ host: configuration.FACTORY_HOST, port: configuration.FACTORY_PORT });
+    await runtime.runPromise(
+      Effect.tryPromise(() =>
+        app.listen({ host: configuration.FACTORY_HOST, port: configuration.FACTORY_PORT })
+      ).pipe(Effect.withSpan('factory.startup'))
+    );
   } catch (cause) {
-    await app.close();
-    await runtime.dispose();
+    try {
+      await app.close();
+    } finally {
+      requests.abort();
+      await runtime.dispose();
+    }
     throw cause;
   }
 
-  return {
-    app,
-    close: async () => {
+  let closing: Promise<void> | undefined;
+  const close = () =>
+    (closing ??= (async () => {
+      const deadline = setTimeout(() => {
+        requests.abort();
+        app.server.closeAllConnections();
+      }, 5000);
       try {
         await app.close();
       } finally {
+        clearTimeout(deadline);
+        requests.abort();
         await runtime.dispose();
       }
-    },
-  };
+    })());
+  return { app, close };
 }

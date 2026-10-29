@@ -53,6 +53,10 @@ else if (args[1] === 'start') {
   if (config.lost) process.exit(1);
   reply({ threadId: 'thread-live', projectId: 'project-id', runId: 'run-1' });
 } else {
+  if (args[1] === 'list' && config.delayObserve) {
+    writeFileSync(join(config.directory, 'observing.pid'), String(process.pid));
+    await new Promise((resolve) => setTimeout(resolve, 30000));
+  }
   const resource = existsSync(join(config.directory, 'resource.json'))
     ? JSON.parse(readFileSync(join(config.directory, 'resource.json'), 'utf8'))
     : null;

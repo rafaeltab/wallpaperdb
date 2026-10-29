@@ -4,7 +4,8 @@ const execute = promisify(execFile);
 export async function command(
   binary: string,
   args: readonly string[],
-  cwd: string
+  cwd: string,
+  signal?: AbortSignal
 ): Promise<string> {
   const result = await execute(binary, [...args], {
     cwd,
@@ -12,6 +13,7 @@ export async function command(
     killSignal: 'SIGKILL',
     maxBuffer: 4 * 1024 * 1024,
     encoding: 'utf8',
+    signal,
   });
   return result.stdout;
 }

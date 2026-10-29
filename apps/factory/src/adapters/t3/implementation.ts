@@ -39,35 +39,38 @@ export function t3Execution(config: {
   project: string;
   projectId: string;
 }): Execution {
-  const call = (args: string[]) =>
-    command(config.binary, ['thread', ...args, '--json'], config.project).then((text) =>
+  const call = (args: string[], signal?: AbortSignal) =>
+    command(config.binary, ['thread', ...args, '--json'], config.project, signal).then((text) =>
       JSON.parse(text)
     );
   return {
     launch: (intent) =>
       Effect.tryPromise({
-        try: async () => {
+        try: async (signal) => {
           z.object({
             threadId: z.string().min(1),
             projectId: z.literal(config.projectId),
             runId: z.string().nullable(),
           }).parse(
-            await call([
-              'start',
-              config.projectId,
-              `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
+            await call(
+              [
+                'start',
+                config.projectId,
+                `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
 ${intent.context}`,
-              '--title',
-              title(intent),
-              '--provider',
-              'codex',
-              '--model',
-              'gpt-6.1-sol',
-              '--worktree',
-              intent.base,
-              '--branch',
-              intent.branch,
-            ])
+                '--title',
+                title(intent),
+                '--provider',
+                'codex',
+                '--model',
+                'gpt-6.1-sol',
+                '--worktree',
+                intent.base,
+                '--branch',
+                intent.branch,
+              ],
+              signal
+            )
           );
           return { kind: 'submitted' as const };
         },
@@ -80,15 +83,17 @@ ${intent.context}`,
       ),
     observe: (intent) =>
       Effect.tryPromise({
-        try: async (): Promise<Observation> => {
+        try: async (signal): Promise<Observation> => {
           const matches = listing
-            .parse(await call(['list', '--project', config.projectId]))
+            .parse(await call(['list', '--project', config.projectId], signal))
             .filter((item) => item.title === title(intent));
           if (matches.length === 0) return { kind: 'absent' };
           if (matches.length !== 1) return { kind: 'ambiguous' };
           const match = matches[0];
           if (!match) return { kind: 'ambiguous' };
-          const { thread } = detail.parse(await call(['show', match.threadId, '--messages', '1']));
+          const { thread } = detail.parse(
+            await call(['show', match.threadId, '--messages', '1'], signal)
+          );
           const binding = z
             .object({
               projectId: z.literal(config.projectId),
@@ -105,8 +110,15 @@ ${intent.context}`,
             .safeParse(thread);
           if (!binding.success) return { kind: 'ambiguous' };
           const worktree = binding.data.worktreePath;
-          const branch = (await command('git', ['branch', '--show-current'], worktree)).trim();
-          await command('git', ['merge-base', '--is-ancestor', intent.base, 'HEAD'], worktree);
+          const branch = (
+            await command('git', ['branch', '--show-current'], worktree, signal)
+          ).trim();
+          await command(
+            'git',
+            ['merge-base', '--is-ancestor', intent.base, 'HEAD'],
+            worktree,
+            signal
+          );
           if (branch !== intent.branch) return { kind: 'ambiguous' };
           return {
             kind: 'found',

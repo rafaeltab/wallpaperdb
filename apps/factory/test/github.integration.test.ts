@@ -21,6 +21,12 @@ it('translates external issue observations and rejects unverified or malformed d
     expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: false });
     await host.save({ body: '## Blocked by\nhttps://github.com/rafaeltab/wallpaperdb/issues/573' });
     expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: false });
+    for (const body of ['Blocked by: #573', '## Blocked by\n- #573', 'Blocked by: #573, #574']) {
+      await host.save({ body });
+      expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: false });
+    }
+    await host.save({ body: 'Parent: #573' });
+    expect(await Effect.runPromise(adapter.inspect(576))).toMatchObject({ blockersReady: true });
     const verified = githubIssues({
       project: host.repository,
       base: host.base,

@@ -193,7 +193,8 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
               .where(
                 and(
                   eq(sourceCleanup.assetId, asset.id),
-                  sql`${sourceCleanup.status} <> 'completed'`
+                  sql`${sourceCleanup.status} <> 'completed'`,
+                  sql`(${sourceCleanup.target}->>'kind' = 'candidate' OR NOT EXISTS (SELECT 1 FROM ${immutableSources} WHERE ${immutableSources.id} = ${sourceCleanup.target}->>'sourceId'))`
                 )
               );
             await tx

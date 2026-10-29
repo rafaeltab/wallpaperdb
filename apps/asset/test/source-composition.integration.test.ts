@@ -793,7 +793,7 @@ it('fences late upload and immutable preparation completion after terminal delet
       ).toMatchObject({
         sources: [],
         nonterminalCandidateCount: 0,
-        candidates: [{ candidateId: id, status: 'cancelled', reason: 'asset-deleted' }],
+        candidates: [],
       });
       expect(
         (
@@ -803,6 +803,14 @@ it('fences late upload and immutable preparation completion after terminal delet
           )
         ).rows
       ).toEqual([{ count: 0 }]);
+      expect(
+        (
+          await pool.query(
+            'SELECT candidate FROM source_candidates WHERE asset_id=$1 AND candidate_id=$2',
+            [assetId, id]
+          )
+        ).rows[0]?.candidate
+      ).toMatchObject({ candidateId: id, status: 'cancelled', reason: 'asset-deleted' });
       // The reserved candidate and Source destinations remain known for bounded cleanup.
       expect(
         (

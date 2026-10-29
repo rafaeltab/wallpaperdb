@@ -150,9 +150,6 @@ test("seeded base user can create and replace a Source through the browser UI", 
   );
 });
 
-test.describe('Source intake capacity', () => {
-  test.use({ video: 'on' });
-
 test('Source management continues after sixteen uploads, withdrawal, add and replacement without reload', async ({ page }) => {
   test.setTimeout(240_000);
   await page.goto('/web/upload');
@@ -179,6 +176,4 @@ test('Source management continues after sixteen uploads, withdrawal, add and rep
   await manager.getByLabel(/^Replace Source /).first().setInputFiles(uploadFixturePaths[1]);
   await expect(manager.getByTestId('source-upload-outcome').filter({ hasText: 'Source accepted' })).toHaveCount(18);
   await expect(manager).toContainText('16 accepted Sources.');
-});
-
 });

@@ -151,7 +151,8 @@ jobs:
 
   container_e2e:
     name: Container E2E Tests
-    runs-on: ubuntu-latest
+    # The locked Playwright installer requires a supported browser host OS.
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write

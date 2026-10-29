@@ -422,3 +422,110 @@ it('replaces a canonical picture through Owner HTTP with atomic retirement, roll
     await lifecycle.dispose();
   }
 });
+
+it('durably accepts the supported 1850-frame picture whose timing facts exceed 16 KiB', async () => {
+  const { animatedPicture } = await import('./fixtures/animation.js');
+  const input = await animatedPicture(1850, 10000000, 65535);
+  const picture = authority.assetTypes.picture;
+  const policy = { ...picture, admission: { ...picture.admission, squareSize: 1 } };
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: postgres.getConnectionUri(),
+      revision: authority.identity,
+      ...authority.delivery,
+      leaseMs: 1000,
+    })
+  );
+  const s3 = tester.getS3();
+  const services = sourcesLayer({
+    revision: authority.identity,
+    types: { ...authority.assetTypes, picture: policy },
+  }).pipe(
+    Layer.provide(
+      Layer.merge(
+        sourcePostgresLayer({
+          databaseUrl: postgres.getConnectionUri(),
+          ...authority.delivery,
+          leaseMs: 1000,
+        }),
+        sourceStorageLayer({
+          endpoint: s3.endpoints.fromHost,
+          region: 'us-east-1',
+          accessKeyId: s3.options.accessKey,
+          secretAccessKey: s3.options.secretKey,
+          bucket: 'picture-source-private',
+        })
+      )
+    )
+  );
+  let runtime = ManagedRuntime.make(services);
+  const owner = { namespace: 'clerk-test', subject: 'large-animation-owner' };
+  try {
+    const created = await lifecycle.runPromise(
+      LifecycleStore.use((s) =>
+        s.accept({
+          revision: authority.identity,
+          applicationId: 'user',
+          canonical: 'large-animation',
+          correlation: { commandId: 'large-animation', applicationReference: 'large-animation' },
+          decision: { kind: 'create', assetType: 'picture', owner },
+          context: { occurrence: { source: 'https://test/user', id: 'large-animation' } },
+        })
+      )
+    );
+    if (created.outcome !== 'created') throw new Error('Expected Asset');
+    const assetId = created.assetId;
+    const intent = { operation: 'add' as const, expectedSourceSetRevision: '0' };
+    const candidate = await runtime.runPromise(
+      Sources.use((s) => s.create(owner, assetId, { ...intent, idempotencyKey: 'large-animation' }))
+    );
+    if (candidate.kind !== 'candidate') throw new Error('Expected candidate');
+    const id = candidate.candidate.candidateId;
+    const inspectionStartedAt = Date.now();
+    const upload = await runtime.runPromise(
+      Sources.use((s) =>
+        s.upload(owner, assetId, id, {
+          async *[Symbol.asyncIterator]() {
+            yield input;
+          },
+          cancel() {},
+        })
+      )
+    );
+    expect(upload).toMatchObject({
+      kind: 'candidate',
+      candidate: {
+        status: 'ready',
+        facts: {
+          animation: { frames: 1850, loop: 65535, delaysMs: Array(1850).fill(10000000) },
+        },
+      },
+    });
+    if (upload.kind !== 'candidate') throw new Error('Expected candidate');
+    expect(Buffer.byteLength(JSON.stringify(upload.candidate.facts))).toBeGreaterThan(16384);
+    console.info('1850-frame inspection profile', {
+      inputBytes: input.length,
+      factsBytes: Buffer.byteLength(JSON.stringify(upload.candidate.facts)),
+      uploadMs: Date.now() - inspectionStartedAt,
+      squareSize: 1,
+    });
+    expect(
+      await runtime.runPromise(Sources.use((s) => s.accept(owner, assetId, id, intent)))
+    ).toMatchObject({ kind: 'candidate', candidate: { status: 'accepted' } });
+    await runtime.dispose();
+    runtime = ManagedRuntime.make(services);
+    expect(
+      await runtime.runPromise(Sources.use((s) => s.status(owner, assetId, id)))
+    ).toMatchObject({
+      kind: 'candidate',
+      candidate: { status: 'accepted', facts: upload.candidate.facts },
+    });
+    expect(await runtime.runPromise(Sources.use((s) => s.list(owner, assetId)))).toMatchObject({
+      kind: 'found',
+      asset: { sources: [{ facts: upload.candidate.facts }], hasPendingCandidates: false },
+    });
+  } finally {
+    await runtime.dispose();
+    await lifecycle.dispose();
+  }
+}, 120000);

@@ -221,10 +221,15 @@ export function sourceStorageLayer(options: Options) {
             signal.addEventListener('abort', abort, { once: true });
             if (signal.aborted) abort();
             const output: Buffer[] = [];
+            // Only animated WebP adds unbounded facts: each ANMF occupies at least
+            // 24 encoded bytes, while its 24-bit delay needs at most 9 JSON bytes
+            // including the separator. The effective input allowance therefore
+            // bounds all timings; retain 16 KiB for the fixed facts and envelope.
+            const maxOutputBytes = 16384 + Math.floor(policy.admission.maxBytes / 24) * 9;
             let size = 0;
             child.stdout.on('data', (chunk) => {
               size += chunk.length;
-              if (size > 16384) worker.kill();
+              if (size > maxOutputBytes) worker.kill();
               else output.push(chunk);
             });
             // Diagnostics never include arbitrary input bytes.

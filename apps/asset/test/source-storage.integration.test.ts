@@ -617,3 +617,61 @@ it('reports displayed geometry for an oriented Source without rewriting its immu
     await runtime.dispose();
   }
 });
+
+it.each([0, 16777215])(
+  'preserves WebP timing boundary %i at the effective encoded-byte limit',
+  async (delayMs) => {
+    const { animatedPicture } = await import('./fixtures/animation.js');
+    const input = await animatedPicture(1850, delayMs, 65535);
+    const s3 = tester.getS3();
+    const runtime = ManagedRuntime.make(
+      sourceStorageLayer({
+        endpoint: s3.endpoints.fromHost,
+        region: 'us-east-1',
+        accessKeyId: s3.options.accessKey,
+        secretAccessKey: s3.options.secretKey,
+        bucket: 'source-private',
+      })
+    );
+    const policy = {
+      ...initialSourcePolicies.picture,
+      admission: {
+        ...initialSourcePolicies.picture.admission,
+        squareSize: 1,
+        maxBytes: input.length,
+      },
+    };
+    const id = `candidate_timing_boundary_${delayMs}`;
+    try {
+      await runtime.runPromise(
+        SourceBytes.use((s) => s.put(id, input, createHash('sha256').update(input).digest('hex')))
+      );
+      expect(
+        await runtime.runPromise(MandatoryInspection.use((s) => s.inspect(id, policy)))
+      ).toMatchObject({
+        kind: 'verified',
+        facts: {
+          byteLength: input.length,
+          animation: {
+            frames: 1850,
+            loop: 65535,
+            delaysMs: Array(1850).fill(delayMs),
+          },
+        },
+      });
+      expect(
+        await runtime.runPromise(
+          MandatoryInspection.use((s) =>
+            s.inspect(id, {
+              ...policy,
+              admission: { ...policy.admission, maxBytes: input.length - 1 },
+            })
+          )
+        )
+      ).toEqual({ kind: 'rejected', reason: 'encoded-size-limit' });
+    } finally {
+      await runtime.dispose();
+    }
+  },
+  60000
+);

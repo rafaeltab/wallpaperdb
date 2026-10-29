@@ -11,6 +11,9 @@ patchedDependencies:
   '@stryker-mutator/vitest-runner@10.0.0':
     hash: 39ecdbebeb734113082eb3b58b0b82bc047fe79cb47f3b0405ea899876fd345d
     path: patches/stryker-vitest-10.0.0.patch
+  nats@2.29.3:
+    hash: f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80
+    path: patches/nats-2.29.3.patch
 
 importers:
 
@@ -132,7 +135,7 @@ importers:
         version: 6.1.3
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -271,7 +274,7 @@ importers:
         version: 5.6.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
@@ -468,7 +471,7 @@ importers:
         version: 16.6.0(bufferutil@4.1.0)(graphql@16.12.0)(utf-8-validate@6.0.6)
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       ulid:
         specifier: ^2.3.0
         version: 2.4.0
@@ -619,7 +622,7 @@ importers:
         version: 5.8.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -776,7 +779,7 @@ importers:
         version: 5.6.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -918,7 +921,7 @@ importers:
         version: 5.6.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -1060,7 +1063,7 @@ importers:
         version: 5.6.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
@@ -1187,7 +1190,7 @@ importers:
         version: 6.1.3
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -1539,7 +1542,7 @@ importers:
         version: 5.8.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -1613,7 +1616,7 @@ importers:
         version: link:../core
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       ulid:
         specifier: ^2.3.0
         version: 2.4.0
@@ -1791,7 +1794,7 @@ importers:
         version: link:../testcontainers
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       postgres:
         specifier: ^3.4.3
         version: 3.4.7
@@ -1862,7 +1865,7 @@ importers:
         version: link:../vitest-config
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -1883,7 +1886,7 @@ importers:
         version: link:../vitest-config
       nats:
         specifier: ^2.29.1
-        version: 2.29.3
+        version: 2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80)
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -17391,9 +17394,9 @@ snapshots:
       obug: 2.2.1
       std-env: 4.2.0
       tinyrainbow: 3.1.1
-      vitest: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@26.0.1)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))
+      vitest: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.21.0)(yaml@2.9.1))
     optionalDependencies:
-      '@vitest/browser': 5.0.2(bufferutil@4.1.0)(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(utf-8-validate@6.0.6)(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))(vitest@5.0.2)
+      '@vitest/browser': 5.0.2(bufferutil@4.1.0)(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(utf-8-validate@6.0.6)(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.21.0)(yaml@2.9.1))(vitest@5.0.2)
 
   '@vitest/expect@2.0.5':
     dependencies:
@@ -17484,7 +17487,7 @@ snapshots:
       pathe: 2.0.3
       sirv: 3.0.2
       tinyrainbow: 3.1.1
-      vitest: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@26.0.1)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@26.0.1)(typescript@5.9.3))(vite@7.3.0(@types/node@26.0.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))
+      vitest: 5.0.2(@opentelemetry/api@1.9.0)(@types/node@22.19.3)(@vitest/browser-playwright@5.0.2)(@vitest/coverage-v8@5.0.2)(@vitest/ui@5.0.2)(jsdom@25.0.1(bufferutil@4.1.0)(utf-8-validate@6.0.6))(msw@2.12.7(@types/node@22.19.3)(typescript@5.9.3))(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.21.0)(yaml@2.9.1))
 
   '@vitest/utils@2.0.5':
     dependencies:
@@ -20262,7 +20265,7 @@ snapshots:
 
   nanoid@3.3.11: {}
 
-  nats@2.29.3:
+  nats@2.29.3(patch_hash=f2c429a4c5e8fb0069eec4148de1cd1dcd97a132daecf04e8d85ac81e33e3b80):
     dependencies:
       nkeys.js: 1.1.0
 

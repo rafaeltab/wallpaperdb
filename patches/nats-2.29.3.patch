@@ -1,0 +1,29 @@
+--- a/lib/src/node_transport.js
++++ b/lib/src/node_transport.js
+@@ -119,6 +119,7 @@
+             socket.removeAllListeners();
+             d.reject(dialError);
+         });
++        this.socket = socket;
+         socket.setNoDelay(true);
+         return d;
+     }
+@@ -263,6 +264,7 @@
+                     d.reject(tlsError);
+                     tlsSocket.removeAllListeners();
+                 });
++                this.socket = tlsSocket;
+                 tlsSocket.setNoDelay(true);
+             }
+             catch (err) {
+@@ -420,9 +422,7 @@
+     }
+     _closed(err_1) {
+         return __awaiter(this, arguments, void 0, function* (err, internal = true) {
+-            // if this connection didn't succeed, then ignore it.
+-            if (!this.connected)
+-                return;
++            // Own the socket during TCP/TLS dialing and the INFO handshake too.
+             if (this.done)
+                 return;
+             this.closeError = err;

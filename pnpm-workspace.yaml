@@ -15,3 +15,6 @@ onlyBuiltDependencies:
 
 patchedDependencies:
   "@stryker-mutator/vitest-runner@10.0.0": patches/stryker-vitest-10.0.0.patch
+  # Close sockets before INFO too. Qualified through User/Wallpaper acquisition
+  # and Asset broker-selection contracts, including successful TCP/TLS controls.
+  "nats@2.29.3": patches/nats-2.29.3.patch

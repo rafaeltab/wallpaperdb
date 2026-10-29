@@ -12,6 +12,38 @@ import { parseAuthority } from '../src/authority.js';
 import { authorityFixture } from './fixtures/authority.js';
 
 const exec = promisify(execFile);
+it.each(['commands', 'notifications', 'sources', 'cleanup', 'events'])(
+  '%s releases a native transport when the peer never sends INFO',
+  async (mode) => {
+    const directory = await mkdtemp(join(tmpdir(), 'asset-no-info-'));
+    const sockets = new Set<Socket>();
+    let accepted = 0;
+    const server = createServer((socket) => {
+      accepted++;
+      sockets.add(socket);
+      socket.once('close', () => sockets.delete(socket));
+      socket.resume();
+    });
+    try {
+      await writeFile(join(directory, 'authority.json'), JSON.stringify(authorityFixture()), {
+        mode: 0o600,
+      });
+      server.listen(0, '127.0.0.1');
+      await once(server, 'listening');
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing peer port');
+      // A leaked SDK socket keeps this child alive beyond caller()'s deadline.
+      expect(await caller(mode, `nats://127.0.0.1:${address.port}`, directory)).toBe(false);
+      expect(accepted).toBeGreaterThan(0);
+      await expect.poll(() => sockets.size).toBe(0);
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+);
+
 async function caller(mode: string, url: string, directory: string, ca?: string) {
   // Only this disposable child trusts the fixture CA. Parent/OS trust is unchanged.
   const environment = Object.fromEntries(

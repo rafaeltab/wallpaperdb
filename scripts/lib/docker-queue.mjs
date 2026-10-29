@@ -229,6 +229,12 @@ export async function acquireDockerLease({
 	signal,
 	report = () => {},
 } = {}) {
+	// #557 workers deliberately measure contention without a Docker scheduler.
+	// A real descriptor preserves the existing launcher contract without a lock.
+	if (process.env.WALLPAPERDB_BOAT_WORKER === "1") {
+		const descriptor = openSync("/dev/null", "r");
+		return { descriptor, file, waitedMs: 0, release: () => closeSync(descriptor) };
+	}
 	file = resolve(file);
 	if (
 		!/^\d+$/.test(String(timeoutSeconds)) ||

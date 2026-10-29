@@ -1,0 +1,120 @@
+{
+	"protocol": "https://github.com/rafaeltab/wallpaperdb/issues/557",
+	"applicationBase": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+	"infrastructureOverlay": "Use the committed prototype head containing this manifest, record its exact SHA at launch.",
+	"launchState": "blocked-pending-account-and-real-worker-smoke",
+	"target": {
+		"providerInstanceId": "codex",
+		"model": "gpt-6.1-sol",
+		"options": {
+			"reasoningEffort": "high",
+			"serviceTier": "default"
+		}
+	},
+	"cohorts": {
+		"a": {
+			"mode": "validation",
+			"size": "large",
+			"count": 5,
+			"development": "local"
+		},
+		"b": {
+			"mode": "development",
+			"size": "large",
+			"count": 5,
+			"development": "remote"
+		}
+	},
+	"cache": {
+		"team": "rafael-biezes-projects",
+		"upstream": "Vercel read-only during preparation; disabled by frozen.json for measured runs",
+		"seed": "Freeze shared seed inventory with hashes before A; same inventory for B",
+		"writes": "Separate cohort directories a/ and b/, never read each other",
+		"reset": "Fresh per-worktree .turbo caches; no copying A outputs into B; preserve uncached tasks and CI test-cache policy"
+	},
+	"protectiveUsageCutoffUSD": 10,
+	"accountingAdmissionThresholdUSD": 9.9,
+	"draftPRs": true,
+	"measuredCohortsMayOverlap": false,
+	"inputs": [
+		{
+			"issue": 554,
+			"url": "https://github.com/rafaeltab/wallpaperdb/issues/554",
+			"body": "## Parent\n\n[#456](https://github.com/rafaeltab/wallpaperdb/issues/456)\n\n## What to build\n\nThe Source UI counts all retained upload rows toward a fixed limit of 16. Completed/failed history can disable add, replacement and resume even when active Source capacity is available.\n\nFound by the subsequent #456 audit at main commit dc17dead07c1d1f66e1806412cb7623812601bf1.\n\n## Acceptance criteria\n\n- [ ] Accept 16 Sources, withdraw one, then add another and replace an active Source without reloading the page.\n- [ ] Completed/failed rows do not permanently consume intake capacity; preserve independent failure retry and saved-candidate recovery.\n- [ ] Keep server-authoritative membership limits and bounded pending UI work; add workflow and browser regressions.\n- [ ] Demonstrate the regression before the repair and validate the fix at the relevant test boundaries.\n\n## Blocked by\n\nNone. Repair now; do not wait for later rendition specifications. Coordinate overlapping files with other repair tickets.\n",
+			"comments": [],
+			"sha256": "84b2fe7fb43f8aeaa5c7d4d26aa58782083366db7e8998de409dff6c4cf83372",
+			"stateAtPreparation": "OPEN",
+			"assigneesAtPreparation": [],
+			"blockersAtPreparation": {
+				"nodes": [],
+				"totalCount": 0
+			}
+		},
+		{
+			"issue": 548,
+			"url": "https://github.com/rafaeltab/wallpaperdb/issues/548",
+			"body": "## Parent\n\n[#456](https://github.com/rafaeltab/wallpaperdb/issues/456)\n\n## What to build\n\nSource transactions load, scan and rewrite the entire retained candidate history; paging the response afterward does not bound persistence work.\n\nOriginal reproduction and review evidence: [#538](https://github.com/rafaeltab/wallpaperdb/issues/538), concern 4.\n\n## Acceptance criteria\n\n- [ ] Bound lookup, mutation and pagination work independently of historical candidate count at the real persistence boundary.\n- [ ] Preserve equal replay, conflicting reuse, exact candidate status, rollback and current-policy/concurrency fencing.\n- [ ] Add a growing-history regression without imposing a lifetime Author quota or discarding replay responsibility.\n- [ ] Demonstrate the regression before the repair and validate the fix at the relevant test boundaries.\n\n## Blocked by\n\nNone. Repair now; do not wait for later rendition specifications. Coordinate overlapping files with other repair tickets.\n",
+			"comments": [],
+			"sha256": "8db57f32146e7987947f85f8ccaae4b86d0f8b089c71be99de3f35ca512fec2a",
+			"stateAtPreparation": "OPEN",
+			"assigneesAtPreparation": [],
+			"blockersAtPreparation": {
+				"nodes": [],
+				"totalCount": 0
+			}
+		},
+		{
+			"issue": 547,
+			"url": "https://github.com/rafaeltab/wallpaperdb/issues/547",
+			"body": "## Parent\n\n[#456](https://github.com/rafaeltab/wallpaperdb/issues/456)\n\n## What to build\n\nA broker peer that accepts TCP but never sends NATS INFO can leave a live socket after connection timeout or runtime disposal.\n\nOriginal reproduction and review evidence: [#538](https://github.com/rafaeltab/wallpaperdb/issues/538), concern 3.\n\n## Acceptance criteria\n\n- [ ] Reproduce through actual User and Wallpaper adapter acquisition paths and audit equivalent new Asset worker connections.\n- [ ] Close underlying transports on failed startup, cancellation and disposal; preserve successful connection/shutdown behavior.\n- [ ] Verify native socket closure rather than only timing out the caller.\n- [ ] Demonstrate the regression before the repair and validate the fix at the relevant test boundaries.\n\n## Blocked by\n\nNone. Repair now; do not wait for later rendition specifications. Coordinate overlapping files with other repair tickets.\n",
+			"comments": [],
+			"sha256": "efcb1a1e4709b046e9ced395d41bc87b8fcafa00937770f879ae1c4e0c105ac9",
+			"stateAtPreparation": "OPEN",
+			"assigneesAtPreparation": [],
+			"blockersAtPreparation": {
+				"nodes": [],
+				"totalCount": 0
+			}
+		},
+		{
+			"issue": 551,
+			"url": "https://github.com/rafaeltab/wallpaperdb/issues/551",
+			"body": "## Parent\n\n[#456](https://github.com/rafaeltab/wallpaperdb/issues/456)\n\n## What to build\n\nWallpaper listing lacks the request cancellation used by adjacent routes, leaving work running after client disconnect or UI abandonment.\n\nOriginal reproduction and review evidence: [#538](https://github.com/rafaeltab/wallpaperdb/issues/538), concern 7.\n\n## Acceptance criteria\n\n- [ ] Disconnect a real HTTP list request with a pending controlled operation and verify underlying cancellation.\n- [ ] Verify bounded shutdown cleanup and retain a successful-request control.\n- [ ] Keep UI navigation/session cancellation connected to the actual request lifetime.\n- [ ] Demonstrate the regression before the repair and validate the fix at the relevant test boundaries.\n\n## Blocked by\n\nNone. Repair now; do not wait for later rendition specifications. Coordinate overlapping files with other repair tickets.\n",
+			"comments": [],
+			"sha256": "a5413e42631e78cab7c0b77853cd8f38847500f9ad4c107f77f4ae00510d300e",
+			"stateAtPreparation": "OPEN",
+			"assigneesAtPreparation": [],
+			"blockersAtPreparation": {
+				"nodes": [],
+				"totalCount": 0
+			}
+		},
+		{
+			"issue": 553,
+			"url": "https://github.com/rafaeltab/wallpaperdb/issues/553",
+			"body": "## Parent\n\n[#456](https://github.com/rafaeltab/wallpaperdb/issues/456)\n\n## What to build\n\nA permitted animation can exceed the inspector's 16-KiB facts-response limit, causing deterministic worker failure while the candidate remains inspecting.\n\nOriginal reproduction and review evidence: [#538](https://github.com/rafaeltab/wallpaperdb/issues/538), concern 9.\n\n## Acceptance criteria\n\n- [ ] Exercise the recorded 1,850-frame WebP case under its supported configured picture policy through the real inspection/candidate-status path.\n- [ ] Supported input reaches a correct durable outcome; internal protocol bounds agree with effective input policy and measured operational constraints.\n- [ ] Preserve timing, loop, cancellation/reaping and valid controls; do not invent an Author restriction to hide the mismatch.\n- [ ] Demonstrate the regression before the repair and validate the fix at the relevant test boundaries.\n\n## Blocked by\n\nNone. Repair now; do not wait for later rendition specifications. Coordinate overlapping files with other repair tickets.\n",
+			"comments": [],
+			"sha256": "ccf626b824178a8023fead9d2e7badabdf4806c3e7bae9923a28c88dffacbbed",
+			"stateAtPreparation": "OPEN",
+			"assigneesAtPreparation": [],
+			"blockersAtPreparation": {
+				"nodes": [],
+				"totalCount": 0
+			}
+		}
+	],
+	"qualificationRequired": [
+		"Boat paid large access",
+		"one actual worker command exit/logs",
+		"initial and live edits plus deletion",
+		"authenticated preview and HMR",
+		"eligible local-to-worker and worker-to-local Turbo hits with hashes and bytes",
+		"idle stop and resume message twice",
+		"settle ownership skip and immediate-stop fallback",
+		"teardown deletion",
+		"provider usage retained, worker stopped",
+		"real frozen-base regressions for all five inputs, replace resolved tickets without claiming them",
+		"final read-only issue/dependency/active-work check before launch",
+		"frozen baseline artifact inventory"
+	]
+}

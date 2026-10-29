@@ -7,4 +7,7 @@ fi
 export MISE_AUTO_INSTALL=false
 export MISE_LOCKED=true
 mise exec -- node scripts/toolchain.mjs --pins
+if [ -f .boat/cache.json ]; then
+  exec mise exec -- node scripts/boat-shell.mjs "$@"
+fi
 exec mise exec -- sh "$@"

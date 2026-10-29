@@ -8,6 +8,10 @@
 		"wallpaperdb-crap": "./crap.mts"
 	},
 	"scripts": {
+		"boat:ready": "cd .. && node --experimental-strip-types scripts/boat-ready.mjs",
+		"boat:lint": "biome lint boat.mjs boat.test.mjs boat-shell.mjs lib/boat.mjs lib/boat-cache.mjs",
+		"boat:cache-login": "cd .. && turbo login",
+		"test:boat": "node --test boat.test.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:docker-queue": "cd .. && node --test scripts/docker-validation.test.mjs",

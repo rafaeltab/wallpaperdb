@@ -1,0 +1,718 @@
+// Throwaway #557 controller. Only enrolled linked worktrees may create workers.
+import { spawn, execFileSync } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import http from "node:http";
+import { fileURLToPath } from "node:url";
+import { delta, estimate, quote } from "./lib/boat.mjs";
+import { cacheServer } from "./lib/boat-cache.mjs";
+
+const root = process.cwd();
+const dir = path.join(root, ".boat");
+const configFile = path.join(dir, "enrollment.json");
+const stateFile = path.join(dir, "state.json");
+const runDir = path.join(os.homedir(), ".local/state/wallpaperdb-boat/557");
+const cli = path.join(root, ".mise/boat/boat");
+const remote = "/home/user/wallpaperdb";
+const [action, ...args] = process.argv.slice(2);
+const read = (p, fallback = {}) =>
+	fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : fallback;
+function write(p, value) {
+	fs.mkdirSync(path.dirname(p), { recursive: true, mode: 0o700 });
+	const tmp = `${p}.${process.pid}`;
+	fs.writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: 0o600 });
+	fs.renameSync(tmp, p);
+}
+const config = read(configFile, null);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+function event(kind, detail = {}) {
+	fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+	fs.appendFileSync(
+		path.join(dir, "events.jsonl"),
+		`${JSON.stringify({ at: new Date().toISOString(), kind, ...detail })}\n`,
+		{ mode: 0o600 },
+	);
+}
+function execute(
+	command,
+	argv,
+	{ capture = false, input, allowFailure = false } = {},
+) {
+	return new Promise((resolve, reject) => {
+		const start = Date.now();
+		const child = spawn(command, argv, {
+			cwd: root,
+			env: { ...process.env, BOAT_NO_UPDATE: "1" },
+			stdio: [
+				input === undefined ? "inherit" : "pipe",
+				capture ? "pipe" : "inherit",
+				capture ? "pipe" : "inherit",
+			],
+		});
+		let out = "",
+			err = "";
+		if (capture) {
+			child.stdout.on("data", (b) => {
+				out += b;
+			});
+			child.stderr.on("data", (b) => {
+				err += b;
+			});
+		}
+		if (input !== undefined) {
+			child.stdin.on("error", () => {});
+			child.stdin.end(input);
+		}
+		child.on("error", reject);
+		child.on("close", (code, signal) => {
+			const status = code ?? (signal === "SIGINT" ? 130 : 143);
+			if (status && !allowFailure) {
+				let code;
+				try {
+					code = JSON.parse(out.trim().split("\n").at(-1)).code;
+				} catch {}
+				const error = new Error(
+					`${path.basename(command)} failed (${status}); ${code ?? (capture ? err.slice(-1000) : "see command output")}`,
+				);
+				error.code = code;
+				reject(error);
+			} else resolve({ status, out, ms: Date.now() - start });
+		});
+	});
+}
+const boat = async (argv, opts = {}) =>
+	execute(cli, ["--no-update", ...argv], opts);
+const json = async (argv) =>
+	JSON.parse((await boat([...argv, "--json"], { capture: true })).out);
+const ssh = (id, command, opts = {}) =>
+	boat(["ssh", id, "--", "bash", "-lc", quote(command)], opts);
+function owned() {
+	if (!config || config.root !== root)
+		throw new Error("This worktree is not enrolled");
+}
+async function lock(fn) {
+	const lockDir = path.join(dir, "lifecycle.lock");
+	for (let attempt = 0; ; attempt++) {
+		try {
+			fs.mkdirSync(lockDir);
+			fs.writeFileSync(path.join(lockDir, "pid"), String(process.pid));
+			break;
+		} catch (e) {
+			if (e.code !== "EEXIST") throw e;
+			const pid = Number(fs.readFileSync(path.join(lockDir, "pid"), "utf8"));
+			try {
+				process.kill(pid, 0);
+			} catch {
+				fs.rmSync(lockDir, { recursive: true, force: true });
+				continue;
+			}
+			if (attempt > 600) throw new Error("Lifecycle lock timed out");
+			await wait(500);
+		}
+	}
+	try {
+		return await fn();
+	} finally {
+		fs.rmSync(lockDir, { recursive: true, force: true });
+	}
+}
+function accounting() {
+	let dollars = 0;
+	for (const name of fs.existsSync(runDir) ? fs.readdirSync(runDir) : []) {
+		if (!name.endsWith(".worker.json")) continue;
+		const s = read(path.join(runDir, name));
+		dollars += s.cost ?? 0;
+		if (s.runningSince)
+			dollars += estimate(s.size, Date.now() - s.runningSince);
+	}
+	return dollars;
+}
+function save(state) {
+	write(stateFile, state);
+	write(path.join(runDir, `${config.key}.worker.json`), state);
+}
+function admit() {
+	if (accounting() >= 9.9)
+		throw new Error(
+			"Protective $10 usage cutoff: no new work admitted; stop experiment workers.",
+		);
+}
+async function ensure() {
+	return lock(async () => {
+		admit();
+		let s = read(stateFile);
+		let resumed = false;
+		if (s.id) {
+			const info = await json(["info", s.id]);
+			const status = info.sandbox?.status ?? info.status;
+			if (status === "archived") {
+				try {
+					await boat(
+						["resume", s.id, "--type", config.size, "--ttl", "2100", "--json"],
+						{ capture: true },
+					);
+					s.runningSince = Date.now();
+					resumed = true;
+				} catch (error) {
+					if (error.code !== "snapshot_data_expired") throw error;
+					event("expired", { id: s.id });
+					delete s.id;
+					for (const name of ["prepared.json", "manifest.json"])
+						fs.rmSync(path.join(dir, name), { force: true });
+				}
+			} else if (status !== "ready" && status !== "running")
+				throw new Error(
+					`Worker ${s.id} has state ${status}; inspect before recovery.`,
+				);
+		}
+		if (!s.id) {
+			const created = await json([
+				"new",
+				"--type",
+				config.size,
+				"--ttl",
+				"2100",
+				"--no-env",
+				"--name",
+				`wallpaperdb-557-${config.cohort}-${config.key}`,
+			]);
+			const id = created.sandbox?.id ?? created.id;
+			if (!id)
+				throw new Error(
+					"Create returned no worker ID; inspect Boat list before retrying",
+				);
+			s = {
+				id,
+				size: config.size,
+				cost: s.cost ?? 0,
+				runningSince: Date.now(),
+				lastActivity: Date.now(),
+			};
+			save(s);
+			event("created", { id });
+		}
+		s.lastActivity = Date.now();
+		save(s);
+		await ssh(
+			s.id,
+			`mkdir -p ${remote}; command -v mise >/dev/null || (curl -fsSL https://mise.run | sh); test -d ${remote}/.git || (git init ${remote} && cd ${remote} && git remote add origin https://github.com/rafaeltab/wallpaperdb.git && git fetch --depth=1 origin ${quote(config.base)} && git checkout --detach FETCH_HEAD)`,
+		);
+		if (resumed) {
+			console.log("Remote environment resumed from sleep");
+			event("resumed", { id: s.id });
+		}
+		return { id: s.id, resumed };
+	});
+}
+function manifest() {
+	const files = execFileSync(
+		"git",
+		["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+		{ cwd: root },
+	)
+		.toString()
+		.split("\0")
+		.filter(Boolean);
+	const result = {};
+	for (const p of files) {
+		if (p.startsWith(".boat/") || p.startsWith(".mise/")) continue;
+		try {
+			const stat = fs.lstatSync(p);
+			if (stat.isSymbolicLink()) result[p] = hash(fs.readlinkSync(p));
+			else if (stat.isFile()) result[p] = hash(fs.readFileSync(p));
+		} catch (e) {
+			if (e.code !== "ENOENT") throw e;
+		}
+	}
+	return result;
+}
+async function sync(id) {
+	return lock(async () => {
+		const baseline = Object.fromEntries(
+			execFileSync("git", ["ls-tree", "-r", "--name-only", "-z", config.base])
+				.toString()
+				.split("\0")
+				.filter(Boolean)
+				.map((p) => [p, "baseline"]),
+		);
+		const after = manifest(),
+			before = read(path.join(dir, "manifest.json"), baseline);
+		const change = delta(before, after);
+		if (change.deleted.length)
+			await ssh(
+				id,
+				`cd ${remote} && rm -f -- ${change.deleted.map(quote).join(" ")}`,
+			);
+		if (change.changed.length) {
+			const tar = execFileSync("tar", ["--null", "-T", "-", "-czf", "-"], {
+				input: `${change.changed.join("\0")}\0`,
+				maxBuffer: 256 * 1024 * 1024,
+			});
+			await ssh(id, `cd ${remote} && tar -xzf -`, { input: tar });
+			event("sync", {
+				changed: change.changed.length,
+				deleted: change.deleted.length,
+				bytes: tar.length,
+			});
+		} else if (change.deleted.length)
+			event("sync", { changed: 0, deleted: change.deleted.length, bytes: 0 });
+		write(path.join(dir, "manifest.json"), after);
+		if (change.changed.length || change.deleted.length) {
+			const s = read(stateFile);
+			s.lastActivity = Date.now();
+			save(s);
+		}
+	});
+}
+async function prepare(id) {
+	const identity =
+		hash(fs.readFileSync("pnpm-lock.yaml")) +
+		hash(fs.readFileSync("mise.lock"));
+	if (read(path.join(dir, "prepared.json")).identity === identity) return;
+	const start = Date.now();
+	await ssh(
+		id,
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && make install BOAT_EXEC=worker`,
+	);
+	// Transfer only the generated development inputs, through SSH stdin, never logs.
+	const paths = [
+		".worktree",
+		...execFileSync("git", [
+			"ls-files",
+			"--others",
+			"--ignored",
+			"--exclude-standard",
+			"-z",
+		])
+			.toString()
+			.split("\0")
+			.filter((p) =>
+				/^(apps\/[^/]+\/\.env|infra\/\.env|apps\/asset\/\.authority\.json|infra\/nats\/\.generated\.conf|infra\/\.operator-inbox\.json|apps\/(user|wallpaper)\/\.workflow\.json)$/.test(
+					p,
+				),
+			),
+	].filter((p) => fs.existsSync(p));
+	if (paths.length)
+		await ssh(id, `cd ${remote} && tar -xzf -`, {
+			input: execFileSync("tar", ["-czf", "-", ...paths], {
+				maxBuffer: 16 * 1024 * 1024,
+			}),
+		});
+	write(path.join(dir, "prepared.json"), { identity });
+	event("dependencies-ready", { ms: Date.now() - start });
+}
+function daemon() {
+	const s = read(stateFile);
+	try {
+		process.kill(s.daemonPid, 0);
+		return;
+	} catch {}
+	const log = fs.openSync(path.join(dir, "daemon.log"), "a", 0o600);
+	const child = spawn(
+		process.execPath,
+		[fileURLToPath(import.meta.url), "daemon"],
+		{ cwd: root, detached: true, stdio: ["ignore", log, log] },
+	);
+	child.unref();
+	s.daemonPid = child.pid;
+	save(s);
+}
+async function stop(remove = false) {
+	return lock(async () => {
+		const s = read(stateFile);
+		if (!s.id) return;
+		if (s.runningSince) {
+			await boat(["stop", s.id]);
+			s.cost = (s.cost ?? 0) + estimate(s.size, Date.now() - s.runningSince);
+			s.runningSince = null;
+			save(s);
+			event("stopped", { id: s.id, estimatedCost: s.cost });
+		}
+		const tunnel = read(path.join(dir, "cache-tunnel.json"));
+		if (tunnel.pid) {
+			try {
+				process.kill(-tunnel.pid, "SIGTERM");
+			} catch {}
+			fs.rmSync(path.join(dir, "cache-tunnel.json"), { force: true });
+		}
+		// Keep the provider's authoritative usage separately from the conservative ledger.
+		write(path.join(dir, "usage.json"), await json(["usage", s.id]));
+		if (remove) {
+			await boat(["delete", s.id]);
+			event("deleted", { id: s.id });
+			delete s.id;
+			save(s);
+		}
+	});
+}
+async function command() {
+	owned();
+	admit();
+	const targets = args
+		.slice(args.indexOf("--") + 1)
+		.filter((v) => !v.startsWith("BOAT_EXEC="));
+	if (targets[0] === "stop" && !read(stateFile).runningSince) {
+		console.log("Remote environment is already stopped");
+		return;
+	}
+	const { id, resumed } = await ensure();
+	await sync(id);
+	await prepare(id);
+	daemon();
+	await cache(id);
+	const lease = path.join(dir, `command-${process.pid}.json`);
+	write(lease, { pid: process.pid, at: Date.now() });
+	const started = Date.now();
+	try {
+		if (
+			resumed &&
+			config.mode === "development" &&
+			read(stateFile).developmentWanted
+		)
+			await ssh(
+				id,
+				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make infra-start apps-start BOAT_EXEC=worker`,
+			);
+		if (["dev", "apps-start"].includes(targets[0])) {
+			const s = read(stateFile);
+			s.developmentWanted = true;
+			save(s);
+		}
+		const result = await ssh(
+			id,
+			`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
+			{ allowFailure: true },
+		);
+		event("command", {
+			targets,
+			status: result.status,
+			ms: Date.now() - started,
+			resumed,
+			local: resourceSample(),
+		});
+		if (resumed) console.log("Remote environment resumed from sleep");
+		process.exitCode = result.status;
+		if (targets[0] === "stop" && result.status === 0) await stop();
+	} finally {
+		fs.rmSync(lease, { force: true });
+		const s = read(stateFile);
+		s.lastActivity = Date.now();
+		save(s);
+	}
+}
+function resourceSample() {
+	return {
+		load: os.loadavg(),
+		free: os.freemem(),
+		total: os.totalmem(),
+		memory: fs.readFileSync("/proc/meminfo", "utf8"),
+		cpu: fs.readFileSync("/proc/stat", "utf8"),
+		disk: fs.statfsSync(root),
+		pressure: Object.fromEntries(
+			["cpu", "memory", "io"].map((n) => [
+				n,
+				fs.readFileSync(`/proc/pressure/${n}`, "utf8"),
+			]),
+		),
+	};
+}
+async function runDaemon() {
+	let extended = 0;
+	while (true) {
+		const s = read(stateFile);
+		if (!s.id || !s.runningSince) return;
+		const leases = fs.readdirSync(dir).filter((p) => p.startsWith("command-"));
+		let active = false;
+		for (const p of leases) {
+			const lease = read(path.join(dir, p));
+			try {
+				process.kill(lease.pid, 0);
+				active = true;
+			} catch {
+				fs.rmSync(path.join(dir, p), { force: true });
+			}
+		}
+		if (
+			accounting() >= 9.9 ||
+			(!active && Date.now() - s.lastActivity >= 1800000)
+		) {
+			await stop();
+			return;
+		}
+		await sync(s.id);
+		const fresh = read(stateFile);
+		if (
+			Date.now() - extended > 60000 &&
+			(active || Date.now() - fresh.lastActivity < 60000)
+		) {
+			await boat(["extend", s.id, "--ttl", "2100"]);
+			extended = Date.now();
+		}
+		event("resources", {
+			local: resourceSample(),
+			estimatedExperimentCost: accounting(),
+		});
+		await wait(2000);
+	}
+}
+async function serveCache() {
+	owned();
+	const directory = path.join(runDir, "cache");
+	const tokenFile = path.join(runDir, "cache-token.json");
+	if (!fs.existsSync(tokenFile))
+		write(tokenFile, { token: randomBytes(32).toString("hex") });
+	const token = read(tokenFile).token;
+	const authPath = path.join(os.homedir(), ".local/share/turborepo/auth.json");
+	const upstreamToken = process.env.TURBO_TOKEN ?? read(authPath).token;
+	const server = cacheServer({
+		directory,
+		cohort: config.cohort,
+		token,
+		upstream: upstreamToken
+			? { token: upstreamToken, team: "rafael-biezes-projects" }
+			: null,
+		record: (detail) => event("cache", detail),
+	});
+	await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+	write(path.join(dir, "cache.json"), {
+		api: `http://127.0.0.1:${server.address().port}`,
+		token,
+	});
+	write(path.join(dir, "cache-server.json"), { pid: process.pid });
+}
+async function cache(id) {
+	const server = read(path.join(dir, "cache-server.json"));
+	let alive = false;
+	try {
+		process.kill(server.pid, 0);
+		alive = true;
+	} catch {}
+	if (!alive) {
+		const log = fs.openSync(path.join(dir, "cache.log"), "a", 0o600);
+		const child = spawn(
+			process.execPath,
+			[fileURLToPath(import.meta.url), "cache-server"],
+			{ cwd: root, detached: true, stdio: ["ignore", log, log] },
+		);
+		child.unref();
+		for (
+			let i = 0;
+			i < 100 && !fs.existsSync(path.join(dir, "cache.json"));
+			i++
+		)
+			await wait(100);
+	}
+	const settings = read(path.join(dir, "cache.json"));
+	if (!settings.api) throw new Error("Cache server did not start");
+	if (id) {
+		const tunnel = read(path.join(dir, "cache-tunnel.json"));
+		let connected = false;
+		try {
+			process.kill(tunnel.pid, 0);
+			connected = tunnel.id === id;
+		} catch {}
+		const local = new URL(settings.api).port;
+		if (!connected) {
+			const forward = spawn(
+				cli,
+				[
+					"--no-update",
+					"forward",
+					id,
+					"--reverse",
+					"--local",
+					local,
+					"--remote",
+					"27857",
+				],
+				{ stdio: "ignore", detached: true },
+			);
+			forward.unref();
+			write(path.join(dir, "cache-tunnel.json"), { id, pid: forward.pid });
+		}
+		await ssh(
+			id,
+			`mkdir -p ${remote}/.boat && chmod 700 ${remote}/.boat && cat > ${remote}/.boat/cache.json && chmod 600 ${remote}/.boat/cache.json`,
+			{ input: JSON.stringify({ ...settings, api: "http://127.0.0.1:27857" }) },
+		);
+	}
+}
+async function preview() {
+	owned();
+	if (config.mode !== "development")
+		throw new Error("Validation mode uses its local development stack");
+	const { id } = await ensure();
+	await sync(id);
+	await prepare(id);
+	daemon();
+	await cache(id);
+	const started = Date.now();
+	await ssh(
+		id,
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make infra-start apps-start BOAT_EXEC=worker && make run PACKAGE=scripts SCRIPT=boat:ready BOAT_EXEC=worker`,
+	);
+	event("application-ready", { ms: Date.now() - started });
+	const desired = read(stateFile);
+	desired.developmentWanted = true;
+	save(desired);
+	const text = fs.readFileSync(".worktree", "utf8");
+	const port = Number(text.match(/^INGRESS_PORT\s*[:?]?=\s*(\d+)/m)?.[1]);
+	if (!port) throw new Error("No generated ingress port");
+	const privatePort = port + 20000;
+	const tunnel = spawn(
+		cli,
+		[
+			"--no-update",
+			"forward",
+			id,
+			"--remote",
+			String(port),
+			"--local",
+			String(privatePort),
+		],
+		{ stdio: "inherit" },
+	);
+	const server = http.createServer((req, res) => {
+		if (!req.url.includes("health")) {
+			const s = read(stateFile);
+			s.lastActivity = Date.now();
+			save(s);
+		}
+		const upstream = http.request(
+			{
+				hostname: "127.0.0.1",
+				port: privatePort,
+				path: req.url,
+				method: req.method,
+				headers: req.headers,
+			},
+			(response) => {
+				res.writeHead(response.statusCode, response.headers);
+				response.pipe(res);
+			},
+		);
+		upstream.on("error", () => {
+			res.writeHead(503);
+			res.end("Remote application is not ready");
+		});
+		req.pipe(upstream);
+	});
+	server.on("upgrade", (req, socket, head) => {
+		const upstream = http.request({
+			hostname: "127.0.0.1",
+			port: privatePort,
+			path: req.url,
+			headers: req.headers,
+		});
+		upstream.on("upgrade", (response, peer, bytes) => {
+			socket.write(
+				`HTTP/1.1 101 Switching Protocols\r\n${Object.entries(response.headers)
+					.map(([k, v]) => `${k}: ${v}`)
+					.join("\r\n")}\r\n\r\n`,
+			);
+			peer.write(head);
+			socket.write(bytes);
+			socket.pipe(peer).pipe(socket);
+		});
+		upstream.on("error", () => socket.destroy());
+		upstream.end();
+	});
+	await new Promise((resolve, reject) =>
+		server.listen(port, "127.0.0.1", resolve).once("error", reject),
+	);
+	console.log(
+		`Private preview proxy http://localhost:${port}/web; application health passed. Authentication must still be verified in the browser.`,
+	);
+	const close = () => {
+		tunnel.kill();
+		server.close();
+	};
+	process.on("SIGINT", close);
+	process.on("SIGTERM", close);
+}
+try {
+	if (action === "enroll") {
+		const [mode = "validation", size = "large", cohort = "smoke"] = args;
+		if (!fs.statSync(".git").isFile())
+			throw new Error("Enrollment requires an isolated linked worktree");
+		if (
+			!["validation", "development"].includes(mode) ||
+			!["smoke", "a", "b"].includes(cohort)
+		)
+			throw new Error("Invalid mode or cohort");
+		estimate(size, 0);
+		if (config)
+			throw new Error("Already enrolled; preserve existing worker ownership");
+		const base = execFileSync("git", ["rev-parse", "HEAD"]).toString().trim();
+		write(configFile, {
+			root,
+			mode,
+			size,
+			cohort,
+			base,
+			key: hash(root).slice(0, 12),
+		});
+		console.log("Enrolled. No worker created.");
+	} else if (action === "status") {
+		owned();
+		console.log(
+			JSON.stringify(
+				{
+					config,
+					state: read(stateFile),
+					estimatedExperimentCost: accounting(),
+				},
+				null,
+				2,
+			),
+		);
+	} else if (action === "command") await command();
+	else if (action === "daemon") {
+		owned();
+		await runDaemon();
+	} else if (action === "stop" || action === "delete") {
+		owned();
+		await stop(action === "delete");
+	} else if (action === "preview") await preview();
+	else if (action === "cache-server") await serveCache();
+	else if (action === "cache") {
+		owned();
+		await cache();
+	} else if (action === "settle") {
+		owned();
+		const database = path.join(
+			process.env.T3CODE_HOME ?? path.join(os.homedir(), ".t3"),
+			"userdata/statev2.sqlite",
+		);
+		const owners = JSON.parse(
+			execFileSync("python", [
+				"scripts/boat-owners.py",
+				root,
+				database,
+			]).toString(),
+		);
+		if (!owners.stop)
+			console.log(
+				"Remote cleanup skipped: another worktree owner remains active.",
+			);
+		else if (read(stateFile).runningSince) {
+			event("settle-stop", { owners: owners.owners });
+			const id = read(stateFile).id;
+			await ssh(
+				id,
+				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make stop BOAT_EXEC=worker`,
+			);
+			await stop();
+		}
+	} else
+		throw new Error(
+			"Use make boat-enroll, boat-status, boat-stop, boat-delete or boat-preview",
+		);
+} catch (error) {
+	console.error(error.message);
+	event("failure", { action, message: error.message });
+	process.exitCode = 1;
+}

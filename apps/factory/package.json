@@ -1,0 +1,39 @@
+{
+  "name": "@wallpaperdb/factory",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --packages=external --format=esm --outfile=dist/main.js",
+    "start": "node dist/main.js",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "lint:architecture": "wallpaperdb-check-architecture apps/factory",
+    "lint:fix": "biome lint --write .",
+    "check-types": "tsc --noEmit",
+    "check": "biome check --write .",
+    "test": "vitest run",
+    "test:unit": "vitest run --config vitest.unit.config.ts --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts --coverage",
+    "format:files": "biome format --write",
+    "dev": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "fastify": "^5.2.0",
+    "zod": "^3.24.1",
+    "effect": "4.0.0-rc.115"
+  },
+  "devDependencies": {
+    "@wallpaperdb/scripts": "workspace:*",
+    "@biomejs/biome": "2.6.2",
+    "@types/node": "^22.10.2",
+    "@wallpaperdb/vitest-config": "workspace:*",
+    "esbuild": "^0.25.12",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "5.0.2"
+  },
+  "exports": {}
+}

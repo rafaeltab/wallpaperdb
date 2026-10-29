@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import { z } from 'zod';
-import type { Job, StartResult } from '../capabilities/job/index.js';
+import { Unavailable, type Job, type StartResult } from '../capabilities/job/index.js';
 import { page } from './page.js';
 const startSchema = z
   .object({ issue: z.number().int().positive().safe(), context: z.string().max(16000).default('') })
@@ -18,18 +18,31 @@ export function operationsServer(config: {
     type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`,
     title,
   });
-  app.setErrorHandler((_error, _request, reply) =>
-    reply
-      .code(503)
+  app.setErrorHandler((error, _request, reply) => {
+    const parsed = z
+      .object({ statusCode: z.union([z.literal(400), z.literal(413), z.literal(415)]) })
+      .safeParse(error);
+    if (parsed.success)
+      return reply
+        .code(parsed.data.statusCode)
+        .type('application/problem+json')
+        .send(problem(parsed.data.statusCode, 'factory-request', 'Invalid request'));
+    if (error instanceof Unavailable)
+      return reply
+        .code(503)
+        .type('application/problem+json')
+        .send(
+          problem(
+            503,
+            'factory-unavailable',
+            'Factory dependency unavailable. The durable reservation is preserved.'
+          )
+        );
+    return reply
+      .code(500)
       .type('application/problem+json')
-      .send(
-        problem(
-          503,
-          'factory-unavailable',
-          'Factory dependency unavailable. The durable reservation is preserved.'
-        )
-      )
-  );
+      .send(problem(500, 'generic-server', 'Unexpected server failure'));
+  });
   app.get('/health', () => ({ status: 'ok' }));
   app.get('/api/job', () => config.run(config.job.status()));
   app.get('/', async (_request, reply) =>

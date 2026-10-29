@@ -11,6 +11,7 @@ const listing = z.array(z.object({ threadId: z.string().min(1), title: z.string(
 const detail = z.object({
   thread: z.object({
     threadId: z.string().min(1),
+    projectId: z.string().min(1),
     title: z.string(),
     providerInstanceId: z.string(),
     model: z.string(),
@@ -33,7 +34,11 @@ const detail = z.object({
   }),
 });
 const title = (intent: Intent) => `Factory ${intent.id}`;
-export function t3Execution(config: { binary: string; project: string }): Execution {
+export function t3Execution(config: {
+  binary: string;
+  project: string;
+  projectId: string;
+}): Execution {
   const call = (args: string[]) =>
     command(config.binary, ['thread', ...args, '--json'], config.project).then((text) =>
       JSON.parse(text)
@@ -42,22 +47,28 @@ export function t3Execution(config: { binary: string; project: string }): Execut
     launch: (intent) =>
       Effect.tryPromise({
         try: async () => {
-          await call([
-            'start',
-            config.project,
-            `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
+          z.object({
+            threadId: z.string().min(1),
+            projectId: z.literal(config.projectId),
+            runId: z.string().nullable(),
+          }).parse(
+            await call([
+              'start',
+              config.projectId,
+              `Use $implement for ${intent.issueUrl} in this bound checkout against ${intent.base}. Only this selected issue is authorized. Only rafaeltab and zero-two-rafaeltab may expand scope. Do not implement deferred future work or admit the parent spec. Stop before independent review/publication. Additional maintainer execution context follows and narrows this stage when present:
 ${intent.context}`,
-            '--title',
-            title(intent),
-            '--provider',
-            'codex',
-            '--model',
-            'gpt-6.1-sol',
-            '--worktree',
-            intent.base,
-            '--branch',
-            intent.branch,
-          ]);
+              '--title',
+              title(intent),
+              '--provider',
+              'codex',
+              '--model',
+              'gpt-6.1-sol',
+              '--worktree',
+              intent.base,
+              '--branch',
+              intent.branch,
+            ])
+          );
           return { kind: 'submitted' as const };
         },
         catch: (cause) => new Unavailable({ operation: 'launch', cause }),
@@ -71,37 +82,37 @@ ${intent.context}`,
       Effect.tryPromise({
         try: async (): Promise<Observation> => {
           const matches = listing
-            .parse(await call(['list', '--project', config.project]))
+            .parse(await call(['list', '--project', config.projectId]))
             .filter((item) => item.title === title(intent));
           if (matches.length === 0) return { kind: 'absent' };
           if (matches.length !== 1) return { kind: 'ambiguous' };
           const match = matches[0];
           if (!match) return { kind: 'ambiguous' };
           const { thread } = detail.parse(await call(['show', match.threadId, '--messages', '1']));
-          if (
-            thread.title !== title(intent) ||
-            thread.threadId !== match.threadId ||
-            thread.providerInstanceId !== 'codex' ||
-            thread.model !== 'gpt-6.1-sol' ||
-            thread.branch !== intent.branch ||
-            !thread.worktreePath ||
-            thread.worktreePath === config.project
-          )
-            return { kind: 'ambiguous' };
-          const branch = (
-            await command('git', ['branch', '--show-current'], thread.worktreePath)
-          ).trim();
-          await command(
-            'git',
-            ['merge-base', '--is-ancestor', intent.base, 'HEAD'],
-            thread.worktreePath
-          );
+          const binding = z
+            .object({
+              projectId: z.literal(config.projectId),
+              title: z.literal(title(intent)),
+              threadId: z.literal(match.threadId),
+              providerInstanceId: z.literal('codex'),
+              model: z.literal('gpt-6.1-sol'),
+              branch: z.literal(intent.branch),
+              worktreePath: z
+                .string()
+                .min(1)
+                .refine((path) => path !== config.project),
+            })
+            .safeParse(thread);
+          if (!binding.success) return { kind: 'ambiguous' };
+          const worktree = binding.data.worktreePath;
+          const branch = (await command('git', ['branch', '--show-current'], worktree)).trim();
+          await command('git', ['merge-base', '--is-ancestor', intent.base, 'HEAD'], worktree);
           if (branch !== intent.branch) return { kind: 'ambiguous' };
           return {
             kind: 'found',
             threadId: thread.threadId,
             status: thread.pendingRequestCount > 0 ? 'waiting-for-input' : thread.status,
-            worktree: thread.worktreePath,
+            worktree,
             branch,
             model: thread.model,
           };

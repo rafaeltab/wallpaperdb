@@ -4,13 +4,13 @@
   "workspaces": {
     ".": {
       "decision": "excluded",
-      "reason": "Repository orchestration uses Node test runner and spawned tools; native Vitest does not instrument those subprocesses.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "Repository orchestration includes native Vitest tests and spawned tools, but mutation source discovery requires src/ production files. Root orchestration outside src/ is not eligible. Spawned implementations lack validated instrumented-artifact selection, mutation-ID activation and native per-test coverage/result return.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/560"
     },
     "scripts": {
       "decision": "excluded",
-      "reason": "Most tooling behavioral tests use node:test and subprocesses; no validated mutation activation across them.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "test:unit combines node:test with native Vitest tests. env-pipeline tests import scripts/lib code in process; CI-runner tests copy files and spawn tools. scripts/lib is outside src/ source eligibility. The selected Vitest runner has no node:test adapter, and separate implementations lack validated artifact selection, activation and returned native per-test attribution.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/560"
     },
     "infra": {
       "decision": "excluded",
@@ -24,7 +24,7 @@
         "unit"
       ],
       "limitations": {
-        "reason": "S3, NATS and image-worker fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "reason": "S3 and NATS fixtures need cancellation-safe invocation ownership and reset isolation before integration opt-in. The image wrapper runs in process but launches decoder.ts/decoder.mjs, returning pixels/errors without native per-test coverage, hit counts or results. The SIGSTOP cleanup suite remains independent; bootstrap import inspection does not execute the deployed service. Child/bundle artifact selection and activation/return transport remain unqualified under #560.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
@@ -41,7 +41,7 @@
         "integration"
       ],
       "limitations": {
-        "reason": "Integration uses the Redis adapter contract and its composed admission scenario. Search, NATS and subprocess fixtures need separate activation/reset validation.",
+        "reason": "Integration uses the Redis adapter contract and its composed admission scenario. Search and NATS need separate activation/reset validation. Search server integration rebuilds and spawns dist/index.mjs; in-process Redis support does not qualify instrumented bundle selection, mutation-ID activation or returned native per-test attribution (#560). OpenSearch's separate #518 diagnostic-only NO-GO decision and #559 qualification follow-up do not enable search mutations or imply that their unmerged controller is present here.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
@@ -52,7 +52,7 @@
         "unit"
       ],
       "limitations": {
-        "reason": "PostgreSQL, S3 and NATS fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "reason": "PostgreSQL, S3 and NATS fixtures need cancellation-safe invocation ownership and reset isolation before integration opt-in. In-process service tests differ from telemetry diagnostic child/container execution. Separately executed diagnostics and deployed output lack validated instrumented-artifact selection, mutation-ID activation and native per-test coverage/result return (#560).",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
@@ -63,7 +63,7 @@
         "unit"
       ],
       "limitations": {
-        "reason": "PostgreSQL, S3/SeaweedFS and NATS fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "reason": "PostgreSQL, S3/SeaweedFS and NATS fixtures need cancellation-safe invocation ownership and reset isolation before integration opt-in. Bootstrap tests rebuild and parse imports, not execute the service. In-process wrappers launch separate resize/inspection .ts or sibling .mjs workers whose byte streams return no native per-test coverage, hit counts or results. Worker/service chunk selection and activation/return transport remain unqualified under #560.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
@@ -74,7 +74,7 @@
         "unit"
       ],
       "limitations": {
-        "reason": "PostgreSQL and NATS fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "reason": "PostgreSQL and NATS fixtures need cancellation-safe invocation ownership and reset isolation before integration opt-in. In-process service tests differ from deployment tests that build and spawn dist/index.mjs. Deployed artifact selection, mutation-ID activation and native per-test coverage/result return remain unqualified under #560.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
@@ -85,7 +85,7 @@
         "unit"
       ],
       "limitations": {
-        "reason": "PostgreSQL, S3 and picture-worker fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "reason": "PostgreSQL and S3 fixtures need cancellation-safe invocation ownership and reset isolation before integration opt-in. Effect workers and the Sharp picture encoder run in process. Separately invoked operator/deployed paths still need validated instrumented-artifact selection, mutation-ID activation and native per-test coverage/result return (#560); existing unit support does not qualify those paths.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
@@ -96,14 +96,20 @@
         "unit"
       ],
       "limitations": {
-        "reason": "S3, NATS and image-worker fixtures use a process-global Testcontainers reaper. Cancellation-safe invocation ownership and reset isolation need validation before integration opt-in. Built subprocess output is also unvalidated.",
+        "reason": "S3 and NATS fixtures need cancellation-safe invocation ownership and reset isolation before integration opt-in. The in-process image wrapper launches encoder.ts/encoder.mjs and receives dimensions/image bytes, not native per-test coverage, hit counts or results. Bootstrap import inspection does not execute the service. Encoder/deployed-chunk selection and activation/return transport remain unqualified under #560.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
     "apps/wallpaper": {
-      "decision": "excluded",
-      "reason": "Native mutation activation and cancellation-safe process/container isolation have not been qualified for this new workspace. Ordinary test coverage does not establish mutation support.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "The ordinary Vitest Node unit stage is configured with full normal src/ eligibility, pending native qualification. Availability capability tests exercise real production guards in process through a controlled probe; baseline, generated mutation, per-test filter, hit count and killer proof remain pending under #520. Configuration alone is not support evidence. Integration and deployed service/process/container activation, ownership and native attribution remain unqualified under #560.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/560"
+      }
     },
     "apps/web": {
       "decision": "enabled",
@@ -130,12 +136,12 @@
     },
     "packages/biome-test-rules": {
       "decision": "excluded",
-      "reason": "Biome plugins execute in an isolated runtime; CLI subprocesses and the Node algorithm contracts have no validated native Vitest mutation activation.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "c8 node --test covers Node algorithm contracts and tests launching Biome with isolated plugin configuration. Native Node-suite test attribution and instrumented-plugin selection, activation and native coverage/result return from the isolated CLI runtime are separately unqualified. Ordinary V8/c8 coverage establishes neither mechanism.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/560"
     },
     "packages/core": {
       "decision": "excluded",
-      "reason": "The unit database health probe opens an unowned localhost:59999 PostgreSQL endpoint. Control this external input before enabling mutations. Integration container ownership/reset and subprocess activation also remain unvalidated.",
+      "reason": "The unit database health probe opens an unowned localhost:59999 PostgreSQL endpoint; its separate deterministic-unit qualification is in #529/PR #533, not this branch. Integration tests import local DatabaseConnection wrappers in process while builders control external services. Integration activation, negative-endpoint inputs and invocation-owned cleanup remain unqualified; child/deployed execution needs separate artifact selection, activation and returned native attribution (#560).",
       "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
     },
     "packages/crap-typescript-core": {
@@ -177,13 +183,13 @@
     },
     "packages/test-utils": {
       "decision": "excluded",
-      "reason": "Container fixture implementation requires separate multi-family isolation and activation validation; ordinary E2E coverage is insufficient.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "Fixture builders run in process and control external PostgreSQL, Redis, NATS, S3 and OpenSearch services. Native wrapper activation and cancellation-safe multi-family ownership remain unqualified. External server behavior and ordinary E2E coverage do not establish artifact/activation/native per-test result transport or authorize fixture reuse. Preserve independent lifecycle/destructive tests.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/560"
     },
     "packages/testcontainers": {
       "decision": "excluded",
-      "reason": "Container/reaper suites include child processes whose mutation activation is unvalidated.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      "reason": "Production NATS/OpenSearch wrappers run in process. The reaper lifecycle fixture forks upstream testcontainers with execArgv cleared and returns a container ID, not native per-test coverage/results; it does not qualify a local production mutation. Wrapper activation/ownership and child artifact selection/activation/native attribution remain unqualified. Preserve independent lifetime/destructive suites.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/560"
     },
     "packages/url-ipv4-resolver": {
       "decision": "excluded",

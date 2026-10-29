@@ -30,7 +30,7 @@ export default defineConfig({
           maxConcurrency: 1,
         },
       },
-      './vitest.mutation.browser.config.ts',
+      './vitest.mutation-browser.config.ts',
     ],
   },
 });

@@ -1,13 +1,22 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactNode, StrictMode, useState } from 'react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { RecentCreations } from '@/components/upload/recent-creations';
 import { recentCreations } from '@/features/wallpaper-creation/adapters/http';
 import { resumeWallpaperWithDetails } from '@/lib/api/wallpaper';
 import { useUploadQueue } from '@/contexts/upload-queue-context';
 import { uploadWallpaperWithDetails, type UploadResult } from '@/lib/api/wallpaper';
+
+// Synthetic public key for the mocked ClerkProvider, before App imports.
+vi.hoisted(() => {
+  vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_test_Y2xlcmsuYXBwLWZpeHR1cmUudGVzdCQ=');
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 const session = vi.hoisted<{ userId: string | undefined }>(() => ({ userId: undefined }));
 vi.mock('@clerk/react', () => ({

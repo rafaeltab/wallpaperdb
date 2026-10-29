@@ -1,7 +1,16 @@
 import { render, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
+
+// Synthetic public key for the mocked ClerkProvider, before App imports.
+vi.hoisted(() => {
+  vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_test_Y2xlcmsuYXBwLWZpeHR1cmUudGVzdCQ=');
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 const { ensureProfile, getToken } = vi.hoisted(() => ({
   ensureProfile: vi.fn(),

@@ -2,7 +2,16 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+
+// Synthetic public key for the mocked ClerkProvider, before App imports.
+vi.hoisted(() => {
+  vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', 'pk_test_Y2xlcmsuYXBwLWZpeHR1cmUudGVzdCQ=');
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 const { getToken } = vi.hoisted(() => ({ getToken: vi.fn(async () => 'test-token') }));
 

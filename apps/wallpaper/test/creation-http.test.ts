@@ -144,3 +144,85 @@ it('reports infrastructure failure safely as retryable unavailability', async ()
     await app.close();
   }
 });
+
+it.each(['authentication', 'listing'] as const)(
+  'releases pending %s work when a real list client disconnects',
+  async (pending) => {
+    const fixture = await pendingList(pending);
+    const controller = new AbortController();
+    const response = fetch(`${fixture.url}/wallpapers`, { signal: controller.signal }).catch(
+      () => {}
+    );
+    try {
+      await expect.poll(() => fixture.started).toBe(true);
+      controller.abort();
+      await expect.poll(() => fixture.released, { timeout: 1000 }).toBe(true);
+    } finally {
+      controller.abort();
+      fixture.release();
+      await response;
+      await fixture.app.close();
+    }
+  }
+);
+
+it('bounds shutdown of a pending real list request and releases its work', async () => {
+  const fixture = await pendingList('listing');
+  const response = fetch(`${fixture.url}/wallpapers`).catch(() => {});
+  let closing: Promise<void> | undefined;
+  try {
+    await expect.poll(() => fixture.started).toBe(true);
+    closing = fixture.app.close();
+    await expect.poll(() => fixture.released, { timeout: 6500 }).toBe(true);
+    await closing;
+  } finally {
+    fixture.release();
+    await response;
+    await (closing ?? fixture.app.close());
+  }
+});
+
+async function pendingList(pending: 'authentication' | 'listing') {
+  let started = false;
+  let released = false;
+  let release = () => {};
+  const wait = Effect.callback<void>((resume) => {
+    started = true;
+    release = () => resume(Effect.void);
+    return Effect.sync(() => {
+      released = true;
+    });
+  });
+  const owner = { namespace: 'authors', subject: 'creator' };
+  const app = Fastify();
+  await registerCreationHttp(
+    app,
+    Layer.mergeAll(
+      Layer.succeed(CreatorAuthentication, {
+        verify: () =>
+          pending === 'authentication' ? wait.pipe(Effect.as(owner)) : Effect.succeed(owner),
+      }),
+      Layer.succeed(Creation, {
+        list: () => (pending === 'listing' ? wait.pipe(Effect.as([])) : Effect.succeed([])),
+        begin: () => Effect.succeed({ kind: 'unavailable' }),
+        get: () => Effect.succeed({ kind: 'unavailable' }),
+        expectSource: () => Effect.succeed({ kind: 'unavailable' }),
+        assetResult: () => Effect.succeed('ignored'),
+        sourceAccepted: () => Effect.succeed('ignored'),
+      }),
+      Layer.succeed(WorkflowHealth, { check: () => Effect.succeed(true) })
+    )
+  );
+  const url = await app.listen({ host: '127.0.0.1', port: 0 });
+  return {
+    app,
+    url,
+    get started() {
+      return started;
+    },
+    get released() {
+      return released;
+    },
+    release: () => release(),
+  };
+}

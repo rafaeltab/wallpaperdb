@@ -595,7 +595,7 @@ async function runDaemon() {
 }
 async function serveCache() {
 	owned();
-	const directory = path.join(runDir, "cache");
+	const directory = path.join(runDir, "cache", config.cacheNamespace ?? "");
 	const tokenFile = path.join(runDir, "cache-token.json");
 	if (!fs.existsSync(tokenFile))
 		write(tokenFile, { token: randomBytes(32).toString("hex") });
@@ -889,6 +889,9 @@ try {
 		)
 			throw new Error("Invalid mode or cohort");
 		estimate(size, 0);
+		const cacheNamespace = process.env.BOAT_CACHE_NAMESPACE ?? "";
+		if (cacheNamespace && !/^[a-z0-9][a-z0-9-]*$/.test(cacheNamespace))
+			throw new Error("Invalid cache namespace");
 		if (config)
 			throw new Error("Already enrolled; preserve existing worker ownership");
 		const base = execFileSync("git", ["rev-parse", "HEAD"]).toString().trim();
@@ -897,6 +900,7 @@ try {
 			mode,
 			size,
 			cohort,
+			cacheNamespace,
 			base,
 			key: hash(root).slice(0, 12),
 		});

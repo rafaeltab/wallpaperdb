@@ -149,3 +149,71 @@ test("seeded base user can create and replace a Source through the browser UI", 
       .digest("hex"),
   );
 });
+
+test("Source intake continues after sixteen completed rows, withdrawal and replacement without reload", async ({
+  page,
+}) => {
+  test.setTimeout(180000);
+  await page.goto("/web/upload");
+  const sources = page.getByRole("region", {
+    name: "Create one Wallpaper with multiple Sources",
+    exact: true,
+  });
+  const intake = sources.getByLabel("Choose initial Sources for one Wallpaper");
+  await intake.setInputFiles(
+    Array.from({ length: 16 }, () => uploadFixturePaths[0]!),
+  );
+  await expect(
+    sources
+      .getByTestId("source-upload-outcome")
+      .filter({ hasText: "Source accepted" }),
+  ).toHaveCount(16, { timeout: 120000 });
+  await expect(sources).toContainText("16 accepted Sources.");
+  // The Default is protected. Withdraw an enabled nondefault Source.
+  await sources
+    .locator('button[aria-label^="Withdraw Source "]:enabled')
+    .first()
+    .click();
+  await expect(sources).toContainText("15 accepted Sources.");
+  await expect(intake).toBeEnabled();
+  await intake.setInputFiles(uploadFixturePaths[0]!);
+  await expect(
+    sources
+      .getByTestId("source-upload-outcome")
+      .filter({ hasText: "Source accepted" }),
+  ).toHaveCount(17);
+  await expect(sources).toContainText("16 accepted Sources.");
+  await sources
+    .getByLabel(/^Replace Source /)
+    .first()
+    .setInputFiles(uploadFixturePaths[1]!);
+  await expect(
+    sources
+      .getByTestId("source-upload-outcome")
+      .filter({ hasText: "Source accepted" }),
+  ).toHaveCount(18);
+  await expect(sources).toContainText("16 accepted Sources.");
+  await intake.setInputFiles({
+    name: "invalid.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("invalid image"),
+  });
+  await expect(
+    sources.getByRole("button", { name: "Retry invalid.png" }),
+  ).toBeVisible();
+  await expect(intake).toBeEnabled();
+  await sources
+    .locator('button[aria-label^="Withdraw Source "]:enabled')
+    .first()
+    .click();
+  await expect(sources).toContainText("15 accepted Sources.");
+  await intake.setInputFiles(uploadFixturePaths[0]!);
+  await expect(
+    sources
+      .getByTestId("source-upload-outcome")
+      .filter({ hasText: "Source accepted" }),
+  ).toHaveCount(19);
+  await expect(
+    sources.getByRole("button", { name: "Retry invalid.png" }),
+  ).toBeEnabled();
+});

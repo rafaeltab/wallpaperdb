@@ -134,7 +134,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
           type="file"
           multiple
           accept="image/jpeg,image/png,image/webp"
-          disabled={snapshot.busy || managing || snapshot.rows.length >= 16}
+          disabled={!snapshot.canAdd || managing}
           onChange={(event) => {
             select(event.target.files);
             event.target.value = '';
@@ -273,7 +273,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
-                    disabled={snapshot.busy || managing || snapshot.rows.length >= 16}
+                    disabled={!snapshot.canAdd || managing}
                     onChange={(event) => {
                       select(event.target.files, undefined, source.sourceId);
                       event.target.value = '';
@@ -303,7 +303,7 @@ function SourceBatch({ wallpaperId, assetId }: { wallpaperId?: string; assetId?:
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
-                      disabled={snapshot.busy || managing}
+                      disabled={!snapshot.canAdd || managing}
                       onChange={(event) => {
                         select(event.target.files, candidate);
                         event.target.value = '';

@@ -97,14 +97,18 @@ export function createWallpaperSourceBatch<TFile>(
     readonly rows: typeof rows;
     readonly busy: boolean;
     readonly canResume: boolean;
+    readonly canAdd: boolean;
     readonly wallpaperId?: string;
     readonly assetId?: string;
-  } = { rows, busy, canResume: false };
+  } = { rows, busy, canResume: false, canAdd: true };
   const listeners = new Set<() => void>();
+  const pendingCount = () =>
+    rows.filter((row) => row.status === 'pending' || row.status === 'uploading').length;
   const publish = () => {
     current = {
       rows,
       busy,
+      canAdd: !busy && pendingCount() < 16,
       canResume: !busy && !blockedInitial && rows.some((row) => row.status === 'pending'),
       ...(wallpaper
         ? {
@@ -130,7 +134,7 @@ export function createWallpaperSourceBatch<TFile>(
       };
     },
     addFiles(files: readonly { readonly value: TFile; readonly name: string }[]) {
-      if (busy || files.length + rows.length > 16) return false;
+      if (busy || files.length + pendingCount() > 16) return false;
       rows = [
         ...rows,
         ...files.map((file) => ({ ...file, id: api.identifier(), status: 'pending' as const })),
@@ -139,7 +143,7 @@ export function createWallpaperSourceBatch<TFile>(
       return true;
     },
     replace(file: { readonly value: TFile; readonly name: string }, targetSourceId: string) {
-      if (busy || rows.length >= 16 || !targetSourceId) return false;
+      if (busy || pendingCount() >= 16 || !targetSourceId) return false;
       rows = [...rows, { ...file, targetSourceId, id: api.identifier(), status: 'pending' }];
       publish();
       return true;
@@ -147,7 +151,7 @@ export function createWallpaperSourceBatch<TFile>(
     resume(file: { readonly value: TFile; readonly name: string }, candidate: ManagedCandidate) {
       if (
         busy ||
-        rows.length >= 16 ||
+        pendingCount() >= 16 ||
         candidate.status === 'accepted' ||
         candidate.operation === 'replace-set' ||
         (candidate.operation === 'replace-one' && !candidate.targetSourceId)
@@ -176,7 +180,7 @@ export function createWallpaperSourceBatch<TFile>(
       return true;
     },
     retry(id: string) {
-      if (busy) return;
+      if (busy || pendingCount() >= 16) return;
       const row = rows.find((row) => row.id === id);
       if (row && (row.status === 'failed' || row.status === 'confirming'))
         update(id, { status: 'pending', message: undefined });

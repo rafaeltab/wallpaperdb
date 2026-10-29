@@ -5,7 +5,8 @@
     "adapters/github",
     "http",
     "platform",
-    "composition"
+    "composition",
+    "adapters/clock"
   ],
   "allowedCapabilityDependencies": {}
 }

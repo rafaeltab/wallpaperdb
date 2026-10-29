@@ -1,7 +1,8 @@
 import { resolve } from 'node:path';
 import { Layer, ManagedRuntime } from 'effect';
 import { z } from 'zod';
-import { Execution, Issues, Job, JobLive, JobStore } from '../capabilities/job/index.js';
+import { Execution, Issues, Job, JobLive, JobStore, Time } from '../capabilities/job/index.js';
+import { systemTime } from '../adapters/clock/index.js';
 import { fileStore } from '../adapters/store/index.js';
 import { githubIssues } from '../adapters/github/index.js';
 import { t3Execution } from '../adapters/t3/index.js';
@@ -51,6 +52,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
   if (!help.includes('--worktree') || !help.includes('--model'))
     throw new Error('T3 installation lacks required headless thread interface');
   const deps = Layer.mergeAll(
+    Layer.succeed(Time, systemTime),
     Layer.succeed(JobStore, fileStore(configuration.FACTORY_STATE)),
     Layer.succeed(
       Issues,

@@ -1,15 +1,16 @@
-import { Clock, Effect, Layer, Random } from 'effect';
-import { Execution, Issues, Job, JobStore, type Start, type Intent } from './contract.js';
+import { Effect, Layer, Random } from 'effect';
+import { Execution, Issues, Job, JobStore, type Start, type Intent, Time } from './contract.js';
 export const JobLive = Layer.effect(
   Job,
   Effect.gen(function* () {
     const store = yield* JobStore;
+    const time = yield* Time;
     const issues = yield* Issues;
     const execution = yield* Execution;
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
         const observation = yield* execution.observe(intent);
-        const now = yield* Clock.currentTimeMillis;
+        const now = yield* time.now();
         return {
           kind: 'job' as const,
           intent,
@@ -29,7 +30,7 @@ export const JobLive = Layer.effect(
           if (!validCommand(command)) return { kind: 'rejected' as const };
           const issue = yield* issues.inspect(command.issue);
           if (!eligible(issue)) return { kind: 'rejected' as const };
-          const createdAt = yield* Clock.currentTimeMillis;
+          const createdAt = yield* time.now();
           const id = `${createdAt}-${yield* Random.nextInt}-${yield* Random.nextInt}`;
           const intent: Intent = {
             ...command,

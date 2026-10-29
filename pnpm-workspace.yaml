@@ -15,3 +15,6 @@ onlyBuiltDependencies:
 
 patchedDependencies:
   "@stryker-mutator/vitest-runner@10.0.0": patches/stryker-vitest-10.0.0.patch
+  # #547: release pre-INFO sockets at the SDK acquisition timeout, including late dials.
+  # Retain until an SDK upgrade passes the User/Wallpaper broker-acquisition regressions.
+  'nats@2.29.3': patches/nats-2.29.3.patch

@@ -1,0 +1,30 @@
+--- a/lib/src/node_transport.js
++++ b/lib/src/node_transport.js
+@@ -71,6 +71,11 @@
+                 else {
+                     this.socket = yield this.dial(hp);
+                 }
++                // close() may win while the TCP/TLS dial is still pending.
++                if (this.done) {
++                    this.socket.destroy();
++                    throw new Error("NATS transport closed during connection");
++                }
+                 const info = yield this.peekInfo();
+                 (0, nats_base_client_1.checkOptions)(info, options);
+                 const { tls_required: tlsRequired, tls_available: tlsAvailable } = info;
+@@ -420,9 +425,13 @@
+     }
+     _closed(err_1) {
+         return __awaiter(this, arguments, void 0, function* (err, internal = true) {
+-            // if this connection didn't succeed, then ignore it.
+-            if (!this.connected)
++            // Acquisition owns a socket before INFO marks the transport connected.
++            // Keep peekInfo's close listener so the pending connect also settles.
++            if (!this.connected) {
++                this.done = true;
++                if (this.socket) this.socket.destroy();
+                 return;
++            }
+             if (this.done)
+                 return;
+             this.closeError = err;

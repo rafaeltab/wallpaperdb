@@ -86,7 +86,7 @@ ifneq ($(strip $(PACKAGE)),)
 	@$(TURBO) run dev $(FILTER)
 else
 	@scripts/check-infra.sh || (echo "Start infrastructure with: make infra-start" && exit 1)
-	@$(APPS_COMPOSE) watch
+	@$(APPS_COMPOSE) watch $(ARGS)
 endif
 
 stop: ## Stop application and infrastructure containers

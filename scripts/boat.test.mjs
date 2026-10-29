@@ -1,6 +1,54 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { route, delta, quote, estimate } from "./lib/boat.mjs";
+import {
+	route,
+	delta,
+	quote,
+	estimate,
+	parseBoatJson,
+	workerState,
+	meaningfulPreviewRequest,
+	worktreeProcesses,
+} from "./lib/boat.mjs";
+test("worktree process measurement includes its own process without command arguments", () => {
+	const sample = worktreeProcesses(process.cwd()).find(
+		(p) => p.pid === process.pid,
+	);
+	assert.ok(sample.rssKB > 0);
+	assert.ok(sample.cpuTicks >= 0);
+	assert.equal("args" in sample, false);
+});
+test("background queries and health probes do not keep previews awake", () => {
+	assert.equal(
+		meaningfulPreviewRequest("/gateway/graphql", { "sec-fetch-mode": "cors" }),
+		false,
+	);
+	assert.equal(
+		meaningfulPreviewRequest("/asset/ready", { "sec-fetch-mode": "navigate" }),
+		false,
+	);
+	assert.equal(
+		meaningfulPreviewRequest("/web/", { "sec-fetch-mode": "navigate" }),
+		true,
+	);
+	assert.equal(
+		meaningfulPreviewRequest("/__boat557/activity", { "x-boat-activity": "1" }),
+		true,
+	);
+});
+test("Boat CLI JSONL creation and idle worker info retain the provisioned identity", () => {
+	assert.equal(
+		parseBoatJson(
+			'{"event":"creating","id":"bx_one"}\n{"event":"ready","sandbox":{"id":"bx_one","state":"idle"}}\n',
+		).sandbox.id,
+		"bx_one",
+	);
+	assert.equal(workerState({ sandbox: { state: "idle" } }), "idle");
+	assert.equal(
+		parseBoatJson('{"sandbox":{"id":"bx_one"}}').sandbox.id,
+		"bx_one",
+	);
+});
 import { cacheServer } from "./lib/boat-cache.mjs";
 import fs from "node:fs";
 import os from "node:os";
@@ -60,6 +108,15 @@ test("experimental workers admit concurrent Docker work without creating the hos
 });
 
 test("unenrolled worktrees and explicit local overrides stay local", () => {
+	assert.equal(
+		route({ mode: "validation" }, "run", undefined, "test:unit"),
+		true,
+	);
+	assert.equal(route({ mode: "validation" }, "run", undefined, "dev"), false);
+	assert.equal(
+		route({ mode: "development" }, "run", undefined, "format:files"),
+		false,
+	);
 	assert.equal(route(null, "ci"), false);
 	assert.equal(route({ mode: "development" }, "ci", "local"), false);
 	assert.equal(route({ mode: "validation" }, "dev"), false);

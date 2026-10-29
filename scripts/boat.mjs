@@ -6,7 +6,15 @@ import path from "node:path";
 import os from "node:os";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
-import { delta, estimate, quote } from "./lib/boat.mjs";
+import {
+	delta,
+	estimate,
+	quote,
+	parseBoatJson,
+	workerState,
+	meaningfulPreviewRequest,
+	worktreeProcesses,
+} from "./lib/boat.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 
 const root = process.cwd();
@@ -39,7 +47,13 @@ function event(kind, detail = {}) {
 function execute(
 	command,
 	argv,
-	{ capture = false, input, allowFailure = false } = {},
+	{
+		capture = false,
+		input,
+		allowFailure = false,
+		streamFrames = false,
+		logPath,
+	} = {},
 ) {
 	return new Promise((resolve, reject) => {
 		const start = Date.now();
@@ -48,8 +62,8 @@ function execute(
 			env: { ...process.env, BOAT_NO_UPDATE: "1" },
 			stdio: [
 				input === undefined ? "inherit" : "pipe",
-				capture ? "pipe" : "inherit",
-				capture ? "pipe" : "inherit",
+				capture || streamFrames ? "pipe" : "inherit",
+				capture || streamFrames ? "pipe" : "inherit",
 			],
 		});
 		let out = "",
@@ -61,6 +75,36 @@ function execute(
 			child.stderr.on("data", (b) => {
 				err += b;
 			});
+		}
+		if (streamFrames) {
+			let pending = "";
+			const emit = (data, stderr = false) => {
+				(stderr ? process.stderr : process.stdout).write(data);
+				if (logPath) fs.appendFileSync(logPath, data, { mode: 0o600 });
+			};
+			const line = (value) => {
+				try {
+					const frame = JSON.parse(value);
+					if (frame.type === "stdout" || frame.type === "stderr")
+						emit(frame.data, frame.type === "stderr");
+					else if (frame.event === "error") emit(`${frame.error}\n`, true);
+				} catch {
+					emit(`${value}\n`);
+				}
+			};
+			child.stdout.on("data", (bytes) => {
+				pending += bytes;
+				let at = pending.indexOf("\n");
+				while (at >= 0) {
+					line(pending.slice(0, at));
+					pending = pending.slice(at + 1);
+					at = pending.indexOf("\n");
+				}
+			});
+			child.stdout.on("end", () => {
+				if (pending) line(pending);
+			});
+			child.stderr.on("data", (bytes) => emit(bytes, true));
 		}
 		if (input !== undefined) {
 			child.stdin.on("error", () => {});
@@ -85,10 +129,12 @@ function execute(
 }
 const boat = async (argv, opts = {}) =>
 	execute(cli, ["--no-update", ...argv], opts);
-const json = async (argv) =>
-	JSON.parse((await boat([...argv, "--json"], { capture: true })).out);
+const json = async (argv) => {
+	const result = await boat(["--json", ...argv], { capture: true });
+	return parseBoatJson(result.out);
+};
 const ssh = (id, command, opts = {}) =>
-	boat(["ssh", id, "--", "bash", "-lc", quote(command)], opts);
+	boat(["ssh", id, "--", "bash", "-lc", command], opts);
 function owned() {
 	if (!config || config.root !== root)
 		throw new Error("This worktree is not enrolled");
@@ -145,16 +191,59 @@ async function ensure() {
 		admit();
 		let s = read(stateFile);
 		let resumed = false;
+		let existingInfo;
 		if (s.id) {
-			const info = await json(["info", s.id]);
-			const status = info.sandbox?.status ?? info.status;
-			if (status === "archived") {
+			try {
+				existingInfo = await json(["info", s.id]);
+			} catch (error) {
+				if (error.code !== "not_found") throw error;
+				event("lost-worker", { id: s.id });
+				delete s.id;
+				delete s.watcher;
+				for (const name of ["prepared.json", "manifest.json"])
+					fs.rmSync(path.join(dir, name), { force: true });
+			}
+		}
+		if (!s.id) {
+			const name = `wallpaperdb-557-${config.cohort}-${config.key}`;
+			const listed = await json(["list", "--all"]);
+			const matches = listed.sandboxes.filter(
+				(worker) =>
+					worker.name === name &&
+					!worker.dataExpiredAt &&
+					worker.state !== "deleted",
+			);
+			if (matches.length > 1)
+				throw new Error(
+					"Multiple owned workers found; inspect and clean up before admitting work",
+				);
+			if (matches.length === 1) {
+				const worker = matches[0];
+				s = {
+					...s,
+					id: worker.id,
+					size: worker.type,
+					cost: s.cost ?? 0,
+					runningSince: ["archived", "stopped"].includes(worker.state)
+						? null
+						: Date.parse(worker.createdAt),
+					lastActivity: Date.now(),
+				};
+				save(s);
+				event("recovered-identity", { id: s.id });
+			}
+		}
+		if (s.id) {
+			const info = existingInfo ?? (await json(["info", s.id]));
+			const status = workerState(info);
+			if (["archived", "stopped"].includes(status)) {
 				try {
 					await boat(
 						["resume", s.id, "--type", config.size, "--ttl", "2100", "--json"],
 						{ capture: true },
 					);
 					s.runningSince = Date.now();
+					delete s.watcher;
 					resumed = true;
 				} catch (error) {
 					if (error.code !== "snapshot_data_expired") throw error;
@@ -163,12 +252,17 @@ async function ensure() {
 					for (const name of ["prepared.json", "manifest.json"])
 						fs.rmSync(path.join(dir, name), { force: true });
 				}
-			} else if (status !== "ready" && status !== "running")
+			} else if (!["ready", "running", "idle"].includes(status))
 				throw new Error(
 					`Worker ${s.id} has state ${status}; inspect before recovery.`,
 				);
 		}
 		if (!s.id) {
+			const limits = await json(["limits"]);
+			if (!limits.canStart || limits.nextStartDollars > 0)
+				throw new Error(
+					"Worker admission refused: starts unavailable or paid bursting required",
+				);
 			const created = await json([
 				"new",
 				"--type",
@@ -280,20 +374,13 @@ async function prepare(id) {
 	// Transfer only the generated development inputs, through SSH stdin, never logs.
 	const paths = [
 		".worktree",
-		...execFileSync("git", [
-			"ls-files",
-			"--others",
-			"--ignored",
-			"--exclude-standard",
-			"-z",
-		])
-			.toString()
-			.split("\0")
-			.filter((p) =>
-				/^(apps\/[^/]+\/\.env|infra\/\.env|apps\/asset\/\.authority\.json|infra\/nats\/\.generated\.conf|infra\/\.operator-inbox\.json|apps\/(user|wallpaper)\/\.workflow\.json)$/.test(
-					p,
-				),
-			),
+		...fs.readdirSync("apps").map((name) => `apps/${name}/.env`),
+		"infra/.env",
+		"apps/asset/.authority.json",
+		"infra/nats/.generated.conf",
+		"infra/.operator-inbox.json",
+		"apps/user/.workflow.json",
+		"apps/wallpaper/.workflow.json",
 	].filter((p) => fs.existsSync(p));
 	if (paths.length)
 		await ssh(id, `cd ${remote} && tar -xzf -`, {
@@ -301,6 +388,12 @@ async function prepare(id) {
 				maxBuffer: 16 * 1024 * 1024,
 			}),
 		});
+	// The existing contributor contract requires these bind-mounted init inputs
+	// to be readable by PostgreSQL's container user, irrespective of host umask.
+	await ssh(
+		id,
+		`cd ${remote} && chmod a+rx infra/postgres/init && chmod a+r infra/postgres/init/*.sql`,
+	);
 	write(path.join(dir, "prepared.json"), { identity });
 	event("dependencies-ready", { ms: Date.now() - start });
 }
@@ -325,9 +418,32 @@ async function stop(remove = false) {
 		const s = read(stateFile);
 		if (!s.id) return;
 		if (s.runningSince) {
-			await boat(["stop", s.id]);
+			if (s.watcher) {
+				await json(["exec", s.id, "--kill", String(s.watcher)]);
+				delete s.watcher;
+				save(s);
+			}
+			const initial = workerState(await json(["info", s.id]));
+			if (!["stopping", "archived", "stopped"].includes(initial))
+				await json(["stop", s.id]);
+			let stopped = false;
+			for (let attempt = 0; attempt < 180; attempt++) {
+				const state = workerState(await json(["info", s.id]));
+				if (["archived", "stopped"].includes(state)) {
+					stopped = true;
+					break;
+				}
+				if (state !== "stopping")
+					throw new Error(`Unexpected worker state during stop: ${state}`);
+				await wait(1000);
+			}
+			if (!stopped)
+				throw new Error(
+					"Provider stop did not complete within 180 seconds; worker state must be inspected",
+				);
 			s.cost = (s.cost ?? 0) + estimate(s.size, Date.now() - s.runningSince);
 			s.runningSince = null;
+			delete s.watcher;
 			save(s);
 			event("stopped", { id: s.id, estimatedCost: s.cost });
 		}
@@ -341,7 +457,7 @@ async function stop(remove = false) {
 		// Keep the provider's authoritative usage separately from the conservative ledger.
 		write(path.join(dir, "usage.json"), await json(["usage", s.id]));
 		if (remove) {
-			await boat(["delete", s.id]);
+			await boat(["delete", s.id, "--yes"]);
 			event("deleted", { id: s.id });
 			delete s.id;
 			save(s);
@@ -359,32 +475,47 @@ async function command() {
 		return;
 	}
 	const { id, resumed } = await ensure();
-	await sync(id);
-	await prepare(id);
-	daemon();
-	await cache(id);
 	const lease = path.join(dir, `command-${process.pid}.json`);
 	write(lease, { pid: process.pid, at: Date.now() });
+	daemon();
 	const started = Date.now();
 	try {
+		await sync(id);
+		await prepare(id);
+		await cache(id);
 		if (
 			resumed &&
 			config.mode === "development" &&
 			read(stateFile).developmentWanted
-		)
+		) {
 			await ssh(
 				id,
-				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make infra-start apps-start BOAT_EXEC=worker`,
+				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make stop BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`,
 			);
+			await watchDevelopment(id);
+		}
 		if (["dev", "apps-start"].includes(targets[0])) {
 			const s = read(stateFile);
 			s.developmentWanted = true;
 			save(s);
 		}
-		const result = await ssh(
-			id,
-			`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
-			{ allowFailure: true },
+		const result = await boat(
+			[
+				"exec",
+				id,
+				"--timeout",
+				"0",
+				"--stream",
+				"--",
+				"bash",
+				"-lc",
+				`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1 PLAYWRIGHT_BROWSERS_PATH="$HOME/.local/share/ms-playwright"; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
+			],
+			{
+				allowFailure: true,
+				streamFrames: true,
+				logPath: path.join(dir, `command-${started}.log`),
+			},
 		);
 		event("command", {
 			targets,
@@ -393,10 +524,10 @@ async function command() {
 			resumed,
 			local: resourceSample(),
 		});
-		if (resumed) console.log("Remote environment resumed from sleep");
 		process.exitCode = result.status;
 		if (targets[0] === "stop" && result.status === 0) await stop();
 	} finally {
+		if (resumed) console.log("Remote environment resumed from sleep");
 		fs.rmSync(lease, { force: true });
 		const s = read(stateFile);
 		s.lastActivity = Date.now();
@@ -405,6 +536,8 @@ async function command() {
 }
 function resourceSample() {
 	return {
+		worktreeProcesses: worktreeProcesses(root),
+		controllerUsage: process.resourceUsage(),
 		load: os.loadavg(),
 		free: os.freemem(),
 		total: os.totalmem(),
@@ -424,7 +557,9 @@ async function runDaemon() {
 	while (true) {
 		const s = read(stateFile);
 		if (!s.id || !s.runningSince) return;
-		const leases = fs.readdirSync(dir).filter((p) => p.startsWith("command-"));
+		const leases = fs
+			.readdirSync(dir)
+			.filter((p) => p.startsWith("command-") && p.endsWith(".json"));
 		let active = false;
 		for (const p of leases) {
 			const lease = read(path.join(dir, p));
@@ -465,7 +600,7 @@ async function serveCache() {
 	if (!fs.existsSync(tokenFile))
 		write(tokenFile, { token: randomBytes(32).toString("hex") });
 	const token = read(tokenFile).token;
-	const authPath = path.join(os.homedir(), ".local/share/turborepo/auth.json");
+	const authPath = path.join(os.homedir(), ".config/turborepo/auth.json");
 	const upstreamToken = process.env.TURBO_TOKEN ?? read(authPath).token;
 	const server = cacheServer({
 		directory,
@@ -524,9 +659,9 @@ async function cache(id) {
 					id,
 					"--reverse",
 					"--local",
-					local,
-					"--remote",
 					"27857",
+					"--remote",
+					local,
 				],
 				{ stdio: "ignore", detached: true },
 			);
@@ -545,16 +680,30 @@ async function preview() {
 	if (config.mode !== "development")
 		throw new Error("Validation mode uses its local development stack");
 	const { id } = await ensure();
+	const startupLease = path.join(dir, `command-${process.pid}.json`);
+	write(startupLease, { pid: process.pid, at: Date.now() });
+	process.once("exit", () => fs.rmSync(startupLease, { force: true }));
 	await sync(id);
 	await prepare(id);
 	daemon();
 	await cache(id);
 	const started = Date.now();
+	const watcher = read(stateFile).watcher;
+	const liveWatcher = watcher
+		? (await json(["exec", id, "--status", String(watcher)])).running
+		: false;
 	await ssh(
 		id,
-		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make infra-start apps-start BOAT_EXEC=worker && make run PACKAGE=scripts SCRIPT=boat:ready BOAT_EXEC=worker`,
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && ${liveWatcher ? "" : `make infra-start BOAT_EXEC=worker && make apps-start ${read(stateFile).developmentWanted ? "ARGS=--no-build" : ""} BOAT_EXEC=worker && `}make run PACKAGE=scripts SCRIPT=boat:ready BOAT_EXEC=worker`,
 	);
 	event("application-ready", { ms: Date.now() - started });
+	await watchDevelopment(id);
+	await ssh(
+		id,
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:ready BOAT_EXEC=worker`,
+	);
+	event("preview-ready", { ms: Date.now() - started });
+	fs.rmSync(startupLease, { force: true });
 	const desired = read(stateFile);
 	desired.developmentWanted = true;
 	save(desired);
@@ -562,6 +711,14 @@ async function preview() {
 	const port = Number(text.match(/^INGRESS_PORT\s*[:?]?=\s*(\d+)/m)?.[1]);
 	if (!port) throw new Error("No generated ingress port");
 	const privatePort = port + 20000;
+	const prior = read(path.join(dir, "preview-process.json"));
+	if (prior.pid && prior.pid !== process.pid) {
+		try {
+			if (fs.readlinkSync(`/proc/${prior.pid}/cwd`) === root)
+				process.kill(prior.pid, "SIGTERM");
+		} catch {}
+		await wait(500);
+	}
 	const tunnel = spawn(
 		cli,
 		[
@@ -573,13 +730,19 @@ async function preview() {
 			"--local",
 			String(privatePort),
 		],
-		{ stdio: "inherit" },
+		{ stdio: "inherit", detached: true },
 	);
 	const server = http.createServer((req, res) => {
-		if (!req.url.includes("health")) {
+		if (meaningfulPreviewRequest(req.url, req.headers)) {
 			const s = read(stateFile);
 			s.lastActivity = Date.now();
 			save(s);
+		}
+		if (req.url === "/__boat557/activity") {
+			req.resume();
+			res.writeHead(204);
+			res.end();
+			return;
 		}
 		const upstream = http.request(
 			{
@@ -587,9 +750,34 @@ async function preview() {
 				port: privatePort,
 				path: req.url,
 				method: req.method,
-				headers: req.headers,
+				headers: { ...req.headers, "accept-encoding": "identity" },
 			},
 			(response) => {
+				if (response.headers["content-type"]?.includes("text/html")) {
+					const chunks = [];
+					let size = 0;
+					response.on("data", (chunk) => {
+						size += chunk.length;
+						if (size > 1024 * 1024) {
+							upstream.destroy();
+							res.destroy();
+						} else chunks.push(chunk);
+					});
+					response.on("end", () => {
+						const headers = { ...response.headers };
+						delete headers["content-length"];
+						delete headers.etag;
+						headers["cache-control"] = "no-store";
+						res.writeHead(response.statusCode, headers);
+						const activity = `<script>let boatLastActivity=0;for(const event of ['pointerdown','keydown','focus'])window.addEventListener(event,()=>{if(document.visibilityState==='visible'&&Date.now()-boatLastActivity>10000){boatLastActivity=Date.now();fetch('/__boat557/activity',{method:'POST',headers:{'x-boat-activity':'1'},keepalive:true}).catch(()=>{})}},{passive:true});</script>`;
+						res.end(
+							Buffer.concat(chunks)
+								.toString("utf8")
+								.replace("</head>", `${activity}</head>`),
+						);
+					});
+					return;
+				}
 				res.writeHead(response.statusCode, response.headers);
 				response.pipe(res);
 			},
@@ -623,15 +811,72 @@ async function preview() {
 	await new Promise((resolve, reject) =>
 		server.listen(port, "127.0.0.1", resolve).once("error", reject),
 	);
+	write(path.join(dir, "preview-process.json"), { pid: process.pid });
+	process.once("exit", () => {
+		if (read(path.join(dir, "preview-process.json")).pid === process.pid)
+			fs.rmSync(path.join(dir, "preview-process.json"), { force: true });
+	});
 	console.log(
 		`Private preview proxy http://localhost:${port}/web; application health passed. Authentication must still be verified in the browser.`,
 	);
+	const sockets = new Set();
+	server.on("connection", (socket) => {
+		sockets.add(socket);
+		socket.once("close", () => sockets.delete(socket));
+	});
 	const close = () => {
-		tunnel.kill();
+		try {
+			process.kill(-tunnel.pid, "SIGTERM");
+		} catch {}
+		for (const socket of sockets) socket.destroy();
 		server.close();
 	};
+	process.once("exit", () => {
+		try {
+			process.kill(-tunnel.pid, "SIGTERM");
+		} catch {}
+	});
 	process.on("SIGINT", close);
 	process.on("SIGTERM", close);
+}
+async function watchDevelopment(id) {
+	const state = read(stateFile);
+	if (state.watcher) {
+		const status = await json(["exec", id, "--status", String(state.watcher)]);
+		if (status.running) return;
+		delete state.watcher;
+	}
+	const command = await json([
+		"exec",
+		id,
+		"--detach",
+		"--",
+		"bash",
+		"-lc",
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:watch BOAT_EXEC=worker`,
+	]);
+	state.watcher = command.processId ?? command.pid;
+	if (!state.watcher)
+		throw new Error("Development watcher returned no process ID");
+	save(state);
+	let ready = false;
+	for (let i = 0; i < 120; i++) {
+		const status = await json(["exec", id, "--status", String(state.watcher)]);
+		if (!status.running)
+			throw new Error(
+				"Development watcher exited before readiness; inspect Boat command history",
+			);
+		if (status.stdout?.includes("Watch enabled")) {
+			ready = true;
+			break;
+		}
+		await wait(500);
+	}
+	if (!ready)
+		throw new Error(
+			"Development watcher did not become ready within 60 seconds",
+		);
+	event("development-watcher", { processId: state.watcher });
 }
 try {
 	if (action === "enroll") {

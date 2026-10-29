@@ -1,11 +1,15 @@
-# Included after ordinary task definitions. Enrollment is private and per worktree.
+# Enrollment is private and per worktree; task implementations stay in Makefile.
 # A recursive Make in the worker uses the original definitions without this overlay.
 ifneq ($(wildcard .boat/enrollment.json),)
 ifeq ($(filter local worker,$(BOAT_EXEC)),)
-boat_validation := build check check-types lint lint-fix test test-focused test-unit test-integration test-e2e test-mutation ci crap check-crap
-boat_development := dev stop infra-start infra-start-admin infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info
+boat_validation := $(shell node --input-type=module -e 'import {validation} from "./scripts/lib/boat.mjs"; console.log(validation.join(" "))')
+boat_development := $(shell node --input-type=module -e 'import {development} from "./scripts/lib/boat.mjs"; console.log(development.join(" "))')
 boat_mode := $(shell node -p 'JSON.parse(require("fs").readFileSync(".boat/enrollment.json")).mode')
 boat_targets := $(boat_validation) $(if $(filter development,$(boat_mode)),$(boat_development))
+boat_local_run := $(filter format% dev:configure boat:cache-login check:pr-history,$(SCRIPT)) $(if $(filter validation,$(boat_mode)),$(filter dev% start% stop% db:migrate%,$(SCRIPT)))
+ifneq ($(strip $(boat_local_run)),)
+boat_targets := $(filter-out run,$(boat_targets))
+endif
 ifeq ($(BOAT_EXEC),remote)
 boat_targets += $(filter-out boat-% help install toolchain worktree-remove,$(MAKECMDGOALS))
 endif

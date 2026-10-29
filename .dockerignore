@@ -33,6 +33,7 @@ infra/.operator-inbox.json
 .agents
 .repos
 .mise
+.boat
 
 # IDE
 .vscode

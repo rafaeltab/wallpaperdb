@@ -16,6 +16,8 @@
     },
     "globalPassThroughEnv": [
         "GITHUB_ACTIONS",
+        "WALLPAPERDB_BOAT_WORKER",
+        "PLAYWRIGHT_BROWSERS_PATH",
         "COMPOSE_PROJECT_NAME"
     ],
     "globalDependencies": [

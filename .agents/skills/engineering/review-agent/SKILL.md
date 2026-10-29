@@ -55,3 +55,7 @@ Use these priorities:
 If there are no qualifying findings, say `No findings.` Do not invent a finding to fill the result.
 After the findings, add a brief overall assessment and mention any material test gaps or residual
 risks.
+
+For factory reviews, read [task scope](../../../../docs/agents/task-scope.md), originating requirements, and retained user decisions. Report concerns separately from authorization to implement remedies. Pin the supplied head, intended live base and merge-base, and record the actual comparison and reviewer identity under [review evidence](../../../../CONTRIBUTING.md#review-evidence).
+
+Use a failing scenario for runtime defect claims where practical under [defect verification](../../wallpaperdb/testing/SKILL.md#verify-defect-fixes). A review result is evidence for the coordinator, not permission to publish.

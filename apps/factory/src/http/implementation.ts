@@ -1,4 +1,8 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyRequest } from 'fastify';
+import { Effect } from 'effect';
+import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
+import { ROOT_CONTEXT, trace } from '@opentelemetry/api';
+import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { z } from 'zod';
 import { Unavailable, type Job, type StartResult } from '../capabilities/job/index.js';
 import { page } from './page.js';
@@ -43,10 +47,27 @@ export function operationsServer(config: {
       .type('application/problem+json')
       .send(problem(500, 'generic-server', 'Unexpected server failure'));
   });
+  const propagator = new W3CTraceContextPropagator();
+  const execute = <A>(
+    request: FastifyRequest,
+    name: string,
+    operation: Effect.Effect<A, Unavailable>
+  ) => {
+    const parent = trace.getSpanContext(
+      propagator.extract(ROOT_CONTEXT, request.headers, {
+        keys: Object.keys,
+        get: (headers, key) => headers[key],
+      })
+    );
+    const observed = operation.pipe(Effect.withSpan(name));
+    return config.run(parent ? observed.pipe(OtelTracer.withSpanContext(parent)) : observed);
+  };
   app.get('/health', () => ({ status: 'ok' }));
-  app.get('/api/job', () => config.run(config.job.status()));
-  app.get('/', async (_request, reply) =>
-    reply.type('text/html').send(page(await config.run(config.job.status())))
+  app.get('/api/job', (request) => execute(request, 'factory.http.status', config.job.status()));
+  app.get('/', async (request, reply) =>
+    reply
+      .type('text/html')
+      .send(page(await execute(request, 'factory.http.page', config.job.status())))
   );
   app.post('/api/job', async (request, reply) => {
     const origin = request.headers.origin;
@@ -72,7 +93,9 @@ export function operationsServer(config: {
             'A positive issue number and bounded context are required'
           )
         );
-    const result: StartResult = await config.run(
+    const result: StartResult = await execute(
+      request,
+      'factory.http.start',
       config.job.start({ ...parsed.data, base: config.base })
     );
     if (result.kind === 'occupied')

@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   index,
+  uniqueIndex,
   integer,
   jsonb,
   pgTable,
@@ -208,6 +209,31 @@ export const assetSourceState = pgTable('asset_source_state', {
   assetId: text('asset_id').primaryKey(),
   state: jsonb('state').notNull().$type<import('../capabilities/sources/index.js').SourceState>(),
 });
+/** History is keyed separately from the bounded membership row. Position preserves cursors. */
+export const sourceCandidates = pgTable(
+  'source_candidates',
+  {
+    assetId: text('asset_id').notNull(),
+    candidateId: text('candidate_id').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    sourceId: text('source_id').notNull(),
+    position: bigint('position', { mode: 'number' }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    pending: boolean('pending').notNull(),
+    candidate: jsonb('candidate')
+      .notNull()
+      .$type<import('../capabilities/sources/index.js').Candidate>(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.assetId, table.candidateId] }),
+    uniqueIndex('source_candidates_replay').on(table.assetId, table.idempotencyKey),
+    uniqueIndex('source_candidates_page').on(table.assetId, table.position),
+    index('source_candidates_source').on(table.assetId, table.sourceId),
+    index('source_candidates_pending')
+      .on(table.assetId, table.expiresAt)
+      .where(sql`${table.pending}`),
+  ]
+);
 /** Accepted identities can only be inserted. Conflicting replay never updates facts. */
 export const immutableSources = pgTable(
   'immutable_sources',

@@ -1,3 +1,4 @@
+import {workingSet} from './fixtures/source-working-set.js';
 import { Clock, Effect, Layer, ManagedRuntime } from 'effect';
 import { TestClock } from 'effect/testing';
 import { expect, it } from 'vitest';
@@ -54,9 +55,9 @@ it.each([
       Layer.provide(
         Layer.mergeAll(
           Layer.succeed(SourceStore, {
-            transact: (_id, _revision, change) =>
+            transact: (_id, _revision, change, selection) =>
               Effect.gen(function* () {
-                const changed = change(structuredClone(state));
+                const changed = change(workingSet(state, selection));
                 if (changed.readProtection) reservations.add(changed.readProtection.readId);
                 if (phase === 'authorization')
                   yield* Effect.promise(() => clockRuntime.runPromise(TestClock.setTime(1200)));

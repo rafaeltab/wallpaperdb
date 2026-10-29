@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, gt, lt, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
 import { Pool } from 'pg';
@@ -23,6 +23,7 @@ import {
   sourceAcceptanceOutbox,
   sourceCleanup,
   sourceReads,
+  sourceCandidates,
 } from '../../db/schema.js';
 interface Options {
   readonly databaseUrl: string;
@@ -112,7 +113,7 @@ export function sourcePostgresLayer(options: Options) {
           run('release-read', async (db) => {
             await db.delete(sourceReads).where(eq(sourceReads.id, id));
           }),
-        transact: (assetId, revision, change) =>
+        transact: (assetId, revision, change, selection) =>
           run('transact', (db) =>
             db.transaction(async (tx) => {
               if (revision !== null) {
@@ -150,9 +151,91 @@ export function sourcePostgresLayer(options: Options) {
                       nonterminalCandidateCount: 0,
                     })
                   : null;
+              if (initial) {
+                const matchAsset = eq(sourceCandidates.assetId, assetId);
+                if (selection?.kind === 'candidate') {
+                  const rows = await tx
+                    .select()
+                    .from(sourceCandidates)
+                    .where(and(matchAsset, eq(sourceCandidates.candidateId, selection.candidateId)))
+                    .limit(1);
+                  initial.candidates = rows.map((row) => row.candidate);
+                } else if (selection?.kind === 'create') {
+                  const replay = await tx
+                    .select()
+                    .from(sourceCandidates)
+                    .where(
+                      and(matchAsset, eq(sourceCandidates.idempotencyKey, selection.idempotencyKey))
+                    )
+                    .limit(1);
+                  const pending = await tx
+                    .select()
+                    .from(sourceCandidates)
+                    .where(
+                      and(
+                        matchAsset,
+                        eq(sourceCandidates.pending, true),
+                        gt(sourceCandidates.expiresAt, new Date(selection.now))
+                      )
+                    )
+                    .orderBy(desc(sourceCandidates.expiresAt))
+                    .limit(selection.limit);
+                  initial.candidates = [
+                    ...new Map(
+                      [...replay, ...pending].map((row) => [row.candidateId, row.candidate])
+                    ).values(),
+                  ];
+                } else if (selection?.kind === 'page') {
+                  let before: number | undefined;
+                  let valid = true;
+                  if (selection.cursor !== undefined) {
+                    const cursor = selection.cursor;
+                    const split = cursor.indexOf(':');
+                    const position = cursor.slice(0, split);
+                    before = Number(position);
+                    valid =
+                      new TextEncoder().encode(cursor).length <= 256 &&
+                      split > 0 &&
+                      /^(0|[1-9][0-9]*)$/.test(position) &&
+                      Number.isSafeInteger(before);
+                    if (valid) {
+                      const [anchor] = await tx
+                        .select({ id: sourceCandidates.candidateId })
+                        .from(sourceCandidates)
+                        .where(and(matchAsset, eq(sourceCandidates.position, before)))
+                        .limit(1);
+                      valid = anchor?.id === cursor.slice(split + 1);
+                    }
+                  }
+                  const rows = valid
+                    ? await tx
+                        .select()
+                        .from(sourceCandidates)
+                        .where(
+                          and(
+                            matchAsset,
+                            before === undefined ? undefined : lt(sourceCandidates.position, before)
+                          )
+                        )
+                        .orderBy(desc(sourceCandidates.position))
+                        .limit(33)
+                    : [];
+                  initial.candidates = rows.slice(0, 32).map((row) => row.candidate);
+                  const last = rows[31];
+                  initial.candidatePage = {
+                    valid,
+                    ...(rows.length > 32 && last
+                      ? { nextCursor: `${last.position}:${last.candidateId}` }
+                      : {}),
+                  };
+                } else initial.candidates = [];
+              }
               const priorSources = initial?.sources.map((source) => source.sourceId) ?? [];
               const priorCandidates = new Map(
-                initial?.candidates.map((candidate) => [candidate.candidateId, candidate.status])
+                initial?.candidates.map((candidate) => [
+                  candidate.candidateId,
+                  structuredClone(candidate),
+                ])
               );
               const changed = decide(() => {
                 const changed = change(initial);
@@ -177,7 +260,39 @@ export function sourcePostgresLayer(options: Options) {
               }
               if (changed.state && asset) {
                 for (const candidate of changed.state.candidates) {
-                  if (priorCandidates.get(candidate.candidateId) === candidate.status) continue;
+                  const prior = priorCandidates.get(candidate.candidateId);
+                  if (isDeepStrictEqual(prior, candidate)) continue;
+                  const values = {
+                    assetId,
+                    candidateId: candidate.candidateId,
+                    idempotencyKey: candidate.idempotencyKey,
+                    sourceId: candidate.sourceId,
+                    expiresAt: new Date(candidate.expiresAt),
+                    pending: !['accepted', 'rejected', 'cancelled'].includes(candidate.status),
+                    candidate,
+                  };
+                  if (prior) {
+                    await tx
+                      .update(sourceCandidates)
+                      .set(values)
+                      .where(
+                        and(
+                          eq(sourceCandidates.assetId, assetId),
+                          eq(sourceCandidates.candidateId, candidate.candidateId)
+                        )
+                      );
+                  } else {
+                    const [last] = await tx
+                      .select({ position: sourceCandidates.position })
+                      .from(sourceCandidates)
+                      .where(eq(sourceCandidates.assetId, assetId))
+                      .orderBy(desc(sourceCandidates.position))
+                      .limit(1);
+                    await tx
+                      .insert(sourceCandidates)
+                      .values({ ...values, position: (last?.position ?? -1) + 1 });
+                  }
+                  if (prior?.status === candidate.status) continue;
                   const terminal = ['accepted', 'rejected', 'cancelled'].includes(candidate.status);
                   const context = changed.cleanupContext ?? candidate.context;
                   const inputExpiry = Math.min(
@@ -300,12 +415,14 @@ export function sourcePostgresLayer(options: Options) {
                       set: { dueAt: new Date(evidenceExpiresAt), context: changed.cleanupContext },
                     });
                 }
+                const { candidatePage: _page, ...membership } = changed.state;
+                const persisted = { ...membership, candidates: [] };
                 await tx
                   .insert(assetSourceState)
-                  .values({ assetId, state: changed.state })
+                  .values({ assetId, state: persisted })
                   .onConflictDoUpdate({
                     target: assetSourceState.assetId,
-                    set: { state: changed.state },
+                    set: { state: persisted },
                   });
               }
               if (changed.confirmation) {

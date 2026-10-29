@@ -7,6 +7,7 @@ import {
   MandatoryInspection,
   SourceFailure,
   type Candidate,
+  type CandidateSelection,
   type CandidateIntent,
   type SourceOutcome,
   type SourceChangeOutcome,
@@ -95,13 +96,19 @@ export function sourcesLayer(configuration: {
         assetId: string,
         revision: string | null,
         change: (state: SourceState) => SourceOutcome,
-        context?: CommandContext
+        context?: CommandContext,
+        selection?: CandidateSelection
       ) =>
-        store.transact<SourceOutcome>(assetId, revision, (state) => ({
-          state,
-          result: owns(owner, state) ? change(state) : unavailable,
-          cleanupContext: context,
-        }));
+        store.transact<SourceOutcome>(
+          assetId,
+          revision,
+          (state) => ({
+            state,
+            result: owns(owner, state) ? change(state) : unavailable,
+            cleanupContext: context,
+          }),
+          selection
+        );
       const candidate = (
         owner: Owner,
         assetId: string,
@@ -122,7 +129,8 @@ export function sourcesLayer(configuration: {
             if (wasPending && !nonterminal(found)) state.nonterminalCandidateCount--;
             return outcome;
           },
-          context
+          context,
+          { kind: 'candidate', candidateId: id }
         );
       const changeSource = Effect.fn('asset.sources.change')(function* (
         owner: Owner,
@@ -204,50 +212,37 @@ export function sourcesLayer(configuration: {
           );
         },
         list: (owner, assetId, cursor) =>
-          store.transact<Effect.Success<ReturnType<SourcesPort['list']>>>(
-            assetId,
-            null,
-            (state) => {
-              if (!owns(owner, state)) return { state, result: unavailable };
-              let end = state.candidates.length;
-              if (cursor !== undefined) {
-                if (typeof cursor !== 'string' || new TextEncoder().encode(cursor).length > 256)
-                  return { state, result: unavailable };
-                const split = cursor.indexOf(':');
-                const position = cursor.slice(0, split);
-                const index = Number(position);
-                if (
-                  split < 1 ||
-                  !/^(0|[1-9][0-9]*)$/.test(position) ||
-                  !Number.isSafeInteger(index) ||
-                  state.candidates[index]?.candidateId !== cursor.slice(split + 1)
-                )
-                  return { state, result: unavailable };
-                end = index;
-              }
-              // Appending history preserves existing index/identity cursors. Verify the
-              // identity so a stale cursor cannot silently skip data after future retirement.
-              const start = Math.max(0, end - 32);
-              const next = start > 0 ? state.candidates[start] : undefined;
-              return {
-                state,
-                result: {
-                  kind: 'found' as const,
-                  asset: {
-                    assetId,
-                    assetType: state.asset.assetType,
-                    sources: state.sources,
-                    candidates: state.candidates.slice(start, end).reverse(),
-                    hasPendingCandidates: state.nonterminalCandidateCount > 0,
-                    ...(next ? { nextCandidateCursor: `${start}:${next.candidateId}` } : {}),
-                    defaultSourceId: state.defaultSourceId,
-                    sourceSetRevision: state.sourceSetRevision,
-                    deliveryRevision: state.deliveryRevision,
-                  },
+          cursor !== undefined &&
+          (typeof cursor !== 'string' || new TextEncoder().encode(cursor).length > 256)
+            ? Effect.succeed(unavailable)
+            : store.transact<Effect.Success<ReturnType<SourcesPort['list']>>>(
+                assetId,
+                null,
+                (state) => {
+                  if (!owns(owner, state)) return { state, result: unavailable };
+                  if (!state.candidatePage?.valid) return { state, result: unavailable };
+                  return {
+                    state,
+                    result: {
+                      kind: 'found' as const,
+                      asset: {
+                        assetId,
+                        assetType: state.asset.assetType,
+                        sources: state.sources,
+                        candidates: state.candidates,
+                        hasPendingCandidates: state.nonterminalCandidateCount > 0,
+                        ...(state.candidatePage.nextCursor
+                          ? { nextCandidateCursor: state.candidatePage.nextCursor }
+                          : {}),
+                        defaultSourceId: state.defaultSourceId,
+                        sourceSetRevision: state.sourceSetRevision,
+                        deliveryRevision: state.deliveryRevision,
+                      },
+                    },
+                  };
                 },
-              };
-            }
-          ),
+                { kind: 'page', cursor }
+              ),
         create: Effect.fn('asset.sources.create')(function* (owner, assetId, input) {
           if (
             !validRevision(input.expectedSourceSetRevision) ||
@@ -264,54 +259,66 @@ export function sourcesLayer(configuration: {
           const context = input.context ?? {
             occurrence: { source: 'https://wallpaperdb/asset/authors', id: crypto.randomUUID() },
           };
-          return yield* modify(owner, assetId, configuration.revision, (state) => {
-            const old = state.candidates.find((c) => c.idempotencyKey === input.idempotencyKey);
-            if (old) return sameIntent(old, input) ? result(old) : reject('idempotency-conflict');
-            const policy = configuration.types[state.asset.assetType];
-            if (!policy || !policy.operations.includes(input.operation))
-              return reject('unsupported-operation');
-            if (
-              (input.operation === 'replace-set' && state.asset.assetType !== 'picture') ||
-              (input.operation === 'replace-one' && state.asset.assetType === 'picture')
-            )
-              return reject('unsupported-operation');
-            if (input.expectedSourceSetRevision !== state.sourceSetRevision)
-              return reject('source-set-conflict');
-            if (
-              input.operation === 'replace-one' &&
-              !state.sources.some((source) => source.sourceId === input.targetSourceId)
-            )
-              return reject('unavailable-source');
-            if (
-              (input.operation === 'replace-set'
-                ? 1
-                : state.sources.length + (input.operation === 'add' ? 1 : 0)) >
-              policy.maxActiveSources
-            )
-              return reject('source-count-limit');
-            if (
-              state.candidates.filter(
-                (c) =>
-                  !['accepted', 'rejected', 'cancelled'].includes(c.status) &&
-                  Date.parse(c.expiresAt) > now
-              ).length >= policy.maxCandidates
-            )
-              return reject('candidate-count-limit');
-            const created: Candidate = {
-              ...input,
-              candidateId,
-              sourceId,
-              context,
-              status: 'awaiting-bytes',
-              expiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
-              orphanExpiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
-              temporaryExpiresAt: new Date(now + policy.temporaryInput.abandonedMs).toISOString(),
-              layout: 'asset-layout-1',
-            };
-            state.candidates.push(created);
-            state.nonterminalCandidateCount++;
-            return result(created);
-          });
+          return yield* modify(
+            owner,
+            assetId,
+            configuration.revision,
+            (state) => {
+              const old = state.candidates.find((c) => c.idempotencyKey === input.idempotencyKey);
+              if (old) return sameIntent(old, input) ? result(old) : reject('idempotency-conflict');
+              const policy = configuration.types[state.asset.assetType];
+              if (!policy || !policy.operations.includes(input.operation))
+                return reject('unsupported-operation');
+              if (
+                (input.operation === 'replace-set' && state.asset.assetType !== 'picture') ||
+                (input.operation === 'replace-one' && state.asset.assetType === 'picture')
+              )
+                return reject('unsupported-operation');
+              if (input.expectedSourceSetRevision !== state.sourceSetRevision)
+                return reject('source-set-conflict');
+              if (
+                input.operation === 'replace-one' &&
+                !state.sources.some((source) => source.sourceId === input.targetSourceId)
+              )
+                return reject('unavailable-source');
+              if (
+                (input.operation === 'replace-set'
+                  ? 1
+                  : state.sources.length + (input.operation === 'add' ? 1 : 0)) >
+                policy.maxActiveSources
+              )
+                return reject('source-count-limit');
+              if (
+                state.candidates.filter(
+                  (c) =>
+                    !['accepted', 'rejected', 'cancelled'].includes(c.status) &&
+                    Date.parse(c.expiresAt) > now
+                ).length >= policy.maxCandidates
+              )
+                return reject('candidate-count-limit');
+              const created: Candidate = {
+                ...input,
+                candidateId,
+                sourceId,
+                context,
+                status: 'awaiting-bytes',
+                expiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
+                orphanExpiresAt: new Date(now + policy.retention.candidateMs).toISOString(),
+                temporaryExpiresAt: new Date(now + policy.temporaryInput.abandonedMs).toISOString(),
+                layout: 'asset-layout-1',
+              };
+              state.candidates.push(created);
+              state.nonterminalCandidateCount++;
+              return result(created);
+            },
+            undefined,
+            {
+              kind: 'create',
+              idempotencyKey: input.idempotencyKey,
+              now,
+              limit: Math.max(1, ...Object.values(configuration.types).map((p) => p.maxCandidates)),
+            }
+          );
         }),
         status: (owner, assetId, id) =>
           candidate(owner, assetId, id, (_state, found) => result(found)),
@@ -441,96 +448,103 @@ export function sourcesLayer(configuration: {
             found.context ?? {
               occurrence: { source: 'https://wallpaperdb/asset/authors', id: crypto.randomUUID() },
             };
-          return yield* store.transact<SourceOutcome>(assetId, configuration.revision, (state) => {
-            if (!owns(owner, state)) return { state, result: unavailable };
-            const current = state.candidates.find((c) => c.candidateId === id);
-            if (!current) return { state, result: unavailable };
-            if (current.status === 'accepted') return { state, result: result(current) };
-            if (current.status !== 'ready' || !current.facts)
-              return { state, result: reject('candidate-not-ready') };
-            const policy = configuration.types[state.asset.assetType];
-            if (!policy) return { state, result: reject('unsupported-type') };
-            if (!policy.operations.includes(current.operation))
-              return { state, result: reject('unsupported-operation') };
-            if (
-              (current.operation === 'replace-set' && state.asset.assetType !== 'picture') ||
-              (current.operation === 'replace-one' && state.asset.assetType === 'picture')
-            )
-              return { state, result: reject('unsupported-operation') };
-            const reason =
-              Date.parse(current.expiresAt) <= now
-                ? 'candidate-expired'
-                : (policyRejection(current.facts, policy) ??
-                  (similarAspectRatios(
-                    [...state.sources.map((s) => s.facts), current.facts],
-                    policy.aspectRatioTolerance
-                  )
-                    ? undefined
-                    : 'aspect-ratio-limit'));
-            if (reason) {
-              current.status = 'rejected';
-              state.nonterminalCandidateCount--;
-              current.reason = reason;
-              return { state, result: result(current), cleanupContext: context };
-            }
-            if (state.sourceSetRevision !== intent.expectedSourceSetRevision)
-              return { state, result: reject('source-set-conflict') };
-            const replaced =
-              current.operation === 'replace-one'
-                ? state.sources.find((source) => source.sourceId === current.targetSourceId)
-                : undefined;
-            if (current.operation === 'replace-one' && !replaced)
-              return { state, result: reject('unavailable-source') };
-            const retired =
-              current.operation === 'replace-set' ? state.sources : replaced ? [replaced] : [];
-            if (state.sources.length - retired.length + 1 > policy.maxActiveSources)
-              return { state, result: reject('source-count-limit') };
-            if (retired.length > 0) {
-              state.sources = state.sources.filter(
-                (source) => !retired.some((prior) => prior.sourceId === source.sourceId)
-              );
-              if (retired.some((prior) => prior.sourceId === state.defaultSourceId))
-                state.defaultSourceId = current.sourceId;
-            }
-            state.sources.push({
-              sourceId: current.sourceId,
-              facts: current.facts,
-              layout: current.layout,
-            });
-            state.defaultSourceId ??= current.sourceId;
-            state.initialAnalysisSourceId ??= current.sourceId;
-            state.sourceSetRevision = (BigInt(state.sourceSetRevision) + 1n).toString();
-            state.deliveryRevision = (BigInt(state.deliveryRevision) + 1n).toString();
-            current.status = 'accepted';
-            state.nonterminalCandidateCount--;
-            current.sourceSetRevision = state.sourceSetRevision;
-            return {
-              state,
-              result: result(current),
-              cleanupContext: context,
-              ...(retired.length > 0
-                ? {
-                    retirements: retired.map((source) => ({
-                      sourceId: source.sourceId,
-                      evidenceExpiresAt: new Date(now + policy.retention.evidenceMs).toISOString(),
-                    })),
-                  }
-                : {}),
-              confirmation: {
-                context,
-                id: `source-accepted:${current.sourceId}`,
-                applicationId: state.asset.applicationId,
-                assetId,
-                assetType: state.asset.assetType,
-                candidateId: id,
+          return yield* store.transact<SourceOutcome>(
+            assetId,
+            configuration.revision,
+            (state) => {
+              if (!owns(owner, state)) return { state, result: unavailable };
+              const current = state.candidates.find((c) => c.candidateId === id);
+              if (!current) return { state, result: unavailable };
+              if (current.status === 'accepted') return { state, result: result(current) };
+              if (current.status !== 'ready' || !current.facts)
+                return { state, result: reject('candidate-not-ready') };
+              const policy = configuration.types[state.asset.assetType];
+              if (!policy) return { state, result: reject('unsupported-type') };
+              if (!policy.operations.includes(current.operation))
+                return { state, result: reject('unsupported-operation') };
+              if (
+                (current.operation === 'replace-set' && state.asset.assetType !== 'picture') ||
+                (current.operation === 'replace-one' && state.asset.assetType === 'picture')
+              )
+                return { state, result: reject('unsupported-operation') };
+              const reason =
+                Date.parse(current.expiresAt) <= now
+                  ? 'candidate-expired'
+                  : (policyRejection(current.facts, policy) ??
+                    (similarAspectRatios(
+                      [...state.sources.map((s) => s.facts), current.facts],
+                      policy.aspectRatioTolerance
+                    )
+                      ? undefined
+                      : 'aspect-ratio-limit'));
+              if (reason) {
+                current.status = 'rejected';
+                state.nonterminalCandidateCount--;
+                current.reason = reason;
+                return { state, result: result(current), cleanupContext: context };
+              }
+              if (state.sourceSetRevision !== intent.expectedSourceSetRevision)
+                return { state, result: reject('source-set-conflict') };
+              const replaced =
+                current.operation === 'replace-one'
+                  ? state.sources.find((source) => source.sourceId === current.targetSourceId)
+                  : undefined;
+              if (current.operation === 'replace-one' && !replaced)
+                return { state, result: reject('unavailable-source') };
+              const retired =
+                current.operation === 'replace-set' ? state.sources : replaced ? [replaced] : [];
+              if (state.sources.length - retired.length + 1 > policy.maxActiveSources)
+                return { state, result: reject('source-count-limit') };
+              if (retired.length > 0) {
+                state.sources = state.sources.filter(
+                  (source) => !retired.some((prior) => prior.sourceId === source.sourceId)
+                );
+                if (retired.some((prior) => prior.sourceId === state.defaultSourceId))
+                  state.defaultSourceId = current.sourceId;
+              }
+              state.sources.push({
                 sourceId: current.sourceId,
-                defaultSourceId: state.defaultSourceId,
-                initialAnalysisSourceId: state.initialAnalysisSourceId,
-                sourceSetRevision: state.sourceSetRevision,
-                deliveryRevision: state.deliveryRevision,
-              },
-            };
-          });
+                facts: current.facts,
+                layout: current.layout,
+              });
+              state.defaultSourceId ??= current.sourceId;
+              state.initialAnalysisSourceId ??= current.sourceId;
+              state.sourceSetRevision = (BigInt(state.sourceSetRevision) + 1n).toString();
+              state.deliveryRevision = (BigInt(state.deliveryRevision) + 1n).toString();
+              current.status = 'accepted';
+              state.nonterminalCandidateCount--;
+              current.sourceSetRevision = state.sourceSetRevision;
+              return {
+                state,
+                result: result(current),
+                cleanupContext: context,
+                ...(retired.length > 0
+                  ? {
+                      retirements: retired.map((source) => ({
+                        sourceId: source.sourceId,
+                        evidenceExpiresAt: new Date(
+                          now + policy.retention.evidenceMs
+                        ).toISOString(),
+                      })),
+                    }
+                  : {}),
+                confirmation: {
+                  context,
+                  id: `source-accepted:${current.sourceId}`,
+                  applicationId: state.asset.applicationId,
+                  assetId,
+                  assetType: state.asset.assetType,
+                  candidateId: id,
+                  sourceId: current.sourceId,
+                  defaultSourceId: state.defaultSourceId,
+                  initialAnalysisSourceId: state.initialAnalysisSourceId,
+                  sourceSetRevision: state.sourceSetRevision,
+                  deliveryRevision: state.deliveryRevision,
+                },
+              };
+            },
+            { kind: 'candidate', candidateId: id }
+          );
         }),
         original: Effect.fn('asset.sources.original')(function* (owner, assetId, sourceId) {
           const readId = crypto.randomUUID();

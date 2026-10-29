@@ -634,23 +634,28 @@ it('serializes concurrent per-Asset preparation without dropping a candidate or 
     const reserve = (id: string) =>
       sources.runPromise(
         SourceStore.use((s) =>
-          s.transact(created.assetId, 'revision-concurrent', (state) => {
-            if (!state) throw new Error('Missing Asset');
-            if (state.candidates.length === 2) return { state, result: 'full' };
-            state.nonterminalCandidateCount++;
-            state.candidates.push({
-              candidateId: id,
-              sourceId: `source-${id}`,
-              idempotencyKey: id,
-              operation: 'add',
-              expectedSourceSetRevision: '0',
-              status: 'awaiting-bytes',
-              expiresAt: '2099-01-01T00:00:00Z',
-              orphanExpiresAt: '2099-01-01T00:00:00Z',
-              layout: 'asset-layout-1',
-            });
-            return { state, result: 'reserved' };
-          })
+          s.transact(
+            created.assetId,
+            'revision-concurrent',
+            (state) => {
+              if (!state) throw new Error('Missing Asset');
+              if (state.candidates.length === 2) return { state, result: 'full' };
+              state.nonterminalCandidateCount++;
+              state.candidates.push({
+                candidateId: id,
+                sourceId: `source-${id}`,
+                idempotencyKey: id,
+                operation: 'add',
+                expectedSourceSetRevision: '0',
+                status: 'awaiting-bytes',
+                expiresAt: '2099-01-01T00:00:00Z',
+                orphanExpiresAt: '2099-01-01T00:00:00Z',
+                layout: 'asset-layout-1',
+              });
+              return { state, result: 'reserved' };
+            },
+            { kind: 'create', idempotencyKey: id, now: Date.now(), limit: 2 }
+          )
         )
       );
     expect((await Promise.all(['a', 'b', 'c'].map(reserve))).sort()).toEqual([
@@ -660,7 +665,7 @@ it('serializes concurrent per-Asset preparation without dropping a candidate or 
     ]);
     const saved = await sources.runPromise(
       SourceStore.use((s) =>
-        s.transact(created.assetId, null, (state) => ({ state, result: state }))
+        s.transact(created.assetId, null, (state) => ({ state, result: state }), { kind: 'page' })
       )
     );
     expect(saved?.candidates).toHaveLength(2);
@@ -958,5 +963,163 @@ it('retires the complete prior set atomically and rejects stale restoration whil
   } finally {
     await sources.dispose();
     await lifecycle.dispose();
+  }
+});
+
+it('keeps the Asset row bounded while retaining growing candidate history for replay', async () => {
+  const assetId = 'asset_growing_history';
+  await pool.query(
+    `INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+    VALUES ($1, 'wallpaper', 'wallpaper', 'clerk', 'owner')`,
+    [assetId]
+  );
+  const runtime = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  try {
+    for (const count of [32, 256]) {
+      await runtime.runPromise(
+        SourceStore.use((store) =>
+          store.transact(assetId, null, (state) => {
+            if (!state) throw new Error('Expected Asset');
+            for (let i = 0; i < count; i++)
+              state.candidates.push({
+                candidateId: `history-${count}-${i}`,
+                sourceId: `history-source-${count}-${i}`,
+                idempotencyKey: `history-key-${count}-${i}`,
+                operation: 'add',
+                expectedSourceSetRevision: '0',
+                status: 'cancelled',
+                layout: 'asset-layout-1',
+                expiresAt: '2030-01-01T00:00:00.000Z',
+                orphanExpiresAt: '2030-01-01T00:00:00.000Z',
+              });
+            return { state, result: undefined };
+          })
+        )
+      );
+      const persisted = await pool.query<{ bytes: number; candidates: number }>(
+        `SELECT octet_length(state::text) AS bytes, jsonb_array_length(state->'candidates') AS candidates
+         FROM asset_source_state WHERE asset_id=$1`,
+        [assetId]
+      );
+      expect(persisted.rows[0]?.candidates).toBe(0);
+      expect(persisted.rows[0]?.bytes).toBeLessThan(1024);
+      const key = `history-key-${count}-0`;
+      const read = (selection: import('../src/capabilities/sources/index.js').CandidateSelection) =>
+        runtime.runPromise(
+          SourceStore.use((store) =>
+            store.transact(assetId, null, (state) => ({ state, result: state }), selection)
+          )
+        );
+      const replay = await read({ kind: 'create', idempotencyKey: key, now: Date.now(), limit: 4 });
+      expect(replay?.candidates.map((c) => c.idempotencyKey)).toEqual([key]);
+      const exact = await read({ kind: 'candidate', candidateId: `history-${count}-0` });
+      expect(exact?.candidates).toEqual(replay?.candidates);
+      let page = await read({ kind: 'page' });
+      const ids: string[] = [];
+      while (page) {
+        expect(page.candidates.length).toBeLessThanOrEqual(32);
+        ids.push(...page.candidates.map((c) => c.candidateId));
+        if (!page.candidatePage?.nextCursor) break;
+        page = await read({ kind: 'page', cursor: page.candidatePage.nextCursor });
+      }
+      expect(ids.length).toBe(count === 32 ? 32 : 288);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect((await read({ kind: 'page', cursor: '0:wrong-identity' }))?.candidatePage?.valid).toBe(
+        false
+      );
+      // Read-only pages and replays must leave all historical rows untouched.
+      const versions = await pool.query(
+        'SELECT candidate_id, xmin::text FROM source_candidates WHERE asset_id=$1 ORDER BY position',
+        [assetId]
+      );
+      await read({ kind: 'page' });
+      expect(
+        (
+          await pool.query(
+            'SELECT candidate_id, xmin::text FROM source_candidates WHERE asset_id=$1 ORDER BY position',
+            [assetId]
+          )
+        ).rows
+      ).toEqual(versions.rows);
+    }
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('qualifies the PostgreSQL Source candidate working set against the shared contract', async () => {
+  const { verifyWorkingSet } = await import('./fixtures/source-working-set-contract.js');
+  const assetId = 'asset_working_set_contract';
+  await pool.query(
+    `INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+    VALUES ($1, 'wallpaper', 'wallpaper', 'clerk', 'owner')`,
+    [assetId]
+  );
+  const runtime = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  try {
+    const result = await verifyWorkingSet((effect) => runtime.runPromise(effect), assetId);
+    expect(result?.candidates[0]?.status).toBe('cancelled');
+    expect(result?.nonterminalCandidateCount).toBe(3);
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('backfills legacy history without losing replay payloads or zero-based cursor positions', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { emptySourceState } = await import('./fixtures/source-working-set-contract.js');
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'CREATE TEMP TABLE asset_source_state (LIKE public.asset_source_state INCLUDING ALL) ON COMMIT DROP'
+    );
+    await client.query(
+      'CREATE TEMP TABLE source_candidates (LIKE public.source_candidates INCLUDING ALL) ON COMMIT DROP'
+    );
+    const state = emptySourceState('legacy-history');
+    state.candidates = Array.from({ length: 40 }, (_, i) => ({
+      candidateId: `legacy-${i}`,
+      sourceId: `legacy-source-${i}`,
+      idempotencyKey: `legacy-key-${i}`,
+      operation: 'add',
+      expectedSourceSetRevision: '0',
+      status: i === 39 ? 'ready' : 'cancelled',
+      expiresAt: '2099-01-01T00:00:00Z',
+      orphanExpiresAt: '2099-01-01T00:00:00Z',
+      layout: 'asset-layout-1',
+    }));
+    state.nonterminalCandidateCount = 1;
+    await client.query('INSERT INTO asset_source_state VALUES ($1,$2)', [state.asset.id, state]);
+    const migration = await readFile('./drizzle/0019_candidate_history_backfill.sql', 'utf8');
+    for (const statement of migration.split('--> statement-breakpoint'))
+      await client.query(statement);
+    const rows = await client.query(
+      'SELECT position::int, candidate, pending FROM source_candidates ORDER BY position'
+    );
+    expect(rows.rows.map((row) => row.candidate)).toEqual(state.candidates);
+    expect(rows.rows.map((row) => row.position)).toEqual(Array.from({ length: 40 }, (_, i) => i));
+    expect(rows.rows.filter((row) => row.pending)).toHaveLength(1);
+    expect((await client.query('SELECT state FROM asset_source_state')).rows[0]?.state).toEqual({
+      ...state,
+      candidates: [],
+    });
+  } finally {
+    await client.query('ROLLBACK');
+    client.release();
   }
 });

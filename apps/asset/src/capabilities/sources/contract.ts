@@ -53,6 +53,15 @@ export interface AcceptedSource {
   readonly facts: SourceFacts;
   readonly layout: 'asset-layout-1';
 }
+export type CandidateSelection =
+  | { readonly kind: 'candidate'; readonly candidateId: string }
+  | {
+      readonly kind: 'create';
+      readonly idempotencyKey: string;
+      readonly now: number;
+      readonly limit: number;
+    }
+  | { readonly kind: 'page'; readonly cursor?: string };
 export interface SourceState {
   readonly asset: OwnedAsset;
   sourceSetRevision: string;
@@ -60,7 +69,9 @@ export interface SourceState {
   defaultSourceId: string | null;
   initialAnalysisSourceId: string | null;
   sources: AcceptedSource[];
+  /** Only the requested candidate working set, never the retained history. */
   candidates: Candidate[];
+  candidatePage?: { readonly valid: boolean; readonly nextCursor?: string };
   /** Includes expired records until their durable status becomes terminal. */
   nonterminalCandidateCount: number;
 }
@@ -95,6 +106,10 @@ export type SourceChangeOutcome =
  * initial analysis provenance and confirmation outbox commit together. Retirement records
  * evidence expiry once on the immutable Source row, without hydrating retirement history.
  * Active membership gates all Source and descendant eligibility; retained bytes confer none. A non-null
+ * Candidate selection is bounded: one identity, replay plus at most limit unexpired pending
+ * candidates, or a 32-item reverse page with an identity-checked exclusive cursor.
+ * Only loaded or newly appended candidates may be changed; omitted history is preserved.
+ * No selection loads no candidates. Nonterminal count covers all retained candidates.
  * revision locks/compares the active configuration in that same transaction. */
 export interface SourceStorePort {
   readonly transact: <A>(
@@ -118,7 +133,8 @@ export interface SourceStorePort {
         readonly expiresAt: string;
       };
       readonly cleanupContext?: CommandContext;
-    }
+    },
+    selection?: CandidateSelection
   ) => Effect.Effect<A, SourceFailure>;
   readonly releaseRead: (readId: string) => Effect.Effect<void, SourceFailure>;
 }

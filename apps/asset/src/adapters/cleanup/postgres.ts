@@ -17,6 +17,7 @@ import {
   immutableSources,
   assetDeletions,
   sourceReads,
+  sourceCandidates,
 } from '../../db/schema.js';
 
 interface Options {
@@ -43,6 +44,7 @@ async function finishDeletedAsset(tx: Transaction, assetId: string) {
     .update(assetDeletions)
     .set({ cleanupPending: false })
     .where(eq(assetDeletions.assetId, assetId));
+  await tx.delete(sourceCandidates).where(eq(sourceCandidates.assetId, assetId));
   await tx.delete(assetSourceState).where(eq(assetSourceState.assetId, assetId));
   await tx.delete(sourceReads).where(eq(sourceReads.assetId, assetId));
 }
@@ -234,7 +236,19 @@ export function cleanupPostgresLayer(options: Options) {
                   }
                   if (record) {
                     const state = record.state;
-                    for (const pending of state.candidates) {
+                    const rows = await tx
+                      .select()
+                      .from(sourceCandidates)
+                      .where(
+                        and(
+                          eq(sourceCandidates.assetId, row.assetId),
+                          target.kind === 'candidate'
+                            ? eq(sourceCandidates.candidateId, target.candidateId)
+                            : eq(sourceCandidates.sourceId, target.sourceId)
+                        )
+                      )
+                      .limit(1);
+                    for (const { candidate: pending } of rows) {
                       if (
                         pending.candidateId !==
                           (row.target.kind === 'candidate' ? row.target.candidateId : undefined) &&
@@ -249,6 +263,15 @@ export function cleanupPostgresLayer(options: Options) {
                             ? 'candidate-expired'
                             : 'temporary-input-expired';
                         state.nonterminalCandidateCount--;
+                        await tx
+                          .update(sourceCandidates)
+                          .set({ candidate: pending, pending: false })
+                          .where(
+                            and(
+                              eq(sourceCandidates.assetId, row.assetId),
+                              eq(sourceCandidates.candidateId, pending.candidateId)
+                            )
+                          );
                         await tx
                           .update(sourceCleanup)
                           .set({ dueAt: sql`least(${sourceCleanup.dueAt}, ${now})` })

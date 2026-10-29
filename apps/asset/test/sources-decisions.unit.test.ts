@@ -1,3 +1,4 @@
+import {workingSet, commitWorkingSet} from './fixtures/source-working-set.js';
 import { Clock, Effect, Layer, ManagedRuntime } from 'effect';
 import { TestClock } from 'effect/testing';
 import { describe, expect, it } from 'vitest';
@@ -78,12 +79,12 @@ function fixture(
   let ambiguousCommit = false;
   const store: SourceStorePort = {
     releaseRead: () => Effect.void,
-    transact: (assetId, revision, change) =>
+    transact: (assetId, revision, change, selection) =>
       Effect.suspend(() => {
         if (revision !== null && revision !== activeRevision)
           return Effect.fail(new SourceFailure({ operation: 'inactive-policy', cause: null }));
-        const changed = change(assetId === state.asset.id ? structuredClone(state) : null);
-        if (changed.state) state = structuredClone(changed.state);
+        const changed = change(assetId === state.asset.id ? workingSet(state, selection) : null);
+        if (changed.state) state = commitWorkingSet(state, changed.state);
         if (changed.retirement) retirements.push(changed.retirement);
         retirements.push(...(changed.retirements ?? []));
         if (changed.confirmation && !confirmations.some((c) => c.id === changed.confirmation?.id))

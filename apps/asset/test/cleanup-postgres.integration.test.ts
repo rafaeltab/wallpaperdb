@@ -661,7 +661,7 @@ it('records bounded orphan work atomically, protects current membership and recl
     expect(await cleanup.runPromise(CleanupStore.use((store) => store.claim(10)))).toEqual([]);
     const state = await sources.runPromise(
       SourceStore.use((store) =>
-        store.transact(assetId, null, (state) => ({ state, result: state }))
+        store.transact(assetId, null, (state) => ({ state, result: state }), {kind: 'candidate', candidateId: 'abandoned'})
       )
     );
     expect(state?.sources.map((source) => source.sourceId)).toEqual(['current']);

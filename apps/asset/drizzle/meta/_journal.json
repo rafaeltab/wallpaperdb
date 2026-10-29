@@ -127,6 +127,20 @@
       "when": 1792875889182,
       "tag": "0017_romantic_rictor",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793311982187,
+      "tag": "0018_perfect_the_spike",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793311995492,
+      "tag": "0019_candidate_history_backfill",
+      "breakpoints": true
     }
   ]
 }

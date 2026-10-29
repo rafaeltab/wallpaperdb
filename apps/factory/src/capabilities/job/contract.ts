@@ -34,9 +34,7 @@ export interface JobStore {
 }
 export const JobStore = Context.Service<JobStore>('wallpaperdb.factory.JobStore');
 export interface Issues {
-  inspect(
-    issue: number
-  ): Effect.Effect<
+  inspect(issue: number): Effect.Effect<
     {
       open: boolean;
       author: string;

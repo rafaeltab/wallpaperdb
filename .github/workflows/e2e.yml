@@ -186,6 +186,9 @@ jobs:
       - name: Build
         run: make build
 
+      - name: Install factory browser
+        run: make run PACKAGE=factory SCRIPT=test:browser:install
+
       - name: Run container E2E tests
         run: make test-e2e TURBO_FLAGS='--filter=!@wallpaperdb/web-e2e'
         env:

@@ -3,9 +3,9 @@
     "adapters/store",
     "adapters/t3",
     "adapters/github",
-    "adapters/git",
     "http",
-    "platform"
+    "platform",
+    "composition"
   ],
   "allowedCapabilityDependencies": {}
 }

@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
@@ -8,6 +8,7 @@ import type { Intent } from '../src/capabilities/job/index.js';
 it('reserves once across independent instances and retains launch claim after reopen', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'factory-'));
   try {
+    expect(await Effect.runPromise(fileStore(directory).read())).toBeNull();
     const a = fileStore(directory),
       b = fileStore(directory);
     const intent: Intent = {
@@ -35,6 +36,8 @@ it('reserves once across independent instances and retains launch claim after re
       issue: 576,
       expectedStage: 'implementation',
     });
+    await writeFile(join(directory, 'intent.json'), '{broken');
+    await expect(Effect.runPromise(reopened.read())).rejects.toMatchObject({ _tag: 'Unavailable' });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

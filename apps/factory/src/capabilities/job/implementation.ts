@@ -26,22 +26,9 @@ export const JobLive = Layer.effect(
       start: (command: Start) =>
         Effect.gen(function* () {
           if (yield* store.read()) return { kind: 'occupied' as const };
-          if (
-            !Number.isSafeInteger(command.issue) ||
-            command.issue < 1 ||
-            command.context.length > 16000 ||
-            !/^[a-f0-9]{40}$/.test(command.base)
-          )
-            return { kind: 'rejected' as const };
+          if (!validCommand(command)) return { kind: 'rejected' as const };
           const issue = yield* issues.inspect(command.issue);
-          if (
-            !issue.open ||
-            !['rafaeltab', 'zero-two-rafaeltab'].includes(issue.author) ||
-            !issue.labels.includes('ready-for-agent') ||
-            issue.labels.some((label) => ['future-work', 'spec'].includes(label)) ||
-            !issue.blockersReady
-          )
-            return { kind: 'rejected' as const };
+          if (!eligible(issue)) return { kind: 'rejected' as const };
           const createdAt = yield* Clock.currentTimeMillis;
           const id = `${createdAt}-${yield* Random.nextInt}-${yield* Random.nextInt}`;
           const intent: Intent = {
@@ -59,3 +46,26 @@ export const JobLive = Layer.effect(
     } satisfies Job;
   })
 );
+
+function validCommand(command: Start): boolean {
+  return (
+    Number.isSafeInteger(command.issue) &&
+    command.issue > 0 &&
+    command.context.length <= 16000 &&
+    /^[a-f0-9]{40}$/.test(command.base)
+  );
+}
+function eligible(issue: {
+  open: boolean;
+  author: string;
+  labels: readonly string[];
+  blockersReady: boolean;
+}): boolean {
+  return (
+    issue.open &&
+    ['rafaeltab', 'zero-two-rafaeltab'].includes(issue.author) &&
+    issue.labels.includes('ready-for-agent') &&
+    !issue.labels.some((label) => ['future-work', 'spec'].includes(label)) &&
+    issue.blockersReady
+  );
+}

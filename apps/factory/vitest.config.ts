@@ -6,6 +6,7 @@ export const configuration = {
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.ts'],
+    exclude: ['test/**/*.e2e.test.ts'],
     testTimeout: 60000,
     hookTimeout: 60000,
     maxConcurrency: 5,

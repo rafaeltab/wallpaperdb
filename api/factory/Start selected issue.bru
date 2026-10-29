@@ -1,0 +1,14 @@
+meta {
+  name: Start selected issue
+  type: http
+}
+
+post {
+  url: {{factoryBaseUrl}}/api/job
+  body: json
+  auth: none
+}
+
+body:json {
+  {"issue": 576, "context": ""}
+}

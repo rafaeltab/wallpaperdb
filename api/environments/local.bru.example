@@ -1,4 +1,5 @@
 vars {
+  factoryBaseUrl: http://localhost:8008
   baseUrl: http://localhost:8000/ingestor
   assetBaseUrl: http://localhost:8000/asset
   gatewayBaseUrl: http://localhost:8000/gateway

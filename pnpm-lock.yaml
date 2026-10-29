@@ -410,6 +410,9 @@ importers:
       '@biomejs/biome':
         specifier: 2.6.2
         version: 2.6.2
+      '@playwright/test':
+        specifier: ^1.51.1
+        version: 1.59.1
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3

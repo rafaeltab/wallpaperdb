@@ -133,6 +133,7 @@ function computePorts(slot) {
 		OPENSEARCH_HOST_PORT: base + 5,
 		OTEL_HTTP_HOST_PORT: base + 6,
 		OTEL_GRPC_HOST_PORT: base + 7,
+		FACTORY_PORT: base + 8,
 	};
 }
 
@@ -408,6 +409,10 @@ function buildServiceOverrides() {
 			OTEL_HTTP_HOST_PORT: (ctx) => String(ctx.ports.OTEL_HTTP_HOST_PORT),
 			OTEL_GRPC_HOST_PORT: (ctx) => String(ctx.ports.OTEL_GRPC_HOST_PORT),
 		},
+		"apps/factory": {
+			FACTORY_PORT: (ctx) => String(ctx.ports.FACTORY_PORT),
+			FACTORY_PROJECT: (ctx) => ctx.repoRoot,
+		},
 		"apps/ingestor": {
 			DATABASE_URL:
 				"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_ingestor",
@@ -518,7 +523,7 @@ function loadSecrets(secretEnvPath) {
  *   4. Apply user secrets from `secrets.env` (or legacy `secret.env`)
  */
 function generateAllEnvFiles(repoRoot, projectName, ports) {
-	const ctx = { projectName, ports };
+	const ctx = { projectName, ports, repoRoot };
 	const serviceOverrides = buildServiceOverrides();
 	const secretEnvPath = resolveSecretEnvPath();
 
@@ -617,6 +622,7 @@ function generateBrunoEnv(repoRoot, ports) {
 	const ingressPort = ports.INGRESS_PORT;
 
 	const overrides = {
+		factoryBaseUrl: `http://localhost:${ports.FACTORY_PORT}`,
 		baseUrl: `http://localhost:${ingressPort}/ingestor`,
 		assetBaseUrl: `http://localhost:${ingressPort}/asset`,
 		gatewayBaseUrl: `http://localhost:${ingressPort}/gateway`,

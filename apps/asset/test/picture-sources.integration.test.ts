@@ -21,6 +21,7 @@ import { AuthorAuthentication } from '../src/adapters/authors/index.js';
 import { AssetDelivery } from '../src/capabilities/delivery/index.js';
 import { Availability } from '../src/capabilities/availability/index.js';
 import { createHttpApp } from '../src/http/index.js';
+import { pictureAnimation } from './fixtures/animation.js';
 
 const authority = parseAuthority(authorityFixture());
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).build();
@@ -39,6 +40,104 @@ afterAll(async () => {
   await postgres?.stop();
   await tester.destroy();
 });
+
+it('durably readies and accepts the recorded 1850-frame configured picture', async () => {
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: postgres.getConnectionUri(),
+      revision: authority.identity,
+      ...authority.delivery,
+      leaseMs: 1000,
+    })
+  );
+  const s3 = tester.getS3();
+  const storage = sourceStorageLayer({
+    endpoint: s3.endpoints.fromHost,
+    region: 'us-east-1',
+    accessKeyId: s3.options.accessKey,
+    secretAccessKey: s3.options.secretKey,
+    bucket: 'picture-source-private',
+  });
+  const runtime = ManagedRuntime.make(
+    sourcesLayer({
+      revision: authority.identity,
+      types: {
+        ...authority.assetTypes,
+        picture: {
+          ...authority.assetTypes.picture,
+          admission: { ...authority.assetTypes.picture.admission, squareSize: 1 },
+        },
+      },
+    }).pipe(
+      Layer.provide(
+        Layer.merge(
+          storage,
+          sourcePostgresLayer({
+            databaseUrl: postgres.getConnectionUri(),
+            ...authority.delivery,
+            leaseMs: 1000,
+          })
+        )
+      )
+    )
+  );
+  const owner = { namespace: 'clerk-test', subject: 'animation-owner' };
+  try {
+    const created = await lifecycle.runPromise(
+      LifecycleStore.use((s) =>
+        s.accept({
+          revision: authority.identity,
+          applicationId: 'user',
+          canonical: 'animation-1850',
+          correlation: { commandId: 'animation-1850', applicationReference: 'animation-1850' },
+          decision: { kind: 'create', assetType: 'picture', owner },
+          context: { occurrence: { source: 'https://test/user', id: 'animation-1850' } },
+        })
+      )
+    );
+    if (created.outcome !== 'created') throw new Error('Expected picture');
+    const intent = {
+      operation: 'add',
+      expectedSourceSetRevision: '0',
+      idempotencyKey: 'animation-1850',
+    } as const;
+    const proposed = await runtime.runPromise(
+      Sources.use((s) => s.create(owner, created.assetId, intent))
+    );
+    if (proposed.kind !== 'candidate') throw new Error('Expected candidate');
+    const id = proposed.candidate.candidateId;
+    const bytes = await pictureAnimation();
+    const upload = {
+      async *[Symbol.asyncIterator]() {
+        yield bytes;
+      },
+      cancel() {},
+    };
+    const uploaded = await runtime.runPromise(
+      Sources.use((s) => s.upload(owner, created.assetId, id, upload)).pipe(Effect.exit)
+    );
+    const result = await runtime.runPromise(
+      Sources.use((s) => s.status(owner, created.assetId, id))
+    );
+    expect(result).toMatchObject({
+      kind: 'candidate',
+      candidate: {
+        status: 'ready',
+        facts: { animation: { frames: 1850, loop: 0, delaysMs: Array(1850).fill(10000000) } },
+      },
+    });
+    expect(uploaded).toMatchObject({ _tag: 'Success', value: result });
+    expect(
+      await runtime.runPromise(Sources.use((s) => s.accept(owner, created.assetId, id, intent)))
+    ).toMatchObject({ kind: 'candidate', candidate: { status: 'accepted' } });
+    expect(
+      await runtime.runPromise(Sources.use((s) => s.status(owner, created.assetId, id)))
+    ).toMatchObject({ kind: 'candidate', candidate: { status: 'accepted' } });
+  } finally {
+    await runtime.dispose();
+    await lifecycle.dispose();
+  }
+}, 180000);
 
 it('replaces a canonical picture through Owner HTTP with atomic retirement, rollback, immutable bytes and explicit conflict retry', async () => {
   const lifecycle = ManagedRuntime.make(

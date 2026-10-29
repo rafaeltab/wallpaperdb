@@ -221,10 +221,15 @@ export function sourceStorageLayer(options: Options) {
             signal.addEventListener('abort', abort, { once: true });
             if (signal.aborted) abort();
             const output: Buffer[] = [];
+            // A WebP ANMF chunk needs at least 24 encoded bytes before any frame data.
+            // Each permitted delay needs at most eight decimal digits and a separator.
+            // Reserve 1 KiB for the fixed facts envelope. Derive the transport bound
+            // from the effective encoded-input policy rather than imposing a frame quota.
+            const maxFactsBytes = 1024 + Math.floor(policy.admission.maxBytes / 24) * 9;
             let size = 0;
             child.stdout.on('data', (chunk) => {
               size += chunk.length;
-              if (size > 16384) worker.kill();
+              if (size > maxFactsBytes) worker.kill();
               else output.push(chunk);
             });
             // Diagnostics never include arbitrary input bytes.

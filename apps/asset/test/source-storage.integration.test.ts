@@ -11,10 +11,58 @@ import { beforeAll, afterAll, expect, it } from 'vitest';
 import { sourceStorageLayer } from '../src/adapters/sources/index.js';
 import { SourceBytes, MandatoryInspection } from '../src/capabilities/sources/index.js';
 import { initialSourcePolicies } from '../src/capabilities/sources/index.js';
+import { pictureAnimation } from './fixtures/animation.js';
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).build();
 const tester = new Tester().withS3().withS3Bucket('source-private');
 beforeAll(() => tester.setup(), 60000);
 afterAll(() => tester.destroy());
+it('preserves every timing in the recorded 1850-frame picture and timing boundary controls', async () => {
+  const s3 = tester.getS3();
+  const runtime = ManagedRuntime.make(
+    sourceStorageLayer({
+      endpoint: s3.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'source-private',
+    })
+  );
+  const policy = {
+    ...initialSourcePolicies.picture,
+    admission: { ...initialSourcePolicies.picture.admission, squareSize: 1 },
+  };
+  try {
+    for (const [frames, delay, loop] of [
+      [2, 0, 65535],
+      [1850, 10000000, 0],
+      [3, 16777215, 3],
+    ]) {
+      if (frames === undefined || delay === undefined || loop === undefined)
+        throw new Error('Missing case');
+      const bytes = await pictureAnimation(frames, delay, loop);
+      const id = `animation-${frames}`;
+      await runtime.runPromise(
+        SourceBytes.use((s) => s.put(id, bytes, createHash('sha256').update(bytes).digest('hex')))
+      );
+      const result = await runtime.runPromise(
+        MandatoryInspection.use((s) =>
+          s.inspect(id, { ...policy, admission: { ...policy.admission, maxBytes: bytes.length } })
+        )
+      );
+      expect(result).toMatchObject({
+        kind: 'verified',
+        facts: {
+          animation: { frames, loop, delaysMs: Array(frames).fill(delay) },
+        },
+      });
+      expect(await runtime.runPromise(MandatoryInspection.use((s) =>
+        s.inspect(id, { ...policy, admission: { ...policy.admission, maxBytes: bytes.length - 1 } })
+      ))).toEqual({ kind: 'rejected', reason: 'encoded-size-limit' });
+    }
+  } finally {
+    await runtime.dispose();
+  }
+}, 180000);
 function pngChunk(kind: string, data: Buffer): Buffer {
   const chunk = Buffer.alloc(data.length + 12);
   chunk.writeUInt32BE(data.length);

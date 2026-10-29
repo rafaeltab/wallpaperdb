@@ -91,7 +91,10 @@ export async function registerCreationHttp<E>(
     call: (
       creation: Creation['Service'],
       owner: { namespace: string; subject: string }
-    ) => Effect.Effect<WallpaperOutcome, unknown>,
+    ) => Effect.Effect<
+      WallpaperOutcome | { kind: 'list'; wallpapers: readonly Wallpaper[] },
+      unknown
+    >,
     accepted = false
   ) => {
     reply.header('Cache-Control', 'no-store');
@@ -115,7 +118,11 @@ export async function registerCreationHttp<E>(
         parent ? OtelTracer.withSpanContext(operation, parent) : operation,
         { signal: controller.signal }
       );
-      if (result.kind === 'result') return respond(reply, result.value, accepted);
+      if (result.kind === 'result') {
+        if (result.value.kind === 'list')
+          return reply.send({ wallpapers: result.value.wallpapers.map(publicWallpaper) });
+        return respond(reply, result.value, accepted);
+      }
       const status = result.kind === 'unauthorized' ? 401 : 503;
       return reply
         .code(status)
@@ -127,24 +134,11 @@ export async function registerCreationHttp<E>(
       reply.raw.off('close', abort);
     }
   };
-  app.get('/wallpapers', async (request, reply) => {
-    reply.header('Cache-Control', 'no-store');
-    const result = await runtime.runPromise(
-      Effect.gen(function* () {
-        const auth = yield* CreatorAuthentication;
-        const owner = yield* auth.verify(request.headers.authorization);
-        if (!owner) return { kind: 'unauthorized' as const };
-        const c = yield* Creation;
-        return { kind: 'list' as const, wallpapers: yield* c.list(owner) };
-      }).pipe(Effect.catch(() => Effect.succeed({ kind: 'failure' as const })))
-    );
-    if (result.kind === 'list') return { wallpapers: result.wallpapers.map(publicWallpaper) };
-    const status = result.kind === 'unauthorized' ? 401 : 503;
-    return reply
-      .code(status)
-      .type('application/problem+json')
-      .send(problem(status, status === 401 ? 'unauthorized' : 'service-unavailable'));
-  });
+  app.get('/wallpapers', (request, reply) =>
+    run(request, reply, (c, owner) =>
+      c.list(owner).pipe(Effect.map((wallpapers) => ({ kind: 'list' as const, wallpapers })))
+    )
+  );
   app.post('/wallpapers', schemaOptions(z.object({}).strict()), (request, reply) => {
     const key = z
       .string()

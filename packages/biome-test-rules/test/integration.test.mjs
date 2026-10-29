@@ -522,6 +522,6 @@ test("mutation inventory records the isolated Biome plugin limitation", () => {
 	assert.match(entry.reason, /Biome/);
 	assert.equal(
 		entry.followUp,
-		"https://github.com/rafaeltab/wallpaperdb/issues/445",
+		"https://github.com/rafaeltab/wallpaperdb/issues/560",
 	);
 });

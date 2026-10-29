@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { createServer, type Socket } from 'node:net';
@@ -172,4 +172,57 @@ it.each([
     }
     if (failures.length) throw new AggregateError(failures, 'Broker trust contract failed');
   }
+);
+
+it.each(['commands', 'notifications', 'sources', 'cleanup', 'events'])(
+  '%s releases a native socket when the broker never sends INFO',
+  async (mode) => {
+    const directory = await mkdtemp(join(tmpdir(), 'asset-silent-broker-'));
+    const sockets = new Set<Socket>();
+    const server = createServer((socket) => {
+      sockets.add(socket);
+      socket.on('error', () => {});
+      socket.once('close', () => sockets.delete(socket));
+      socket.resume();
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Missing TCP address');
+    await writeFile(join(directory, 'authority.json'), JSON.stringify(authorityFixture()));
+    const child = spawn(
+      process.execPath,
+      [
+        '--import',
+        resolve('node_modules/tsx/dist/loader.mjs'),
+        resolve('test/fixtures/broker-selection.ts'),
+        mode,
+        `nats://127.0.0.1:${address.port}`,
+        join(directory, 'authority.json'),
+      ],
+      { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] }
+    );
+    const exited = once(child, 'exit');
+    const settled = once(child, 'message');
+    try {
+      await expect.poll(() => sockets.size, { timeout: 10000 }).toBe(1);
+      expect(
+        await Promise.race([
+          settled.then(([message]) => message),
+          exited.then(() => 'exited-before-inspection'),
+        ])
+      ).toBe('acquisition-settled');
+      expect(child.exitCode).toBeNull();
+      await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0);
+      child.send('release');
+      expect((await exited)[0]).toBe(1);
+    } finally {
+      if (child.exitCode === null) child.kill();
+      await exited;
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+  30000
 );

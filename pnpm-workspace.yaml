@@ -15,3 +15,4 @@ onlyBuiltDependencies:
 
 patchedDependencies:
   "@stryker-mutator/vitest-runner@10.0.0": patches/stryker-vitest-10.0.0.patch
+  'nats@2.29.3': patches/nats-2.29.3.patch

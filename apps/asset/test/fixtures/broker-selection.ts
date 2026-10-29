@@ -1,3 +1,4 @@
+import { once } from 'node:events';
 import { connect } from 'nats';
 import { assetBrokerTransport } from '../../src/adapters/nats.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
@@ -136,4 +137,11 @@ try {
 } catch {
   process.stdout.write('broker-selection: refused\n');
   process.exitCode = 1;
+}
+
+// Native-socket tests inspect the peer while this process is still alive.
+if (process.send) {
+  process.send('acquisition-settled');
+  await once(process, 'message');
+  process.disconnect();
 }

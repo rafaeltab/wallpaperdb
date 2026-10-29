@@ -1,0 +1,15 @@
+diff --git a/lib/src/node_transport.js b/lib/src/node_transport.js
+--- a/lib/src/node_transport.js
++++ b/lib/src/node_transport.js
+@@ -420,9 +420,8 @@ class NodeTransport {
+     }
+     _closed(err_1) {
+         return __awaiter(this, arguments, void 0, function* (err, internal = true) {
+-            // if this connection didn't succeed, then ignore it.
+-            if (!this.connected)
+-                return;
++            // Failed handshakes own a socket too. ProtocolHandler closes this
++            // transport on its connection deadline, before INFO may arrive.
+             if (this.done)
+                 return;
+             this.closeError = err;

@@ -41,7 +41,7 @@
         "integration"
       ],
       "limitations": {
-        "reason": "Integration uses the Redis adapter contract and its composed admission scenario. Search and NATS need separate activation/reset validation. Search server integration rebuilds and spawns dist/index.mjs; in-process Redis support does not qualify instrumented bundle selection, mutation-ID activation or returned native per-test attribution (#560). OpenSearch's separate #518 diagnostic-only NO-GO decision and #559 qualification follow-up do not enable search mutations or imply that their unmerged controller is present here.",
+        "reason": "Integration uses the Redis adapter contract and its composed admission scenario. Search and NATS need separate activation/reset validation. Search server integration rebuilds and spawns dist/index.mjs; in-process Redis support does not qualify instrumented bundle selection, mutation-ID activation or returned native per-test attribution (#560). OpenSearch remains diagnostic-only under #518, with qualification work tracked in #559; search mutations remain excluded.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
@@ -141,7 +141,7 @@
     },
     "packages/core": {
       "decision": "excluded",
-      "reason": "The unit database health probe opens an unowned localhost:59999 PostgreSQL endpoint; its separate deterministic-unit qualification is in #529/PR #533, not this branch. Integration tests import local DatabaseConnection wrappers in process while builders control external services. Integration activation, negative-endpoint inputs and invocation-owned cleanup remain unqualified; child/deployed execution needs separate artifact selection, activation and returned native attribution (#560).",
+      "reason": "The unit database health probe opens an unowned localhost:59999 PostgreSQL endpoint; the separate deterministic-unit decision is tracked in #529/PR #533. Integration tests import local DatabaseConnection wrappers in process while builders control external services. Integration activation, negative-endpoint inputs and invocation-owned cleanup remain unqualified; child/deployed execution needs separate artifact selection, activation and returned native attribution (#560).",
       "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
     },
     "packages/crap-typescript-core": {

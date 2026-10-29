@@ -221,10 +221,15 @@ export function sourceStorageLayer(options: Options) {
             signal.addEventListener('abort', abort, { once: true });
             if (signal.aborted) abort();
             const output: Buffer[] = [];
+            // Every WebP frame needs an 8-byte ANMF chunk header and 16-byte
+            // frame header. Each 24-bit delay needs at most 8 decimal digits
+            // plus a separator. Reserve the existing envelope for scalar facts.
+            // This is a protocol allocation bound, not a new Author frame limit.
+            const outputLimit = 16384 + Math.floor(policy.admission.maxBytes / 24) * 9;
             let size = 0;
             child.stdout.on('data', (chunk) => {
               size += chunk.length;
-              if (size > 16384) worker.kill();
+              if (size > outputLimit) worker.kill();
               else output.push(chunk);
             });
             // Diagnostics never include arbitrary input bytes.

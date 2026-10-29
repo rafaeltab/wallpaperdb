@@ -819,3 +819,120 @@ it('fences late upload and immutable preparation completion after terminal delet
     await lifecycle.dispose();
   }
 });
+
+it('durably completes the recorded 1850-frame picture candidate through HTTP and preserves exact original bytes', async () => {
+  const { animationWebp } = await import('./fixtures/animation.js');
+  const input = await animationWebp();
+  const lifecycle = ManagedRuntime.make(
+    lifecyclePostgresLayer({
+      databaseUrl: postgres.getConnectionUri(),
+      revision: authority.identity,
+      ...authority.delivery,
+      leaseMs: 1000,
+    })
+  );
+  const s3 = tester.getS3();
+  const persistence = sourcePostgresLayer({
+    databaseUrl: postgres.getConnectionUri(),
+    ...authority.delivery,
+    leaseMs: 1000,
+  });
+  const storage = sourceStorageLayer({
+    endpoint: s3.endpoints.fromHost,
+    region: 'us-east-1',
+    accessKeyId: s3.options.accessKey,
+    secretAccessKey: s3.options.secretKey,
+    bucket: 'composition-private',
+  });
+  const services = sourcesLayer({
+    revision: authority.identity,
+    types: {
+      ...authority.assetTypes,
+      picture: {
+        ...authority.assetTypes.picture,
+        admission: { ...authority.assetTypes.picture.admission, squareSize: 1 },
+      },
+    },
+  }).pipe(Layer.provide(Layer.merge(persistence, storage)));
+  const app = await createHttpApp(
+    { nodeEnv: 'test', port: 3003 },
+    Layer.merge(
+      Layer.succeed(Availability, {
+        health: () => Effect.die('unused'),
+        ready: () => Effect.die('unused'),
+      }),
+      Layer.succeed(AssetDelivery, {
+        wallpaper: () => Effect.die('unused'),
+        picture: () => Effect.die('unused'),
+      })
+    ),
+    {
+      sourceServices: Layer.merge(
+        services,
+        Layer.succeed(AuthorAuthentication, {
+          verify: (token) =>
+            Effect.succeed(
+              token === 'Bearer owner' ? { namespace: 'clerk-test', subject: 'owner' } : null
+            ),
+        })
+      ),
+    }
+  );
+  try {
+    const created = await lifecycle.runPromise(
+      LifecycleStore.use((store) =>
+        store.accept({
+          revision: authority.identity,
+          applicationId: 'user',
+          canonical: 'animation-553',
+          correlation: { commandId: 'animation-553', applicationReference: 'animation-553' },
+          decision: {
+            kind: 'create',
+            assetType: 'picture',
+            owner: { namespace: 'clerk-test', subject: 'owner' },
+          },
+          context: { occurrence: { source: 'https://test/picture', id: 'animation-553' } },
+        })
+      )
+    );
+    if (created.outcome !== 'created') throw new Error('Expected Asset');
+    const root = `/assets/${created.assetId}`;
+    const headers = { authorization: 'Bearer owner', 'idempotency-key': 'animation-553' };
+    const candidate = await app.inject({
+      method: 'POST',
+      url: `${root}/source-candidates`,
+      headers,
+      payload: { operation: 'add', expectedSourceSetRevision: '0' },
+    });
+    expect(candidate.statusCode).toBe(201);
+    const id = candidate.json<{ candidateId: string }>().candidateId;
+    const upload = await app.inject({
+      method: 'PUT',
+      url: `${root}/source-candidates/${id}/bytes`,
+      headers: { ...headers, 'content-type': 'application/octet-stream' },
+      payload: input,
+    });
+    expect(upload.statusCode).toBe(200);
+    expect(upload.json()).toMatchObject({ status: 'ready' });
+    expect(
+      (await app.inject({ url: `${root}/source-candidates/${id}`, headers })).json()
+    ).toMatchObject({ status: 'ready' });
+    const accepted = await app.inject({
+      method: 'POST',
+      url: `${root}/source-candidates/${id}/accept`,
+      headers,
+      payload: { operation: 'add', expectedSourceSetRevision: '0' },
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect(
+      (await app.inject({ url: `${root}/source-candidates/${id}`, headers })).json()
+    ).toMatchObject({ status: 'accepted' });
+    const sourceId = accepted.json<{ sourceId: string }>().sourceId;
+    expect(
+      (await app.inject({ url: `${root}/sources/${sourceId}/original`, headers })).rawPayload
+    ).toEqual(input);
+  } finally {
+    await app.close();
+    await lifecycle.dispose();
+  }
+}, 300000);

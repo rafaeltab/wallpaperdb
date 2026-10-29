@@ -617,3 +617,70 @@ it('reports displayed geometry for an oriented Source without rewriting its immu
     await runtime.dispose();
   }
 });
+
+it.each([
+  { frames: 1850, delay: 10000000, loop: 0 },
+  { frames: 1850, delay: 16777215, loop: 65535 },
+  { frames: 2, delay: 0, loop: 3 },
+])(
+  'preserves all $frames frame timings, delay $delay and loop $loop across the inspection protocol',
+  async ({ frames, delay, loop }) => {
+    const { animationWebp } = await import('./fixtures/animation.js');
+    const bytes = await animationWebp(frames, delay, loop);
+    const s3 = tester.getS3();
+    const runtime = ManagedRuntime.make(
+      sourceStorageLayer({
+        endpoint: s3.endpoints.fromHost,
+        region: 'us-east-1',
+        accessKeyId: s3.options.accessKey,
+        secretAccessKey: s3.options.secretKey,
+        bucket: 'source-private',
+      })
+    );
+    const id = `animation-${frames}-${delay}-${loop}`;
+    try {
+      await runtime.runPromise(
+        SourceBytes.use((storage) =>
+          storage.put(id, bytes, createHash('sha256').update(bytes).digest('hex'))
+        )
+      );
+      const result = await runtime.runPromise(
+        MandatoryInspection.use((inspector) =>
+          inspector.inspect(id, {
+            ...initialSourcePolicies.picture,
+            admission: {
+              ...initialSourcePolicies.picture.admission,
+              squareSize: 1,
+              maxBytes: bytes.length,
+            },
+          })
+        )
+      );
+      expect(result).toMatchObject({
+        kind: 'verified',
+        facts: {
+          model: 'animated-sdr-webp',
+          byteLength: bytes.length,
+          animation: { frames, loop, delaysMs: Array(frames).fill(delay) },
+        },
+      });
+      expect(
+        await runtime.runPromise(
+          MandatoryInspection.use((inspector) =>
+            inspector.inspect(id, {
+              ...initialSourcePolicies.picture,
+              admission: {
+                ...initialSourcePolicies.picture.admission,
+                squareSize: 1,
+                maxBytes: bytes.length - 1,
+              },
+            })
+          )
+        )
+      ).toEqual({ kind: 'rejected', reason: 'encoded-size-limit' });
+    } finally {
+      await runtime.dispose();
+    }
+  },
+  300000
+);

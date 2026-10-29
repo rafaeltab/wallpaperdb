@@ -1,13 +1,14 @@
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { controlledStore } from './fixtures/store.js';
+import { Clock, Effect, Layer, ManagedRuntime } from 'effect';
 import { TestClock } from 'effect/testing';
 import { expect, it } from 'vitest';
 import {
   Execution,
   Issues,
+  Time,
   Job,
   JobLive,
   JobStore,
-  type Intent,
   type Issues as IssuePort,
 } from '../src/capabilities/job/index.js';
 const facts = {
@@ -18,28 +19,14 @@ const facts = {
   url: 'https://github.com/rafaeltab/wallpaperdb/issues/576',
 };
 function setup(issue: Effect.Success<ReturnType<IssuePort['inspect']>> = facts) {
-  let saved: Intent | null = null;
-  let claimed = false;
+  const store = controlledStore();
   let launches = 0;
   const runtime = ManagedRuntime.make(
     JobLive.pipe(
       Layer.provide(
         Layer.mergeAll(
-          Layer.succeed(JobStore, {
-            read: () => Effect.succeed(saved),
-            reserve: (intent) =>
-              Effect.sync(() => {
-                if (saved) return false;
-                saved = intent;
-                return true;
-              }),
-            claimLaunch: () =>
-              Effect.sync(() => {
-                if (claimed) return false;
-                claimed = true;
-                return true;
-              }),
-          }),
+          Layer.succeed(Time, { now: () => Clock.currentTimeMillis }),
+          Layer.succeed(JobStore, store),
           Layer.succeed(Issues, { inspect: () => Effect.succeed(issue) }),
           Layer.succeed(Execution, {
             launch: () =>
@@ -61,7 +48,7 @@ function setup(issue: Effect.Success<ReturnType<IssuePort['inspect']>> = facts) 
       runtime.runPromise(
         Effect.flatMap(Job, (job) => job.start({ issue: 576, base: 'a'.repeat(40), context: '' }))
       ),
-    saved: () => saved,
+    saved: () => Effect.runPromise(store.read()),
   };
 }
 it.each([
@@ -75,7 +62,7 @@ it.each([
   const app = setup(facts);
   try {
     expect(await app.start()).toEqual({ kind: 'rejected' });
-    expect(app.saved()).toBeNull();
+    expect(await app.saved()).toBeNull();
     expect(app.launches()).toBe(0);
   } finally {
     await app.runtime.dispose();

@@ -193,6 +193,17 @@
       "decision": "excluded",
       "reason": "No maintained mutation-compatible behavioral suite.",
       "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+    },
+    "apps/factory": {
+      "decision": "enabled",
+      "mechanism": "native-vitest-node",
+      "stages": [
+        "unit"
+      ],
+      "limitations": {
+        "reason": "Integration exercises spawned CLI endpoints, built subprocesses and real Git worktrees; mutation activation/reset across those processes is not validated. Browser deployment uses its own E2E suite.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+      }
     }
   }
 }

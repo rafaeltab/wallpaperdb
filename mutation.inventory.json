@@ -85,7 +85,7 @@
         "unit"
       ],
       "limitations": {
-        "reason": "PostgreSQL and S3 fixtures need cancellation-safe invocation ownership and reset isolation before integration opt-in. Effect workers and the Sharp picture encoder run in process. Separately invoked operator/deployed paths still need validated instrumented-artifact selection, mutation-ID activation and native per-test coverage/result return (#560); existing unit support does not qualify those paths.",
+        "reason": "PostgreSQL and S3 fixtures need cancellation-safe invocation ownership and reset isolation before integration opt-in. Effect workers and the picture codec wrapper run in process, but the wrapper spawns Node encoder.ts or built picture-encoder.mjs. The child returns application JSON with encoded image bytes, not native per-test coverage, hit counts or results. Encoder and separately invoked operator/deployed paths need validated instrumented-artifact selection, mutation-ID activation and returned native attribution (#560); existing unit support does not qualify those paths.",
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },

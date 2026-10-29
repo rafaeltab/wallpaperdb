@@ -51,14 +51,25 @@ try {
     throw new Error('noncanonical-picture');
   if (animated && (metadata.loop === undefined || metadata.delay?.length !== frames))
     throw new Error('invalid-image');
-  // Full strict decoding verifies mandatory facts. Sequential per-frame decoding avoids a whole-animation pixel allocation.
-  for (let page = 0; page < frames; page++)
+  // Decode small animations once within the existing pixel allocation budget.
+  // Reopening each page repeatedly decodes its predecessors, making long tiny
+  // animations exceed the HTTP lifetime despite their small decoded footprint.
+  if (animated && frames <= Math.floor(options.maxPixels / (width * height))) {
     await sharp(bytes, {
-      page,
-      pages: 1,
+      animated: true,
       limitInputPixels: options.maxPixels,
       failOn: 'warning',
     }).stats();
+  } else {
+    // Larger animations still allocate at most one bounded frame at a time.
+    for (let page = 0; page < frames; page++)
+      await sharp(bytes, {
+        page,
+        pages: 1,
+        limitInputPixels: options.maxPixels,
+        failOn: 'warning',
+      }).stats();
+  }
   const swap =
     metadata.orientation !== undefined && metadata.orientation >= 5 && metadata.orientation <= 8;
   process.stdout.write(

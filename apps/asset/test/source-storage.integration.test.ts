@@ -55,14 +55,35 @@ it('preserves every timing in the recorded 1850-frame picture and timing boundar
           animation: { frames, loop, delaysMs: Array(frames).fill(delay) },
         },
       });
-      expect(await runtime.runPromise(MandatoryInspection.use((s) =>
-        s.inspect(id, { ...policy, admission: { ...policy.admission, maxBytes: bytes.length - 1 } })
-      ))).toEqual({ kind: 'rejected', reason: 'encoded-size-limit' });
+      expect(
+        await runtime.runPromise(
+          MandatoryInspection.use((s) =>
+            s.inspect(id, {
+              ...policy,
+              admission: { ...policy.admission, maxBytes: bytes.length - 1 },
+            })
+          )
+        )
+      ).toEqual({ kind: 'rejected', reason: 'encoded-size-limit' });
     }
+    const corrupt = await pictureAnimation(3);
+    // Preserve the container and first two frames, corrupt the final VP8L signature.
+    const lastFrame = corrupt.lastIndexOf(Buffer.from('ANMF'));
+    corrupt[lastFrame + 32] = 0xff;
+    await runtime.runPromise(
+      SourceBytes.use((s) =>
+        s.put('animation-corrupt-last', corrupt, createHash('sha256').update(corrupt).digest('hex'))
+      )
+    );
+    expect(
+      await runtime.runPromise(
+        MandatoryInspection.use((s) => s.inspect('animation-corrupt-last', policy))
+      )
+    ).toEqual({ kind: 'rejected', reason: 'invalid-image' });
   } finally {
     await runtime.dispose();
   }
-}, 180000);
+});
 function pngChunk(kind: string, data: Buffer): Buffer {
   const chunk = Buffer.alloc(data.length + 12);
   chunk.writeUInt32BE(data.length);

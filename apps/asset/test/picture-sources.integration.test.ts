@@ -137,7 +137,7 @@ it('durably readies and accepts the recorded 1850-frame configured picture', asy
     await runtime.dispose();
     await lifecycle.dispose();
   }
-}, 180000);
+});
 
 it('replaces a canonical picture through Owner HTTP with atomic retirement, rollback, immutable bytes and explicit conflict retry', async () => {
   const lifecycle = ManagedRuntime.make(

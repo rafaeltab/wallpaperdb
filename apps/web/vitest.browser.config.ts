@@ -13,6 +13,9 @@ export default mergeConfig(
     optimizeDeps: {
       include: [
         '@tanstack/react-router',
+        'react-dom/client',
+        '@tanstack/react-query-devtools',
+        '@tanstack/router-devtools',
         'react-markdown',
         'rehype-sanitize',
         'remark-gfm',

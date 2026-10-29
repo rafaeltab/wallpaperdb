@@ -171,3 +171,76 @@ it('requires explicit selection of the winner when a competing replacement retir
   expect(changes).toEqual([{ operation: 'replace-one', targetSourceId: 'old' }, { operation: 'replace-one', targetSourceId: 'winner' }]);
   expect(batch.getSnapshot().rows[1]).toMatchObject({ status: 'accepted' });
 });
+
+it.each(['accepted', 'failed'] as const)(
+  'releases %s history for add, replacement and saved recovery while bounding pending work',
+  async (outcome) => {
+    const wallpaper = {
+      wallpaperId: 'published',
+      assetId: 'asset',
+      sourceId: 'first',
+      state: 'published' as const,
+      createdAt: 'now',
+    };
+    const api: SourceBatchApi<string> = {
+      identifier: () => crypto.randomUUID(),
+      begin: async () => wallpaper,
+      wallpaper: async () => wallpaper,
+      list: async () => ({
+        sourceSetRevision: '1',
+        sources: [{ sourceId: 'first' }],
+        candidates: [],
+        hasPendingCandidates: false,
+      }),
+      create: async (_asset, key) => ({
+        candidateId: key,
+        status: 'awaiting-bytes',
+        expectedSourceSetRevision: '1',
+      }),
+      status: async (_asset, id) => ({
+        candidateId: id,
+        status: 'ready',
+        expectedSourceSetRevision: '1',
+      }),
+      upload: async (_asset, id) => ({
+        candidateId: id,
+        status: outcome === 'failed' ? 'rejected' : 'ready',
+        expectedSourceSetRevision: '1',
+      }),
+      accept: async (_asset, id) => ({
+        candidateId: id,
+        status: 'accepted',
+        sourceId: id,
+        expectedSourceSetRevision: '1',
+      }),
+      expectSource: async () => {},
+      cancel: async () => {},
+      wait: async () => {},
+    };
+    const batch = createWallpaperSourceBatch(api, { wallpaperId: 'published' });
+    const file = { value: 'bytes', name: 'source.png' };
+    expect(batch.addFiles(Array.from({ length: 16 }, () => file))).toBe(true);
+    expect(batch.addFiles([file])).toBe(false);
+    await batch.run(new AbortController().signal);
+    expect(batch.getSnapshot().rows.every((row) => row.status === outcome)).toBe(true);
+    expect(batch.addFiles([file])).toBe(true);
+    expect(batch.replace(file, 'first')).toBe(true);
+    expect(
+      batch.resume(file, { candidateId: 'saved', status: 'ready', expectedSourceSetRevision: '1' })
+    ).toBe(true);
+    expect(batch.addFiles(Array.from({ length: 13 }, () => file))).toBe(true);
+    expect(batch.addFiles([file])).toBe(false);
+    expect(batch.replace(file, 'first')).toBe(false);
+    expect(
+      batch.resume(file, {
+        candidateId: 'another',
+        status: 'ready',
+        expectedSourceSetRevision: '1',
+      })
+    ).toBe(false);
+    const first = batch.getSnapshot().rows[0];
+    if (!first) throw new Error('Missing retained outcome');
+    batch.retry(first.id);
+    expect(batch.getSnapshot().rows[0]?.status).toBe(outcome);
+  }
+);

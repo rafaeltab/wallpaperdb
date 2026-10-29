@@ -149,3 +149,25 @@ test("seeded base user can create and replace a Source through the browser UI", 
       .digest("hex"),
   );
 });
+
+test('Source intake continues after 16 acceptances, withdrawal and replacement without reload', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto('/web/upload');
+  const sources = page.getByRole('region', { name: 'Create one Wallpaper with multiple Sources', exact: true });
+  const input = sources.getByLabel('Choose initial Sources for one Wallpaper');
+  await input.setInputFiles(Array.from({ length: 16 }, () => uploadFixturePaths[0]));
+  await expect(sources).toContainText('16 accepted Sources.', { timeout: 120_000 });
+  await expect(sources.getByTestId('source-upload-outcome')).toHaveCount(16);
+  await sources.locator('button[aria-label^="Withdraw Source "]:enabled').first().click();
+  await expect(sources).toContainText('15 accepted Sources.');
+  await expect(input).toBeEnabled();
+  await input.setInputFiles(uploadFixturePaths[0]);
+  await expect(sources).toContainText('16 accepted Sources.');
+  await expect(sources.getByTestId('source-upload-outcome')).toHaveCount(17);
+  const replacement = sources.locator('input[type="file"]').nth(1);
+  await expect(replacement).toBeEnabled();
+  await replacement.setInputFiles(uploadFixturePaths[0]);
+  await expect(sources.getByTestId('source-upload-outcome')).toHaveCount(18);
+  await expect(sources.getByTestId('source-upload-outcome').last()).toContainText('Source accepted');
+  await expect(sources).toContainText('16 accepted Sources. Source revision 19.');
+});

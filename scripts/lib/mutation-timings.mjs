@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
 	appendFileSync,
 	existsSync,
@@ -30,16 +31,74 @@ function nativeEvidence(file, runner) {
 		try {
 			const line = `${JSON.stringify(value)}\n`;
 			const size = Buffer.byteLength(line);
-			if (
-				size > recordLimit ||
-				bytes + size > totalLimit - (terminal ? 0 : healthReserve)
-			) {
-				issues.add(size > recordLimit ? "record-limit" : "total-limit");
+			const limit = totalLimit - (terminal ? 0 : healthReserve);
+			if ((terminal && size > healthReserve) || bytes + size > limit) {
+				issues.add(
+					terminal && size > healthReserve ? "record-limit" : "total-limit",
+				);
 				stopped = true;
 				return;
 			}
-			appendFileSync(file, line);
-			bytes += size;
+			if (size <= recordLimit) {
+				appendFileSync(file, line);
+				bytes += size;
+				return;
+			}
+			// Only an existing allowlisted call event can use the framing format.
+			if (
+				terminal ||
+				!["entry", "end"].includes(value.event) ||
+				!["dryRun", "mutantRun"].includes(value.method) ||
+				typeof value.id !== "string" ||
+				Buffer.byteLength(value.id) > 128
+			) {
+				issues.add("record-limit");
+				stopped = true;
+				return;
+			}
+			// The raw-byte lower-bound check above precedes the additional buffer.
+			const payload = Buffer.from(line, "utf8");
+			const chunkBytes = 96 * 1024;
+			const parts = Math.ceil(size / chunkBytes);
+			const sha256 = createHash("sha256").update(payload).digest("hex");
+			function part(index) {
+				const data = payload
+					.subarray(index * chunkBytes, (index + 1) * chunkBytes)
+					.toString("base64");
+				const text = `${JSON.stringify({
+					event: "fragment",
+					version: 1,
+					id: value.id,
+					method: value.method,
+					originalEvent: value.event,
+					index,
+					parts,
+					logicalBytes: size,
+					sha256,
+					encoding: "base64",
+					data,
+				})}\n`;
+				const length = Buffer.byteLength(text);
+				if (length > recordLimit || length - data.length > 2048)
+					throw new Error("Capture fragment exceeds its bounds");
+				return { text, length };
+			}
+			// Preflight the complete physical encoding before appending any part.
+			let physicalBytes = 0;
+			for (let index = 0; index < parts; index++) {
+				physicalBytes += part(index).length;
+				if (bytes + physicalBytes > limit) {
+					issues.add("total-limit");
+					stopped = true;
+					return;
+				}
+			}
+			// Regenerate one bounded part at a time; do not retain a parts array.
+			for (let index = 0; index < parts; index++) {
+				const { text, length } = part(index);
+				appendFileSync(file, text);
+				bytes += length;
+			}
 		} catch {
 			issues.add("serialization-or-write-failed");
 			stopped = true;

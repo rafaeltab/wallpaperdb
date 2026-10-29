@@ -19,13 +19,22 @@ export function storeContract(
         expectedStage: 'implementation',
       };
       expect(await Effect.runPromise(fixture.store.read())).toBeNull();
-      const results = await Promise.all([
-        Effect.runPromise(fixture.store.reserve(intent)),
-        Effect.runPromise(fixture.store.reserve({ ...intent, id: '2' })),
-      ]);
+      const requests = [
+        intent,
+        {
+          ...intent,
+          id: '2',
+          base: 'b'.repeat(40),
+          context: 'Different scope',
+          branch: 'factory/job-2',
+        },
+      ];
+      const results = await Promise.all(
+        requests.map((request) => Effect.runPromise(fixture.store.reserve(request)))
+      );
       expect(results.filter(Boolean)).toHaveLength(1);
       const saved = await Effect.runPromise(fixture.store.read());
-      expect(saved).toMatchObject({ issue: 576, expectedStage: 'implementation' });
+      expect(saved).toEqual(requests[results.findIndex(Boolean)]);
       expect(await Effect.runPromise(fixture.reopen().read())).toEqual(saved);
       const claims = await Promise.all([
         Effect.runPromise(fixture.store.claimLaunch()),

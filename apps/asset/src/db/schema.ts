@@ -2,6 +2,7 @@ import {
   bigint,
   boolean,
   index,
+  uniqueIndex,
   integer,
   jsonb,
   pgTable,
@@ -208,6 +209,30 @@ export const assetSourceState = pgTable('asset_source_state', {
   assetId: text('asset_id').primaryKey(),
   state: jsonb('state').notNull().$type<import('../capabilities/sources/index.js').SourceState>(),
 });
+/** Durable replay history, addressed independently of the active Source set. */
+export const sourceCandidates = pgTable(
+  'source_candidates',
+  {
+    assetId: text('asset_id').notNull(),
+    id: text('id').notNull(),
+    replayKey: text('replay_key').notNull(),
+    position: integer('position').notNull(),
+    sourceId: text('source_id').notNull(),
+    liveUntil: timestamp('live_until', { withTimezone: true }),
+    candidate: jsonb('candidate')
+      .notNull()
+      .$type<import('../capabilities/sources/index.js').Candidate>(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.assetId, table.id] }),
+    uniqueIndex('source_candidates_replay').on(table.assetId, table.replayKey),
+    uniqueIndex('source_candidates_page').on(table.assetId, table.position),
+    uniqueIndex('source_candidates_source').on(table.sourceId),
+    index('source_candidates_live')
+      .on(table.assetId, table.liveUntil)
+      .where(sql`${table.liveUntil} IS NOT NULL`),
+  ]
+);
 /** Accepted identities can only be inserted. Conflicting replay never updates facts. */
 export const immutableSources = pgTable(
   'immutable_sources',

@@ -61,6 +61,10 @@ export interface SourceState {
   initialAnalysisSourceId: string | null;
   sources: AcceptedSource[];
   candidates: Candidate[];
+  /** Window metadata supplied by bounded stores; absent in legacy controlled stores. */
+  candidateSequence?: number;
+  candidateWindow?: { start: number; valid: boolean };
+  liveCandidateCount?: number;
   /** Includes expired records until their durable status becomes terminal. */
   nonterminalCandidateCount: number;
 }
@@ -95,7 +99,15 @@ export type SourceChangeOutcome =
  * initial analysis provenance and confirmation outbox commit together. Retirement records
  * evidence expiry once on the immutable Source row, without hydrating retirement history.
  * Active membership gates all Source and descendant eligibility; retained bytes confer none. A non-null
+ * Candidate selection hydrates at most one exact identity/replay key or 32 records in
+ * append order. Omitted selection reads the newest page. A replay selection also
+ * supplies the count of unexpired nonterminal candidates. Only loaded/new candidates
+ * are changed; omitted history remains durable. Page cursors bind position and identity.
  * revision locks/compares the active configuration in that same transaction. */
+export type CandidateSelection =
+  | { readonly kind: 'candidate'; readonly id: string }
+  | { readonly kind: 'replay'; readonly key: string; readonly now: string }
+  | { readonly kind: 'page'; readonly cursor?: string };
 export interface SourceStorePort {
   readonly transact: <A>(
     assetId: string,
@@ -118,7 +130,8 @@ export interface SourceStorePort {
         readonly expiresAt: string;
       };
       readonly cleanupContext?: CommandContext;
-    }
+    },
+    selection?: CandidateSelection
   ) => Effect.Effect<A, SourceFailure>;
   readonly releaseRead: (readId: string) => Effect.Effect<void, SourceFailure>;
 }

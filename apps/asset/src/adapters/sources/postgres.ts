@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, gt, lt, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
 import { Pool } from 'pg';
@@ -23,6 +23,7 @@ import {
   sourceAcceptanceOutbox,
   sourceCleanup,
   sourceReads,
+  sourceCandidates,
 } from '../../db/schema.js';
 interface Options {
   readonly databaseUrl: string;
@@ -112,7 +113,7 @@ export function sourcePostgresLayer(options: Options) {
           run('release-read', async (db) => {
             await db.delete(sourceReads).where(eq(sourceReads.id, id));
           }),
-        transact: (assetId, revision, change) =>
+        transact: (assetId, revision, change, selection = { kind: 'page' }) =>
           run('transact', (db) =>
             db.transaction(async (tx) => {
               if (revision !== null) {
@@ -150,7 +151,64 @@ export function sourcePostgresLayer(options: Options) {
                       nonterminalCandidateCount: 0,
                     })
                   : null;
+              if (initial) {
+                initial.candidateSequence ??= 0;
+                if (initial.candidates.length) throw new Error('Source history migration required');
+                const predicates = [eq(sourceCandidates.assetId, assetId)];
+                if (selection.kind === 'candidate')
+                  predicates.push(eq(sourceCandidates.id, selection.id));
+                if (selection.kind === 'replay') {
+                  predicates.push(eq(sourceCandidates.replayKey, selection.key));
+                  const [live] = await tx
+                    .select({ count: sql<number>`count(*)::int` })
+                    .from(sourceCandidates)
+                    .where(
+                      and(
+                        eq(sourceCandidates.assetId, assetId),
+                        gt(sourceCandidates.liveUntil, new Date(selection.now))
+                      )
+                    );
+                  initial.liveCandidateCount = live?.count ?? 0;
+                }
+                let end = initial.candidateSequence ?? 0;
+                let valid = true;
+                if (selection.kind === 'page' && selection.cursor !== undefined) {
+                  const match = /^(0|[1-9][0-9]*):(.+)$/.exec(selection.cursor);
+                  end = match ? Number(match[1]) : -1;
+                  if (!Number.isSafeInteger(end) || end < 0 || selection.cursor.length > 256)
+                    valid = false;
+                  else {
+                    const [anchor] = await tx
+                      .select({ id: sourceCandidates.id })
+                      .from(sourceCandidates)
+                      .where(
+                        and(
+                          eq(sourceCandidates.assetId, assetId),
+                          eq(sourceCandidates.position, end)
+                        )
+                      );
+                    valid = anchor?.id === match?.[2];
+                  }
+                }
+                if (selection.kind === 'page')
+                  predicates.push(lt(sourceCandidates.position, valid ? end : 0));
+                const rows = await tx
+                  .select()
+                  .from(sourceCandidates)
+                  .where(and(...predicates))
+                  .orderBy(desc(sourceCandidates.position))
+                  .limit(selection.kind === 'page' ? 32 : 1);
+                initial.candidates = rows.reverse().map((row) => row.candidate);
+                if (selection.kind === 'page')
+                  initial.candidateWindow = { start: rows[0]?.position ?? 0, valid };
+              }
               const priorSources = initial?.sources.map((source) => source.sourceId) ?? [];
+              const priorValues = new Map(
+                initial?.candidates.map((candidate) => [
+                  candidate.candidateId,
+                  structuredClone(candidate),
+                ])
+              );
               const priorCandidates = new Map(
                 initial?.candidates.map((candidate) => [candidate.candidateId, candidate.status])
               );
@@ -300,12 +358,45 @@ export function sourcePostgresLayer(options: Options) {
                       set: { dueAt: new Date(evidenceExpiresAt), context: changed.cleanupContext },
                     });
                 }
+                let sequence = initial?.candidateSequence ?? 0;
+                for (const candidate of changed.state.candidates) {
+                  const prior = priorValues.get(candidate.candidateId);
+                  if (isDeepStrictEqual(prior, candidate)) continue;
+                  const values = {
+                    candidate,
+                    liveUntil: ['accepted', 'rejected', 'cancelled'].includes(candidate.status)
+                      ? null
+                      : new Date(candidate.expiresAt),
+                  };
+                  if (prior)
+                    await tx
+                      .update(sourceCandidates)
+                      .set(values)
+                      .where(
+                        and(
+                          eq(sourceCandidates.assetId, assetId),
+                          eq(sourceCandidates.id, candidate.candidateId)
+                        )
+                      );
+                  else
+                    await tx.insert(sourceCandidates).values({
+                      ...values,
+                      assetId,
+                      id: candidate.candidateId,
+                      replayKey: candidate.idempotencyKey,
+                      sourceId: candidate.sourceId,
+                      position: sequence++,
+                    });
+                }
+                const persisted = { ...changed.state, candidates: [], candidateSequence: sequence };
+                delete persisted.candidateWindow;
+                delete persisted.liveCandidateCount;
                 await tx
                   .insert(assetSourceState)
-                  .values({ assetId, state: changed.state })
+                  .values({ assetId, state: persisted })
                   .onConflictDoUpdate({
                     target: assetSourceState.assetId,
-                    set: { state: changed.state },
+                    set: { state: persisted },
                   });
               }
               if (changed.confirmation) {

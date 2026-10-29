@@ -9,6 +9,7 @@ export {
   type SourceOperation,
   type CandidateIntent,
   type Candidate,
+  type CandidateSelection,
   type AcceptedSource,
   type SourceState,
   type SourceConfirmation,

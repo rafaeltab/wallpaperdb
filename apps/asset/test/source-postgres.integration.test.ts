@@ -960,3 +960,190 @@ it('retires the complete prior set atomically and rejects stale restoration whil
     await lifecycle.dispose();
   }
 });
+
+it('bounds candidate hydration and state writes while retaining growing replay history', async () => {
+  const sources = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  await pool.query(`INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+    VALUES ('asset_history', 'wallpaper', 'wallpaper', 'clerk', 'owner')`);
+  try {
+    for (let index = 0; index < 96; index++) {
+      await sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact(
+            'asset_history',
+            null,
+            (state) => {
+              if (!state) throw new Error('Expected Asset');
+              expect(state.candidates).toHaveLength(0);
+              state.candidates.push({
+                candidateId: `history-${index}`,
+                sourceId: `history-source-${index}`,
+                idempotencyKey: `history-key-${index}`,
+                operation: 'add',
+                expectedSourceSetRevision: '0',
+                status: 'cancelled',
+                expiresAt: '2099-01-01T00:00:00Z',
+                orphanExpiresAt: '2099-01-01T00:00:00Z',
+                layout: 'asset-layout-1',
+              });
+              return { state, result: undefined };
+            },
+            { kind: 'replay', key: `history-key-${index}`, now: new Date().toISOString() }
+          )
+        )
+      );
+    }
+    const read = (id: string) =>
+      sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact('asset_history', null, (state) => ({ state, result: state?.candidates }), {
+            kind: 'candidate',
+            id,
+          })
+        )
+      );
+    expect(await read('history-0')).toMatchObject([
+      { candidateId: 'history-0', status: 'cancelled' },
+    ]);
+    expect(await read('missing')).toEqual([]);
+    await expect(
+      sources.runPromise(
+        SourceStore.use((store) =>
+          store.transact(
+            'asset_history',
+            null,
+            (state) => {
+              if (!state?.candidates[0]) throw new Error('Expected candidate');
+              state.candidates[0].status = 'ready';
+              return {
+                state,
+                result: undefined,
+                confirmation: {
+                  id: 'history-rollback',
+                  assetId: 'wrong-asset',
+                  applicationId: 'wallpaper',
+                  assetType: 'wallpaper',
+                  candidateId: 'history-0',
+                  sourceId: 'history-source-0',
+                  defaultSourceId: 'history-source-0',
+                  initialAnalysisSourceId: 'history-source-0',
+                  sourceSetRevision: '1',
+                  deliveryRevision: '1',
+                  context: {
+                    occurrence: { source: 'https://test/author', id: 'history-rollback' },
+                  },
+                },
+              };
+            },
+            { kind: 'candidate', id: 'history-0' }
+          )
+        )
+      )
+    ).rejects.toThrow();
+    expect(await read('history-0')).toMatchObject([
+      { candidateId: 'history-0', status: 'cancelled' },
+    ]);
+
+    const page = await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact('asset_history', null, (state) => ({ state, result: state }), {
+          kind: 'page',
+        })
+      )
+    );
+    expect(page?.candidates).toHaveLength(32);
+    expect(page?.candidateWindow).toEqual({ start: 64, valid: true });
+    const next = await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact('asset_history', null, (state) => ({ state, result: state }), {
+          kind: 'page',
+          cursor: '64:history-64',
+        })
+      )
+    );
+    expect(next?.candidates[0]?.candidateId).toBe('history-32');
+    expect(next?.candidateWindow).toEqual({ start: 32, valid: true });
+    const persisted = await pool.query('SELECT state FROM asset_source_state WHERE asset_id=$1', [
+      'asset_history',
+    ]);
+    expect(persisted.rows[0].state.candidates).toEqual([]);
+    expect(JSON.stringify(persisted.rows[0].state).length).toBeLessThan(1000);
+  } finally {
+    await sources.dispose();
+  }
+});
+
+it('migrates retained legacy history once without dropping replay identities or cursor positions', async () => {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const sources = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  await pool.query(`INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+    VALUES ('asset_legacy_history', 'wallpaper', 'wallpaper', 'clerk', 'owner')`);
+  try {
+    const state = await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact('asset_legacy_history', null, (state) => ({ state, result: state }))
+      )
+    );
+    if (!state) throw new Error('Expected Asset');
+    const history = Array.from({ length: 80 }, (_, index) => ({
+      candidateId: `legacy-${index}`,
+      sourceId: `legacy-source-${index}`,
+      idempotencyKey: `legacy-key-${index}`,
+      operation: 'add',
+      expectedSourceSetRevision: '0',
+      status: 'cancelled',
+      expiresAt: '2099-01-01T00:00:00Z',
+      orphanExpiresAt: '2099-01-01T00:00:00Z',
+      layout: 'asset-layout-1',
+    }));
+    await pool.query('UPDATE asset_source_state SET state=$1 WHERE asset_id=$2', [
+      JSON.stringify({ ...state, candidates: history }),
+      state.asset.id,
+    ]);
+    for (let attempt = 0; attempt < 2; attempt++)
+      await promisify(execFile)(
+        process.execPath,
+        ['--import', 'tsx', 'scripts/migrate-source-history.ts'],
+        {
+          env: { ...process.env, DATABASE_URL: container.getConnectionUri() },
+        }
+      );
+    const replay = await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(state.asset.id, null, (state) => ({ state, result: state?.candidates }), {
+          kind: 'replay',
+          key: 'legacy-key-0',
+          now: new Date().toISOString(),
+        })
+      )
+    );
+    expect(replay).toEqual([history[0]]);
+    const page = await sources.runPromise(
+      SourceStore.use((store) =>
+        store.transact(state.asset.id, null, (state) => ({ state, result: state }), {
+          kind: 'page',
+          cursor: '48:legacy-48',
+        })
+      )
+    );
+    expect(page?.candidateWindow).toEqual({ start: 16, valid: true });
+    expect(page?.candidates).toEqual(history.slice(16, 48));
+  } finally {
+    await sources.dispose();
+  }
+});

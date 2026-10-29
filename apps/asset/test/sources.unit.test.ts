@@ -1,3 +1,4 @@
+import { sourceWindow, mergeSourceWindow } from './fixtures/source-window.js';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import {
@@ -31,11 +32,11 @@ it('keeps private bytes outside membership until immutable preparation and first
   const objects = new Map<string, Uint8Array>();
   const store: SourceStorePort = {
     releaseRead: () => Effect.void,
-    transact: (_id, _revision, change) =>
+    transact: (_id, _revision, change, selection) =>
       Effect.sync(() => {
-        const changed = change(structuredClone(state));
+        const changed = change(sourceWindow(state, selection));
         if (!changed.state) throw new Error('Unexpected missing Asset');
-        state = changed.state;
+        state = mergeSourceWindow(state, changed.state);
         if (changed.confirmation) confirmations.push(changed.confirmation);
         return changed.result;
       }),

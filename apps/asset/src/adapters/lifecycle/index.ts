@@ -21,6 +21,7 @@ import {
   assetResultOutbox,
   ownedAssets,
   assetSourceState,
+  sourceCandidates,
   immutableSources,
   assetDeletions,
   sourceCleanup,
@@ -181,12 +182,30 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
             state.defaultSourceId = null;
             state.sourceSetRevision = sourceSetRevision;
             state.deliveryRevision = deliveryRevision;
-            for (const candidate of state.candidates)
+            const pendingRows = await tx
+              .select()
+              .from(sourceCandidates)
+              .where(
+                and(
+                  eq(sourceCandidates.assetId, asset.id),
+                  sql`${sourceCandidates.liveUntil} IS NOT NULL`
+                )
+              );
+            for (const { candidate } of pendingRows)
               if (!['accepted', 'rejected', 'cancelled'].includes(candidate.status)) {
                 candidate.status = 'cancelled';
                 candidate.reason = 'asset-deleted';
               }
-            for (const candidate of state.candidates) {
+            for (const { candidate } of pendingRows) {
+              await tx
+                .update(sourceCandidates)
+                .set({ candidate, liveUntil: null })
+                .where(
+                  and(
+                    eq(sourceCandidates.assetId, asset.id),
+                    eq(sourceCandidates.id, candidate.candidateId)
+                  )
+                );
               await tx
                 .insert(sourceCleanup)
                 .values({

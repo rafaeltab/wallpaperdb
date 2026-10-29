@@ -17,6 +17,7 @@ import {
   immutableSources,
   assetDeletions,
   sourceReads,
+  sourceCandidates,
 } from '../../db/schema.js';
 
 interface Options {
@@ -234,7 +235,19 @@ export function cleanupPostgresLayer(options: Options) {
                   }
                   if (record) {
                     const state = record.state;
-                    for (const pending of state.candidates) {
+                    const candidates = await tx
+                      .select()
+                      .from(sourceCandidates)
+                      .where(
+                        and(
+                          eq(sourceCandidates.assetId, row.assetId),
+                          target.kind === 'candidate'
+                            ? eq(sourceCandidates.id, target.candidateId)
+                            : eq(sourceCandidates.sourceId, target.sourceId)
+                        )
+                      )
+                      .limit(1);
+                    for (const { candidate: pending } of candidates) {
                       if (
                         pending.candidateId !==
                           (row.target.kind === 'candidate' ? row.target.candidateId : undefined) &&
@@ -249,6 +262,15 @@ export function cleanupPostgresLayer(options: Options) {
                             ? 'candidate-expired'
                             : 'temporary-input-expired';
                         state.nonterminalCandidateCount--;
+                        await tx
+                          .update(sourceCandidates)
+                          .set({ candidate: pending, liveUntil: null })
+                          .where(
+                            and(
+                              eq(sourceCandidates.assetId, row.assetId),
+                              eq(sourceCandidates.id, pending.candidateId)
+                            )
+                          );
                         await tx
                           .update(sourceCleanup)
                           .set({ dueAt: sql`least(${sourceCleanup.dueAt}, ${now})` })

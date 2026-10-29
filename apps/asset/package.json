@@ -23,7 +23,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "drizzle-kit migrate && tsx scripts/migrate-source-history.ts",
     "db:studio": "drizzle-kit studio",
     "format:files": "biome format --write",
     "dev:configure": "tsx scripts/development-authority.ts",

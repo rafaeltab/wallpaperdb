@@ -135,7 +135,10 @@ export function githubIssues(config: {
 }
 
 function blockerNumbers(native: readonly { number: number }[], body: string): number[] {
-  const sections = body.match(/^(?:#{1,6}\s+)?Blocked by\s*:?.*(?:\n(?!#{1,6}\s)[^\n]*)*/gim) ?? [];
+  const sections =
+    body.match(
+      /^(?:#{1,6}[ \t]+Blocked by[^\n]*(?:\n(?!#{1,6}[ \t])[^\n]*)*|Blocked by[ \t]*:[^\n]*(?:\n[ \t]*[-*][ \t]+[^\n]*)*)/gim
+    ) ?? [];
   const fallback = sections.flatMap((section) =>
     [
       ...section.matchAll(/(?:github\.com\/rafaeltab\/wallpaperdb\/issues\/|(?<![\w/])#)(\d+)/g),

@@ -8,6 +8,7 @@ export {
   type SourceFacts,
   type SourceOperation,
   type CandidateIntent,
+  type CandidateSelection,
   type Candidate,
   type AcceptedSource,
   type SourceState,

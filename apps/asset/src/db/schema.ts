@@ -10,6 +10,7 @@ import {
   timestamp,
   uuid,
   check,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -206,8 +207,36 @@ export const assetResultOutbox = pgTable(
 /** One serialization boundary per owned Asset, independent of legacy catalogue rows. */
 export const assetSourceState = pgTable('asset_source_state', {
   assetId: text('asset_id').primaryKey(),
+  candidateSequence: bigint('candidate_sequence', { mode: 'number' }).notNull().default(0),
   state: jsonb('state').notNull().$type<import('../capabilities/sources/index.js').SourceState>(),
 });
+/** Replay identities survive terminal outcomes and byte cleanup. */
+export const sourceCandidates = pgTable(
+  'source_candidates',
+  {
+    assetId: text('asset_id').notNull(),
+    candidateId: text('candidate_id').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    position: bigint('position', { mode: 'number' }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    status: text('status').notNull(),
+    candidate: jsonb('candidate')
+      .notNull()
+      .$type<import('../capabilities/sources/index.js').Candidate>(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.assetId, table.candidateId] }),
+    uniqueIndex('source_candidates_source').on(
+      table.assetId,
+      sql`(${table.candidate}->>'sourceId')`
+    ),
+    uniqueIndex('source_candidates_replay').on(table.assetId, table.idempotencyKey),
+    uniqueIndex('source_candidates_history').on(table.assetId, table.position),
+    index('source_candidates_live')
+      .on(table.assetId, table.expiresAt)
+      .where(sql`${table.status} NOT IN ('accepted', 'rejected', 'cancelled')`),
+  ]
+);
 /** Accepted identities can only be inserted. Conflicting replay never updates facts. */
 export const immutableSources = pgTable(
   'immutable_sources',

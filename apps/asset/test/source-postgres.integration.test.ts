@@ -1,7 +1,10 @@
+import { mkdtemp, mkdir, readFile, readdir, copyFile, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Cause, Effect, Exit, ManagedRuntime } from 'effect';
+import { Cause, Effect, Exit, Layer, ManagedRuntime } from 'effect';
 import { Pool } from 'pg';
 import { beforeAll, afterAll, expect, it } from 'vitest';
 import { activateLifecycle, lifecyclePostgresLayer } from '../src/adapters/lifecycle/index.js';
@@ -9,6 +12,11 @@ import { sourcePostgresLayer } from '../src/adapters/sources/index.js';
 import { LifecycleStore } from '../src/capabilities/lifecycle/index.js';
 import {
   SourceStore,
+  Sources,
+  SourceBytes,
+  MandatoryInspection,
+  sourcesLayer,
+  initialSourcePolicies,
   SourceAcceptanceOutbox,
   type SourceConfirmation,
 } from '../src/capabilities/sources/index.js';
@@ -17,7 +25,50 @@ let pool: Pool;
 beforeAll(async () => {
   container = await new PostgreSqlContainer('postgres:16-alpine').start();
   pool = new Pool({ connectionString: container.getConnectionUri() });
-  await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+  const baseline = await mkdtemp(join(tmpdir(), 'source-history-migration-'));
+  try {
+    await mkdir(join(baseline, 'meta'));
+    const journal = JSON.parse(await readFile('./drizzle/meta/_journal.json', 'utf8'));
+    journal.entries = journal.entries.filter((entry: { idx: number }) => entry.idx < 18);
+    await writeFile(join(baseline, 'meta/_journal.json'), JSON.stringify(journal));
+    for (const file of await readdir('./drizzle'))
+      if (file.endsWith('.sql')) await copyFile(join('./drizzle', file), join(baseline, file));
+    await migrate(drizzle(pool), { migrationsFolder: baseline });
+    const candidates = Array.from({ length: 40 }, (_, position) => ({
+      candidateId: `upgrade-${position}`,
+      sourceId: `upgrade-source-${position}`,
+      idempotencyKey: `upgrade-key-${position}`,
+      operation: 'add',
+      expectedSourceSetRevision: '0',
+      status: 'cancelled',
+      expiresAt: '2027-01-01T00:00:00Z',
+      orphanExpiresAt: '2027-01-01T00:00:00Z',
+      layout: 'asset-layout-1',
+    }));
+    await pool.query(`INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+      VALUES ('asset_upgrade', 'wallpaper', 'wallpaper', 'clerk', 'owner')`);
+    await pool.query('INSERT INTO asset_source_state (asset_id, state) VALUES ($1, $2)', [
+      'asset_upgrade',
+      {
+        asset: {
+          id: 'asset_upgrade',
+          applicationId: 'wallpaper',
+          assetType: 'wallpaper',
+          owner: { namespace: 'clerk', subject: 'owner' },
+        },
+        sourceSetRevision: '0',
+        deliveryRevision: '0',
+        defaultSourceId: null,
+        initialAnalysisSourceId: null,
+        sources: [],
+        candidates,
+        nonterminalCandidateCount: 0,
+      },
+    ]);
+    await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
+  } finally {
+    await rm(baseline, { recursive: true, force: true });
+  }
   await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-1'));
 });
 afterAll(async () => {
@@ -958,5 +1009,242 @@ it('retires the complete prior set atomically and rejects stale restoration whil
   } finally {
     await sources.dispose();
     await lifecycle.dispose();
+  }
+});
+
+it('keeps persisted Source state bounded as retained candidate history grows', async () => {
+  const persistence = sourcePostgresLayer({
+    databaseUrl: container.getConnectionUri(),
+    maxAttempts: 3,
+    retryDelayMs: 1,
+    leaseMs: 1000,
+  });
+  const runtime = ManagedRuntime.make(
+    Layer.merge(
+      persistence,
+      sourcesLayer({ revision: 'revision-548', types: initialSourcePolicies }).pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            persistence,
+            Layer.succeed(SourceBytes, {
+              put: () => Effect.die('unused'),
+              prepare: () => Effect.die('unused'),
+              read: () => Effect.die('unused'),
+            }),
+            Layer.succeed(MandatoryInspection, { inspect: () => Effect.die('unused') })
+          )
+        )
+      )
+    )
+  );
+  await Effect.runPromise(activateLifecycle(container.getConnectionUri(), 'revision-548'));
+  const assetId = 'asset_growing_history';
+  await pool.query(
+    `INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+    VALUES ($1, 'wallpaper', 'wallpaper', 'clerk', 'owner')`,
+    [assetId]
+  );
+  try {
+    for (let index = 0; index < 128; index++) {
+      await runtime.runPromise(
+        SourceStore.use((store) =>
+          store.transact(assetId, null, (state) => {
+            if (!state) throw new Error('Expected Asset');
+            state.candidates.push({
+              candidateId: `history-${index}`,
+              sourceId: `history-source-${index}`,
+              idempotencyKey: `history-key-${index}`,
+              operation: 'add',
+              expectedSourceSetRevision: '0',
+              status: 'cancelled',
+              expiresAt: '2027-01-01T00:00:00Z',
+              orphanExpiresAt: '2027-01-01T00:00:00Z',
+              layout: 'asset-layout-1',
+            });
+            return { state, result: undefined };
+          })
+        )
+      );
+    }
+    const stored = await pool.query<{ bytes: number }>(
+      'SELECT octet_length(state::text) AS bytes FROM asset_source_state WHERE asset_id=$1',
+      [assetId]
+    );
+    expect(stored.rows[0]?.bytes).toBeLessThan(2048);
+    const owner = { namespace: 'clerk', subject: 'owner' };
+    const oldest = await runtime.runPromise(
+      Sources.use((s) => s.status(owner, assetId, 'history-0'))
+    );
+    expect(oldest).toMatchObject({ kind: 'candidate', candidate: { status: 'cancelled' } });
+    expect(
+      await runtime.runPromise(
+        Sources.use((s) =>
+          s.create(owner, assetId, {
+            operation: 'add',
+            expectedSourceSetRevision: '0',
+            idempotencyKey: 'history-key-0',
+          })
+        )
+      )
+    ).toEqual(oldest);
+    expect(
+      await runtime.runPromise(
+        Sources.use((s) =>
+          s.create(owner, assetId, {
+            operation: 'add',
+            expectedSourceSetRevision: '1',
+            idempotencyKey: 'history-key-0',
+          })
+        )
+      )
+    ).toEqual({ kind: 'rejected', reason: 'idempotency-conflict' });
+    let cursor: string | undefined;
+    const ids: string[] = [];
+    do {
+      const page = await runtime.runPromise(Sources.use((s) => s.list(owner, assetId, cursor)));
+      if (page.kind !== 'found') throw new Error('Expected page');
+      expect(page.asset.candidates).toHaveLength(32);
+      expect(page.asset.hasPendingCandidates).toBe(false);
+      ids.push(...page.asset.candidates.map((c) => c.candidateId));
+      cursor = page.asset.nextCandidateCursor;
+    } while (cursor !== undefined);
+    expect(ids).toEqual(Array.from({ length: 128 }, (_, i) => `history-${127 - i}`));
+    expect(
+      await runtime.runPromise(Sources.use((s) => s.list(owner, assetId, '32:wrong')))
+    ).toEqual({ kind: 'unavailable' });
+    // Grow the same retained history another 64-fold without changing live capacity.
+    await pool.query(
+      `INSERT INTO source_candidates
+      (asset_id, candidate_id, idempotency_key, position, expires_at, status, candidate)
+      SELECT asset_id, 'history-' || n, 'history-key-' || n, n, expires_at, status,
+        candidate || jsonb_build_object('candidateId', 'history-' || n, 'sourceId', 'history-source-' || n, 'idempotencyKey', 'history-key-' || n)
+      FROM source_candidates CROSS JOIN generate_series(128, 8319) n
+      WHERE asset_id=$1 AND candidate_id='history-0'`,
+      [assetId]
+    );
+    await pool.query('UPDATE asset_source_state SET candidate_sequence=8320 WHERE asset_id=$1', [
+      assetId,
+    ]);
+    await pool.query('ANALYZE source_candidates');
+    for (const query of [
+      "SELECT candidate FROM source_candidates WHERE asset_id=$1 AND candidate_id='history-0'",
+      "SELECT candidate FROM source_candidates WHERE asset_id=$1 AND idempotency_key='history-key-0'",
+      'SELECT candidate FROM source_candidates WHERE asset_id=$1 AND position <= 8000 ORDER BY position DESC LIMIT 33',
+      "SELECT candidate_id FROM source_candidates WHERE asset_id=$1 AND status NOT IN ('accepted', 'rejected', 'cancelled') AND expires_at > now() LIMIT 2",
+    ]) {
+      const plan = await pool.query<{
+        'QUERY PLAN': {
+          Plan: {
+            'Actual Rows': number;
+            'Shared Hit Blocks': number;
+            'Shared Read Blocks': number;
+          };
+        }[];
+      }>(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${query}`, [assetId]);
+      const work = plan.rows[0]?.['QUERY PLAN'][0]?.Plan;
+      expect(work?.['Actual Rows']).toBeLessThanOrEqual(33);
+      expect(
+        (work?.['Shared Hit Blocks'] ?? Infinity) + (work?.['Shared Read Blocks'] ?? Infinity)
+      ).toBeLessThan(64);
+    }
+    expect(
+      await runtime.runPromise(Sources.use((s) => s.status(owner, assetId, 'history-0')))
+    ).toEqual(oldest);
+    const grownPage = await runtime.runPromise(
+      Sources.use((s) => s.list(owner, assetId, '8000:history-8000'))
+    );
+    expect(grownPage).toMatchObject({
+      kind: 'found',
+      asset: {
+        candidates: Array.from({ length: 32 }, (_, i) => ({ candidateId: `history-${7999 - i}` })),
+      },
+    });
+    const beforeRows = await pool.query(
+      'SELECT candidate_id, xmin::text AS version FROM source_candidates WHERE asset_id=$1 ORDER BY position',
+      [assetId]
+    );
+    const created = await runtime.runPromise(
+      Sources.use((s) =>
+        s.create(owner, assetId, {
+          operation: 'add',
+          expectedSourceSetRevision: '0',
+          idempotencyKey: 'after-history',
+        })
+      )
+    );
+    if (created.kind !== 'candidate') throw new Error('History must not consume intake capacity');
+    expect(
+      await runtime.runPromise(
+        Sources.use((s) => s.cancel(owner, assetId, created.candidate.candidateId))
+      )
+    ).toMatchObject({ kind: 'candidate', candidate: { status: 'cancelled' } });
+    const afterRows = await pool.query(
+      'SELECT candidate_id, xmin::text AS version FROM source_candidates WHERE asset_id=$1 AND candidate_id <> $2 ORDER BY position',
+      [assetId, created.candidate.candidateId]
+    );
+    expect(afterRows.rows).toEqual(beforeRows.rows);
+    expect(
+      (
+        await pool.query('SELECT count(*)::int AS count FROM source_candidates WHERE asset_id=$1', [
+          assetId,
+        ])
+      ).rows
+    ).toEqual([{ count: 8321 }]);
+    // Read-only and one-candidate transitions never rewrite retained replay records.
+    expect(
+      await runtime.runPromise(
+        Sources.use((s) => s.status({ ...owner, subject: 'other' }, assetId, 'history-0'))
+      )
+    ).toEqual({ kind: 'unavailable' });
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('migrates existing replay history without losing identities or cursor positions', async () => {
+  expect(
+    (
+      await pool.query(
+        "SELECT candidate_sequence, state->'candidates' AS candidates FROM asset_source_state WHERE asset_id='asset_upgrade'"
+      )
+    ).rows
+  ).toEqual([{ candidate_sequence: '40', candidates: [] }]);
+  expect(
+    (
+      await pool.query(
+        "SELECT count(*)::int AS count FROM source_candidates WHERE asset_id='asset_upgrade'"
+      )
+    ).rows
+  ).toEqual([{ count: 40 }]);
+  const runtime = ManagedRuntime.make(
+    sourcePostgresLayer({
+      databaseUrl: container.getConnectionUri(),
+      maxAttempts: 3,
+      retryDelayMs: 1,
+      leaseMs: 1000,
+    })
+  );
+  try {
+    const replay = await runtime.runPromise(
+      SourceStore.use((s) =>
+        s.transact('asset_upgrade', null, (state) => ({ state, result: state?.candidates }), {
+          idempotencyKey: 'upgrade-key-0',
+        })
+      )
+    );
+    expect(replay).toMatchObject([{ candidateId: 'upgrade-0', status: 'cancelled' }]);
+    const page = await runtime.runPromise(
+      SourceStore.use((s) =>
+        s.transact('asset_upgrade', null, (state) => ({ state, result: state }), {
+          page: { cursor: '8:upgrade-8' },
+        })
+      )
+    );
+    expect(page?.candidateOffset).toBe(0);
+    expect(page?.candidates.map((c) => c.candidateId)).toEqual(
+      Array.from({ length: 9 }, (_, i) => `upgrade-${i}`)
+    );
+  } finally {
+    await runtime.dispose();
   }
 });

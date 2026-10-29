@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
 import { Pool } from 'pg';
@@ -19,6 +19,7 @@ import {
   assetConfiguration,
   ownedAssets,
   assetSourceState,
+  sourceCandidates,
   immutableSources,
   sourceAcceptanceOutbox,
   sourceCleanup,
@@ -112,7 +113,7 @@ export function sourcePostgresLayer(options: Options) {
           run('release-read', async (db) => {
             await db.delete(sourceReads).where(eq(sourceReads.id, id));
           }),
-        transact: (assetId, revision, change) =>
+        transact: (assetId, revision, change, selection) =>
           run('transact', (db) =>
             db.transaction(async (tx) => {
               if (revision !== null) {
@@ -150,9 +151,81 @@ export function sourcePostgresLayer(options: Options) {
                       nonterminalCandidateCount: 0,
                     })
                   : null;
+              let sequence = record?.candidateSequence ?? 0;
+              if (initial) {
+                const identity =
+                  selection?.candidateId !== undefined
+                    ? eq(sourceCandidates.candidateId, selection.candidateId)
+                    : selection?.idempotencyKey !== undefined
+                      ? eq(sourceCandidates.idempotencyKey, selection.idempotencyKey)
+                      : undefined;
+                let cursorPosition: number | undefined;
+                if (selection?.page?.cursor !== undefined) {
+                  const cursor = selection.page.cursor;
+                  const split = cursor.indexOf(':');
+                  const position = Number(cursor.slice(0, split));
+                  if (
+                    cursor.length <= 256 &&
+                    split > 0 &&
+                    /^(0|[1-9][0-9]*)$/.test(cursor.slice(0, split)) &&
+                    Number.isSafeInteger(position)
+                  ) {
+                    const [anchor] = await tx
+                      .select({ position: sourceCandidates.position })
+                      .from(sourceCandidates)
+                      .where(
+                        and(
+                          eq(sourceCandidates.assetId, assetId),
+                          eq(sourceCandidates.position, position),
+                          eq(sourceCandidates.candidateId, cursor.slice(split + 1))
+                        )
+                      );
+                    cursorPosition = anchor?.position;
+                  }
+                  // The application validates the cursor against the returned anchor.
+                  if (cursorPosition === undefined) initial.candidateOffset = -1;
+                }
+                const rows =
+                  selection?.none || initial.candidateOffset === -1
+                    ? []
+                    : await tx
+                        .select()
+                        .from(sourceCandidates)
+                        .where(
+                          and(
+                            eq(sourceCandidates.assetId, assetId),
+                            identity,
+                            cursorPosition === undefined
+                              ? undefined
+                              : lte(sourceCandidates.position, cursorPosition)
+                          )
+                        )
+                        .orderBy(desc(sourceCandidates.position))
+                        .limit(identity ? 1 : cursorPosition === undefined ? 32 : 33);
+                initial.candidates = rows.reverse().map((row) => row.candidate);
+                if (selection?.page && initial.candidateOffset !== -1)
+                  initial.candidateOffset = rows[0]?.position ?? 0;
+                if (selection?.liveAt !== undefined) {
+                  const live = await tx
+                    .select({ id: sourceCandidates.candidateId })
+                    .from(sourceCandidates)
+                    .where(
+                      and(
+                        eq(sourceCandidates.assetId, assetId),
+                        sql`${sourceCandidates.status} NOT IN ('accepted', 'rejected', 'cancelled')`,
+                        gt(sourceCandidates.expiresAt, new Date(selection.liveAt))
+                      )
+                    )
+                    .limit(Math.max(1, selection.liveLimit ?? 1));
+                  initial.liveCandidateCount = live.length;
+                }
+              }
               const priorSources = initial?.sources.map((source) => source.sourceId) ?? [];
               const priorCandidates = new Map(
-                initial?.candidates.map((candidate) => [candidate.candidateId, candidate.status])
+                initial?.candidates.map((candidate) => [
+                  candidate.candidateId,
+                  structuredClone(candidate),
+                ])
               );
               const changed = decide(() => {
                 const changed = change(initial);
@@ -177,7 +250,34 @@ export function sourcePostgresLayer(options: Options) {
               }
               if (changed.state && asset) {
                 for (const candidate of changed.state.candidates) {
-                  if (priorCandidates.get(candidate.candidateId) === candidate.status) continue;
+                  const prior = priorCandidates.get(candidate.candidateId);
+                  if (isDeepStrictEqual(prior, candidate)) continue;
+                  if (prior) {
+                    await tx
+                      .update(sourceCandidates)
+                      .set({
+                        candidate,
+                        status: candidate.status,
+                        expiresAt: new Date(candidate.expiresAt),
+                      })
+                      .where(
+                        and(
+                          eq(sourceCandidates.assetId, assetId),
+                          eq(sourceCandidates.candidateId, candidate.candidateId)
+                        )
+                      );
+                  } else {
+                    await tx.insert(sourceCandidates).values({
+                      assetId,
+                      candidateId: candidate.candidateId,
+                      idempotencyKey: candidate.idempotencyKey,
+                      position: sequence++,
+                      candidate,
+                      status: candidate.status,
+                      expiresAt: new Date(candidate.expiresAt),
+                    });
+                  }
+                  if (prior?.status === candidate.status) continue;
                   const terminal = ['accepted', 'rejected', 'cancelled'].includes(candidate.status);
                   const context = changed.cleanupContext ?? candidate.context;
                   const inputExpiry = Math.min(
@@ -300,12 +400,18 @@ export function sourcePostgresLayer(options: Options) {
                       set: { dueAt: new Date(evidenceExpiresAt), context: changed.cleanupContext },
                     });
                 }
+                const {
+                  candidateOffset: _offset,
+                  liveCandidateCount: _live,
+                  ...membership
+                } = changed.state;
+                const persisted = { ...membership, candidates: [] };
                 await tx
                   .insert(assetSourceState)
-                  .values({ assetId, state: changed.state })
+                  .values({ assetId, state: persisted, candidateSequence: sequence })
                   .onConflictDoUpdate({
                     target: assetSourceState.assetId,
-                    set: { state: changed.state },
+                    set: { state: persisted, candidateSequence: sequence },
                   });
               }
               if (changed.confirmation) {

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "source_candidates_source" ON "source_candidates" USING btree ("asset_id",("candidate"->>'sourceId'));

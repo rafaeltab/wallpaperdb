@@ -61,6 +61,9 @@ export interface SourceState {
   initialAnalysisSourceId: string | null;
   sources: AcceptedSource[];
   candidates: Candidate[];
+  /** Offset of a bounded history page, never persisted in the membership snapshot. */
+  candidateOffset?: number;
+  liveCandidateCount?: number;
   /** Includes expired records until their durable status becomes terminal. */
   nonterminalCandidateCount: number;
 }
@@ -90,12 +93,23 @@ export type SourceChangeOutcome =
     }
   | { readonly kind: 'unavailable' }
   | { readonly kind: 'rejected'; readonly reason: string };
-/** Serializes one Asset. The callback is pure, receives a detached state, and cannot
+/** Candidate reads hydrate at most one identity or a 32-item history page.
+ * With no selection, the most recent 32 candidates are available for transitions.
+ * Only changed/new hydrated candidates are persisted; omitted history is retained.
+ * Serializes one Asset. The callback is pure, receives a detached state, and cannot
  * escape transaction resources. State, immutable Source metadata, cleanup deadlines,
  * initial analysis provenance and confirmation outbox commit together. Retirement records
  * evidence expiry once on the immutable Source row, without hydrating retirement history.
  * Active membership gates all Source and descendant eligibility; retained bytes confer none. A non-null
  * revision locks/compares the active configuration in that same transaction. */
+export interface CandidateSelection {
+  readonly candidateId?: string;
+  readonly idempotencyKey?: string;
+  readonly liveAt?: string;
+  readonly liveLimit?: number;
+  readonly page?: { readonly cursor?: string };
+  readonly none?: boolean;
+}
 export interface SourceStorePort {
   readonly transact: <A>(
     assetId: string,
@@ -118,7 +132,8 @@ export interface SourceStorePort {
         readonly expiresAt: string;
       };
       readonly cleanupContext?: CommandContext;
-    }
+    },
+    selection?: CandidateSelection
   ) => Effect.Effect<A, SourceFailure>;
   readonly releaseRead: (readId: string) => Effect.Effect<void, SourceFailure>;
 }

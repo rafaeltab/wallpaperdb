@@ -21,6 +21,7 @@ import {
   assetResultOutbox,
   ownedAssets,
   assetSourceState,
+  sourceCandidates,
   immutableSources,
   assetDeletions,
   sourceCleanup,
@@ -181,55 +182,35 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
             state.defaultSourceId = null;
             state.sourceSetRevision = sourceSetRevision;
             state.deliveryRevision = deliveryRevision;
-            for (const candidate of state.candidates)
-              if (!['accepted', 'rejected', 'cancelled'].includes(candidate.status)) {
-                candidate.status = 'cancelled';
-                candidate.reason = 'asset-deleted';
-              }
-            for (const candidate of state.candidates) {
-              await tx
-                .insert(sourceCleanup)
-                .values({
-                  id: `candidate:${candidate.candidateId}`,
-                  context: input.context,
-                  assetId: asset.id,
-                  applicationId: asset.applicationId,
-                  target: { kind: 'candidate', candidateId: candidate.candidateId },
-                  dueAt: new Date(
-                    Math.min(
-                      deletedAt.getTime(),
-                      Date.parse(candidate.temporaryExpiresAt ?? candidate.expiresAt)
-                    )
-                  ),
-                })
-                .onConflictDoUpdate({
-                  target: sourceCleanup.id,
-                  set: {
-                    dueAt: sql`least(${sourceCleanup.dueAt}, ${deletedAt})`,
-                    context: input.context,
-                  },
-                });
-              if (candidate.status !== 'accepted')
-                await tx
-                  .insert(sourceCleanup)
-                  .values({
-                    id: `source:${candidate.sourceId}`,
-                    context: input.context,
-                    assetId: asset.id,
-                    applicationId: asset.applicationId,
-                    target: { kind: 'source', assetId: asset.id, sourceId: candidate.sourceId },
-                    dueAt: new Date(
-                      Math.min(deletedAt.getTime(), Date.parse(candidate.orphanExpiresAt))
-                    ),
-                  })
-                  .onConflictDoUpdate({
-                    target: sourceCleanup.id,
-                    set: {
-                      dueAt: sql`least(${sourceCleanup.dueAt}, ${deletedAt})`,
-                      context: input.context,
-                    },
-                  });
-            }
+            await tx
+              .update(sourceCandidates)
+              .set({
+                status: 'cancelled',
+                candidate: sql`${sourceCandidates.candidate} || '{"status":"cancelled","reason":"asset-deleted"}'::jsonb`,
+              })
+              .where(
+                and(
+                  eq(sourceCandidates.assetId, asset.id),
+                  sql`${sourceCandidates.status} NOT IN ('accepted', 'rejected', 'cancelled')`
+                )
+              );
+            // Every candidate has durable cleanup duties from its creation transaction.
+            await tx
+              .update(sourceCleanup)
+              .set({
+                dueAt: sql`least(${sourceCleanup.dueAt}, ${deletedAt})`,
+                context: input.context,
+              })
+              .where(
+                and(
+                  eq(sourceCleanup.assetId, asset.id),
+                  sql`(${sourceCleanup.target}->>'kind' = 'candidate' OR
+                    ${sourceCleanup.target}->>'sourceId' IN (
+                      SELECT candidate->>'sourceId' FROM source_candidates
+                      WHERE asset_id = ${asset.id} AND status <> 'accepted'
+                    ))`
+                )
+              );
             state.nonterminalCandidateCount = 0;
             await tx
               .update(assetSourceState)

@@ -1,13 +1,21 @@
+import { createHash } from "node:crypto";
 import {
+	closeSync,
+	constants,
 	copyFileSync,
+	fstatSync,
+	lstatSync,
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	openSync,
 	readFileSync,
+	readSync,
+	realpathSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { runBounded } from "./mutation-process.mjs";
@@ -26,6 +34,99 @@ import {
 } from "./mutation-results.mjs";
 
 const json = (file) => JSON.parse(readFileSync(file, "utf8"));
+
+/** Project only Web's two declared browser assets beside Stryker's child. */
+function projectWebBrowserFixtures(root, sandbox, config) {
+	const inputs = [
+		"apps/web-e2e/fixtures/profile-small.png",
+		"apps/web-e2e/fixtures/profile-transparent-p3.png",
+	];
+	if (
+		!Array.isArray(config.externalInputs) ||
+		JSON.stringify([...config.externalInputs].sort()) !== JSON.stringify(inputs)
+	)
+		throw new Error(
+			"Web browser fixture declarations must match the two owned PNGs",
+		);
+	const repository = realpathSync(root),
+		owner = realpathSync(sandbox);
+	const ownerInfo = lstatSync(owner);
+	if (
+		owner !== resolve(sandbox) ||
+		!ownerInfo.isDirectory() ||
+		(ownerInfo.mode & 0o077) !== 0 ||
+		typeof constants.O_NOFOLLOW !== "number" ||
+		typeof constants.O_NONBLOCK !== "number"
+	)
+		throw new Error(
+			"Web browser fixtures require a private owned stage directory",
+		);
+	const files = inputs.map((file) => {
+		const source = resolve(repository, file);
+		if (realpathSync(source) !== source)
+			throw new Error(`Web browser fixture may not traverse symlinks: ${file}`);
+		const descriptor = openSync(
+			source,
+			constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+		);
+		try {
+			const info = fstatSync(descriptor);
+			if (!info.isFile() || info.size < 8 || info.size > 64 * 1024)
+				throw new Error(
+					`Web browser fixture must be a PNG of at most 64 KiB: ${file}`,
+				);
+			const buffer = Buffer.alloc(64 * 1024 + 1);
+			let used = 0,
+				read;
+			do {
+				read = readSync(descriptor, buffer, used, buffer.length - used, used);
+				used += read;
+			} while (read && used < buffer.length);
+			const after = fstatSync(descriptor),
+				pathInfo = lstatSync(source);
+			if (
+				used !== info.size ||
+				after.size !== info.size ||
+				after.mtimeMs !== info.mtimeMs ||
+				pathInfo.dev !== info.dev ||
+				pathInfo.ino !== info.ino ||
+				pathInfo.isSymbolicLink()
+			)
+				throw new Error(`Web browser fixture changed while reading: ${file}`);
+			const content = buffer.subarray(0, used);
+			if (
+				!content.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"))
+			)
+				throw new Error(`Web browser fixture has no PNG signature: ${file}`);
+			return {
+				source: file,
+				target: file.slice("apps/".length),
+				bytes: used,
+				sha256: createHash("sha256").update(content).digest("hex"),
+				content,
+			};
+		} finally {
+			closeSync(descriptor);
+		}
+	});
+	// Exclusive directories and files reject collisions instead of overwriting.
+	mkdirSync(join(owner, "web-e2e"), { mode: 0o700 });
+	mkdirSync(join(owner, "web-e2e", "fixtures"), { mode: 0o700 });
+	for (const file of files)
+		writeFileSync(join(owner, file.target), file.content, {
+			flag: "wx",
+			mode: 0o600,
+		});
+	return {
+		ownedTempRoot: owner,
+		files: files.map(({ source, target, bytes, sha256 }) => ({
+			source,
+			target,
+			bytes,
+			sha256,
+		})),
+	};
+}
 
 /** One native Stryker/Vitest stage, with a private sandbox and report files. */
 export async function runStage({
@@ -113,6 +214,16 @@ export async function runStage({
 	try {
 		sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
 		options.tempDirName = sandbox;
+		if (
+			workspace === "apps/web" &&
+			suite === "unit" &&
+			config.externalInputs?.length
+		)
+			summary.browserFixtureProjection = projectWebBrowserFixtures(
+				root,
+				sandbox,
+				config,
+			);
 		writeFileSync(join(run, "stryker.json"), JSON.stringify(options));
 		if (config.fixture === "redis-owned-reuse")
 			fixture = await redisFixture(

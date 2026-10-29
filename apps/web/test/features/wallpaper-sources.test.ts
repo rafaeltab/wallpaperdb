@@ -171,3 +171,70 @@ it('requires explicit selection of the winner when a competing replacement retir
   expect(changes).toEqual([{ operation: 'replace-one', targetSourceId: 'old' }, { operation: 'replace-one', targetSourceId: 'winner' }]);
   expect(batch.getSnapshot().rows[1]).toMatchObject({ status: 'accepted' });
 });
+
+function capacityApi() {
+  const wallpaper = { wallpaperId: 'published', assetId: 'asset', sourceId: 'first', state: 'published' as const, createdAt: 'now' };
+  let revision = 1;
+  const uploads: string[] = [];
+  const api: SourceBatchApi<string> = {
+    identifier: () => crypto.randomUUID(), begin: async () => wallpaper, wallpaper: async () => wallpaper,
+    list: async () => ({ sourceSetRevision: String(revision), sources: [{ sourceId: 'first' }], candidates: [], hasPendingCandidates: false }),
+    create: async (_asset, key, expected) => ({ candidateId: key, status: 'awaiting-bytes', expectedSourceSetRevision: expected }),
+    status: async (_asset, id) => ({ candidateId: id, status: 'awaiting-bytes', expectedSourceSetRevision: String(revision) }),
+    upload: async (_asset, id, file) => { uploads.push(file); return { candidateId: id, status: file === 'bad' ? 'rejected' : 'ready', expectedSourceSetRevision: String(revision) }; },
+    accept: async (_asset, id, expected) => { revision++; return { candidateId: id, status: 'accepted', sourceId: id, expectedSourceSetRevision: expected }; },
+    expectSource: async () => {}, cancel: async () => {}, wait: async () => {},
+  };
+  return { api, uploads };
+}
+
+it('admits add, replacement and saved recovery after sixteen completed uploads without replaying them', async () => {
+  const { api, uploads } = capacityApi();
+  const batch = createWallpaperSourceBatch(api, { wallpaperId: 'published' });
+  expect(batch.addFiles(Array.from({ length: 16 }, (_, i) => ({ value: `file-${i}`, name: `${i}.png` })))).toBe(true);
+  expect(batch.addFiles([{ value: 'overflow', name: 'overflow.png' }])).toBe(false);
+  expect(batch.replace({ value: 'overflow', name: 'overflow.png' }, 'first')).toBe(false);
+  expect(batch.resume({ value: 'overflow', name: 'overflow.png' }, { candidateId: 'saved', status: 'ready', expectedSourceSetRevision: '1' })).toBe(false);
+  await batch.run(new AbortController().signal);
+  expect(batch.getSnapshot().rows.every(row => row.status === 'accepted')).toBe(true);
+  expect(batch.addFiles([{ value: 'added', name: 'added.png' }])).toBe(true);
+  expect(batch.replace({ value: 'replacement', name: 'replacement.png' }, 'first')).toBe(true);
+  expect(batch.resume({ value: 'recovered', name: 'recovered.png' }, { candidateId: 'saved', status: 'awaiting-bytes', expectedSourceSetRevision: '17' })).toBe(true);
+  await batch.run(new AbortController().signal);
+  expect(uploads).toEqual([...Array.from({ length: 16 }, (_, i) => `file-${i}`), 'added', 'replacement', 'recovered']);
+});
+
+it('releases failed history while bounding queued work including independent retries', async () => {
+  const { api } = capacityApi();
+  const batch = createWallpaperSourceBatch(api, { wallpaperId: 'published' });
+  batch.addFiles(Array.from({ length: 16 }, (_, i) => ({ value: 'bad', name: `${i}.png` })));
+  await batch.run(new AbortController().signal);
+  const failed = batch.getSnapshot().rows[0];
+  if (!failed) throw new Error('Missing failed upload');
+  expect(batch.addFiles(Array.from({ length: 16 }, (_, i) => ({ value: `new-${i}`, name: `new-${i}.png` })))).toBe(true);
+  batch.retry(failed.id);
+  expect(batch.getSnapshot().rows.filter(row => row.status === 'pending')).toHaveLength(16);
+  expect(batch.getSnapshot().rows[0]?.status).toBe('failed');
+  await batch.run(new AbortController().signal);
+  batch.retry(failed.id);
+  expect(batch.getSnapshot().rows[0]?.status).toBe('pending');
+});
+
+it('reserves capacity for confirmations while permitting their own retry', async () => {
+  const { api } = capacityApi();
+  const batch = createWallpaperSourceBatch({
+    ...api,
+    upload: async (_asset, id) => ({ candidateId: id, status: 'accepting', expectedSourceSetRevision: '1' }),
+    status: async (_asset, id) => ({ candidateId: id, status: 'accepting', expectedSourceSetRevision: '1' }),
+  }, { wallpaperId: 'published' });
+  batch.addFiles(Array.from({ length: 16 }, (_, i) => ({ value: `${i}`, name: `${i}.png` })));
+  await batch.run(new AbortController().signal);
+  expect(batch.getSnapshot().availableSlots).toBe(0);
+  expect(batch.addFiles([{ value: 'overflow', name: 'overflow.png' }])).toBe(false);
+  const confirming = batch.getSnapshot().rows[0];
+  if (!confirming) throw new Error('Missing confirmation');
+  expect(confirming.status).toBe('confirming');
+  batch.retry(confirming.id);
+  expect(batch.getSnapshot().rows[0]?.status).toBe('pending');
+  expect(batch.getSnapshot().availableSlots).toBe(0);
+});

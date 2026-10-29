@@ -97,14 +97,19 @@ export function createWallpaperSourceBatch<TFile>(
     readonly rows: typeof rows;
     readonly busy: boolean;
     readonly canResume: boolean;
+    readonly availableSlots: number;
     readonly wallpaperId?: string;
     readonly assetId?: string;
-  } = { rows, busy, canResume: false };
+  } = { rows, busy, canResume: false, availableSlots: 16 };
+  // Retained outcomes do not reserve work. Membership is checked by the Asset service.
+  const availableSlots = () =>
+    16 - rows.filter((row) => ['pending', 'uploading', 'confirming'].includes(row.status)).length;
   const listeners = new Set<() => void>();
   const publish = () => {
     current = {
       rows,
       busy,
+      availableSlots: availableSlots(),
       canResume: !busy && !blockedInitial && rows.some((row) => row.status === 'pending'),
       ...(wallpaper
         ? {
@@ -130,7 +135,7 @@ export function createWallpaperSourceBatch<TFile>(
       };
     },
     addFiles(files: readonly { readonly value: TFile; readonly name: string }[]) {
-      if (busy || files.length + rows.length > 16) return false;
+      if (busy || files.length > availableSlots()) return false;
       rows = [
         ...rows,
         ...files.map((file) => ({ ...file, id: api.identifier(), status: 'pending' as const })),
@@ -139,7 +144,7 @@ export function createWallpaperSourceBatch<TFile>(
       return true;
     },
     replace(file: { readonly value: TFile; readonly name: string }, targetSourceId: string) {
-      if (busy || rows.length >= 16 || !targetSourceId) return false;
+      if (busy || availableSlots() === 0 || !targetSourceId) return false;
       rows = [...rows, { ...file, targetSourceId, id: api.identifier(), status: 'pending' }];
       publish();
       return true;
@@ -147,7 +152,7 @@ export function createWallpaperSourceBatch<TFile>(
     resume(file: { readonly value: TFile; readonly name: string }, candidate: ManagedCandidate) {
       if (
         busy ||
-        rows.length >= 16 ||
+        availableSlots() === 0 ||
         candidate.status === 'accepted' ||
         candidate.operation === 'replace-set' ||
         (candidate.operation === 'replace-one' && !candidate.targetSourceId)
@@ -178,6 +183,7 @@ export function createWallpaperSourceBatch<TFile>(
     retry(id: string) {
       if (busy) return;
       const row = rows.find((row) => row.id === id);
+      if (row?.status === 'failed' && availableSlots() === 0) return;
       if (row && (row.status === 'failed' || row.status === 'confirming'))
         update(id, { status: 'pending', message: undefined });
     },

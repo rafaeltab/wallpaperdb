@@ -149,3 +149,36 @@ test("seeded base user can create and replace a Source through the browser UI", 
       .digest("hex"),
   );
 });
+
+test.describe('Source intake capacity', () => {
+  test.use({ video: 'on' });
+
+test('Source management continues after sixteen uploads, withdrawal, add and replacement without reload', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.goto('/web/upload');
+  const manager = page.getByTestId('wallpaper-sources').filter({ hasText: 'Choose initial Sources for one Wallpaper' });
+  await manager.getByLabel('Choose initial Sources for one Wallpaper').setInputFiles(
+    Array.from({ length: 16 }, () => uploadFixturePaths[0]),
+  );
+  await expect(manager.getByTestId('source-upload-outcome')).toHaveCount(16);
+  await expect(manager.getByTestId('source-upload-outcome').filter({ hasText: 'Source accepted' })).toHaveCount(16, { timeout: 180_000 });
+  await expect(manager).toContainText('16 accepted Sources.');
+  const withdraw = manager.getByRole('button', { name: /^Withdraw Source / }).filter({ visible: true });
+  // The Default cannot be withdrawn. Select a non-default member in this same mounted manager.
+  const buttons = await withdraw.all();
+  const member = await Promise.all(buttons.map(async button => ({ button, enabled: await button.isEnabled() })));
+  const target = member.find(entry => entry.enabled);
+  if (!target) throw new Error('Missing non-default Source');
+  await target.button.click();
+  await expect(manager).toContainText('15 accepted Sources.');
+  const intake = manager.getByLabel('Choose initial Sources for one Wallpaper');
+  await expect(intake).toBeEnabled();
+  await intake.setInputFiles(uploadFixturePaths[1]);
+  await expect(manager.getByTestId('source-upload-outcome').filter({ hasText: 'Source accepted' })).toHaveCount(17);
+  await expect(manager).toContainText('16 accepted Sources.');
+  await manager.getByLabel(/^Replace Source /).first().setInputFiles(uploadFixturePaths[1]);
+  await expect(manager.getByTestId('source-upload-outcome').filter({ hasText: 'Source accepted' })).toHaveCount(18);
+  await expect(manager).toContainText('16 accepted Sources.');
+});
+
+});

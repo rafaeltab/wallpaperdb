@@ -108,32 +108,48 @@ else if (args[1] === 'start') {
   else if (args[1] === 'show')
     reply({
       thread: resource ? { ...resource, ...config.overrides } : null,
-      messages: (config.holdPublication && resource?.runCount === 3 ? [] : config.messages) ??
-        (config.complete && resource
+      messages:
+        config.waitingForGithub && resource?.stage === 'babysitting'
           ? [
               {
                 role: 'assistant',
                 runId: resource.latestRunId,
                 text: JSON.stringify({
                   jobId: resource.title.slice(8),
-                  stage:
-                    resource.stage ??
-                    ['implementation', 'review', 'publication'][resource.runCount - 1],
+                  stage: 'babysitting',
                   base: config.base,
-                  commit: config.base,
-                  outcome:
-                    resource.stage === 'babysitting'
-                      ? '<PR>READY</PR>'
-                      : ['<TASK>COMPLETE</TASK>', '<REVIEW>COMPLETE</REVIEW>', '<PR>CREATED</PR>'][
-                          resource.runCount - 1
-                        ],
-                  tests: true,
-                  coverage: true,
-                  crap: true,
-                  reviews: resource.runCount > 1,
+                  outcome: 'WAITING_FOR_GITHUB',
                 }),
               },
             ]
-          : null) ?? [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }],
+          : ((config.holdPublication && resource?.runCount === 3 ? [] : config.messages) ??
+            (config.complete && resource
+              ? [
+                  {
+                    role: 'assistant',
+                    runId: resource.latestRunId,
+                    text: JSON.stringify({
+                      jobId: resource.title.slice(8),
+                      stage:
+                        resource.stage ??
+                        ['implementation', 'review', 'publication'][resource.runCount - 1],
+                      base: config.base,
+                      commit: config.base,
+                      outcome:
+                        resource.stage === 'babysitting'
+                          ? '<PR>READY</PR>'
+                          : [
+                              '<TASK>COMPLETE</TASK>',
+                              '<REVIEW>COMPLETE</REVIEW>',
+                              '<PR>CREATED</PR>',
+                            ][resource.runCount - 1],
+                      tests: true,
+                      coverage: true,
+                      crap: true,
+                      reviews: resource.runCount > 1,
+                    }),
+                  },
+                ]
+              : null) ?? [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }]),
     });
 }

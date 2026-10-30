@@ -37,10 +37,14 @@ export interface JobStore {
   /** Append atomically at revision; competing writers cannot overwrite a deadline or delivery identity. */
   saveWait(state: WaitState): Effect.Effect<boolean, Unavailable>;
   reserve(intent: Intent): Effect.Effect<boolean, Unavailable>;
-  /** First run binding wins atomically and survives reopen. Repeating that
+  /** First binding per stage/run ordinal wins atomically and survives reopen. Repeating that
    * binding returns true; any replacement returns false. Records retain the
    * stage/thread/accepted commit and predecessor association for reconciliation. */
-  bindRun(request: StageRequest, runId: string): Effect.Effect<boolean, Unavailable>;
+  bindRun(
+    request: StageRequest,
+    runId: string,
+    ordinal?: number
+  ): Effect.Effect<boolean, Unavailable>;
   /** Stage records are immutable. saveStage returns false if already present;
    * callers must use the winning record. Claims permit at most one uncertain
    * send per stage and are never automatically released. */
@@ -92,8 +96,8 @@ export interface Job {
 export const Job = Context.Service<Job>('wallpaperdb.factory.Job');
 
 export type Stage = 'implementation' | 'review' | 'publication' | 'babysitting' | 'ci';
-/** Immutable stage association, written before any delivery. Index is also the
- * expected T3 run ordinal: unrequested intervening turns never count as acceptance. */
+/** Immutable stage association, written before any delivery. Ordinal pins single-turn stages. Babysitting watcher turns also require the
+ * exact stage delivery identity in their current-run receipt. */
 export interface StageRequest {
   readonly index: number;
   readonly ordinal?: number;
@@ -109,6 +113,8 @@ export interface StageEvidence {
   readonly commit: string;
   readonly accepted: boolean;
   readonly waitingForGitHub?: boolean;
+  /** Exact delivery association validated from the latest assistant receipt. */
+  readonly stageIndex?: number;
   readonly linked?: readonly string[];
 }
 export type PullRequestObservation =

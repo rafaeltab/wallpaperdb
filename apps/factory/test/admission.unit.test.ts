@@ -27,8 +27,13 @@ function setup(issue: Effect.Success<ReturnType<IssuePort['inspect']>> = facts) 
         Layer.mergeAll(
           Layer.succeed(Time, { now: () => Clock.currentTimeMillis }),
           Layer.succeed(JobStore, store),
-          Layer.succeed(Issues, { inspect: () => Effect.succeed(issue) }),
+          Layer.succeed(Issues, {
+            pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
+            inspect: () => Effect.succeed(issue),
+          }),
           Layer.succeed(Execution, {
+            inspectStage: () => Effect.succeed(null),
+            sendStage: () => Effect.void,
             launch: () =>
               Effect.sync(() => {
                 launches++;

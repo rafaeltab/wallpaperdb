@@ -16,6 +16,15 @@ const intentSchema = z
     expectedStage: z.literal('implementation'),
   })
   .strict();
+const stageSchema = z
+  .object({
+    index: z.number().int().min(0).max(3),
+    stage: z.enum(['implementation', 'review', 'publication']),
+    threadId: z.string().min(1),
+    commit: z.string().regex(/^[a-f0-9]{40}$/),
+    previousRunId: z.string().min(1).nullable(),
+  })
+  .strict();
 const code = (cause: unknown, expected: string) =>
   cause instanceof Error && 'code' in cause && cause.code === expected;
 async function syncDirectory(directory: string) {
@@ -61,6 +70,23 @@ export function fileStore(directory: string): JobStore {
     }
   };
   return {
+    readStage: (index) =>
+      effect('read-stage', async () => {
+        try {
+          return stageSchema.parse(
+            JSON.parse(await readFile(join(directory, `stage-${index}.json`), 'utf8'))
+          );
+        } catch (cause) {
+          if (code(cause, 'ENOENT')) return null;
+          throw cause;
+        }
+      }),
+    saveStage: (request) =>
+      effect('save-stage', () =>
+        publish(`stage-${request.index}.json`, stageSchema.parse(request))
+      ),
+    claimStage: (index) =>
+      effect('claim-stage', () => publish(`stage-${index}-claimed.json`, { version: 1 })),
     read: () =>
       effect('read', async () => {
         try {

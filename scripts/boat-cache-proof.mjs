@@ -1,7 +1,7 @@
 // Disposable C benchmark: compile frozen common source, never implementation-child outputs.
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 const root = process.cwd();
@@ -19,10 +19,19 @@ const frozen = spawnSync(
 if (frozen.status !== 0)
 	throw new Error("Cache proof requires unchanged frozen common source");
 const directory = path.join(root, ".boat/common-cache-proof");
+fs.rmSync(directory, { recursive: true, force: true });
 fs.mkdirSync(directory, { recursive: true });
-fs.cpSync("packages/core/src", path.join(directory, "src"), {
-	recursive: true,
-});
+const archive = execFileSync(
+	"git",
+	["archive", "dc17dead07c1d1f66e1806412cb7623812601bf1", "packages/core/src"],
+	{ maxBuffer: 16 * 1024 * 1024 },
+);
+execFileSync("tar", ["-x", "-C", directory], { input: archive });
+fs.renameSync(
+	path.join(directory, "packages/core/src"),
+	path.join(directory, "src"),
+);
+fs.rmSync(path.join(directory, "packages"), { recursive: true });
 fs.copyFileSync("pnpm-lock.yaml", path.join(directory, "pnpm-lock.yaml"));
 fs.writeFileSync(path.join(directory, "pnpm-workspace.yaml"), "packages: []\n");
 const link = path.join(directory, "node_modules");

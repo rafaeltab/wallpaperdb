@@ -63,12 +63,69 @@ import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { acquireDockerLease } from "./lib/docker-queue.mjs";
+import { ownsWatch } from "./boat-stop-watch.mjs";
+
+test("restoration stops only a Compose watcher for this checkout and exact project", () => {
+	const input = {
+		root: "/owned",
+		cwd: "/owned",
+		project: "owned-stack",
+		argv: [
+			"/managed/docker-compose",
+			"compose",
+			"-p",
+			"owned-stack",
+			"-f",
+			"compose.yml",
+			"watch",
+		],
+	};
+	assert.equal(ownsWatch(input), true);
+	assert.equal(ownsWatch({ ...input, cwd: "/sibling" }), false);
+	assert.equal(ownsWatch({ ...input, project: "owned" }), false);
+	assert.equal(
+		ownsWatch({ ...input, argv: ["/bin/sh", "-p", "owned-stack", "watch"] }),
+		false,
+	);
+	assert.equal(ownsWatch({ ...input, argv: input.argv.slice(0, -1) }), false);
+});
 import {
 	fingerprint,
 	validateAuthority,
 	generatedAuthority,
 	prepareEnvironment,
+	installationInputs,
 } from "./lib/boat-preparation.mjs";
+
+test("setup helper, workspace and template edits invalidate actual preparation selection", (t) => {
+	const root = fs.mkdtempSync(
+		path.join(os.tmpdir(), "boat-installation-inputs-"),
+	);
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	const files = installationInputs([
+		".npmrc",
+		"package.json",
+		"apps/user/package.json",
+		"apps/user/.env.example",
+	]);
+	for (const file of files) {
+		fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+		fs.writeFileSync(path.join(root, file), "initial");
+	}
+	let previous = fingerprint(root, files);
+	for (const file of [
+		"scripts/lib/worktree-project.mjs",
+		"apps/user/.env.example",
+		"apps/user/package.json",
+		".npmrc",
+		"pnpm-workspace.yaml",
+	]) {
+		fs.appendFileSync(path.join(root, file), "changed");
+		const next = fingerprint(root, files);
+		assert.notEqual(next, previous, file);
+		previous = next;
+	}
+});
 
 test("actual Make routing preserves enrolled remote tasks and explicit local/worker overrides", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-routing-"));

@@ -2,6 +2,21 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
+export function installationInputs(tracked) {
+	return [
+		"pnpm-lock.yaml",
+		"mise.lock",
+		"mise.toml",
+		"pnpm-workspace.yaml",
+		...tracked.filter((name) =>
+			/(^|\/)(package.json|\.npmrc|\.env.example)$/.test(name),
+		),
+		"scripts/setup-worktree.mjs",
+		"scripts/lib/env-pipeline.mjs",
+		"scripts/lib/worktree-project.mjs",
+	];
+}
+
 export const generatedAuthority = [
 	"apps/asset/.authority.json",
 	"infra/nats/.generated.conf",

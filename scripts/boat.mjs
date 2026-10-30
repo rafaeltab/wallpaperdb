@@ -20,7 +20,7 @@ import { cacheServer } from "./lib/boat-cache.mjs";
 import {
 	fingerprint,
 	projectedInputs,
-	validateAuthority,
+	installationInputs,
 	prepareEnvironment,
 } from "./lib/boat-preparation.mjs";
 
@@ -157,6 +157,12 @@ const json = async (argv) => {
 };
 const ssh = (id, command, opts = {}) =>
 	boat(["ssh", id, "--", "bash", "-lc", command], opts);
+const retireWatchers = (id) =>
+	ssh(
+		id,
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise exec -- node --input-type=module -`,
+		{ input: fs.readFileSync("scripts/boat-stop-watch.mjs") },
+	);
 function owned() {
 	if (!config || config.root !== root)
 		throw new Error("This worktree is not enrolled");
@@ -317,6 +323,7 @@ async function ensure() {
 			`mkdir -p ${remote}; command -v mise >/dev/null || (curl -fsSL https://mise.run | sh); test -d ${remote}/.git || (git init ${remote} && cd ${remote} && git remote add origin https://github.com/rafaeltab/wallpaperdb.git && git fetch --depth=1 origin ${quote(config.base)} && git checkout --detach FETCH_HEAD)`,
 		);
 		if (resumed) {
+			await retireWatchers(s.id);
 			console.log("Remote environment resumed from sleep");
 			event("resumed", { id: s.id });
 		}
@@ -389,17 +396,7 @@ async function prepare(id) {
 		.toString()
 		.split("\0")
 		.filter(Boolean);
-	const installation = [
-		"pnpm-lock.yaml",
-		"mise.lock",
-		"mise.toml",
-		"pnpm-workspace.yaml",
-		...tracked.filter((name) =>
-			/(^|\/)(package.json|\.npmrc|\.env.example)$/.test(name),
-		),
-		"scripts/setup-worktree.mjs",
-		"scripts/lib/env-pipeline.mjs",
-	];
+	const installation = installationInputs(tracked);
 	const dependencies = fingerprint(root, installation);
 	const configuration = [
 		...new Set([
@@ -471,14 +468,11 @@ async function stop(remove = false) {
 		const s = read(stateFile);
 		if (!s.id) return;
 		if (s.runningSince) {
-			if (s.watcher) {
-				await json(["exec", s.id, "--kill", String(s.watcher)]);
-				delete s.watcher;
-				save(s);
-			}
 			const initial = workerState(await json(["info", s.id]));
-			if (!["stopping", "archived", "stopped"].includes(initial))
+			if (!["stopping", "archived", "stopped"].includes(initial)) {
+				await retireWatchers(s.id);
 				await json(["stop", s.id]);
+			}
 			let stopped = false;
 			for (let attempt = 0; attempt < 180; attempt++) {
 				const state = workerState(await json(["info", s.id]));
@@ -550,7 +544,7 @@ async function command() {
 		) {
 			await ssh(
 				id,
-				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make stop BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`,
+				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`,
 			);
 			if (targets[0] !== "dev") await watchDevelopment(id);
 		}

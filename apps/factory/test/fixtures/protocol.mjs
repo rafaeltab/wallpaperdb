@@ -66,6 +66,6 @@ else if (args[1] === 'start') {
   else if (args[1] === 'show')
     reply({
       thread: resource ? { ...resource, ...config.overrides } : null,
-      messages: [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }],
+      messages: config.messages ?? [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }],
     });
 }

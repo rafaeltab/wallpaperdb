@@ -19,6 +19,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         .url()
         .refine((value) => /^https?:/.test(value))
         .optional(),
+      FACTORY_T3_MCP_ENDPOINT: z.string().url().optional(),
+      FACTORY_T3_MCP_AUTHORIZATION_FILE: z.string().startsWith('/').optional(),
       FACTORY_T3_PROJECT_ID: z.string().min(1),
       FACTORY_PR_BASE: z
         .string()
@@ -87,6 +89,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         prBase: configuration.FACTORY_PR_BASE,
         projectId: configuration.FACTORY_T3_PROJECT_ID,
         binary: configuration.FACTORY_T3_BINARY,
+        mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+        mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
       })
     )
   );

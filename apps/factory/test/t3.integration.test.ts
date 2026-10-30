@@ -53,3 +53,63 @@ it('reconciles a lost launch using real isolated Git binding and rejects contrad
     await host.cleanup();
   }
 });
+it('reads current structured questions, excluding historical and inherited questions', async () => {
+  const host = await protocol();
+  const previous = process.env.FACTORY_FIXTURE;
+  process.env.FACTORY_FIXTURE = host.configFile;
+  try {
+    const { writeFile } = await import('node:fs/promises');
+    const authorizationFile = host.directory + '/authorization';
+    await writeFile(authorizationFile, 'Bearer controlled-protocol');
+    const adapter = t3Execution({
+      binary: host.binary,
+      project: host.repository,
+      projectId: 'project-id',
+      mcpEndpoint: 'http://127.0.0.1:1/mcp',
+      mcpAuthorizationFile: authorizationFile,
+    });
+    const intent: Intent = {
+      id: 'questions',
+      issue: 579,
+      issueUrl: 'https://github.com/rafaeltab/wallpaperdb/issues/579',
+      base: host.base,
+      context: 'Only 579',
+      branch: 'factory/questions',
+      createdAt: 100,
+      expectedStage: 'implementation',
+    };
+    await Effect.runPromise(adapter.launch(intent));
+    const question = {
+      itemId: 'question-1',
+      runId: 'run-1',
+      type: 'user_input_request',
+      status: 'waiting',
+      text: 'Choose the approved option?',
+      sourceThreadId: 'thread-live',
+      visibility: 'local',
+    };
+    await host.save({
+      activity: [question],
+      overrides: { pendingRequestCount: 1, status: 'running' },
+    });
+    expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({
+      question: { id: 'question-1', text: 'Choose the approved option?' },
+    });
+    for (const change of [
+      { runId: 'old-run' },
+      { sourceThreadId: 'other-thread' },
+      { visibility: 'inherited' },
+      { status: 'completed' },
+      { status: 'cancelled' },
+      { type: 'approval_request' },
+    ]) {
+      await host.save({ activity: [{ ...question, ...change }] });
+      const observed = await Effect.runPromise(adapter.observe(intent));
+      expect(observed).not.toHaveProperty('question', expect.anything());
+    }
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+});

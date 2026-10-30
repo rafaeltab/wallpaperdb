@@ -72,9 +72,12 @@ describe('Profile picture settings', () => {
   }) => {
     // Diagnostic only for #537: retain the last entered phase even when the test times out.
     const started = performance.now();
+    const cpuStarted = process.cpuUsage();
     const trace: {
       phase: string;
       elapsed: number;
+      cpuUserMicroseconds: number;
+      cpuSystemMicroseconds: number;
       pickerDisabled: boolean | undefined;
       dialog: boolean;
       slider: boolean;
@@ -86,9 +89,12 @@ describe('Profile picture settings', () => {
       if (closed || trace.length >= 64) return;
       const before = performance.now();
       if (phase.endsWith(':enter') || phase.endsWith(':complete')) currentPhase = phase;
+      const cpu = process.cpuUsage(cpuStarted);
       trace.push({
         phase,
         elapsed: Math.round(performance.now() - started),
+        cpuUserMicroseconds: cpu.user,
+        cpuSystemMicroseconds: cpu.system,
         pickerDisabled: document.querySelector('input[type=file]')?.hasAttribute('disabled'),
         dialog: document.querySelector('[role=dialog]') !== null,
         slider: document.querySelector('input[type=range]') !== null,
@@ -120,6 +126,7 @@ describe('Profile picture settings', () => {
           `[crop-settings-537] ${JSON.stringify({
             state: task.result?.state,
             elapsed: Math.round(performance.now() - started),
+            cpuMicroseconds: process.cpuUsage(cpuStarted),
             currentPhase,
             trace,
             samples,

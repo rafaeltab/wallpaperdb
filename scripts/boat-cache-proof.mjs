@@ -5,6 +5,19 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 const root = process.cwd();
+const frozen = spawnSync(
+	"git",
+	[
+		"diff",
+		"--quiet",
+		"dc17dead07c1d1f66e1806412cb7623812601bf1",
+		"--",
+		"packages/core",
+	],
+	{ cwd: root },
+);
+if (frozen.status !== 0)
+	throw new Error("Cache proof requires unchanged frozen common source");
 const directory = path.join(root, ".boat/common-cache-proof");
 fs.mkdirSync(directory, { recursive: true });
 fs.cpSync("packages/core/src", path.join(directory, "src"), {
@@ -27,7 +40,7 @@ fs.writeFileSync(
 );
 fs.writeFileSync(
 	path.join(directory, "build.mjs"),
-	`import { build } from '../../packages/profile-markdown/node_modules/esbuild/lib/main.js';
+	`import { build } from '../../scripts/node_modules/esbuild/lib/main.js';
 await build({entryPoints:['src/assets/index.ts','src/quarantine/index.ts','src/errors/index.ts','src/health/index.ts','src/openapi/index.ts','src/connections/database.ts'],bundle:true,platform:'node',format:'esm',target:'node22',outdir:'dist',metafile:true}).then(x=>import('node:fs').then(fs=>fs.writeFileSync('dist/meta.json',JSON.stringify(x.metafile))));
 `,
 );

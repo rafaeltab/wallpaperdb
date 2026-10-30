@@ -21,6 +21,7 @@ import {
 	fingerprint,
 	projectedInputs,
 	validateAuthority,
+	prepareEnvironment,
 } from "./lib/boat-preparation.mjs";
 
 const root = process.cwd();
@@ -59,6 +60,7 @@ function execute(
 		allowFailure = false,
 		streamFrames = false,
 		logPath,
+		onOutput = () => {},
 	} = {},
 ) {
 	return new Promise((resolve, reject) => {
@@ -85,6 +87,7 @@ function execute(
 		if (streamFrames) {
 			let pending = "";
 			const emit = (data, stderr = false) => {
+				onOutput(data);
 				(stderr ? process.stderr : process.stdout).write(data);
 				if (logPath) fs.appendFileSync(logPath, data, { mode: 0o600 });
 				for (const phase of [
@@ -381,72 +384,74 @@ async function sync(id) {
 	});
 }
 async function prepare(id) {
-	// The existing generator owns credentials and derived broker/workflow inputs.
 	const inputs = projectedInputs(root);
-	if (inputs.some((name) => !fs.existsSync(name)))
-		await execute("make", [
-			"run",
-			"PACKAGE=asset",
-			"SCRIPT=dev:configure",
-			"BOAT_EXEC=local",
-		]);
-	validateAuthority(root);
-	const dependencies = fingerprint(root, [
+	const tracked = execFileSync("git", ["ls-files", "-z"])
+		.toString()
+		.split("\0")
+		.filter(Boolean);
+	const installation = [
 		"pnpm-lock.yaml",
 		"mise.lock",
 		"mise.toml",
-		"package.json",
-	]);
-	const configuration = [
-		...inputs,
-		"pnpm-lock.yaml",
-		"mise.lock",
-		"mise.toml",
-		"package.json",
+		"pnpm-workspace.yaml",
+		...tracked.filter((name) =>
+			/(^|\/)(package.json|\.npmrc|\.env.example)$/.test(name),
+		),
 		"scripts/setup-worktree.mjs",
 		"scripts/lib/env-pipeline.mjs",
-		"apps/asset/scripts/development-authority.ts",
 	];
-	let identity = fingerprint(root, configuration);
-	if (read(path.join(dir, "prepared.json")).identity === identity) return;
-	await execute("make", [
-		"run",
-		"PACKAGE=asset",
-		"SCRIPT=dev:configure",
-		"BOAT_EXEC=local",
-	]);
-	validateAuthority(root);
-	identity = fingerprint(root, configuration);
-	const start = Date.now();
-	// Transfer only the generated development inputs, through SSH stdin, never logs.
-	const project = async () =>
-		ssh(id, `cd ${remote} && tar -xzf -`, {
-			input: execFileSync("tar", ["-czf", "-", ...inputs], {
-				maxBuffer: 16 * 1024 * 1024,
+	const dependencies = fingerprint(root, installation);
+	const configuration = [
+		...new Set([
+			...inputs,
+			...installation,
+			...tracked.filter(
+				(name) =>
+					name.startsWith("apps/asset/scripts/") ||
+					name.startsWith("apps/asset/src/adapters/commands/") ||
+					name === "apps/asset/src/authority.ts" ||
+					name.startsWith("apps/asset/src/capabilities/sources/"),
+			),
+		]),
+	];
+	const previous = read(path.join(dir, "prepared.json"));
+	const started = Date.now();
+	const result = await prepareEnvironment({
+		root,
+		previous,
+		configuration,
+		dependencies,
+		generate: async () => {
+			if (previous.dependencies !== dependencies)
+				await execute("node", ["scripts/setup-worktree.mjs"]);
+			await execute("make", [
+				"run",
+				"PACKAGE=asset",
+				"SCRIPT=dev:configure",
+				"BOAT_EXEC=local",
+			]);
+		},
+		project: () =>
+			ssh(id, `cd ${remote} && tar -xzf -`, {
+				input: execFileSync("tar", ["-czf", "-", ...inputs], {
+					maxBuffer: 16 * 1024 * 1024,
+				}),
 			}),
-		});
-	await project();
-	if (read(path.join(dir, "prepared.json")).dependencies !== dependencies) {
-		await ssh(
-			id,
-			`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && make install BOAT_EXEC=worker`,
-		);
-		// Postinstall assigns remote-main ports. Restore this enrollment's inputs.
-		await project();
-	}
-	await ssh(
-		id,
-		`cd ${remote} && ${inputs.map((name) => `test -f ${quote(name)}`).join(" && ")}`,
-	);
-	// The existing contributor contract requires these bind-mounted init inputs
-	// to be readable by PostgreSQL's container user, irrespective of host umask.
-	await ssh(
-		id,
-		`cd ${remote} && chmod a+rx infra/postgres/init && chmod a+r infra/postgres/init/*.sql`,
-	);
-	write(path.join(dir, "prepared.json"), { identity, dependencies });
-	event("dependencies-ready", { ms: Date.now() - start });
+		install: () =>
+			ssh(
+				id,
+				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && make install BOAT_EXEC=worker`,
+			),
+		validateMounts: () =>
+			ssh(
+				id,
+				`cd ${remote} && ${inputs.map((name) => `test -f ${quote(name)}`).join(" && ")} && chmod a+rx infra/postgres/init && chmod a+r infra/postgres/init/*.sql`,
+			),
+		persist: (record) => write(path.join(dir, "prepared.json"), record),
+	});
+	event("preparation", { changed: result.changed, ms: Date.now() - started });
 }
+
 function daemon() {
 	const s = read(stateFile);
 	if (liveOwnedProcess(root, s.daemon)) return;
@@ -527,7 +532,7 @@ async function command() {
 	write(lease, {
 		pid: process.pid,
 		at: Date.now(),
-		watcherOnly: ["dev", "apps-logs", "infra-logs"].includes(targets[0]),
+		watcherOnly: ["apps-logs", "infra-logs"].includes(targets[0]),
 		development: targets[0] === "dev",
 		startTicks: worktreeProcesses(root).find((p) => p.pid === process.pid)
 			?.startTicks,
@@ -570,6 +575,13 @@ async function command() {
 				allowFailure: true,
 				streamFrames: true,
 				logPath: path.join(dir, `command-${started}.log`),
+				onOutput: (data) => {
+					if (targets[0] === "dev" && data.includes("Watch enabled")) {
+						const record = read(lease);
+						write(lease, { ...record, watcherOnly: true });
+						event("foreground-watching");
+					}
+				},
 			},
 		);
 		event("command", {
@@ -658,7 +670,7 @@ async function serveCache() {
 	const upstreamToken = process.env.TURBO_TOKEN ?? read(authPath).token;
 	const server = cacheServer({
 		directory,
-		cohort: config.cohort,
+		cohort: config.cohort === "c" ? `c-${config.key}` : config.cohort,
 		token,
 		upstream: upstreamToken
 			? { token: upstreamToken, team: "rafael-biezes-projects" }

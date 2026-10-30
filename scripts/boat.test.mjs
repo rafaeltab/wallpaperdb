@@ -67,6 +67,7 @@ import {
 	fingerprint,
 	validateAuthority,
 	generatedAuthority,
+	prepareEnvironment,
 } from "./lib/boat-preparation.mjs";
 
 test("actual Make routing preserves enrolled remote tasks and explicit local/worker overrides", (t) => {
@@ -150,9 +151,94 @@ test("preparation requires issuer, JWKS and origins to agree with actual worktre
 		);
 	save();
 	validateAuthority(root);
+	fs.writeFileSync(
+		path.join(root, "apps/user/.env"),
+		"CLERK_DOMAIN=https://example.clerk.accounts.dev/\n",
+	);
+	validateAuthority(root);
 	clerk.authorizedParties = ["http://localhost:8000"];
 	save();
 	assert.throws(() => validateAuthority(root), /does not match/);
+});
+
+test("preparation upgrades existing placeholders before projection, restores postinstall inputs and skips unchanged installation", async (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-prepare-sequence-"));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	for (const name of generatedAuthority) {
+		fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+		fs.writeFileSync(path.join(root, name), "{}");
+	}
+	fs.writeFileSync(path.join(root, ".worktree"), "INGRESS_PORT=9120\n");
+	fs.writeFileSync(
+		path.join(root, "apps/user/.env"),
+		"CLERK_DOMAIN=example.clerk.accounts.dev\n",
+	);
+	const authorityPath = path.join(root, generatedAuthority[0]);
+	fs.writeFileSync(
+		authorityPath,
+		JSON.stringify({
+			credentials: "preserve",
+			identityProviders: {
+				clerk: { issuer: "https://unconfigured.clerk.accounts.dev" },
+			},
+		}),
+	);
+	let previous = {},
+		remoteEnv = "",
+		calls = [];
+	const configuration = [".worktree", "apps/user/.env", ...generatedAuthority];
+	const run = () =>
+		prepareEnvironment({
+			root,
+			previous,
+			configuration,
+			dependencies: "frozen-lockfiles",
+			generate: async () => {
+				calls.push("generate");
+				const authority = JSON.parse(fs.readFileSync(authorityPath));
+				authority.identityProviders.clerk = {
+					issuer: "https://example.clerk.accounts.dev",
+					jwksUrl: "https://example.clerk.accounts.dev/.well-known/jwks.json",
+					authorizedParties: ["http://localhost:9120", "http://127.0.0.1:9120"],
+				};
+				fs.writeFileSync(authorityPath, JSON.stringify(authority));
+			},
+			project: async () => {
+				calls.push("project");
+				remoteEnv = fs.readFileSync(path.join(root, "apps/user/.env"), "utf8");
+			},
+			install: async () => {
+				calls.push("install");
+				assert.match(remoteEnv, /example.clerk/);
+				remoteEnv = "placeholder overwritten by postinstall";
+			},
+			validateMounts: async () => {
+				calls.push("mounts");
+				assert.match(remoteEnv, /example.clerk/);
+			},
+			persist: async (record) => {
+				previous = record;
+			},
+		});
+	assert.equal((await run()).changed, true);
+	assert.deepEqual(calls, [
+		"generate",
+		"project",
+		"install",
+		"project",
+		"mounts",
+	]);
+	assert.equal(
+		JSON.parse(fs.readFileSync(authorityPath)).credentials,
+		"preserve",
+	);
+	calls = [];
+	assert.equal((await run()).changed, false);
+	assert.deepEqual(calls, ["mounts"]);
+	calls = [];
+	fs.appendFileSync(path.join(root, "apps/user/.env"), "# new configuration\n");
+	await run();
+	assert.deepEqual(calls, ["generate", "project", "mounts"]);
 });
 
 test("settled child cannot stop its active parent sharing the worktree", (t) => {

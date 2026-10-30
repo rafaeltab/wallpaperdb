@@ -26,9 +26,15 @@ export function fingerprint(root, names) {
 	const digest = createHash("sha256");
 	for (const name of [...names].sort()) {
 		const file = path.join(root, name);
-		if (!fs.lstatSync(file).isFile())
+		const stat = fs.lstatSync(file);
+		if (!stat.isFile())
 			throw new Error(`Preparation requires regular file: ${name}`);
-		digest.update(name).update("\0").update(fs.readFileSync(file)).update("\0");
+		digest
+			.update(name)
+			.update(String(stat.mode & 0o777))
+			.update("\0")
+			.update(fs.readFileSync(file))
+			.update("\0");
 	}
 	return digest.digest("hex");
 }
@@ -47,7 +53,9 @@ export function validateAuthority(root) {
 		)
 			.toString()
 			.replace(/\$$/, "");
-	const issuer = domain.startsWith("https://") ? domain : `https://${domain}`;
+	const issuer = new URL(
+		domain.startsWith("https://") ? domain : `https://${domain}`,
+	).origin;
 	const port = fs
 		.readFileSync(path.join(root, ".worktree"), "utf8")
 		.match(/^INGRESS_PORT\s*[:?]?=\s*(\d+)/m)?.[1];
@@ -73,4 +81,37 @@ export function validateAuthority(root) {
 		if (!fs.lstatSync(path.join(root, name)).isFile())
 			throw new Error(`Preparation requires regular file: ${name}`);
 	}
+}
+
+export async function prepareEnvironment({
+	root,
+	previous,
+	configuration,
+	dependencies,
+	generate,
+	project,
+	install,
+	validateMounts,
+	persist,
+}) {
+	const complete = configuration.every((name) =>
+		fs.existsSync(path.join(root, name)),
+	);
+	let identity = complete ? fingerprint(root, configuration) : null;
+	if (identity !== previous.identity) {
+		await generate();
+		validateAuthority(root);
+		identity = fingerprint(root, configuration);
+		await project();
+		if (dependencies !== previous.dependencies) {
+			await install();
+			await project();
+		}
+		await validateMounts();
+		await persist({ identity, dependencies });
+		return { changed: true };
+	}
+	validateAuthority(root);
+	await validateMounts();
+	return { changed: false };
 }

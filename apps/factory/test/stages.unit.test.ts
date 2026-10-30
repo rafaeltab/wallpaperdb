@@ -82,3 +82,149 @@ it('requires fresh accepted stages and matching current CI before reporting read
   });
   expect(sent).toEqual([1, 2]);
 });
+
+async function stagesFixture() {
+  const store = controlledStore();
+  let ordinal = 1;
+  let runId = 'run-1';
+  let commit = 'b'.repeat(40);
+  let accepted = true;
+  let links = ['https://github.com/rafaeltab/wallpaperdb/pull/999'];
+  let prCommit = commit;
+  let prKind: 'found' | 'absent' | 'ambiguous' = 'found';
+  let sends = 0;
+  const deps = Layer.mergeAll(
+    Layer.succeed(JobStore, store),
+    Layer.succeed(Time, { now: () => Effect.succeed(100) }),
+    Layer.succeed(Issues, {
+      inspect: () =>
+        Effect.succeed({
+          open: true,
+          author: 'rafaeltab',
+          labels: ['ready-for-agent'],
+          blockersReady: true,
+          url: 'https://github.com/rafaeltab/wallpaperdb/issues/577',
+        }),
+      pullRequest: () =>
+        Effect.succeed(
+          prKind === 'found'
+            ? {
+                kind: 'found' as const,
+                url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+                commit: prCommit,
+                ready: true,
+                landed: false,
+              }
+            : { kind: prKind }
+        ),
+    }),
+    Layer.succeed(Execution, {
+      launch: () => Effect.succeed({ kind: 'submitted' as const }),
+      observe: (intent) =>
+        Effect.succeed({
+          kind: 'found' as const,
+          threadId: 'thread',
+          status: 'completed',
+          worktree: '/worker',
+          branch: intent.branch,
+          model: 'gpt-6.1-sol',
+        }),
+      inspectStage: () => Effect.succeed({ runId, ordinal, commit, accepted, linked: links }),
+      sendStage: (_intent, request) =>
+        Effect.sync(() => {
+          ordinal = request.index + 1;
+          runId = `run-${ordinal}`;
+          sends++;
+        }),
+    })
+  );
+  const run = (
+    operation: (
+      job: import('../src/capabilities/job/index.js').Job
+    ) => Effect.Effect<
+      import('../src/capabilities/job/index.js').StartResult,
+      import('../src/capabilities/job/index.js').Unavailable
+    >
+  ) =>
+    Effect.runPromise(
+      Effect.flatMap(Job, operation).pipe(Effect.provide(JobLive.pipe(Layer.provide(deps))))
+    );
+  return {
+    start: () => run((job) => job.start({ issue: 577, base: 'a'.repeat(40), context: '' })),
+    status: () => run((job) => job.status()),
+    change: (value: {
+      ordinal?: number;
+      runId?: string;
+      commit?: string;
+      accepted?: boolean;
+      links?: string[];
+      prCommit?: string;
+      prKind?: typeof prKind;
+    }) => {
+      ordinal = value.ordinal ?? ordinal;
+      runId = value.runId ?? runId;
+      commit = value.commit ?? commit;
+      accepted = value.accepted ?? accepted;
+      links = value.links ?? links;
+      prCommit = value.prCommit ?? prCommit;
+      prKind = value.prKind ?? prKind;
+    },
+    sends: () => sends,
+  };
+}
+it.each([{ accepted: false }, { ordinal: 2 }])(
+  'keeps implementation pending on incompatible evidence %j',
+  async (change) => {
+    const job = await stagesFixture();
+    job.change(change);
+    expect(await job.start()).toMatchObject({
+      delivery: { stage: 'implementation', ready: false },
+    });
+    expect(job.sends()).toBe(0);
+  }
+);
+it('rejects the predecessor run as the next stage outcome', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  job.change({ runId: 'run-1' });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
+  expect(job.sends()).toBe(1);
+});
+it('does not accept publication that changed the reviewed commit', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ commit: 'c'.repeat(40) });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'publication', ready: false } });
+});
+it.each([
+  { links: [] },
+  { prCommit: 'c'.repeat(40) },
+  { prKind: 'absent' as const },
+  { prKind: 'ambiguous' as const },
+])('does not report CI readiness without matching external publication %j', async (change) => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change(change);
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'ci', ready: false, landed: false },
+  });
+  expect(job.sends()).toBe(2);
+});
+it('invalidates displayed readiness if the current worktree changes after acceptance', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  expect(await job.status()).toMatchObject({ delivery: { ready: true } });
+  job.change({ commit: 'c'.repeat(40) });
+  expect(await job.status()).toMatchObject({ delivery: { ready: false } });
+});
+it('does not replace a durably associated run with another run at the same ordinal', async () => {
+  const job = await stagesFixture();
+  job.change({ accepted: false });
+  await job.start();
+  job.change({ runId: 'replacement-run', accepted: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'implementation', ready: false } });
+  expect(job.sends()).toBe(0);
+});

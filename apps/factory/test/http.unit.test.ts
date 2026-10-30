@@ -175,3 +175,36 @@ it('translates technical failure without disclosing the cause', () =>
         Effect.fail(new Unavailable({ operation: 'hidden', cause: new Error('secret') })),
     }
   ));
+it('shows current commit PR readiness separately from default branch landing', () =>
+  contract(
+    async (app) => {
+      const rendered = (await app.inject('/')).body;
+      expect(rendered).toContain('Ready for manual merge');
+      expect(rendered).toContain('Not landed');
+      expect(rendered).toContain('https://github.com/rafaeltab/wallpaperdb/pull/999');
+      expect(rendered).toContain('b'.repeat(40));
+    },
+    {
+      ...idle,
+      status: () =>
+        Effect.succeed({
+          kind: 'job',
+          intent,
+          execution: { kind: 'absent' },
+          elapsedMs: 0,
+          delivery: {
+            stage: 'ci',
+            commit: 'b'.repeat(40),
+            ready: true,
+            landed: false,
+            pr: {
+              kind: 'found',
+              url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+              commit: 'b'.repeat(40),
+              ready: true,
+              landed: false,
+            },
+          },
+        }),
+    }
+  ));

@@ -41,6 +41,22 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       await browserExpect(page.getByText(/Elapsed: \d+ seconds/)).toBeVisible();
       await page.getByRole('link', { name: 'Refresh observation' }).click();
       await browserExpect(page.getByText('Status: running')).toBeVisible();
+      await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
+      await browserExpect
+        .poll(async () => {
+          await page.reload();
+          return page.getByText('Ready for manual merge', { exact: true }).count();
+        })
+        .toBe(1);
+      await browserExpect(page.getByText('Not landed.', { exact: false })).toBeVisible();
+      await browserExpect(page.getByRole('link', { name: 'Open pull request' })).toHaveAttribute(
+        'href',
+        'https://github.com/rafaeltab/wallpaperdb/pull/999'
+      );
+      await browserExpect(page.getByText(host.base, { exact: true })).toBeVisible();
+      expect(
+        (await host.calls()).filter((call) => call.binary === 't3' && call.args[1] === 'send')
+      ).toHaveLength(2);
       expect(
         (await host.calls()).filter(
           (call) =>

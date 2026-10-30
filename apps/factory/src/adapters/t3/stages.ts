@@ -46,19 +46,26 @@ export function stageExecution(
 ): Pick<Execution, 'inspectStage' | 'sendStage'> {
   return {
     sendStage: (intent, request) =>
-      Effect.tryPromise({
-        try: async (signal) => {
-          const skill = request.stage === 'review' ? '$review-loop' : '$publish-pr';
-          await call(
-            [
-              'send',
-              request.threadId,
-              `Use ${skill} for ${intent.issueUrl} against PR target ${prBase}, pinned comparison ${intent.base}, in this existing bound checkout. Stage ${request.index} of factory job ${intent.id}; predecessor run ${request.previousRunId}; reviewed starting commit ${request.commit}. Preserve all requirements, decisions, validation and demo handoffs in this thread. Only this issue is authorized. All agents and fresh independent reviewers use gpt-6.1-sol. Publication must reconcile an existing PR before creating one, keep it concise, link it in T3, leave the issue open, and stop before CI repairs or merging. Mutation and hosted approval are advisory. ${receiptInstructions(intent, request.stage)}`,
-            ],
-            signal
+      Effect.gen(function* () {
+        const binding = yield* observe(intent);
+        if (binding.kind !== 'found' || binding.threadId !== request.threadId)
+          return yield* Effect.fail(
+            new Unavailable({ operation: 'stage-binding-changed', cause: null })
           );
-        },
-        catch: (cause) => new Unavailable({ operation: 'deliver-stage-uncertain', cause }),
+        yield* Effect.tryPromise({
+          try: async (signal) => {
+            const head = (
+              await command('git', ['rev-parse', 'HEAD'], binding.worktree, signal)
+            ).trim();
+            if (
+              head !== request.commit ||
+              (await command('git', ['status', '--porcelain'], binding.worktree, signal)).trim()
+            )
+              throw new Error('Accepted commit changed before stage delivery');
+            await call(['send', request.threadId, stagePrompt(intent, request, prBase)], signal);
+          },
+          catch: (cause) => new Unavailable({ operation: 'deliver-stage-uncertain', cause }),
+        });
       }).pipe(
         Effect.tapError((error) => Effect.logError(error)),
         Effect.withSpan('factory.t3.send-stage')
@@ -69,38 +76,10 @@ export function stageExecution(
         if (binding.kind !== 'found' || binding.threadId !== request.threadId) return null;
         return yield* Effect.tryPromise({
           try: async (signal) => {
-            const detail = stageDetail.safeParse(
-              await call(['show', request.threadId, '--messages', '1'], signal)
-            );
-            if (!detail.success) return null;
-            const { thread, messages } = detail.data;
-            if (
-              thread.threadId !== request.threadId ||
-              thread.status !== 'completed' ||
-              thread.pendingRequestCount !== 0 ||
-              thread.runCount !== request.index + 1 ||
-              !thread.latestRunId
-            )
-              return null;
-            const message = messages.at(-1);
-            if (message?.role !== 'assistant' || message.runId !== thread.latestRunId) return null;
-            let parsed: unknown;
-            try {
-              parsed = JSON.parse(message.text);
-            } catch {
-              return null;
-            }
-            const receipt = receiptSchema.safeParse(parsed);
-            if (!receipt.success) return null;
-            const result = receipt.data;
-            if (
-              result.jobId !== intent.id ||
-              result.stage !== request.stage ||
-              result.base !== intent.base ||
-              result.outcome !== markers[request.stage]
-            )
-              return null;
-            if (request.stage !== 'implementation' && !result.reviews) return null;
+            const raw = await call(['show', request.threadId, '--messages', '1'], signal);
+            const observed = outcome(raw, intent, request);
+            if (!observed) return pendingRun(raw, request);
+            const { thread, result } = observed;
             const commit = (
               await command('git', ['rev-parse', 'HEAD'], binding.worktree, signal)
             ).trim();
@@ -120,5 +99,75 @@ export function stageExecution(
           catch: (cause) => new Unavailable({ operation: 'inspect-stage', cause }),
         }).pipe(Effect.tapError((error) => Effect.logError(error)));
       }).pipe(Effect.withSpan('factory.t3.inspect-stage')),
+  };
+}
+
+function stagePrompt(intent: Intent, request: StageRequest, prBase: string) {
+  const skill = request.stage === 'review' ? '$review-loop' : '$publish-pr';
+  return `Use ${skill} for ${intent.issueUrl} against PR target ${prBase}, pinned comparison ${intent.base}, in this existing bound checkout. Stage ${request.index} of factory job ${intent.id}; predecessor run ${request.previousRunId}; reviewed starting commit ${request.commit}. Preserve all requirements, decisions, validation and demo handoffs in this thread. Only this issue is authorized. All agents and fresh independent reviewers use gpt-6.1-sol. Publication must reconcile an existing PR before creating one, keep it concise, link it in T3, leave the issue open, and stop before CI repairs or merging. Mutation and hosted approval are advisory. ${receiptInstructions(intent, request.stage)}`;
+}
+function completed(thread: z.infer<typeof stageDetail>['thread'], request: StageRequest) {
+  return (
+    thread.threadId === request.threadId &&
+    thread.status === 'completed' &&
+    thread.pendingRequestCount === 0 &&
+    thread.runCount === request.index + 1 &&
+    Boolean(thread.latestRunId)
+  );
+}
+function parseReceipt(text: string) {
+  try {
+    const parsed = receiptSchema.safeParse(JSON.parse(text));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+function matchesReceipt(
+  result: z.infer<typeof receiptSchema>,
+  intent: Intent,
+  request: StageRequest
+) {
+  return (
+    result.jobId === intent.id &&
+    result.stage === request.stage &&
+    result.base === intent.base &&
+    result.outcome === markers[request.stage] &&
+    (request.stage === 'implementation' || result.reviews)
+  );
+}
+function outcome(raw: unknown, intent: Intent, request: StageRequest) {
+  const detail = stageDetail.safeParse(raw);
+  if (!detail.success) return null;
+  const { thread, messages } = detail.data;
+  if (!completed(thread, request)) return null;
+  const result = receiptForRun(messages.at(-1), thread.latestRunId);
+  if (!result || !matchesReceipt(result, intent, request)) return null;
+  return { thread: { ...thread, latestRunId: thread.latestRunId ?? '' }, result };
+}
+
+function receiptForRun(
+  message: z.infer<typeof stageDetail>['messages'][number] | undefined,
+  runId: string | null
+) {
+  if (message?.role !== 'assistant' || message.runId !== runId) return null;
+  return parseReceipt(message.text);
+}
+
+function pendingRun(raw: unknown, request: StageRequest) {
+  const detail = stageDetail.safeParse(raw);
+  if (!detail.success) return null;
+  const { thread } = detail.data;
+  if (
+    thread.threadId !== request.threadId ||
+    thread.runCount !== request.index + 1 ||
+    !thread.latestRunId
+  )
+    return null;
+  return {
+    runId: thread.latestRunId,
+    ordinal: thread.runCount,
+    commit: request.commit,
+    accepted: false,
   };
 }

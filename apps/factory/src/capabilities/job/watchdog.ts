@@ -58,8 +58,7 @@ function suspended(store: JobStore, request: StageRequest, delivery: Delivery, q
     const saved = yield* store.readWait();
     if (saved?.continuation?.index === request.index)
       return { ...delivery, activity: 'continuation-pending' as const, deadline: saved.deadline };
-    if (question && saved && !saved.nudged && saved.progress !== '')
-      yield* store.saveWait({ ...saved, revision: saved.revision + 1, progress: '' });
+    if (question) yield* interruptForQuestion(store, saved);
     return delivery;
   });
 }
@@ -136,5 +135,12 @@ function observedProgress(issues: Issues, intent: Intent, commit: string) {
     const pr = yield* issues.pullRequest(intent);
     if (pr.kind !== 'found' || !pr.ci || pr.commit !== commit) return null;
     return `${pr.commit}:${pr.ci.progress}`;
+  });
+}
+
+function interruptForQuestion(store: JobStore, saved: WaitState | null) {
+  return Effect.gen(function* () {
+    if (saved && !saved.nudged && saved.progress !== '')
+      yield* store.saveWait({ ...saved, revision: saved.revision + 1, progress: '' });
   });
 }

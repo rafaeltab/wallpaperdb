@@ -369,3 +369,11 @@ it('keeps babysitting pending when GitHub cannot identify its PR', async () => {
   expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
   expect(job.sends()).toBe(3);
 });
+it('does not continue waiting against a PR head that differs from the expected agent commit', async () => {
+  const job = await waitingJob();
+  job.change({ prCommit: 'c'.repeat(40) });
+  await job.status();
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+});

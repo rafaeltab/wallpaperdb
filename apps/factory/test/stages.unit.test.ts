@@ -408,3 +408,35 @@ it('accepts successful current watcher completion only for the owning repair sta
     previousRunId: 'watcher-5',
   });
 });
+it('retains the original GitHub deadline across an active watcher turn without sending while active', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3500000, ordinal: 5, runId: 'watcher-5', status: 'running', waiting: false });
+  expect(await job.status()).toMatchObject({ delivery: { activity: 'repairing' } });
+  expect(await Effect.runPromise(job.store.readWait())).toMatchObject({
+    progress: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:run-1:failed',
+    deadline: 3600100,
+  });
+  expect(job.sends()).toBe(3);
+  job.change({ now: 3500100, status: 'completed', waiting: true, stageIndex: 4 });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', deadline: 3600100 },
+  });
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(4);
+});
+it('does not count a human-question interruption as continued GitHub waiting', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3500000, status: 'waiting-for-input', waiting: false });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 3500100, status: 'completed', waiting: true });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', deadline: 7100100 },
+  });
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+});

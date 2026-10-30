@@ -115,4 +115,51 @@ export function storeContract(
       await fixture.close();
     }
   });
+  it(`${name}: preserves parking and serializes cancellation against delivery across reopen`, async () => {
+    const fixture = await setup();
+    try {
+      const control = {
+        revision: 0,
+        cancelled: false,
+        claimed: [],
+        parked: {
+          index: 0,
+          run: { id: 'run-1', ordinal: 1 },
+          question: { id: 'q', text: 'Choose?' },
+        },
+      };
+      expect(await Effect.runPromise(fixture.store.saveControl(control))).toBe(true);
+      expect(await Effect.runPromise(fixture.reopen().readControl())).toEqual(control);
+      const commands = await Promise.all([
+        Effect.runPromise(fixture.store.saveControl({ ...control, revision: 1, cancelled: true })),
+        Effect.runPromise(
+          fixture.reopen().saveControl({
+            ...control,
+            revision: 1,
+            parked: { index: 0, question: { id: 'new', text: 'New question' } },
+          })
+        ),
+      ]);
+      expect(commands.filter(Boolean)).toHaveLength(1);
+      const saved = await Effect.runPromise(fixture.reopen().readControl());
+      expect(saved).toEqual(
+        commands[0]
+          ? { ...control, revision: 1, cancelled: true }
+          : {
+              ...control,
+              revision: 1,
+              parked: { index: 0, question: { id: 'new', text: 'New question' } },
+            }
+      );
+      if (!saved.cancelled)
+        expect(
+          await Effect.runPromise(
+            fixture.store.saveControl({ ...saved, revision: 2, cancelled: true })
+          )
+        ).toBe(true);
+      expect(await Effect.runPromise(fixture.reopen().claimStage(9))).toBe(false);
+    } finally {
+      await fixture.close();
+    }
+  });
 }

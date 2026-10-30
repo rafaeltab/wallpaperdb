@@ -8,6 +8,11 @@ appendFileSync(
   join(config.directory, 'calls.jsonl'),
   JSON.stringify({ binary: basename(process.argv[1]), args }) + '\n'
 );
+const mcpSend = args[0] === 'acp-mcp-call' && args[1] === 't3_thread_send';
+if (mcpSend) {
+  const input = JSON.parse(args[2]);
+  args.splice(0, args.length, 'thread', 'send', input.threadId, input.message);
+}
 const flag = (name) => args[args.indexOf(name) + 1];
 const reply = (value) => console.log(JSON.stringify(value));
 if (basename(process.argv[1]) === 'gh') {
@@ -32,12 +37,25 @@ if (basename(process.argv[1]) === 'gh') {
       labels: [{ name: 'ready-for-agent' }],
     });
 } else if (args[0] === 'acp-mcp-call') {
+  if (config.mcpReply) {
+    reply(config.mcpReply);
+    process.exit(0);
+  }
+  if (config.activityPages) {
+    const position = JSON.parse(args[2]).afterPosition;
+    reply({ structuredContent: config.activityPages[position === undefined ? 0 : position + 1] });
+    process.exit(0);
+  }
   if (args[1] === 't3_thread_interrupt')
     reply({ structuredContent: { status: 'interrupt_requested', threadId: 'thread-live' } });
   else
     reply({
       structuredContent: {
-        thread: { latestRunId: 'run-1' },
+        thread: {
+          latestRunId: existsSync(join(config.directory, 'resource.json'))
+            ? JSON.parse(readFileSync(join(config.directory, 'resource.json'), 'utf8')).latestRunId
+            : null,
+        },
         items: config.activity ?? [],
         hasMore: false,
         nextPosition: null,
@@ -85,9 +103,11 @@ else if (args[1] === 'start') {
     ? 'babysitting'
     : args[3].includes('$review-loop')
       ? 'review'
-      : 'publication';
+      : args[3].includes('$implement')
+        ? 'implementation'
+        : 'publication';
   resource.latestRunId = `run-${index + 1}`;
-  if (index === 2) {
+  if (index === 2 && resource.stage === 'publication') {
     const pr = {
       url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
       headRefName: resource.branch,
@@ -106,7 +126,8 @@ else if (args[1] === 'start') {
   }
   writeFileSync(path, JSON.stringify(resource));
   if (config.lostSend || (config.lostPublication && index === 2)) process.exit(1);
-  reply({ threadId: resource.threadId, runId: resource.latestRunId });
+  const sent = { threadId: resource.threadId, runId: resource.latestRunId };
+  reply(mcpSend ? { structuredContent: sent } : sent);
 } else {
   if (args[1] === 'list' && config.delayObserve) {
     writeFileSync(join(config.directory, 'observing.pid'), String(process.pid));

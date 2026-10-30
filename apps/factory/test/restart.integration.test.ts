@@ -4,8 +4,9 @@ import { join, resolve } from 'node:path';
 import { once } from 'node:events';
 import { expect, it, vi } from 'vitest';
 import { protocol } from './fixtures/setup.js';
-it('a fresh process recovers the durable job and existing external thread without relaunch', async () => {
+it('a fresh process reconciles publication after a lost response without repeating threads, stages or PRs', async () => {
   const host = await protocol();
+  await host.save({ complete: true, base: host.base, lostPublication: true });
   const socket = createServer();
   socket.listen(0, '127.0.0.1');
   await once(socket, 'listening');
@@ -67,6 +68,8 @@ it('a fresh process recovers the durable job and existing external thread withou
       kind: 'job',
       execution: { kind: 'found', threadId: 'thread-live' },
     });
+    const uncertain = await fetch(origin + '/api/job');
+    expect(uncertain.status).toBe(503);
     await stop(child);
     child = launch();
     await ready();
@@ -75,6 +78,12 @@ it('a fresh process recovers the durable job and existing external thread withou
       kind: 'job',
       intent: { issue: 576, expectedStage: 'implementation' },
       execution: { threadId: 'thread-live' },
+      delivery: {
+        stage: 'ci',
+        ready: true,
+        landed: false,
+        pr: { url: 'https://github.com/rafaeltab/wallpaperdb/pull/999', commit: host.base },
+      },
     });
     const page = await (await fetch(origin)).text();
     expect(page).toContain('t3-thread://v1/thread-live');
@@ -90,6 +99,12 @@ it('a fresh process recovers the durable job and existing external thread withou
       body: JSON.stringify({ issue: 576 }),
     });
     expect(duplicate.status).toBe(409);
+    const calls = await host.calls();
+    expect(calls.filter((call) => call.binary === 't3' && call.args[1] === 'send')).toHaveLength(2);
+    const demonstrated = await (await fetch(origin + '/api/job')).json();
+    process.stdout.write(
+      'Factory composition demonstration: ' + JSON.stringify(demonstrated) + '\n'
+    );
   } finally {
     await stop(child);
     await host.cleanup();

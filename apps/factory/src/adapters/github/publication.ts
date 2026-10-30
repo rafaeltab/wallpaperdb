@@ -48,14 +48,7 @@ export function publication(
         );
         if (prs.length === 0) return { kind: 'absent' as const };
         const pr = prs[0];
-        if (
-          prs.length !== 1 ||
-          !pr ||
-          pr.headRefName !== intent.branch ||
-          pr.baseRefName !== base ||
-          pr.baseRefOid !== intent.base ||
-          !/^https:\/\/github.com\/rafaeltab\/wallpaperdb\/pull\/\d+$/.test(pr.url)
-        )
+        if (prs.length !== 1 || !pr || !matches(pr, intent.branch, base, intent.base))
           return { kind: 'ambiguous' as const };
         const checks = pr.statusCheckRollup.map((check) =>
           'name' in check
@@ -74,7 +67,7 @@ export function publication(
           kind: 'found' as const,
           url: pr.url,
           commit: pr.headRefOid,
-          ready: pr.state === 'OPEN' && !pr.isDraft && pr.mergeable === 'MERGEABLE' && passed,
+          ready: ready(pr, passed),
           landed: false,
         };
       },
@@ -83,4 +76,16 @@ export function publication(
       Effect.tapError((error) => Effect.logError(error)),
       Effect.withSpan('factory.github.publication')
     );
+}
+
+function matches(pr: z.infer<typeof schema>[number], branch: string, base: string, commit: string) {
+  return (
+    pr.headRefName === branch &&
+    pr.baseRefName === base &&
+    pr.baseRefOid === commit &&
+    /^https:\/\/github.com\/rafaeltab\/wallpaperdb\/pull\/\d+$/.test(pr.url)
+  );
+}
+function ready(pr: z.infer<typeof schema>[number], passed: boolean) {
+  return pr.state === 'OPEN' && !pr.isDraft && pr.mergeable === 'MERGEABLE' && passed;
 }

@@ -34,6 +34,7 @@ export type Observation =
 export interface JobStore {
   read(): Effect.Effect<Intent | null, Unavailable>;
   reserve(intent: Intent): Effect.Effect<boolean, Unavailable>;
+  bindRun(request: StageRequest, runId: string): Effect.Effect<boolean, Unavailable>;
   readStage(index: number): Effect.Effect<StageRequest | null, Unavailable>;
   saveStage(request: StageRequest): Effect.Effect<boolean, Unavailable>;
   claimStage(index: number): Effect.Effect<boolean, Unavailable>;

@@ -28,11 +28,6 @@
         "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
-    "apps/docs": {
-      "decision": "excluded",
-      "reason": "No maintained mutation-compatible behavioral suite.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
-    },
     "apps/gateway": {
       "decision": "enabled",
       "mechanism": "native-vitest-node",

@@ -17,7 +17,7 @@ Asset owns stable Assets and their immutable Sources. Applications create empty 
 
 PostgreSQL commits delivery catalog changes together with their pending availability announcements so they can recover after interrupted publication. Sharp performs resizing in isolated worker processes so cancelled requests can stop native image work.
 
-Read the [domain context](GLOSSARY.md), [delivery decision](docs/adr/0001-replay-safe-delivery-catalog.md), and [upgrade and recovery procedures](../docs/content/docs/guides/service-upgrades.mdx#rename-from-media) before changing delivery or replaying events. The upgrade guide inventories the persistent Media identifiers retained to preserve data and messaging progress.
+Read the [domain context](GLOSSARY.md), [delivery decision](docs/adr/0001-replay-safe-delivery-catalog.md) and [storage ownership decision](../../docs/adr/0012-own-stable-assets-and-immutable-sources-in-media.md) before changing delivery or replaying events.
 
 ## Owned Source operations
 

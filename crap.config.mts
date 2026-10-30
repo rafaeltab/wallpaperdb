@@ -15,7 +15,7 @@ interface CrapConfig {
 // of the analyzer's defaults. No permanent threshold is chosen during calibration.
 export default {
   workspaceRoots: ['apps', 'packages'],
-  excludedWorkspaces: ['apps/docs', 'apps/web-e2e'],
+  excludedWorkspaces: ['apps/web-e2e'],
   sourceDirectory: 'src',
   coverageTasks: {
     'test:unit': 'coverage/unit',

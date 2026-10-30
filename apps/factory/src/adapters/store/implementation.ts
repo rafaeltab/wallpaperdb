@@ -22,6 +22,7 @@ const stageSchema = z
     continuation: z.boolean().optional(),
     resume: z.boolean().optional(),
     observedRunId: z.string().optional(),
+    question: z.object({ id: z.string(), text: z.string() }).optional(),
     deliveryIndex: z.number().int().nonnegative().optional(),
     index: z.number().int().min(0),
     stage: z.enum(['implementation', 'review', 'publication', 'babysitting', 'ci']),

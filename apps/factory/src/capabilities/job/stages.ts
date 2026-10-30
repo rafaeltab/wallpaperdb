@@ -140,7 +140,7 @@ function readiness(
 function associateStage(store: JobStore, evidence: StageEvidence | null, request: StageRequest) {
   return Effect.gen(function* () {
     if (!associatedRun(evidence, request)) return null;
-    if (request.observedRunId && evidence.runId !== request.observedRunId) return null;
+    if (!adoptedRunMatches(evidence, request)) return null;
     if (!(yield* store.bindRun(request, evidence.runId, evidence.ordinal))) return null;
     return evidence;
   });
@@ -234,7 +234,7 @@ function suspension(
   observation: Extract<Observation, { kind: 'found' }>
 ) {
   return Effect.gen(function* () {
-    const control = yield* store.readControl();
+    const control = yield* controlForStage(store, waiting);
     if (control.cancelled)
       return {
         stage: waiting.stage,
@@ -244,6 +244,8 @@ function suspension(
         activity: 'cancelled' as const,
         active: false,
       };
+    if (answerContinuation(control, waiting, observation))
+      return yield* adoptAnswer(store, waiting, observation, control);
     if (observation.question) {
       if (changedPark(control, waiting, observation.question))
         yield* store.saveControl({
@@ -337,23 +339,18 @@ function adoptAnswer(
     const run = observation.run;
     if (run && parkedRun && run.id !== parkedRun.id) {
       if (run.ordinal <= parkedRun.ordinal) return parkedDelivery(waiting, control);
-      yield* store.saveStage({
+      const request: StageRequest = {
         ...waiting,
         index: waiting.index + 1,
         ordinal: run.ordinal,
         previousRunId: parkedRun.id,
         observedRunId: run.id,
+        question: observation.question,
         deliveryIndex: waiting.deliveryIndex ?? waiting.index,
         resume: false,
-      });
-      return {
-        stage: waiting.stage,
-        commit: waiting.commit,
-        ready: false,
-        landed: false,
-        activity: 'resume-pending' as const,
-        active: true,
       };
+      yield* store.saveStage(request);
+      return adoptedDelivery(waiting, observation);
     }
     // A message-mode answer may be committed before its continuation run is created.
     // Keep the association until that run appears or this original run is accepted.
@@ -377,4 +374,70 @@ export function hasAnsweredQuestion(observation: Observation, questionId: string
   return (
     observation.kind === 'found' && observation.answeredQuestions?.includes(questionId) === true
   );
+}
+
+function adoptedRunMatches(evidence: StageEvidence, request: StageRequest) {
+  if (!request.observedRunId) return true;
+  return (
+    evidence.runId === request.observedRunId ||
+    evidence.ordinal > (request.ordinal ?? request.index + 1)
+  );
+}
+function answerContinuation(
+  control: import('./contract.js').Control,
+  waiting: StageRequest,
+  observation: Extract<Observation, { kind: 'found' }>
+) {
+  if (control.parked?.index !== waiting.index) return false;
+  if (!hasAnsweredQuestion(observation, control.parked.question.id)) return false;
+  return Boolean(
+    observation.run && control.parked.run && observation.run.id !== control.parked.run.id
+  );
+}
+function adoptedDelivery(
+  waiting: StageRequest,
+  observation: Extract<Observation, { kind: 'found' }>
+): Delivery {
+  if (observation.question)
+    return {
+      stage: waiting.stage,
+      commit: waiting.commit,
+      ready: false,
+      landed: false,
+      activity: 'awaiting-answer',
+      active: false,
+      question: observation.question,
+    };
+  return {
+    stage: waiting.stage,
+    commit: waiting.commit,
+    ready: false,
+    landed: false,
+    activity: 'resume-pending',
+    active: true,
+  };
+}
+function controlForStage(store: JobStore, waiting: StageRequest) {
+  return Effect.gen(function* () {
+    const saved = yield* store.readControl();
+    if (!canRestoreQuestion(saved, waiting)) return saved;
+    const next = {
+      ...saved,
+      revision: saved.revision + 1,
+      parked: {
+        index: waiting.index,
+        run: { id: waiting.observedRunId, ordinal: waiting.ordinal ?? waiting.index + 1 },
+        question: waiting.question,
+      },
+    };
+    if (yield* store.saveControl(next)) return next;
+    return yield* store.readControl();
+  });
+}
+function canRestoreQuestion(
+  control: import('./contract.js').Control,
+  waiting: StageRequest
+): waiting is StageRequest & { observedRunId: string; question: { id: string; text: string } } {
+  if (control.parked && control.parked.index >= waiting.index) return false;
+  return waiting.observedRunId !== undefined && waiting.question !== undefined;
 }

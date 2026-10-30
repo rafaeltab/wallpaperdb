@@ -79,7 +79,10 @@ it('a fresh process reconciles publication after a lost response without repeati
       async () => {
         await fetch(origin + '/api/job');
         expect(
-          (await host.calls()).filter((call) => call.binary === 't3' && call.args[1] === 'send')
+          (await host.calls()).filter(
+            (call) =>
+              call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+          )
         ).toHaveLength(2);
       },
       { timeout: 10000, interval: 30 }
@@ -115,7 +118,11 @@ it('a fresh process reconciles publication after a lost response without repeati
     });
     expect(duplicate.status).toBe(409);
     const calls = await host.calls();
-    expect(calls.filter((call) => call.binary === 't3' && call.args[1] === 'send')).toHaveLength(2);
+    expect(
+      calls.filter(
+        (call) => call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+      )
+    ).toHaveLength(2);
     const demonstrated = await (await fetch(origin + '/api/job')).json();
     process.stdout.write(
       'Factory composition demonstration: ' + JSON.stringify(demonstrated) + '\n'

@@ -13,7 +13,14 @@ const schema = z.array(
     isDraft: z.boolean(),
     statusCheckRollup: z.array(
       z.union([
-        z.object({ name: z.string(), status: z.string(), conclusion: z.string().nullable() }),
+        z.object({
+          name: z.string(),
+          status: z.string(),
+          conclusion: z.string().nullable(),
+          detailsUrl: z.string().optional(),
+          startedAt: z.string().optional(),
+          completedAt: z.string().optional(),
+        }),
         z.object({ context: z.string(), state: z.string() }),
       ])
     ),
@@ -59,14 +66,38 @@ export function publication(
             : { name: check.context, success: check.state === 'SUCCESS' }
         );
         const passed =
-          required.every((name) => checks.some((check) => check.name === name && check.success)) &&
+          required.every(
+            (name) =>
+              checks.some((check) => check.name === name) &&
+              checks.filter((check) => check.name === name).every((check) => check.success)
+          ) &&
           checks
             .filter((check) => check.name.startsWith('codecov/'))
             .every((check) => check.success);
+        const progress = await workflowProgress(pr, gh, signal);
         return {
           kind: 'found' as const,
           url: pr.url,
           commit: pr.headRefOid,
+          ci: {
+            failed:
+              pr.state === 'OPEN' &&
+              pr.statusCheckRollup.some(
+                (check) =>
+                  applicable('name' in check ? check.name : check.context) &&
+                  ('name' in check
+                    ? check.status === 'COMPLETED' &&
+                      [
+                        'FAILURE',
+                        'CANCELLED',
+                        'TIMED_OUT',
+                        'ACTION_REQUIRED',
+                        'STARTUP_FAILURE',
+                      ].includes(check.conclusion ?? '')
+                    : ['FAILURE', 'ERROR'].includes(check.state))
+              ),
+            progress,
+          },
           ready: ready(pr, passed),
           landed: false,
         };
@@ -89,4 +120,63 @@ function matches(pr: z.infer<typeof schema>[number], branch: string, base: strin
 }
 function ready(pr: z.infer<typeof schema>[number], passed: boolean) {
   return pr.state === 'OPEN' && !pr.isDraft && pr.mergeable === 'MERGEABLE' && passed;
+}
+
+function applicable(name: string) {
+  return required.includes(name) || name.startsWith('codecov/');
+}
+
+const jobsSchema = z.object({
+  total_count: z.number().int(),
+  jobs: z.array(
+    z.object({
+      id: z.number().int(),
+      run_id: z.number().int(),
+      head_sha: z.string(),
+      status: z.string(),
+      conclusion: z.string().nullable(),
+      steps: z.array(
+        z.object({
+          number: z.number().int(),
+          status: z.string(),
+          conclusion: z.string().nullable(),
+          started_at: z.string().nullable(),
+          completed_at: z.string().nullable(),
+        })
+      ),
+    })
+  ),
+});
+async function workflowProgress(
+  pr: z.infer<typeof schema>[number],
+  gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
+  signal: AbortSignal
+) {
+  const checks = pr.statusCheckRollup.filter((check) =>
+    applicable('name' in check ? check.name : check.context)
+  );
+  const runs = new Set<string>();
+  for (const check of checks) {
+    if (!('name' in check)) continue;
+    const match = check.detailsUrl?.match(
+      /^https:\/\/github.com\/rafaeltab\/wallpaperdb\/actions\/runs\/(\d+)\/job\/\d+/
+    );
+    if (match?.[1]) runs.add(match[1]);
+  }
+  const progress = checks.map((check) => JSON.stringify(check));
+  for (const run of runs) {
+    const result = jobsSchema.parse(
+      await gh(
+        ['api', `repos/rafaeltab/wallpaperdb/actions/runs/${run}/jobs?per_page=100&filter=latest`],
+        signal
+      )
+    );
+    if (
+      result.total_count !== result.jobs.length ||
+      result.jobs.some((job) => job.head_sha !== pr.headRefOid || String(job.run_id) !== run)
+    )
+      throw new Error('Incomplete or stale CI job observation');
+    progress.push(JSON.stringify(result.jobs.sort((a, b) => a.id - b.id)));
+  }
+  return JSON.stringify(progress.sort());
 }

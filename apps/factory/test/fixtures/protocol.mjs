@@ -12,7 +12,8 @@ const flag = (name) => args[args.indexOf(name) + 1];
 const reply = (value) => console.log(JSON.stringify(value));
 if (basename(process.argv[1]) === 'gh') {
   if (config.githubMalformed) console.log('{}');
-  else if (args[0] === 'api') reply([config.blockers ?? []]);
+  else if (args[0] === 'api')
+    reply(args[1]?.includes('/actions/runs/') ? config.jobs : [config.blockers ?? []]);
   else if (args[0] === 'pr' && args[1] === 'list')
     reply(
       config.prs ??
@@ -30,7 +31,8 @@ if (basename(process.argv[1]) === 'gh') {
       body: config.body ?? '',
       labels: [{ name: 'ready-for-agent' }],
     });
-} else if (args.includes('--help')) console.log('--worktree --model');
+} else if (args.includes('--help'))
+  console.log('--worktree --model' + (config.idempotency ? ' --client-request-id' : ''));
 else if (args[1] === 'start') {
   if (
     flag('--model') !== 'gpt-6.1-sol' ||
@@ -65,7 +67,12 @@ else if (args[1] === 'start') {
   const path = join(config.directory, 'resource.json');
   const resource = JSON.parse(readFileSync(path, 'utf8'));
   const index = Number(args[3].match(/Stage (\d) of factory/)[1]);
-  resource.runCount = index + 1;
+  resource.runCount = Number(args[3].match(/expected run ordinal (\d+)/)?.[1] ?? index + 1);
+  resource.stage = args[3].includes('$babysit-pr')
+    ? 'babysitting'
+    : args[3].includes('$review-loop')
+      ? 'review'
+      : 'publication';
   resource.latestRunId = `run-${index + 1}`;
   if (index === 2) {
     const pr = {
@@ -109,14 +116,17 @@ else if (args[1] === 'start') {
                 runId: resource.latestRunId,
                 text: JSON.stringify({
                   jobId: resource.title.slice(8),
-                  stage: ['implementation', 'review', 'publication'][resource.runCount - 1],
+                  stage:
+                    resource.stage ??
+                    ['implementation', 'review', 'publication'][resource.runCount - 1],
                   base: config.base,
                   commit: config.base,
-                  outcome: [
-                    '<TASK>COMPLETE</TASK>',
-                    '<REVIEW>COMPLETE</REVIEW>',
-                    '<PR>CREATED</PR>',
-                  ][resource.runCount - 1],
+                  outcome:
+                    resource.stage === 'babysitting'
+                      ? '<PR>READY</PR>'
+                      : ['<TASK>COMPLETE</TASK>', '<REVIEW>COMPLETE</REVIEW>', '<PR>CREATED</PR>'][
+                          resource.runCount - 1
+                        ],
                   tests: true,
                   coverage: true,
                   crap: true,

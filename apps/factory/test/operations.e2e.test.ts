@@ -55,7 +55,9 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
       );
       await browserExpect(page.getByText(host.base, { exact: true })).toBeVisible();
       expect(
-        (await host.calls()).filter((call) => call.binary === 't3' && call.args[1] === 'send')
+        (await host.calls()).filter(
+          (call) => call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+        )
       ).toHaveLength(2);
       expect(
         (await host.calls()).filter(

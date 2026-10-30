@@ -61,7 +61,10 @@ it('continues admitted work through publication without an operations-page obser
     await vi.waitFor(
       async () => {
         expect(
-          (await host.calls()).filter((call) => call.binary === 't3' && call.args[1] === 'send')
+          (await host.calls()).filter(
+            (call) =>
+              call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
+          )
         ).toHaveLength(2);
       },
       { timeout: 10000, interval: 30 }

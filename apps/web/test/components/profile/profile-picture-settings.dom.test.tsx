@@ -66,13 +66,107 @@ async function renderPage(initial = profile, openPicture = true) {
 }
 
 describe('Profile picture settings', () => {
-  it('warns below Zoom when a crop needs enlargement, clears on reset, and still permits Apply', async () => {
-    vi.mocked(openPictureSource).mockResolvedValue({ width: 1024, height: 1024, preview: new Blob(['preview']), process: processPicture, dispose: disposePicture });
-    vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'saved' });
-    await renderPage();
+  it('warns below Zoom when a crop needs enlargement, clears on reset, and still permits Apply', async ({
+    onTestFinished,
+    task,
+  }) => {
+    // Diagnostic only for #537: retain the last entered phase even when the test times out.
+    const started = performance.now();
+    const trace: {
+      phase: string;
+      elapsed: number;
+      pickerDisabled: boolean | undefined;
+      dialog: boolean;
+      slider: boolean;
+    }[] = [];
+    let closed = false;
+    let currentPhase = 'start';
+    let probeMilliseconds = 0;
+    const mark = (phase: string) => {
+      if (closed || trace.length >= 64) return;
+      const before = performance.now();
+      if (phase.endsWith(':enter') || phase.endsWith(':complete')) currentPhase = phase;
+      trace.push({
+        phase,
+        elapsed: Math.round(performance.now() - started),
+        pickerDisabled: document.querySelector('input[type=file]')?.hasAttribute('disabled'),
+        dialog: document.querySelector('[role=dialog]') !== null,
+        slider: document.querySelector('input[type=range]') !== null,
+      });
+      probeMilliseconds += performance.now() - before;
+    };
+    const resolved = <T,>(operation: string, value: T) => {
+      mark(`${operation}:called`);
+      const promise = Promise.resolve(value);
+      void promise.then(() => mark(`${operation}:settled`));
+      return promise;
+    };
+    let samples = 0;
+    let previousTick = performance.now();
+    let largestLag = { milliseconds: 0, phase: currentPhase };
+    const timer = setInterval(() => {
+      const now = performance.now();
+      const lag = Math.round(Math.max(0, now - previousTick - 250));
+      if (lag > largestLag.milliseconds) largestLag = { milliseconds: lag, phase: currentPhase };
+      previousTick = now;
+      if (++samples >= 40) clearInterval(timer);
+    }, 250);
+    onTestFinished(() => {
+      clearInterval(timer);
+      closed = true;
+      // One bounded record on success or failure; logging must never replace the test's error.
+      try {
+        process.stderr.write(
+          `[crop-settings-537] ${JSON.stringify({
+            state: task.result?.state,
+            elapsed: Math.round(performance.now() - started),
+            currentPhase,
+            trace,
+            samples,
+            largestLag,
+            unfinishedTickLag: Math.round(Math.max(0, performance.now() - previousTick - 250)),
+            probeMilliseconds: Math.round(probeMilliseconds),
+          })}\n`
+        );
+      } catch {
+        /* The original test result remains authoritative if the output stream is closed. */
+      }
+    });
+    mark('start');
+    vi.mocked(userApi.picturePolicy).mockImplementationOnce(() => resolved('policy', picturePolicy));
+    processPicture.mockImplementationOnce(() => resolved('processing', canonical));
+    vi.mocked(openPictureSource).mockImplementationOnce(() =>
+      resolved('decode', {
+        width: 1024,
+        height: 1024,
+        preview: new Blob(['preview']),
+        process: processPicture,
+        dispose: disposePicture,
+      })
+    );
+    vi.mocked(userApi.uploadPicture).mockImplementationOnce(() =>
+      resolved('upload', { ...profile, version: 2, pictureAssetId: 'saved' })
+    );
+    mark('render:enter');
+    await renderPage(profile, false);
+    mark('render:complete');
+    mark('opener-query:enter');
+    const opener = screen.getByRole('button', { name: 'Edit profile picture' });
+    mark('opener-query:complete');
+    mark('dialog-click:enter');
+    await userEvent.setup().click(opener);
+    mark('dialog-click:complete');
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], 'picture.png', { type: 'image/png' }));
+    mark('picker-query:enter');
+    const picker = screen.getByLabelText('Choose picture');
+    mark('picker-query:complete');
+    mark('source-upload:enter');
+    await user.upload(picker, new File(['source'], 'picture.png', { type: 'image/png' }));
+    mark('source-upload:complete');
+    mark('slider-query:enter');
     const zoom = await screen.findByRole('slider', { name: 'Zoom' });
+    mark('slider-query:complete');
+    mark('warning-assertions:enter');
     const warning = 'This crop will be enlarged and may look pixelated.';
     expect(screen.queryByText(warning)).not.toBeInTheDocument();
     fireEvent.change(zoom, { target: { value: '3' } });
@@ -81,22 +175,44 @@ describe('Profile picture settings', () => {
     const status = screen.getByRole('status');
     expect(status).toHaveAttribute('aria-live', 'polite');
     expect(status).toHaveTextContent('Picture quality warning. This crop may look pixelated.');
+    mark('warning-assertions:complete');
     const updates: MutationRecord[] = [];
     const observer = new MutationObserver((records) => updates.push(...records));
+    onTestFinished(() => observer.disconnect());
     observer.observe(status, { subtree: true, childList: true, characterData: true });
     try {
       fireEvent.change(zoom, { target: { value: '4' } });
+      mark('announcement-act:enter');
       await act(async () => {});
+      mark('announcement-act:complete');
       expect(updates).toHaveLength(0);
-    } finally { observer.disconnect(); }
-    await user.click(screen.getByRole('button', { name: 'Reset crop' }));
+    } finally {
+      observer.disconnect();
+    }
+    mark('reset-query:enter');
+    const reset = screen.getByRole('button', { name: 'Reset crop' });
+    mark('reset-query:complete');
+    mark('reset-click:enter');
+    await user.click(reset);
+    mark('reset-click:complete');
+    mark('reset-assertions:enter');
     expect(screen.queryByText(warning)).not.toBeInTheDocument();
     expect(zoom).not.toHaveAttribute('aria-describedby');
     expect(status).toBeEmptyDOMElement();
+    mark('reset-assertions:complete');
+    mark('apply-assertion:enter');
     fireEvent.change(zoom, { target: { value: '3' } });
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    mark('apply-assertion:complete');
+    mark('apply-query:enter');
+    const apply = screen.getByRole('button', { name: 'Apply' });
+    mark('apply-query:complete');
+    mark('apply-click:enter');
+    await user.click(apply);
+    mark('apply-click:complete');
+    mark('upload-observation:enter');
     await waitFor(() => expect(userApi.uploadPicture).toHaveBeenCalled());
+    mark('upload-observation:complete');
   });
 
   it('keeps the small-source zoom explanation without announcing pixelation when output needs no enlargement', async () => {

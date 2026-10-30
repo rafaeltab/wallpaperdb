@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react';
+import { playwright } from '@vitest/browser-playwright';
 import { defaults } from '@wallpaperdb/vitest-config/defaults';
-import { defineConfig, mergeConfig } from 'vitest/config';
+import { configDefaults, defineConfig, mergeConfig } from 'vitest/config';
 
 export default mergeConfig(
   defaults,
@@ -8,14 +9,34 @@ export default mergeConfig(
     plugins: [react()],
     test: {
       name: 'react-muuri',
-      // Parallel JSDOM cold starts can starve Muuri initialization in repository-wide CI.
-      fileParallelism: false,
       globals: true,
       environment: 'jsdom',
-      include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
       setupFiles: ['./test/setup.ts'],
       testTimeout: 10000,
       hookTimeout: 10000,
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: 'react-muuri-unit',
+            include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
+            exclude: [...configDefaults.exclude, 'test/hooks/useGrid.test.tsx'],
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'react-muuri-browser',
+            include: ['test/hooks/useGrid.test.tsx'],
+            browser: {
+              enabled: true,
+              headless: true,
+              provider: playwright(),
+              instances: [{ browser: 'chromium' }],
+            },
+          },
+        },
+      ],
       coverage: {
         provider: 'v8',
         include: ['src/**/*.ts', 'src/**/*.tsx'],

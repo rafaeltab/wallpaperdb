@@ -21,6 +21,8 @@ const stageSchema = z
     ordinal: z.number().int().positive().optional(),
     continuation: z.boolean().optional(),
     resume: z.boolean().optional(),
+    observedRunId: z.string().optional(),
+    deliveryIndex: z.number().int().nonnegative().optional(),
     index: z.number().int().min(0),
     stage: z.enum(['implementation', 'review', 'publication', 'babysitting', 'ci']),
     threadId: z.string().min(1),
@@ -102,6 +104,7 @@ export function fileStore(directory: string): JobStore {
       parked: z
         .object({
           index: z.number().int().nonnegative(),
+          run: z.object({ id: z.string(), ordinal: z.number().int().positive() }).optional(),
           question: z.object({ id: z.string(), text: z.string() }),
         })
         .optional(),

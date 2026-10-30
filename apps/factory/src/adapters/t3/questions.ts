@@ -13,19 +13,28 @@ export async function mcpCall(
   args: object,
   signal?: AbortSignal
 ) {
-  if (!config.mcpEndpoint || !config.mcpAuthorizationFile)
-    throw new Error('Structured T3 MCP requires an endpoint and authorization file');
-  const authorization = (await readFile(config.mcpAuthorizationFile, 'utf8')).trim();
+  const { endpoint, authorization } = await mcpAuthorization(config);
   const raw = await command(
     config.binary,
     ['acp-mcp-call', tool, JSON.stringify(args)],
     config.project,
     signal,
     {
-      T3_ACP_MCP_ENDPOINT: config.mcpEndpoint,
+      T3_ACP_MCP_ENDPOINT: endpoint,
       T3_ACP_MCP_AUTHORIZATION: authorization,
     }
   );
+  return mcpResult(raw);
+}
+async function mcpAuthorization(config: Configuration) {
+  if (!config.mcpEndpoint || !config.mcpAuthorizationFile)
+    throw new Error('Structured T3 MCP requires an endpoint and authorization file');
+  return {
+    endpoint: config.mcpEndpoint,
+    authorization: (await readFile(config.mcpAuthorizationFile, 'utf8')).trim(),
+  };
+}
+function mcpResult(raw: string) {
   const envelope = z
     .object({
       structuredContent: z.unknown().optional(),
@@ -58,10 +67,12 @@ const activity = z.object({
 export async function pendingQuestion(
   config: Configuration,
   threadId: string,
+  expectedRunId: string | null,
   signal?: AbortSignal
 ) {
   let afterPosition: number | undefined;
   let question: { id: string; text: string } | undefined;
+  const answeredQuestions: string[] = [];
   for (;;) {
     const page = activity.parse(
       await mcpCall(
@@ -78,19 +89,54 @@ export async function pendingQuestion(
         signal
       )
     );
-    for (const item of page.items) {
-      if (
-        item.type === 'user_input_request' &&
-        item.status === 'waiting' &&
-        item.sourceThreadId === threadId &&
-        item.visibility === 'local' &&
-        item.runId === page.thread.latestRunId
-      )
-        question = { id: item.itemId, text: item.text ?? 'Question awaiting an answer in T3' };
-    }
-    if (!page.hasMore) return question;
-    if (page.nextPosition === null || page.nextPosition === afterPosition)
-      throw new Error('T3 activity pagination did not advance');
-    afterPosition = page.nextPosition;
+    verifyRun(page, expectedRunId);
+    question = questionOnPage(page, threadId) ?? question;
+    answeredQuestions.push(...answeredOnPage(page, threadId));
+    if (!page.hasMore) return { question, answeredQuestions };
+    afterPosition = followingPosition(page, afterPosition);
   }
+}
+
+function isCurrentQuestion(
+  item: z.infer<typeof activity>['items'][number],
+  threadId: string,
+  runId: string | null
+) {
+  return (
+    item.type === 'user_input_request' &&
+    item.status === 'waiting' &&
+    item.sourceThreadId === threadId &&
+    item.visibility === 'local' &&
+    item.runId === runId
+  );
+}
+
+function verifyRun(page: z.infer<typeof activity>, expectedRunId: string | null) {
+  if (page.thread.latestRunId !== expectedRunId)
+    throw new Error('T3 run changed during question observation');
+}
+function questionOnPage(page: z.infer<typeof activity>, threadId: string) {
+  const item = [...page.items]
+    .reverse()
+    .find((candidate) => isCurrentQuestion(candidate, threadId, page.thread.latestRunId));
+  return item
+    ? { id: item.itemId, text: item.text ?? 'Question awaiting an answer in T3' }
+    : undefined;
+}
+function followingPosition(page: z.infer<typeof activity>, previous: number | undefined) {
+  if (page.nextPosition === null || page.nextPosition === previous)
+    throw new Error('T3 activity pagination did not advance');
+  return page.nextPosition;
+}
+
+function answeredOnPage(page: z.infer<typeof activity>, threadId: string) {
+  return page.items
+    .filter(
+      (item) =>
+        item.type === 'user_input_request' &&
+        item.status === 'completed' &&
+        item.sourceThreadId === threadId &&
+        item.visibility === 'local'
+    )
+    .map((item) => item.itemId);
 }

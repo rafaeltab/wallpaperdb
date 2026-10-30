@@ -24,6 +24,8 @@ export type Observation =
       readonly kind: 'found';
       readonly threadId: string;
       readonly status: string;
+      readonly answeredQuestions?: readonly string[];
+      readonly run?: { readonly id: string; readonly ordinal: number };
       readonly question?: { readonly id: string; readonly text: string };
       readonly worktree: string;
       readonly branch: string;
@@ -62,6 +64,7 @@ export interface Control {
   readonly cancelled: boolean;
   readonly claimed: readonly number[];
   readonly parked?: {
+    readonly run?: { readonly id: string; readonly ordinal: number };
     readonly index: number;
     readonly question: { readonly id: string; readonly text: string };
   };
@@ -131,6 +134,8 @@ export interface StageRequest {
   readonly ordinal?: number;
   readonly continuation?: boolean;
   readonly resume?: boolean;
+  readonly observedRunId?: string;
+  readonly deliveryIndex?: number;
   readonly stage: Stage;
   readonly threadId: string;
   readonly commit: string;

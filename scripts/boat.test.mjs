@@ -65,6 +65,56 @@ import { fileURLToPath } from "node:url";
 import { acquireDockerLease } from "./lib/docker-queue.mjs";
 import { ownsWatch } from "./boat-stop-watch.mjs";
 
+test("retirement fails explicitly when a matching watcher cannot be inspected", async (t) => {
+	if (process.getuid() === 0)
+		return t.skip("Root can inspect non-dumpable processes");
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-protected-watch-"));
+	const python = execFileSync(
+		"python",
+		["-c", "import sys;print(sys.executable)"],
+		{ encoding: "utf8" },
+	).trim();
+	const executable = path.join(root, "docker-compose");
+	fs.symlinkSync(python, executable);
+	const child = spawn(
+		executable,
+		[
+			"-c",
+			"import ctypes,time; assert ctypes.CDLL(None).prctl(4,0)==0; print('ready',flush=True); time.sleep(60)",
+			"compose",
+			"-p",
+			"protected-test",
+			"watch",
+		],
+		{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+	);
+	t.after(() => {
+		child.kill("SIGKILL");
+		fs.rmSync(root, { recursive: true, force: true });
+	});
+	await new Promise((resolve, reject) => {
+		child.stdout.once("data", resolve);
+		child.once("error", reject);
+	});
+	const helper = fileURLToPath(
+		new URL("./boat-stop-watch.mjs", import.meta.url),
+	);
+	const result = await new Promise((resolve, reject) => {
+		const runner = spawn(process.execPath, [helper], {
+			cwd: root,
+			env: { ...process.env, COMPOSE_PROJECT_NAME: "protected-test" },
+			stdio: "pipe",
+		});
+		let output = "";
+		runner.stderr.on("data", (data) => (output += data));
+		runner.once("error", reject);
+		runner.once("close", (code) => resolve({ code, output }));
+	});
+	assert.notEqual(result.code, 0);
+	assert.match(result.output, /privileged inspection is required/);
+	assert.equal(child.exitCode, null);
+});
+
 test("watcher retirement observes delayed owned shutdown before reporting success", async (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-watch-retirement-"));
 	t.after(() => fs.rmSync(root, { recursive: true, force: true }));

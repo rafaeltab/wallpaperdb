@@ -160,7 +160,7 @@ const ssh = (id, command, opts = {}) =>
 const retireWatchers = (id) =>
 	ssh(
 		id,
-		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise exec -- node --input-type=module -`,
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && sudo -n "$(mise which node)" --input-type=module -`,
 		{ input: fs.readFileSync("scripts/boat-stop-watch.mjs") },
 	);
 function owned() {

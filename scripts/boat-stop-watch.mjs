@@ -34,7 +34,17 @@ if (
 				.split(") ")[1]
 				.split(" ")[19];
 			const argv = fs.readFileSync(`${directory}/cmdline`, "utf8").split("\0");
-			const cwd = fs.readlinkSync(`${directory}/cwd`);
+			if (!ownsWatch({ root, cwd: root, project, argv })) continue;
+			let cwd;
+			try {
+				cwd = fs.readlinkSync(`${directory}/cwd`);
+			} catch (error) {
+				if (error.code === "EACCES")
+					throw new Error(
+						"Cannot inspect an owned watcher candidate; privileged inspection is required",
+					);
+				throw error;
+			}
 			if (!ownsWatch({ root, cwd, project, argv })) continue;
 			const current = fs
 				.readFileSync(`${directory}/stat`, "utf8")

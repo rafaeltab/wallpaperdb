@@ -85,14 +85,14 @@ export async function registerCreationHttp<E>(
     for (const controller of controllers) controller.abort();
     await runtime.dispose();
   });
-  const run = async (
+  const execute = async <A>(
     request: FastifyRequest,
     reply: FastifyReply,
     call: (
       creation: Creation['Service'],
       owner: { namespace: string; subject: string }
-    ) => Effect.Effect<WallpaperOutcome, unknown>,
-    accepted = false
+    ) => Effect.Effect<A, unknown>,
+    respondResult: (value: A) => unknown
   ) => {
     reply.header('Cache-Control', 'no-store');
     const controller = new AbortController();
@@ -115,7 +115,7 @@ export async function registerCreationHttp<E>(
         parent ? OtelTracer.withSpanContext(operation, parent) : operation,
         { signal: controller.signal }
       );
-      if (result.kind === 'result') return respond(reply, result.value, accepted);
+      if (result.kind === 'result') return respondResult(result.value);
       const status = result.kind === 'unauthorized' ? 401 : 503;
       return reply
         .code(status)
@@ -127,24 +127,23 @@ export async function registerCreationHttp<E>(
       reply.raw.off('close', abort);
     }
   };
-  app.get('/wallpapers', async (request, reply) => {
-    reply.header('Cache-Control', 'no-store');
-    const result = await runtime.runPromise(
-      Effect.gen(function* () {
-        const auth = yield* CreatorAuthentication;
-        const owner = yield* auth.verify(request.headers.authorization);
-        if (!owner) return { kind: 'unauthorized' as const };
-        const c = yield* Creation;
-        return { kind: 'list' as const, wallpapers: yield* c.list(owner) };
-      }).pipe(Effect.catch(() => Effect.succeed({ kind: 'failure' as const })))
-    );
-    if (result.kind === 'list') return { wallpapers: result.wallpapers.map(publicWallpaper) };
-    const status = result.kind === 'unauthorized' ? 401 : 503;
-    return reply
-      .code(status)
-      .type('application/problem+json')
-      .send(problem(status, status === 401 ? 'unauthorized' : 'service-unavailable'));
-  });
+  const run = (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    call: (
+      creation: Creation['Service'],
+      owner: { namespace: string; subject: string }
+    ) => Effect.Effect<WallpaperOutcome, unknown>,
+    accepted = false
+  ) => execute(request, reply, call, (value) => respond(reply, value, accepted));
+  app.get('/wallpapers', (request, reply) =>
+    execute(
+      request,
+      reply,
+      (c, owner) => c.list(owner),
+      (wallpapers) => reply.send({ wallpapers: wallpapers.map(publicWallpaper) })
+    )
+  );
   app.post('/wallpapers', schemaOptions(z.object({}).strict()), (request, reply) => {
     const key = z
       .string()

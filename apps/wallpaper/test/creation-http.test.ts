@@ -1,4 +1,5 @@
 import Fastify from 'fastify';
+import { get } from 'node:http';
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
 import {
@@ -8,6 +9,68 @@ import {
   WorkflowFailure,
 } from '../src/capabilities/creation/index.js';
 import { registerCreationHttp } from '../src/http/index.js';
+
+it.each(['disconnect', 'shutdown'] as const)(
+  'releases pending list work on %s through the real HTTP route',
+  async (ending) => {
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let interrupted = false;
+    const app = Fastify();
+    await registerCreationHttp(
+      app,
+      Layer.mergeAll(
+        Layer.succeed(CreatorAuthentication, {
+          verify: () => Effect.succeed({ namespace: 'authors', subject: 'creator' }),
+        }),
+        Layer.succeed(WorkflowHealth, { check: () => Effect.succeed(true) }),
+        Layer.succeed(Creation, {
+          list: () =>
+            Effect.gen(function* () {
+              entered();
+              yield* Effect.promise(() => pending);
+              return [];
+            }).pipe(
+              Effect.onInterrupt(() =>
+                Effect.sync(() => {
+                  interrupted = true;
+                })
+              )
+            ),
+          begin: () => Effect.succeed({ kind: 'unavailable' }),
+          get: () => Effect.succeed({ kind: 'unavailable' }),
+          expectSource: () => Effect.succeed({ kind: 'unavailable' }),
+          assetResult: () => Effect.succeed('ignored'),
+          sourceAccepted: () => Effect.succeed('ignored'),
+        })
+      )
+    );
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const request = get(`${address}/wallpapers`, { agent: false }, (response) => response.resume());
+    request.on('error', () => {});
+    let closing: Promise<void> | undefined;
+    try {
+      await started;
+      if (ending === 'disconnect') request.destroy();
+      else closing = app.close();
+      await expect
+        .poll(() => interrupted, { timeout: ending === 'shutdown' ? 6500 : 1000 })
+        .toBe(true);
+      if (closing) await closing;
+    } finally {
+      release();
+      request.destroy();
+      await (closing ?? app.close());
+    }
+  },
+  10000
+);
 it('uses verified Creator identity, returns durable progress and hides private workflow fields', async () => {
   const calls: unknown[] = [];
   const services = Layer.merge(

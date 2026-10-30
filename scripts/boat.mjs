@@ -16,6 +16,11 @@ import {
 	worktreeProcesses,
 } from "./lib/boat.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
+import {
+	fingerprint,
+	projectedInputs,
+	validateAuthority,
+} from "./lib/boat-preparation.mjs";
 
 const root = process.cwd();
 const dir = path.join(root, ".boat");
@@ -362,39 +367,61 @@ async function sync(id) {
 	});
 }
 async function prepare(id) {
-	const identity =
-		hash(fs.readFileSync("pnpm-lock.yaml")) +
-		hash(fs.readFileSync("mise.lock"));
+	// The existing generator owns credentials and derived broker/workflow inputs.
+	const inputs = projectedInputs(root);
+	if (inputs.some((name) => !fs.existsSync(name)))
+		await execute("make", [
+			"run",
+			"PACKAGE=asset",
+			"SCRIPT=dev:configure",
+			"BOAT_EXEC=local",
+		]);
+	validateAuthority(root);
+	const dependencies = fingerprint(root, [
+		"pnpm-lock.yaml",
+		"mise.lock",
+		"mise.toml",
+		"package.json",
+	]);
+	const identity = fingerprint(root, [
+		...inputs,
+		"pnpm-lock.yaml",
+		"mise.lock",
+		"mise.toml",
+		"package.json",
+		"scripts/setup-worktree.mjs",
+		"scripts/lib/env-pipeline.mjs",
+		"apps/asset/scripts/development-authority.ts",
+	]);
 	if (read(path.join(dir, "prepared.json")).identity === identity) return;
 	const start = Date.now();
-	await ssh(
-		id,
-		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && make install BOAT_EXEC=worker`,
-	);
 	// Transfer only the generated development inputs, through SSH stdin, never logs.
-	const paths = [
-		".worktree",
-		...fs.readdirSync("apps").map((name) => `apps/${name}/.env`),
-		"infra/.env",
-		"apps/asset/.authority.json",
-		"infra/nats/.generated.conf",
-		"infra/.operator-inbox.json",
-		"apps/user/.workflow.json",
-		"apps/wallpaper/.workflow.json",
-	].filter((p) => fs.existsSync(p));
-	if (paths.length)
-		await ssh(id, `cd ${remote} && tar -xzf -`, {
-			input: execFileSync("tar", ["-czf", "-", ...paths], {
+	const project = async () =>
+		ssh(id, `cd ${remote} && tar -xzf -`, {
+			input: execFileSync("tar", ["-czf", "-", ...inputs], {
 				maxBuffer: 16 * 1024 * 1024,
 			}),
 		});
+	await project();
+	if (read(path.join(dir, "prepared.json")).dependencies !== dependencies) {
+		await ssh(
+			id,
+			`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && make install BOAT_EXEC=worker`,
+		);
+		// Postinstall assigns remote-main ports. Restore this enrollment's inputs.
+		await project();
+	}
+	await ssh(
+		id,
+		`cd ${remote} && ${inputs.map((name) => `test -f ${quote(name)}`).join(" && ")}`,
+	);
 	// The existing contributor contract requires these bind-mounted init inputs
 	// to be readable by PostgreSQL's container user, irrespective of host umask.
 	await ssh(
 		id,
 		`cd ${remote} && chmod a+rx infra/postgres/init && chmod a+r infra/postgres/init/*.sql`,
 	);
-	write(path.join(dir, "prepared.json"), { identity });
+	write(path.join(dir, "prepared.json"), { identity, dependencies });
 	event("dependencies-ready", { ms: Date.now() - start });
 }
 function daemon() {
@@ -476,7 +503,11 @@ async function command() {
 	}
 	const { id, resumed } = await ensure();
 	const lease = path.join(dir, `command-${process.pid}.json`);
-	write(lease, { pid: process.pid, at: Date.now() });
+	write(lease, {
+		pid: process.pid,
+		at: Date.now(),
+		watcherOnly: ["dev", "apps-logs", "infra-logs"].includes(targets[0]),
+	});
 	daemon();
 	const started = Date.now();
 	try {
@@ -565,7 +596,7 @@ async function runDaemon() {
 			const lease = read(path.join(dir, p));
 			try {
 				process.kill(lease.pid, 0);
-				active = true;
+				active ||= !lease.watcherOnly;
 			} catch {
 				fs.rmSync(path.join(dir, p), { force: true });
 			}
@@ -595,7 +626,7 @@ async function runDaemon() {
 }
 async function serveCache() {
 	owned();
-	const directory = path.join(runDir, "cache");
+	const directory = path.join(runDir, "cache", config.cacheNamespace ?? "");
 	const tokenFile = path.join(runDir, "cache-token.json");
 	if (!fs.existsSync(tokenFile))
 		write(tokenFile, { token: randomBytes(32).toString("hex") });
@@ -885,10 +916,15 @@ try {
 			throw new Error("Enrollment requires an isolated linked worktree");
 		if (
 			!["validation", "development"].includes(mode) ||
-			!["smoke", "a", "b"].includes(cohort)
+			!["smoke", "a", "b", "c"].includes(cohort)
 		)
 			throw new Error("Invalid mode or cohort");
 		estimate(size, 0);
+		const cacheNamespace = process.env.BOAT_CACHE_NAMESPACE ?? "";
+		if (cacheNamespace && !/^[a-z0-9][a-z0-9-]*$/.test(cacheNamespace))
+			throw new Error("Invalid cache namespace");
+		if (cohort === "c" && !cacheNamespace)
+			throw new Error("C requires an isolated cache namespace");
 		if (config)
 			throw new Error("Already enrolled; preserve existing worker ownership");
 		const base = execFileSync("git", ["rev-parse", "HEAD"]).toString().trim();
@@ -897,6 +933,7 @@ try {
 			mode,
 			size,
 			cohort,
+			cacheNamespace,
 			base,
 			key: hash(root).slice(0, 12),
 		});

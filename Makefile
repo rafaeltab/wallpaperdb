@@ -5,7 +5,7 @@ SHELL := $(CURDIR)/scripts/mise-shell.sh
 help install boat-bootstrap: SHELL := /bin/sh
 
 # Throwaway #557 overlay; ordinary task implementations remain below.
-include scripts/boat-route.mk
+include $(wildcard scripts/boat-route.mk)
 
 ifeq ($(strip $(boat_routed_goals)),)
 
@@ -69,7 +69,7 @@ help: ## Show commands and selectors
 	@echo "Workspace tasks default to all packages. FORCE=1 bypasses Turbo cache."
 	@echo "One-off scripts: make run PACKAGE=web SCRIPT=preview ARGS='--host 0.0.0.0'"
 	@echo ""
-	@awk 'BEGIN {FS = ":.*## "} /^[a-z][a-z0-9-]*:.*## / {printf "  %-22s %s\n", $$1, $$2}' Makefile scripts/boat-route.mk
+	@awk 'BEGIN {FS = ":.*## "} /^[a-z][a-z0-9-]*:.*## / {printf "  %-22s %s\n", $$1, $$2}' Makefile $(wildcard scripts/boat-route.mk)
 
 install: ## Install dependencies and initialize this worktree
 	@command -v mise >/dev/null 2>&1 || { echo 'mise is required. See CONTRIBUTING.md for setup.' >&2; exit 127; }

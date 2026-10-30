@@ -56,6 +56,54 @@ import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { acquireDockerLease } from "./lib/docker-queue.mjs";
+import {
+	fingerprint,
+	validateAuthority,
+	generatedAuthority,
+} from "./lib/boat-preparation.mjs";
+
+test("preparation rejects missing mounts and directories and invalidates changed generated inputs", (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-prepare-"));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	assert.throws(() => fingerprint(root, ["mount"]), /ENOENT/);
+	fs.mkdirSync(path.join(root, "mount"));
+	assert.throws(() => fingerprint(root, ["mount"]), /regular file/);
+	fs.rmSync(path.join(root, "mount"), { recursive: true });
+	fs.writeFileSync(path.join(root, "mount"), "first");
+	const initial = fingerprint(root, ["mount"]);
+	assert.equal(fingerprint(root, ["mount"]), initial);
+	fs.writeFileSync(path.join(root, "mount"), "second");
+	assert.notEqual(fingerprint(root, ["mount"]), initial);
+});
+
+test("preparation requires issuer, JWKS and origins to agree with actual worktree configuration", (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-authority-"));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	for (const name of generatedAuthority) {
+		fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+		fs.writeFileSync(path.join(root, name), "{}");
+	}
+	fs.writeFileSync(path.join(root, ".worktree"), "INGRESS_PORT=9120\n");
+	fs.writeFileSync(
+		path.join(root, "apps/user/.env"),
+		"CLERK_DOMAIN=example.clerk.accounts.dev\n",
+	);
+	const clerk = {
+		issuer: "https://example.clerk.accounts.dev",
+		jwksUrl: "https://example.clerk.accounts.dev/.well-known/jwks.json",
+		authorizedParties: ["http://localhost:9120", "http://127.0.0.1:9120"],
+	};
+	const save = () =>
+		fs.writeFileSync(
+			path.join(root, generatedAuthority[0]),
+			JSON.stringify({ identityProviders: { clerk } }),
+		);
+	save();
+	validateAuthority(root);
+	clerk.authorizedParties = ["http://localhost:8000"];
+	save();
+	assert.throws(() => validateAuthority(root), /does not match/);
+});
 
 test("settled child cannot stop its active parent sharing the worktree", (t) => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "boat-owners-test-"));

@@ -31,7 +31,7 @@ export function watchdog(
       landed: false,
     };
     if (!explicitWait(observation, request, evidence))
-      return yield* suspended(store, request, delivery);
+      return yield* suspended(store, request, delivery, observation.status === 'waiting-for-input');
 
     const progress = yield* observedProgress(issues, intent, evidence.commit);
     if (progress === null) return delivery;
@@ -53,12 +53,12 @@ function explicitWait(
   if (!evidence?.waitingForGitHub) return false;
   return observation.status === 'completed' && evidence.runId !== request.previousRunId;
 }
-function suspended(store: JobStore, request: StageRequest, delivery: Delivery) {
+function suspended(store: JobStore, request: StageRequest, delivery: Delivery, question: boolean) {
   return Effect.gen(function* () {
     const saved = yield* store.readWait();
     if (saved?.continuation?.index === request.index)
       return { ...delivery, activity: 'continuation-pending' as const, deadline: saved.deadline };
-    if (saved && !saved.nudged && saved.progress !== '')
+    if (question && saved && !saved.nudged && saved.progress !== '')
       yield* store.saveWait({ ...saved, revision: saved.revision + 1, progress: '' });
     return delivery;
   });

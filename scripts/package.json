@@ -8,6 +8,7 @@
 		"wallpaperdb-crap": "./crap.mts"
 	},
 	"scripts": {
+		"boat:cache-proof": "cd .. && node scripts/boat-cache-proof.mjs",
 		"boat:watch": "node boat-watch.mjs",
 		"boat:probe": "node boat-probe.mjs",
 		"boat:ready": "cd .. && node --experimental-strip-types scripts/boat-ready.mjs",

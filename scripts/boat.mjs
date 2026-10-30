@@ -14,6 +14,7 @@ import {
 	workerState,
 	meaningfulPreviewRequest,
 	worktreeProcesses,
+	liveOwnedProcess,
 } from "./lib/boat.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 import {
@@ -86,6 +87,19 @@ function execute(
 			const emit = (data, stderr = false) => {
 				(stderr ? process.stderr : process.stdout).write(data);
 				if (logPath) fs.appendFileSync(logPath, data, { mode: 0o600 });
+				for (const phase of [
+					"building",
+					"exporting",
+					"unpacking",
+					"extracting",
+					"loading",
+					"healthy",
+					"started",
+					"watch enabled",
+				]) {
+					if (data.toLowerCase().includes(phase))
+						event("startup-progress", { phase, elapsedMs: Date.now() - start });
+				}
 			};
 			const line = (value) => {
 				try {
@@ -383,7 +397,7 @@ async function prepare(id) {
 		"mise.toml",
 		"package.json",
 	]);
-	const identity = fingerprint(root, [
+	const configuration = [
 		...inputs,
 		"pnpm-lock.yaml",
 		"mise.lock",
@@ -392,8 +406,17 @@ async function prepare(id) {
 		"scripts/setup-worktree.mjs",
 		"scripts/lib/env-pipeline.mjs",
 		"apps/asset/scripts/development-authority.ts",
-	]);
+	];
+	let identity = fingerprint(root, configuration);
 	if (read(path.join(dir, "prepared.json")).identity === identity) return;
+	await execute("make", [
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		"BOAT_EXEC=local",
+	]);
+	validateAuthority(root);
+	identity = fingerprint(root, configuration);
 	const start = Date.now();
 	// Transfer only the generated development inputs, through SSH stdin, never logs.
 	const project = async () =>
@@ -426,10 +449,7 @@ async function prepare(id) {
 }
 function daemon() {
 	const s = read(stateFile);
-	try {
-		process.kill(s.daemonPid, 0);
-		return;
-	} catch {}
+	if (liveOwnedProcess(root, s.daemon)) return;
 	const log = fs.openSync(path.join(dir, "daemon.log"), "a", 0o600);
 	const child = spawn(
 		process.execPath,
@@ -438,6 +458,7 @@ function daemon() {
 	);
 	child.unref();
 	s.daemonPid = child.pid;
+	s.daemon = worktreeProcesses(root).find((p) => p.pid === child.pid);
 	save(s);
 }
 async function stop(remove = false) {
@@ -475,7 +496,7 @@ async function stop(remove = false) {
 			event("stopped", { id: s.id, estimatedCost: s.cost });
 		}
 		const tunnel = read(path.join(dir, "cache-tunnel.json"));
-		if (tunnel.pid) {
+		if (liveOwnedProcess(root, tunnel)) {
 			try {
 				process.kill(-tunnel.pid, "SIGTERM");
 			} catch {}
@@ -507,6 +528,9 @@ async function command() {
 		pid: process.pid,
 		at: Date.now(),
 		watcherOnly: ["dev", "apps-logs", "infra-logs"].includes(targets[0]),
+		development: targets[0] === "dev",
+		startTicks: worktreeProcesses(root).find((p) => p.pid === process.pid)
+			?.startTicks,
 	});
 	daemon();
 	const started = Date.now();
@@ -523,7 +547,7 @@ async function command() {
 				id,
 				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make stop BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`,
 			);
-			await watchDevelopment(id);
+			if (targets[0] !== "dev") await watchDevelopment(id);
 		}
 		if (["dev", "apps-start"].includes(targets[0])) {
 			const s = read(stateFile);
@@ -594,10 +618,9 @@ async function runDaemon() {
 		let active = false;
 		for (const p of leases) {
 			const lease = read(path.join(dir, p));
-			try {
-				process.kill(lease.pid, 0);
+			if (liveOwnedProcess(root, lease)) {
 				active ||= !lease.watcherOnly;
-			} catch {
+			} else {
 				fs.rmSync(path.join(dir, p), { force: true });
 			}
 		}
@@ -647,16 +670,16 @@ async function serveCache() {
 		api: `http://127.0.0.1:${server.address().port}`,
 		token,
 	});
-	write(path.join(dir, "cache-server.json"), { pid: process.pid });
+	write(
+		path.join(dir, "cache-server.json"),
+		worktreeProcesses(root).find((p) => p.pid === process.pid),
+	);
 }
 async function cache(id) {
 	const server = read(path.join(dir, "cache-server.json"));
-	let alive = false;
-	try {
-		process.kill(server.pid, 0);
-		alive = true;
-	} catch {}
+	const alive = liveOwnedProcess(root, server);
 	if (!alive) {
+		fs.rmSync(path.join(dir, "cache.json"), { force: true });
 		const log = fs.openSync(path.join(dir, "cache.log"), "a", 0o600);
 		const child = spawn(
 			process.execPath,
@@ -677,8 +700,7 @@ async function cache(id) {
 		const tunnel = read(path.join(dir, "cache-tunnel.json"));
 		let connected = false;
 		try {
-			process.kill(tunnel.pid, 0);
-			connected = tunnel.id === id;
+			connected = liveOwnedProcess(root, tunnel) && tunnel.id === id;
 		} catch {}
 		const local = new URL(settings.api).port;
 		if (!connected) {
@@ -697,7 +719,10 @@ async function cache(id) {
 				{ stdio: "ignore", detached: true },
 			);
 			forward.unref();
-			write(path.join(dir, "cache-tunnel.json"), { id, pid: forward.pid });
+			write(path.join(dir, "cache-tunnel.json"), {
+				id,
+				...worktreeProcesses(root).find((p) => p.pid === forward.pid),
+			});
 		}
 		await ssh(
 			id,
@@ -712,23 +737,35 @@ async function preview() {
 		throw new Error("Validation mode uses its local development stack");
 	const { id } = await ensure();
 	const startupLease = path.join(dir, `command-${process.pid}.json`);
-	write(startupLease, { pid: process.pid, at: Date.now() });
+	write(startupLease, {
+		...worktreeProcesses(root).find((p) => p.pid === process.pid),
+		at: Date.now(),
+	});
 	process.once("exit", () => fs.rmSync(startupLease, { force: true }));
 	await sync(id);
 	await prepare(id);
 	daemon();
 	await cache(id);
 	const started = Date.now();
-	const watcher = read(stateFile).watcher;
-	const liveWatcher = watcher
-		? (await json(["exec", id, "--status", String(watcher)])).running
-		: false;
+	const foreground = fs
+		.readdirSync(dir)
+		.filter((name) => /^command-\d+\.json$/.test(name))
+		.some((name) => {
+			const lease = read(path.join(dir, name));
+			return lease.development && liveOwnedProcess(root, lease);
+		});
+	// Readiness belongs to the app, independent of the process that started it.
+	const health = await ssh(
+		id,
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:ready ARGS=--once BOAT_EXEC=worker`,
+		{ allowFailure: true, capture: true },
+	);
 	await ssh(
 		id,
-		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && ${liveWatcher ? "" : `make infra-start BOAT_EXEC=worker && make apps-start ${read(stateFile).developmentWanted ? "ARGS=--no-build" : ""} BOAT_EXEC=worker && `}make run PACKAGE=scripts SCRIPT=boat:ready BOAT_EXEC=worker`,
+		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && ${health.status === 0 || foreground ? "" : `make infra-start BOAT_EXEC=worker && make apps-start ${read(stateFile).developmentWanted ? "ARGS=--no-build" : ""} BOAT_EXEC=worker && `}make run PACKAGE=scripts SCRIPT=boat:ready BOAT_EXEC=worker`,
 	);
 	event("application-ready", { ms: Date.now() - started });
-	await watchDevelopment(id);
+	if (!foreground) await watchDevelopment(id);
 	await ssh(
 		id,
 		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:ready BOAT_EXEC=worker`,
@@ -743,7 +780,7 @@ async function preview() {
 	if (!port) throw new Error("No generated ingress port");
 	const privatePort = port + 20000;
 	const prior = read(path.join(dir, "preview-process.json"));
-	if (prior.pid && prior.pid !== process.pid) {
+	if (liveOwnedProcess(root, prior) && prior.pid !== process.pid) {
 		try {
 			if (fs.readlinkSync(`/proc/${prior.pid}/cwd`) === root)
 				process.kill(prior.pid, "SIGTERM");
@@ -842,7 +879,10 @@ async function preview() {
 	await new Promise((resolve, reject) =>
 		server.listen(port, "127.0.0.1", resolve).once("error", reject),
 	);
-	write(path.join(dir, "preview-process.json"), { pid: process.pid });
+	write(
+		path.join(dir, "preview-process.json"),
+		worktreeProcesses(root).find((p) => p.pid === process.pid),
+	);
 	process.once("exit", () => {
 		if (read(path.join(dir, "preview-process.json")).pid === process.pid)
 			fs.rmSync(path.join(dir, "preview-process.json"), { force: true });

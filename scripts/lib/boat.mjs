@@ -126,3 +126,12 @@ export function meaningfulPreviewRequest(url, headers) {
 		(url === "/__boat557/activity" && headers["x-boat-activity"] === "1")
 	);
 }
+
+export function liveOwnedProcess(root, record) {
+	return (
+		!!record?.startTicks &&
+		worktreeProcesses(root).some(
+			(p) => p.pid === record.pid && p.startTicks === record.startTicks,
+		)
+	);
+}

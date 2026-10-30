@@ -9,6 +9,7 @@ import {
 	workerState,
 	meaningfulPreviewRequest,
 	worktreeProcesses,
+	liveOwnedProcess,
 } from "./lib/boat.mjs";
 test("worktree process measurement includes its own process without command arguments", () => {
 	const sample = worktreeProcesses(process.cwd()).find(
@@ -17,6 +18,12 @@ test("worktree process measurement includes its own process without command argu
 	assert.ok(sample.rssKB > 0);
 	assert.ok(sample.cpuTicks >= 0);
 	assert.equal("args" in sample, false);
+	assert.equal(liveOwnedProcess(process.cwd(), sample), true);
+	assert.equal(
+		liveOwnedProcess(process.cwd(), { ...sample, startTicks: "0" }),
+		false,
+	);
+	assert.equal(liveOwnedProcess(process.cwd(), { pid: process.pid }), false);
 });
 test("background queries and health probes do not keep previews awake", () => {
 	assert.equal(
@@ -61,6 +68,49 @@ import {
 	validateAuthority,
 	generatedAuthority,
 } from "./lib/boat-preparation.mjs";
+
+test("actual Make routing preserves enrolled remote tasks and explicit local/worker overrides", (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-routing-"));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	const repository = path.resolve(import.meta.dirname, "..");
+	for (const name of [
+		"Makefile",
+		"scripts/boat-route.mk",
+		"scripts/lib/boat.mjs",
+	]) {
+		fs.mkdirSync(path.dirname(path.join(root, name)), { recursive: true });
+		fs.copyFileSync(path.join(repository, name), path.join(root, name));
+	}
+	const run = (override) =>
+		execFileSync(
+			"make",
+			[
+				"-n",
+				"build",
+				"SHELL=/bin/sh",
+				...(override ? [`BOAT_EXEC=${override}`] : []),
+			],
+			{
+				cwd: root,
+				env: {
+					...process.env,
+					MAKEFLAGS: "",
+					MFLAGS: "",
+					MAKEOVERRIDES: "",
+					BOAT_EXEC: "",
+				},
+			},
+		).toString();
+	assert.match(run(), /turbo.*run build/);
+	fs.mkdirSync(path.join(root, ".boat"));
+	fs.writeFileSync(
+		path.join(root, ".boat/enrollment.json"),
+		JSON.stringify({ mode: "development" }),
+	);
+	assert.match(run(), /boat.mjs command -- build/);
+	assert.match(run("local"), /turbo.*run build/);
+	assert.match(run("worker"), /turbo.*run build/);
+});
 
 test("preparation rejects missing mounts and directories and invalidates changed generated inputs", (t) => {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-prepare-"));

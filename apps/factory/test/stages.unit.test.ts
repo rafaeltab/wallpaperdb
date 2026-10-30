@@ -93,9 +93,14 @@ async function stagesFixture() {
   let prCommit = commit;
   let prKind: 'found' | 'absent' | 'ambiguous' = 'found';
   let sends = 0;
+  let failed = false;
+  let now = 100;
+  let progress = 'run-1:failed';
+  let waiting = false;
+  let status = 'completed';
   const deps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
-    Layer.succeed(Time, { now: () => Effect.succeed(100) }),
+    Layer.succeed(Time, { now: () => Effect.succeed(now) }),
     Layer.succeed(Issues, {
       inspect: () =>
         Effect.succeed({
@@ -112,7 +117,8 @@ async function stagesFixture() {
                 kind: 'found' as const,
                 url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
                 commit: prCommit,
-                ready: true,
+                ready: !failed,
+                ci: { failed, progress },
                 landed: false,
               }
             : { kind: prKind }
@@ -124,15 +130,23 @@ async function stagesFixture() {
         Effect.succeed({
           kind: 'found' as const,
           threadId: 'thread',
-          status: 'completed',
+          status,
           worktree: '/worker',
           branch: intent.branch,
           model: 'gpt-6.1-sol',
         }),
-      inspectStage: () => Effect.succeed({ runId, ordinal, commit, accepted, linked: links }),
+      inspectStage: () =>
+        Effect.succeed({
+          runId,
+          ordinal,
+          commit,
+          accepted,
+          linked: links,
+          waitingForGitHub: waiting,
+        }),
       sendStage: (_intent, request) =>
         Effect.sync(() => {
-          ordinal = request.index + 1;
+          ordinal = request.ordinal ?? request.index + 1;
           runId = `run-${ordinal}`;
           sends++;
         }),
@@ -160,6 +174,11 @@ async function stagesFixture() {
       links?: string[];
       prCommit?: string;
       prKind?: typeof prKind;
+      failed?: boolean;
+      now?: number;
+      progress?: string;
+      waiting?: boolean;
+      status?: string;
     }) => {
       ordinal = value.ordinal ?? ordinal;
       runId = value.runId ?? runId;
@@ -168,6 +187,11 @@ async function stagesFixture() {
       links = value.links ?? links;
       prCommit = value.prCommit ?? prCommit;
       prKind = value.prKind ?? prKind;
+      failed = value.failed ?? failed;
+      now = value.now ?? now;
+      progress = value.progress ?? progress;
+      waiting = value.waiting ?? waiting;
+      status = value.status ?? status;
     },
     sends: () => sends,
   };
@@ -227,4 +251,70 @@ it('does not replace a durably associated run with another run at the same ordin
   job.change({ runId: 'replacement-run', accepted: true });
   expect(await job.status()).toMatchObject({ delivery: { stage: 'implementation', ready: false } });
   expect(job.sends()).toBe(0);
+});
+
+it('sends a failed current check to the same issue agent and requires review of repaired code', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ failed: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  expect(job.sends()).toBe(3);
+  job.change({ commit: 'c'.repeat(40), prCommit: 'c'.repeat(40), failed: false });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'publication', ready: false } });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'ci', commit: 'c'.repeat(40), ready: true },
+  });
+});
+
+async function waitingJob() {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ failed: true });
+  await job.status();
+  job.change({ accepted: false, waiting: true });
+  return job;
+}
+it('sends one continuation at an hour of unchanged explicit GitHub waiting, retaining it across fresh runtimes', async () => {
+  const job = await waitingJob();
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', deadline: 3600100 },
+  });
+  job.change({ now: 3600099 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 3600100 });
+  await job.status();
+  expect(job.sends()).toBe(4);
+  job.change({ now: 7200101 });
+  await job.status();
+  await job.status();
+  expect(job.sends()).toBe(4);
+});
+it('restarts the hour on actual CI progress and does not nudge ongoing work or human questions', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3600099, progress: 'run-2:step-3-completed' });
+  await job.status();
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 7200099, status: 'running' });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ status: 'waiting-for-input' });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ status: 'completed', waiting: false });
+  await job.status();
+  expect(job.sends()).toBe(3);
+});
+it('does not nudge from a stale or wrong-ordinal waiting observation', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3600101, ordinal: 3 });
+  await job.status();
+  expect(job.sends()).toBe(3);
 });

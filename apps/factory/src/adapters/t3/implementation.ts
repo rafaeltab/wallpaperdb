@@ -138,5 +138,10 @@ ${receiptInstructions(intent, 'implementation')}`,
         Effect.withSpan('factory.t3.observe')
       ),
   };
-  return { ...execution, ...stageExecution(call, execution.observe, config.prBase ?? 'main') };
+  return {
+    ...execution,
+    ...stageExecution(call, execution.observe, config.prBase ?? 'main', (signal) =>
+      command(config.binary, ['thread', 'send', '--help'], config.project, signal)
+    ),
+  };
 }

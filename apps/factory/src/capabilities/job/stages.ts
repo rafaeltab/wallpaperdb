@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import {
   Unavailable,
   type Delivery,
+  type Time,
   type Execution,
   type Intent,
   type Issues,
@@ -17,7 +18,8 @@ export function reconcileStages(
   execution: Execution,
   issues: Issues,
   intent: Intent,
-  observation: Observation
+  observation: Observation,
+  time: Time
 ) {
   return Effect.gen(function* () {
     if (observation.kind !== 'found') return undefined;
@@ -30,7 +32,8 @@ export function reconcileStages(
     });
     const waiting = yield* currentStage(store);
     if (!waiting || waiting.threadId !== observation.threadId) return undefined;
-    if (waiting.index === 3) return yield* readiness(execution, issues, intent, waiting);
+    if (waiting.stage === 'ci' || waiting.index === 3)
+      return yield* readiness(store, execution, issues, intent, waiting);
     yield* deliver(store, execution, intent, waiting);
     const evidence = yield* execution.inspectStage(intent, waiting);
     const delivery: Delivery = {
@@ -40,7 +43,20 @@ export function reconcileStages(
       landed: false,
     };
     const verified = yield* acceptStage(store, evidence, waiting);
-    if (!verified) return delivery;
+    if (!verified) {
+      if (waiting.stage === 'babysitting')
+        return yield* watchdog(
+          store,
+          execution,
+          issues,
+          intent,
+          waiting,
+          observation,
+          time,
+          evidence
+        );
+      return delivery;
+    }
     return yield* advance(store, execution, issues, intent, waiting, verified);
   }).pipe(Effect.withSpan('factory.job.stages'));
 }
@@ -49,7 +65,10 @@ function accepted(
   request: StageRequest
 ): evidence is StageEvidence {
   if (!evidence?.accepted) return false;
-  if (evidence.ordinal !== request.index + 1 || evidence.runId === request.previousRunId)
+  if (
+    evidence.ordinal !== (request.ordinal ?? request.index + 1) ||
+    evidence.runId === request.previousRunId
+  )
     return false;
   return request.stage !== 'publication' || evidence.commit === request.commit;
 }
@@ -70,7 +89,13 @@ function advance(
   return Effect.gen(function* () {
     const proposed: StageRequest = {
       index: waiting.index + 1,
-      stage: waiting.index === 0 ? 'review' : 'publication',
+      stage:
+        waiting.stage === 'publication'
+          ? 'ci'
+          : waiting.stage === 'review'
+            ? 'publication'
+            : 'review',
+      ordinal: evidence.ordinal + (waiting.stage === 'publication' ? 0 : 1),
       threadId: waiting.threadId,
       commit: evidence.commit,
       previousRunId: evidence.runId,
@@ -81,18 +106,19 @@ function advance(
       return yield* Effect.fail(
         new Unavailable({ operation: 'stage-record-missing', cause: null })
       );
-    if (next.index === 3) return yield* readiness(execution, issues, intent, next);
+    if (next.stage === 'ci') return yield* readiness(store, execution, issues, intent, next);
     yield* deliver(store, execution, intent, next);
     return { stage: next.stage, commit: next.commit, ready: false, landed: false };
   });
 }
 function currentStage(store: JobStore) {
   return Effect.gen(function* () {
-    for (const index of [3, 2, 1, 0]) {
+    let latest: StageRequest | null = null;
+    for (let index = 0; ; index++) {
       const saved = yield* store.readStage(index);
-      if (saved) return saved;
+      if (!saved) return latest;
+      latest = saved;
     }
-    return null;
   });
 }
 function publicationMatches(
@@ -108,11 +134,38 @@ function publicationMatches(
     Boolean(evidence.linked?.includes(pr.url))
   );
 }
-function readiness(execution: Execution, issues: Issues, intent: Intent, accepted: StageRequest) {
+function readiness(
+  store: JobStore,
+  execution: Execution,
+  issues: Issues,
+  intent: Intent,
+  accepted: StageRequest
+) {
   return Effect.gen(function* () {
-    const evidence = yield* execution.inspectStage(intent, { ...accepted, index: 2 });
+    const publication = yield* store.readStage(accepted.index - 1);
+    const evidence = publication ? yield* execution.inspectStage(intent, publication) : null;
     const pr = yield* issues.pullRequest(intent);
     const matches = publicationMatches(evidence, accepted, pr);
+    if (matches && pr.kind === 'found' && pr.ci?.failed) {
+      const request: StageRequest = {
+        index: accepted.index + 1,
+        stage: 'babysitting',
+        threadId: accepted.threadId,
+        commit: accepted.commit,
+        previousRunId: accepted.previousRunId,
+        ordinal: (evidence?.ordinal ?? 3) + 1,
+      };
+      yield* store.saveStage(request);
+      const saved = yield* store.readStage(request.index);
+      if (saved) yield* deliver(store, execution, intent, saved);
+      return {
+        stage: 'babysitting' as const,
+        commit: accepted.commit,
+        ready: false,
+        landed: false,
+        pr,
+      };
+    }
     return {
       stage: 'ci' as const,
       commit: accepted.commit,
@@ -123,9 +176,95 @@ function readiness(execution: Execution, issues: Issues, intent: Intent, accepte
   });
 }
 
+function watchdog(
+  store: JobStore,
+  execution: Execution,
+  issues: Issues,
+  intent: Intent,
+  request: StageRequest,
+  observation: Extract<Observation, { kind: 'found' }>,
+  time: Time,
+  evidence: StageEvidence | null
+) {
+  return Effect.gen(function* () {
+    const delivery: Delivery = {
+      stage: 'babysitting',
+      activity: 'repairing',
+      commit: request.commit,
+      ready: false,
+      landed: false,
+    };
+    // Only a finished babysitting turn can be stuck awaiting a missed GitHub wake.
+    // Running work and pending human questions do not authorize a continuation.
+    if (
+      observation.status !== 'completed' ||
+      !evidence?.waitingForGitHub ||
+      evidence.ordinal !== (request.ordinal ?? request.index + 1)
+    ) {
+      const saved = yield* store.readWait();
+      if (saved?.continuation?.index === request.index)
+        return { ...delivery, activity: 'continuation-pending' as const, deadline: saved.deadline };
+      if (saved && !saved.nudged && saved.progress !== '')
+        yield* store.saveWait({ ...saved, revision: saved.revision + 1, progress: '' });
+      return delivery;
+    }
+    if (
+      evidence.runId === request.previousRunId ||
+      !(yield* store.bindRun(request, evidence.runId))
+    )
+      return delivery;
+    const pr = yield* issues.pullRequest(intent);
+    if (pr.kind !== 'found' || !pr.ci) return delivery;
+    const progress = `${pr.commit}:${pr.ci.progress}`;
+    const now = yield* time.now();
+    const saved = yield* store.readWait();
+    if (!saved || saved.progress !== progress) {
+      yield* store.saveWait({
+        revision: (saved?.revision ?? -1) + 1,
+        progress,
+        deadline: now + 3600000,
+        nudged: false,
+      });
+      return { ...delivery, activity: 'waiting-for-github' as const, deadline: now + 3600000 };
+    }
+    if (saved.nudged) {
+      if (saved.continuation && saved.continuation.index > request.index) {
+        yield* store.saveStage(saved.continuation);
+        yield* deliver(store, execution, intent, saved.continuation);
+      }
+      return { ...delivery, activity: 'continuation-pending' as const, deadline: saved.deadline };
+    }
+    if (now < saved.deadline)
+      return { ...delivery, activity: 'waiting-for-github' as const, deadline: saved.deadline };
+    // Persist the new stage before claiming delivery. A lost CLI response stays
+    // pending; neither restart nor replay grants a second non-idempotent send.
+    const continuation: StageRequest = {
+      ...request,
+      index: request.index + 1,
+      commit: evidence.commit,
+      previousRunId: evidence.runId,
+      ordinal: (request.ordinal ?? request.index + 1) + 1,
+      continuation: true,
+    };
+    if (
+      !(yield* store.saveWait({
+        ...saved,
+        revision: saved.revision + 1,
+        nudged: true,
+        continuation,
+      }))
+    )
+      return delivery;
+    yield* store.saveStage(continuation);
+    const winning = yield* store.readStage(continuation.index);
+    if (winning) yield* deliver(store, execution, intent, winning);
+    return delivery;
+  });
+}
+
 function acceptStage(store: JobStore, evidence: StageEvidence | null, request: StageRequest) {
   return Effect.gen(function* () {
-    if (!evidence || evidence.ordinal !== request.index + 1) return null;
+    if (!evidence || evidence.ordinal !== (request.ordinal ?? request.index + 1)) return null;
     if (!(yield* store.bindRun(request, evidence.runId))) return null;
     return accepted(evidence, request) ? evidence : null;
   });

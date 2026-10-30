@@ -11,7 +11,14 @@ export const JobLive = Layer.effect(
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
         const observation = yield* execution.observe(intent);
-        const delivery = yield* reconcileStages(store, execution, issues, intent, observation);
+        const delivery = yield* reconcileStages(
+          store,
+          execution,
+          issues,
+          intent,
+          observation,
+          time
+        );
         const now = yield* time.now();
         return {
           kind: 'job' as const,

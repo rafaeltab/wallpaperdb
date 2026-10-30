@@ -42,6 +42,22 @@ export function storeContract(
       ]);
       expect(claims.filter(Boolean)).toHaveLength(1);
       expect(await Effect.runPromise(fixture.reopen().claimLaunch())).toBe(false);
+      const wait = {
+        revision: 0,
+        progress: 'current-run:step-completed',
+        deadline: 3600100,
+        nudged: false,
+      };
+      expect(await Effect.runPromise(fixture.store.readWait())).toBeNull();
+      const waits = await Promise.all(
+        [fixture.store.saveWait(wait), fixture.reopen().saveWait({ ...wait, deadline: 999 })].map(
+          (effect) => Effect.runPromise(effect)
+        )
+      );
+      expect(waits.filter(Boolean)).toHaveLength(1);
+      const savedWait = await Effect.runPromise(fixture.reopen().readWait());
+      expect(savedWait).toEqual(waits[0] ? wait : { ...wait, deadline: 999 });
+      expect(await Effect.runPromise(fixture.reopen().saveWait(wait))).toBe(false);
       const stage = {
         index: 1,
         stage: 'review' as const,
@@ -67,6 +83,16 @@ export function storeContract(
       );
       expect(sends.filter(Boolean)).toHaveLength(1);
       expect(await Effect.runPromise(fixture.reopen().claimStage(1))).toBe(false);
+      const continuation = {
+        ...stage,
+        index: 4,
+        ordinal: 4,
+        stage: 'babysitting' as const,
+        continuation: true,
+      };
+      const pending = { ...wait, revision: 1, nudged: true, continuation };
+      expect(await Effect.runPromise(fixture.store.saveWait(pending))).toBe(true);
+      expect(await Effect.runPromise(fixture.reopen().readWait())).toEqual(pending);
       const bindings = await Promise.all(
         ['run-2', 'replacement'].map((runId) =>
           Effect.runPromise(fixture.store.bindRun(stage, runId))

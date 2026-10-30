@@ -3,10 +3,18 @@ import type { Intent, JobStore } from '../../src/capabilities/job/index.js';
 export function controlledStore(): JobStore {
   let intent: Intent | null = null;
   let launched = false;
+  let wait: import('../../src/capabilities/job/index.js').WaitState | null = null;
   const stages = new Map<number, import('../../src/capabilities/job/index.js').StageRequest>();
   const runs = new Map<number, string>();
   const claims = new Set<number>();
   return {
+    readWait: () => Effect.sync(() => wait),
+    saveWait: (state) =>
+      Effect.sync(() => {
+        if (state.revision !== (wait?.revision ?? -1) + 1) return false;
+        wait = state;
+        return true;
+      }),
     bindRun: (request, runId) =>
       Effect.sync(() => {
         const existing = runs.get(request.index);

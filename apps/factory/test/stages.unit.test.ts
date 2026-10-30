@@ -475,6 +475,14 @@ it('parks an actual question without accepting its completed-looking receipt or 
       question: { id: 'q-1', text: 'Which approved option?' },
     },
   });
+  expect(await job.status()).toMatchObject({
+    delivery: {
+      stage: 'implementation',
+      activity: 'awaiting-answer',
+      active: false,
+      question: { id: 'q-1' },
+    },
+  });
   expect(job.sends()).toBe(0);
 });
 it('requires explicit resumption after a cleared question and never sends twice for competing commands', async () => {
@@ -614,6 +622,97 @@ it('retains the question association while an answered async continuation is not
   expect(await Effect.runPromise(job.store.readStage(1))).toMatchObject({
     observedRunId: 'answer-run',
     ordinal: 2,
+  });
+  expect(job.sends()).toBe(0);
+});
+async function answeredBabysitting() {
+  const job = await waitingJob();
+  job.change({
+    status: 'waiting-for-input',
+    waiting: false,
+    question: { id: 'repair-q', text: 'Which repair?' },
+  });
+  await job.status();
+  job.change({ status: 'running', runId: 'answer-5', ordinal: 5, answeredQuestions: ['repair-q'] });
+  await job.status();
+  job.change({ status: 'completed', waiting: true, stageIndex: 5 });
+  await job.status();
+  return job;
+}
+it('sends the watchdog continuation once after adopting an answered babysitting run', async () => {
+  const job = await answeredBabysitting();
+  job.change({ now: 3600101 });
+  await job.status();
+  await job.status();
+  expect(job.sends()).toBe(4);
+  expect(await Effect.runPromise(job.store.readStage(6))).toMatchObject({
+    stage: 'babysitting',
+    continuation: true,
+    ordinal: 6,
+    previousRunId: 'answer-5',
+  });
+});
+it('accepts an associated watcher completion after adopting a babysitting answer', async () => {
+  const job = await answeredBabysitting();
+  job.change({
+    status: 'completed',
+    waiting: false,
+    accepted: true,
+    runId: 'watcher-6',
+    ordinal: 6,
+    stageIndex: 5,
+  });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review' } });
+  expect(job.sends()).toBe(4);
+});
+it('retains the answer continuation when it asks another question before observation', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q1', text: 'First?' },
+  });
+  await job.start();
+  job.change({
+    answeredQuestions: ['q1'],
+    runId: 'answer-2',
+    ordinal: 2,
+    question: { id: 'q2', text: 'Second?' },
+  });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'awaiting-answer', active: false, question: { id: 'q2' } },
+  });
+  job.change({ answeredQuestions: ['q1', 'q2'], status: 'completed', accepted: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review' } });
+  expect(job.sends()).toBe(1);
+});
+it('recovers the question recorded with an adopted run before control publication', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q1', text: 'First?' },
+  });
+  await job.start();
+  const original = await Effect.runPromise(job.store.readStage(0));
+  if (!original) throw new Error('Expected original stage');
+  await Effect.runPromise(
+    job.store.saveStage({
+      ...original,
+      index: 1,
+      ordinal: 2,
+      previousRunId: 'run-1',
+      observedRunId: 'answer-2',
+      deliveryIndex: 0,
+      question: { id: 'q2', text: 'Second?' },
+    })
+  );
+  job.change({ status: 'running', answeredQuestions: ['q1', 'q2'], runId: 'answer-3', ordinal: 3 });
+  await job.status();
+  expect(await Effect.runPromise(job.store.readStage(2))).toMatchObject({
+    stage: 'implementation',
+    observedRunId: 'answer-3',
+    ordinal: 3,
   });
   expect(job.sends()).toBe(0);
 });

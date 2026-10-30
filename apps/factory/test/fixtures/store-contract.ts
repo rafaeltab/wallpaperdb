@@ -61,6 +61,9 @@ export function storeContract(
       const stage = {
         index: 1,
         stage: 'review' as const,
+        observedRunId: 'answered-run-2',
+        deliveryIndex: 1,
+        question: { id: 'review-q', text: 'Which review option?' },
         threadId: 'thread-1',
         commit: 'c'.repeat(40),
         previousRunId: 'run-1',

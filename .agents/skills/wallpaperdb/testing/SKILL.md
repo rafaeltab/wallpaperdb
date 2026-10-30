@@ -30,7 +30,7 @@ Apply this guidance to implementation defects, review feedback, and automated re
 
 ## Container failures
 
-- Integration tests and container E2E suites start their own containers. Docker must be running. Local `make ci` excludes E2E; GitHub Actions enforces complete E2E coverage. Explicit local `make test-e2e` provisions only selected dependencies and owns browser stack startup and cleanup. Follow [contributor guidance](../../../../CONTRIBUTING.md#check-a-change) for prerequisites, deadlines, diagnostics, and the shared Docker host lock used by Docker-heavy validation across worktrees.
+- Integration tests and container E2E suites start their own containers. Docker must be running. Local `make ci` excludes E2E; GitHub Actions enforces complete E2E coverage. Explicit local `make test-e2e` provisions only selected dependencies and owns browser stack startup and cleanup.
 - Check where the caller runs. Host test code needs a published host address and mapped port; a service on the test Docker network needs the network alias and internal port. Use the endpoints supplied by the tester rather than inventing connection strings.
 - Await tester setup before accessing resources. Await cleanup between tests and destroy resources after the suite. When teardown hangs, inspect live clients, consumers, and application lifetimes before increasing timeouts.
 - Keep container tests serial when diagnosing resource exhaustion. Increasing concurrency or retry counts can hide the cause.

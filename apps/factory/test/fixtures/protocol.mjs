@@ -68,6 +68,7 @@ else if (args[1] === 'start') {
   const resource = JSON.parse(readFileSync(path, 'utf8'));
   const index = Number(args[3].match(/Stage (\d) of factory/)[1]);
   resource.runCount = Number(args[3].match(/expected run ordinal (\d+)/)?.[1] ?? index + 1);
+  resource.stageIndex = index;
   resource.stage = args[3].includes('$babysit-pr')
     ? 'babysitting'
     : args[3].includes('$review-loop')
@@ -102,6 +103,7 @@ else if (args[1] === 'start') {
   const resource = existsSync(join(config.directory, 'resource.json'))
     ? JSON.parse(readFileSync(join(config.directory, 'resource.json'), 'utf8'))
     : null;
+  if (resource && args[1] === 'show') Object.assign(resource, config.overrides);
   if (config.malformed) console.log('{broken');
   else if (args[1] === 'list')
     reply(resource ? (config.duplicate ? [resource, resource] : [resource]) : []);
@@ -115,6 +117,9 @@ else if (args[1] === 'start') {
                 role: 'assistant',
                 runId: resource.latestRunId,
                 text: JSON.stringify({
+                  ...(resource.stage === 'babysitting'
+                    ? { delivery: `${resource.title.slice(8)}:${resource.stageIndex}` }
+                    : {}),
                   jobId: resource.title.slice(8),
                   stage: 'babysitting',
                   base: config.base,
@@ -129,20 +134,21 @@ else if (args[1] === 'start') {
                     role: 'assistant',
                     runId: resource.latestRunId,
                     text: JSON.stringify({
+                      ...(resource.stage === 'babysitting'
+                        ? { delivery: `${resource.title.slice(8)}:${resource.stageIndex}` }
+                        : {}),
                       jobId: resource.title.slice(8),
                       stage:
                         resource.stage ??
                         ['implementation', 'review', 'publication'][resource.runCount - 1],
                       base: config.base,
                       commit: config.base,
-                      outcome:
-                        resource.stage === 'babysitting'
-                          ? '<PR>READY</PR>'
-                          : [
-                              '<TASK>COMPLETE</TASK>',
-                              '<REVIEW>COMPLETE</REVIEW>',
-                              '<PR>CREATED</PR>',
-                            ][resource.runCount - 1],
+                      outcome: {
+                        implementation: '<TASK>COMPLETE</TASK>',
+                        review: '<REVIEW>COMPLETE</REVIEW>',
+                        publication: '<PR>CREATED</PR>',
+                        babysitting: '<PR>READY</PR>',
+                      }[resource.stage ?? 'implementation'],
                       tests: true,
                       coverage: true,
                       crap: true,

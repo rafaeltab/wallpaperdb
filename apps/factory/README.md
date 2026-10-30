@@ -4,7 +4,7 @@ Repository-owned operational infrastructure for deliberately starting and observ
 
 ## Capabilities
 
-A maintainer selects one trusted ready issue and can narrow its execution with context. The factory durably reserves the admission and expected implementation stage, requests a dedicated T3 thread/worktree using gpt-6.1-sol, and shows stage, elapsed time and issue/thread links. Launch uncertainty preserves the reservation and reconciles the exact job identity instead of launching twice. Only a structured outcome from the exact expected completed run, at the clean current commit and pinned base, advances a stage. Review-loop requires fresh independent Standards, Spec and Defects review; applicable tests, coverage and CRAP remain mandatory. Mutation and hosted review are advisory. The dashboard distinguishes current-commit PR readiness from verified default-branch landing.
+A maintainer selects one trusted ready issue and can narrow its execution with context. The factory durably reserves the admission and expected implementation stage, requests a dedicated T3 thread/worktree using gpt-6.1-sol, and shows stage, elapsed time and issue/thread links. Launch uncertainty preserves the reservation and reconciles the exact job identity instead of launching twice. Only a structured outcome from the expected completed run (or a current babysitting watcher run carrying the exact active delivery identity), at the clean current commit and pinned base, advances a stage. Review-loop requires fresh independent Standards, Spec and Defects review; applicable tests, coverage and CRAP remain mandatory. Mutation and hosted review are advisory. The dashboard distinguishes current-commit PR readiness from verified default-branch landing.
 
 ## Operating constraints
 

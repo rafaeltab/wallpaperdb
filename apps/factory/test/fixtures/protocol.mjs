@@ -101,7 +101,7 @@ else if (args[1] === 'start') {
   else if (args[1] === 'show')
     reply({
       thread: resource ? { ...resource, ...config.overrides } : null,
-      messages: config.messages ??
+      messages: (config.holdPublication && resource?.runCount === 3 ? [] : config.messages) ??
         (config.complete && resource
           ? [
               {

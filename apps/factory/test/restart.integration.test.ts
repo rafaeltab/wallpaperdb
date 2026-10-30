@@ -6,7 +6,7 @@ import { expect, it, vi } from 'vitest';
 import { protocol } from './fixtures/setup.js';
 it('a fresh process reconciles publication after a lost response without repeating threads, stages or PRs', async () => {
   const host = await protocol();
-  await host.save({ complete: true, base: host.base, lostPublication: true });
+  await host.save({ base: host.base });
   const socket = createServer();
   socket.listen(0, '127.0.0.1');
   await once(socket, 'listening');
@@ -61,22 +61,37 @@ it('a fresh process reconciles publication after a lost response without repeati
     const response = await fetch(origin + '/api/job', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ issue: 576, context: 'Read only' }),
+      body: JSON.stringify({ issue: 577, context: 'Read only' }),
     });
     expect(response.status).toBe(202);
     expect(await response.json()).toMatchObject({
       kind: 'job',
       execution: { kind: 'found', threadId: 'thread-live' },
     });
-    const uncertain = await fetch(origin + '/api/job');
-    expect(uncertain.status).toBe(503);
+    await host.save({
+      complete: true,
+      base: host.base,
+      lostPublication: true,
+      holdPublication: true,
+      overrides: { status: 'completed' },
+    });
+    await vi.waitFor(
+      async () => {
+        await fetch(origin + '/api/job');
+        expect(
+          (await host.calls()).filter((call) => call.binary === 't3' && call.args[1] === 'send')
+        ).toHaveLength(2);
+      },
+      { timeout: 10000, interval: 30 }
+    );
     await stop(child);
+    await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
     child = launch();
     await ready();
     const recovered = await fetch(origin + '/api/job');
     expect(await recovered.json()).toMatchObject({
       kind: 'job',
-      intent: { issue: 576, expectedStage: 'implementation' },
+      intent: { issue: 577, expectedStage: 'implementation' },
       execution: { threadId: 'thread-live' },
       delivery: {
         stage: 'ci',
@@ -96,7 +111,7 @@ it('a fresh process reconciles publication after a lost response without repeati
     const duplicate = await fetch(origin + '/api/job', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ issue: 576 }),
+      body: JSON.stringify({ issue: 577 }),
     });
     expect(duplicate.status).toBe(409);
     const calls = await host.calls();

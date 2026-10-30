@@ -34,7 +34,13 @@ export type Observation =
 export interface JobStore {
   read(): Effect.Effect<Intent | null, Unavailable>;
   reserve(intent: Intent): Effect.Effect<boolean, Unavailable>;
+  /** First run binding wins atomically and survives reopen. Repeating that
+   * binding returns true; any replacement returns false. Records retain the
+   * stage/thread/accepted commit and predecessor association for reconciliation. */
   bindRun(request: StageRequest, runId: string): Effect.Effect<boolean, Unavailable>;
+  /** Stage records are immutable. saveStage returns false if already present;
+   * callers must use the winning record. Claims permit at most one uncertain
+   * send per stage and are never automatically released. */
   readStage(index: number): Effect.Effect<StageRequest | null, Unavailable>;
   saveStage(request: StageRequest): Effect.Effect<boolean, Unavailable>;
   claimStage(index: number): Effect.Effect<boolean, Unavailable>;

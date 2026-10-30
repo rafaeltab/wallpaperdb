@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { chromium, expect as browserExpect } from '@playwright/test';
 import { expect, it } from 'vitest';
 import { startFactory } from '../src/composition/index.js';
@@ -54,11 +56,31 @@ it('starts one deliberately selected job and observes stage, elapsed time and wo
         'https://github.com/rafaeltab/wallpaperdb/pull/999'
       );
       await browserExpect(page.getByText(host.base, { exact: true })).toBeVisible();
+      const pr = JSON.parse(await readFile(join(host.directory, 'pr.json'), 'utf8'));
+      pr.statusCheckRollup[0].conclusion = 'FAILURE';
+      await host.save({
+        complete: true,
+        base: host.base,
+        prs: [pr],
+        waitingForGithub: true,
+        overrides: { status: 'completed' },
+      });
+      await browserExpect
+        .poll(async () => {
+          await page.reload();
+          return page.getByText('waiting-for-github', { exact: true }).count();
+        })
+        .toBe(1);
+      await browserExpect(
+        page.getByRole('heading', { name: 'Babysitting', exact: true })
+      ).toBeVisible();
+      await browserExpect(page.getByText(/GitHub wait deadline:/)).toBeVisible();
+      await browserExpect(page.getByText('Ready for manual merge', { exact: true })).toHaveCount(0);
       expect(
         (await host.calls()).filter(
           (call) => call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
         )
-      ).toHaveLength(2);
+      ).toHaveLength(3);
       expect(
         (await host.calls()).filter(
           (call) =>

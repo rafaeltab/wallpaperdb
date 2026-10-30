@@ -155,14 +155,7 @@ async function workflowProgress(
   const checks = pr.statusCheckRollup.filter((check) =>
     applicable('name' in check ? check.name : check.context)
   );
-  const runs = new Set<string>();
-  for (const check of checks) {
-    if (!('name' in check)) continue;
-    const match = check.detailsUrl?.match(
-      /^https:\/\/github.com\/rafaeltab\/wallpaperdb\/actions\/runs\/(\d+)\/job\/\d+/
-    );
-    if (match?.[1]) runs.add(match[1]);
-  }
+  const runs = workflowRuns(checks);
   const progress = checks.map((check) => JSON.stringify(check));
   for (const run of runs) {
     const result = jobsSchema.parse(
@@ -179,4 +172,16 @@ async function workflowProgress(
     progress.push(JSON.stringify(result.jobs.sort((a, b) => a.id - b.id)));
   }
   return JSON.stringify(progress.sort());
+}
+
+function workflowRuns(checks: z.infer<typeof schema>[number]['statusCheckRollup']) {
+  const runs = new Set<string>();
+  for (const check of checks) {
+    if (!('name' in check)) continue;
+    const match = check.detailsUrl?.match(
+      /^https:\/\/github.com\/rafaeltab\/wallpaperdb\/actions\/runs\/(\d+)\/job\/\d+/
+    );
+    if (match?.[1]) runs.add(match[1]);
+  }
+  return runs;
 }

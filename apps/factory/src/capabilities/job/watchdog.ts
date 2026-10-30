@@ -33,7 +33,7 @@ export function watchdog(
     if (!explicitWait(observation, request, evidence))
       return yield* suspended(store, request, delivery);
     if (!(yield* store.bindRun(request, evidence.runId))) return delivery;
-    const progress = yield* observedProgress(issues, intent);
+    const progress = yield* observedProgress(issues, intent, evidence.commit);
     if (progress === null) return delivery;
     const now = yield* time.now();
     const saved = yield* store.readWait();
@@ -135,10 +135,10 @@ function continueWaiting(
   });
 }
 
-function observedProgress(issues: Issues, intent: Intent) {
+function observedProgress(issues: Issues, intent: Intent, commit: string) {
   return Effect.gen(function* () {
     const pr = yield* issues.pullRequest(intent);
-    if (pr.kind !== 'found' || !pr.ci) return null;
+    if (pr.kind !== 'found' || !pr.ci || pr.commit !== commit) return null;
     return `${pr.commit}:${pr.ci.progress}`;
   });
 }

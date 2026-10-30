@@ -67,9 +67,16 @@ export function storeContract(
       );
       expect(sends.filter(Boolean)).toHaveLength(1);
       expect(await Effect.runPromise(fixture.reopen().claimStage(1))).toBe(false);
-      expect(await Effect.runPromise(fixture.store.bindRun(stage, 'run-2'))).toBe(true);
-      expect(await Effect.runPromise(fixture.reopen().bindRun(stage, 'run-2'))).toBe(true);
-      expect(await Effect.runPromise(fixture.reopen().bindRun(stage, 'replacement'))).toBe(false);
+      const bindings = await Promise.all(
+        ['run-2', 'replacement'].map((runId) =>
+          Effect.runPromise(fixture.store.bindRun(stage, runId))
+        )
+      );
+      expect(bindings.filter(Boolean)).toHaveLength(1);
+      const winner = bindings[0] ? 'run-2' : 'replacement';
+      const loser = bindings[0] ? 'replacement' : 'run-2';
+      expect(await Effect.runPromise(fixture.reopen().bindRun(stage, winner))).toBe(true);
+      expect(await Effect.runPromise(fixture.reopen().bindRun(stage, loser))).toBe(false);
     } finally {
       await fixture.close();
     }

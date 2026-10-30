@@ -1,6 +1,6 @@
 # Project organization
 
-Scope: module organization and shared testing principles apply project-wide. The backend architecture section applies only to backend applications and their supporting modules.
+Scope: module organization, documentation, and shared testing principles apply project-wide. The backend architecture section applies only to backend applications and their supporting modules.
 
 ## Module organization
 
@@ -11,6 +11,13 @@ Scope: module organization and shared testing principles apply project-wide. The
 - Every deployable backend application opts in to the shared architecture check when created. An existing application opts in when it adopts capability architecture. The directories under `src/capabilities/` define capability ownership; do not duplicate that list in `quality.config.json`. The config declares other local boundaries and permitted external dependencies. Its `lint:architecture` package script invokes the shared checker. The repository lint pipeline runs that task through Turbo; direct package `lint` scripts cover their own lint commands. The application owner maintains its boundary configuration, while changes to the shared checker and its regression tests are repository tooling changes. See the [checker](../../scripts/check-architecture.mjs), [gateway configuration](../../apps/gateway/quality.config.json), [Turbo task graph](../../turbo.json), and [Make lint entry point](../../Makefile).
 - Use shared packages for cohesive modules whose stable semantics are genuinely common to actual consumers, with a deliberate interface and clear ownership. Keep context-specific meanings local and accept small duplication when sharing would couple them; shared packages must not depend on deployable applications.
 - Filename conventions must not impose mandatory architectural role suffixes.
+
+## Documentation
+
+- Documentation must contain only information another agent will need for a concrete repository task. Speculative future usefulness does not justify a document or section.
+- Creating or editing README files requires the [write-readme skill](../../.agents/skills/wallpaperdb/write-readme/SKILL.md).
+- `AGENTS.md` must contain only instructions necessary for at least 90% of coding agents working in its scope. Specialized guidance belongs in skills or linked documents with explicit reading triggers.
+- Creating or editing skills or `AGENTS.md` requires the [writing-for-agents skill](../../.agents/skills/productivity/writing-for-agents/SKILL.md).
 
 ## Backend architecture
 

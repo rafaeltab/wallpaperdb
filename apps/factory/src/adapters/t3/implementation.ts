@@ -1,3 +1,4 @@
+import { mcpCall, pendingQuestion } from './questions.js';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import {
@@ -40,6 +41,8 @@ export function t3Execution(config: {
   project: string;
   projectId: string;
   prBase?: string;
+  mcpEndpoint?: string;
+  mcpAuthorizationFile?: string;
 }): Execution {
   const call = (args: string[], signal?: AbortSignal) =>
     command(config.binary, ['thread', ...args, '--json'], config.project, signal).then((text) =>
@@ -123,7 +126,16 @@ ${receiptInstructions(intent, 'implementation')}`,
             signal
           );
           if (branch !== intent.branch) return { kind: 'ambiguous' };
+          const question =
+            config.mcpEndpoint && config.mcpAuthorizationFile
+              ? await pendingQuestion(config, thread.threadId, signal)
+              : undefined;
+          if (!config.mcpEndpoint && thread.pendingRequestCount > 0)
+            throw new Error(
+              'Structured T3 MCP observation requires endpoint and authorization file'
+            );
           return {
+            question,
             kind: 'found',
             threadId: thread.threadId,
             status: thread.pendingRequestCount > 0 ? 'waiting-for-input' : thread.status,
@@ -140,6 +152,25 @@ ${receiptInstructions(intent, 'implementation')}`,
   };
   return {
     ...execution,
+    interrupt: (intent, threadId) =>
+      Effect.tryPromise({
+        try: async (signal) => {
+          await mcpCall(
+            config,
+            't3_thread_interrupt',
+            {
+              threadId,
+              clientRequestId: `${intent.id}:cancel`,
+              reason: 'Explicit factory cancellation',
+            },
+            signal
+          );
+        },
+        catch: (cause) => new Unavailable({ operation: 'interrupt', cause }),
+      }).pipe(
+        Effect.tapError((error) => Effect.logError(error)),
+        Effect.withSpan('factory.t3.interrupt')
+      ),
     ...stageExecution(call, execution.observe, config.prBase ?? 'main', (signal) =>
       command(config.binary, ['thread', 'send', '--help'], config.project, signal)
     ),

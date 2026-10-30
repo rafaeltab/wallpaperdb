@@ -82,7 +82,7 @@ function advance(
     return { stage: next.stage, commit: next.commit, ready: false, landed: false };
   });
 }
-function currentStage(store: JobStore) {
+export function currentStage(store: JobStore) {
   return Effect.gen(function* () {
     let latest: StageRequest | null = null;
     for (let index = 0; ; index++) {
@@ -181,8 +181,51 @@ function reconcileStage(
   time: Time
 ) {
   return Effect.gen(function* () {
-    if (waiting.stage === 'ci' || waiting.index === 3)
-      return yield* readiness(store, execution, issues, intent, waiting);
+    const control = yield* store.readControl();
+    if (control.cancelled)
+      return {
+        stage: waiting.stage,
+        commit: waiting.commit,
+        ready: false,
+        landed: false,
+        activity: 'cancelled' as const,
+        active: false,
+      };
+    if (observation.question) {
+      if (
+        control.parked?.index !== waiting.index ||
+        control.parked.question.id !== observation.question.id
+      )
+        yield* store.saveControl({
+          ...control,
+          revision: control.revision + 1,
+          parked: { index: waiting.index, question: observation.question },
+        });
+      if (waiting.stage === 'babysitting')
+        yield* watchdog(store, issues, intent, waiting, observation, time, null, (request) =>
+          deliver(store, execution, intent, request)
+        );
+      return {
+        stage: waiting.stage,
+        commit: waiting.commit,
+        ready: false,
+        landed: false,
+        activity: 'awaiting-answer' as const,
+        active: false,
+        question: observation.question,
+      };
+    }
+    if (control.parked?.index === waiting.index)
+      return {
+        stage: waiting.stage,
+        commit: waiting.commit,
+        ready: false,
+        landed: false,
+        activity: 'awaiting-answer' as const,
+        active: false,
+        question: control.parked.question,
+      };
+    if (waiting.stage === 'ci') return yield* readiness(store, execution, issues, intent, waiting);
     yield* deliver(store, execution, intent, waiting);
     const observed = yield* execution.inspectStage(intent, waiting);
     const evidence = yield* associateStage(store, observed, waiting);
@@ -192,7 +235,10 @@ function reconcileStage(
       ready: false,
       landed: false,
     };
-    const verified = evidence && accepted(evidence, waiting) ? evidence : null;
+    const verified =
+      observation.status === 'completed' && evidence && accepted(evidence, waiting)
+        ? evidence
+        : null;
     if (!verified) {
       if (waiting.stage === 'babysitting')
         return yield* watchdog(

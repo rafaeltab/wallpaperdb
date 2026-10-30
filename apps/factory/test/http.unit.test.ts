@@ -10,6 +10,8 @@ import {
   type StartResult,
 } from '../src/capabilities/job/index.js';
 const idle: Job = {
+  resume: () => Effect.succeed({ kind: 'rejected' }),
+  cancel: () => Effect.succeed({ kind: 'rejected' }),
   start: () => Effect.succeed({ kind: 'empty' }),
   status: () => Effect.succeed({ kind: 'empty' }),
 };
@@ -208,3 +210,25 @@ it('shows current commit PR readiness separately from default branch landing', (
         }),
     }
   ));
+it('translates explicit resume with its job and parked-stage identity', async () => {
+  const commands: unknown[] = [];
+  const command = { jobId: '1', index: 0, questionId: 'q' };
+  await contract(
+    async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/job/resume',
+        payload: command,
+      });
+      expect(response.statusCode).toBe(202);
+      expect(commands).toEqual([command]);
+    },
+    {
+      ...idle,
+      resume: (value) => {
+        commands.push(value);
+        return Effect.succeed({ kind: 'empty' });
+      },
+    }
+  );
+});

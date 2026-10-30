@@ -8,6 +8,8 @@ export default mergeConfig(
     plugins: [react()],
     test: {
       name: 'react-muuri',
+      // Parallel JSDOM cold starts can starve Muuri initialization in repository-wide CI.
+      fileParallelism: false,
       globals: true,
       environment: 'jsdom',
       include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],

@@ -1,7 +1,7 @@
 // Resolve the layout dependency before the hook's readiness deadlines begin.
 import 'muuri';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useEffect, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { MuuriGrid } from '../../src/MuuriGrid.js';
 import { MuuriItem } from '../../src/MuuriItem.js';
@@ -58,63 +58,16 @@ describe('useGrid', () => {
     }
 
     it('should return grid instance when used inside MuuriGrid', async () => {
-      const started = performance.now();
-      const timeline: { event: string; elapsedMs: number }[] = [];
-      let recordingMs = 0;
-      let droppedEvents = 0;
-      const record = (event: string) => {
-        if (timeline.length >= 60) {
-          droppedEvents++;
-          return;
-        }
-        const before = performance.now();
-        timeline.push({ event, elapsedMs: before - started });
-        recordingMs += performance.now() - before;
-      };
+      const { result } = renderHook(() => useGrid(), {
+        wrapper: GridWrapper,
+      });
 
-      function ObservedGridWrapper({ children }: { children: ReactNode }) {
-        useEffect(() => {
-          record('wrapper mounted');
-          return () => record('wrapper unmounted');
-        }, []);
-        return (
-          <MuuriGrid
-            ref={(grid) => record(grid ? 'forwarded ref ready' : 'forwarded ref null')}
-            onLayoutStart={() => record('layoutStart callback')}
-            onLayoutEnd={() => record('layoutEnd callback')}
-          >
-            <MuuriItem key="1">
-              <div style={{ width: 100, height: 100 }}>Item 1</div>
-            </MuuriItem>
-            {children}
-          </MuuriGrid>
-        );
-      }
-
-      const { result } = renderHook(
+      await waitFor(
         () => {
-          const value = useGrid();
-          record(value.grid ? 'hook render ready' : 'hook render null');
-          return value;
+          expect(result.current.grid).not.toBeNull();
         },
-        { wrapper: ObservedGridWrapper }
+        { timeout: 1000 }
       );
-      record('renderHook returned');
-
-      try {
-        await waitFor(
-          () => {
-            record(result.current.grid ? 'hook result ready' : 'hook result null');
-            expect(result.current.grid).not.toBeNull();
-          },
-          { timeout: 1000 }
-        );
-      } catch (error) {
-        // Public callbacks do not measure private initialization. Recording time includes
-        // scheduler pauses within record(), but excludes the added React effect/ref work.
-        console.error('useGrid readiness failure', { timeline, recordingMs, droppedEvents });
-        throw error;
-      }
     });
 
     it('should return getItems function that retrieves items', async () => {

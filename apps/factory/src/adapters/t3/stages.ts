@@ -62,8 +62,9 @@ export function stageExecution(
               await command('git', ['rev-parse', 'HEAD'], binding.worktree, signal)
             ).trim();
             if (
-              head !== request.commit ||
-              (await command('git', ['status', '--porcelain'], binding.worktree, signal)).trim()
+              !request.resume &&
+              (head !== request.commit ||
+                (await command('git', ['status', '--porcelain'], binding.worktree, signal)).trim())
             )
               throw new Error('Accepted commit changed before stage delivery');
             const help = await sendHelp(signal);
@@ -125,6 +126,10 @@ export function stageExecution(
 }
 
 function stagePrompt(intent: Intent, request: StageRequest, prBase: string) {
+  const scope = `Only ${intent.issueUrl} is authorized. Preserve retained scope and decisions. Only rafaeltab and zero-two-rafaeltab may expand scope. Retained context: ${intent.context}`;
+  if (request.resume)
+    return `Resume the existing ${request.stage} stage of this issue job in this owning thread/worktree. Do not admit another job, launch a worker, create another worktree or expand scope. Stage ${request.index} of factory job ${intent.id}; expected run ordinal ${request.ordinal}; predecessor run ${request.previousRunId}. ${scope}. Keep the existing stage handoffs and watchdog association. Use ${request.stage === 'implementation' ? '$implement' : request.stage === 'review' ? '$review-loop' : request.stage === 'publication' ? '$publish-pr' : '$babysit-pr'}. ${receiptInstructions(intent, request.stage)}`;
+
   if (request.stage === 'babysitting')
     return `${request.continuation ? 'continue. ' : ''}Use $babysit-pr for ${intent.issueUrl} in this existing bound thread/worktree. Stage ${request.index} of factory job ${intent.id}; delivery ${intent.id}:${request.index}; expected run ordinal ${request.ordinal}. Failed applicable CI requires repair; actual code repairs require affected independent Standards/Spec/Defects re-review before readiness. Only the selected issue and retained agreed scope are authorized; significant proposals return to the coordinator. Preserve manual babysitting behavior, use factory policy: mutation and hosted approval advisory, no automerge or issue closure. Keep questions here. While stuck waiting for GitHub return exactly JSON {"delivery":"${intent.id}:${request.index}","jobId":"${intent.id}","stage":"babysitting","base":"${intent.base}","outcome":"WAITING_FOR_GITHUB"} as the entire final message. Never use that outcome for a human question, active repair, or progressing agent work. ${receiptInstructions(intent, request.stage)} For babysitting only, include delivery="${intent.id}:${request.index}" in every success receipt, including watcher wakes. This immutable delivery identity remains the same through watcher wakes; return receipts only for this active stage.`;
   const skill = request.stage === 'review' ? '$review-loop' : '$publish-pr';

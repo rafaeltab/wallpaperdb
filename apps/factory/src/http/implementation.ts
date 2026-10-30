@@ -110,5 +110,49 @@ export function operationsServer(config: {
         .send(problem(422, 'factory-admission', 'Issue is not eligible'));
     return reply.code(202).send(result);
   });
+  const resumeSchema = z
+    .object({
+      jobId: z.string().min(1),
+      index: z.number().int().nonnegative(),
+      questionId: z.string().min(1),
+    })
+    .strict();
+  const cancelSchema = z.object({ jobId: z.string().min(1) }).strict();
+  for (const action of ['resume', 'cancel'] as const) {
+    app.post(`/api/job/${action}`, async (request, reply) => {
+      const origin = request.headers.origin;
+      if (origin && origin !== `${request.protocol}://${request.headers.host}`)
+        return reply
+          .code(403)
+          .type('application/problem+json')
+          .send(problem(403, 'factory-origin', 'Request origin rejected'));
+      const parsed =
+        action === 'resume'
+          ? resumeSchema.safeParse(request.body)
+          : cancelSchema.safeParse(request.body);
+      if (!parsed.success)
+        return reply
+          .code(400)
+          .type('application/problem+json')
+          .send(problem(400, 'factory-request', 'Invalid job command'));
+      const operation =
+        action === 'resume'
+          ? config.job.resume(resumeSchema.parse(parsed.data))
+          : config.job.cancel(parsed.data.jobId);
+      const result = await execute(request, `factory.http.${action}`, operation);
+      if (result.kind === 'rejected' || result.kind === 'occupied')
+        return reply
+          .code(409)
+          .type('application/problem+json')
+          .send(
+            problem(
+              409,
+              'factory-command',
+              'Job changed or command is unavailable. Refresh observation.'
+            )
+          );
+      return reply.code(202).send(result);
+    });
+  }
   return app;
 }

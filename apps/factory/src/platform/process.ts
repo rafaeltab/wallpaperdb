@@ -5,10 +5,12 @@ export async function command(
   binary: string,
   args: readonly string[],
   cwd: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  environment?: NodeJS.ProcessEnv
 ): Promise<string> {
   const result = await execute(binary, [...args], {
     cwd,
+    env: environment ? { ...process.env, ...environment } : process.env,
     timeout: 30000,
     killSignal: 'SIGKILL',
     maxBuffer: 4 * 1024 * 1024,

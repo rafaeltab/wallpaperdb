@@ -31,6 +31,18 @@ if (basename(process.argv[1]) === 'gh') {
       body: config.body ?? '',
       labels: [{ name: 'ready-for-agent' }],
     });
+} else if (args[0] === 'acp-mcp-call') {
+  if (args[1] === 't3_thread_interrupt')
+    reply({ structuredContent: { status: 'interrupt_requested', threadId: 'thread-live' } });
+  else
+    reply({
+      structuredContent: {
+        thread: { latestRunId: 'run-1' },
+        items: config.activity ?? [],
+        hasMore: false,
+        nextPosition: null,
+      },
+    });
 } else if (args.includes('--help'))
   console.log('--worktree --model' + (config.idempotency ? ' --client-request-id' : ''));
 else if (args[1] === 'start') {

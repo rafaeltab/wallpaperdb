@@ -3,11 +3,23 @@ import type { Intent, JobStore } from '../../src/capabilities/job/index.js';
 export function controlledStore(): JobStore {
   let intent: Intent | null = null;
   let launched = false;
+  let control: import('../../src/capabilities/job/index.js').Control = {
+    revision: -1,
+    cancelled: false,
+    claimed: [],
+  };
   let wait: import('../../src/capabilities/job/index.js').WaitState | null = null;
   const stages = new Map<number, import('../../src/capabilities/job/index.js').StageRequest>();
   const runs = new Map<string, string>();
   const claims = new Set<number>();
   return {
+    readControl: () => Effect.sync(() => control),
+    saveControl: (state) =>
+      Effect.sync(() => {
+        if (state.revision !== control.revision + 1) return false;
+        control = state;
+        return true;
+      }),
     readWait: () => Effect.sync(() => wait),
     saveWait: (state) =>
       Effect.sync(() => {
@@ -32,8 +44,13 @@ export function controlledStore(): JobStore {
       }),
     claimStage: (index) =>
       Effect.sync(() => {
-        if (claims.has(index)) return false;
+        if (control.cancelled || claims.has(index)) return false;
         claims.add(index);
+        control = {
+          ...control,
+          revision: control.revision + 1,
+          claimed: [...control.claimed, index],
+        };
         return true;
       }),
     read: () => Effect.succeed(intent),

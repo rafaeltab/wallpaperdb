@@ -101,15 +101,9 @@
       }
     },
     "apps/wallpaper": {
-      "decision": "enabled",
-      "mechanism": "native-vitest-node",
-      "stages": [
-        "unit"
-      ],
-      "limitations": {
-        "reason": "The ordinary Vitest Node unit stage is configured with full normal src/ eligibility, pending native qualification. Availability capability tests exercise real production guards in process through a controlled probe; baseline, generated mutation, per-test filter, hit count and killer proof remain pending under #520. Configuration alone is not support evidence. Integration and deployed service/process/container activation, ownership and native attribution remain unqualified under #560.",
-        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/560"
-      }
+      "decision": "excluded",
+      "reason": "The bounded in-process Availability run 41064773613 passed 79 native baseline tests with owning perTest hit 1. Generated LogicalOperator 10 at implementation.ts:16 (&& to ||) was reported Killed after 2 tests by the existing false-database/true-NATS readiness case, with a genuine ready true versus false assertion. Whole capture contains three rows and no terminal health footer; timings contain 30 call IDs across five PIDs with four unclosed calls. The target native filter, activation mode, observed readHitCount, returned result and all-worker health remain missing. Normal mutation execution is excluded pending separate in-process qualification, without removing or narrowing production sources. Capture-loss, restart and open-error causes are unknown. The result was not budget expiry and does not establish permanent unsupported execution. Integration, child/bundle/container and deployed transport remain separately unqualified under #560.",
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/604"
     },
     "apps/web": {
       "decision": "enabled",

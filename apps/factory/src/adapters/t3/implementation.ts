@@ -33,6 +33,8 @@ const detail = z.object({
       'rolled_back',
     ]),
     pendingRequestCount: z.number().int().nonnegative(),
+    latestRunId: z.string().nullable(),
+    runCount: z.number().int().nonnegative(),
   }),
 });
 const title = (intent: Intent) => `Factory ${intent.id}`;
@@ -126,16 +128,9 @@ ${receiptInstructions(intent, 'implementation')}`,
             signal
           );
           if (branch !== intent.branch) return { kind: 'ambiguous' };
-          const question =
-            config.mcpEndpoint && config.mcpAuthorizationFile
-              ? await pendingQuestion(config, thread.threadId, signal)
-              : undefined;
-          if (!config.mcpEndpoint && thread.pendingRequestCount > 0)
-            throw new Error(
-              'Structured T3 MCP observation requires endpoint and authorization file'
-            );
+          const questions = await questionObservation(config, thread, signal);
           return {
-            question,
+            ...questions,
             kind: 'found',
             threadId: thread.threadId,
             status: thread.pendingRequestCount > 0 ? 'waiting-for-input' : thread.status,
@@ -171,8 +166,43 @@ ${receiptInstructions(intent, 'implementation')}`,
         Effect.tapError((error) => Effect.logError(error)),
         Effect.withSpan('factory.t3.interrupt')
       ),
-    ...stageExecution(call, execution.observe, config.prBase ?? 'main', (signal) =>
-      command(config.binary, ['thread', 'send', '--help'], config.project, signal)
+    ...stageExecution(
+      call,
+      execution.observe,
+      config.prBase ?? 'main',
+      (signal) => command(config.binary, ['thread', 'send', '--help'], config.project, signal),
+      config.mcpEndpoint && config.mcpAuthorizationFile
+        ? (intent, request, prompt, signal) =>
+            mcpCall(
+              config,
+              't3_thread_send',
+              {
+                threadId: request.threadId,
+                message: prompt,
+                mode: 'queue',
+                clientRequestId: `${intent.id}:stage:${request.index}`,
+              },
+              signal
+            )
+        : undefined
     ),
   };
+}
+
+async function questionObservation(
+  config: Parameters<typeof t3Execution>[0],
+  thread: z.infer<typeof detail>['thread'],
+  signal?: AbortSignal
+) {
+  if (config.mcpEndpoint && config.mcpAuthorizationFile)
+    return {
+      ...(await pendingQuestion(config, thread.threadId, thread.latestRunId, signal)),
+      run: currentRun(thread),
+    };
+  if (thread.pendingRequestCount > 0)
+    throw new Error('Structured T3 MCP observation requires endpoint and authorization file');
+  return { question: undefined, run: currentRun(thread) };
+}
+function currentRun(thread: z.infer<typeof detail>['thread']) {
+  return thread.latestRunId ? { id: thread.latestRunId, ordinal: thread.runCount } : undefined;
 }

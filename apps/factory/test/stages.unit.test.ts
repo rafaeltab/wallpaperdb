@@ -194,6 +194,7 @@ async function stagesFixture() {
       status = value.status ?? status;
     },
     sends: () => sends,
+    store,
   };
 }
 it.each([{ accepted: false }, { ordinal: 2 }])(
@@ -316,5 +317,55 @@ it('does not nudge from a stale or wrong-ordinal waiting observation', async () 
   await job.status();
   job.change({ now: 3600101, ordinal: 3 });
   await job.status();
+  expect(job.sends()).toBe(3);
+});
+
+it('recovers a persisted continuation decision interrupted before its stage record without a second send', async () => {
+  const job = await waitingJob();
+  await job.status();
+  const saved = await Effect.runPromise(job.store.readWait());
+  const request = await Effect.runPromise(job.store.readStage(4));
+  if (!saved || !request) throw new Error('Expected existing wait and repair stage');
+  const continuation = {
+    ...request,
+    index: 5,
+    ordinal: 5,
+    previousRunId: 'run-4',
+    continuation: true,
+  };
+  await Effect.runPromise(
+    job.store.saveWait({ ...saved, revision: saved.revision + 1, nudged: true, continuation })
+  );
+  await job.status();
+  await job.status();
+  expect(job.sends()).toBe(4);
+  expect(await Effect.runPromise(job.store.readStage(5))).toEqual(continuation);
+});
+it('does not nudge an unbound replacement run at the expected ordinal', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3600101, runId: 'replacement' });
+  await job.status();
+  expect(job.sends()).toBe(3);
+});
+it('allows a full new hour after meaningful CI progress before one continuation', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3500000, progress: 'run-2:job-3-completed' });
+  await job.status();
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 7099999 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 7100001 });
+  await job.status();
+  expect(job.sends()).toBe(4);
+});
+it('keeps babysitting pending when GitHub cannot identify its PR', async () => {
+  const job = await waitingJob();
+  job.change({ prKind: 'ambiguous', now: 3600101 });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
   expect(job.sends()).toBe(3);
 });

@@ -15,9 +15,10 @@ Scope: module organization, documentation, and shared testing principles apply p
 ## Documentation
 
 - Documentation must contain only information another agent will need for a concrete repository task. Speculative future usefulness does not justify a document or section.
-- Creating or editing README files requires the [write-readme skill](../../.agents/skills/wallpaperdb/write-readme/SKILL.md).
+- Refer to skills using `$<skillname>` syntax, such as `$write-readme`, rather than Markdown links.
+- Creating or editing README files requires $write-readme.
 - `AGENTS.md` must contain only instructions necessary for at least 90% of coding agents working in its scope. Specialized guidance belongs in skills or linked documents with explicit reading triggers.
-- Creating or editing skills or `AGENTS.md` requires the [writing-for-agents skill](../../.agents/skills/productivity/writing-for-agents/SKILL.md).
+- Creating or editing skills or `AGENTS.md` requires $writing-for-agents.
 
 ## Backend architecture
 

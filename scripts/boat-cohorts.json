@@ -75,7 +75,8 @@
 			"551": "make check PACKAGE=wallpaper FORCE=1",
 			"553": "make check PACKAGE=asset FORCE=1"
 		},
-		"protocol": "All children keep development stacks active and wait at .boat/validation-ready after changed-path verification. Coordinator freezes exact heads and starts this command set together using ordinary routed Make. Retain failures without counting the gate passed. Release scoped cleanup only after aligned observation. FORCE=1 requires actual execution rather than a cached check replay. The 120-second aligned window begins at release; record command completion and any continued work separately."
+		"protocol": "All children keep development stacks active and wait at .boat/validation-ready after changed-path verification. Coordinator freezes exact heads and starts this command set together using ordinary routed Make. Retain failures without counting the gate passed. Release scoped cleanup only after aligned observation. FORCE=1 requires actual execution rather than a cached check replay. The 120-second aligned window begins at release; record command completion and any continued work separately.",
+		"sampler": "make boat-sample ARGS='<private inventory> <private evidence directory>'; 10-second rounds contain host before/after and all worker/readiness timestamps"
 	},
 	"inputs": [
 		{

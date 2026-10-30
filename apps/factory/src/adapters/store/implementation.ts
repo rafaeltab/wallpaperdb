@@ -70,6 +70,15 @@ export function fileStore(directory: string): JobStore {
     }
   };
   return {
+    bindRun: (request, runId) =>
+      effect('bind-run', async () => {
+        const name = `stage-${request.index}-run.json`;
+        await publish(name, { ...stageSchema.parse(request), runId });
+        const saved = stageSchema
+          .extend({ runId: z.string().min(1) })
+          .parse(JSON.parse(await readFile(join(directory, name), 'utf8')));
+        return saved.runId === runId;
+      }),
     readStage: (index) =>
       effect('read-stage', async () => {
         try {

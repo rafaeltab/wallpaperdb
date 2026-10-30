@@ -119,9 +119,22 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     throw cause;
   }
 
+  let observing: Promise<unknown> | undefined;
+  const observationTimer = setInterval(() => {
+    if (observing) return;
+    observing = runtime
+      .runPromise(job.status().pipe(Effect.catch((error) => Effect.logError(error))), {
+        signal: requests.signal,
+      })
+      .finally(() => {
+        observing = undefined;
+      });
+    void observing.catch(() => undefined);
+  }, 1000);
   let closing: Promise<void> | undefined;
   const close = () =>
     (closing ??= (async () => {
+      clearInterval(observationTimer);
       const deadline = setTimeout(() => {
         requests.abort();
         app.server.closeAllConnections();
@@ -131,6 +144,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       } finally {
         clearTimeout(deadline);
         requests.abort();
+        await observing?.catch(() => undefined);
         await runtime.dispose();
       }
     })());

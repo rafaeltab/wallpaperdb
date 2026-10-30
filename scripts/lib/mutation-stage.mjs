@@ -7,7 +7,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { runBounded } from "./mutation-process.mjs";
@@ -111,7 +111,14 @@ export async function runStage({
 	let workerStarted = false;
 	try {
 		sandbox = mkdtempSync(join(tmpdir(), "wallpaperdb-mutation-"));
-		options.tempDirName = sandbox;
+		// Stryker creates a workspace copy beneath tempDirName. Mirror its parent
+		// layout so repository-relative external fixtures retain their import paths.
+		options.tempDirName = join(sandbox, dirname(workspace));
+		for (const file of config.externalInputs ?? []) {
+			const destination = join(sandbox, file);
+			mkdirSync(dirname(destination), { recursive: true });
+			copyFileSync(join(root, file), destination);
+		}
 		writeFileSync(join(run, "stryker.json"), JSON.stringify(options));
 		if (config.fixture === "redis-owned-reuse")
 			fixture = await redisFixture(

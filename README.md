@@ -6,7 +6,6 @@ WallpaperDB lets people upload, discover, and download wallpapers, with contribu
 
 ## Start here
 
-- [Run and contribute to the project](CONTRIBUTING.md).
 - [Understand domain ownership and service relationships](GLOSSARY-MAP.md).
 - [Read the coding guidelines](CODING_STANDARDS.md) or [agent workflow rules](AGENTS.md).
 - [Read architecture decisions](docs/adr/).
@@ -15,6 +14,6 @@ Workspace READMEs explain their purpose, core capabilities, and relevant technol
 
 ## What belongs in the docs
 
-Keep decisions and their reasons, domain language, contributor setup, user guidance, and operational procedures that are difficult to infer safely from code. Give each topic one home and link to it. Keep ADRs as historical records.
+Keep decisions and their reasons, domain language, user guidance, and operational procedures that are difficult to infer safely from code. Give each topic one home and link to it. Keep ADRs as historical records.
 
 Do not copy file trees, API signatures, configuration defaults, test inventories, or implementation walkthroughs into prose. Track new work in GitHub issues; remove completed plans once their lasting decisions have a home.

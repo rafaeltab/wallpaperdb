@@ -10,7 +10,7 @@ The margin comes from a small October 21, 2026 sample of seven completed reviews
 
 Retain each kind's request URL, start, deadline, last authenticated status and update, comparison identity, and recovery attempts in the existing ledger. Conversation compaction and monitoring wakes preserve these values. Repeated reads and unrelated comment edits do not restart the clock.
 
-Before requesting recovery after a comparison changes, assess retained evidence under the shared [review evidence policy](../../../../../CONTRIBUTING.md#review-evidence). An equivalent history change preserves the associated round's deadlines and retry counts. It neither creates a missing review nor replenishes its recovery budget. A newer pending or adverse round still requires handling under the main skill.
+Before requesting recovery after a comparison changes, assess retained evidence. An equivalent history change preserves the associated round's deadlines and retry counts. It neither creates a missing review nor replenishes its recovery budget. A newer pending or adverse round still requires handling under the main skill.
 
 ## One recovery request
 

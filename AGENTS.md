@@ -1,10 +1,10 @@
 ## Coding standards
 
-Use the [coding guidelines index](CODING_STANDARDS.md) to select the authoritative guidelines relevant to the work. Skills and contribution guides govern their respective workflows; implementation examples do not add coding standards.
+Use the [coding guidelines index](CODING_STANDARDS.md) to select the authoritative guidelines relevant to the work. Skills govern their respective workflows; implementation examples do not add coding standards.
 
 ## Environment
 
-For setup, execution, and tool-version assumptions, read [mise.toml](mise.toml) and [contributor setup](CONTRIBUTING.md#set-up-a-checkout). Run repository tasks through Make and direct tool commands through `mise exec --`; verify effective selection with `make toolchain`.
+For setup, execution, and tool-version assumptions, read [mise.toml](mise.toml) and [Makefile](Makefile). Run repository tasks through Make and direct tool commands through `mise exec --`; verify effective selection with `make toolchain`.
 
 ## Agent skills
 

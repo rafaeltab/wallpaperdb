@@ -12,7 +12,7 @@ Wallpaper owns contribution identities, contributor facts and progress through c
 
 PostgreSQL transactions preserve creation state with outgoing responsibility. NATS transports commands and publication facts independently. Wallpaper has no storage client or image processor. Legacy Ingestor and public discovery projections remain separate during the clean rebuild.
 
-Use [contributor setup](../../CONTRIBUTING.md) and the [generated development authority setup](../asset/scripts/development-authority.ts). The generated Wallpaper configuration contains only its application credential, selected Creator verification and operator contact. It is private and excluded from image builds. Provision the protected broker before starting the workflow; development Compose orders that startup explicitly.
+Use the [generated development authority setup](../asset/scripts/development-authority.ts). The generated Wallpaper configuration contains only its application credential, selected Creator verification and operator contact. It is private and excluded from image builds. Provision the protected broker before starting the workflow; development Compose orders that startup explicitly.
 
 Exhausted records carry a recovery identity and scope in the operator inbox. The trusted [Wallpaper operator entry](scripts/operator.ts) requeues an outbox occurrence or reapplies a retained valid confirmation with its original identities. It exposes no public recovery route and cannot make an invalid confirmation valid. See its [workspace scripts](package.json) for invocation and the [schema source](src/db/schema.ts) for migrations.
 

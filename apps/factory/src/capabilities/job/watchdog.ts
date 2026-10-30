@@ -111,6 +111,10 @@ function continueWaiting(
       previousRunId: evidence.runId,
       ordinal: evidence.ordinal + 1,
       continuation: true,
+      observedRunId: undefined,
+      deliveryIndex: undefined,
+      question: undefined,
+      resume: undefined,
     };
     // Persist the identity before claiming a send. Without transport idempotency,
     // a crash after a claim stays pending instead of repeating an uncertain send.

@@ -71,6 +71,7 @@ export const JobLive = Layer.effect(
             previousRunId: evidence.runId,
             resume: true,
             observedRunId: undefined,
+            question: undefined,
             deliveryIndex: undefined,
           };
           yield* store.saveStage(request);

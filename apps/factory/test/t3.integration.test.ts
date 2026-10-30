@@ -288,3 +288,23 @@ it.each([
     expect(await Effect.runPromise(adapter.observe(intent))).toMatchObject({ answeredQuestions });
   })
 );
+it('targets cancellation to its owning thread with a stable job-specific native request key', () =>
+  questionProtocol(async ({ host, adapter, intent }) => {
+    await Effect.runPromise(adapter.interrupt(intent, 'thread-live'));
+    await Effect.runPromise(adapter.interrupt(intent, 'thread-live'));
+    const calls = (await host.calls()).filter(
+      (call) => call.args[0] === 'acp-mcp-call' && call.args[1] === 't3_thread_interrupt'
+    );
+    expect(calls.map((call) => JSON.parse(call.args[2]))).toEqual([
+      {
+        threadId: 'thread-live',
+        clientRequestId: 'protocol:cancel',
+        reason: 'Explicit factory cancellation',
+      },
+      {
+        threadId: 'thread-live',
+        clientRequestId: 'protocol:cancel',
+        reason: 'Explicit factory cancellation',
+      },
+    ]);
+  }));

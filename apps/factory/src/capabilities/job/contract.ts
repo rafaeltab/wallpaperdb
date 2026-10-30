@@ -135,6 +135,8 @@ export interface StageRequest {
   readonly continuation?: boolean;
   readonly resume?: boolean;
   readonly observedRunId?: string;
+  /** Question already observed on this adopted run, retained atomically with its association. */
+  readonly question?: { readonly id: string; readonly text: string };
   readonly deliveryIndex?: number;
   readonly stage: Stage;
   readonly threadId: string;

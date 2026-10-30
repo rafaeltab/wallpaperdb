@@ -107,19 +107,19 @@
     },
     "apps/web": {
       "decision": "enabled",
-      "mechanism": "native-vitest-node-jsdom-chromium",
+      "mechanism": "native-vitest-node",
       "stages": [
         "unit"
       ],
       "limitations": {
-        "reason": "Node, jsdom and page-owned Vitest Chromium projects are configured in one native per-test stage. jsdom and Chromium activation remain pending qualification under #519; configuration alone does not establish support. Image Worker globals lack verified activation and per-test coverage transport and remain excluded under #520.",
-        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
+        "reason": "Only pre-existing native Node execution is enabled, with all 183 eligible Web sources preserved. The jsdom guard targets remained Pending. Chromium's distance target was reported Killed by the expected real pinch assertion and browser killer, but raw target filter/mode/hit/result and complete timing/worker/footer/disposal evidence were missing. The 1048-test baseline passed; a separate mutant RuntimeError remains an error. PID-change, open-error and transport causes are unknown. Image Worker and deployed-bundle transport remain separate under #560.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/600"
       }
     },
     "apps/web-e2e": {
       "decision": "excluded",
       "reason": "Deployed Playwright journeys load separately served application bundles without native Vitest mutant activation, per-test coverage or result transport. The workspace's Node configuration tests do not qualify browser journeys. Supporting them requires owned instrumented serving, browser activation and native selected-test/result transport.",
-      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/519"
+      "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/560"
     },
     "packages/auth": {
       "decision": "enabled",
@@ -166,8 +166,8 @@
         "unit"
       ],
       "limitations": {
-        "reason": "The existing jsdom suites are configured for native per-test mutation analysis; activation remains pending qualification under #519. jsdom does not establish real Muuri layout or Chromium behavior.",
-        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/519"
+        "reason": "A bounded production event-bridge item-identity witness at ee3f0b36/run40944953596 established native jsdom activation and coverage/filter/hit/assertion/killer joins with healthy capture for one of15 source files. This is not full-baseline, real-layout, Chromium, fault or independent residual-cleanup qualification. Later shared writer changes are source-reviewed; they do not create a new whole-package runtime witness.",
+        "followUp": "https://github.com/rafaeltab/wallpaperdb/issues/445"
       }
     },
     "packages/test-logger": {

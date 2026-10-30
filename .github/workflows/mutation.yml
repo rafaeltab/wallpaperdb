@@ -90,10 +90,6 @@ jobs:
         run: |
           make install
           make build
-      - name: Install Chromium for native browser mutations
-        if: inputs.suite != 'integration' && (inputs.package == '' || contains(format(',{0},', inputs.package), ',web,'))
-        timeout-minutes: 5
-        run: make run PACKAGE=web SCRIPT=test:browser:install
       - name: Import explicitly selected acceptance checkpoint
         if: github.event_name != 'pull_request' && inputs.import_run != ''
         timeout-minutes: 2

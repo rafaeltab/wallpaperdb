@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import { Effect } from 'effect';
+import { fileStore } from '../src/adapters/store/index.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
@@ -123,6 +126,70 @@ it('a fresh process reconciles publication after a lost response without repeati
         (call) => call.binary === 't3' && call.args[1] === 'send' && !call.args.includes('--help')
       )
     ).toHaveLength(2);
+    const pr = JSON.parse(await readFile(join(host.directory, 'pr.json'), 'utf8'));
+    pr.statusCheckRollup[0].conclusion = 'FAILURE';
+    const waiting = {
+      complete: true,
+      base: host.base,
+      prs: [pr],
+      waitingForGithub: true,
+      overrides: { status: 'completed' },
+    };
+    await host.save(waiting);
+    await vi.waitFor(
+      async () => {
+        const observed = await (await fetch(origin + '/api/job')).json();
+        expect(observed).toMatchObject({
+          delivery: { stage: 'babysitting', activity: 'waiting-for-github' },
+        });
+      },
+      { timeout: 10000, interval: 30 }
+    );
+    await stop(child);
+    const store = fileStore(join(host.directory, 'state'));
+    const retained = await Effect.runPromise(store.readWait());
+    if (!retained) throw new Error('Expected persisted waiting deadline');
+    expect(retained.nudged).toBe(false);
+    // Exercise an already expired persisted deadline, without a real hour wait.
+    expect(
+      await Effect.runPromise(
+        store.saveWait({ ...retained, revision: retained.revision + 1, deadline: 0 })
+      )
+    ).toBe(true);
+    await host.save({ ...waiting, lostSend: true });
+    child = launch();
+    await ready();
+    await vi.waitFor(
+      async () => {
+        await fetch(origin + '/api/job');
+        expect(
+          (await host.calls()).filter(
+            (call) => call.args[1] === 'send' && !call.args.includes('--help')
+          )
+        ).toHaveLength(4);
+      },
+      { timeout: 10000, interval: 30 }
+    );
+    await stop(child);
+    expect(
+      await Effect.runPromise(fileStore(join(host.directory, 'state')).readWait())
+    ).toMatchObject({
+      deadline: 0,
+      nudged: true,
+      continuation: { stage: 'babysitting', continuation: true, threadId: 'thread-live' },
+    });
+    await host.save(waiting);
+    child = launch();
+    await ready();
+    const pending = await (await fetch(origin + '/api/job')).json();
+    expect(pending).toMatchObject({
+      delivery: { stage: 'babysitting', activity: 'continuation-pending', ready: false },
+    });
+    expect(
+      (await host.calls()).filter(
+        (call) => call.args[1] === 'send' && !call.args.includes('--help')
+      )
+    ).toHaveLength(4);
     const demonstrated = await (await fetch(origin + '/api/job')).json();
     process.stdout.write(
       'Factory composition demonstration: ' + JSON.stringify(demonstrated) + '\n'

@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { watchdog } from './watchdog.js';
 import {
   Unavailable,
   type Delivery,
@@ -32,32 +33,7 @@ export function reconcileStages(
     });
     const waiting = yield* currentStage(store);
     if (!waiting || waiting.threadId !== observation.threadId) return undefined;
-    if (waiting.stage === 'ci' || waiting.index === 3)
-      return yield* readiness(store, execution, issues, intent, waiting);
-    yield* deliver(store, execution, intent, waiting);
-    const evidence = yield* execution.inspectStage(intent, waiting);
-    const delivery: Delivery = {
-      stage: waiting.stage,
-      commit: waiting.commit,
-      ready: false,
-      landed: false,
-    };
-    const verified = yield* acceptStage(store, evidence, waiting);
-    if (!verified) {
-      if (waiting.stage === 'babysitting')
-        return yield* watchdog(
-          store,
-          execution,
-          issues,
-          intent,
-          waiting,
-          observation,
-          time,
-          evidence
-        );
-      return delivery;
-    }
-    return yield* advance(store, execution, issues, intent, waiting, verified);
+    return yield* reconcileStage(store, execution, issues, intent, waiting, observation, time);
   }).pipe(Effect.withSpan('factory.job.stages'));
 }
 function accepted(
@@ -147,17 +123,7 @@ function readiness(
     const pr = yield* issues.pullRequest(intent);
     const matches = publicationMatches(evidence, accepted, pr);
     if (matches && pr.kind === 'found' && pr.ci?.failed) {
-      const request: StageRequest = {
-        index: accepted.index + 1,
-        stage: 'babysitting',
-        threadId: accepted.threadId,
-        commit: accepted.commit,
-        previousRunId: accepted.previousRunId,
-        ordinal: (evidence?.ordinal ?? 3) + 1,
-      };
-      yield* store.saveStage(request);
-      const saved = yield* store.readStage(request.index);
-      if (saved) yield* deliver(store, execution, intent, saved);
+      yield* dispatchRepair(store, execution, intent, accepted, evidence);
       return {
         stage: 'babysitting' as const,
         commit: accepted.commit,
@@ -170,95 +136,9 @@ function readiness(
       stage: 'ci' as const,
       commit: accepted.commit,
       pr,
-      ready: matches && pr.kind === 'found' && pr.ready,
-      landed: matches && pr.kind === 'found' && pr.landed,
-    };
-  });
-}
-
-function watchdog(
-  store: JobStore,
-  execution: Execution,
-  issues: Issues,
-  intent: Intent,
-  request: StageRequest,
-  observation: Extract<Observation, { kind: 'found' }>,
-  time: Time,
-  evidence: StageEvidence | null
-) {
-  return Effect.gen(function* () {
-    const delivery: Delivery = {
-      stage: 'babysitting',
-      activity: 'repairing',
-      commit: request.commit,
-      ready: false,
+      ready: matches && isReady(pr),
       landed: false,
     };
-    // Only a finished babysitting turn can be stuck awaiting a missed GitHub wake.
-    // Running work and pending human questions do not authorize a continuation.
-    if (
-      observation.status !== 'completed' ||
-      !evidence?.waitingForGitHub ||
-      evidence.ordinal !== (request.ordinal ?? request.index + 1)
-    ) {
-      const saved = yield* store.readWait();
-      if (saved?.continuation?.index === request.index)
-        return { ...delivery, activity: 'continuation-pending' as const, deadline: saved.deadline };
-      if (saved && !saved.nudged && saved.progress !== '')
-        yield* store.saveWait({ ...saved, revision: saved.revision + 1, progress: '' });
-      return delivery;
-    }
-    if (
-      evidence.runId === request.previousRunId ||
-      !(yield* store.bindRun(request, evidence.runId))
-    )
-      return delivery;
-    const pr = yield* issues.pullRequest(intent);
-    if (pr.kind !== 'found' || !pr.ci) return delivery;
-    const progress = `${pr.commit}:${pr.ci.progress}`;
-    const now = yield* time.now();
-    const saved = yield* store.readWait();
-    if (!saved || saved.progress !== progress) {
-      yield* store.saveWait({
-        revision: (saved?.revision ?? -1) + 1,
-        progress,
-        deadline: now + 3600000,
-        nudged: false,
-      });
-      return { ...delivery, activity: 'waiting-for-github' as const, deadline: now + 3600000 };
-    }
-    if (saved.nudged) {
-      if (saved.continuation && saved.continuation.index > request.index) {
-        yield* store.saveStage(saved.continuation);
-        yield* deliver(store, execution, intent, saved.continuation);
-      }
-      return { ...delivery, activity: 'continuation-pending' as const, deadline: saved.deadline };
-    }
-    if (now < saved.deadline)
-      return { ...delivery, activity: 'waiting-for-github' as const, deadline: saved.deadline };
-    // Persist the new stage before claiming delivery. A lost CLI response stays
-    // pending; neither restart nor replay grants a second non-idempotent send.
-    const continuation: StageRequest = {
-      ...request,
-      index: request.index + 1,
-      commit: evidence.commit,
-      previousRunId: evidence.runId,
-      ordinal: (request.ordinal ?? request.index + 1) + 1,
-      continuation: true,
-    };
-    if (
-      !(yield* store.saveWait({
-        ...saved,
-        revision: saved.revision + 1,
-        nudged: true,
-        continuation,
-      }))
-    )
-      return delivery;
-    yield* store.saveStage(continuation);
-    const winning = yield* store.readStage(continuation.index);
-    if (winning) yield* deliver(store, execution, intent, winning);
-    return delivery;
   });
 }
 
@@ -267,5 +147,70 @@ function acceptStage(store: JobStore, evidence: StageEvidence | null, request: S
     if (!evidence || evidence.ordinal !== (request.ordinal ?? request.index + 1)) return null;
     if (!(yield* store.bindRun(request, evidence.runId))) return null;
     return accepted(evidence, request) ? evidence : null;
+  });
+}
+
+function dispatchRepair(
+  store: JobStore,
+  execution: Execution,
+  intent: Intent,
+  accepted: StageRequest,
+  evidence: StageEvidence | null
+) {
+  return Effect.gen(function* () {
+    const request: StageRequest = {
+      index: accepted.index + 1,
+      stage: 'babysitting',
+      threadId: accepted.threadId,
+      commit: accepted.commit,
+      previousRunId: accepted.previousRunId,
+      ordinal: (evidence?.ordinal ?? 3) + 1,
+    };
+    yield* store.saveStage(request);
+    const saved = yield* store.readStage(request.index);
+    if (saved) yield* deliver(store, execution, intent, saved);
+  });
+}
+
+function isReady(pr: PullRequestObservation) {
+  return pr.kind === 'found' && pr.ready;
+}
+
+function reconcileStage(
+  store: JobStore,
+  execution: Execution,
+  issues: Issues,
+  intent: Intent,
+  waiting: StageRequest,
+  observation: Extract<Observation, { kind: 'found' }>,
+  time: Time
+) {
+  return Effect.gen(function* () {
+    if (waiting.stage === 'ci' || waiting.index === 3)
+      return yield* readiness(store, execution, issues, intent, waiting);
+    yield* deliver(store, execution, intent, waiting);
+    const evidence = yield* execution.inspectStage(intent, waiting);
+    const delivery: Delivery = {
+      stage: waiting.stage,
+      commit: waiting.commit,
+      ready: false,
+      landed: false,
+    };
+    const verified = yield* acceptStage(store, evidence, waiting);
+    if (!verified) {
+      if (waiting.stage === 'babysitting')
+        return yield* watchdog(
+          store,
+          issues,
+          intent,
+          waiting,
+          observation,
+          time,
+          evidence,
+          (request) => deliver(store, execution, intent, request)
+        );
+      return delivery;
+    }
+    return yield* advance(store, execution, issues, intent, waiting, verified);
   });
 }

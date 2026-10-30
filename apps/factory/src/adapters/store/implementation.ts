@@ -18,8 +18,10 @@ const intentSchema = z
   .strict();
 const stageSchema = z
   .object({
-    index: z.number().int().min(0).max(3),
-    stage: z.enum(['implementation', 'review', 'publication']),
+    ordinal: z.number().int().positive().optional(),
+    continuation: z.boolean().optional(),
+    index: z.number().int().min(0),
+    stage: z.enum(['implementation', 'review', 'publication', 'babysitting', 'ci']),
     threadId: z.string().min(1),
     commit: z.string().regex(/^[a-f0-9]{40}$/),
     previousRunId: z.string().min(1).nullable(),
@@ -69,7 +71,36 @@ export function fileStore(directory: string): JobStore {
       await unlink(temporary);
     }
   };
+  const waitSchema = z
+    .object({
+      revision: z.number().int().nonnegative(),
+      progress: z.string(),
+      deadline: z.number().finite(),
+      nudged: z.boolean(),
+      continuation: stageSchema.optional(),
+    })
+    .strict();
+  const readWait = async () => {
+    let latest = null;
+    for (let revision = 0; ; revision++) {
+      try {
+        latest = waitSchema.parse(
+          JSON.parse(await readFile(join(directory, `wait-${revision}.json`), 'utf8'))
+        );
+      } catch (cause) {
+        if (code(cause, 'ENOENT')) return latest;
+        throw cause;
+      }
+    }
+  };
   return {
+    readWait: () => effect('read-wait', readWait),
+    saveWait: (state) =>
+      effect('save-wait', async () => {
+        const current = await readWait();
+        if (state.revision !== (current?.revision ?? -1) + 1) return false;
+        return publish(`wait-${state.revision}.json`, waitSchema.parse(state));
+      }),
     bindRun: (request, runId) =>
       effect('bind-run', async () => {
         const name = `stage-${request.index}-run.json`;

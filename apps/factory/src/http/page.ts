@@ -20,7 +20,7 @@ export function page(status: Status): string {
 function deliveryPage(delivery: Delivery | undefined): string {
   if (!delivery) return '';
   const pr = delivery.pr?.kind === 'found' ? delivery.pr : null;
-  return `<p>${delivery.ready ? 'Ready for manual merge' : 'Required acceptance or CI pending'}</p><p>Not landed. Default-branch landing is not verified by this slice.</p><p>Current accepted commit: <code>${escapeHtml(delivery.commit)}</code></p>${pr ? `<p><a href="${escapeHtml(pr.url)}">Open pull request</a></p>` : ''}`;
+  return `<p>${escapeHtml(delivery.activity ?? '')}</p>${delivery.deadline ? `<p>GitHub wait deadline: ${escapeHtml(new Date(delivery.deadline).toISOString())}</p>` : ''}<p>${delivery.ready ? 'Ready for manual merge' : 'Required acceptance or CI pending'}</p><p>Not landed. Default-branch landing is not verified by this slice.</p><p>Current accepted commit: <code>${escapeHtml(delivery.commit)}</code></p>${pr ? `<p><a href="${escapeHtml(pr.url)}">Open pull request</a></p>` : ''}`;
 }
 
 function stageHeading(delivery: Delivery | undefined) {

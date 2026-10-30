@@ -1,3 +1,10 @@
-# @wallpaperdb/test-logger
+# Test logger
 
-A minimal Pino logger factory for use in tests. Produces loggers that are silent by default so test output stays clean, while remaining configurable via the `LOG_LEVEL` environment variable when debugging is needed.
+A shared Pino logger factory keeps test output silent until a test author enables diagnostics.
+
+## Core capabilities
+
+- Names loggers so failures can be associated with their test context.
+- Defaults to silent output and accepts an environment override for debugging.
+
+See the [factory](src/index.ts) for its interface and configuration.

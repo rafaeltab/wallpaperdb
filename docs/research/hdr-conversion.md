@@ -287,21 +287,7 @@ hashes both archives and the compact evidence files. The [research prerelease][e
 is an evidence archive, not a production release. The large proof branch remains
 separate from this documentation change.
 
-To rerun the latest archived suite from a separate checkout, use Docker with
-linux/amd64 support and the repository's normal package tooling:
-
-```sh
-git fetch origin t3code/hdr-conversion-proof-suite
-git worktree add --detach ../wallpaperdb-hdr-proof-replay fd1c43e78134a5ecc0cd353a3ce099e02ed19392
-cd ../wallpaperdb-hdr-proof-replay
-make run PACKAGE=media SCRIPT=proof:hdr
-```
-
-This regenerates evidence in the archive checkout. The documentation branch
-does not contain the suite. The full command intentionally returns 2 while its
-engineering qualification gates or physical checks remain unresolved; exit 1
-means suite integrity or helper-test failure. Consult the [archive instructions][proof-readme]
-before interpreting the result.
+For reproduction, use the [archived suite instructions][proof-readme] in a separate checkout at the pinned proof commit. Exit 2 records unresolved qualification gates or physical checks; exit 1 records suite integrity or helper-test failure.
 
 ## Using this evidence in the wayfinder map
 

@@ -2,7 +2,7 @@
 
 The skills use five canonical triage roles. Each role maps to the same-named GitHub label in this repository.
 
-When triaging an issue, follow the [triage workflow](../../.agents/skills/engineering/triage/SKILL.md), including its agent-brief guidance.
+When triaging an issue, use $triage, including its agent-brief guidance.
 
 | Canonical role | GitHub label | Meaning |
 | --- | --- | --- |

@@ -4,7 +4,7 @@
 | --- | --- |
 | Guideline authority, scope, or changes to the guidelines themselves | [Maintaining guidelines](docs/coding-standards/maintaining-guidelines.md) |
 | Module interfaces, shared packages, or repository organization | [Project organization](docs/coding-standards/project-organization.md#module-organization) |
-| README files, AGENTS.md, or skills | [Documentation](docs/coding-standards/project-organization.md#documentation) |
+| Documentation, including README files, AGENTS.md, and skills | [Documentation](docs/coding-standards/project-organization.md#documentation) |
 | Backend application boundaries and bounded contexts | [Backend architecture](docs/coding-standards/project-organization.md#backend-architecture) |
 | Backend capabilities, domain policy, ports, dependency injection, or failures | [Application and domain](docs/coding-standards/application-and-domain.md) |
 | Backend request/message handlers, external clients, or persistence | [Adapters](docs/coding-standards/adapters.md) |

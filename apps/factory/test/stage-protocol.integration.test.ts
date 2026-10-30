@@ -1,11 +1,18 @@
-import { writeFile, rm } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { t3Execution } from '../src/adapters/t3/index.js';
 import type { Intent, StageRequest } from '../src/capabilities/job/index.js';
 import { protocol } from './fixtures/setup.js';
-it('accepts only a structured outcome of the expected completed run at the clean current commit', async () => {
+type Fixture = {
+  host: Awaited<ReturnType<typeof protocol>>;
+  adapter: ReturnType<typeof t3Execution>;
+  intent: Intent;
+  request: StageRequest;
+  review: StageRequest;
+};
+async function stageFixture(check: (fixture: Fixture) => Promise<void>) {
   const host = await protocol();
   const previous = process.env.FACTORY_FIXTURE;
   process.env.FACTORY_FIXTURE = host.configFile;
@@ -25,7 +32,6 @@ it('accepts only a structured outcome of the expected completed run at the clean
       createdAt: 1,
       expectedStage: 'implementation',
     };
-    await Effect.runPromise(adapter.launch(intent));
     const request: StageRequest = {
       index: 0,
       stage: 'implementation',
@@ -33,6 +39,17 @@ it('accepts only a structured outcome of the expected completed run at the clean
       commit: host.base,
       previousRunId: null,
     };
+    const review: StageRequest = { ...request, index: 1, stage: 'review', previousRunId: 'run-1' };
+    await Effect.runPromise(adapter.launch(intent));
+    await check({ host, adapter, intent, request, review });
+  } finally {
+    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
+    else process.env.FACTORY_FIXTURE = previous;
+    await host.cleanup();
+  }
+}
+it('accepts only a structured outcome of the expected completed run at the clean current commit', () =>
+  stageFixture(async ({ host, adapter, intent, request, review }) => {
     expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
       accepted: true,
     });
@@ -73,7 +90,6 @@ it('accepts only a structured outcome of the expected completed run at the clean
     expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
       accepted: true,
     });
-    const review: StageRequest = { ...request, index: 1, stage: 'review', previousRunId: 'run-1' };
     const reviewReceipt = {
       ...receipt,
       stage: 'review',
@@ -97,16 +113,24 @@ it('accepts only a structured outcome of the expected completed run at the clean
       accepted: true,
       runId: 'run-2',
     });
-    const dirty = join(host.directory, 'worker', 'unreviewed.txt');
-    await writeFile(dirty, 'unreviewed change');
-    expect(await Effect.runPromise(adapter.inspectStage(intent, review))).not.toMatchObject({
+  }));
+it('refuses stage delivery and acceptance while the worktree has unreviewed changes', () =>
+  stageFixture(async ({ host, adapter, intent, request, review }) => {
+    await host.save({ complete: true, base: host.base, overrides: { status: 'completed' } });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).toMatchObject({
       accepted: true,
     });
-    await expect(
-      Effect.runPromise(adapter.sendStage(intent, { ...review, index: 2, stage: 'publication' }))
-    ).rejects.toMatchObject({ _tag: 'Unavailable' });
+    await writeFile(join(host.directory, 'worker', 'unreviewed.txt'), 'unreviewed change');
+    expect(await Effect.runPromise(adapter.inspectStage(intent, request))).not.toMatchObject({
+      accepted: true,
+    });
+    await expect(Effect.runPromise(adapter.sendStage(intent, review))).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
     expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
-    await rm(dirty);
+  }));
+it('reconciles the fresh stage outcome after a send response is lost', () =>
+  stageFixture(async ({ host, adapter, intent, review }) => {
     await host.save({
       complete: true,
       base: host.base,
@@ -121,9 +145,4 @@ it('accepts only a structured outcome of the expected completed run at the clean
       accepted: true,
       runId: 'run-2',
     });
-  } finally {
-    if (previous === undefined) delete process.env.FACTORY_FIXTURE;
-    else process.env.FACTORY_FIXTURE = previous;
-    await host.cleanup();
-  }
-});
+  }));

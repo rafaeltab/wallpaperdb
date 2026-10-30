@@ -14,4 +14,5 @@ onlyBuiltDependencies:
   - ssh2
 
 patchedDependencies:
+  "@stryker-mutator/instrumenter@10.0.0": patches/stryker-instrumenter-10.0.0.patch
   "@stryker-mutator/vitest-runner@10.0.0": patches/stryker-vitest-10.0.0.patch

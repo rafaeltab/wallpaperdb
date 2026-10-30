@@ -8,6 +8,9 @@ overrides:
   graphql: 16.12.0
 
 patchedDependencies:
+  '@stryker-mutator/instrumenter@10.0.0':
+    hash: 47662f8ff6a9615f04162fbdc6795159f7a69bc79c42d0d1fe2059688120de97
+    path: patches/stryker-instrumenter-10.0.0.patch
   '@stryker-mutator/vitest-runner@10.0.0':
     hash: 39ecdbebeb734113082eb3b58b0b82bc047fe79cb47f3b0405ea899876fd345d
     path: patches/stryker-vitest-10.0.0.patch
@@ -16621,7 +16624,7 @@ snapshots:
     dependencies:
       '@inquirer/prompts': 8.7.3(@types/node@26.0.1)
       '@stryker-mutator/api': 10.0.0
-      '@stryker-mutator/instrumenter': 10.0.0
+      '@stryker-mutator/instrumenter': 10.0.0(patch_hash=47662f8ff6a9615f04162fbdc6795159f7a69bc79c42d0d1fe2059688120de97)
       '@stryker-mutator/util': 10.0.0
       ajv: 8.20.0
       chalk: 5.6.2
@@ -16648,7 +16651,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/node'
 
-  '@stryker-mutator/instrumenter@10.0.0':
+  '@stryker-mutator/instrumenter@10.0.0(patch_hash=47662f8ff6a9615f04162fbdc6795159f7a69bc79c42d0d1fe2059688120de97)':
     dependencies:
       '@babel/core': 8.0.7
       '@babel/generator': 8.0.6

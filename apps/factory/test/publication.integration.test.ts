@@ -91,7 +91,7 @@ it('requires a unique matching PR and mandatory current checks while ignoring ad
     await host.cleanup();
   }
 });
-it('preserves current-head readiness after an independent target-branch advance', async () => {
+async function publicationScenario() {
   const host = await protocol();
   const previous = { path: process.env.PATH, fixture: process.env.FACTORY_FIXTURE };
   process.env.PATH = host.directory + ':' + previous.path;
@@ -120,6 +120,21 @@ it('preserves current-head readiness after an independent target-branch advance'
       (name) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
     ),
   };
+  return {
+    host,
+    intent,
+    adapter,
+    pr,
+    close: async () => {
+      process.env.PATH = previous.path;
+      if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
+      else process.env.FACTORY_FIXTURE = previous.fixture;
+      await host.cleanup();
+    },
+  };
+}
+it('preserves current-head readiness after an independent target-branch advance', async () => {
+  const { host, intent, adapter, pr, close } = await publicationScenario();
   try {
     await host.save({ prs: [pr] });
     expect(await Effect.runPromise(adapter.pullRequest(intent))).toMatchObject({
@@ -148,7 +163,13 @@ it('preserves current-head readiness after an independent target-branch advance'
       kind: 'found',
       ready: false,
     });
-
+  } finally {
+    await close();
+  }
+});
+it('reports current CI step progress and rejects unrelated run or head observations', async () => {
+  const { host, intent, adapter, pr, close } = await publicationScenario();
+  try {
     const current = {
       ...pr,
       statusCheckRollup: pr.statusCheckRollup.map((check) => ({
@@ -213,9 +234,6 @@ it('preserves current-head readiness after an independent target-branch advance'
       });
     }
   } finally {
-    process.env.PATH = previous.path;
-    if (previous.fixture === undefined) delete process.env.FACTORY_FIXTURE;
-    else process.env.FACTORY_FIXTURE = previous.fixture;
-    await host.cleanup();
+    await close();
   }
 });

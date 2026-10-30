@@ -1,0 +1,13 @@
+--- a/dist/src/transformers/mutant-collector.js
++++ b/dist/src/transformers/mutant-collector.js
+@@ -15,7 +15,9 @@
+      * @returns The mutant (for testability)
+      */
+     collect(fileName, original, mutable, offset = { line: 0, column: 0 }) {
+-        const mutant = new Mutant(this.nextMutantId.toString(), fileName, original, mutable, offset);
++        // Opaque string IDs avoid sparse numeric-element dictionaries in the
++        // per-test coverage counters when a file's first mutant ID is large.
++        const mutant = new Mutant(`m${this.nextMutantId}`, fileName, original, mutable, offset);
+         this._mutants.push(mutant);
+         this.nextMutantId++;
+         return mutant;

@@ -1,8 +1,6 @@
 # Custom Sign-Up Flow (Core 2)
 
-> This document covers the **older SDK** (`@clerk/nextjs` v5–v6, `@clerk/clerk-react` v5–v6, `@clerk/clerk-expo` v1–v2). For the current SDK, see `core-3/custom-sign-up.md`.
-
-Build a custom sign-up experience using the `useSignUp()` hook.
+> This document covers the **older SDK** (`@clerk/nextjs` v5–v6, `@clerk/clerk-react` v5–v6, `@clerk/clerk-expo` v1–v2). For the current SDK, see [its custom flow](../core-3/custom-sign-up.md).
 
 ## Hook API
 
@@ -11,12 +9,6 @@ import { useSignUp } from '@clerk/nextjs' // or @clerk/clerk-react, @clerk/clerk
 
 const { signUp, isLoaded, setActive } = useSignUp()
 ```
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `signUp` | `SignUp` | Sign-up object with methods |
-| `isLoaded` | `boolean` | Whether the hook has loaded |
-| `setActive` | `(params) => Promise` | Sets the active session |
 
 ## Sign-Up Flow
 
@@ -33,8 +25,6 @@ const result = await signUp.create({
 
 ### 2. Prepare Verification
 
-Send a verification code to the user's email or phone:
-
 ```typescript
 await signUp.prepareVerification({
   strategy: 'email_code', // or 'phone_code', 'email_link'
@@ -42,8 +32,6 @@ await signUp.prepareVerification({
 ```
 
 ### 3. Attempt Verification
-
-Verify the code the user received:
 
 ```typescript
 const result = await signUp.attemptVerification({
@@ -71,8 +59,6 @@ await signUp.authenticateWithRedirect({
 ```
 
 ## Error Handling
-
-Use try/catch with `isClerkAPIResponseError()`:
 
 ```typescript
 import { isClerkAPIResponseError } from '@clerk/nextjs/errors'

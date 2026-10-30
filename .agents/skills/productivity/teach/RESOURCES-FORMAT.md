@@ -1,6 +1,6 @@
 # RESOURCES.md Format
 
-`RESOURCES.md` is the curated set of trusted sources for this topic. Knowledge for explainers should be drawn from here, not from parametric guesses. Wisdom comes from the communities listed here.
+`RESOURCES.md` lists trusted sources for lesson knowledge and communities for practical judgment.
 
 ## Structure
 
@@ -9,24 +9,22 @@
 
 ## Knowledge
 
-- [Book: _The Science and Practice of Strength Training_ by Zatsiorsky & Kraemer](https://example.com)
-  Foundational text on programming and adaptation. Use for: anything to do with periodisation, recovery, intensity zones.
-- [Article: "How Much Should I Train?" by Greg Nuckols (Stronger By Science)](https://example.com)
-  Evidence-based review of volume landmarks. Use for: weekly set targets per muscle group.
+- [{Title} by {author}]({URL})
+  {What it covers and when to use it.}
 
 ## Wisdom (Communities)
 
-- [r/weightroom](https://reddit.com/r/weightroom)
-  High-signal subreddit, moderated against bro-science. Use for: programme critique, plateau troubleshooting.
-- Local: Tuesday strength class at {gym name}
-  Use for: real-time coaching feedback on lifts.
+- [{Community name}]({URL})
+  {What it offers and when to use it.}
+- Local: {class or group}
+  {What it offers and when to use it.}
 ```
 
 ## Rules
 
-- **High-trust only.** Prefer primary sources, recognised experts, peer-reviewed work, and communities with strong moderation. If a resource is marketing dressed as education, leave it out.
-- **Annotate every entry.** A bare link is useless in three months. Add one line: what it covers and when to reach for it.
-- **Group by Knowledge / Wisdom.** Mirrors the philosophy in [SKILL.md](./SKILL.md). It is fine for a resource to appear in only one group.
-- **Surface gaps explicitly.** If no good resource exists for an area the mission needs, write a `## Gaps` section listing what is missing. This drives future search.
-- **Prune ruthlessly.** A resource that turned out to be wrong, shallow, or off-mission should be removed, not buried. Better five sharp sources than thirty mediocre ones.
-- **Record community preferences.** If the user has opted out of joining communities, note it here so future sessions don't keep proposing them.
+- Prefer primary sources, recognized experts, peer-reviewed work, and well-moderated communities. Exclude marketing posing as education.
+- Annotate every entry with its coverage and use.
+- Group by Knowledge and Wisdom as in [SKILL.md](SKILL.md#philosophy).
+- List missing sources needed for the mission under `## Gaps`.
+- Remove sources that prove wrong, shallow, or off-mission.
+- Record a preference against joining communities so future sessions respect it.

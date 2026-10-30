@@ -1,10 +1,10 @@
 ## Coding standards
 
-Use the [coding guidelines index](CODING_STANDARDS.md) to select the authoritative guidelines relevant to the work. Skills and contribution guides govern their respective workflows; implementation examples do not add coding standards.
+Use the [coding guidelines index](CODING_STANDARDS.md) for the work's applicable standards. Skills and contribution guides govern workflows.
 
 ## Environment
 
-For setup, execution, and tool-version assumptions, read [mise.toml](mise.toml) and [contributor setup](CONTRIBUTING.md#set-up-a-checkout). Run repository tasks through Make and direct tool commands through `mise exec --`; verify effective selection with `make toolchain`.
+Read [contributor setup](CONTRIBUTING.md#set-up-a-checkout) and [mise.toml](mise.toml). Run repository tasks through Make and direct commands through `mise exec --`. Verify tools with `make toolchain`.
 
 ## Agent skills
 
@@ -12,20 +12,20 @@ For skill installation, updates, or moves, follow the [skill layout](.agents/ski
 
 ### Task scope
 
-Read [task scope](docs/agents/task-scope.md) when planning, implementing, reviewing, delegating, monitoring, or automatically picking up work, and when resuming any of those workflows.
+Read [task scope](docs/agents/task-scope.md) before starting or resuming planning, implementation, review, delegation, monitoring, or automatic pickup.
 
 ### Issue tracker
 
-Issues and specs are tracked in GitHub Issues, with membership and lifecycle status in the WallpaperDB GitHub Project. Read `docs/agents/issue-tracker.md` when creating, planning, implementing, reopening, or reviewing issue work. External pull requests are not a triage surface.
+Read [issue tracking](docs/agents/issue-tracker.md) when creating, planning, implementing, reopening, or reviewing issue work.
 
 ### Triage labels
 
-Use the five canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+Follow [triage labels](docs/agents/triage-labels.md) when triaging issues.
 
 ### Domain docs
 
-WallpaperDB uses a multi-context layout rooted at `GLOSSARY-MAP.md`; system-wide ADRs live in `docs/adr/`. See `docs/agents/domain.md`.
+Follow [domain docs](docs/agents/domain.md) for terminology, context ownership, and ADRs.
 
 ### Documentation
 
-Keep documentation for setup pitfalls, domain language, decisions and their rationale, and policies that cannot be inferred from code. Link to source for commands, configuration, APIs, and implementation details. Update the existing authoritative document instead of adding another explanation of the same topic. Track unfinished work in issues; keep temporary handoffs and investigation notes outside the repository.
+Document setup pitfalls, domain terms, decisions and their reasons, and non-obvious policies. Update the existing guide and link to source instead of repeating implementation details. Track unfinished work in issues; keep temporary notes outside the repository.

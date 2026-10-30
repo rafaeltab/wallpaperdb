@@ -1,13 +1,5 @@
 # IPv4 URL resolver
 
-Resolves hostnames to IPv4 addresses for connection URLs. Use it when a connection explicitly needs IPv4.
+[Resolves](src/index.ts) bare hostnames, local names, and hostnames in URLs or connection strings to IPv4 addresses. Preserves the scheme, credentials, port, path, and query. Bare IPv4 addresses bypass DNS.
 
-## Core capabilities
-
-- Resolves bare hostnames, including local names, or the hostname in a URL or connection string.
-- Retains the scheme, credentials, port, path, and query when replacing a URL's hostname.
-- Returns bare IPv4 addresses unchanged without a DNS lookup.
-
-This helper does not reject private addresses or prevent DNS rebinding. Callers needing SSRF protection must enforce that policy separately.
-
-See the [resolver](src/index.ts) and [tests](test/resolver.test.ts) for supported inputs.
+Callers must enforce any SSRF protection separately; this helper neither rejects private addresses nor prevents DNS rebinding. See the [tests](test/resolver.test.ts) for supported inputs.

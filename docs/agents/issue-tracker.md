@@ -1,103 +1,87 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+Issues and specs live in GitHub Issues. Use `mise exec -- gh` from the checkout. External pull requests are not a triage surface.
 
 ## Conventions
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`.
-- **Read an issue**: `gh issue view <number> --comments`, including labels and the full body.
-- **List issues**: `gh issue list` with appropriate state and label filters and JSON output when structured data is needed.
-- **Comment on an issue**: `gh issue comment <number> --body "..."`.
-- **Apply or remove labels**: `gh issue edit <number> --add-label "..."` or `--remove-label "..."`.
-- **Close an issue**: `gh issue close <number> --comment "..."`.
-- **Reopen an issue**: [gh issue reopen](https://cli.github.com/manual/gh_issue_reopen) accepts an issue number or URL. Explain why the recurrence warrants reopening in an issue comment. After reopening, use [gh issue view](https://cli.github.com/manual/gh_issue_view) with `--json state,url` and verify `state` is `OPEN` before relying on the issue as active tracking. Report a failed mutation or verification instead of treating the issue as open.
+Read tickets with `gh issue view <number> --comments`, including their body and labels. Use [gh issue](https://cli.github.com/manual/gh_issue) for mutations and [multiline body handling](../../.agents/skills/wallpaperdb/github-markdown-bodies/SKILL.md) when publishing.
 
-Infer the repository from `git remote -v`; `gh` does this automatically inside the clone.
+Reopen a closed issue only when resuming it is authorized. Explain the recurrence in a comment, run `gh issue reopen`, and verify `OPEN` with `gh issue view <number> --json state,url` before using it as active tracking. Report failed writes or verification. Historical discussion alone leaves the issue closed.
 
 ## Claiming an issue
 
-When picking up a GitHub issue, assign it to the authenticated GitHub account used by the agent before planning or implementation. Use [gh issue edit](https://cli.github.com/manual/gh_issue_edit) with `<number-or-url> --add-assignee @me` and preserve existing assignees. Read back the issue with [gh issue view](https://cli.github.com/manual/gh_issue_view) using `<number-or-url> --json assignees` and verify the account is assigned.
-
-If assignment or verification fails, stop work on that issue and report the failure. Resume planning and implementation only after assignment is verified.
+Before planning or implementation, assign the issue to the authenticated account with `gh issue edit <number> --add-assignee @me`, preserving other assignees. Verify with `gh issue view <number> --json assignees`. Stop work on that issue if assignment or verification fails.
 
 ## Project lifecycle
 
-Track repository issues in [WallpaperDB, project 7](https://github.com/users/rafaeltab/projects/7), owned by `rafaeltab`. Always select that owner explicitly; the authenticated agent account can be different.
+Use [WallpaperDB, project 7](https://github.com/users/rafaeltab/projects/7), explicitly selecting owner `rafaeltab` even when authenticated as another account.
 
 | Status | Meaning |
 | --- | --- |
 | `Backlog` | Needs refinement |
-| `Todo` | Ready for planning with an agent |
-| `Planning` | Planning is underway |
-| `Planned` | Has an agreed plan and can be picked up once dependencies permit |
-| `In Progress` | Implementation or substantive review fixes are underway |
-| `In Review` | Implementation is published and ready for review |
-| `Done` | Completed work has reached the default branch |
-| `Canary` | Available to some users |
-| `Released` | Available to all users |
-| `Cancelled` | Will not be picked up |
+| `Todo` | Needs planning |
+| `Planning` | Planning underway |
+| `Planned` | Agreed plan; implementation awaits dependency readiness |
+| `In Progress` | Implementation or substantive review fixes underway |
+| `In Review` | Published and ready for review |
+| `Done` | Landed on the default branch |
+| `Canary` | Deployed to some users |
+| `Released` | Deployed to all users |
+| `Cancelled` | Explicitly abandoned |
 
-Use grilling when planning needs human decisions. For an existing issue, verify assignment and set `Planning` when grilling starts. Set `Planned` after the agreed plan is recorded in the issue. Triage can complete planning when evidence, scope, and testable acceptance criteria establish bounded work with no human decisions remaining. Record that outcome and set `Planned`; routine investigation and implementation choices belong to the agent. Work that still needs planning remains `Todo`. Planning without an existing issue has no project item to update. `to-spec` and `to-tickets` publish prepared specs and tickets as `Planned`.
+Verify the issue is open before moving it to an active status. Reopen authorized work through [Conventions](#conventions) first.
 
-Active work requires an open issue. Read `state` before moving an existing issue to `Planning`, `Planned`, `In Progress`, or `In Review`. For a closed issue, use the user's existing authorization to resume work, or clarify that intent when absent, then follow the [reopening convention](#conventions), explain the recurrence in an issue comment, and verify `OPEN` before changing status. Discussing historical work leaves its closed state and project status unchanged.
+- Set `Planning` when grilling an assigned issue for human decisions. Record the agreed plan before `Planned`. Triage can establish a plan when evidence, bounded scope and testable acceptance criteria leave no human decisions. Otherwise keep `Todo`. `to-spec` and `to-tickets` publish as `Planned`.
+- Set and verify `In Progress` before implementation, including authorized work from `Backlog` or `Todo`. Check [dependencies](#relationships) first. A `do-work` checklist does not return an implementation ticket to planning.
+- Set and verify `In Review` after tested work is pushed and its PR is ready. Drafts remain `In Progress`; stacks also require complete-spec review and final head/base checks. Substantive review fixes return to `In Progress`, then `In Review` when ready. Monitoring and investigation alone leave status unchanged.
 
-Implementation starts with `In Progress`, including explicitly requested work on an issue currently in `Backlog` or `Todo`. Check [dependency readiness](#relationships) first. A checklist inside `do-work` does not move an implementation ticket back into `Planning`. After the completed implementation is pushed and its PR is ready for review, verify `In Review` before handing it back. Draft PRs keep their tickets `In Progress`; stack tickets enter `In Review` after the complete-spec review and final head/base checks pass and their PRs are marked ready. During substantive review fixes use `In Progress`, then restore `In Review` after the tested fixes are pushed and the PR is ready for review. Merely monitoring CI or investigating feedback does not change status.
-
-Update only the selected issue's item. Creating child tickets does not authorize changing their parent's status. Track each stack ticket when its own implementation starts and reaches review; leave unstarted siblings at their existing status. Close the parent only after all tickets have landed and the complete spec is validated.
+Update only the selected issue. Creating children does not authorize parent status changes. Track stack tickets individually; leave unstarted siblings unchanged. Planning without an issue has no project item to update.
 
 ### Selecting issues for PR fixes
 
-Use the issue explicitly selected by the user when provided. For a PR-only request, read the authenticated PR's `closingIssuesReferences` and body with [gh pr view](https://cli.github.com/manual/gh_pr_view). Closing references identify linked tickets; body references also supply candidates for stack PRs targeting another branch. Read candidate issues with [gh issue view](https://cli.github.com/manual/gh_issue_view), verify their repository and full URL, and match their acceptance criteria to the PR diff and requested fixes.
+Use the user's selected issue. For a PR-only request, read its authenticated `closingIssuesReferences` and body with `gh pr view`. Read candidate issues and match their repository, full URL and acceptance criteria to the diff and fixes. Body references can identify stack tickets whose PR targets another branch.
 
-Select the issue that owns the fixes before substantive edits or project-status writes. If several tickets remain plausible or the references conflict, ask the user to select the issue while continuing independent feedback investigation. A PR without an associated repository issue has no issue status to update.
+Select the owning issue before substantive edits or status writes. Ask if associations conflict or several candidates remain plausible; continue independent investigation. A PR without a repository issue has no issue status to update.
 
-Record the selected issue's full URL in the review or babysitting ledger and use that same selection for `In Progress` and the later `In Review` transition. On resume, revalidate the selection against current PR links and issue state; a changed or ambiguous association needs resolution before dependent work continues. Apply the open-state and reopening gate above to the selected issue.
+Record the full issue URL in the review/babysitting ledger and use it for both status transitions. On resume, revalidate current PR links and issue state. Resolve changed or ambiguous associations before dependent work.
 
 ### CLI and verification
 
-Use the named-field syntax in [gh project item-edit](https://cli.github.com/manual/gh_project_item-edit). It is supported by the installed CLI. Set `ISSUE_URL` to the selected issue's verified URL before these commands:
+Set `ISSUE_URL` to the verified selected issue URL:
 
 ```sh
-gh project item-edit 7 --owner rafaeltab --url "$ISSUE_URL" --field Status --value 'In Progress'
-gh issue view "$ISSUE_URL" --json state,projectItems
+mise exec -- gh project item-edit 7 --owner rafaeltab --url "$ISSUE_URL" --field Status --value 'In Progress'
+mise exec -- gh issue view "$ISSUE_URL" --json state,projectItems
 ```
 
-Use the exact status names above, including capitalization and spaces; replace the value with `Planning`, `Planned`, or `In Review` at the relevant transition. Read the result back and verify the WallpaperDB item's status. Before code edits, verify `In Progress`; before reporting review handoff, verify `In Review`. A successful command alone does not establish the transition. Report a failed write or read-back instead of claiming it succeeded.
+Use exact status names and verify the read-back at each transition. Report failures rather than claiming success.
 
-Verify membership with [gh issue view](https://cli.github.com/manual/gh_issue_view)'s `projectItems` before the first status change and after issue creation or sub-issue linking. Allow the auto-add workflow to run and read back again. If the item is still absent, use [gh project item-add](https://cli.github.com/manual/gh_project_item-add) with `7 --owner rafaeltab --url "$ISSUE_URL"`, then verify membership before editing its fields. Reuse existing items.
+Check `projectItems` before the first transition and after issue creation or sub-issue linking. Allow auto-add to run, then reread. If still absent, use `gh project item-add 7 --owner rafaeltab --url "$ISSUE_URL"` and verify membership. Reuse existing items.
 
-If a different installation rejects named-field flags, inspect `gh --version` and `gh project item-edit --help` before retrying. Use the documented ID-based form with project, item, field, and option IDs discovered from live data through [field-list](https://cli.github.com/manual/gh_project_field-list), [item-list](https://cli.github.com/manual/gh_project_item-list), or the [Projects API](https://docs.github.com/en/graphql/reference/projects). Do not guess IDs or repeatedly try unsupported flag combinations.
+If another CLI version rejects named fields, inspect `gh --version` and `gh project item-edit --help`. Discover IDs through `field-list`, `item-list` or the [Projects API](https://docs.github.com/en/graphql/reference/projects) for its documented ID-based form; do not guess IDs or retry unsupported flag combinations.
 
 ### Automation and terminal states
 
-The project's enabled built-in workflows are `Auto-add to project`, `Auto-add sub-issues to project`, `Item added to project`, `Pull request linked to issue`, `Code changes requested`, `Pull request merged`, `Item closed`, and `Auto-close issue`. These are GitHub Projects workflows, separate from GitHub Actions. Let applicable automation run and verify its result before writing the same intermediate status manually. Correct a missing intermediate transition only after rereading the issue and confirming the work still warrants it; preserve later release states.
+Let applicable GitHub Projects automation run and verify it before duplicating a status write. Correct missing intermediate transitions only after rereading the issue; preserve later release states. Inspect live Workflows settings when investigating automation. API workflow names and enabled flags do not reveal filters or target statuses.
 
-Workflow names and enabled flags are exposed by the [Projects GraphQL API](https://docs.github.com/en/graphql/reference/projects#projectv2workflow); their filters, item types, and target statuses require the authenticated project's Workflows settings. Discover the live configuration when investigating automation; names alone do not prove the configured action.
+Completion requires verified default-branch landing, linked issue closure and `Done` status. Verify both closure and status after landing; report discrepancies with landing evidence. The enabled `Auto-close issue` workflow can close an issue on a terminal status write, so do not set `Done` early. A PR, passing CI, approval or a feature-branch merge does not establish completion.
 
-The intended completion path is verified default-branch landing, linked issue closure, then `Item closed` setting `Done`. Verify both issue closure and project status after landing. Report missing closure or an incorrect terminal status, with the landing evidence; do not compensate by setting `Done` before landing. The enabled `Auto-close issue` workflow means a terminal status write can itself close an issue. Opening a PR, passing CI, obtaining approval, or merging into another feature branch does not establish completion.
+[Closing keywords link issues only for default-branch PRs](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue). Recheck links when retargeting stack layers and closure after landing.
 
-For stacked PRs, [closing keywords only create closing links when the PR targets the default branch](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue). Verify those links as layers are retargeted and verify closure after actual landing; the original PR description alone is insufficient.
-
-On reopening, verify `OPEN` under the reopening convention above, then restore the status appropriate to the resumed work. Cancellation requires an explicit decision and an issue close reason of `not planned`; verify `Cancelled` rather than treating closure as completion. Use `Canary` or `Released` only with evidence of the corresponding deployment. Implementation and PR-monitoring skills do not infer release from merge or approval.
+Reopened work resumes at the appropriate active status after verifying `OPEN`. Cancellation requires an explicit decision, close reason `not planned`, and verified `Cancelled` status. `Canary` and `Released` require deployment evidence.
 
 ## Pull requests as a triage surface
 
-External pull requests are not a request or triage surface. Triage GitHub issues only.
+Triage GitHub issues only, not external pull requests.
 
 ## Publishing
 
-When a skill says to publish to the issue tracker, create a GitHub issue.
-
-When a skill says to fetch a ticket, retrieve its full body, comments, and labels with `gh`.
+A skill's instruction to publish to the tracker means create a GitHub issue. Fetching a ticket means reading its full body, comments and labels.
 
 ## Relationships
 
-- Use GitHub sub-issues for parent-child relationships when available.
-- Use GitHub native issue dependencies for blocking edges when available.
-- If either native feature is unavailable, record `Parent: #<number>` and `Blocked by: #<number>` references in the issue body.
-- A ticket is ready to work when every blocking issue is closed. During PR stack implementation, an open blocker also satisfies readiness when all of the following hold:
-  - Its changes are present in an ancestor layer of the same stack.
-  - Its acceptance criteria and required validation and review have passed.
-  - Its PR URL and validated commit are recorded in the blocking issue.
-- Every blocker must satisfy the readiness rule. An open PR alone is insufficient, and the stack exception does not make a ticket ready for implementation outside that stack.
-- Keep implementation tickets open until their changes reach the default branch. Verify landing before closing a ticket; close the parent spec only after every ticket has landed and the complete spec is validated.
+Use native sub-issues for parent-child relationships and native issue dependencies for blockers. If unavailable, record `Parent: #<number>` and `Blocked by: #<number>` in the body.
+
+Every blocker must be closed before implementation, with one stack exception: its changes are in an ancestor layer of the same stack, acceptance criteria and required validation/review have passed, and its PR URL and validated commit are recorded in the blocker. An open PR alone is insufficient; this exception does not authorize implementation outside that stack.
+
+Keep tickets open until verified default-branch landing. Close the parent spec only after all tickets land and the complete spec is validated.

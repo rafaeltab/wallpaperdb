@@ -1,25 +1,13 @@
 # Gateway
 
-Gateway lets visitors discover wallpapers and contributor Profiles through a catalogue built from facts published by their owning services. It owns public search and presentation; the publishing services remain responsible for the underlying records.
+Gateway owns public wallpaper and contributor discovery through a catalogue of facts published by their owning services.
 
-## Core capabilities
+- Search wallpapers by contributor, dimensions, aspect ratio and format, with [color ranking](src/graphql/schema.ts) and pagination.
+- Retrieve wallpaper metadata, contributor Profiles and asset URLs.
+- Find Profiles by Handle, active alias or Display name, and redirect earlier Handles.
+- Project wallpaper, variant, color and Profile events without letting replay undo newer state.
+- Bound query complexity, visitor cost and active GraphQL work.
 
-- Search wallpapers by contributor, rendition dimensions, aspect ratio, and format, with [color query ranking](src/graphql/schema.ts) and pagination.
-- Retrieve wallpapers with their contributor Profiles and asset URLs.
-- Find Profiles by Handle, active alias, or Display name, and resolve earlier Handles to the current Profile address.
-- Keep the catalogue up to date as wallpapers, variants, colors, and Profiles are published, without allowing replayed events to undo newer state.
-- Limit query complexity, visitor cost budgets, and active GraphQL work to protect public discovery.
+OpenSearch provides search, Mercurius exposes GraphQL, and Redis shares visitor quotas across replicas. Read the [domain context](GLOSSARY.md) and [recovery guide](../docs/content/docs/guides/service-upgrades.mdx) before rebuilding projections or replaying events. The [admission contract](../docs/content/docs/guides/gateway-admission.mdx) covers quota responses, degraded operation and production ingress controls; [load evidence](docs/admission-load-test.md) records initial limits and deployment checks.
 
-## Technology choices
-
-OpenSearch supports the catalogue's filtered and ranked searches. Mercurius exposes the catalogue through GraphQL, and Redis coordinates visitor quotas across Gateway replicas.
-
-Read the [domain context](GLOSSARY.md) for ownership and the [recovery guide](../docs/content/docs/guides/service-upgrades.mdx) before rebuilding projections or replaying messages.
-
-The [admission contract](../docs/content/docs/guides/gateway-admission.mdx) explains quota and overload responses, degraded operation, and required production ingress controls. [Load evidence](docs/admission-load-test.md) records initial limits and the checks required before deployment.
-
-## API documentation
-
-Gateway serves Swagger UI at `/documentation` and its OpenAPI document at `/documentation/json`, registered by the [HTTP adapter](src/http/index.ts) and the [shared OpenAPI plugin](../../packages/core/src/openapi/plugin.ts).
-
-Offline OpenAPI artifact generation is not a supported Gateway workflow. The former `gen:swagger` script pointed to a missing source file and was removed because no in-repository consumer requires a Gateway artifact. The [documentation site's OpenAPI inputs](../docs/src/lib/openapi.ts) consume only Ingestor and Asset artifacts.
+Gateway serves Swagger UI at `/documentation` and OpenAPI at `/documentation/json`, registered by the [HTTP adapter](src/http/index.ts) and [shared plugin](../../packages/core/src/openapi/plugin.ts). Offline OpenAPI generation is unsupported; the [documentation site](../docs/src/lib/openapi.ts) consumes only Ingestor and Asset artifacts.

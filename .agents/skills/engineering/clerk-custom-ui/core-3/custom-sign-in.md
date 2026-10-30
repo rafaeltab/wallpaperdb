@@ -1,7 +1,5 @@
 # Custom Sign-In Flow
 
-Build a custom sign-in experience using the `useSignIn()` hook.
-
 ## Hook API
 
 ```typescript

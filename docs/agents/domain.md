@@ -1,7 +1,5 @@
 # Domain Docs
 
-WallpaperDB uses a multi-context domain documentation layout.
-
 ## Before exploring
 
 - Read `GLOSSARY-MAP.md` at the repository root.
@@ -10,18 +8,6 @@ WallpaperDB uses a multi-context domain documentation layout.
 - Read context-local ADRs when the context has a `docs/adr/` directory.
 
 If a context glossary or ADR directory does not exist, proceed silently. Domain documentation is created lazily when terms or decisions are resolved.
-
-## Layout
-
-```text
-/
-|-- GLOSSARY-MAP.md
-|-- docs/adr/                  # system-wide decisions
-|-- apps/
-|   |-- user/
-|       |-- GLOSSARY.md
-|       |-- docs/adr/          # optional context-local decisions
-```
 
 ## Vocabulary
 

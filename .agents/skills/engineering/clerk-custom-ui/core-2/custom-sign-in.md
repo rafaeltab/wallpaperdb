@@ -1,8 +1,6 @@
 # Custom Sign-In Flow (Core 2)
 
-> This document covers the **older SDK** (`@clerk/nextjs` v5–v6, `@clerk/clerk-react` v5–v6, `@clerk/clerk-expo` v1–v2). For the current SDK, see `core-3/custom-sign-in.md`.
-
-Build a custom sign-in experience using the `useSignIn()` hook.
+> This document covers the **older SDK** (`@clerk/nextjs` v5–v6, `@clerk/clerk-react` v5–v6, `@clerk/clerk-expo` v1–v2). For the current SDK, see [its custom flow](../core-3/custom-sign-in.md).
 
 ## Hook API
 
@@ -11,12 +9,6 @@ import { useSignIn } from '@clerk/nextjs' // or @clerk/clerk-react, @clerk/clerk
 
 const { signIn, isLoaded, setActive } = useSignIn()
 ```
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `signIn` | `SignIn` | Sign-in object with methods |
-| `isLoaded` | `boolean` | Whether the hook has loaded |
-| `setActive` | `(params) => Promise` | Sets the active session |
 
 ## Sign-In Flow
 
@@ -98,8 +90,6 @@ await signIn.authenticateWithRedirect({
 ```
 
 ## Error Handling
-
-Use try/catch with `isClerkAPIResponseError()`:
 
 ```typescript
 import { isClerkAPIResponseError } from '@clerk/nextjs/errors'

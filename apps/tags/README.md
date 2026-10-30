@@ -1,14 +1,7 @@
 # Tagging
 
-This workspace reserves the service boundary for wallpaper classification. It is an operational skeleton; tagging behavior has not been defined or implemented.
+This workspace reserves the wallpaper-classification boundary. It has no tagging storage or event processing yet.
 
-## Current capabilities
+The Fastify/Effect skeleton reports PostgreSQL, NATS and telemetry health, readiness, and startup/shutdown state. It exposes operational API documentation and exports traces, logs and metrics. Shutdown gives requests a bounded drain period before cancellation and connection release.
 
-- Reports PostgreSQL, NATS, and telemetry health so operators can inspect its dependencies.
-- Reports readiness separately from dependency health, including startup and shutdown state.
-- Exposes its operational API documentation and exports traces, logs, and metrics.
-- Gives active requests time to finish during shutdown, then cancels remaining work and releases its connections.
-
-Fastify provides the HTTP interface, and Effect scopes application resources to each running service instance. The PostgreSQL and NATS connections currently support operational checks; the service does not store tags or process classification events.
-
-Resolve its [domain language and ownership](GLOSSARY.md) before adding classification features. Follow [contributor setup](../../CONTRIBUTING.md) to run and check the workspace.
+Define [domain language and ownership](GLOSSARY.md) before adding classification. See [contributor setup](../../CONTRIBUTING.md) to run the workspace.

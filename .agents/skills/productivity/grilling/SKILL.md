@@ -5,9 +5,9 @@ description: Grill the user relentlessly about a plan, decision, or idea. Use wh
 
 For planning tied to an existing GitHub issue, follow [issue claiming](../../../../docs/agents/issue-tracker.md#claiming-an-issue) and the [project lifecycle](../../../../docs/agents/issue-tracker.md#project-lifecycle), including its reopening gate, to verify `OPEN` before setting `Planning` when the interview starts. After the user confirms the shared understanding and the agreed plan is recorded in the issue, verify `Planned`. An unfinished interview stays in `Planning`; a conversation without an issue has no status to update.
 
-Interview the user relentlessly until you reach a shared understanding. Map this as a **design tree**: every decision branches into the decisions that hang off it.
+Interview the user until you share an understanding. Map a design tree of decisions and their dependencies.
 
-Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
+Work in rounds. The frontier contains decisions whose prerequisites are settled. Ask the whole frontier, number the questions, recommend answers, and wait for the user before the next round.
 
 Format a round like so:
 
@@ -23,8 +23,8 @@ Format a round like so:
 ➡️ <your recommended answer>
 ```
 
-Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
+After each round, recompute the frontier. Defer questions that depend on unanswered questions.
 
-Finding _facts_ is your job, never the user's. When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it; don't ask the user for anything you could look up yourself. Don't block on it: a running exploration is an unsettled prerequisite, so only the questions downstream of it wait for the sub-agent to report; ask the rest of the frontier now. The _decisions_ are the user's: put each to them and wait.
+Dispatch subagents to find facts available from the environment rather than asking the user. While they investigate, ask independent frontier questions; defer dependent questions. Put decisions to the user and wait.
 
-The session is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed. Do not act on it until the user confirms you have reached a shared understanding.
+Finish when every branch is visited and the frontier is empty. Before acting, obtain the user's confirmation of the shared understanding.

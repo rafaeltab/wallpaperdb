@@ -1,12 +1,9 @@
 # Selected color-search method
 
-Accepted direction: **256 overlapping color anchors, shade-aware strict-hue
-matching, all five cutoff layers, three linked quality preferences, and
-precomputed numeric scores ranked by OpenSearch.** Requested amounts use 10%
-steps. The middle preference preserves the user's favorite exactly at the
-mathematical-formula level.
-
-This describes the selected method and its limitations. The production
+The accepted method uses 256 overlapping anchors, shade-aware strict-hue
+matching, five cutoff layers, three linked preferences, and precomputed
+OpenSearch scores. Proportions use 10% steps; the middle preference retains
+the favorite formula. The production
 [GraphQL schema](../../../apps/gateway/src/graphql/schema.ts) and
 [Catalogue admission and target resolution](../../../apps/gateway/src/capabilities/catalogue/colors.ts)
 define its complete request contract. See [research path](RESEARCH-PATH.md),
@@ -14,29 +11,18 @@ define its complete request contract. See [research path](RESEARCH-PATH.md),
 
 ## The idea in plain language
 
-For each wallpaper, measure how much of it matches many reference colors and how
-good those matches are. Treat a darker red as a useful match for red while
-requiring its hue to remain close. Keep several levels of closeness rather than
-using one abrupt definition of what counts.
-
-Calculate the final fit for each offered color, amount, and quality preference
-before a user searches. At query time, select the appropriate stored fit scores
-and let OpenSearch combine them across every eligible wallpaper. This preserves
-global ordering without retrieving a limited candidate set to rerank in the
-application.
-
-The main tradeoff is deliberate: more extraction/indexing work and storage buy
-less per-query scoring work. Restricting the controls to three linked settings
-and 10% amounts reduces the number of precomputed answers.
+Measure matching area and quality against reference colors, then precompute fit
+scores for each offered color, amount, and preference. OpenSearch combines the
+selected scores across all eligible wallpapers. This moves arithmetic from
+search to indexing at the cost of storage; three linked settings and 10% amounts
+limit the number of stored scores.
 
 ## 1. Sample the image and choose color anchors
 
-The prototype reads the original image, applies its orientation, converts it to
-sRGB, keeps alpha, and resizes to a 128×128 sample using fill resizing. It then
-composites each sampled pixel onto black and rounds its RGB channels. These
-choices are part of the descriptor definition; changing them can change scores.
-They describe still-image measurements and do not establish a strategy for video
-or live wallpapers.
+The prototype applies original-image orientation, converts to sRGB with alpha,
+and fill-resizes to 128×128. It composites sampled pixels onto black and rounds
+RGB channels. These choices define the still-image descriptor; video and live
+wallpapers need a separate sampling strategy.
 
 The original 1,024-anchor bank starts with the eight RGB cube corners and unique
 named-color seeds. It adds colors through deterministic farthest-point selection
@@ -45,12 +31,9 @@ bank is a deterministic subset of that original bank: start with the eight cube
 corners, then repeatedly choose the remaining anchor farthest from the selected
 set in OKLab. Original IDs are retained.
 
-An anchor is a reference color with a neighborhood, not an exclusive histogram
-bucket. A pixel may belong to several neighborhoods. The user selects any hex
-color, but the query resolves it to the nearest available anchor by ordinary
-OKLab distance. The query therefore uses that anchor's measured behavior rather
-than an exact new measurement around the requested hex. This approximation
-remains even with shade-aware matching.
+Pixels may belong to several anchor neighborhoods. Hex queries resolve to the
+nearest stored anchor by ordinary OKLab distance, so even shade-aware matching
+approximates the requested hex with that anchor's measurements.
 
 Sources: [anchor definition](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/overlap-regions.mjs),
 [nested banks](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/overlap-banks.mjs),
@@ -66,23 +49,16 @@ anchors keep full hue credit through a 10-degree OKLab hue difference and fade
 to zero by 30 degrees. Neutral anchors retain their previous distance behavior.
 These angles are OKLab hue angles, not the HSL coordinates used by the inspector.
 
-For each anchor, keep five nested measurements. A pixel enters a layer when its
-match quality reaches that layer's threshold: **0%, 25%, 50%, 75%, or 90%**.
-The 0% layer still has finite color-distance support and a positive visibility
-and hue gate; it does not admit arbitrary unrelated pixels merely because their
-quality is zero.
+Each anchor has nested layers at 0%, 25%, 50%, 75%, and 90% pixel quality.
+Even the 0% layer requires finite color-distance support and positive visibility
+and hue gates. Each layer stores:
 
-Each layer stores two separate values:
+- Coverage, the admitted fraction of sampled area, rounded to integer basis
+  points from 0 to 10,000. Every admitted pixel contributes its full area.
+- Conditional mean quality, a float32 mean from 0 to 1, or zero for an empty layer.
 
-- **Coverage:** the fraction of sampled image area admitted to that layer.
-  An admitted pixel contributes its full area, even if its quality is low.
-- **Conditional mean quality:** the average match quality of admitted pixels.
-  This is zero when no pixels are admitted.
-
-Coverage is rounded to integer basis points, from 0 to 10,000. Quality is a
-float32 value from 0 to 1. Layers overlap, and anchor neighborhoods overlap;
-summing their coverages does not yield a union or a disjoint image palette.
 High-quality pixels can contribute to all five layers of several anchors.
+Summed coverages therefore do not describe a union or disjoint palette.
 
 Sources: [shade measurement](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/shade-definition.mjs),
 [hue gate](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/hue-definition.mjs),
@@ -90,32 +66,25 @@ Sources: [shade measurement](https://github.com/rafaeltab/wallpaperdb/blob/30edc
 
 ## 3. Score the requested intent
 
-The method distinguishes two query modes.
+Catalogue accepts one through ten targets, each with one six-digit sRGB hex or
+supported name. Vibe and favorite quality are the defaults. Vibe omits a
+percentage; proportions require 0 through 100 in exact 10% steps. Intermediate
+values are rejected. Each target may override mode and quality, otherwise
+inheriting query defaults. The schema defines protocol values; Catalogue owns
+admission, defaults, and resolution.
 
-Catalogue accepts one through ten targets. Each target supplies exactly one
-concrete six-digit sRGB hex color or supported name. Vibe is the default mode;
-favorite is the default quality preference. A vibe target omits its percentage.
-A proportion target supplies an integer from 0 through 100 in exact 10% steps;
-unsupported intermediate values are rejected. The schema owns the external
-representation, while Catalogue owns defaults, admission, and target resolution.
+Vibe rewards area with diminishing returns through square-root coverage and
+applies a match-quality penalty. A small strong region can compete with a
+larger weak one, without a guaranteed accent preference.
 
-**Color vibe:** reward a substantial matching area and good color quality.
-Coverage uses a square root, so increasing coverage has diminishing returns.
-This lets a smaller strong color region compete with a larger weaker one; it
-does not guarantee that any particular small accent will outrank a large area.
+Proportions reward closeness to the whole-image target. For "40% green," excess
+is penalized 1.5 times as strongly as shortfall. Each layer compares its own
+coverage with that amount, without first averaging the layers' coverages.
 
-**Requested proportion:** reward closeness to the requested whole-image amount.
-For “40% green,” both too little and too much green lower the score. Excess is
-penalized 1.5 times as strongly as shortfall. Each cutoff layer compares its own
-coverage with the same requested amount; the scorer does not first collapse
-the layers into one averaged green percentage.
-
-Other colors can occupy an unspecified remainder. The method does not normalize
-40% into 100%, nor let excess requested green disappear into that remainder.
-However, it also has no independent penalty for an unwanted color outside the
-requested neighborhoods. Even when requested amounts total 100%, the method
-remains a set of marginal color targets; it does not enforce exclusive palette
-allocation or exact palette purity.
+A partial request keeps its unspecified remainder without renormalization;
+excess requested color still incurs a penalty. There is no independent penalty
+for unwanted colors outside the requested neighborhoods. Even a 100% total
+does not enforce exclusive region allocation or palette purity.
 
 Each proportion target is admitted independently, including requests in which
 every percentage is zero or the total exceeds 100%. This follows the
@@ -123,10 +92,8 @@ every percentage is zero or the total exceeds 100%. This follows the
 overlapping target measurements do not require a disjoint composition summing
 to 100%. Historical prototype UI admission checks do not change this contract.
 
-For either mode, score each cutoff layer, combine the layers with their cutoff
-weights, then average requested targets equally. A larger requested percentage
-changes the desired amount; it does not automatically give that target more
-weight than another target.
+Score each layer, combine layers with cutoff weights, then average targets
+equally. Requested percentages change desired amounts, not target weights.
 
 Sources: [query and target resolution](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/methods-cutoff.mjs),
 [score reference](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/favorite-optimized-scoring.mjs).
@@ -139,30 +106,26 @@ Sources: [query and target resolution](https://github.com/rafaeltab/wallpaperdb/
 | Favorite / default | 0.5 | 1 | Preserve the user's favored balance of area and quality. |
 | Strict | 1 | 3 | Apply stronger mean-quality penalties and favor stricter layers. |
 
-The prototype calls the last position **Strictest**. These are provisional UI
+The prototype calls the last position Strictest. These are provisional UI
 labels; the selected parameter pairs are the concrete decision.
 
-Quality influence and cutoff weighting are different mechanisms. Influence
-changes the penalty for the layer's mean quality. Weighting changes how much
-each layer's complete score matters. Linking them provides a useful preference
-path without claiming an exact conversion between the two controls.
+Influence changes the mean-quality penalty within a layer. Weighting changes
+the contribution of each layer's complete score; the controls are not
+mathematically interchangeable.
 
-Even the relaxed position still uses shade/hue membership and five
-quality-based cutoffs. “Quality influence 0” does not mean every pixel counts as
-the selected color. Conversely, “strict” changes ranking preference; it does not
-automatically become a hard exclusion rule or remove all weak results.
+Relaxed still uses shade/hue membership and five quality cutoffs. Strict
+changes ranking preference without hard exclusion of weak results.
 
-The selected curve is **linear**, not smooth power. Linear influence 0.5 has
-quality multiplier `0.5 + 0.5 × quality` for vibe. There is no single smooth-power
-exponent that reproduces this curve for every quality. The original smooth-power
-prototype remains research history, not a silent substitute for the favorite.
+The selected linear curve gives vibe multiplier `0.5 + 0.5 × quality` at
+influence 0.5. No smooth-power exponent reproduces it for every quality;
+the historical smooth-power prototype is not a substitute.
 
 Sources: [linked preset definitions](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/linked-strictness.mjs),
 [frozen favorite](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md).
 
 ## 5. Precompute one fit score for each offered request
 
-A **utility** is the complete single-target fit score: the result of combining
+A utility is the complete single-target fit score: the result of combining
 that target's cutoff layers for one mode, amount, and linked preference. It is
 not a coverage percentage or a new color measurement.
 
@@ -174,53 +137,30 @@ includes 256 anchor targets and 23 named-feature targets:
 279 targets × 12 profiles × 3 preferences = 10,044 numeric utilities per wallpaper
 ```
 
-That is **36 utility values per anchor**, plus the named-feature utilities and
-ordinary metadata. It is a field/value count, not a count of separate OpenSearch
-indexes. The three-choice prototype stores the whole bank in one index.
-
-The prototype represents each utility as a float field with numeric indexing and
-doc values. It disables stored `_source` and retrieves IDs through doc values.
-On September 30, 2026, the maintainer selected this layout for production
-integration, as recorded in
+The prototype stores the bank in one index as indexed float fields with doc
+values, disables `_source`, and retrieves IDs through doc values. Production
+keeps metadata, measurements, and provenance in source while excluding utilities;
+see [mapping](../../../apps/gateway/src/adapters/opensearch/mappings.ts) and
 [ADR 0006](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions).
-The production [mapping](../../../apps/gateway/src/adapters/opensearch/mappings.ts)
-retains Catalogue metadata, measurements, and descriptor provenance in source
-while excluding the utility bank. Utilities and wallpaper IDs keep float and
-keyword doc values, respectively, in the same index; no separate metadata
-retrieval path is required. Retained versioned NATS measurements support deriving
-utilities again when the descriptor definition is unchanged. The initial
-installation uses fresh storage and uploads, so migration/backfill or operator
-rebuild tooling is unnecessary. See [production guidance](PRODUCTION-QUESTIONS.md).
-The actual million-record disk cost of this three-preset layout remains unmeasured.
+The three-preset million-record disk cost remains unmeasured.
 
-For a search, select the stored field for each resolved target and preference.
-OpenSearch applies metadata eligibility filters and averages those utilities,
-sorting by score and then ID. All eligible documents participate, including
-zero-score documents. No color candidate ranking is performed in TypeScript.
-An ordinary query reads one utility per requested target instead of five
-coverage/quality pairs per target.
+The [native query](../../../apps/gateway/src/adapters/opensearch/query.ts)
+filters metadata, contributor eligibility, and utility-version readiness before
+ranking every eligible document, including zero-score records. It reads one
+utility per target instead of five coverage/quality pairs. IDs come from doc
+values and metadata from source. Timeouts, shard failures, or malformed responses
+report unavailability.
 
-The [production query](../../../apps/gateway/src/adapters/opensearch/query.ts)
-uses the selected native numeric scoring path. Metadata, contributor, and exact
-utility-version readiness requirements apply before ranking. A zero-score base
-clause keeps eligible zero-score wallpapers in the results. Wallpaper IDs come
-from doc values and retained metadata comes from source. Timeout, shard failure,
-or malformed search responses produce unavailability rather than incomplete
-successful rankings.
+Scores sort descending, with ascending wallpaper-ID ties. The existing
+[score/ID cursors](../../../apps/gateway/src/capabilities/catalogue/implementation.ts)
+support forward and reverse traversal on an unchanged index; there is no new
+snapshot consistency model. [Production guidance](PRODUCTION-QUESTIONS.md)
+covers retained measurements, complete-document updates, and installation scope.
 
-Results use descending native scores and ascending wallpaper-ID ties. Existing
-score/ID cursors support forward and reverse traversal on an unchanged index;
-this change does not introduce a snapshot consistency model. The
-[Catalogue pagination contract](../../../apps/gateway/src/capabilities/catalogue/implementation.ts)
-owns page size, cursor validation, and page information.
-
-The utility is stored as float32. Precomputing layer sums changes the grouping
-of floating-point operations relative to the original query. The formula is
-preserved at offered settings, but near-tie order is not promised to be bitwise
-identical to earlier per-layer formulas. Production preserves the selected
-float32 utility encoder and native OpenSearch execution, including near-tie
-ordering. Historical parity measurements and their tolerance remain in
-[evidence](EVIDENCE.md).
+Precomputing float32 layer sums changes operation grouping and can reorder
+near ties relative to the original per-layer formulas. Production preserves the
+selected float32 encoder and native execution order. [EVIDENCE.md](EVIDENCE.md)
+records historical parity and tolerances.
 
 Sources: [utility definitions and native query](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/favorite-utilities.mjs),
 [linked index builder](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/linked-strictness-index.mjs),
@@ -246,8 +186,8 @@ meaning is distribution strength rather than physical image coverage. Advanced
 picker design remains [#36](https://github.com/rafaeltab/wallpaperdb/issues/36).
 
 The selected prototype supports explicit combinations such as 80% grayscale /
-20% red. It does not implement “grayscale with red accents” without proportions
-or “dark with bright spots” as a special composition objective. Custom RGB/HSV/HSL
+20% red. It does not implement "grayscale with red accents" without proportions
+or "dark with bright spots" as a special composition objective. Custom RGB/HSV/HSL
 range controls and arbitrary per-query cutoff geometries are also unsupported
 in this precomputed bank. Tags can constrain eligibility; this method does not
 infer a city, flag, season, or other semantic subject from color alone.
@@ -257,21 +197,15 @@ and [query support checks](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2
 
 ## Repeated resolved targets
 
-The intended aggregation averages every requested target contribution. The
-existing numeric prototype can deviate when multiple targets resolve to the
-same complete utility field: Lucene can collapse identical query clauses, while
-the original target-count denominator remains. Distinct hex colors may trigger
-this by choosing the same anchor and amount.
+Lucene can collapse identical utility clauses while retaining the original
+target-count denominator. Distinct hex colors resolving to the same anchor and
+amount can therefore lose contributions in the frozen prototype.
 
-The linked prototype retains that historical behavior. A separate repeated-target
-weights prototype corrects it and has arithmetic regression evidence, but it was
-not silently incorporated into the linked snapshot. Production adopts that
-correction: group targets by their complete resolved utility key and apply a
-field factor of `multiplicity / original target count`. Repeated targets keep
-all intended contributions. The complete key includes the resolved target,
-query mode, proportion, and quality preset; different proportions remain
-separate even when their anchors match. Distinct-target clauses retain the
-selected native path. The
+The separate correction prototype has arithmetic regression evidence. Production
+adopts it: group identical complete keys and apply
+`multiplicity / original target count`. Keys include resolved
+target, mode, proportion, and quality, so different proportions remain separate.
+Distinct-target clauses retain the selected native path. The
 [resolver](../../../apps/gateway/src/capabilities/catalogue/colors.ts) records
 multiplicities and the [query adapter](../../../apps/gateway/src/adapters/opensearch/query.ts)
 applies their factors. Verify duplicate cases separately from frozen-snapshot

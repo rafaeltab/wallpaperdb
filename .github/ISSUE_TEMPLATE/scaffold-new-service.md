@@ -7,8 +7,6 @@ assignees: ''
 
 ---
 
-TODO: add a reusable prompt for scaffolding a new service
-
 # Purpose
 
 What purpose does this new service serve?

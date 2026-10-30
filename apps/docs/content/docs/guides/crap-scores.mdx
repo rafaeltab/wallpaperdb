@@ -1,18 +1,18 @@
 ---
 title: Local CRAP scores
-description: Use complexity and coverage to identify functions worth investigating.
+description: Use complexity and coverage to find functions worth investigating.
 ---
 
-CRAP combines cyclomatic complexity with test coverage. Use it to find functions that may need tests or refactoring. It does not measure developer performance or prove that behavior is correct.
+CRAP combines cyclomatic complexity with test coverage to identify candidates for tests or refactoring. It does not measure developer performance or prove correctness.
 
 ```sh
 make crap
 make check-crap CRAP_THRESHOLD=30
 ```
 
-Both commands run unit and integration coverage, including dependency builds. Docker is required. They analyze the repository by default; add `PACKAGE=<workspace>` to select one workspace. Run one CRAP command at a time, without another test run writing the same coverage directories.
+Both commands build dependencies and run unit and integration coverage, requiring Docker. Add `PACKAGE=<workspace>` to limit the default repository-wide scope. Run one CRAP command at a time, without other tests writing the same coverage directories.
 
-`make crap` lists functions from highest to lowest score. `make check-crap` prints only functions above the supplied threshold and fails when any exceed it. Equality passes. The example threshold of 30 is a calibration value, not repository policy or a CI gate. A failed test or invalid coverage report fails the command rather than reusing stale coverage.
+`make crap` sorts functions by descending score. `make check-crap` prints functions above the threshold and fails if any exceed it; equality passes. The example threshold is not repository policy or a CI gate. Failed tests or invalid reports fail the command instead of reusing stale coverage.
 
 ## Interpret the report
 
@@ -20,18 +20,18 @@ Both commands run unit and integration coverage, including dependency builds. Do
 CRAP = complexity² × (1 − coverage)³ + complexity
 ```
 
-Coverage is a fraction from zero to one. The report uses the lower applicable statement or branch coverage; a branchless function uses statement coverage. Missing coverage counts as zero. A function with complexity 4 and 50% effective coverage scores 6; with no coverage it scores 20.
+Coverage is a fraction from zero to one, using the lower applicable statement or branch coverage. Branchless functions use statement coverage; missing measurements count as zero. Complexity 4 with 50% coverage scores 6; without coverage it scores 20. E2E coverage does not contribute, so inspect the tests before treating a high score as missing coverage.
 
-Only unit and integration coverage contributes. Libraries tested exclusively through E2E can therefore receive high scores despite having tests. Inspect the behavior and its tests before deciding what to change.
+Callbacks, nested functions, generators, and curried wrappers such as `Effect.fn` receive separate scores. Nested decisions belong to the nested function; source positions distinguish anonymous callbacks. Calling a wrapper or constructing an Effect does not cover its callback body.
 
-The inventory includes ordinary, async, and generator callbacks, including nested callbacks and curried wrappers such as `Effect.fn`. Each body receives its own score; nested decisions belong to the nested function. Source positions distinguish anonymous callbacks on the same line. Calling a wrapper or constructing an Effect does not establish coverage of its callback body.
+The shared Vitest 3 configuration enables AST-aware coverage remapping; Vitest 5 already uses it. Legacy V8 reports may omit callback metadata or contain only function-entry branch counters. If those records cannot establish a function's own statement or source-branch coverage, the analyzer uses zero.
 
-The shared Vitest configuration enables AST-aware coverage remapping for Vitest 3; Vitest 5 already uses it. This preserves callback locations and source branches. Older V8 reports can omit anonymous function metadata or contain only function-entry branch counters. When those records cannot establish a function's own statement or source-branch coverage, the analyzer treats the measurement as missing and uses zero. A passing threshold does not prove that the tests establish correct behavior.
+V8 can mark a generator's first yield covered at iterator creation, before `.next()` runs, overstating coverage for short generators. The [provider fixture](https://github.com/rafaeltab/wallpaperdb/blob/main/test/fixtures/crap/callbacks.test.ts) checks creation separately from execution.
 
-V8 can mark a generator's first yield covered when only its iterator has been created, before `.next()` runs. This provider limitation can overstate coverage for short generators. The [provider regression fixture](https://github.com/rafaeltab/wallpaperdb/blob/main/test/fixtures/crap/callbacks.test.ts) checks iterator creation separately from resumed execution.
+## Maintenance
 
-The analyzer is maintained as the private `@wallpaperdb/crap-typescript-core` workspace. Its [upstream provenance and Apache-2.0 license](https://github.com/rafaeltab/wallpaperdb/blob/main/packages/crap-typescript-core/UPSTREAM.md) record the vendored baseline. [Issue #239](https://github.com/rafaeltab/wallpaperdb/issues/239) tracks evaluating an upstream contribution after sustained repository use.
+The private `@wallpaperdb/crap-typescript-core` workspace records its [upstream provenance and Apache-2.0 license](https://github.com/rafaeltab/wallpaperdb/blob/main/packages/crap-typescript-core/UPSTREAM.md). [Issue #239](https://github.com/rafaeltab/wallpaperdb/issues/239) tracks a possible upstream contribution.
 
-The analyzer's tests and type checks run through the standard Turbo workspace tasks in CI. Use `make test-unit PACKAGE=crap-typescript-core` for its tests and coverage, and `make check-types PACKAGE=crap-typescript-core` for type checking. The root workspace owns [provider integration tests](https://github.com/rafaeltab/wallpaperdb/blob/main/test/integration/crap-provider.test.ts) that generate real coverage with the installed Vitest 3 and gateway Vitest 5. They also retain checks for supported legacy coverage. Run them through `make test-integration PACKAGE=root`, and type-check root tooling through `make check-types PACKAGE=root`. These tasks join the same CI graph; see the [root package scripts](https://github.com/rafaeltab/wallpaperdb/blob/main/package.json) and [Turbo configuration](https://github.com/rafaeltab/wallpaperdb/blob/main/turbo.json). The analyzer workspace participates in repository-wide CRAP reports like other packages.
+Use `make test-unit PACKAGE=crap-typescript-core` and `make check-types PACKAGE=crap-typescript-core` for analyzer changes. The root [provider integration tests](https://github.com/rafaeltab/wallpaperdb/blob/main/test/integration/crap-provider.test.ts) exercise installed Vitest 3 and 5 coverage and supported legacy reports. Run `make test-integration PACKAGE=root` and `make check-types PACKAGE=root` for those changes. These checks also run in CI.
 
-For scope and exclusions, read [crap.config.mts](https://github.com/rafaeltab/wallpaperdb/blob/main/crap.config.mts). For orchestration and coverage handling, read [scripts/crap.mts](https://github.com/rafaeltab/wallpaperdb/blob/main/scripts/crap.mts). If a killed process leaves `coverage/.crap-lock`, confirm it is no longer running before removing the lock.
+[crap.config.mts](https://github.com/rafaeltab/wallpaperdb/blob/main/crap.config.mts) owns scope and exclusions; [scripts/crap.mts](https://github.com/rafaeltab/wallpaperdb/blob/main/scripts/crap.mts) owns orchestration. If a killed process leaves `coverage/.crap-lock`, confirm it is no longer running before removing the lock.

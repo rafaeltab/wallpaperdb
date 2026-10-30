@@ -1,6 +1,6 @@
-# Gateway Catalogue
+# Gateway catalogue
 
-The Gateway Catalogue lets visitors discover wallpapers and their public contributors. It interprets published wallpaper, the Asset service delivery, color, and Profile facts.
+Gateway projects published wallpaper, Asset delivery, color and Profile facts for public discovery.
 
 The Wallpaper Asset and discovery terms below follow the [accepted Source rendition model](https://github.com/rafaeltab/wallpaperdb/issues/269#issuecomment-6152919559). [Architecture reconciliation](https://github.com/rafaeltab/wallpaperdb/issues/391) tracks its replacement of the earlier single-source model.
 

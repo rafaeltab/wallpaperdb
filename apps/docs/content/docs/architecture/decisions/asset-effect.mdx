@@ -1,14 +1,10 @@
 ---
 title: Asset Effect migration
-description: Delivery catalog transactions, replay, and scoped resource ownership
+description: Delivery catalog transactions, replay, and scoped resource ownership.
 ---
 
-Asset now composes application-owned Effect ports and scoped adapter Layers. Its PostgreSQL transaction records accepted event occurrences, immutable catalog targets, Profile versions, and availability publication intent. A separate outbox worker publishes that intent with a stable CloudEvent identity and waits for JetStream PubAck before completion.
+Asset adopted application-owned Effect ports and scoped adapter layers. A PostgreSQL transaction accepts event occurrences, catalog changes, and availability publication intent together. An outbox publishes with stable CloudEvent identities and waits for JetStream acknowledgement. Replay resolves ambiguous publication without requiring a cross-system transaction.
 
-Variants arriving before their originals remain in the catalog. Publication waits until their parent is present. Replayed events cannot duplicate a new target, and Profile snapshots cannot move a head backwards. Existing legacy rows are reconciled without replacing their metadata or deleting old variants. The first reconciliation can repeat an availability fact because the old service kept no publication ledger.
+The [context decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/asset/docs/adr/0001-replay-safe-delivery-catalog.md) records catalog ordering, resource bounds, and recovery. Its amendments distinguish the original immutable-target and User-authorized picture design from the target Asset/Source model.
 
-Profile delivery still checks User authority for each origin GET and HEAD. Missing metadata or denied authority returns 404. Authority and storage failures return uncached 503. Successful picture bodies are fully read before enabling immutable caching.
-
-Native resize workers have process isolation, admission limits, and deadlines. Deploy the complete `dist` directory, including `resize-worker.mjs` and deferred application chunks. Telemetry initializes before instrumented clients load.
-
-Before deploying, apply Asset's generated migrations. Legacy consumers with prior redeliveries require coordinated operator recovery; increasing MaxDeliver does not revive already exhausted deliveries. Follow the [Asset recovery procedure](/docs/guides/service-upgrades#asset) and preserve retained source streams. The full decision and operating bounds are in `apps/asset/docs/adr/0001-replay-safe-delivery-catalog.md`.
+For migration and exhausted-consumer recovery, use the [Asset upgrade procedure](/docs/guides/service-upgrades#asset).

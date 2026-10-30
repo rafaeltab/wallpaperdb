@@ -1,4 +1,5 @@
 import { Effect, Layer, Random } from 'effect';
+import { reconcileStages } from './stages.js';
 import { Execution, Issues, Job, JobStore, type Start, type Intent, Time } from './contract.js';
 export const JobLive = Layer.effect(
   Job,
@@ -10,11 +11,13 @@ export const JobLive = Layer.effect(
     const observe = (intent: Intent) =>
       Effect.gen(function* () {
         const observation = yield* execution.observe(intent);
+        const delivery = yield* reconcileStages(store, execution, issues, intent, observation);
         const now = yield* time.now();
         return {
           kind: 'job' as const,
           intent,
           execution: observation,
+          delivery,
           elapsedMs: Math.max(0, now - intent.createdAt),
         };
       }).pipe(Effect.withSpan('factory.job.observe'));

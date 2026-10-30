@@ -391,62 +391,64 @@ async function sync(id) {
 	});
 }
 async function prepare(id) {
-	const inputs = projectedInputs(root);
-	const tracked = execFileSync("git", ["ls-files", "-z"])
-		.toString()
-		.split("\0")
-		.filter(Boolean);
-	const installation = installationInputs(tracked);
-	const dependencies = fingerprint(root, installation);
-	const configuration = [
-		...new Set([
-			...inputs,
-			...installation,
-			...tracked.filter(
-				(name) =>
-					name.startsWith("apps/asset/scripts/") ||
-					name.startsWith("apps/asset/src/adapters/commands/") ||
-					name === "apps/asset/src/authority.ts" ||
-					name.startsWith("apps/asset/src/capabilities/sources/"),
-			),
-		]),
-	];
-	const previous = read(path.join(dir, "prepared.json"));
-	const started = Date.now();
-	const result = await prepareEnvironment({
-		root,
-		previous,
-		configuration,
-		dependencies,
-		generate: async () => {
-			if (previous.dependencies !== dependencies)
-				await execute("node", ["scripts/setup-worktree.mjs"]);
-			await execute("make", [
-				"run",
-				"PACKAGE=asset",
-				"SCRIPT=dev:configure",
-				"BOAT_EXEC=local",
-			]);
-		},
-		project: () =>
-			ssh(id, `cd ${remote} && tar -xzf -`, {
-				input: execFileSync("tar", ["-czf", "-", ...inputs], {
-					maxBuffer: 16 * 1024 * 1024,
+	return lock(async () => {
+		const inputs = projectedInputs(root);
+		const tracked = execFileSync("git", ["ls-files", "-z"])
+			.toString()
+			.split("\0")
+			.filter(Boolean);
+		const installation = installationInputs(tracked);
+		const dependencies = fingerprint(root, installation);
+		const configuration = [
+			...new Set([
+				...inputs,
+				...installation,
+				...tracked.filter(
+					(name) =>
+						name.startsWith("apps/asset/scripts/") ||
+						name.startsWith("apps/asset/src/adapters/commands/") ||
+						name === "apps/asset/src/authority.ts" ||
+						name.startsWith("apps/asset/src/capabilities/sources/"),
+				),
+			]),
+		];
+		const previous = read(path.join(dir, "prepared.json"));
+		const started = Date.now();
+		const result = await prepareEnvironment({
+			root,
+			previous,
+			configuration,
+			dependencies,
+			generate: async () => {
+				if (previous.dependencies !== dependencies)
+					await execute("node", ["scripts/setup-worktree.mjs"]);
+				await execute("make", [
+					"run",
+					"PACKAGE=asset",
+					"SCRIPT=dev:configure",
+					"BOAT_EXEC=local",
+				]);
+			},
+			project: () =>
+				ssh(id, `cd ${remote} && tar -xzf -`, {
+					input: execFileSync("tar", ["-czf", "-", ...inputs], {
+						maxBuffer: 16 * 1024 * 1024,
+					}),
 				}),
-			}),
-		install: () =>
-			ssh(
-				id,
-				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && make install BOAT_EXEC=worker`,
-			),
-		validateMounts: () =>
-			ssh(
-				id,
-				`cd ${remote} && ${inputs.map((name) => `test -f ${quote(name)}`).join(" && ")} && chmod a+rx infra/postgres/init && chmod a+r infra/postgres/init/*.sql`,
-			),
-		persist: (record) => write(path.join(dir, "prepared.json"), record),
+			install: () =>
+				ssh(
+					id,
+					`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && make install BOAT_EXEC=worker`,
+				),
+			validateMounts: () =>
+				ssh(
+					id,
+					`cd ${remote} && ${inputs.map((name) => `test -f ${quote(name)}`).join(" && ")} && chmod a+rx infra/postgres/init && chmod a+r infra/postgres/init/*.sql`,
+				),
+			persist: (record) => write(path.join(dir, "prepared.json"), record),
+		});
+		event("preparation", { changed: result.changed, ms: Date.now() - started });
 	});
-	event("preparation", { changed: result.changed, ms: Date.now() - started });
 }
 
 function daemon() {
@@ -553,6 +555,7 @@ async function command() {
 			s.developmentWanted = true;
 			save(s);
 		}
+		if (targets[0] === "stop") await retireWatchers(id);
 		const result = await boat(
 			[
 				"exec",
@@ -682,60 +685,116 @@ async function serveCache() {
 	);
 }
 async function cache(id) {
-	const server = read(path.join(dir, "cache-server.json"));
-	const alive = liveOwnedProcess(root, server);
-	if (!alive) {
-		fs.rmSync(path.join(dir, "cache.json"), { force: true });
-		const log = fs.openSync(path.join(dir, "cache.log"), "a", 0o600);
-		const child = spawn(
-			process.execPath,
-			[fileURLToPath(import.meta.url), "cache-server"],
-			{ cwd: root, detached: true, stdio: ["ignore", log, log] },
-		);
-		child.unref();
-		for (
-			let i = 0;
-			i < 100 && !fs.existsSync(path.join(dir, "cache.json"));
-			i++
-		)
-			await wait(100);
-	}
-	const settings = read(path.join(dir, "cache.json"));
-	if (!settings.api) throw new Error("Cache server did not start");
-	if (id) {
-		const tunnel = read(path.join(dir, "cache-tunnel.json"));
-		let connected = false;
-		try {
-			connected = liveOwnedProcess(root, tunnel) && tunnel.id === id;
-		} catch {}
-		const local = new URL(settings.api).port;
-		if (!connected) {
-			const forward = spawn(
-				cli,
-				[
-					"--no-update",
-					"forward",
-					id,
-					"--reverse",
-					"--local",
-					"27857",
-					"--remote",
-					local,
-				],
-				{ stdio: "ignore", detached: true },
+	return lock(async () => {
+		const server = read(path.join(dir, "cache-server.json"));
+		const alive = liveOwnedProcess(root, server);
+		if (!alive) {
+			fs.rmSync(path.join(dir, "cache.json"), { force: true });
+			const log = fs.openSync(path.join(dir, "cache.log"), "a", 0o600);
+			const child = spawn(
+				process.execPath,
+				[fileURLToPath(import.meta.url), "cache-server"],
+				{ cwd: root, detached: true, stdio: ["ignore", log, log] },
 			);
-			forward.unref();
-			write(path.join(dir, "cache-tunnel.json"), {
-				id,
-				...worktreeProcesses(root).find((p) => p.pid === forward.pid),
-			});
+			child.unref();
+			for (
+				let i = 0;
+				i < 100 && !fs.existsSync(path.join(dir, "cache.json"));
+				i++
+			)
+				await wait(100);
 		}
-		await ssh(
-			id,
-			`mkdir -p ${remote}/.boat && chmod 700 ${remote}/.boat && cat > ${remote}/.boat/cache.json && chmod 600 ${remote}/.boat/cache.json`,
-			{ input: JSON.stringify({ ...settings, api: "http://127.0.0.1:27857" }) },
-		);
-	}
+		const settings = read(path.join(dir, "cache.json"));
+		if (!settings.api) throw new Error("Cache server did not start");
+		if (id) {
+			const tunnel = read(path.join(dir, "cache-tunnel.json"));
+			let connected = false;
+			try {
+				connected =
+					liveOwnedProcess(root, tunnel) &&
+					tunnel.id === id &&
+					tunnel.api === settings.api;
+			} catch {}
+			const local = new URL(settings.api).port;
+			if (!connected) {
+				for (const record of worktreeProcesses(root)) {
+					let argv;
+					try {
+						argv = fs
+							.readFileSync(`/proc/${record.pid}/cmdline`, "utf8")
+							.split("\0");
+					} catch {
+						continue;
+					}
+					const wrapper =
+						argv[0] === cli &&
+						argv.includes("forward") &&
+						argv.includes("--reverse") &&
+						argv.includes(id);
+					const orphanSsh =
+						record.name === "ssh" &&
+						argv.includes("-R") &&
+						argv.some((arg) => arg.startsWith("127.0.0.1:27857:127.0.0.1:"));
+					if (!wrapper && !orphanSsh) continue;
+					if (liveOwnedProcess(root, record)) {
+						const group = Number(
+							fs
+								.readFileSync(`/proc/${record.pid}/stat`, "utf8")
+								.split(") ")[1]
+								.split(" ")[2],
+						);
+						if (wrapper && group !== record.pid)
+							throw new Error("Cache wrapper has unexpected process group");
+						process.kill(-group, "SIGTERM");
+					}
+					for (let attempt = 0; liveOwnedProcess(root, record); attempt++) {
+						if (attempt >= 100)
+							throw new Error("Owned cache forward did not terminate");
+						await wait(50);
+					}
+				}
+				const log = fs.openSync(
+					path.join(dir, "cache-forward.log"),
+					"a",
+					0o600,
+				);
+				const forward = spawn(
+					cli,
+					[
+						"--no-update",
+						"forward",
+						id,
+						"--reverse",
+						"--local",
+						"27857",
+						"--remote",
+						local,
+					],
+					{ stdio: ["ignore", log, log], detached: true },
+				);
+				forward.unref();
+				write(path.join(dir, "cache-tunnel.json"), {
+					id,
+					api: settings.api,
+					...worktreeProcesses(root).find((p) => p.pid === forward.pid),
+				});
+			}
+			await ssh(
+				id,
+				`mkdir -p ${remote}/.boat && chmod 700 ${remote}/.boat && cat > ${remote}/.boat/cache.json && chmod 600 ${remote}/.boat/cache.json`,
+				{
+					input: JSON.stringify({ ...settings, api: "http://127.0.0.1:27857" }),
+				},
+			);
+			await ssh(
+				id,
+				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise exec -- node --input-type=module -`,
+				{
+					input: `import fs from 'node:fs';const c=JSON.parse(fs.readFileSync('.boat/cache.json'));let ready=false;for(let i=0;i<30;i++){try{const r=await fetch(c.api+'/v8/artifacts/status',{headers:{Authorization:'Bearer '+c.token},signal:AbortSignal.timeout(1000)});if(r.status===200){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,100));}if(!ready)throw new Error('Authenticated cache forward is unavailable');console.log('Authenticated cache forward ready');`,
+				},
+			);
+		}
+	});
 }
 async function preview() {
 	owned();

@@ -65,6 +65,53 @@ import { fileURLToPath } from "node:url";
 import { acquireDockerLease } from "./lib/docker-queue.mjs";
 import { ownsWatch } from "./boat-stop-watch.mjs";
 
+test("watcher retirement observes delayed owned shutdown before reporting success", async (t) => {
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "boat-watch-retirement-"));
+	t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+	const executable = path.join(root, "docker-compose");
+	fs.symlinkSync(process.execPath, executable);
+	const child = spawn(
+		executable,
+		[
+			"-e",
+			"const fs=require('fs');process.on('SIGTERM',()=>setTimeout(()=>{fs.writeFileSync('terminated','yes');process.exit(0)},150));console.log('ready');setInterval(()=>{},1000)",
+			"--",
+			"compose",
+			"-p",
+			"owned-test",
+			"watch",
+		],
+		{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+	);
+	t.after(() => {
+		try {
+			child.kill("SIGKILL");
+		} catch {}
+	});
+	await new Promise((resolve, reject) => {
+		child.stdout.once("data", resolve);
+		child.once("error", reject);
+	});
+	const helper = fileURLToPath(
+		new URL("./boat-stop-watch.mjs", import.meta.url),
+	);
+	await new Promise((resolve, reject) => {
+		const runner = spawn(process.execPath, [helper], {
+			cwd: root,
+			env: { ...process.env, COMPOSE_PROJECT_NAME: "owned-test" },
+			stdio: "pipe",
+		});
+		let output = "";
+		runner.stdout.on("data", (data) => (output += data));
+		runner.stderr.on("data", (data) => (output += data));
+		runner.once("error", reject);
+		runner.once("close", (code) =>
+			code === 0 ? resolve() : reject(new Error(output)),
+		);
+	});
+	assert.equal(fs.readFileSync(path.join(root, "terminated"), "utf8"), "yes");
+});
+
 test("restoration stops only a Compose watcher for this checkout and exact project", () => {
 	const input = {
 		root: "/owned",

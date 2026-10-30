@@ -69,13 +69,13 @@
 		"durationSeconds": 120,
 		"samplingIntervalSeconds": 10,
 		"commands": {
-			"554": "make check PACKAGE=web",
-			"548": "make check PACKAGE=asset",
-			"547": "make check PACKAGE=user",
-			"551": "make check PACKAGE=wallpaper",
-			"553": "make check PACKAGE=asset"
+			"554": "make check PACKAGE=web FORCE=1",
+			"548": "make check PACKAGE=asset FORCE=1",
+			"547": "make check PACKAGE=user FORCE=1",
+			"551": "make check PACKAGE=wallpaper FORCE=1",
+			"553": "make check PACKAGE=asset FORCE=1"
 		},
-		"protocol": "All children keep development stacks active and wait at .boat/validation-ready after changed-path verification. Coordinator freezes exact heads and starts this command set together using ordinary routed Make. Retain failures without counting the gate passed. Release scoped cleanup only after aligned observation."
+		"protocol": "All children keep development stacks active and wait at .boat/validation-ready after changed-path verification. Coordinator freezes exact heads and starts this command set together using ordinary routed Make. Retain failures without counting the gate passed. Release scoped cleanup only after aligned observation. FORCE=1 requires actual execution rather than a cached check replay. The 120-second aligned window begins at release; record command completion and any continued work separately."
 	},
 	"inputs": [
 		{

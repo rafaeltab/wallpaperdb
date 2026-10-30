@@ -42,6 +42,25 @@ if (
 				.split(" ")[19];
 			if (current === identity) {
 				process.kill(Number(name), "SIGTERM");
+				const started = Date.now();
+				while (true) {
+					let live;
+					try {
+						live = fs
+							.readFileSync(`${directory}/stat`, "utf8")
+							.split(") ")[1]
+							.split(" ")[19];
+					} catch (error) {
+						if (error.code === "ENOENT") break;
+						throw error;
+					}
+					if (live !== identity) break;
+					if (Date.now() - started >= 10000)
+						throw new Error(
+							`Owned watcher ${name} did not terminate within 10 seconds`,
+						);
+					await new Promise((resolve) => setTimeout(resolve, 50));
+				}
 				console.log(`Stopped owned Compose watcher ${name}`);
 			}
 		} catch (error) {

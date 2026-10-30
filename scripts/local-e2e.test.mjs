@@ -259,6 +259,8 @@ if (args.includes('down') && args.includes('infra/docker-compose.apps.yml') && p
 	);
 	const env = {
 		...process.env,
+		// Exercise host lock safety independently of the suite's execution location.
+		WALLPAPERDB_BOAT_WORKER: "",
 		PATH: `${root}:${process.env.PATH}`,
 		MAKEFLAGS: "",
 		MFLAGS: "",
@@ -1423,60 +1425,55 @@ for (const [stream, keepOpen] of [
 	["stdout", true],
 	["stderr", true],
 ]) {
-	test(
-		`a closed ${stream} consumer ${keepOpen ? "stops active browser work" : "handles a finite producer"} and completes owned teardown`,
-		{ timeout: 10_000 },
-		async (t) => {
-			const f = await browserFixture(t);
-			f.env.TEST_HOLD = "1";
-			f.env.TEST_PIPE_STREAM = stream;
-			f.env.TEST_PIPE_KEEP_OPEN = keepOpen ? "1" : "";
-			f.onOutput = (output, child) => {
-				if (!output.includes("Browser fixture running")) return;
-				child[stream].once("close", () =>
-					writeFileSync(join(f.root, "pipe-consumer-closed"), "closed"),
-				);
-				child[stream].destroy();
-			};
-			let pid;
-			try {
-				const result = await f.runAsync("PACKAGE=web-e2e");
+	test(`a closed ${stream} consumer ${keepOpen ? "stops active browser work" : "handles a finite producer"} and completes owned teardown`, {
+		timeout: 10_000,
+	}, async (t) => {
+		const f = await browserFixture(t);
+		f.env.TEST_HOLD = "1";
+		f.env.TEST_PIPE_STREAM = stream;
+		f.env.TEST_PIPE_KEEP_OPEN = keepOpen ? "1" : "";
+		f.onOutput = (output, child) => {
+			if (!output.includes("Browser fixture running")) return;
+			child[stream].once("close", () =>
+				writeFileSync(join(f.root, "pipe-consumer-closed"), "closed"),
+			);
+			child[stream].destroy();
+		};
+		let pid;
+		try {
+			const result = await f.runAsync("PACKAGE=web-e2e");
+			pid = Number(
+				readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
+			);
+			assert.notEqual(result.status, 0);
+			assert.equal(f.calls().filter((call) => call.includes("down")).length, 2);
+			assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+			const directory = result.stdout.match(
+				/E2E diagnostics retained at (\S+)\./,
+			)[1];
+			const log = readFileSync(join(directory, "run.log"), "utf8");
+			assert.match(log, /Console output failed.*EPIPE/);
+			assert.match(
+				log,
+				/phase "(?:browser tests|browser cleanup)" failed, exit 1/,
+			);
+			assert.doesNotMatch(result.stdout + result.stderr, /Unhandled/);
+			assert.equal(
+				spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+				0,
+			);
+		} finally {
+			if (!pid && existsSync(join(f.root, "active-fixture-child.pid")))
 				pid = Number(
 					readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
 				);
-				assert.notEqual(result.status, 0);
-				assert.equal(
-					f.calls().filter((call) => call.includes("down")).length,
-					2,
-				);
-				assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
-				const directory = result.stdout.match(
-					/E2E diagnostics retained at (\S+)\./,
-				)[1];
-				const log = readFileSync(join(directory, "run.log"), "utf8");
-				assert.match(log, /Console output failed.*EPIPE/);
-				assert.match(
-					log,
-					/phase "(?:browser tests|browser cleanup)" failed, exit 1/,
-				);
-				assert.doesNotMatch(result.stdout + result.stderr, /Unhandled/);
-				assert.equal(
-					spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
-					0,
-				);
-			} finally {
-				if (!pid && existsSync(join(f.root, "active-fixture-child.pid")))
-					pid = Number(
-						readFileSync(join(f.root, "active-fixture-child.pid"), "utf8"),
-					);
-				if (Number.isInteger(pid) && pid > 0) {
-					try {
-						process.kill(-pid, "SIGKILL");
-					} catch {}
-				}
+			if (Number.isInteger(pid) && pid > 0) {
+				try {
+					process.kill(-pid, "SIGKILL");
+				} catch {}
 			}
-		},
-	);
+		}
+	});
 }
 
 for (const [capture, stream, browserStatus] of [
@@ -1485,71 +1482,67 @@ for (const [capture, stream, browserStatus] of [
 	["logs", "both", 0],
 	["config", "stdout", 0],
 ]) {
-	test(
-		`oversized ${capture} ${stream} capture fails safely${browserStatus ? " without replacing the browser failure" : ""}`,
-		{ timeout: 15_000 },
-		async (t) => {
-			const f = await browserFixture(t);
-			f.env.TEST_LARGE_CAPTURE = capture;
-			f.env.TEST_CAPTURE_STREAM = stream;
-			f.env.NODE_OPTIONS = "--max-old-space-size=32";
-			if (browserStatus) f.env.TEST_BROWSER_EXIT = String(browserStatus);
-			try {
-				const result = await f.runAsync("PACKAGE=web-e2e");
-				assert.notEqual(result.status, 0);
-				assert.doesNotMatch(result.stderr, /heap out of memory|FATAL ERROR/);
-				assert.match(result.stderr, /Capture exceeded 1048576 bytes/);
-				assert.match(
-					result.stderr,
-					new RegExp(
-						`phase "${browserStatus ? "browser tests" : capture === "logs" ? "browser cleanup" : "browser preflight"}" failed, exit ${browserStatus || 1}`,
-					),
+	test(`oversized ${capture} ${stream} capture fails safely${browserStatus ? " without replacing the browser failure" : ""}`, {
+		timeout: 15_000,
+	}, async (t) => {
+		const f = await browserFixture(t);
+		f.env.TEST_LARGE_CAPTURE = capture;
+		f.env.TEST_CAPTURE_STREAM = stream;
+		f.env.NODE_OPTIONS = "--max-old-space-size=32";
+		if (browserStatus) f.env.TEST_BROWSER_EXIT = String(browserStatus);
+		try {
+			const result = await f.runAsync("PACKAGE=web-e2e");
+			assert.notEqual(result.status, 0);
+			assert.doesNotMatch(result.stderr, /heap out of memory|FATAL ERROR/);
+			assert.match(result.stderr, /Capture exceeded 1048576 bytes/);
+			assert.match(
+				result.stderr,
+				new RegExp(
+					`phase "${browserStatus ? "browser tests" : capture === "logs" ? "browser cleanup" : "browser preflight"}" failed, exit ${browserStatus || 1}`,
+				),
+			);
+			const calls = f.calls();
+			assert.equal(
+				calls.filter((call) => call.includes("down")).length,
+				capture === "logs" ? 2 : 0,
+			);
+			if (capture === "logs")
+				assert.equal(calls.filter((call) => call.includes("logs")).length, 2);
+			if (capture === "config")
+				assert.ok(
+					!calls.some((call) => call.includes("build") || call.includes("up")),
 				);
-				const calls = f.calls();
-				assert.equal(
-					calls.filter((call) => call.includes("down")).length,
-					capture === "logs" ? 2 : 0,
-				);
-				if (capture === "logs")
-					assert.equal(calls.filter((call) => call.includes("logs")).length, 2);
-				if (capture === "config")
-					assert.ok(
-						!calls.some(
-							(call) => call.includes("build") || call.includes("up"),
-						),
+			const directory = result.stdout.match(
+				/E2E diagnostics retained at (\S+)\./,
+			)[1];
+			assert.ok(existsSync(join(directory, "run.log")));
+			assert.doesNotMatch(
+				result.stdout,
+				/All requested E2E phases and cleanup passed/,
+			);
+			for (const name of ["apps", "infra"]) {
+				const pidFile = join(f.root, `capture-fixture-${name}.pid`);
+				if (existsSync(pidFile))
+					assert.throws(
+						() => process.kill(Number(readFileSync(pidFile, "utf8")), 0),
+						{ code: "ESRCH" },
 					);
-				const directory = result.stdout.match(
-					/E2E diagnostics retained at (\S+)\./,
-				)[1];
-				assert.ok(existsSync(join(directory, "run.log")));
-				assert.doesNotMatch(
-					result.stdout,
-					/All requested E2E phases and cleanup passed/,
-				);
-				for (const name of ["apps", "infra"]) {
-					const pidFile = join(f.root, `capture-fixture-${name}.pid`);
-					if (existsSync(pidFile))
-						assert.throws(
-							() => process.kill(Number(readFileSync(pidFile, "utf8")), 0),
-							{ code: "ESRCH" },
-						);
-				}
-				assert.equal(
-					spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
-					0,
-				);
-			} finally {
-				for (const name of ["apps", "infra"]) {
-					const pidFile = join(f.root, `capture-fixture-${name}.pid`);
-					if (existsSync(pidFile)) {
-						try {
-							process.kill(-Number(readFileSync(pidFile, "utf8")), "SIGKILL");
-						} catch {}
-					}
+			}
+			assert.equal(
+				spawnSync("flock", ["-n", f.env.E2E_LOCK_FILE, "true"]).status,
+				0,
+			);
+		} finally {
+			for (const name of ["apps", "infra"]) {
+				const pidFile = join(f.root, `capture-fixture-${name}.pid`);
+				if (existsSync(pidFile)) {
+					try {
+						process.kill(-Number(readFileSync(pidFile, "utf8")), "SIGKILL");
+					} catch {}
 				}
 			}
-		},
-	);
+		}
+	});
 }
 
 for (const kind of ["existing data", "symbolic link", "hard link"]) {

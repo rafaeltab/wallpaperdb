@@ -90,6 +90,8 @@ function fixture(t) {
 	t.after(cleanup);
 	const env = {
 		...process.env,
+		// This fixture proves host admission even when the suite runs on a worker.
+		WALLPAPERDB_BOAT_WORKER: "",
 		DOCKER_VALIDATION_LOCK_FILE: join(root, "host.lock"),
 		DOCKER_VALIDATION_TIMEOUT: "5",
 	};

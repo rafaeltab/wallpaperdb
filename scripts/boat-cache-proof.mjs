@@ -5,6 +5,17 @@ import { spawnSync, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 const root = process.cwd();
+const base = "dc17dead07c1d1f66e1806412cb7623812601bf1";
+if (
+	spawnSync("git", ["cat-file", "-e", `${base}^{tree}`], {
+		cwd: root,
+		stdio: "ignore",
+	}).status !== 0
+)
+	execFileSync("git", ["fetch", "--depth=1", "origin", base], {
+		cwd: root,
+		stdio: "inherit",
+	});
 const frozen = spawnSync(
 	"git",
 	[

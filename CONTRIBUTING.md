@@ -43,7 +43,7 @@ The local operator destination is `/operator-inbox/` through ingress. Its HTTP B
 
 PostgreSQL runs its [database initialization](infra/postgres/init/01-init.sql) only for an empty volume. An existing development volume needs the new `wallpaperdb_wallpaper` database before Wallpaper can report readiness. Use `make psql` to create that database and apply its grant from the initialization file; restarting PostgreSQL does not rerun initialization.
 
-`make dev` runs the applications in Docker with source watching. `make dev PACKAGE=<workspace>` runs that workspace's development script; the script determines whether it runs on the host or in Docker. Host-run services need host-accessible dependency endpoints. Use [service upgrade instructions](apps/docs/content/docs/guides/service-upgrades.mdx) and the [storage migration procedure](apps/docs/content/docs/infrastructure/seaweedfs.mdx) when upgrading existing data.
+`make dev` runs the applications in Docker with source watching. `make dev PACKAGE=<workspace>` runs that workspace's development script; the script determines whether it runs on the host or in Docker. Host-run services need host-accessible dependency endpoints.
 
 ## Check a change
 
@@ -175,4 +175,4 @@ Normal [teardown](scripts/teardown-worktree.mjs) uses the project name saved in 
 
 ## Change the documentation
 
-Keep human setup here, domain terms in [context documents](GLOSSARY-MAP.md), decisions in ADRs, and coding rules under [the guidelines index](CODING_STANDARDS.md). The [documentation site](apps/docs/README.md) holds user guides and operational procedures. Link to these homes instead of repeating them.
+Keep human setup here, domain terms in [context documents](GLOSSARY-MAP.md), decisions in ADRs, and coding rules under [the guidelines index](CODING_STANDARDS.md). Link to these homes instead of repeating them.

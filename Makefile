@@ -244,7 +244,7 @@ clean: ## Remove dependencies, build output, caches, and coverage
 	@echo "Cleaning node_modules..."
 	@rm -rf node_modules apps/*/node_modules packages/*/node_modules experiments/*/node_modules
 	@echo "Cleaning compiled output..."
-	@rm -rf apps/*/dist apps/docs/.next packages/*/dist packages/react-muuri/storybook-static
+	@rm -rf apps/*/dist packages/*/dist packages/react-muuri/storybook-static
 	@echo "Cleaning turbo caches..."
 	@rm -rf .turbo apps/*/.turbo packages/*/.turbo
 	@echo "Cleaning coverage reports..."

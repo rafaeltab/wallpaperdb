@@ -40,8 +40,7 @@
         },
         "build": {
             "dependsOn": [
-                "^build",
-                "gen:swagger-pages"
+                "^build"
             ],
             "outputs": [
                 "dist/**",
@@ -196,15 +195,6 @@
             ],
             "outputs": [
                 "swagger.json"
-            ]
-        },
-        "gen:swagger-pages": {
-            "cache": true,
-            "dependsOn": [
-                "^gen:swagger"
-            ],
-            "outputs": [
-                "content/docs/openapi/**"
             ]
         },
         "db:migrate": {

@@ -15,7 +15,7 @@ The browser application lets people discover wallpapers, upload their own, and m
 
 React and TanStack Router provide the application and its navigation. TanStack Query manages service data and refreshes after accepted changes. The workspace's [React Muuri wrapper](../../packages/react-muuri/README.md) provides the masonry gallery layout.
 
-Profile edits go to the owning User service; public pages read Gateway's projection, which can take a moment to catch up. See the [profile editing guide](../docs/content/docs/guides/profile-editing.mdx) for saving, aliases, cooldowns, and picture changes.
+Profile edits go to the owning User service; public pages read Gateway's projection, which can take a moment to catch up.
 
 Local static Profile picture sources follow [Ingestor's dimension admission limits](../ingestor/src/capabilities/ingestion/implementation.ts) to bound decoding before canonical reduction. The [browser source inspector](src/features/picture-editor/adapters/source.ts) checks headers before starting either decoder. The effective User picture policy remains authoritative for the processed upload.
 

@@ -8,9 +8,6 @@ build
 .next
 .turbo
 
-# Keep the docs postinstall output generated inside the image.
-apps/docs/.source
-
 # Testing
 coverage
 .testcontainers

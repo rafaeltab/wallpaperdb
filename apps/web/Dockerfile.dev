@@ -27,8 +27,7 @@ RUN corepack enable && corepack prepare "$(node -p 'require("./package.json").pa
 COPY --parents package.json pnpm-lock.yaml pnpm-workspace.yaml \
     apps/*/package.json packages/*/package.json experiments/*/package.json \
     infra/package.json scripts/package.json ./
-COPY --parents apps/docs/source.config.ts apps/docs/content \
-    scripts/check-architecture.mjs scripts/crap.mts \
+COPY --parents scripts/check-architecture.mjs scripts/crap.mts \
     scripts/setup-worktree.mjs scripts/lib/worktree-project.mjs \
     scripts/lib/env-pipeline.mjs ./
 

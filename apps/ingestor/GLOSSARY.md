@@ -1,6 +1,6 @@
-# Wallpaper Ingestion
+# Wallpaper ingestion
 
-The existing Ingestion implementation accepts an authenticated Profile's wallpaper bytes and owns progress through an acknowledged upload announcement; ownership comes from the authenticated Profile ID. The [accepted target](../../docs/adr/0012-own-stable-assets-and-immutable-sources-in-media.md) transfers byte acceptance/storage/lifecycle to the Asset service while this context retains Wallpaper identity and domain workflow; the existing terms and policy below describe the implementation being replaced.
+Ingestion currently accepts authenticated wallpaper bytes and owns progress through broker acknowledgement. The [accepted target](../../docs/adr/0012-own-stable-assets-and-immutable-sources-in-media.md) transfers byte acceptance, storage and lifecycle to Asset; Ingestion retains Wallpaper identity and workflow. The current terms and policy below describe the implementation being replaced.
 
 ## Accepted target language
 
@@ -27,4 +27,4 @@ Ingestion publishes wallpaper upload announcements for independent enrichment an
 
 ## Policy
 
-Inspection permits still JPEG, PNG, and WebP images up to 50 MiB (52,428,800 encoded bytes), 100,000,000 total pixels, and 20,000 pixels on either axis. The limits are inclusive. There is no minimum dimension beyond a valid positive image size. The byte limit bounds transfer and storage; the pixel and axis limits bound accepted image scale and extreme shapes. They do not guarantee that downstream processors can derive every variant or color. Animated PNG and WebP are rejected because animated wallpaper processing is undefined. Content determines format; the supplied MIME type is diagnostic input. Anonymous ingestion is rejected. Recovery checks the exact persisted asset reference, retries missing originals finitely, and publishes only after stored state and an outbox entry commit together.
+Inspection permits still JPEG, PNG, and WebP images up to 50 MiB (52,428,800 encoded bytes), 100,000,000 total pixels, and 20,000 pixels on either axis. The limits are inclusive. There is no minimum dimension beyond a valid positive image size. These limits do not guarantee every downstream variant or color extraction. Animated PNG and WebP are rejected because animated wallpaper processing is undefined. Content determines format; the supplied MIME type is diagnostic input. Anonymous ingestion is rejected. Recovery checks the exact persisted asset reference, retries missing originals finitely, and publishes only after stored state and an outbox entry commit together.

@@ -6,16 +6,13 @@ model: inherit
 permissionMode: default
 ---
 
-You are an agent that specializes in making good git commits.
-To create useful, consistent, and concise commits you always follow these steps:
-1. You read the currently staged changes.
-2. You decide on what type of change this is, from your predetermined list.
-3. You think of a one word description of the primary subsystem, folder or module affected by the changes.
-4. You design a concise, imperitive summary (max 72 chars).
-5. You write a description of 1-4 short lines, explaining what changed and why. Include context, motivation, and notable impacts. Mention breaking changes or follow-ups if relevant.
-6. Finally you create a commit.
+Create a commit from the staged changes:
 
-You do not create commits with huge descriptions, maximum 4 short lines!!! You sacrifice grammar for the sake of being concise.
+1. Read the staged diff.
+2. Choose a type from the list below and a lowercase, one-word area naming the primary subsystem, folder, or module.
+3. Write an imperative summary of at most 72 characters.
+4. Write a description of 1–4 short lines explaining what changed and why, with relevant context, impacts, breaking changes, or follow-ups. Prefer brevity over grammar.
+5. Create the commit and include Claude Code as a co-author.
 
 # Commit format
 
@@ -24,24 +21,10 @@ You do not create commits with huge descriptions, maximum 4 short lines!!! You s
 description
 ```
 
-And always include claude code as a co-author
-
 # Types
 
-Type can be any of the following:
-- feat
-- fix
-- style
-- refactor
-- chore
-- revert
+`feat`, `fix`, `style`, `refactor`, `chore`, `revert`.
 
 # Area
 
-Area is a lower case, one word description of the primary subsystem, folder, or module affected, such as:
-- ingestor
-- media
-- openapi
-- infra
-- test
-- docs
+Use a lowercase, one-word name, such as `ingestor`, `media`, `infra`, or `docs`.

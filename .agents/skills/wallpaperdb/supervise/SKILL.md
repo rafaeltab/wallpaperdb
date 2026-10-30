@@ -6,60 +6,60 @@ disable-model-invocation: true
 
 # Supervise
 
-Supervise independent T3 conversations in WallpaperDB until their assignments are verified or cannot reasonably progress without the user. The supervised workers are ordinary top-level threads. Subagents may help verify their results.
+Supervise independent top-level T3 conversations until assignments are verified or cannot reasonably progress without the user. Subagents may help verify results.
 
 Apply [task scope](../../../../docs/agents/task-scope.md) when assigning work, answering worker questions, and judging results. Include its scope and decision context in the work record and worker and verification briefs, restoring it on resume.
 
 ## Establish the work
 
-Use the user's requested task boundaries, such as one thread per issue or bullet. Recover each assignment from the user's request, linked issue, and existing conversation. Judge completion against that assignment using your judgment; explain what was achieved in the final summary rather than requiring a separate acceptance-criteria exercise at startup.
+Use the user's task boundaries, such as one thread per issue or bullet. Recover assignments from the request, linked issues, and existing conversations. Judge completion against those assignments without a separate acceptance-criteria exercise at startup.
 
-For existing conversations, use IDs supplied by the user or discover matches with `t3_thread_list` using the user's criteria. Paginate as needed and read candidates before adopting them. Resolve ambiguous matches with the user. Include matching completed threads whose results still need verification. Adopting a thread starts with monitoring and verification, without launching a replacement.
+Find existing conversations from supplied IDs or `t3_thread_list` using the user's criteria. Paginate and read candidates; ask about ambiguous matches. Include completed threads needing verification. Start adopted threads with monitoring and verification, without a replacement launch.
 
-Name every supervised thread `SUPERVISED: <the rest of the name>`. Set this title when launching a new thread and rename an existing thread when adopting it, preserving the rest of its title and adding the prefix only once. Keep the prefix while supervision is active and remove it when supervision ends for that thread.
+Prefix each launched or adopted thread's existing title with `SUPERVISED: ` once. Remove the prefix when supervision ends for that thread.
 
-Keep a compact record in this conversation of each assignment, dependencies, thread ID, relevant run ID, workspace, monitoring state, verification evidence, and unresolved gaps. For a user-supplied time budget, record the start and deadline once and check it during monitoring and verification. Update the record after launches, follow-ups, and verdicts so supervision can resume after an interruption. Keep temporary investigation notes outside the repository.
+Record assignments, dependencies, thread/run IDs, workspaces, monitoring state, verification evidence, and gaps in this conversation. For a user time budget, record the start and deadline once and check it during monitoring and verification. Update after launches, follow-ups, and verdicts so work can resume. Keep temporary investigation notes outside the repository.
 
-Inspect the live T3 tools and their schemas before using them. If required capabilities are unavailable, explain the limitation and retain the work record instead of claiming supervision is running.
+Inspect live T3 tool schemas before use. If required capabilities are unavailable, report the limitation and retain the work record; do not claim supervision is running.
 
 ## Launch requested conversations
 
-Use `t3_thread_launch` for each new independent conversation. Give it the task, relevant issue/spec links, dependency context, and the user's constraints. Let the worker follow WallpaperDB's applicable repository instructions and skills. Inherit provider, model, and modes unless the user requests otherwise; resolve requested model selections through `orchestrator_capabilities`.
+Use `t3_thread_launch` for each new conversation with the task, issue/spec links, dependencies, and user constraints. Workers follow applicable repository instructions and skills. Inherit provider, model, and modes unless requested otherwise; resolve requested models through `orchestrator_capabilities`.
 
-For coding tasks, explicitly bind a separate worktree through `workspaceStrategy`. Choose the base from the assignment and dependency state. For a local base, use `type: "worktree"`, `baseRef`, and `startFromOrigin: false`; use an upstream base when that is intended. Local worktree bases contain committed work, so account for required uncommitted changes before dispatching. Omitting the strategy uses the project root, not this thread's checkout. Repository research also needs the intended branch/workspace context. Preserve adopted threads' existing workspaces.
+For coding tasks, bind a separate worktree with `workspaceStrategy`, choosing the base from the assignment and dependencies. For a local base, use `type: "worktree"`, `baseRef`, and `startFromOrigin: false`; otherwise use the intended upstream base. Uncommitted changes do not transfer. Omitting the strategy selects the project root. Give repository research the intended branch/workspace context and preserve adopted threads' workspaces.
 
-Launch independent tasks concurrently within the user's limits. Hold dependent tasks until prerequisites are verified and their required artifacts are available in the chosen base or context. Separate worktrees alone do not transfer another task's changes.
+Launch independent tasks concurrently within user limits. Hold dependent tasks until prerequisites are verified and required artifacts are available in their base or context.
 
-Retain the returned thread and run IDs immediately, including launches still preparing. Launch has no idempotency key: after an uncertain response, inspect the thread list and candidate conversations before retrying so you do not create duplicate workers.
+Retain returned thread/run IDs immediately, including preparing launches. Launch has no idempotency key; after an uncertain response, inspect threads before retrying.
 
 ## Monitor and verify as results arrive
 
-Keep the supervisor turn active while selected tasks can progress. Independent top-level conversations do not have a documented automatic parent completion notification. Use bounded monitoring cycles; do not add a recurring schedule or promise background continuation after this turn ends. If interrupted, resume from the recorded IDs and reread current state.
+Keep the turn active while selected tasks can progress. Top-level conversations have no documented automatic parent completion notification. Use bounded monitoring cycles, without recurring schedules or promises of continuation after the turn. Resume interruptions from recorded IDs and current state.
 
-1. Read current thread states with `t3_thread_read`. Check all selected threads, including pending questions and newly finished runs, before waiting. Process available results without waiting for the group to finish.
-2. When no result is ready, wait on active runs with `t3_thread_wait`, passing explicit thread and run IDs and short timeouts, for example 15–30 seconds. Concurrent bounded waits can cover independent threads; inspect each result and error after every cycle. While a launch is preparing without a run ID, use a short bounded delay between status reads rather than inventing an ID or polling continuously. Cap every wait or delay by the remaining supervision budget, keep waits below 60 seconds, and share meaningful progress at least once per minute. A timeout leaves the worker running and is not a failure verdict.
-3. For each finished run, read its actual output and relevant activity. Follow pagination and recover truncated text using `itemId`, `textOffset`, and `nextTextOffset`. Track read positions for efficiency, but reread the finished run's result because an earlier message may have been updated in place.
-4. Check current state again before judging the assignment finished. A terminal run status, an idle thread, or a worker saying "done" is not evidence that the goal succeeded. Account for later runs, pending or queued work, and explicitly unfinished delegated work before accepting the result.
-5. Verify the deliverable against the original assignment. For code, inspect the actual workspace/diff and relevant test evidence, running focused checks when needed under the repository's testing workflow. For research or documents, inspect the artifact and check the claims or sources that determine success. Record the artifact version or commit verified. State what remains unverifiable.
+1. Read all selected threads with `t3_thread_read`, including questions and newly finished runs. Process results before waiting for the group.
+2. When no result is ready, call `t3_thread_wait` with explicit thread/run IDs and short timeouts, such as 15–30 seconds. Wait concurrently for independent threads and inspect every result/error. For preparing launches without run IDs, delay briefly between reads; never invent IDs or poll continuously. Cap waits/delays by the remaining budget and below 60 seconds. Share progress at least once per minute. A timeout leaves the worker running.
+3. Read finished runs' output and relevant activity. Paginate and recover truncation with `itemId`, `textOffset`, and `nextTextOffset`. Track read positions, but reread final results because messages may update in place.
+4. Recheck state before accepting completion, accounting for later runs, pending/queued work, and unfinished delegated work. Terminal or idle status and claims of completion do not establish success.
+5. Verify against the original assignment. Inspect code diffs and test evidence, running focused checks under the testing workflow when needed. For research/documents, inspect artifacts and decisive claims/sources. Record the version or commit verified and remaining limits.
 
 Use a verification subagent when its independent review would help. Supply the original assignment, relevant artifacts and version, and enough context to assess the result. For non-Git research and documents, recheck affected evidence whenever the artifact or its relevant assumptions change; record the version checked. For Git-backed work, handle independent base advances with unchanged PR head and base branch under the [PR history policy](../../../../CONTRIBUTING.md#pull-request-history). Assess reviewed-work or base-branch changes under the shared [review evidence policy](../../../../CONTRIBUTING.md#review-evidence) before dispatching another reviewer. Pass the applicable verification evidence to workers on continuation or handoff. For another required delegated review round, create a fresh delegated task containing prior findings, responses, unresolved objections, and retained evidence. The supervisor remains responsible for the final verdict.
 
-Between verifications, revisit other selected threads so questions and failures are handled while unrelated work continues.
+Between verifications, check other threads for questions and failures.
 
 ## Resolve questions and incomplete work
 
-When a worker asks a question, use `t3_pending_request_list`, `t3_pending_request_read`, and `t3_pending_request_respond` where available. Answer from the assignment, repository evidence, and decisions already made. Surface unresolved user decisions or permission requests with the exact missing input, and continue independent tasks. These question tools cannot approve permission requests.
+Handle worker questions through `t3_pending_request_list`, `t3_pending_request_read`, and `t3_pending_request_respond` where available. Answer from the assignment, evidence, and existing decisions. Surface unresolved decisions or permission requests with the exact missing input while independent work continues. Question tools cannot approve permission requests.
 
-For incomplete work with a reasonable path forward, send concrete corrective feedback to the same conversation with `t3_thread_send`. Describe the observed gap, supporting evidence, and required result. Retain the returned run ID and use a stable `clientRequestId` when retrying the same send. Resume monitoring and verify the follow-up result rather than accepting a promise to fix it.
+For incomplete work with a reasonable path forward, use `t3_thread_send` on the same conversation with the gap, evidence, and required result. Retain its run ID and use a stable `clientRequestId` when retrying that send. Monitor and verify the follow-up result.
 
-Continue when there is a concrete next action and a credible path to success. Use progress, feasibility, and any user-supplied time or retry budget to decide whether another attempt is worthwhile. Repeating encouragement without a changed approach or new evidence is not progress. Slow execution alone does not justify interrupting a worker. Honor explicit user pauses or cancellations.
+Continue while a concrete next action and credible path remain, considering progress, feasibility, and user time/retry budgets. Repeated encouragement without new evidence or approach is not progress. Slowness alone does not justify interruption. Honor user pauses or cancellations.
 
-Keep the supervisor focused on coordination and verification. Prefer feedback to the existing worker before taking over implementation or replacing it; either escalation needs a reason grounded in the failure. Preserve useful existing work and record any replacement thread under the same assignment.
+Prefer feedback to the existing worker before taking over or replacing it. Either escalation needs a reason grounded in the failure. Preserve useful work and record replacements under the same assignment.
 
-Distinguish work blocked on outside input from work that has no reasonable path to completion. Explain the evidence, useful partial results, and what would be needed to proceed. Report these failures promptly, continue independent tasks, and hold tasks whose prerequisites failed. Missing verification evidence is a gap to resolve or report, not a verified success.
+Distinguish outside-input blockers from work with no reasonable path to completion. Promptly report evidence, useful partial results, and what is needed. Continue independent tasks and hold failed dependencies. Resolve or report missing verification evidence.
 
 ## Finish
 
-Finish when every selected assignment has a verified outcome or an explained failure/blocker and no selected work can reasonably progress, or when the user's supervision budget expires. If handing back while a worker is still active, identify it and explain why supervision is ending. Budget expiry alone does not mean a worker failed or should be cancelled. Never imply that monitoring continues after this turn.
+Finish when all assignments have verified outcomes or explained failures/blockers and none can reasonably progress, or when the user budget expires. Identify active workers and explain why supervision is ending. Budget expiry alone does not establish failure or justify cancellation. Do not imply monitoring continues after the turn.
 
-Summarize each task's achieved result, verdict, verification evidence, remaining gaps, and any decision needed from the user. Link its conversation as `[title](t3-thread://v1/<threadId>)` using the exact returned ID, and link relevant deliverables. Summarize substantive findings from verification subagents rather than forwarding their verdicts without assessment.
+Report each task's result, verdict, verification evidence, gaps, and needed decisions. Link conversations as `[title](t3-thread://v1/<threadId>)` with exact IDs, plus relevant deliverables. Assess verification subagents' substantive findings before summarizing them.

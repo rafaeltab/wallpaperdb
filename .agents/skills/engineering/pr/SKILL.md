@@ -9,12 +9,12 @@ metadata:
     url: "https://github.com/humanlayer/skills/blob/main/plugins/show-me/skills/show-me/SKILL.md"
 ---
 
-Use this template for writing the PR body:
+Use this PR body template:
 
 ```markdown
 ## Summary
 
-<diagram, diff-sketch, or tree>
+<diagram, diff sketch, or tree>
 
 ## Evidence
 
@@ -25,156 +25,59 @@ Use this template for writing the PR body:
 
 **Door:** <one-way or two-way>
 
-<optional: description>
+<optional explanation>
 
 **Blast Radius:** <one-word description>
 
-<optional: potential ramifications of merge>
+<optional ramifications>
 ```
 
 ## Closing issues
 
-When creating or updating a PR body, put a separate `Closes #123` line in the Summary for each issue the PR fully resolves. For an issue in another repository, use `Closes owner/repository#123`. Repeat the keyword for every issue. Write these as ordinary body text outside code fences, rather than only in the title, comments, or commits. Use `Refs #123` for related issues or partial work that should remain open.
+Put a separate `Closes #123` line in Summary for each fully resolved issue. For another repository, use `Closes owner/repository#123`. Repeat the keyword for every issue, as ordinary body text outside code fences. Use `Refs #123` for partial or related work that should remain open.
 
-Check the PR's base against the repository's default branch. GitHub applies closing keywords only to PRs targeting that branch. For stacked PRs or other bases, carry the closing references into the PR that delivers the completed work to the default branch. Report that merging an intermediate PR will leave the issues open; keep the intended base.
+Check the PR's base against the default branch. Closing keywords apply only to PRs targeting that branch. For stacks or other bases, carry the closing references into the PR delivering the completed work to the default branch. Keep the intended base and report that intermediate merges leave issues open.
 
-After publishing or editing the body, verify that GitHub's `closingIssuesReferences` exactly matches the intended issue set for a PR targeting the default branch. Compare canonical repository identities and issue numbers. Correct missing or unintended closing references and verify again before claiming completion; report any mismatch that remains unresolved.
+After publishing or editing, verify that GitHub's `closingIssuesReferences` exactly matches the intended repository identities and issue numbers for a default-branch PR. Correct mismatches and verify again before claiming completion; report any unresolved mismatch.
 
 See [GitHub's issue-linking rules](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/linking-a-pull-request-to-an-issue).
 
 ## Sections
 
-Skip all preambles and keep prose brief. Use the user's domain language from `GLOSSARY.md`.
+Keep prose brief, omit preambles, and use `GLOSSARY.md` vocabulary.
 
 ### Summary
 
-Pick the smallest view that makes the key point clear.
+Choose the smallest visual that explains the change:
 
-- Show logic or an algorithm as pseudocode:
+- Pseudocode for logic or an algorithm.
+- A call tree for runtime control flow.
+- A component tree for UI structure and relevant state or module ownership.
+- A shallow file tree for responsibilities or layout changes.
+- Mermaid for interactions, control flow, or data flow.
+- A diff when the surrounding structure already exists.
 
-```text
-on(save)
-  if content is unchanged
-    return cached result
-  write new content
-  return fresh result
-```
-
-- Show runtime control flow as a call tree:
-
-```text
-submitForm
-  createSession
-    persistPrompt
-    launchAgent
-  navigateToSession
-```
-
-- Show UI structure as a component tree, including state and module boundaries that matter:
-
-```text
-<SessionPage> (apps/example/src/routes/session.tsx)
-  useSessionEvents()
-  <SessionToolbar>
-    <RunSkillButton> (packages/ui)
-```
-
-- Show file responsibility or a broad refactor as a shallow file tree:
-
-```text
-src/
-├── commands/       # parses user actions
-├── sessions/       # owns session state
-└── transport/      # sends API requests
-```
-
-- Show component interaction, control flow, or data flow with Mermaid:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant UI
-    participant Daemon
-    User->>UI: choose command
-    UI->>Daemon: send expanded prompt
-    Daemon-->>UI: stream result
-```
-
-- Use `diff` when the point is what changes and the surrounding shape already exists. Match the diff shape to the topic.
-
-For a component change:
-
-```diff
- <SessionPage>
-   useSessionEvents()
-   <SessionToolbar>
-+    <RunSkillButton />
-   <SessionTimeline>
-+    <SkillResultCard />
-```
-
-For a file-layout change:
-
-```diff
- src/
- ├── commands/
-+│   └── show-me.ts       # expands the slash command
- ├── sessions/
--└── transport.ts
-+└── transport/
-+    ├── client.ts
-+    └── stream.ts
-```
-
-For a call-tree or call-stack change:
-
-```diff
- submitForm
-   createSession
-     persistPrompt
-+    expandSkillMention
-     launchAgent
--  navigateToSession
-+  navigateToSession
-+    subscribeToEvents
-```
-
-For a state or control-flow change:
+For example:
 
 ```diff
  on(save)
 -  write content
 +  if content is unchanged
 +    return cached result
-+  write new content
++  write content
 +  invalidate cache
 ```
 
-- Show the whole block when most of it is new, when omitted context would hide ownership or order, or when the user needs a copyable target shape:
-
-```ts
-function expandSkill(command: string): string {
-  const skillName = command.slice(1);
-  return `use the ${skillName} skill`;
-}
-```
+Show a whole block when most is new, omitted context would hide ownership or order, or the reader needs a copyable target.
 
 #### Guidance
 
-Place each visual next to the short text it supports. Keep only the calls, files, props, states, and boundaries needed to answer the user's current question or the options to resolve the current discussion point.
-
-You may use one of these, you may use several, it is unlikely you will use all of them. Use your judgement and don't overwhelm the user.
+Place each visual beside the text it supports. Include only relevant calls, files, props, states, and relationships. Use multiple visuals only when each adds useful information.
 
 ### Evidence
 
-Concrete evidence that the change works. Show a before and after.
-
-Screenshots are S-tier - when the environment is set up for it and the change is visual.
-
-Execution-based evidence is A-tier. Test results, console output. Show the exact test that now fails and passes, using pseudocode.
+Show concrete before/after evidence. Prefer screenshots for visual changes when the environment supports them. Otherwise use test results or console output, showing the exact test's failure and success in pseudocode.
 
 ### Merge Danger
 
-Describe whether it's a one-way or two-way door. You can walk back through two-way doors, but not one-way doors. A PR that is cheap to roll back is lower risk. Changes that involve destructive actions or hard-to-reverse decisions are one-way doors.
-
-The blast radius is the potential impact or scope of the changes introduced by this PR. Consider all possibilities. Examples are layout shift, breakages for consumers, mobile responsiveness, etc.
+A two-way door is cheap to roll back. A one-way door involves destructive actions or hard-to-reverse decisions. State which applies and describe the affected scope, such as consumers or mobile layouts.

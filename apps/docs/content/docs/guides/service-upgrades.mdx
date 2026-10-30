@@ -3,7 +3,7 @@ title: Service upgrades and retained work
 description: Deployment ordering, legacy recovery, and replay procedures for existing installations.
 ---
 
-Use this guide when upgrading an existing installation. Fresh local setup is in [CONTRIBUTING.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CONTRIBUTING.md). These procedures preserve historical data and work that ordinary restarts cannot recover.
+For fresh local setup, use [CONTRIBUTING.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CONTRIBUTING.md). This guide covers existing data and retained work.
 
 Apply generated database migrations before starting the corresponding new service. Deploy each service's complete `dist` directory: native image workers and deferred application chunks are required at runtime.
 
@@ -11,7 +11,7 @@ Apply generated database migrations before starting the corresponding new servic
 
 Storage adapters derive addresses from logical references and the image metadata in events. Keep `S3_BUCKET` consistent across Ingestor, Variant Generator, Color Extractor, and Asset. Keep `PROFILE_PICTURE_BUCKET` consistent between User and Asset. Consumers need read access to their producers' objects; only owners may delete bytes. [ADR 0008](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/adr/0008-resolve-assets-through-stable-object-layouts.md) records why these layouts are stable contracts.
 
-When upgrading a development installation from the descriptor-registry revision, stop producers while upgrading all applications together. Before switching, compare its descriptors against the deterministic layouts and configured buckets. Preserve any mismatching object and its descriptor, and migrate it deliberately before replaying its logical reference. The current layout preserves the original, variant, and Profile-picture paths; matching assets need no copy or reset. The old `asset-references` bucket is no longer a runtime dependency. Leave retained descriptors intact until the audit and replay checks are complete. Rolling back to descriptor-based binaries also requires descriptors for assets created after the switch; the old descriptor records alone are insufficient.
+When upgrading a development installation from the descriptor-registry revision, stop producers while upgrading all applications together. Before switching, compare its descriptors against the deterministic layouts and configured buckets. Preserve any mismatching object and its descriptor, and migrate it deliberately before replaying its logical reference. Matching original, variant, and Profile-picture paths need no copy or reset. The old `asset-references` bucket is no longer a runtime dependency; retain its descriptors until audit and replay checks finish. Rolling back to descriptor-based binaries also requires descriptors for assets created after the switch; the old descriptor records alone are insufficient.
 
 Do not rename buckets or change layouts through configuration alone. A migration must preserve object bytes and identities and account for producer records, Asset's stored locations, and retained messages. Historical coordinate-based events continue to use their recorded locations. Back up the object buckets with their owning databases and configuration, and verify restore and replay together. The production release procedure and Grafana alerts that reach a human are tracked in [issue 236](https://github.com/rafaeltab/wallpaperdb/issues/236).
 
@@ -21,7 +21,7 @@ Asset, Color Extractor, and Variant Generator share a replay decoder in [`@wallp
 
 Read a manifest's chunk sequences in order and pass their data with the manifest to `decodeQuarantineReplay`; pass a single record without chunks. The decoder validates bounded metadata, lengths, and SHA-256 before restoring original bytes and CloudEvent/trace headers, including repeated values. Do not silently normalize invalid metadata: repair it deliberately before replay. Archived broker publication controls are excluded from replay. Publish to the recorded original subject with a fresh broker publication ID, preserving the original CloudEvent occurrence instead of the quarantine envelope's identity.
 
-Partial chunks without a completed manifest do not establish durable handoff. Failed writes leave the original pending; restore capacity or broker availability so the application can retry. Restrict quarantine access because it contains original events.
+Acknowledge the source only after every chunk and the completion manifest receives durable acknowledgement. Partial chunks do not establish handoff. Failed writes leave the original pending until capacity or broker availability returns. Restrict access to quarantined original events.
 
 ## Ingestor
 
@@ -31,7 +31,7 @@ The CloudEvents upload migration requires consumer-first deployment:
 2. Drain and stop all old Ingestor replicas.
 3. Apply the Ingestor migrations with `make migrate PACKAGE=ingestor`, then start the new Ingestor.
 
-Older upload consumers reject the new envelope and can terminate deliveries. Upgrading them afterward does not trigger ordinary redelivery. Keep support for both formats while either can be retained or replayed.
+Older consumers can terminate new-envelope deliveries; upgrading afterward does not trigger redelivery. Keep both formats supported while either remains retained or replayable.
 
 The migration prepares legacy reservations and outbox recovery metadata in one transaction. Incomplete committed records stop migration for repair; investigate those records and rerun the migration rather than making their originals eligible for cleanup. Keep committed originals and their metadata intact. The [Ingestion context decisions](https://github.com/rafaeltab/wallpaperdb/tree/main/apps/ingestor/docs/adr) explain the compatibility limits.
 
@@ -43,12 +43,12 @@ The workspace, Compose service, telemetry service name and public delivery prefi
 
 Upgrade an existing development stack in the same worktree and Compose project:
 
-1. Before switching revisions, run `make apps-stop` with no `SERVICE` selector using the previous checkout. This removes all application containers, including old Media, Gateway, Web, User and Caddy. The separate infrastructure stack, external network and persistent volumes remain in place.
+1. In the previous checkout, run `make apps-stop` without a `SERVICE` selector. This removes all application containers while preserving infrastructure, its network, and volumes.
 2. Switch to the renamed revision and run `make install` to regenerate application environments. Keep the existing `.worktree` project identity and infrastructure volumes.
-3. Run `make apps-start` with no `SERVICE` selector. This builds and recreates all applications from the updated checkout. Gateway and Web load their new Asset configuration, User loads its updated code, and a fresh Caddy process loads `/asset` routing to `asset:3003`.
+3. Run `make apps-start` without a `SERVICE` selector to rebuild all applications and reload their configuration, including Caddy routing `/asset` to `asset:3003`.
 4. Check `/asset/ready`, request an existing wallpaper through `/asset/wallpapers/<id>`, and request a resized rendition. Verify Gateway returns `/asset` delivery URLs and Web loads them. Compare catalog state and consumer acknowledgement floors with the values recorded before stopping the applications.
 
-Starting only `SERVICE=asset` is insufficient because it leaves callers and Caddy running their previous code or configuration. Do not reset infrastructure, purge streams or recreate consumers for this rename. The recovery procedure below applies only when startup reports an older consumer's exhausted delivery limit.
+Starting only `SERVICE=asset` leaves callers and Caddy unchanged. Do not reset infrastructure, purge streams, or recreate consumers for the rename. Use consumer recovery below only if startup reports an exhausted legacy delivery limit.
 
 Persistent identities deliberately retain their earlier names:
 
@@ -59,7 +59,7 @@ Persistent identities deliberately retain their earlier names:
 - `USER_MEDIA_SERVICE_TOKEN` remains the shared User/Asset credential setting, so setup reuses the existing secret instead of rotating it. It is unrelated to Gateway's renamed URL configuration.
 - The dashboard file and display name use Asset, but its `wallpaperdb-media-overview` UID remains stable to preserve saved Grafana links. Queries use the renamed `asset_*` metrics; new telemetry identifies the service as `asset`. Historical `media_*` telemetry remains under its original name.
 
-The delivery catalog stores bucket/key references and asset identities, not public delivery URLs. Gateway constructs wallpaper and Profile picture URLs at read time; Web constructs the owner's picture URL from its asset identity. User's stored picture-import `source_url` is the external identity provider's input URL and remains unchanged. No stored delivery-URL rewrite or event replay is required. Back up the existing databases, object storage and JetStream state as a unit before an upgrade, and verify delivery and consumer progress afterward.
+No delivery-URL rewrite or event replay is required. The catalog stores bucket/key references and asset identities; Gateway and Web construct public URLs. User's picture-import `source_url` remains the external identity provider's input URL. Back up the existing databases, object storage and JetStream state as a unit before an upgrade, and verify delivery and consumer progress afterward.
 
 ### Catalog and consumer recovery
 
@@ -95,13 +95,13 @@ Use the [shared quarantine replay procedure](#quarantine-replay), including its 
 
 ### Wallpaper index compatibility
 
-The color-utility catalogue requires a fresh wallpaper mapping. An index from the histogram-based catalogue is incompatible, and startup reports `IncompatibleWallpaperMapping` with the affected index and remediation. Restarting containers or running `make infra-start` preserves the old mapping in the OpenSearch volume.
+The color-utility catalogue requires a fresh mapping. Startup rejects a histogram-based index with `IncompatibleWallpaperMapping`, identifying the index and remediation. Container restarts and `make infra-start` preserve the incompatible mapping.
 
-The color-query replacement assumes a [fresh installation](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/research/color-querying/PRODUCTION-QUESTIONS.md#fresh-installation-and-picker-scope). For disposable local data, stop the applications with `make apps-stop`, run `make infra-reset`, then `make infra-start` and `make dev`. The reset deletes all infrastructure data for the checkout, including databases, object storage, and retained NATS events. It is not an index-only repair.
+The color-query replacement assumes a [fresh installation](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/research/color-querying/PRODUCTION-QUESTIONS.md#fresh-installation-and-picker-scope). For disposable local data, stop the applications with `make apps-stop`, run `make infra-reset`, then `make infra-start` and `make dev`. The reset deletes the checkout's databases, object storage, and retained NATS events as well as OpenSearch.
 
 If data must be retained, preserve the old index and original assets before planning recovery into a new `OPENSEARCH_INDEX` with the [required mapping](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/src/adapters/opensearch/mappings.ts). Legacy histograms cannot supply current measurements; copying supported catalogue metadata restores ordinary browsing but leaves those wallpapers out of color-ranked results until their originals are measured again. Already acknowledged Gateway consumers do not repopulate a new index merely because its name changed.
 
-Utilities are excluded from stored `_source`, so source-only reindexing of a current catalogue also loses its utility bank. Stop Gateway writers during the copy. Remove `utilities`, `colorReady`, `colorOrder`, and `colorSnapshot` from every copied document before writing it to the new index; do not transfer legacy histogram fields either. A copied readiness flag admits documents without utility values into color searches, while a copied occurrence watermark can suppress the very measurement replay needed to rebuild them. Keep the original snapshots and events in the preserved source, then replay retained compatible measurements through [Gateway's projection path](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/src/adapters/opensearch/wallpaper-projection.ts). That path writes the snapshot, occurrence order, complete utility bank, and readiness marker together. Verify ordinary and color-ranked browsing before reopening catalogue traffic; never set `colorReady` independently to mark an incomplete restore as ready.
+Utilities are excluded from stored `_source`, so source-only reindexing of a current catalogue also loses its utility bank. Stop Gateway writers during the copy. Remove `utilities`, `colorReady`, `colorOrder`, and `colorSnapshot` from every copied document before writing it to the new index; do not transfer legacy histogram fields either. Copied readiness admits unmeasured documents to color searches; a copied watermark can suppress their measurement replay. Keep the original snapshots and events in the preserved source, then replay retained compatible measurements through [Gateway's projection path](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/gateway/src/adapters/opensearch/wallpaper-projection.ts). That path writes the snapshot, occurrence order, complete utility bank, and readiness marker together. Verify ordinary and color-ranked browsing before reopening catalogue traffic; never set `colorReady` independently to mark an incomplete restore as ready.
 
 Audit copied `variants` and `variantOrder` together. Every copied rendition needs the matching occurrence watermark for its width, height, and format; otherwise an older pending event can replace it. If the source predates occurrence metadata or has incomplete watermarks, remove both the copied variants and their order map from the destination, then initialize `variants` as an empty array. Replay the complete retained variant history through Gateway's projection path in occurrence order while catalogue traffic and new producers remain stopped. This rebuilds each rendition and its watermark together. Verify that every recovered rendition matches the latest retained occurrence before reopening traffic. If the available history cannot establish those latest occurrences, keep recovery incomplete and reconstruct them from verified evidence; do not invent watermarks from document timestamps.
 
@@ -109,7 +109,7 @@ Audit copied `variants` and `variantOrder` together. Every copied rendition need
 
 Upgrading projections does not recover information older versions discarded. Existing color projections lack occurrence ordering metadata, so the first stale result after upgrade can replace their colors. Replay the complete retained color history before reopening catalogue traffic if historical ordering must be preserved. The same applies to timestamp precision lost by older millisecond-only projections.
 
-The wallpaper and Profile source streams admit messages up to 64 KiB including headers. Quarantine and the broker's `max_payload` must each allow at least 256 KiB for the quarantine envelope. Gateway startup fails before subscribing when these limits are incompatible.
+Wallpaper and Profile source messages are bounded to 64 KiB including headers. Quarantine and broker `max_payload` must each allow at least 256 KiB for the envelope. Gateway rejects incompatible limits before subscribing.
 
 Gateway quarantine stores the original payload in `data.original` and complete NATS headers in `data.originalHeaders`, both base64 encoded. Decode both fields for replay, preserving the original occurrence and trace metadata while excluding archived broker publication controls. Choose a fresh broker publication ID. Oversized duplicate diagnostic fields may be omitted; the replay evidence remains intact. This format is separate from the three services' [chunked quarantine protocol](#quarantine-replay).
 
@@ -117,7 +117,7 @@ Lowering a stream limit does not rewrite retained messages. Gateway audits retai
 
 An oversized historical message stops startup and reports its stream, sequence, and byte count. The original remains stored. Export the identified record, for example with `nats stream get WALLPAPER <sequence> --json`, determine its retention and replay requirements, and explicitly resolve that record before restarting. Do not purge the source stream to bypass the failure.
 
-An administrative change that loosens a source limit must remove its audit certificate before larger publications are accepted, even if the old limit will later be restored. Stream recreation or a changed limit also requires another audit. Change the event-size contract, quarantine capacity, and audit policy together. See the [Gateway projection decision](https://github.com/rafaeltab/wallpaperdb/tree/main/apps/gateway/docs/adr).
+Remove the audit certificate before loosening a source limit, even temporarily. Stream recreation or a changed limit requires another audit. Change the event-size contract, quarantine capacity, and audit policy together. See the [Gateway projection decision](https://github.com/rafaeltab/wallpaperdb/tree/main/apps/gateway/docs/adr).
 
 Deployments retaining `GRAPHQL_MAX_COMPLEXITY=1000` must raise it to admit the web browse query under descendant-aware costing; the current default is 2000. Clients inspecting failed health probes must read the health classification from `healthStatus`; `status` is now the numeric Problem Details HTTP status.
 
@@ -151,9 +151,9 @@ Deploy a Gateway that accepts CloudEvents color results before upgrading Color E
 
 Variant Generator and Color Extractor quarantine have a thirty-day repair horizon and one-GiB capacity with file-backed storage and discard-new overflow. Startup rejects incompatible policies. Explicitly migrate existing Color stream settings while preserving retained evidence.
 
-Container restarts and infrastructure setup preserve existing quarantine configuration. If Color Extractor rejects `COLOR_EXTRACTOR_QUARANTINE`, inspect that stream before restarting the worker. Export retained evidence before tightening its age or capacity limit, or confirm the stream is empty. Compare every field checked by the [startup validation](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/color-extractor/src/adapters/events/quarantine.ts), including subjects, storage, retention, discard policy, byte and age limits, and per-subject eviction settings. Correct mutable incompatible values in place. The required byte limit is at most 1 GiB and greater than zero; the age is exactly thirty days.
+Restarts and infrastructure setup preserve quarantine configuration. If startup rejects `COLOR_EXTRACTOR_QUARANTINE`, inspect the stream before restarting. Export retained evidence before tightening its age or capacity limit, or confirm the stream is empty. Compare every field checked by the [startup validation](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/color-extractor/src/adapters/events/quarantine.ts), including subjects, storage, retention, discard policy, byte and age limits, and per-subject eviction settings. Correct mutable incompatible values in place. The required byte limit is at most 1 GiB and greater than zero; the age is exactly thirty days.
 
-Startup validation does not audit every routing or access setting. Remove quarantine `republish` rules before restarting publishers: [NATS republishes bodies and publisher headers to live subjects](https://docs.nats.io/learn/jetstream/subject-mapping#republish-to-live-subjects), where ordinary subscribers can receive the evidence. Also audit subject transforms, mirrors and sources, account exports, and subscriber permissions for access to original events. Preserve unrelated settings only after that audit; keep any evidence archive under the same access restrictions. A passing startup check does not establish quarantine confidentiality.
+Startup validation does not audit every routing or access setting. Remove quarantine `republish` rules before restarting publishers: [NATS republishes bodies and publisher headers to live subjects](https://docs.nats.io/learn/jetstream/subject-mapping#republish-to-live-subjects), where ordinary subscribers can receive the evidence. Also audit subject transforms, mirrors and sources, account exports, and subscriber permissions for access to original events. Apply the same access restrictions to evidence archives; a passing startup check does not establish confidentiality.
 
 Storage and retention policy are not mutable [stream-update fields](https://nats-io.github.io/nats.js/jetstream/types/StreamUpdateConfig.html). A memory-backed stream therefore needs deliberate replacement, not an in-place storage change:
 
@@ -165,7 +165,7 @@ Storage and retention policy are not mutable [stream-update fields](https://nats
 
 Do not republish raw chunks into the replacement stream with new sequence numbers while leaving old manifest references unchanged. Do not delete retained evidence or reset the NATS volume merely to bypass startup validation.
 
-Both workers use the [shared quarantine replay procedure](#quarantine-replay). Inputs that exceed the complete message budget or JetStream's 64 KiB header limit after quarantine metadata is added use bounded chunks and, when necessary, the versioned original-message frame. Every chunk and the completion manifest require durable acknowledgement before the source is acknowledged. Monitor pending inputs, quarantine capacity, and publication failures.
+Both workers use the [shared quarantine replay procedure](#quarantine-replay). Inputs exceeding the complete message budget or JetStream's 64 KiB header limit use bounded chunks and, when needed, the versioned original-message frame. Monitor pending inputs, quarantine capacity, and publication failures.
 
 Existing variant object keys are immutable. Changing encoding settings affects new targets; replay does not regenerate an existing rendition with new settings. Deliberate regeneration needs a separately designed versioned target identity. See the [Variant Generator decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/variant-generator/docs/adr/0001-replay-safe-variant-generation.md).
 

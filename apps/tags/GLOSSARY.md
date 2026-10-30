@@ -1,3 +1,3 @@
 # Tagging
 
-Tagging is reserved for wallpaper classification. Its domain language and relationships are not defined yet; this migration makes no decisions about tag identity, ownership, or assignment.
+Reserved for wallpaper classification. Tag identity, ownership and assignment remain undefined.

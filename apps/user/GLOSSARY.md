@@ -1,6 +1,4 @@
-# WallpaperDB
-
-WallpaperDB is a community catalog of wallpapers and the people who contribute them.
+# User
 
 ## Language
 
@@ -17,7 +15,7 @@ The immutable Clerk user ID that identifies a Profile and matches the `userId` r
 _Avoid_: Internal user ID, Clerk ID mapping
 
 **Profile picture**:
-The custom image accepted for a Profile, represented by a Asset whose identity remains stable across complete Source-set replacement. A generated avatar represents the absence of a custom picture and needs no Asset.
+The custom image accepted for a Profile, represented by an Asset whose identity remains stable across complete Source-set replacement. A generated avatar represents the absence of a custom picture and needs no Asset.
 
 **Profile picture removal**:
 The Profile's transition to having no custom picture, accompanied by a durable request to delete its former Asset. It completes independently of the Asset service's deletion; a later custom picture has a new Asset identity.

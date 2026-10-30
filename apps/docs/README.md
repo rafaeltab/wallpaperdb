@@ -1,14 +1,5 @@
 # @wallpaperdb/docs
 
-The documentation site helps people use, operate, and contribute to WallpaperDB. It makes maintained guidance and architectural decisions accessible to both human readers and agents.
+WallpaperDB's Next.js and Fumadocs site publishes user guides, operating procedures, incident records, and architecture decisions with navigation and search. It links contributors to repository setup, standards, and domain records.
 
-## Core capabilities
-
-- Publish user guides, operational recovery procedures, incident records, and historical architecture decisions with navigation and full-text search.
-- Direct contributors to the maintained setup guide, coding standards, and domain context map.
-- Generate browsable REST references from the Ingestor and Asset OpenAPI specifications.
-- Export the documentation as a single text response for agents and other tools.
-
-## Technology choices
-
-Fumadocs renders the MDX content and generates REST API reference pages from service OpenAPI specifications. Next.js hosts the site.
+Fumadocs generates REST references from the Ingestor, Asset, and Wallpaper OpenAPI specifications. The site also exports its documentation as a single text response for tools.

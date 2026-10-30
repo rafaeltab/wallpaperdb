@@ -1,7 +1,5 @@
 # Custom Sign-Up Flow
 
-Build a custom sign-up experience using the `useSignUp()` hook.
-
 ## Hook API
 
 ```typescript

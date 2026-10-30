@@ -2,7 +2,7 @@
 
 The `<Show>` component conditionally renders content based on authentication state, roles, permissions, billing plans, and features.
 
-> **Core 2 ONLY (skip if current SDK):** The `<Show>` component does not exist in Core 2. Use `<SignedIn>`, `<SignedOut>`, and `<Protect>` instead. See migration table below.
+Core 2 uses `<SignedIn>`, `<SignedOut>`, and `<Protect>` instead. See [Migration from Core 2](#migration-from-core-2).
 
 ## Import
 
@@ -26,12 +26,10 @@ import { Show } from '@clerk/expo'          // Expo
 ### Authentication State
 
 ```tsx
-// Show content only when signed in
 <Show when="signed-in">
   <p>Welcome back!</p>
 </Show>
 
-// Show content only when signed out
 <Show when="signed-out">
   <p>Please sign in.</p>
 </Show>
@@ -79,8 +77,6 @@ import { Show } from '@clerk/expo'          // Expo
 
 ## Fallback Content
 
-Show alternative content when the condition fails:
-
 ```tsx
 <Show when="signed-in" fallback={<p>Please sign in to continue.</p>}>
   <Dashboard />
@@ -89,7 +85,7 @@ Show alternative content when the condition fails:
 
 ## Session Tasks and Pending State
 
-The `treatPendingAsSignedOut` prop controls how pending sessions (sessions with incomplete tasks) are handled:
+Pending sessions have incomplete tasks. They count as signed out by default; set `treatPendingAsSignedOut={false}` to show task completion UI.
 
 ```tsx
 // Default: pending sessions are treated as signed-out
@@ -105,7 +101,7 @@ The `treatPendingAsSignedOut` prop controls how pending sessions (sessions with 
 
 ## Security Caveat
 
-**`<Show>` only visually hides content** — it remains in browser source. It is not a security boundary. For protecting sensitive data, always verify authentication server-side with `auth()` or use `auth.protect()` in middleware.
+`<Show>` only hides content visually; it remains in browser source. Protect sensitive data by verifying authentication server-side with `auth()` or `auth.protect()` in middleware.
 
 ## Migration from Core 2
 

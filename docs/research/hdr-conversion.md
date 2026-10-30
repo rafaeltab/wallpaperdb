@@ -1,51 +1,38 @@
 # HDR conversion research for implementation
 
-Research completed, 2026-10-11. The October 4 native replay and representative
-physical reviews establish useful paths for HDR AVIF, explicit SDR delivery
-and several gain-map JPEG operations, alongside measured failures and untested
-consumer paths. This completes the empirical investigation in [#284][proof-ticket];
-it does not qualify every HDR capability or originally named device.
-The strongest starting point is a pipeline that identifies the source's actual
-color model, processes geometry at adequate precision, and chooses a separately
-verified output representation. A filename or an encoder's format support list
-does not establish that pipeline's accuracy.
+Research completed on 2026-10-11 for [#284][proof-ticket]. The October 4 native
+replay and physical reviews demonstrate HDR AVIF, explicit SDR delivery, and
+several gain-map JPEG paths, with failures and untested consumers retained below.
+Conversion must identify the actual source color model, preserve geometry at
+adequate precision, and verify the output representation.
 
-The experiments remain on `t3code/hdr-conversion-proof-suite`, preserved at
-[`fd1c43e7`][archive]. This document extracts implementation guidance without
-merging that suite. It changes no production dependency, API, generation policy,
-migration or editor behavior.
+The suite remains on `t3code/hdr-conversion-proof-suite` at [`fd1c43e7`][archive].
+These findings do not change production dependencies, APIs, generation policy,
+migration, or editor behavior.
 
 ## Product policy and research coverage
 
-The [accepted delivery contract][contract] and [HDR resolution][resolution]
-remain the product authorities. They establish explicit conversion selectors,
-preserved originals, conservative capabilities, source-sensitive HDR handling,
-authored SDR preference, and useful explicit SDR delivery. The [conversion
-ledger][ledger] inventories candidate paths; it does not make every possible
-cross-format conversion a release requirement.
+The [delivery contract][contract] and [HDR resolution][resolution] govern explicit
+selectors, preserved originals, conservative source-sensitive capabilities,
+authored SDR preference, and explicit SDR delivery. The [conversion ledger][ledger]
+is a candidate inventory, not a requirement to ship every conversion.
 
-The user clarified on 2026-09-29 that not passing every case subsequently called
-"required" by the suite should not hold up planning. The suite's 320 initial
-fixture/geometry cases, 25 additional display-headroom comparisons and 20
-same-file combinations are engineering coverage choices. Its [thresholds][thresholds]
-explicitly describe themselves as "provisional engineering gates for this
-fixture corpus." Specific fixtures, geometry dimensions, headroom samples and
-numeric tolerances are not independent product decisions.
-
-Those checks still reveal real limitations. A failed file must retain its
-measured failure; an untested case must remain unqualified. Planning should
-select the capabilities worth shipping and the evidence they need, rather than
-use the suite's entire accumulated experiment inventory as an automatic release
-gate. This document does not silently revise the accepted product policy.
+On 2026-09-29 the user clarified that suite cases subsequently called "required"
+should not block planning. Its 320 initial fixture/geometry cases, 25 additional
+headroom comparisons, and 20 same-file combinations are engineering coverage
+choices. The [thresholds][thresholds] call themselves "provisional engineering
+gates for this fixture corpus." Fixtures, dimensions, headrooms, and tolerances
+are not independent product decisions. Keep failures and untested cases explicit;
+select release capabilities and their evidence without adopting the whole suite
+as a release gate.
 
 ## Best available conversion paths
 
-"Pass" below means the tested files meet their declared structural and
-appearance checks. It does not mean general source coverage or consumer support.
-The [final replay evidence][native-results] retains failed candidates beside
-passing alternatives, so an aggregate cell marked failed can contain a useful
-recipe. The [compact matrix][matrix] summarizes all classified cells; the full
-archive contains exact selectors and per-case measurements.
+"Pass" means the tested files meet their structural and appearance checks,
+not general source or consumer support. The [replay evidence][native-results]
+retains failures beside passing alternatives, so a failed aggregate cell may
+still contain a useful recipe. The [compact matrix][matrix] summarizes cells;
+the full archive retains exact selectors and measurements.
 
 | Source and requested result | Best demonstrated approach | Capability and limit |
 | --- | --- | --- |
@@ -58,31 +45,25 @@ archive contains exact selectors and per-case measurements.
 | HDR PNG/APNG conversions | Explicitly inspect CICP and sample depth, normalize native transport, then reuse color and geometry processing | Several HDR/SDR, animation and alpha paths pass. PNG8 needed separate precision fixes; a PNG16 result does not qualify PNG8. [PNG/APNG][png], [PNG8 normalization][png8] |
 | GIF or HDR WebP | Keep these optional and request-specific | Synthetic SDR GIF examples pass with palette/transfer choices and explicit binary-alpha conversion. Photographic gain-map examples fail. HDR WebP has no qualified path; HDR GIF selectors are incompatible. [GIF evidence][gif], [matrix][matrix] |
 
-The tested geometry modes include proportional containment, center crop,
-stretch, upscaling and orientation. Their exact coverage is recipe-specific.
-Capabilities must preserve that specificity: a passing eight-bit WebP does not
-satisfy `depth=preserve` for a ten-bit source, and binary GIF transparency does
-not preserve fractional alpha. Static extraction selects the first fully
-composed frame. Gain-map JPEG reports the base and map coded depths separately.
-[Selector contract][contract], [exact combinations in the native archive][native-results].
+Geometry coverage is recipe-specific: proportional containment, center crop,
+stretch, upscaling, and orientation. Eight-bit WebP cannot satisfy `depth=preserve`
+for a ten-bit source; binary GIF alpha cannot preserve fractional alpha. Static
+extraction selects the first fully composed frame. Gain-map JPEG reports base
+and map depths separately. [Selector contract][contract], [exact combinations][native-results].
 
-Two newer focused results are useful but narrow. Original-size XMP JPEG to
-gain-map AVIF preserves base/map samples and gain metadata, passing at display
-boosts 2, approximately 11.314 and 16. It does not establish resizing. A separate
-opaque PQ8/P3 AVIF to HDR JPEG passes at boost 16 with ordered dithering; its
-undithered control fails highlight detail. These results cover only their named
-fixtures and rendering points. They do not establish resized conversions,
-additional source depths, arbitrary display headrooms or consumer compatibility.
-[XMP conversion][xmp-identity], [PQ8 conversion][pq8-jpeg].
+Original-size XMP JPEG to gain-map AVIF preserves base/map samples and metadata,
+passing at display boosts 2, approximately 11.314, and 16. Opaque PQ8/P3 AVIF to
+HDR JPEG passes at boost 16 with ordered dithering; its undithered control fails
+highlight detail. Neither establishes resizing, other depths/headrooms, or
+consumer compatibility. [XMP conversion][xmp-identity], [PQ8 conversion][pq8-jpeg].
 
 ## Techniques worth carrying into implementation
 
-Inspect source facts before choosing a decoder. Transfer, primaries, sample
-depth, alpha, motion, orientation and gain-map model all matter. ISO binary gain
-metadata, Android/Adobe XMP and the two Apple representations need distinct
-admission rules. The proof retains unknown required facts as original-only.
-Native decoding must preserve the declared source model before output encoding
-can be evaluated. [Source inspection][source-inspection], [selector controls][selectors].
+Inspect transfer, primaries, depth, alpha, motion, orientation, and gain-map
+model before selecting a decoder. ISO binary metadata, Android/Adobe XMP, and
+the two Apple representations need distinct admission rules. The proof keeps
+sources with unknown required facts original-only and checks native decoding
+against the declared model. [Source inspection][source-inspection], [selector controls][selectors].
 
 The old Apple fixture exposed an actual model error. Its retained libavif
 interpretation applied exponential gain to stored map values and failed six
@@ -93,24 +74,18 @@ maximum Delta E ITP of 0.000027853. This equation is fixture-specific; intermedi
 adaptation and newer Apple semantics are not established by it.
 [Source comparison][apple-model], [native implementation][apple-source].
 
-Process HDR geometry in linear light with enough intermediate precision. Apply
-orientation once, filter premultiplied color when alpha is present, then restore
-the output's required alpha convention. Explicit pixel formats matter: implicit
-FFmpeg conversions introduced measurable rounding and association errors.
-PQ uses absolute luminance; the tested HLG interpretation uses a 1000-nit
-reference display with a luminance-coupled system gamma of 1.2. Its explicit
-native transform avoids treating that display response as independent channel
-curves. Preserve frame timing and loop metadata separately from raster
-processing. [Native geometry][avif], [HLG transfer][transfer].
+Process geometry in linear light at adequate precision. Apply orientation once,
+filter premultiplied color, then restore the required alpha convention. Implicit
+FFmpeg pixel-format conversions caused rounding and association errors. PQ uses
+absolute luminance; tested HLG uses a 1000-nit reference display and luminance-coupled
+system gamma 1.2, not independent channel curves. Preserve timing and loops
+separately. [Native geometry][avif], [HLG transfer][transfer].
 
-For gain-map SDR delivery, preserve the authored base instead of automatically
-tone mapping the HDR reconstruction. For single-layer HDR without an authored
-SDR image, the best tested fallback uses FFmpeg's CPU Mobius operator. The
-1000-nit recipe uses knee 0.6 and exposure 1.1; the 4000-nit sequence uses knee
-0.54 and exposure 1.2. Both reserve rounding headroom with output scale 0.99.
-These are calibrated fixture recipes, not an automatic policy for arbitrary
-content peaks. A sequence uses one grade, avoiding per-frame exposure changes.
-[Tone mapping][tone], [independent reference][sdr-reference].
+For gain-map SDR, preserve the authored base. Single-layer HDR's best tested
+fallback is FFmpeg CPU Mobius: knee 0.6 / exposure 1.1 for 1000 nits, and
+knee 0.54 / exposure 1.2 for the 4000-nit sequence, both with output scale 0.99
+for rounding headroom. These are fixture calibrations, not arbitrary-peak
+policy. Use one grade per sequence. [Tone mapping][tone], [independent reference][sdr-reference].
 
 The tone checks place 203-nit ordinary white near 0.90 SDR signal, within 0.025,
 and separately test shadows, midtones and a smooth highlight shoulder. The
@@ -118,15 +93,13 @@ tested gamut mapping converts primaries and clips out-of-gamut sRGB channels
 relative-colorimetrically. It is deliberate and independently checked, but does
 not establish a perceptual gamut-compression algorithm. [Checks and rationale][thresholds].
 
-Choose precision and transfer together. Omitted depth allows a supported depth;
-it does not require eight-bit output. The proof found near-black samples that
-no full-range sRGB RGB8 triple could represent within its fixed gate. AOM encoded
-the supplied codes exactly, so changing encoder quality could not restore the
-missing precision. Higher-depth SDR AVIF or PNG16 solved relevant cases.
-Gamma-2.2 coding helped eight-bit AVIF/JPEG/WebP, while gamma-3.2 helped some
-authored JPEG and GIF cases. These files require their actual CICP or ICC
-interpretation; they cannot be relabeled as standard sRGB-transfer files.
-[Precision diagnostic][precision], [gamma coding][gamma].
+Choose precision and transfer together. Omitted depth permits supported depths;
+it does not require eight bits. Some near-black samples could not meet the gate
+with any full-range sRGB RGB8 triple. AOM reproduced supplied codes exactly,
+so encoder quality could not fix this. Higher-depth SDR AVIF or PNG16 solved
+relevant cases. Gamma-2.2 helped eight-bit AVIF/JPEG/WebP; gamma-3.2 helped some
+authored JPEG/GIF cases. Preserve their actual CICP/ICC interpretation rather
+than relabeling them sRGB. [Precision diagnostic][precision], [gamma coding][gamma].
 
 Recent precision work also shows why output depth remains consequential:
 
@@ -164,13 +137,10 @@ a lower capacity can match one endpoint and then stop brightening too early.
 Copying source capacity improves some highlights but leaves shadow/midtone
 failures. [Headroom evidence][headroom], [capacity experiment][capacity].
 
-This is a limitation of the tested recipes and source interpretations, not a
-proof that HDR JPEG conversion is universally impossible or a standalone reason
-to block every HDR feature. Bounded diagnostics eliminate several fixes for a
-specific ISO upscale model; they do not eliminate other color models,
-representations or product scopes. Preserve source-dependent capability
-decisions and measure any replacement recipe against its declared intent.
-[Diagnostic scope][bounds].
+These failures concern tested recipes and source interpretations. Bounded
+diagnostics eliminate several fixes for one ISO upscale model, not HDR JPEG
+conversion generally. Keep source-dependent capabilities and test replacement
+recipes against their declared intent. [Diagnostic scope][bounds].
 
 The fixture corpus is small. Static AVIF charts deliberately stress transfer,
 gamut, depth and fractional alpha; short animation sequences do not represent
@@ -184,20 +154,17 @@ metadata, independent newer Apple scenes and creator-authored SDR/HDR pairs
 remain important coverage gaps.
 [Provenance and hashes][provenance], [generated fixture locks][fixture-lock].
 
-Consumer results below narrow several of these paths further. Browser success
-does not establish native-viewer or wallpaper compatibility. The research also
-supplies no production throughput, memory, file-size target or concurrency
-qualification, and no proof of faithful browser-side Profile picture cropping
-or encoding.
+Browser results do not establish native-viewer or wallpaper compatibility.
+Production throughput, memory, file-size targets, concurrency, and browser-side
+Profile picture cropping/encoding remain unqualified.
 
 ## Physical review findings
 
-The October 8 to 11 reviews cover representative exact files, not every native
-case. The [consumer observations][consumer-observations], [result rows][consumer-results]
-and [asset hashes][consumer-assets] retain each result's scope. These are user
-observations under recorded settings, without measured display luminance.
-The photographic SDR PNG is an independently prepared authored-base reference;
-its natural appearance does not prove HDR-to-SDR conversion quality.
+The October 8 to 11 reviews cover exact files, not every native case. The
+[observations][consumer-observations], [results][consumer-results], and
+[hashes][consumer-assets] record scope and settings, without luminance measurements.
+The photographic SDR PNG is an independent authored-base reference; its natural
+appearance does not qualify HDR-to-SDR conversion.
 
 | Device and recorded environment | Browser findings | Native viewing and wallpaper findings |
 | --- | --- | --- |
@@ -236,12 +203,10 @@ Several narrower limits matter when interpreting the table:
   and Firefox SDR presentation, remain untested. Usable SDR wallpaper on every
   originally named device is therefore unestablished.
 
-Most of the 1,288 native manual assets remain physically unreviewed. The
-observations do not fix gain-map adaptation failures or qualify other encodings,
-software versions or consumer paths. Missing visible HDR also does not establish
-how an operating system stores an imported wallpaper. Private screenshots
-support the recorded color-corruption observations and are excluded from the
-published evidence.
+Most of the 1,288 manual assets remain physically unreviewed. These observations
+do not qualify other encodings, versions, or consumers, resolve gain-map adaptation,
+or reveal how operating systems store wallpapers. Private screenshots support
+the color-corruption observations but remain outside published evidence.
 
 ## Deployment and evidence boundaries
 
@@ -279,13 +244,11 @@ same-file results leave `milestone_qualified=false`. The native replay's histori
 physical-review pending entries remain intact; the smaller consumer record
 above supplements them without retroactively qualifying the whole matrix.
 
-The [raw native results archive][native-results] preserves the final report,
-full matrix, measurements, commands, fixture facts and native versions. The
-[compact matrix][matrix] links its full source hash, and the [replay audit][replay-audit]
-records the hashes of the principal result files. The [publication manifest][publication]
-hashes both archives and the compact evidence files. The [research prerelease][evidence-release]
-is an evidence archive, not a production release. The large proof branch remains
-separate from this documentation change.
+The [native archive][native-results] retains the report, full matrix,
+measurements, commands, fixture facts, and versions. The [compact matrix][matrix]
+links its source hash; the [audit][replay-audit] hashes principal results; the
+[publication manifest][publication] hashes both archives and compact evidence.
+The [prerelease][evidence-release] publishes evidence, not production software.
 
 To rerun the latest archived suite from a separate checkout, use Docker with
 linux/amd64 support and the repository's normal package tooling:
@@ -305,25 +268,20 @@ before interpreting the result.
 
 ## Using this evidence in the wayfinder map
 
-Use these findings to choose practical implementation scope in the
-[Media rendition map][map]. The accepted [HDR Profile picture resolution][profile-hdr]
-places native processing in Media and stores the processed image as User's
-immutable Asset. Its source admission, crop, preview and retention decisions
-remain in force; this research supplies evidence for their implementation. The separate
-[SDR editor specification][profile-sdr] already chooses a 512-by-512 sRGB SDR
-WebP upload; this research does not change that contract or prove its browser
-implementation.
+Use the [Media rendition map][map] and [final specification planning][specs] to
+select combinations, consumers, deployment dependencies, and acceptance tests.
+Generation policy and companion lifecycle remain with the map investigations.
+The [HDR Profile picture resolution][profile-hdr] places native processing in
+Media and stores the result as User's immutable Asset, retaining its admission,
+crop, preview, and retention decisions. The [SDR editor specification][profile-sdr]
+requires a 512-by-512 sRGB SDR WebP upload; this research does not qualify its
+browser implementation. The [clean-rebuild decision][clean-rebuild] requires
+no historical migration or backfill.
 
-[Final specification planning][specs] should select the supported combinations,
-consumer targets, deployment dependencies and representative acceptance tests.
-Generation policy and companion lifecycle remain with their existing map
-investigations. The accepted [clean-rebuild decision][clean-rebuild] requires no
-historical migration or backfill. The [conversion proof ticket][proof-ticket] concludes as
-completed empirical research with demonstrated, failed and explicitly untested
-outcomes. Remaining fidelity and consumer qualifications belong in the selected
-implementation scope and its acceptance tests. Closing the research does not
-change accepted product policy, authorize silent SDR or gamut reduction, or
-require every optional experiment to pass before planning proceeds.
+[#284][proof-ticket] completes empirical research with passing, failed, and
+untested outcomes. Remaining fidelity and consumer qualification belong to the
+selected implementation's acceptance tests. Completion neither authorizes silent
+SDR/gamut reduction nor requires every optional experiment to pass before planning.
 
 [archive]: https://github.com/rafaeltab/wallpaperdb/commit/fd1c43e78134a5ecc0cd353a3ce099e02ed19392
 [publication]: hdr-conversion-evidence/publication.json

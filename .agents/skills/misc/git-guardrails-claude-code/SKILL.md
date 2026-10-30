@@ -5,91 +5,54 @@ description: Set up Claude Code hooks to block dangerous git commands (push, res
 
 # Setup Git Guardrails
 
-Sets up a PreToolUse hook that intercepts and blocks dangerous git commands before Claude executes them.
+Install a PreToolUse hook that blocks dangerous git commands before Claude runs them.
 
 ## What Gets Blocked
 
-- `git push` (all variants including `--force`)
-- `git reset --hard`
-- `git clean -f` / `git clean -fd`
-- `git branch -D`
-- `git checkout .` / `git restore .`
+- `git push`, including `--force`.
+- `git reset --hard`.
+- `git clean -f` and `git clean -fd`.
+- `git branch -D`.
+- `git checkout .` and `git restore .`.
 
-When blocked, Claude sees a message telling it that it does not have authority to access these commands.
+Blocked commands tell Claude it lacks authority to run them.
 
 ## Steps
 
 ### 1. Ask scope
 
-Ask the user: install for **this project only** (`.claude/settings.json`) or **all projects** (`~/.claude/settings.json`)?
+Ask whether to install for this project in `.claude/settings.json` or globally in `~/.claude/settings.json`.
 
 ### 2. Copy the hook script
 
-The bundled script is at: [scripts/block-dangerous-git.sh](scripts/block-dangerous-git.sh)
-
-Copy it to the target location based on scope:
-
-- **Project**: `.claude/hooks/block-dangerous-git.sh`
-- **Global**: `~/.claude/hooks/block-dangerous-git.sh`
-
-Make it executable with `chmod +x`.
+Copy [scripts/block-dangerous-git.sh](scripts/block-dangerous-git.sh) to `.claude/hooks/block-dangerous-git.sh` under the project or home directory, according to scope. Make it executable with `chmod +x`.
 
 ### 3. Add hook to settings
 
-Add to the appropriate settings file:
-
-**Project** (`.claude/settings.json`):
+Merge this entry into `hooks.PreToolUse` without overwriting other settings:
 
 ```json
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-dangerous-git.sh"
-          }
-        ]
-      }
-    ]
-  }
+  "matcher": "Bash",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-dangerous-git.sh"
+    }
+  ]
 }
 ```
 
-**Global** (`~/.claude/settings.json`):
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/block-dangerous-git.sh"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-If the settings file already exists, merge the hook into the existing `hooks.PreToolUse` array. Don't overwrite other settings.
+For global installation, use `~/.claude/hooks/block-dangerous-git.sh` as the command instead.
 
 ### 4. Ask about customization
 
-Ask if user wants to add or remove any patterns from the blocked list. Edit the copied script accordingly.
+Ask whether to add or remove blocked patterns, then edit the copied script accordingly.
 
 ### 5. Verify
 
-Run a quick test:
-
-```bash
+```sh
 echo '{"tool_input":{"command":"git push origin main"}}' | <path-to-script>
 ```
 
-Should exit with code 2 and print a BLOCKED message to stderr.
+Require exit code 2 and a BLOCKED message on stderr.

@@ -1,12 +1,10 @@
 ---
 title: Profile picture delivery
-description: Private picture storage, immediate origin retirement, and immutable caching.
+description: The original origin-authorization decision and its replacement.
 ---
 
-User owns Profile picture ingestion and lifecycle state. It stores immutable objects in a private bucket and publishes asset metadata through the transactional Profile outbox. Asset projects this metadata and serves `/asset/profile-pictures/:pictureId`.
+The [original decision](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/adr/0004-authorize-profile-picture-delivery-at-origin.md) required Asset to check User's current-picture authority on every origin request. An asynchronous projection alone could expose a replaced picture while events were delayed. The uncached, fail-closed check prevented that exposure but made delivery depend on User availability.
 
-Before each origin response, Asset asks User whether the asset is still the current public picture. This internal request uses a shared service token, is never cached, and fails closed. The synchronous check prevents a delayed or replayed event from exposing a replaced or removed picture.
+[ADR 0011](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/adr/0011-unlink-profile-pictures-before-asynchronous-media-deletion.md) and [ADR 0012](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/adr/0012-own-stable-assets-and-immutable-sources-in-media.md) supersede that design for the target architecture. Profile unlink precedes asynchronous Asset deletion, so an already-known URL may remain usable until deletion is processed. Asset owns source bytes and private retention.
 
-Successful image responses use immutable caching. Removal prevents subsequent origin delivery; it cannot recall copies already downloaded or cached by browsers or a CDN. A User outage makes picture delivery unavailable. Missing assets and other errors are not cached, so a newly accepted image can become available after its projection arrives.
-
-User retains replaced and removed objects privately for the configured window (30 days by default). Each asset keeps its recorded expiry when configuration changes. Public responses and GraphQL expose only the immutable asset ID and Asset URL, never object-store credentials or the captured Clerk import URL.
+Neither origin retirement nor deletion can recall copies already downloaded or cached. The target retains the 30-day private-evidence default and recorded expiry dates without choosing a new cache policy.

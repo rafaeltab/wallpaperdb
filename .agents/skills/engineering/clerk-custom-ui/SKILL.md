@@ -12,23 +12,11 @@ metadata:
 
 # Custom UI
 
-> **Prerequisite**: Ensure `ClerkProvider` wraps your app. See `clerk-setup` skill.
->
-> **Version**: Check `package.json` for the SDK version — see `clerk` skill for the version table. This determines which custom flow references to use below.
-
-This skill covers two areas:
-1. **Custom authentication flows** — build your own sign-in/sign-up UI with hooks
-2. **Appearance customization** — theme, style, and brand Clerk's pre-built components
+Wrap the app in `ClerkProvider`; see `clerk-setup`. Check the SDK version in `package.json` against the `clerk` skill's version table before choosing custom flow references.
 
 ## What Do You Need?
 
-| Task | Reference |
-|------|-----------|
-| Custom sign-in (Core 2 / LTS) | core-2/custom-sign-in.md |
-| Custom sign-up (Core 2 / LTS) | core-2/custom-sign-up.md |
-| Custom sign-in (Current SDK v7+) | core-3/custom-sign-in.md |
-| Custom sign-up (Current SDK v7+) | core-3/custom-sign-up.md |
-| Show component pattern (Current SDK) | core-3/show-component.md |
+Use hooks for custom authentication flows or the appearance prop for pre-built components.
 
 ## Custom Flow References
 
@@ -38,11 +26,9 @@ This skill covers two areas:
 | Custom sign-up (useSignUp) | `core-2/custom-sign-up.md` | `core-3/custom-sign-up.md` |
 | `<Show>` component | *(use `<SignedIn>`, `<SignedOut>`, `<Protect>`)* | `core-3/show-component.md` |
 
----
-
 ## Appearance Customization
 
-Appearance customization applies to both Core 2 and the current SDK.
+Applies to Core 2 and the current SDK.
 
 ### Component Customization Options
 
@@ -72,8 +58,6 @@ Appearance customization applies to both Core 2 and the current SDK.
 />
 ```
 
-> **Core 2 ONLY (skip if current SDK):** The `options` property was named `layout`. Use `layout: { logoImageUrl: '...', socialButtonsVariant: '...' }` instead of `options`.
-
 ### variables (colors, typography, borders)
 
 | Property | Description |
@@ -82,9 +66,7 @@ Appearance customization applies to both Core 2 and the current SDK.
 | `colorBackground` | Background color |
 | `borderRadius` | Border radius (default: `0.375rem`) |
 
-**Opacity change:** `colorRing` and `colorModalBackdrop` now render at full opacity. Use explicit `rgba()` values if you need transparency.
-
-> **Core 2 ONLY (skip if current SDK):** `colorRing` and `colorModalBackdrop` rendered at 15% opacity by default.
+`colorRing` and `colorModalBackdrop` render at full opacity; use `rgba()` for transparency. Core 2 rendered them at 15% opacity by default.
 
 ### options (structure, logo, social buttons)
 
@@ -95,15 +77,11 @@ Appearance customization applies to both Core 2 and the current SDK.
 | `socialButtonsPlacement` | `'top'` \| `'bottom'` |
 | `showOptionalFields` | Show optional fields (default: `false`) |
 
-> **Core 2 ONLY (skip if current SDK):** This property is called `layout`, not `options`. Also, `showOptionalFields` defaulted to `true`.
+In Core 2, use `layout` instead of `options`; `showOptionalFields` defaulted to `true`.
 
 ### Themes
 
-Install themes from `@clerk/ui`:
-
-```bash
-npm install @clerk/ui
-```
+Install `@clerk/ui` for themes.
 
 ```typescript
 import { dark } from '@clerk/ui/themes'
@@ -111,9 +89,9 @@ import { dark } from '@clerk/ui/themes'
 <ClerkProvider appearance={{ theme: dark }} />
 ```
 
-> **Core 2 ONLY (skip if current SDK):** Themes are imported from `@clerk/themes` (install `@clerk/themes` instead of `@clerk/ui`). Example: `import { dark } from '@clerk/themes'`.
+In Core 2, install and import themes from `@clerk/themes` instead.
 
-**Theme stacking** — pass an array where the last theme takes precedence:
+For stacked themes, the last theme takes precedence:
 
 ```typescript
 import { dark, neobrutalism } from '@clerk/ui/themes'
@@ -121,15 +99,13 @@ import { dark, neobrutalism } from '@clerk/ui/themes'
 <ClerkProvider appearance={{ theme: [dark, neobrutalism] }} />
 ```
 
-**CSS `color-scheme` support** — the default theme respects the CSS `color-scheme` property for automatic light/dark mode toggling.
+The default theme respects CSS `color-scheme` for light/dark mode.
 
 **Available themes:** `dark`, `neobrutalism`, `shadcn`, `simple`
 
 #### shadcn Theme
 
-> **IMPORTANT:** If the project has `components.json` (shadcn/ui installed), ALWAYS apply the shadcn theme as the FIRST customization step. This ensures Clerk components visually match the existing shadcn design system. Skip this only if the user explicitly requests a different theme.
-
-**If the project uses shadcn/ui** (check for `components.json` in the project root), **always use the shadcn theme**:
+If the project has `components.json`, apply the shadcn theme before other customization unless the user requests another theme.
 
 ```typescript
 import { shadcn } from '@clerk/ui/themes'
@@ -160,13 +136,7 @@ Also import shadcn CSS in your global styles:
 
 ## Common Pitfalls
 
-| Issue | Solution |
-|-------|----------|
-| Colors not applying | Use `colorPrimary` not `primaryColor` |
-| Logo not showing | Put `logoImageUrl` inside `options: {}` (or `layout: {}` in Core 2) |
-| Social buttons wrong | Add `socialButtonsVariant: 'iconButton'` in `options` (or `layout` in Core 2) |
-| Styling not working | Use appearance prop, not direct CSS (unless with bring-your-own-css) |
-| Hook returns different shape | Check SDK version — Core 2 and current have completely different `useSignIn`/`useSignUp` APIs |
+Use `colorPrimary`, not `primaryColor`. Apply styling through the appearance prop unless using bring-your-own-css. Hook APIs differ between Core 2 and the current SDK; use the matching reference above.
 
 ## See Also
 

@@ -48,7 +48,7 @@ export function publication(
         );
         if (prs.length === 0) return { kind: 'absent' as const };
         const pr = prs[0];
-        if (prs.length !== 1 || !pr || !matches(pr, intent.branch, base, intent.base))
+        if (prs.length !== 1 || !pr || !matches(pr, intent.branch, base))
           return { kind: 'ambiguous' as const };
         const checks = pr.statusCheckRollup.map((check) =>
           'name' in check
@@ -78,11 +78,12 @@ export function publication(
     );
 }
 
-function matches(pr: z.infer<typeof schema>[number], branch: string, base: string, commit: string) {
+// The pinned stage comparison stays in the intent; an independent target-head
+// advance preserves validation when head/target and conflict freedom still match.
+function matches(pr: z.infer<typeof schema>[number], branch: string, base: string) {
   return (
     pr.headRefName === branch &&
     pr.baseRefName === base &&
-    pr.baseRefOid === commit &&
     /^https:\/\/github.com\/rafaeltab\/wallpaperdb\/pull\/\d+$/.test(pr.url)
   );
 }

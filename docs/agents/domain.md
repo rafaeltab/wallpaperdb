@@ -11,18 +11,6 @@ WallpaperDB uses a multi-context domain documentation layout.
 
 If a context glossary or ADR directory does not exist, proceed silently. Domain documentation is created lazily when terms or decisions are resolved.
 
-## Layout
-
-```text
-/
-|-- GLOSSARY-MAP.md
-|-- docs/adr/                  # system-wide decisions
-|-- apps/
-|   |-- user/
-|       |-- GLOSSARY.md
-|       |-- docs/adr/          # optional context-local decisions
-```
-
 ## Vocabulary
 
 Use each context glossary's canonical terms in issue titles, specifications, tests, and code. Avoid synonyms explicitly listed by the glossary.

@@ -12,8 +12,8 @@ WallpaperDB lets people upload, discover, and download wallpapers, with contribu
 
 Workspace READMEs explain their purpose, core capabilities, and relevant technology choices. Use the source, tests, schemas, and `make help` for implementation and command details.
 
-## What belongs in the docs
+## Core capabilities
 
-Keep decisions and their reasons, domain language, user guidance, and operational procedures that are difficult to infer safely from code. Give each topic one home and link to it. Keep ADRs as historical records.
-
-Do not copy file trees, API signatures, configuration defaults, test inventories, or implementation walkthroughs into prose. Track new work in GitHub issues; remove completed plans once their lasting decisions have a home.
+- Upload wallpapers, filter discovery by contributor, format, and aspect ratio, and rank results by color preference.
+- Retrieve original images and renditions sized for different devices.
+- Manage public contributor Profiles with Handles, Biographies, and pictures.

@@ -15,6 +15,6 @@ Local changes include JavaScript source selection and parsing, callback discover
 
 Keep imports and unrelated upstream code stable when making changes. Modified upstream files carry a notice referring to this document. The package's [Biome configuration](biome.json) deliberately limits linting and formatting to workspace JSON files and the Vitest configuration. Imported source and test formatting remains unchanged to keep comparisons with upstream focused on behavioral changes.
 
-Run package tests and coverage through `make test-unit PACKAGE=crap-typescript-core` and type checking through `make check-types PACKAGE=crap-typescript-core`. Type checking includes tests; the package's [Turbo configuration](turbo.json) includes them in its cache inputs. Run the root provider integration tests through `make test-integration PACKAGE=root` and their type checks through `make check-types PACKAGE=root`. All of these use the standard Turbo tasks and run in workspace CI. Command definitions remain in the [root Makefile](../../Makefile), with root tasks declared in [package.json](../../package.json) and [turbo.json](../../turbo.json).
+The [package scripts](package.json) and [root Makefile](../../Makefile) define verification. Include the [root provider contracts](../../test/integration/crap-provider.test.ts) when changing coverage attribution across Vitest versions.
 
 Compare changes against the pinned revision before preparing an upstream contribution, retaining the license and any future upstream notices when refreshing this copy.

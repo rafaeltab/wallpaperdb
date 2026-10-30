@@ -12,7 +12,7 @@ Each axis requiring fresh review runs in a separate sub-agent. When both are nee
 
 Apply [task scope](../../../../docs/agents/task-scope.md) when preparing both sub-agent briefs and interpreting their findings. Include the agreed scope, relevant user decisions, and pending proposals in each brief, including repeated rounds.
 
-The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, tell the user to run `/setup-matt-pocock-skills`.
+The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, tell the user to run $setup-matt-pocock-skills.
 
 ## Process
 
@@ -28,7 +28,7 @@ Before going further, confirm the fixed point resolves (`git rev-parse <fixed-po
 
 ### 2. Identify the spec source
 
-Use originating requirements supplied by the invoking workflow or established in the current conversation as the spec source. When `do-work` invokes this review, use its recorded requirements and starting comparison. Follow their issue or document references for supporting context.
+Use originating requirements supplied by the invoking workflow or established in the current conversation as the spec source. When $do-work invokes this review, use its recorded requirements and starting comparison. Follow their issue or document references for supporting context.
 
 If requirements are not already available, look for the originating spec in this order:
 

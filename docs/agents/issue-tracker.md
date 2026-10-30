@@ -4,15 +4,9 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 ## Conventions
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`.
-- **Read an issue**: `gh issue view <number> --comments`, including labels and the full body.
-- **List issues**: `gh issue list` with appropriate state and label filters and JSON output when structured data is needed.
-- **Comment on an issue**: `gh issue comment <number> --body "..."`.
-- **Apply or remove labels**: `gh issue edit <number> --add-label "..."` or `--remove-label "..."`.
-- **Close an issue**: `gh issue close <number> --comment "..."`.
-- **Reopen an issue**: [gh issue reopen](https://cli.github.com/manual/gh_issue_reopen) accepts an issue number or URL. Explain why the recurrence warrants reopening in an issue comment. After reopening, use [gh issue view](https://cli.github.com/manual/gh_issue_view) with `--json state,url` and verify `state` is `OPEN` before relying on the issue as active tracking. Report a failed mutation or verification instead of treating the issue as open.
+Use the [GitHub CLI manual](https://cli.github.com/manual/gh_issue) for issue operations and $github-markdown-bodies for published Markdown. Infer the repository from the checkout's Git remote.
 
-Infer the repository from `git remote -v`; `gh` does this automatically inside the clone.
+When reopening an issue, explain the recurrence in a comment and verify `OPEN` with `gh issue view --json state,url` before relying on it as active tracking. Report a failed mutation or verification.
 
 ## Claiming an issue
 
@@ -37,11 +31,11 @@ Track repository issues in [WallpaperDB, project 7](https://github.com/users/raf
 | `Released` | Available to all users |
 | `Cancelled` | Will not be picked up |
 
-Use grilling when planning needs human decisions. For an existing issue, verify assignment and set `Planning` when grilling starts. Set `Planned` after the agreed plan is recorded in the issue. Triage can complete planning when evidence, scope, and testable acceptance criteria establish bounded work with no human decisions remaining. Record that outcome and set `Planned`; routine investigation and implementation choices belong to the agent. Work that still needs planning remains `Todo`. Planning without an existing issue has no project item to update. `to-spec` and `to-tickets` publish prepared specs and tickets as `Planned`.
+Use $grilling when planning needs human decisions. For an existing issue, verify assignment and set `Planning` when grilling starts. Set `Planned` after the agreed plan is recorded in the issue. Triage can complete planning when evidence, scope, and testable acceptance criteria establish bounded work with no human decisions remaining. Record that outcome and set `Planned`; routine investigation and implementation choices belong to the agent. Work that still needs planning remains `Todo`. Planning without an existing issue has no project item to update. $to-spec and $to-tickets publish prepared specs and tickets as `Planned`.
 
 Active work requires an open issue. Read `state` before moving an existing issue to `Planning`, `Planned`, `In Progress`, or `In Review`. For a closed issue, use the user's existing authorization to resume work, or clarify that intent when absent, then follow the [reopening convention](#conventions), explain the recurrence in an issue comment, and verify `OPEN` before changing status. Discussing historical work leaves its closed state and project status unchanged.
 
-Implementation starts with `In Progress`, including explicitly requested work on an issue currently in `Backlog` or `Todo`. Check [dependency readiness](#relationships) first. A checklist inside `do-work` does not move an implementation ticket back into `Planning`. After the completed implementation is pushed and its PR is ready for review, verify `In Review` before handing it back. Draft PRs keep their tickets `In Progress`; stack tickets enter `In Review` after the complete-spec review and final head/base checks pass and their PRs are marked ready. During substantive review fixes use `In Progress`, then restore `In Review` after the tested fixes are pushed and the PR is ready for review. Merely monitoring CI or investigating feedback does not change status.
+Implementation starts with `In Progress`, including explicitly requested work on an issue currently in `Backlog` or `Todo`. Check [dependency readiness](#relationships) first. A checklist inside $do-work does not move an implementation ticket back into `Planning`. After the completed implementation is pushed and its PR is ready for review, verify `In Review` before handing it back. Draft PRs keep their tickets `In Progress`; stack tickets enter `In Review` after the complete-spec review and final head/base checks pass and their PRs are marked ready. During substantive review fixes use `In Progress`, then restore `In Review` after the tested fixes are pushed and the PR is ready for review. Merely monitoring CI or investigating feedback does not change status.
 
 Update only the selected issue's item. Creating child tickets does not authorize changing their parent's status. Track each stack ticket when its own implementation starts and reaches review; leave unstarted siblings at their existing status. Close the parent only after all tickets have landed and the complete spec is validated.
 

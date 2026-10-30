@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-TODO: add a reusable prompt for scaffolding a new service
+Use $create-service to implement the agreed service boundary.
 
 # Purpose
 

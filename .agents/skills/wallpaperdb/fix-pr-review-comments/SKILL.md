@@ -42,7 +42,7 @@ The verification step is complete when every selected claim has either an eviden
 
 For fixes tied to an issue, follow the [project lifecycle](../../../../docs/agents/issue-tracker.md#project-lifecycle) to verify `In Progress` when substantive rework starts and `In Review` after the tested fixes are pushed. Feedback investigation or monitoring alone does not change status. Preserve the issue's open state until verified default-branch landing.
 
-Apply the repository's [development-principles](../development-principles/SKILL.md) and [testing](../testing/SKILL.md) skills. For each independent fix, implement the smallest complete change, run the relevant checks and formatting through Make, then commit it before starting the next fix. Group duplicate comments reporting the same defect into that commit and map every duplicate to it. Keep unrelated fixes in separate commits.
+Apply the repository's $development-principles and $testing skills. For each independent fix, implement the smallest complete change, run the relevant checks and formatting through Make, then commit it before starting the next fix. Group duplicate comments reporting the same defect into that commit and map every duplicate to it. Keep unrelated fixes in separate commits.
 
 Address the verified problem; use the reviewer's suggested implementation only if it is appropriate. If a valid concern is already fixed on the PR branch, verify the existing change and identify its commit or code location. Acknowledge it without an empty commit. Invalid feedback needs an explanation, not a code change.
 
@@ -50,7 +50,7 @@ Run the required checks for the completed changes before publication. Keep fixes
 
 ## 4. Reply, react, and resolve
 
-Re-read the selected conversation and PR head before publishing a verdict. Reassess changed claims or code. Reply in the existing review thread when one exists. For review summaries and standalone conversation comments, reply in the PR conversation with a link identifying the original comment. Use [github-markdown-bodies](../github-markdown-bodies/SKILL.md) for bodies and read them back after posting.
+Re-read the selected conversation and PR head before publishing a verdict. Reassess changed claims or code. Reply in the existing review thread when one exists. For review summaries and standalone conversation comments, reply in the PR conversation with a link identifying the original comment. Use $github-markdown-bodies for bodies and read them back after posting.
 
 For valid feedback, reply with the fix commit or existing fix and the verification performed, then add thumbs up to the original comment. For invalid feedback, post the evidence-backed reason first, then add thumbs down to the original comment. Apply the verdict to each actionable comment, including duplicate reports, rather than reacting only to your reply or the PR itself.
 

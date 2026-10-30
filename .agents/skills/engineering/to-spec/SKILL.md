@@ -6,19 +6,19 @@ disable-model-invocation: true
 
 This skill takes the current conversation context and codebase understanding and produces a spec. Do NOT interview the user; just synthesize what you already know.
 
-The issue tracker and triage label vocabulary should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`.
+The issue tracker and triage label vocabulary should have been provided to you. If not, tell the user to run $setup-matt-pocock-skills.
 
 ## Process
 
 1. Explore the repo to understand the current state of the codebase, if you haven't already. Use the project's domain glossary vocabulary throughout the spec, and respect any ADRs in the area you're touching.
 
-2. Before proposing test seams, load the [testing skill](../../wallpaperdb/testing/SKILL.md) and the applicable guidelines from [CODING_STANDARDS.md](../../../../CODING_STANDARDS.md). Use WallpaperDB's test vocabulary and choose the narrowest public boundary that owns each behavior. Add a wider test only for a distinct risk.
+2. Before proposing test seams, load $testing and the applicable guidelines from [CODING_STANDARDS.md](../../../../CODING_STANDARDS.md). Use WallpaperDB's test vocabulary and choose the narrowest public boundary that owns each behavior. Add a wider test only for a distinct risk.
 
 Check with the user that the proposed seams match their expectations after applying that guidance.
 
 3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `spec` GitHub label.
 
-   Until `to-tickets` has completed the spec's ticket breakdown, apply `ready-for-human` and remove any `ready-for-agent` label. A spec is eligible for `ready-for-agent` only after that breakdown is complete.
+   Until $to-tickets has completed the spec's ticket breakdown, apply `ready-for-human` and remove any `ready-for-agent` label. A spec is eligible for `ready-for-agent` only after that breakdown is complete.
 
    Follow the [project lifecycle](../../../../docs/agents/issue-tracker.md#project-lifecycle) to verify project membership and `Planned` after publishing.
 

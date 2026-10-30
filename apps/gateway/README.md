@@ -18,8 +18,4 @@ Read the [domain context](GLOSSARY.md) for ownership and the [projection decisio
 
 The [admission decision](docs/adr/0003-weighted-ip-admission-with-bounded-fallback.md) explains quota and overload responses, degraded operation, and required production ingress controls. [Load evidence](docs/admission-load-test.md) records initial limits and the checks required before deployment.
 
-## API documentation
-
-Gateway serves Swagger UI at `/documentation` and its OpenAPI document at `/documentation/json`, registered by the [HTTP adapter](src/http/index.ts) and the [shared OpenAPI plugin](../../packages/core/src/openapi/plugin.ts).
-
-Offline OpenAPI artifact generation is not a supported Gateway workflow. The former `gen:swagger` script pointed to a missing source file and was removed because no in-repository consumer requires a Gateway artifact.
+Gateway's [HTTP adapter](src/http/index.ts) registers its live API documentation.

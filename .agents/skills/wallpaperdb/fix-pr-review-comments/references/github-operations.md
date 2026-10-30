@@ -19,7 +19,7 @@ See GitHub's [GraphQL reference](https://docs.github.com/en/graphql/reference), 
 
 For a review thread, use GraphQL `addPullRequestReviewThreadReply` with `pullRequestReviewThreadId` and `body`. For review summaries and PR conversation comments, use `gh pr comment <pr> --body-file <file>` and include the original comment URL. A review summary is a review node, not an issue comment or a review thread.
 
-Follow [github-markdown-bodies](../../github-markdown-bodies/SKILL.md). With `gh api`, pass a Markdown file as `-F body=@<file>` when the endpoint supports form fields, or build a JSON payload with an encoder and use `--input <file>`. Read the posted body back and verify its contents before continuing.
+Follow $github-markdown-bodies. With `gh api`, pass a Markdown file as `-F body=@<file>` when the endpoint supports form fields, or build a JSON payload with an encoder and use `--input <file>`. Read the posted body back and verify its contents before continuing.
 
 ## React to the original comment
 

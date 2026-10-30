@@ -18,14 +18,10 @@ Read [task scope](docs/agents/task-scope.md) when planning, implementing, review
 
 Issues and specs are tracked in GitHub Issues, with membership and lifecycle status in the WallpaperDB GitHub Project. Read `docs/agents/issue-tracker.md` when creating, planning, implementing, reopening, or reviewing issue work. External pull requests are not a triage surface.
 
-### Triage labels
-
-Use the five canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
-
 ### Domain docs
 
-WallpaperDB uses a multi-context layout rooted at `GLOSSARY-MAP.md`; system-wide ADRs live in `docs/adr/`. See `docs/agents/domain.md`.
+When changing domain behavior or recording decisions, read [domain documentation](docs/agents/domain.md).
 
 ### Documentation
 
-Keep documentation for setup pitfalls, domain language, decisions and their rationale, and policies that cannot be inferred from code. Link to source for commands, configuration, APIs, and implementation details. Update the existing authoritative document instead of adding another explanation of the same topic. Track unfinished work in issues; keep temporary handoffs and investigation notes outside the repository.
+For documentation changes, follow the [documentation guidelines](docs/coding-standards/project-organization.md#documentation). Update the authoritative document and link to source for commands, configuration, APIs, and implementation details. Track unfinished work in issues; keep temporary handoffs and investigation notes outside the repository.

@@ -9,8 +9,7 @@ mathematical-formula level.
 This describes the selected method and its limitations. The production
 [GraphQL schema](../../../apps/gateway/src/graphql/schema.ts) and
 [Catalogue admission and target resolution](../../../apps/gateway/src/capabilities/catalogue/colors.ts)
-define its complete request contract. See [research path](RESEARCH-PATH.md),
-[historical evidence](EVIDENCE.md), and [production decisions and remaining work](PRODUCTION-QUESTIONS.md).
+define its complete request contract. See [historical evidence](EVIDENCE.md) and the [integration decision](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions).
 
 ## The idea in plain language
 
@@ -190,7 +189,9 @@ keyword doc values, respectively, in the same index; no separate metadata
 retrieval path is required. Retained versioned NATS measurements support deriving
 utilities again when the descriptor definition is unchanged. The initial
 installation uses fresh storage and uploads, so migration/backfill or operator
-rebuild tooling is unnecessary. See [production guidance](PRODUCTION-QUESTIONS.md).
+rebuild tooling is unnecessary. See the [integration decision](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md#production-integration-decisions).
+Excluding utilities from stored source bounds result retrieval, but ordinary source-only metadata updates would discard the utility bank. Projection changes must preserve complete banks by deriving utilities from retained measurements. See the [projection adapter](../../../apps/gateway/src/adapters/opensearch/index.ts).
+
 The actual million-record disk cost of this three-preset layout remains unmeasured.
 
 For a search, select the stored field for each resolved target and preference.

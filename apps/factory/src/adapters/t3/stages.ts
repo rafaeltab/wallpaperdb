@@ -114,7 +114,7 @@ export function stageExecution(
               ordinal: thread.runCount,
               commit,
               accepted: true,
-              stageIndex: request.stage === 'babysitting' ? request.index : undefined,
+              stageIndex: request.index,
               linked: thread.pullRequests?.map((pr) => pr.url) ?? [],
             };
           },

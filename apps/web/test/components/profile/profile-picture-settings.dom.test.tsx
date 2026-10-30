@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
+import { ProfilePictureSettings } from '@/components/profile/profile-picture-settings';
 import { ProfileSettingsPage } from '@/components/profile/profile-settings-page';
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 import { openPictureSource } from '@/features/picture-editor/adapters/browser';
@@ -69,7 +70,16 @@ describe('Profile picture settings', () => {
   it('warns below Zoom when a crop needs enlargement, clears on reset, and still permits Apply', async () => {
     vi.mocked(openPictureSource).mockResolvedValue({ width: 1024, height: 1024, preview: new Blob(['preview']), process: processPicture, dispose: disposePicture });
     vi.mocked(userApi.uploadPicture).mockResolvedValue({ ...profile, version: 2, pictureAssetId: 'saved' });
-    await renderPage();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    client.setQueryData(profileQueryKey(profile.id), profile);
+    render(
+      <QueryClientProvider client={client}>
+        <ProfilePictureSettings profile={profile} tokenProvider={async () => 'token'} />
+      </QueryClientProvider>
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Edit profile picture' }));
     const user = userEvent.setup();
     await user.upload(screen.getByLabelText('Choose picture'), new File(['source'], 'picture.png', { type: 'image/png' }));
     const zoom = await screen.findByRole('slider', { name: 'Zoom' });

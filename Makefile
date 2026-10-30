@@ -100,7 +100,7 @@ test-focused: ## Build dependencies and run selected tests serially (requires PA
 	@pnpm --filter @wallpaperdb/$(PACKAGE) exec vitest run --maxWorkers=1 --no-file-parallelism $(ARGS)
 
 test-unit: ## Run unit tests (no containers; optional PACKAGE)
-	@$(TURBO) run test:unit $(TURBO_FLAGS) --concurrency=1
+	@$(TURBO) run test:unit $(TURBO_FLAGS) --concurrency=$(CI_CONCURRENCY)
 
 test-mutation: ## Run advisory staged mutations (optional PACKAGE and ARGS; local diagnostics <=300s)
 	@node scripts/mutation.mjs $(if $(PACKAGE),--package "$(PACKAGE)") $(ARGS)

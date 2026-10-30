@@ -145,6 +145,17 @@ it('a fresh process reconciles publication after a lost response without repeati
       },
       { timeout: 10000, interval: 30 }
     );
+    const initialWait = await Effect.runPromise(
+      fileStore(join(host.directory, 'state')).readWait()
+    );
+    const watcher = {
+      ...waiting,
+      overrides: { status: 'completed', runCount: 5, latestRunId: 'watcher-5' },
+    };
+    await host.save(watcher);
+    expect(await (await fetch(origin + '/api/job')).json()).toMatchObject({
+      delivery: { activity: 'waiting-for-github', deadline: initialWait?.deadline },
+    });
     await stop(child);
     const store = fileStore(join(host.directory, 'state'));
     const retained = await Effect.runPromise(store.readWait());
@@ -156,7 +167,7 @@ it('a fresh process reconciles publication after a lost response without repeati
         store.saveWait({ ...retained, revision: retained.revision + 1, deadline: 0 })
       )
     ).toBe(true);
-    await host.save({ ...waiting, lostSend: true });
+    await host.save({ ...watcher, lostSend: true });
     child = launch();
     await ready();
     await vi.waitFor(

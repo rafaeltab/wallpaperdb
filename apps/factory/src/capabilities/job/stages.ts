@@ -41,11 +41,6 @@ function accepted(
   request: StageRequest
 ): evidence is StageEvidence {
   if (!evidence?.accepted) return false;
-  if (
-    evidence.ordinal !== (request.ordinal ?? request.index + 1) ||
-    evidence.runId === request.previousRunId
-  )
-    return false;
   return request.stage !== 'publication' || evidence.commit === request.commit;
 }
 function deliver(store: JobStore, execution: Execution, intent: Intent, request: StageRequest) {
@@ -142,11 +137,11 @@ function readiness(
   });
 }
 
-function acceptStage(store: JobStore, evidence: StageEvidence | null, request: StageRequest) {
+function associateStage(store: JobStore, evidence: StageEvidence | null, request: StageRequest) {
   return Effect.gen(function* () {
-    if (!evidence || evidence.ordinal !== (request.ordinal ?? request.index + 1)) return null;
-    if (!(yield* store.bindRun(request, evidence.runId))) return null;
-    return accepted(evidence, request) ? evidence : null;
+    if (!associatedRun(evidence, request)) return null;
+    if (!(yield* store.bindRun(request, evidence.runId, evidence.ordinal))) return null;
+    return evidence;
   });
 }
 
@@ -189,14 +184,15 @@ function reconcileStage(
     if (waiting.stage === 'ci' || waiting.index === 3)
       return yield* readiness(store, execution, issues, intent, waiting);
     yield* deliver(store, execution, intent, waiting);
-    const evidence = yield* execution.inspectStage(intent, waiting);
+    const observed = yield* execution.inspectStage(intent, waiting);
+    const evidence = yield* associateStage(store, observed, waiting);
     const delivery: Delivery = {
       stage: waiting.stage,
       commit: waiting.commit,
       ready: false,
       landed: false,
     };
-    const verified = yield* acceptStage(store, evidence, waiting);
+    const verified = evidence && accepted(evidence, waiting) ? evidence : null;
     if (!verified) {
       if (waiting.stage === 'babysitting')
         return yield* watchdog(
@@ -213,4 +209,18 @@ function reconcileStage(
     }
     return yield* advance(store, execution, issues, intent, waiting, verified);
   });
+}
+
+function associatedRun(
+  evidence: StageEvidence | null,
+  request: StageRequest
+): evidence is StageEvidence {
+  if (!evidence || evidence.runId === request.previousRunId) return false;
+  const expected = request.ordinal ?? request.index + 1;
+  if (evidence.ordinal === expected) return true;
+  return (
+    request.stage === 'babysitting' &&
+    evidence.ordinal > expected &&
+    evidence.stageIndex === request.index
+  );
 }

@@ -103,6 +103,14 @@ export function storeContract(
       const loser = bindings[0] ? 'replacement' : 'run-2';
       expect(await Effect.runPromise(fixture.reopen().bindRun(stage, winner))).toBe(true);
       expect(await Effect.runPromise(fixture.reopen().bindRun(stage, loser))).toBe(false);
+      const repair = { ...stage, index: 4, stage: 'babysitting' as const, ordinal: 4 };
+      expect(await Effect.runPromise(fixture.store.bindRun(repair, 'repair-4', 4))).toBe(true);
+      expect(await Effect.runPromise(fixture.reopen().bindRun(repair, 'watcher-5', 5))).toBe(true);
+      expect(await Effect.runPromise(fixture.reopen().bindRun(repair, 'watcher-5', 5))).toBe(true);
+      expect(await Effect.runPromise(fixture.reopen().bindRun(repair, 'replacement-5', 5))).toBe(
+        false
+      );
+      expect(await Effect.runPromise(fixture.reopen().bindRun(repair, 'repair-4', 4))).toBe(true);
     } finally {
       await fixture.close();
     }

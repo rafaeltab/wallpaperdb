@@ -5,7 +5,7 @@ export function controlledStore(): JobStore {
   let launched = false;
   let wait: import('../../src/capabilities/job/index.js').WaitState | null = null;
   const stages = new Map<number, import('../../src/capabilities/job/index.js').StageRequest>();
-  const runs = new Map<number, string>();
+  const runs = new Map<string, string>();
   const claims = new Set<number>();
   return {
     readWait: () => Effect.sync(() => wait),
@@ -15,11 +15,12 @@ export function controlledStore(): JobStore {
         wait = state;
         return true;
       }),
-    bindRun: (request, runId) =>
+    bindRun: (request, runId, ordinal = request.ordinal ?? request.index + 1) =>
       Effect.sync(() => {
-        const existing = runs.get(request.index);
+        const key = `${request.index}:${ordinal}`;
+        const existing = runs.get(key);
         if (existing) return existing === runId;
-        runs.set(request.index, runId);
+        runs.set(key, runId);
         return true;
       }),
     readStage: (index) => Effect.sync(() => stages.get(index) ?? null),

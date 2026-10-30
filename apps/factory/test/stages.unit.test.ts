@@ -98,6 +98,7 @@ async function stagesFixture() {
   let progress = 'run-1:failed';
   let waiting = false;
   let status = 'completed';
+  let stageIndex: number | undefined;
   const deps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
     Layer.succeed(Time, { now: () => Effect.succeed(now) }),
@@ -143,6 +144,7 @@ async function stagesFixture() {
           accepted,
           linked: links,
           waitingForGitHub: waiting,
+          stageIndex,
         }),
       sendStage: (_intent, request) =>
         Effect.sync(() => {
@@ -179,6 +181,7 @@ async function stagesFixture() {
       progress?: string;
       waiting?: boolean;
       status?: string;
+      stageIndex?: number;
     }) => {
       ordinal = value.ordinal ?? ordinal;
       runId = value.runId ?? runId;
@@ -192,6 +195,7 @@ async function stagesFixture() {
       progress = value.progress ?? progress;
       waiting = value.waiting ?? waiting;
       status = value.status ?? status;
+      stageIndex = value.stageIndex ?? stageIndex;
     },
     sends: () => sends,
     store,
@@ -376,4 +380,31 @@ it('does not continue waiting against a PR head that differs from the expected a
   job.change({ now: 3600101 });
   await job.status();
   expect(job.sends()).toBe(3);
+});
+it('continues an explicitly associated watcher run and uses its ordinal for the next stage', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ ordinal: 5, runId: 'watcher-5', stageIndex: 4 });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', deadline: 3600100 },
+  });
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(4);
+  expect(await Effect.runPromise(job.store.readStage(5))).toMatchObject({
+    ordinal: 6,
+    previousRunId: 'watcher-5',
+  });
+});
+it('accepts successful current watcher completion only for the owning repair stage', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ ordinal: 5, runId: 'watcher-5', stageIndex: 99, accepted: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  job.change({ stageIndex: 4 });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
+  expect(await Effect.runPromise(job.store.readStage(5))).toMatchObject({
+    ordinal: 6,
+    previousRunId: 'watcher-5',
+  });
 });

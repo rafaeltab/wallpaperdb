@@ -101,9 +101,13 @@ export function fileStore(directory: string): JobStore {
         if (state.revision !== (current?.revision ?? -1) + 1) return false;
         return publish(`wait-${state.revision}.json`, waitSchema.parse(state));
       }),
-    bindRun: (request, runId) =>
+    bindRun: (request, runId, ordinal = request.ordinal ?? request.index + 1) =>
       effect('bind-run', async () => {
-        const name = `stage-${request.index}-run.json`;
+        const initial = request.ordinal ?? request.index + 1;
+        const name =
+          ordinal === initial
+            ? `stage-${request.index}-run.json`
+            : `stage-${request.index}-run-${ordinal}.json`;
         await publish(name, { ...stageSchema.parse(request), runId });
         const saved = stageSchema
           .extend({ runId: z.string().min(1) })

@@ -32,7 +32,7 @@ export function watchdog(
     };
     if (!explicitWait(observation, request, evidence))
       return yield* suspended(store, request, delivery);
-    if (!(yield* store.bindRun(request, evidence.runId))) return delivery;
+
     const progress = yield* observedProgress(issues, intent, evidence.commit);
     if (progress === null) return delivery;
     const now = yield* time.now();
@@ -51,11 +51,7 @@ function explicitWait(
   evidence: StageEvidence | null
 ): evidence is StageEvidence {
   if (!evidence?.waitingForGitHub) return false;
-  return (
-    observation.status === 'completed' &&
-    evidence.ordinal === (request.ordinal ?? request.index + 1) &&
-    evidence.runId !== request.previousRunId
-  );
+  return observation.status === 'completed' && evidence.runId !== request.previousRunId;
 }
 function suspended(store: JobStore, request: StageRequest, delivery: Delivery) {
   return Effect.gen(function* () {
@@ -114,7 +110,7 @@ function continueWaiting(
       index: request.index + 1,
       commit: evidence.commit,
       previousRunId: evidence.runId,
-      ordinal: (request.ordinal ?? request.index + 1) + 1,
+      ordinal: evidence.ordinal + 1,
       continuation: true,
     };
     // Persist the identity before claiming a send. Without transport idempotency,

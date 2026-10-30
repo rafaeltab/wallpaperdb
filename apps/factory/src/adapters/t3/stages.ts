@@ -19,6 +19,7 @@ export function receiptInstructions(intent: Intent, stage: StageRequest['stage']
 }
 const receiptSchema = z
   .object({
+    delivery: z.string().optional(),
     jobId: z.string(),
     stage: z.enum(['implementation', 'review', 'publication', 'babysitting']),
     base: z.string(),
@@ -113,6 +114,7 @@ export function stageExecution(
               ordinal: thread.runCount,
               commit,
               accepted: true,
+              stageIndex: request.stage === 'babysitting' ? request.index : undefined,
               linked: thread.pullRequests?.map((pr) => pr.url) ?? [],
             };
           },
@@ -124,7 +126,7 @@ export function stageExecution(
 
 function stagePrompt(intent: Intent, request: StageRequest, prBase: string) {
   if (request.stage === 'babysitting')
-    return `${request.continuation ? 'continue. ' : ''}Use $babysit-pr for ${intent.issueUrl} in this existing bound thread/worktree. Stage ${request.index} of factory job ${intent.id}; delivery ${intent.id}:${request.index}; expected run ordinal ${request.ordinal}. Failed applicable CI requires repair; actual code repairs require affected independent Standards/Spec/Defects re-review before readiness. Only the selected issue and retained agreed scope are authorized; significant proposals return to the coordinator. Preserve manual babysitting behavior, use factory policy: mutation and hosted approval advisory, no automerge or issue closure. Keep questions here. While stuck waiting for GitHub return exactly JSON {"jobId":"${intent.id}","stage":"babysitting","base":"${intent.base}","outcome":"WAITING_FOR_GITHUB"} as the entire final message. Never use that outcome for a human question, active repair, or progressing agent work. ${receiptInstructions(intent, request.stage)}`;
+    return `${request.continuation ? 'continue. ' : ''}Use $babysit-pr for ${intent.issueUrl} in this existing bound thread/worktree. Stage ${request.index} of factory job ${intent.id}; delivery ${intent.id}:${request.index}; expected run ordinal ${request.ordinal}. Failed applicable CI requires repair; actual code repairs require affected independent Standards/Spec/Defects re-review before readiness. Only the selected issue and retained agreed scope are authorized; significant proposals return to the coordinator. Preserve manual babysitting behavior, use factory policy: mutation and hosted approval advisory, no automerge or issue closure. Keep questions here. While stuck waiting for GitHub return exactly JSON {"delivery":"${intent.id}:${request.index}","jobId":"${intent.id}","stage":"babysitting","base":"${intent.base}","outcome":"WAITING_FOR_GITHUB"} as the entire final message. Never use that outcome for a human question, active repair, or progressing agent work. ${receiptInstructions(intent, request.stage)} For babysitting only, include delivery="${intent.id}:${request.index}" in every success receipt, including watcher wakes. This immutable delivery identity remains the same through watcher wakes; return receipts only for this active stage.`;
   const skill = request.stage === 'review' ? '$review-loop' : '$publish-pr';
   return `Use ${skill} for ${intent.issueUrl} against PR target ${prBase}, pinned comparison ${intent.base}, in this existing bound checkout. Stage ${request.index} of factory job ${intent.id}; expected run ordinal ${request.ordinal ?? request.index + 1}; predecessor run ${request.previousRunId}; reviewed starting commit ${request.commit}. Preserve all requirements, decisions, validation and demo handoffs in this thread. Only this issue is authorized. All agents and fresh independent reviewers use gpt-6.1-sol. Publication must reconcile an existing PR before creating one, keep it concise, link it in T3, leave the issue open, and stop before CI repairs or merging. Mutation and hosted approval are advisory. ${receiptInstructions(intent, request.stage)}`;
 }
@@ -133,7 +135,7 @@ function completed(thread: z.infer<typeof stageDetail>['thread'], request: Stage
     thread.threadId === request.threadId &&
     thread.status === 'completed' &&
     thread.pendingRequestCount === 0 &&
-    thread.runCount === (request.ordinal ?? request.index + 1) &&
+    expectedRun(thread.runCount, request) &&
     Boolean(thread.latestRunId)
   );
 }
@@ -155,7 +157,8 @@ function matchesReceipt(
     result.stage === request.stage &&
     result.base === intent.base &&
     result.outcome === markers[request.stage] &&
-    (request.stage === 'implementation' || result.reviews)
+    (request.stage === 'implementation' || result.reviews) &&
+    (request.stage !== 'babysitting' || result.delivery === `${intent.id}:${request.index}`)
   );
 }
 function outcome(raw: unknown, intent: Intent, request: StageRequest) {
@@ -182,7 +185,7 @@ function pendingRun(raw: unknown, request: StageRequest, intent: Intent) {
   const { thread } = detail.data;
   if (
     thread.threadId !== request.threadId ||
-    thread.runCount !== (request.ordinal ?? request.index + 1) ||
+    !expectedRun(thread.runCount, request) ||
     !thread.latestRunId
   )
     return null;
@@ -192,6 +195,7 @@ function pendingRun(raw: unknown, request: StageRequest, intent: Intent) {
     commit: request.commit,
     accepted: false,
     waitingForGitHub: waitingReceipt(detail.data, request, intent),
+    stageIndex: waitingReceipt(detail.data, request, intent) ? request.index : undefined,
   };
 }
 
@@ -206,6 +210,7 @@ function waitingReceipt(
   try {
     return z
       .object({
+        delivery: z.literal(`${intent.id}:${request.index}`),
         jobId: z.literal(intent.id),
         stage: z.literal('babysitting'),
         base: z.literal(intent.base),
@@ -216,4 +221,9 @@ function waitingReceipt(
   } catch {
     return false;
   }
+}
+
+function expectedRun(ordinal: number, request: StageRequest) {
+  const initial = request.ordinal ?? request.index + 1;
+  return request.stage === 'babysitting' ? ordinal >= initial : ordinal === initial;
 }

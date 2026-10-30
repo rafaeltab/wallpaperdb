@@ -192,6 +192,7 @@ it('recognizes only the current expected assistant waiting receipt, without acce
       role: 'assistant',
       runId: 'repair-4',
       text: JSON.stringify({
+        delivery: `${intent.id}:4`,
         jobId: intent.id,
         stage: 'babysitting',
         base: host.base,
@@ -213,6 +214,51 @@ it('recognizes only the current expected assistant waiting receipt, without acce
       await host.save({ overrides, messages: [invalid] });
       expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).not.toMatchObject({
         waitingForGitHub: true,
+      });
+    }
+  }));
+it('accepts a latest watcher receipt only with the owning delivery identity and current commit', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const babysit = { ...request, stage: 'babysitting' as const, index: 4, ordinal: 4 };
+    const overrides = { status: 'completed', runCount: 5, latestRunId: 'watcher-5' };
+    const waiting = {
+      delivery: `${intent.id}:4`,
+      jobId: intent.id,
+      stage: 'babysitting',
+      base: host.base,
+      outcome: 'WAITING_FOR_GITHUB',
+    };
+    const message = { role: 'assistant', runId: 'watcher-5', text: JSON.stringify(waiting) };
+    await host.save({ overrides, messages: [message] });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).toMatchObject({
+      accepted: false,
+      waitingForGitHub: true,
+      ordinal: 5,
+      stageIndex: 4,
+    });
+    const success = {
+      ...waiting,
+      outcome: '<PR>READY</PR>',
+      commit: host.base,
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: true,
+    };
+    await host.save({ overrides, messages: [{ ...message, text: JSON.stringify(success) }] });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).toMatchObject({
+      accepted: true,
+      ordinal: 5,
+      stageIndex: 4,
+      runId: 'watcher-5',
+    });
+    for (const invalid of [
+      { ...success, delivery: `${intent.id}:3` },
+      { ...success, commit: 'f'.repeat(40) },
+    ]) {
+      await host.save({ overrides, messages: [{ ...message, text: JSON.stringify(invalid) }] });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).not.toMatchObject({
+        accepted: true,
       });
     }
   }));

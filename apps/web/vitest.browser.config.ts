@@ -12,6 +12,10 @@ export default mergeConfig(
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
     optimizeDeps: {
       include: [
+        // Pre-optimize app entries so cold starts do not reload active browser tests.
+        'react-dom/client',
+        '@tanstack/react-query-devtools',
+        '@tanstack/router-devtools',
         '@tanstack/react-router',
         'react-markdown',
         'rehype-sanitize',

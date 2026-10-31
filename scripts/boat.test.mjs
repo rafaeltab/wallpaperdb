@@ -831,6 +831,7 @@ async function lockGenerationCheckout(t) {
 		"scripts/lib/boat-cache.mjs",
 		"scripts/lib/boat-preparation.mjs",
 		"scripts/lib/boat-snapshot.mjs",
+		"scripts/lib/boat-source-generation.mjs",
 		"scripts/package.json",
 	]) {
 		local(name, fs.readFileSync(path.join(repository, name)));

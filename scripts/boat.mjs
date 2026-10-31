@@ -27,6 +27,12 @@ import {
 	prepareEnvironment,
 } from "./lib/boat-preparation.mjs";
 
+import {
+	sourceGeneration,
+	generateSource,
+	recoverPublication,
+} from "./lib/boat-source-generation.mjs";
+
 const root = process.cwd();
 const dir = path.join(root, ".boat");
 const configFile = path.join(dir, "enrollment.json");
@@ -64,6 +70,8 @@ function execute(
 		streamFrames = false,
 		logPath,
 		onOutput = () => {},
+		collectOutput = false,
+		maxCaptureBytes = Infinity,
 	} = {},
 ) {
 	return new Promise((resolve, reject) => {
@@ -78,10 +86,16 @@ function execute(
 			],
 		});
 		let out = "",
-			err = "";
+			err = "",
+			decoded = "",
+			outputOverflow = false,
+			captureOverflow = false;
 		if (capture) {
 			child.stdout.on("data", (b) => {
-				out += b;
+				if (Buffer.byteLength(out) + b.length > maxCaptureBytes) {
+					captureOverflow = true;
+					child.kill("SIGTERM");
+				} else out += b;
 			});
 			child.stderr.on("data", (b) => {
 				err += b;
@@ -90,6 +104,13 @@ function execute(
 		if (streamFrames) {
 			let pending = "";
 			const emit = (data, stderr = false) => {
+				if (collectOutput) {
+					decoded += data;
+					if (Buffer.byteLength(decoded) > 8 * 1024 * 1024) {
+						outputOverflow = true;
+						decoded = decoded.slice(-1024 * 1024);
+					}
+				}
 				onOutput(data);
 				(stderr ? process.stderr : process.stdout).write(data);
 				if (logPath) fs.appendFileSync(logPath, data, { mode: 0o600 });
@@ -138,6 +159,10 @@ function execute(
 		child.on("error", reject);
 		child.on("close", (code, signal) => {
 			const status = code ?? (signal === "SIGINT" ? 130 : 143);
+			if (captureOverflow) {
+				reject(new Error("Captured transport output limit exceeded"));
+				return;
+			}
 			if (status && !allowFailure) {
 				let code;
 				try {
@@ -148,7 +173,14 @@ function execute(
 				);
 				error.code = code;
 				reject(error);
-			} else resolve({ status, out, ms: Date.now() - start });
+			} else
+				resolve({
+					status,
+					out,
+					output: decoded,
+					outputOverflow,
+					ms: Date.now() - start,
+				});
 		});
 	});
 }
@@ -329,7 +361,7 @@ async function ensure() {
 		return { id: s.id, resumed: false };
 	});
 }
-function manifest() {
+function sourceNames() {
 	const files = execFileSync(
 		"git",
 		["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
@@ -338,6 +370,19 @@ function manifest() {
 		.toString()
 		.split("\0")
 		.filter(Boolean);
+	return files.filter((name) => {
+		if (name.startsWith(".boat/") || name.startsWith(".mise/")) return false;
+		try {
+			fs.lstatSync(path.join(root, name));
+			return true;
+		} catch (error) {
+			if (error.code !== "ENOENT") throw error;
+			return false;
+		}
+	});
+}
+function manifest() {
+	const files = sourceNames();
 	const result = {};
 	for (const p of files) {
 		if (p.startsWith(".boat/") || p.startsWith(".mise/")) continue;
@@ -354,6 +399,7 @@ function manifest() {
 async function sync(id) {
 	return lock(() => {
 		snapshots.startup();
+		recoverPublication(root, acceptSource);
 		return syncSource(id, manifest());
 	}, "source");
 }
@@ -367,7 +413,51 @@ async function syncSource(id, after, sourceRoot = root) {
 			.map((p) => [p, "baseline"]),
 	);
 	const before = read(path.join(dir, "manifest.json"), baseline);
+	const pending = fs.existsSync(
+		path.join(dir, "migration-return-pending.json"),
+	);
+	if (pending)
+		for (const name of Object.keys(after))
+			if (name.startsWith("apps/asset/drizzle/")) before[name] = null;
+	const modes = {};
+	const priorModes = read(path.join(dir, "source-modes.json"));
+	for (const name of Object.keys(after)) {
+		const stat = fs.lstatSync(path.join(sourceRoot, name));
+		modes[name] = stat.isSymbolicLink() ? "link" : stat.mode & 0o777;
+		if (priorModes[name] !== modes[name]) before[name] = null;
+	}
 	const change = delta(before, after);
+	if (pending) {
+		const marker = path.join(dir, "migration-return-pending.json"),
+			record = read(marker);
+		if (!record.retained) {
+			const result = await ssh(
+				id,
+				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise exec -- node scripts/lib/boat-source-generation.mjs retain-migrations ${quote(record.id)}`,
+				{ capture: true },
+			);
+			const receipt = JSON.parse(result.out);
+			if (
+				receipt.id !== record.id ||
+				receipt.retained !== `.boat/source-proposals/${record.id}`
+			)
+				throw new Error(
+					"Remote proposal retention not confirmed; restoration blocked",
+				);
+			write(marker, { ...record, retained: receipt.retained });
+		}
+		await ssh(
+			id,
+			`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise exec -- node scripts/lib/boat-source-generation.mjs prune-migrations`,
+			{
+				input: JSON.stringify(
+					Object.keys(after).filter((name) =>
+						name.startsWith("apps/asset/drizzle/"),
+					),
+				),
+			},
+		);
+	}
 	if (change.deleted.length)
 		await ssh(
 			id,
@@ -379,7 +469,9 @@ async function syncSource(id, after, sourceRoot = root) {
 			input: `${change.changed.join("\0")}\0`,
 			maxBuffer: 256 * 1024 * 1024,
 		});
-		await ssh(id, `cd ${remote} && tar -xzf -`, { input: tar });
+		await ssh(id, `cd ${remote} && tar -xzf - --same-permissions`, {
+			input: tar,
+		});
 		event("sync", {
 			changed: change.changed.length,
 			deleted: change.deleted.length,
@@ -387,7 +479,11 @@ async function syncSource(id, after, sourceRoot = root) {
 		});
 	} else if (change.deleted.length)
 		event("sync", { changed: 0, deleted: change.deleted.length, bytes: 0 });
+
+	if (pending)
+		fs.rmSync(path.join(dir, "migration-return-pending.json"), { force: true });
 	write(path.join(dir, "manifest.json"), after);
+	write(path.join(dir, "source-modes.json"), modes);
 	if (change.changed.length || change.deleted.length) {
 		const s = read(stateFile);
 		s.lastActivity = Date.now();
@@ -395,137 +491,109 @@ async function syncSource(id, after, sourceRoot = root) {
 	}
 }
 
-function lockGeneration(targets) {
-	return (
-		targets.length === 3 &&
-		targets[0] === "run" &&
-		targets.includes("PACKAGE=scripts") &&
-		targets.includes("SCRIPT=dependencies:lock")
+function acceptSource(outputs) {
+	write(path.join(dir, "manifest.json"), {
+		...read(path.join(dir, "manifest.json")),
+		...outputs,
+	});
+	const migration = Object.hasOwn(
+		outputs,
+		"apps/asset/drizzle/meta/_journal.json",
+	);
+	if (migration)
+		fs.rmSync(path.join(dir, "migration-return-pending.json"), { force: true });
+	const modes = read(path.join(dir, "source-modes.json"));
+	for (const name of Object.keys(outputs))
+		modes[name] = fs.lstatSync(path.join(root, name)).mode & 0o777;
+	write(path.join(dir, "source-modes.json"), modes);
+	event(
+		migration ? "migrations-accepted" : "lock-accepted",
+		migration ? { outputs } : { hash: outputs["pnpm-lock.yaml"] },
 	);
 }
-function dependencyState(source) {
-	return Object.fromEntries(
-		[...new Set(installationInputs(Object.keys(source)))]
-			.sort()
-			.map((name) => [name, source[name] ?? null]),
-	);
-}
-async function generateLock(id, started) {
-	return lock(async () => {
-		const staging = fs.mkdtempSync(path.join(runDir, `lock-${config.key}-`));
-		fs.chmodSync(staging, 0o700);
-		const snapshot = path.join(staging, "source");
-		const source = {};
-		// Capture bytes once. Hashing live files and later archiving them can send
-		// a different input than the one used by the acceptance check.
-		for (const name of Object.keys(manifest())) {
-			const from = path.join(root, name),
-				to = path.join(snapshot, name);
-			fs.mkdirSync(path.dirname(to), { recursive: true });
-			const stat = fs.lstatSync(from);
-			if (stat.isSymbolicLink()) {
-				const target = fs.readlinkSync(from);
-				fs.symlinkSync(target, to);
-				source[name] = hash(target);
-			} else if (stat.isFile()) {
-				const bytes = fs.readFileSync(from);
-				fs.writeFileSync(to, bytes, { mode: stat.mode & 0o777 });
-				source[name] = hash(bytes);
-			}
-		}
-		const inputs = dependencyState(source);
-		for (const name of Object.keys(inputs)) {
-			if (
-				inputs[name] !== null &&
-				!fs.lstatSync(path.join(snapshot, name)).isFile()
-			)
-				throw new Error(`Lock generation requires regular input: ${name}`);
-		}
-		let accepted = false;
-		try {
-			await syncSource(id, source, snapshot);
-			// A failed generator may have changed the worker lock. Force the next
-			// sync to restore local authority, including a locally absent output.
-			const sent = read(path.join(dir, "manifest.json"));
-			write(path.join(dir, "manifest.json"), {
-				...sent,
-				"pnpm-lock.yaml": null,
-			});
-			await ssh(
-				id,
-				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && mise install --locked`,
-			);
-			const result = await boat(
-				[
-					"exec",
-					id,
-					"--timeout",
-					"0",
-					"--stream",
-					"--",
-					"bash",
-					"-lc",
-					`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker run PACKAGE=scripts SCRIPT=dependencies:lock`,
-				],
-				{
-					allowFailure: true,
-					streamFrames: true,
-					logPath: path.join(dir, `command-${started}.log`),
+
+async function generate(id, started, kind) {
+	return lock(
+		() =>
+			generateSource({
+				kind,
+				root,
+				stagingRoot: runDir,
+				names: sourceNames,
+				transport: {
+					sync: (source, snapshot) => syncSource(id, source, snapshot),
+					invalidate: (kind, outputs) => {
+						const sent = read(path.join(dir, "manifest.json"));
+						for (const name of kind === "lock" ? ["pnpm-lock.yaml"] : outputs)
+							sent[name] = null;
+						write(path.join(dir, "manifest.json"), sent);
+						if (kind === "migrations")
+							write(path.join(dir, "migration-return-pending.json"), {
+								id: randomBytes(12).toString("hex"),
+							});
+					},
+					prepare: async (kind) => {
+						await ssh(
+							id,
+							`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && ${kind === "lock" ? "mise install --locked" : "make install BOAT_EXEC=worker"}`,
+						);
+					},
+					generate: (kind) =>
+						boat(
+							[
+								"exec",
+								id,
+								"--timeout",
+								"0",
+								"--stream",
+								"--",
+								"bash",
+								"-lc",
+								`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker run ${kind === "lock" ? "PACKAGE=scripts SCRIPT=dependencies:lock" : "PACKAGE=asset SCRIPT=db:generate"}`,
+							],
+							{
+								allowFailure: true,
+								collectOutput: kind === "migrations",
+								streamFrames: true,
+								logPath: path.join(dir, `command-${started}.log`),
+							},
+						),
+					collect: async (kind) =>
+						(
+							await ssh(
+								id,
+								kind === "lock"
+									? `cd ${remote} && test ! -L pnpm-lock.yaml && test -f pnpm-lock.yaml && base64 -w0 -- pnpm-lock.yaml`
+									: `export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise exec -- node scripts/lib/boat-source-generation.mjs collect-migrations`,
+								{ capture: true, maxCaptureBytes: 48 * 1024 * 1024 },
+							)
+						).out,
+					verify: async (inputs) => {
+						const result = await ssh(
+							id,
+							`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise exec -- node scripts/lib/boat-source-generation.mjs verify-inputs`,
+							{ input: JSON.stringify(inputs), capture: true },
+						);
+						const { changed } = JSON.parse(result.out);
+						if (
+							!Array.isArray(changed) ||
+							changed.some((name) => !Object.hasOwn(inputs, name))
+						)
+							throw new Error("Invalid worker input verification");
+						if (changed.length) {
+							const sent = read(path.join(dir, "manifest.json"));
+							for (const name of changed) sent[name] = null;
+							write(path.join(dir, "manifest.json"), sent);
+							throw new Error(
+								`Worker generation inputs changed: ${changed.join(",")}`,
+							);
+						}
+					},
+					accept: acceptSource,
 				},
-			);
-			const proposal = path.join(staging, "pnpm-lock.yaml");
-			try {
-				const collected = await ssh(
-					id,
-					`cd ${remote} && test ! -L pnpm-lock.yaml && test -f pnpm-lock.yaml && base64 -w0 -- pnpm-lock.yaml`,
-					{ capture: true },
-				);
-				const encoded = collected.out.trim();
-				const bytes = Buffer.from(encoded, "base64");
-				if (!bytes.length || bytes.toString("base64") !== encoded)
-					throw new Error("Invalid lockfile transfer");
-				fs.writeFileSync(proposal, bytes, { mode: 0o600 });
-			} catch (error) {
-				throw new Error(
-					`Lock generation output collection failed; retained evidence at ${staging}: ${error.message}`,
-				);
-			}
-			if (result.status !== 0)
-				throw new Error(
-					`Lock generator failed (${result.status}); proposal retained at ${proposal}`,
-				);
-			if (
-				JSON.stringify(dependencyState(manifest())) !== JSON.stringify(inputs)
-			)
-				throw new Error(
-					`Local dependency inputs or old lock changed; proposal retained at ${proposal}`,
-				);
-			const output = path.join(root, "pnpm-lock.yaml");
-			if (fs.existsSync(output) && !fs.lstatSync(output).isFile())
-				throw new Error(
-					`Local lock is not regular; proposal retained at ${proposal}`,
-				);
-			const bytes = fs.readFileSync(proposal);
-			// Keep the retained proposal private and replace source atomically on its
-			// own filesystem. No event-loop yield between comparison and rename.
-			const temporary = path.join(root, `.boat/lock-${process.pid}.tmp`);
-			fs.writeFileSync(temporary, bytes, {
-				mode: fs.existsSync(output) ? fs.statSync(output).mode & 0o777 : 0o644,
-			});
-			fs.renameSync(temporary, output);
-			const current = read(path.join(dir, "manifest.json"));
-			write(path.join(dir, "manifest.json"), {
-				...current,
-				"pnpm-lock.yaml": hash(bytes),
-			});
-			accepted = true;
-			event("lock-accepted", { hash: hash(bytes) });
-			return result;
-		} finally {
-			fs.rmSync(snapshot, { recursive: true, force: true });
-			if (accepted) fs.rmSync(staging, { recursive: true, force: true });
-		}
-	}, "source");
+			}),
+		"source",
+	);
 }
 async function prepare(id) {
 	return lock(async () => {
@@ -729,8 +797,9 @@ async function command() {
 	daemon();
 	const started = Date.now();
 	try {
-		if (lockGeneration(targets)) {
-			const result = await generateLock(id, started);
+		const kind = sourceGeneration(targets);
+		if (kind) {
+			const result = await generate(id, started, kind);
 			event("command", {
 				targets,
 				status: result.status,

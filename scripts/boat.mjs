@@ -18,6 +18,7 @@ import {
 	forwardPreviewDisconnect,
 	developmentWantedAfterCommand,
 } from "./lib/boat.mjs";
+import { snapshotLifecycle } from "./lib/boat-snapshot.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 import {
 	fingerprint,
@@ -210,17 +211,20 @@ function save(state) {
 	write(stateFile, state);
 	write(path.join(runDir, `${config.key}.worker.json`), state);
 }
+const snapshots = snapshotLifecycle({
+	load: () => read(stateFile),
+	persist: save,
+});
 function admit() {
 	if (accounting() >= 9.9)
 		throw new Error(
 			"Protective $10 usage cutoff: no new work admitted; stop experiment workers.",
 		);
 }
-async function ensure({ developmentRequested = false } = {}) {
+async function ensure() {
 	return lock(async () => {
 		admit();
-		let s = read(stateFile);
-		let resumed = false;
+		let s = snapshots.startup();
 		let existingInfo;
 		if (s.id) {
 			try {
@@ -266,28 +270,8 @@ async function ensure({ developmentRequested = false } = {}) {
 		if (s.id) {
 			const info = existingInfo ?? (await json(["info", s.id]));
 			const status = workerState(info);
-			if (["archived", "stopped"].includes(status)) {
-				try {
-					await boat(
-						["resume", s.id, "--type", config.size, "--ttl", "2100", "--json"],
-						{ capture: true },
-					);
-					s.runningSince = Date.now();
-					delete s.watcher;
-					if (
-						config.mode === "development" &&
-						(s.developmentWanted || developmentRequested)
-					)
-						s.reconciliationPending = true;
-					resumed = true;
-				} catch (error) {
-					if (error.code !== "snapshot_data_expired") throw error;
-					event("expired", { id: s.id });
-					delete s.id;
-					for (const name of ["prepared.json", "manifest.json"])
-						fs.rmSync(path.join(dir, name), { force: true });
-				}
-			} else if (!["ready", "running", "idle"].includes(status))
+			s = snapshots.startup(info);
+			if (!["ready", "running", "idle"].includes(status))
 				throw new Error(
 					`Worker ${s.id} has state ${status}; inspect before recovery.`,
 				);
@@ -329,12 +313,7 @@ async function ensure({ developmentRequested = false } = {}) {
 			s.id,
 			`mkdir -p ${remote}; command -v mise >/dev/null || (curl -fsSL https://mise.run | sh); test -d ${remote}/.git || (git init ${remote} && cd ${remote} && git remote add origin https://github.com/rafaeltab/wallpaperdb.git && git fetch --depth=1 origin ${quote(config.base)} && git checkout --detach FETCH_HEAD)`,
 		);
-		if (resumed) {
-			await retireWatchers(s.id);
-			console.log("Remote environment resumed from sleep");
-			event("resumed", { id: s.id });
-		}
-		return { id: s.id, resumed };
+		return { id: s.id, resumed: false };
 	});
 }
 function manifest() {
@@ -360,7 +339,10 @@ function manifest() {
 	return result;
 }
 async function sync(id) {
-	return lock(() => syncSource(id, manifest()), "source");
+	return lock(() => {
+		snapshots.startup();
+		return syncSource(id, manifest());
+	}, "source");
 }
 // Caller holds source.lock, including while accepting generated source.
 async function syncSource(id, after, sourceRoot = root) {
@@ -644,29 +626,17 @@ function daemon() {
 }
 async function stop(remove = false) {
 	return lock(async () => {
-		const s = read(stateFile);
+		let s = read(stateFile);
 		if (!s.id) return;
+		const result = await snapshots.stopCompute({
+			inspect: () => json(["info", s.id]),
+			retire: () => retireWatchers(s.id),
+			request: () => json(["stop", s.id]),
+			wait,
+		});
+		// Read after the transition so accounting cannot overwrite DIRTY intent.
+		s = read(stateFile);
 		if (s.runningSince) {
-			const initial = workerState(await json(["info", s.id]));
-			if (!["stopping", "archived", "stopped"].includes(initial)) {
-				await retireWatchers(s.id);
-				await json(["stop", s.id]);
-			}
-			let stopped = false;
-			for (let attempt = 0; attempt < 180; attempt++) {
-				const state = workerState(await json(["info", s.id]));
-				if (["archived", "stopped"].includes(state)) {
-					stopped = true;
-					break;
-				}
-				if (state !== "stopping")
-					throw new Error(`Unexpected worker state during stop: ${state}`);
-				await wait(1000);
-			}
-			if (!stopped)
-				throw new Error(
-					"Provider stop did not complete within 180 seconds; worker state must be inspected",
-				);
 			s.cost = (s.cost ?? 0) + estimate(s.size, Date.now() - s.runningSince);
 			s.runningSince = null;
 			delete s.watcher;
@@ -682,6 +652,7 @@ async function stop(remove = false) {
 		}
 		// Keep the provider's authoritative usage separately from the conservative ledger.
 		write(path.join(dir, "usage.json"), await json(["usage", s.id]));
+		if (result.error) throw new Error(result.error);
 		if (remove) {
 			await boat(["delete", s.id, "--yes"]);
 			event("deleted", { id: s.id });
@@ -790,13 +761,16 @@ async function command() {
 		if (!developmentWantedAfterCommand(true, targets, result.status))
 			delete s.reconciliationPending;
 		save(s);
-		if (targets[0] === "stop" && result.status === 0) await stop();
 	} finally {
-		if (resumed) console.log("Remote environment resumed from sleep");
-		fs.rmSync(lease, { force: true });
-		const s = read(stateFile);
-		s.lastActivity = Date.now();
-		save(s);
+		try {
+			if (targets[0] === "stop") await stop();
+		} finally {
+			if (resumed) console.log("Remote environment resumed from sleep");
+			fs.rmSync(lease, { force: true });
+			const s = read(stateFile);
+			s.lastActivity = Date.now();
+			save(s);
+		}
 	}
 }
 function resourceSample() {
@@ -1001,7 +975,7 @@ async function preview() {
 	owned();
 	if (config.mode !== "development")
 		throw new Error("Validation mode uses its local development stack");
-	const { id } = await ensure({ developmentRequested: true });
+	const { id } = await ensure();
 	const startupLease = path.join(dir, `command-${process.pid}.json`);
 	write(startupLease, {
 		...worktreeProcesses(root).find((p) => p.pid === process.pid),

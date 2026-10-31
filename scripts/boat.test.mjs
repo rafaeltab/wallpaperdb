@@ -824,6 +824,7 @@ async function lockGenerationCheckout(t) {
 		"scripts/lib/boat.mjs",
 		"scripts/lib/boat-cache.mjs",
 		"scripts/lib/boat-preparation.mjs",
+		"scripts/lib/boat-snapshot.mjs",
 		"scripts/package.json",
 	]) {
 		local(name, fs.readFileSync(path.join(repository, name)));
@@ -942,7 +943,12 @@ if(argv.includes('--lockfile-only')){
 const fs=require('fs'),cp=require('child_process'),path=require('path');
 const argv=process.argv.slice(2),control=process.env.FAKE_CONTROL;
 fs.appendFileSync(path.join(control,'transport'),JSON.stringify(argv)+'\\n');
-if(argv.includes('info')){console.log(JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);}
+if(argv.includes('info')){console.log(fs.existsSync(path.join(control,'provider-info'))?fs.readFileSync(path.join(control,'provider-info'),'utf8'):JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);}
+if(argv.includes('stop')){fs.writeFileSync(path.join(control,'sleep'),'yes');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
+if(argv.includes('usage')){console.log('{}');process.exit(0);}
+if(argv.includes('snapshot')&&argv.includes('latest')){console.log(JSON.stringify({snapshot:{id:'snapshot-current',sandboxId:'fake-worker',chainId:'chain-current',generation:3,status:'completed',kind:'incremental',origin:'captured',createdAt:'2026-10-31T01:00:00Z',completedAt:'2026-10-31T01:00:01Z',fileCount:42}}));process.exit(0);}
+if((argv.includes('ssh')||argv.includes('exec'))&&fs.existsSync(path.join(control,'audit-startup')))fs.appendFileSync(path.join(control,'startup-state'),JSON.stringify(JSON.parse(fs.readFileSync('.boat/state.json','utf8')))+'\\n');
+if(argv.includes('ssh')&&argv.at(-1).includes('sudo -n')&&fs.existsSync(path.join(control,'fail-retire')))process.exit(31);
 if(argv.includes('extend')){console.log('{}');process.exit(0);}
 if(argv.includes('resume')){fs.unlinkSync(path.join(control,'sleep'));console.log('{}');process.exit(0);}
 const command=argv.at(-1).replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER);
@@ -1519,13 +1525,21 @@ require('fs').appendFileSync(require('path').join(process.env.FAKE_CONTROL,'vali
 	};
 }
 
-async function sleepingDevelopmentCheckout(t) {
+async function pendingDevelopmentCheckout(t) {
 	const f = await developmentCheckout(t);
 	const built = await f.run("apps-start").done;
 	assert.equal(built.status, 0, built.output);
 	for (const name of ["calls", "transport", "docker"])
 		fs.rmSync(path.join(f.control, name), { force: true });
-	flag(f, "sleep");
+	// Exercise deferred reconciliation while awake. The available contract
+	// cannot produce a legitimately qualified stopped snapshot.
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			reconciliationPending: true,
+		}),
+	);
 	return f;
 }
 
@@ -1655,11 +1669,11 @@ test("initial preview uses ordinary startup when readiness fails without a recov
 	assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
 });
 
-test("ordinary commands reconcile development after generator resume and frozen preparation", async (t) => {
-	const f = await sleepingDevelopmentCheckout(t);
+test("awake pending reconciliation follows generation and frozen preparation", async (t) => {
+	const f = await pendingDevelopmentCheckout(t);
 	const result = await f.generate();
 	assert.equal(result.status, 0, result.output);
-	assert.match(result.output, /Remote environment resumed from sleep/);
+	assert.doesNotMatch(result.output, /Remote environment resumed from sleep/);
 	assert.equal(f.json(".boat/state.json").developmentWanted, true);
 	assert.equal(f.json(".boat/state.json").reconciliationPending, true);
 	assert.doesNotMatch(
@@ -1703,8 +1717,8 @@ for (const entry of ["normal", "preview"])
 			'{"scripts":{},"dependencies":{"example":"2.0.0"}}\n',
 		],
 	])
-		test(`restoration through ${entry} runs newly prepared image dependencies after changing ${name}`, async (t) => {
-			const f = await sleepingDevelopmentCheckout(t);
+		test(`awake pending reconciliation through ${entry} runs newly prepared images after changing ${name}`, async (t) => {
+			const f = await pendingDevelopmentCheckout(t);
 			const original = f.dependencies("running").inputs[name];
 			assert.notEqual(original, changed);
 			f.local(name, changed);
@@ -1731,8 +1745,8 @@ for (const entry of ["normal", "preview"])
 		});
 
 for (const identity of ["missing", "other-worker"])
-	test(`restoration rebuilds owned images when their dependency identity is ${identity}`, async (t) => {
-		const f = await sleepingDevelopmentCheckout(t);
+	test(`awake pending reconciliation rebuilds images when their dependency identity is ${identity}`, async (t) => {
+		const f = await pendingDevelopmentCheckout(t);
 		const state = f.json(".boat/state.json");
 		if (identity === "missing") delete state.developmentDependencies;
 		else state.developmentDependencies.id = "a-different-worker";
@@ -1750,8 +1764,8 @@ for (const identity of ["missing", "other-worker"])
 		assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
 	});
 
-test("a healthy preview with no saved development intent rebuilds images of unknown identity", async (t) => {
-	const f = await sleepingDevelopmentCheckout(t);
+test("awake pending preview with no saved development intent rebuilds unknown images", async (t) => {
+	const f = await pendingDevelopmentCheckout(t);
 	const state = f.json(".boat/state.json");
 	state.developmentWanted = false;
 	delete state.developmentDependencies;
@@ -1768,8 +1782,8 @@ test("a healthy preview with no saved development intent rebuilds images of unkn
 	);
 });
 
-test("preview recovery without saved intent stays pending across preparation and rebuild failures", async (t) => {
-	const f = await sleepingDevelopmentCheckout(t);
+test("awake pending preview without saved intent survives preparation and rebuild failures", async (t) => {
+	const f = await pendingDevelopmentCheckout(t);
 	const state = f.json(".boat/state.json");
 	state.developmentWanted = false;
 	delete state.developmentDependencies;
@@ -1797,14 +1811,14 @@ test("preview recovery without saved intent stays pending across preparation and
 });
 
 for (const failure of ["fail-build", "fail-apps", "fail-watch"])
-	test(`deferred reconciliation survives failed generation, frozen preparation and ${failure}`, async (t) => {
-		const f = await sleepingDevelopmentCheckout(t);
+	test(`awake pending reconciliation survives failed generation, frozen preparation and ${failure}`, async (t) => {
+		const f = await pendingDevelopmentCheckout(t);
 		f.local("patches/dependency.patch", "changed dependency B\n");
 		flag(f, "fail");
 		const failed = await f.generate();
 		assert.notEqual(failed.status, 0);
 		assert.match(failed.output, /Lock generator failed/);
-		assert.match(failed.output, /Remote environment resumed from sleep/);
+		assert.doesNotMatch(failed.output, /Remote environment resumed from sleep/);
 		assert.equal(f.json(".boat/state.json").reconciliationPending, true);
 		const invalid = await f.normal();
 		assert.notEqual(invalid.status, 0);
@@ -1848,8 +1862,8 @@ for (const failure of ["fail-build", "fail-apps", "fail-watch"])
 		);
 	});
 
-test("preview reconciles pending development despite a healthy readiness probe", async (t) => {
-	const f = await sleepingDevelopmentCheckout(t);
+test("awake pending preview reconciles development despite a healthy readiness probe", async (t) => {
+	const f = await pendingDevelopmentCheckout(t);
 	const generated = await f.generate();
 	assert.equal(generated.status, 0, generated.output);
 	flag(f, "fail-apps");
@@ -1878,8 +1892,8 @@ for (const [targets, failure, pending] of [
 	[["apps-stop", "SERVICE=web"], false, true],
 	[["apps-stop"], true, true],
 ])
-	test(`unwanted pending development follows existing cleanup semantics for ${targets.join(" ")} with failure=${failure}`, async (t) => {
-		const f = await sleepingDevelopmentCheckout(t);
+	test(`awake pending unwanted development follows cleanup semantics for ${targets.join(" ")} with failure=${failure}`, async (t) => {
+		const f = await pendingDevelopmentCheckout(t);
 		const generated = await f.generate();
 		assert.equal(generated.status, 0, generated.output);
 		f.local(
@@ -1940,3 +1954,242 @@ for (const phase of ["sync", "", "collect"])
 			"pending source delivered",
 		);
 	});
+
+for (const entry of ["generator", "validation", "preview"])
+	test(`DIRTY snapshot blocks ${entry} before paid resume or remote effects`, async (t) => {
+		const f = await developmentCheckout(t);
+		flag(f, "sleep");
+		const state = f.json(".boat/state.json");
+		state.runningSince = null;
+		state.developmentWanted = true;
+		state.reconciliationPending = true;
+		// A local claim, even with convincing identities, is not provider qualification.
+		state.cleanReceipt = {
+			worker: state.id,
+			project: "wallpaperdb",
+			stopId: "stop-old",
+			snapshotId: "snapshot-old",
+			clean: true,
+		};
+		f.local(".boat/state.json", JSON.stringify(state));
+		fs.rmSync(path.join(f.control, "transport"), { force: true });
+		const before = fs.existsSync(path.join(f.control, "docker"))
+			? fs.readFileSync(path.join(f.control, "docker"), "utf8")
+			: "";
+		const result = await (entry === "generator"
+			? f.generate()
+			: entry === "preview"
+				? f.run("boat-preview").done
+				: f.run("check", "PACKAGE=user").done);
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /DIRTY.*snapshot/i);
+		assert.equal(
+			f
+				.transport()
+				.some(
+					(argv) =>
+						argv.includes("resume") ||
+						argv.includes("new") ||
+						argv.includes("ssh") ||
+						argv.includes("exec"),
+				),
+			false,
+		);
+		assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+		assert.equal(f.json(".boat/state.json").developmentWanted, true);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+		assert.equal(
+			fs.existsSync(path.join(f.control, "docker"))
+				? fs.readFileSync(path.join(f.control, "docker"), "utf8")
+				: "",
+			before,
+		);
+	});
+
+for (const evidence of [
+	"none",
+	"latest",
+	"forced",
+	"old-snapshot",
+	"missing-stop",
+	"hook-timeout",
+	"changed-worker",
+])
+	test(`DIRTY snapshot rejects ${evidence} evidence without startup`, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		const state = f.json(".boat/state.json");
+		state.runningSince = null;
+		state.cleanReceipt = {
+			worker: evidence === "changed-worker" ? "other-worker" : state.id,
+			stopId: "stop-old",
+			snapshotId: "snapshot-old",
+			generation: 2,
+			clean: true,
+		};
+		if (evidence === "none") delete state.cleanReceipt;
+		if (evidence === "latest")
+			state.cleanReceipt = {
+				worker: state.id,
+				stopId: "stop-current",
+				clean: true,
+				snapshot: {
+					id: "snapshot-current",
+					sandboxId: state.id,
+					chainId: "chain-current",
+					generation: 3,
+					status: "completed",
+					kind: "incremental",
+					origin: "captured",
+					createdAt: "2026-10-31T01:00:00Z",
+					completedAt: "2026-10-31T01:00:01Z",
+					fileCount: 42,
+				},
+			};
+		if (evidence === "hook-timeout")
+			state.cleanReceipt.hook = { status: "timed-out" };
+		f.local(".boat/state.json", JSON.stringify(state));
+		fs.writeFileSync(
+			path.join(f.control, "provider-info"),
+			JSON.stringify({
+				sandbox: {
+					id: state.id,
+					state: "archived",
+					hydrated: true,
+					snapshotAvailable: true,
+					snapshotCompletedAt: "2026-10-31T01:00:01Z",
+					stop:
+						evidence === "missing-stop"
+							? null
+							: {
+									id: "stop-current",
+									status: "completed",
+									forced: evidence === "forced",
+									error: null,
+									endedAt: "2026-10-31T01:00:01Z",
+								},
+				},
+			}),
+		);
+		const result = await f.generate();
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /DIRTY.*snapshot/i);
+		const calls = fs.readFileSync(path.join(f.control, "transport"), "utf8");
+		assert.doesNotMatch(calls, /"resume"|"new"|"ssh"|"exec"/);
+		assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+	});
+
+test("awake startup invalidates a stale receipt before any remote effects and keeps deferred intent on failure", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	const state = f.json(".boat/state.json");
+	state.cleanReceipt = { clean: true, worker: state.id };
+	state.snapshotRecovery = {
+		status: "CLEAN",
+		receipt: { stopId: "old", generation: 1 },
+	};
+	state.developmentWanted = true;
+	state.reconciliationPending = true;
+	f.local(".boat/state.json", JSON.stringify(state));
+	flag(f, "audit-startup");
+	flag(f, "fail");
+	const result = await f.generate();
+	assert.match(result.output, /Lock generator failed/);
+	const snapshots = fs
+		.readFileSync(path.join(f.control, "startup-state"), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	assert.ok(snapshots.length > 0);
+	for (const observed of snapshots) {
+		assert.equal(observed.cleanReceipt, undefined);
+		assert.equal(observed.snapshotRecovery.receipt, undefined);
+		assert.equal(observed.snapshotRecovery.status, "ACTIVE");
+	}
+	assert.equal(f.json(".boat/state.json").developmentWanted, true);
+	assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+});
+
+for (const failure of ["fail-retire", "fail-stop", "none"])
+	test(`DIRTY stop still stops compute despite ${failure} and blocks subsequent commands`, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		if (failure !== "none") flag(f, failure);
+		const state = f.json(".boat/state.json");
+		state.cleanReceipt = { clean: true };
+		state.developmentWanted = true;
+		state.reconciliationPending = true;
+		f.local(".boat/state.json", JSON.stringify(state));
+		const result = await f.run("boat-stop").done;
+		assert.equal(result.status === 0, failure === "none", result.output);
+		assert.equal(
+			fs.existsSync(path.join(f.control, "sleep")),
+			true,
+			"compute stop must still be requested",
+		);
+		assert.equal(f.json(".boat/state.json").runningSince, null);
+		assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+		assert.equal(f.json(".boat/state.json").cleanReceipt, undefined);
+		assert.equal(f.json(".boat/state.json").developmentWanted, true);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+		const failed = await f.generate();
+		assert.match(failed.output, /DIRTY.*snapshot/i);
+		const calls = fs
+			.readFileSync(path.join(f.control, "transport"), "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		assert.equal(calls.filter((argv) => argv.includes("stop")).length, 1);
+		assert.equal(
+			calls.some((argv) => argv.includes("resume") || argv.includes("new")),
+			false,
+		);
+	});
+
+test("already stopped inspection records DIRTY without resuming or remote cleanup", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({ ...f.json(".boat/state.json"), runningSince: null }),
+	);
+	flag(f, "sleep");
+	const result = await f.run("boat-stop").done;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+	assert.doesNotMatch(
+		fs.readFileSync(path.join(f.control, "transport"), "utf8"),
+		/"resume"|"new"|"ssh"|"exec"|"stop"/,
+	);
+});
+
+for (const failure of [false, true])
+	test(`explicit Make cleanup always stops compute and preserves wanted distinction with failure=${failure}`, async (t) => {
+		const f = await developmentCheckout(t);
+		const started = await f.run("apps-start").done;
+		assert.equal(started.status, 0, started.output);
+		if (failure) flag(f, "fail-cleanup");
+		fs.rmSync(path.join(f.control, "transport"), { force: true });
+		const result = await f.run("stop").done;
+		assert.equal(result.status === 0, !failure, result.output);
+		assert.equal(fs.existsSync(path.join(f.control, "sleep")), true);
+		assert.equal(f.json(".boat/state.json").runningSince, null);
+		assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+		assert.equal(f.json(".boat/state.json").developmentWanted, failure);
+		const calls = f.transport();
+		assert.equal(calls.filter((argv) => argv.includes("stop")).length, 1);
+		assert.equal(
+			calls.filter((argv) =>
+				argv.at(-1).includes("make BOAT_EXEC=worker 'stop'"),
+			).length,
+			1,
+		);
+	});
+
+test("compute stop inspects a worker even when its local running timestamp is absent", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({ ...f.json(".boat/state.json"), runningSince: null }),
+	);
+	const result = await f.run("boat-stop").done;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(fs.existsSync(path.join(f.control, "sleep")), true);
+	assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+});

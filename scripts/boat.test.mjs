@@ -745,6 +745,48 @@ test("real Turbo restores an eligible build through authenticated HTTP into a fr
 
 // Exercise real Make routing, controller, archives and the maintained package script.
 // Only Boat, mise and pnpm are controlled external processes. No worker is contacted.
+function processGroupRunning(group) {
+	if (!group) return false;
+	return fs.readdirSync("/proc").some((pid) => {
+		if (!/^\d+$/.test(pid)) return false;
+		try {
+			const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+			const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+			return Number(fields[2]) === group && fields[0] !== "Z";
+		} catch (error) {
+			if (["ENOENT", "ESRCH"].includes(error.code)) return false;
+			throw error;
+		}
+	});
+}
+
+async function stopLockFixtureChildren(children, drain = false) {
+	const exited = async () => {
+		const deadline = Date.now() + 1000;
+		while (
+			children.some((p) => !p.closed || processGroupRunning(p.child.pid))
+		) {
+			if (Date.now() >= deadline) return false;
+			await new Promise((resolve) => setTimeout(resolve, 10));
+		}
+		await Promise.all(children.map((p) => p.done));
+		return true;
+	};
+	if (drain && (await exited())) return;
+	for (const signal of ["SIGTERM", "SIGKILL"]) {
+		for (const { child } of children) {
+			if (!processGroupRunning(child.pid)) continue;
+			try {
+				process.kill(-child.pid, signal);
+			} catch (error) {
+				if (error.code !== "ESRCH") throw error;
+			}
+		}
+		if (await exited()) return;
+	}
+	assert.fail("Owned lock fixture process groups did not exit");
+}
+
 async function lockGenerationCheckout(t) {
 	const directory = fs.mkdtempSync(
 		path.join(os.tmpdir(), "boat-lock-command-"),
@@ -754,6 +796,19 @@ async function lockGenerationCheckout(t) {
 	const home = path.join(directory, "home");
 	const bin = path.join(home, ".local/bin");
 	const control = path.join(directory, "control");
+	const commands = [];
+	const background = [];
+	t.after(async () => {
+		if (fs.existsSync(control))
+			for (const name of ["release", "release-sync", "release-collect"])
+				fs.writeFileSync(path.join(control, name), "yes");
+		try {
+			await stopLockFixtureChildren(commands, true);
+		} finally {
+			await stopLockFixtureChildren(background);
+		}
+		fs.rmSync(directory, { recursive: true, force: true });
+	});
 	const repository = path.resolve(import.meta.dirname, "..");
 	const put = (name, bytes, mode) => {
 		fs.mkdirSync(path.dirname(name), { recursive: true });
@@ -889,7 +944,7 @@ if(command.includes('base64 -w0')){
  if(fs.existsSync(path.join(control,'framed'))){console.log(JSON.stringify({type:'stdout',data:'invalid framed payload'}));process.exit(0);}
 }
 const pause=command.includes('tar -xzf -')?'sync':command.includes('base64 -w0')?'collect':null;
-if(pause&&fs.existsSync(path.join(control,'pause-'+pause))){fs.writeFileSync(path.join(control,'entered-'+pause),'yes');while(!fs.existsSync(path.join(control,'release-'+pause)))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);}
+if(pause&&fs.existsSync(path.join(control,'pause-'+pause))){fs.writeFileSync(path.join(control,'entered-'+pause),'yes');while(!fs.existsSync(path.join(control,'release-'+pause))||fs.existsSync(path.join(control,'ignore-release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);}
 const stream=argv.includes('--stream'),child=cp.spawn('bash',['-c',command],{env:process.env,stdio:['pipe',stream?'pipe':'inherit',stream?'pipe':'inherit']});
 process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});
 if(stream)for(const type of ['stdout','stderr'])child[type].on('data',b=>console.log(JSON.stringify({type,data:b.toString()})));
@@ -897,17 +952,32 @@ child.on('close',code=>process.exit(code??1));
 `,
 		0o755,
 	);
-	const keeper = spawn(
-		process.execPath,
-		["-e", "console.log('ready');setInterval(()=>{},1000)"],
-		{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
-	);
+	const start = (owned, command, args) => {
+		const child = spawn(command, args, {
+			cwd: root,
+			env,
+			detached: true,
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+		let output = "";
+		child.stdout.on("data", (b) => (output += b));
+		child.stderr.on("data", (b) => (output += b));
+		child.on("error", (error) => (output += error.message));
+		const record = { child, closed: false };
+		record.done = new Promise((resolve) => {
+			child.on("close", (status) => {
+				record.closed = true;
+				resolve({ status, output });
+			});
+		});
+		owned.push(record);
+		return record;
+	};
+	const { child: keeper } = start(background, process.execPath, [
+		"-e",
+		"console.log('ready');setInterval(()=>{},1000)",
+	]);
 	await once(keeper.stdout, "data");
-	t.after(async () => {
-		keeper.kill();
-		await once(keeper, "close");
-		fs.rmSync(directory, { recursive: true, force: true });
-	});
 	const processRecord = worktreeProcesses(root).find(
 		(p) => p.pid === keeper.pid,
 	);
@@ -935,21 +1005,7 @@ child.on('close',code=>process.exit(code??1));
 		id: "fake-worker",
 		api: "http://127.0.0.1:12345",
 	});
-	const run = (...targets) => {
-		const child = spawn("make", targets, {
-			cwd: root,
-			env,
-			stdio: ["ignore", "pipe", "pipe"],
-		});
-		let output = "";
-		child.stdout.on("data", (b) => (output += b));
-		child.stderr.on("data", (b) => (output += b));
-		const done = new Promise((resolve, reject) => {
-			child.on("error", reject);
-			child.on("close", (status) => resolve({ status, output }));
-		});
-		return { child, done };
-	};
+	const run = (...targets) => start(commands, "make", targets);
 	return {
 		directory,
 		root,
@@ -959,6 +1015,8 @@ child.on('close',code=>process.exit(code??1));
 		local,
 		json,
 		run,
+		daemon: () =>
+			start(background, process.execPath, ["scripts/boat.mjs", "daemon"]),
 		generate: () =>
 			run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock").done,
 	};
@@ -1022,10 +1080,6 @@ async function pausedGeneration(t, phase = "") {
 	const f = await lockGenerationCheckout(t);
 	flag(f, phase ? `pause-${phase}` : "pause");
 	const pending = f.generate();
-	t.after(() => {
-		if (fs.existsSync(f.control))
-			flag(f, phase ? `release-${phase}` : "release");
-	});
 	await observed(
 		() =>
 			fs.existsSync(
@@ -1039,6 +1093,150 @@ async function pausedGeneration(t, phase = "") {
 		release: () => flag(f, phase ? `release-${phase}` : "release"),
 	};
 }
+
+// Run an actual failing test in a child so its after hooks and open handles are
+// exercised without failing (or hanging) the surrounding regression suite.
+if (process.env.BOAT_LOCK_CLEANUP_PHASE) {
+	test("lock fixture intentional failure", async (t) => {
+		const phase = process.env.BOAT_LOCK_CLEANUP_PHASE;
+		const pause =
+			phase === "generate" ? "" : phase === "unresponsive" ? "sync" : phase;
+		const f = await pausedGeneration(t, pause);
+		if (phase === "unresponsive") flag(f, "ignore-release");
+		f.pending.then((result) => {
+			fs.writeFileSync(
+				`${process.env.BOAT_LOCK_CLEANUP_REPORT}.result`,
+				JSON.stringify(result),
+			);
+		});
+		const { child: daemon } = f.daemon();
+		await observed(
+			() => worktreeProcesses(f.root).some((p) => p.pid === daemon.pid),
+			"owned daemon started",
+		);
+		const processes = [
+			...worktreeProcesses(f.root),
+			...worktreeProcesses(f.worker),
+		].flatMap((record) => {
+			try {
+				const stat = fs.readFileSync(`/proc/${record.pid}/stat`, "utf8");
+				const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+				return [{ ...record, group: Number(fields[2]) }];
+			} catch (error) {
+				if (["ENOENT", "ESRCH"].includes(error.code)) return [];
+				throw error;
+			}
+		});
+		fs.writeFileSync(
+			process.env.BOAT_LOCK_CLEANUP_REPORT,
+			JSON.stringify({ directory: f.directory, processes }),
+		);
+		assert.fail("intentional failure before normal barrier release");
+	});
+}
+
+for (const phase of ["sync", "generate", "collect", "unresponsive"])
+	test(`lock fixture cleans up after failure during ${phase} without stopping unrelated processes`, async (t) => {
+		const directory = fs.mkdtempSync(
+			path.join(os.tmpdir(), "boat-lock-cleanup-"),
+		);
+		const report = path.join(directory, "report.json");
+		const unrelated = spawn(process.execPath, [
+			"-e",
+			"console.log('ready');setInterval(()=>{},1000)",
+		]);
+		const unrelatedClosed = once(unrelated, "close");
+		let unrelatedReady = false;
+		unrelated.stdout.once("data", () => {
+			unrelatedReady = true;
+		});
+		const runner = spawn(
+			process.execPath,
+			[
+				"--test",
+				"--test-name-pattern=^lock fixture intentional failure$",
+				fileURLToPath(import.meta.url),
+			],
+			{
+				detached: true,
+				env: {
+					...process.env,
+					NODE_TEST_CONTEXT: undefined,
+					NODE_OPTIONS: "",
+					BOAT_LOCK_CLEANUP_PHASE: phase,
+					BOAT_LOCK_CLEANUP_REPORT: report,
+				},
+				stdio: ["ignore", "pipe", "pipe"],
+			},
+		);
+		let output = "";
+		runner.stdout.on("data", (b) => (output += b));
+		runner.stderr.on("data", (b) => (output += b));
+		let closed = false;
+		const done = once(runner, "close").then(([status]) => {
+			closed = true;
+			return status;
+		});
+		t.after(async () => {
+			const snapshot = fs.existsSync(report)
+				? JSON.parse(fs.readFileSync(report, "utf8"))
+				: null;
+			// Emergency cleanup bounds the regression even against the broken fixture.
+			const groups = new Set([
+				runner.pid,
+				...(snapshot?.processes.map((p) => p.group) ?? []),
+			]);
+			try {
+				for (const group of groups) {
+					try {
+						process.kill(-group, "SIGKILL");
+					} catch (error) {
+						if (error.code !== "ESRCH") throw error;
+					}
+				}
+				await observed(() => closed, "regression runner emergency shutdown");
+				await done;
+			} finally {
+				unrelated.kill("SIGKILL");
+				await observed(
+					() => unrelated.exitCode !== null || unrelated.signalCode !== null,
+					"unrelated process shutdown",
+				);
+				await unrelatedClosed;
+			}
+			if (snapshot)
+				fs.rmSync(snapshot.directory, { recursive: true, force: true });
+			fs.rmSync(directory, { recursive: true, force: true });
+		});
+		await observed(() => unrelatedReady, "unrelated process ready");
+		await observed(
+			() => fs.existsSync(report) || closed,
+			"failure scenario ready",
+		);
+		assert.equal(fs.existsSync(report), true, output);
+		await observed(() => closed, `failed ${phase} test exits after cleanup`);
+		assert.equal(await done, 1, output);
+		assert.match(output, /intentional failure before normal barrier release/);
+		const snapshot = JSON.parse(fs.readFileSync(report, "utf8"));
+		const result = JSON.parse(fs.readFileSync(`${report}.result`, "utf8"));
+		if (phase === "unresponsive")
+			assert.notEqual(result.status, 0, result.output);
+		else assert.equal(result.status, 0, result.output);
+		assert.equal(fs.existsSync(snapshot.directory), false);
+		for (const record of snapshot.processes) {
+			const statPath = `/proc/${record.pid}/stat`;
+			if (!fs.existsSync(statPath)) continue;
+			const stat = fs.readFileSync(statPath, "utf8");
+			const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+			assert.ok(
+				fields[19] !== record.startTicks || fields[0] === "Z",
+				`owned process ${record.pid} survived fixture cleanup`,
+			);
+		}
+		assert.equal(unrelated.exitCode, null);
+		assert.equal(unrelated.signalCode, null);
+		assert.equal(unrelated.kill(0), true);
+	});
 
 for (const [name, edit] of [
 	["old output", (f) => f.local("pnpm-lock.yaml", "concurrent local lock\n")],
@@ -1411,16 +1609,7 @@ for (const phase of ["sync", "", "collect"])
 	test(`source synchronization and a second generator wait through ${phase || "generation"} and acceptance`, async (t) => {
 		const f = await pausedGeneration(t, phase);
 		f.local("notes.txt", "concurrent unrelated edit\n");
-		const daemon = spawn(process.execPath, ["scripts/boat.mjs", "daemon"], {
-			cwd: f.root,
-			env: f.env,
-			stdio: "ignore",
-		});
-		const stopped = once(daemon, "close");
-		t.after(async () => {
-			daemon.kill();
-			await stopped;
-		});
+		f.daemon();
 		const second = f.generate();
 		await observed(
 			() =>

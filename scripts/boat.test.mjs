@@ -789,7 +789,51 @@ async function stopLockFixtureChildren(children, drain = false) {
 	assert.fail("Owned lock fixture process groups did not exit");
 }
 
-async function lockGenerationCheckout(t) {
+// hrtime uses the same monotonic clock in the parent and its local child.
+const fixtureNow = () => Number(process.hrtime.bigint() / 1_000_000n);
+function lockFixtureReadiness({
+	deadline = fixtureNow() + 5000,
+	report,
+	now = fixtureNow,
+} = {}) {
+	assert.ok(
+		Number.isFinite(deadline) && deadline > 0,
+		"invalid fixture deadline",
+	);
+	let phase = "runner startup";
+	const check = () => {
+		if (now() >= deadline)
+			assert.fail(`Readiness deadline exhausted during ${phase}`);
+	};
+	return {
+		deadline,
+		enter(name) {
+			phase = name;
+			if (report)
+				fs.appendFileSync(
+					`${report}.phases`,
+					JSON.stringify({ phase, at: now(), deadline }) + "\n",
+				);
+			check();
+		},
+		async wait(predicate, name) {
+			this.enter(name);
+			for (;;) {
+				check();
+				const ready = predicate();
+				check();
+				if (ready) return;
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}
+		},
+	};
+}
+
+async function lockGenerationCheckout(
+	t,
+	{ readiness = lockFixtureReadiness() } = {},
+) {
+	readiness.enter("checkout setup");
 	const directory = fs.mkdtempSync(
 		path.join(os.tmpdir(), "boat-lock-command-"),
 	);
@@ -1032,11 +1076,17 @@ child.on('close',code=>{
 		owned.push(record);
 		return record;
 	};
-	const { child: keeper } = start(background, process.execPath, [
+	readiness.enter("keeper startup");
+	const keeperRecord = start(background, process.execPath, [
 		"-e",
 		"console.log('ready');setInterval(()=>{},1000)",
 	]);
-	await once(keeper.stdout, "data");
+	const keeper = keeperRecord.child;
+	await readiness.wait(() => {
+		if (keeperRecord.terminal)
+			assert.fail(`Keeper exited before readiness: ${keeperRecord.output()}`);
+		return keeperRecord.output().includes("ready");
+	}, "keeper readiness");
 	const processRecord = worktreeProcesses(root).find(
 		(p) => p.pid === keeper.pid,
 	);
@@ -1074,6 +1124,7 @@ child.on('close',code=>{
 		local,
 		json,
 		commands,
+		readiness,
 		run,
 		writer: () =>
 			start(background, process.execPath, [
@@ -1143,10 +1194,11 @@ function flag(f, name) {
 }
 async function pausedGeneration(t, phase = "", checkout) {
 	const f = checkout ?? (await lockGenerationCheckout(t));
+	f.readiness.enter(`paused ${phase || "generator"}`);
 	flag(f, phase ? `pause-${phase}` : "pause");
 	const command = f.run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock");
 	const pending = command.done;
-	await observed(
+	await f.readiness.wait(
 		() => {
 			if (command.terminal) {
 				throw new Error(
@@ -1244,6 +1296,96 @@ test("paused lock fixture observes Make signal before generator barrier", async 
 	assert.equal(processGroupRunning(command.child.pid), false);
 });
 
+test("lock fixture phases consume one monotonic budget even while Make stays live", async (t) => {
+	let clock = 1000;
+	const shared = lockFixtureReadiness({
+		deadline: clock + 5000,
+		now: () => clock,
+	});
+	const f = await lockGenerationCheckout(t, { readiness: shared });
+	clock = 4000;
+	const paused = await pausedGeneration(t, "sync", f);
+	assert.equal(shared.deadline, 6000);
+	const command = f.commands[0];
+	assert.equal(command.child.exitCode, null);
+	assert.equal(command.child.signalCode, null);
+	assert.equal(command.closed, false);
+	clock = 5999;
+	await assert.rejects(
+		shared.wait(() => {
+			clock = 6000;
+			return true;
+		}, "report publication"),
+		/Readiness deadline exhausted during report publication/,
+	);
+	await assert.rejects(
+		shared.wait(
+			() => fs.existsSync(path.join(f.control, "entered")),
+			"paused generator",
+		),
+		/Readiness deadline exhausted during paused generator/,
+	);
+	assert.equal(fs.existsSync(path.join(f.control, "entered")), false);
+	assert.equal(
+		command.terminal,
+		null,
+		"live missing marker must still exhaust the original budget",
+	);
+	paused.release();
+	await stopLockFixtureChildren(f.commands, true);
+	assert.equal(command.closed, true);
+	const result = await paused.pending;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(result.signal, null);
+	assert.equal(processGroupRunning(command.child.pid), false);
+});
+
+test("lock fixture child cannot restart an expired overall readiness budget", async (t) => {
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "boat-lock-budget-"));
+	const report = path.join(directory, "report.json");
+	t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+	const runner = spawn(
+		process.execPath,
+		[
+			"--test",
+			"--test-name-pattern=^lock fixture intentional failure$",
+			fileURLToPath(import.meta.url),
+		],
+		{
+			env: {
+				...process.env,
+				NODE_TEST_CONTEXT: undefined,
+				NODE_OPTIONS: "",
+				BOAT_LOCK_CLEANUP_PHASE: "sync",
+				BOAT_LOCK_CLEANUP_REPORT: report,
+				BOAT_LOCK_READY_DEADLINE: "1",
+			},
+			stdio: ["ignore", "pipe", "pipe"],
+		},
+	);
+	let output = "";
+	runner.stdout.on("data", (bytes) => {
+		output += bytes;
+	});
+	runner.stderr.on("data", (bytes) => {
+		output += bytes;
+	});
+	const done = once(runner, "close");
+	await observed(
+		() => runner.exitCode !== null || runner.signalCode !== null,
+		"expired budget runner exit",
+	);
+	const [status, signal] = await done;
+	assert.equal(status, 1, output);
+	assert.equal(signal, null, output);
+	assert.match(output, /Readiness deadline exhausted during checkout setup/);
+	assert.equal(
+		fs.existsSync(report),
+		false,
+		"expired setup must not advance to report publication",
+	);
+});
+
 // Run an actual failing test in a child so its after hooks and open handles are
 // exercised without failing (or hanging) the surrounding regression suite.
 if (process.env.BOAT_LOCK_CLEANUP_PHASE) {
@@ -1251,7 +1393,12 @@ if (process.env.BOAT_LOCK_CLEANUP_PHASE) {
 		const phase = process.env.BOAT_LOCK_CLEANUP_PHASE;
 		const pause =
 			phase === "generate" ? "" : phase === "unresponsive" ? "sync" : phase;
-		const f = await pausedGeneration(t, pause);
+		const readiness = lockFixtureReadiness({
+			deadline: Number(process.env.BOAT_LOCK_READY_DEADLINE),
+			report: process.env.BOAT_LOCK_CLEANUP_REPORT,
+		});
+		const checkout = await lockGenerationCheckout(t, { readiness });
+		const f = await pausedGeneration(t, pause, checkout);
 		if (phase === "unresponsive") flag(f, "ignore-release");
 		f.pending.then((result) => {
 			fs.writeFileSync(
@@ -1259,8 +1406,9 @@ if (process.env.BOAT_LOCK_CLEANUP_PHASE) {
 				JSON.stringify(result),
 			);
 		});
+		readiness.enter("daemon startup");
 		const { child: daemon } = f.daemon();
-		await observed(
+		await readiness.wait(
 			() => worktreeProcesses(f.root).some((p) => p.pid === daemon.pid),
 			"owned daemon started",
 		);
@@ -1277,6 +1425,7 @@ if (process.env.BOAT_LOCK_CLEANUP_PHASE) {
 				throw error;
 			}
 		});
+		readiness.enter("report publication");
 		fs.writeFileSync(
 			process.env.BOAT_LOCK_CLEANUP_REPORT,
 			JSON.stringify({ directory: f.directory, processes }),
@@ -1300,6 +1449,7 @@ for (const phase of ["sync", "generate", "collect", "unresponsive"])
 		unrelated.stdout.once("data", () => {
 			unrelatedReady = true;
 		});
+		const readiness = lockFixtureReadiness({ report });
 		const runner = spawn(
 			process.execPath,
 			[
@@ -1315,6 +1465,7 @@ for (const phase of ["sync", "generate", "collect", "unresponsive"])
 					NODE_OPTIONS: "",
 					BOAT_LOCK_CLEANUP_PHASE: phase,
 					BOAT_LOCK_CLEANUP_REPORT: report,
+					BOAT_LOCK_READY_DEADLINE: String(readiness.deadline),
 				},
 				stdio: ["ignore", "pipe", "pipe"],
 			},
@@ -1359,7 +1510,7 @@ for (const phase of ["sync", "generate", "collect", "unresponsive"])
 			fs.rmSync(directory, { recursive: true, force: true });
 		});
 		await observed(() => unrelatedReady, "unrelated process ready");
-		await observed(
+		await readiness.wait(
 			() => fs.existsSync(report) || closed,
 			"failure scenario ready",
 		);

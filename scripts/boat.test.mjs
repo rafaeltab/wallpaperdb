@@ -6737,6 +6737,122 @@ function previewProbe(promise, description, ms = 1000) {
 	]).finally(() => clearTimeout(timer));
 }
 
+// Evidence belongs to the caller when supplied. Private fallback archives are
+// released only after the owning fixture's actual cleanup and verification.
+function pendingPreviewEvidence(
+	t,
+	supplied = process.env.BOAT_PENDING_UPGRADE_EVIDENCE,
+) {
+	const owned = !supplied;
+	const directory =
+		supplied ||
+		fs.mkdtempSync(path.join(os.tmpdir(), "boat-pending-preview-evidence-"));
+	return {
+		directory,
+		async cleanup(cleanup) {
+			try {
+				await cleanup();
+				if (owned) fs.rmSync(directory, { recursive: true });
+			} catch (error) {
+				t.diagnostic(`Pending preview evidence retained at ${directory}`);
+				throw error;
+			}
+		},
+	};
+}
+
+test("pending-preview evidence preserves ownership until cleanup settles", async (t) => {
+	const directories = [];
+	const diagnostics = [];
+	const owner = { diagnostic: (text) => diagnostics.push(text) };
+	// These controls own no processes. Their independent cleanup follows every
+	// retention assertion and never supplies the archive helper's verdict.
+	t.after(() => {
+		for (const directory of directories)
+			fs.rmSync(directory, { recursive: true, force: true });
+	});
+	const fallback = pendingPreviewEvidence(owner, "");
+	directories.push(fallback.directory);
+	assert.equal(
+		fixtureContains(
+			path.resolve(import.meta.dirname, ".."),
+			fallback.directory,
+		),
+		false,
+	);
+	assert.equal(fs.statSync(fallback.directory).mode & 0o777, 0o700);
+	const receipt = path.join(fallback.directory, "cleanup.json");
+	fs.writeFileSync(receipt, "ownership before retirement");
+	let release;
+	const retirement = new Promise((resolve) => {
+		release = resolve;
+	});
+	const cleaning = fallback.cleanup(async () => {
+		await retirement;
+		assert.equal(
+			fs.readFileSync(receipt, "utf8"),
+			"ownership before retirement",
+		);
+		fs.writeFileSync(receipt, "verified final retirement");
+	});
+	assert.equal(
+		fs.existsSync(receipt),
+		true,
+		"evidence survives pending cleanup",
+	);
+	release();
+	await cleaning;
+	assert.equal(
+		fs.existsSync(fallback.directory),
+		false,
+		"verified fallback is retired",
+	);
+
+	const failed = pendingPreviewEvidence(owner, "");
+	directories.push(failed.directory);
+	const retained = path.join(failed.directory, "cleanup.json");
+	const failure = new Error("controlled cleanup rejection");
+	await assert.rejects(
+		failed.cleanup(async () => {
+			fs.writeFileSync(retained, "unexpected survivor receipt");
+			throw failure;
+		}),
+		(error) => error === failure,
+	);
+	assert.equal(
+		fs.readFileSync(retained, "utf8"),
+		"unexpected survivor receipt",
+	);
+	assert.ok(
+		diagnostics.includes(
+			`Pending preview evidence retained at ${failed.directory}`,
+		),
+	);
+
+	const caller = fs.mkdtempSync(
+		path.join(os.tmpdir(), "boat-caller-preview-evidence-"),
+	);
+	directories.push(caller);
+	const supplied = pendingPreviewEvidence(owner, caller);
+	assert.equal(supplied.directory, caller);
+	const callerReceipt = path.join(caller, "caller.json");
+	fs.writeFileSync(callerReceipt, "caller-owned archive");
+	await supplied.cleanup(async () => {
+		assert.equal(
+			fs.readFileSync(callerReceipt, "utf8"),
+			"caller-owned archive",
+		);
+	});
+	assert.equal(fs.readFileSync(callerReceipt, "utf8"), "caller-owned archive");
+	await assert.rejects(
+		supplied.cleanup(async () => {
+			throw failure;
+		}),
+		(error) => error === failure,
+	);
+	assert.equal(fs.readFileSync(callerReceipt, "utf8"), "caller-owned archive");
+});
+
 async function cleanupPendingPreview({
 	f,
 	cleanups,
@@ -6810,8 +6926,8 @@ async function cleanupPendingPreview({
 }
 
 test("pending-upgrade fixture preserves receipts and retires keeper when command pipes cannot close", async (t) => {
-	const evidence = process.env.BOAT_PENDING_UPGRADE_EVIDENCE;
-	assert.ok(evidence, "diagnostic evidence directory is required");
+	const archive = pendingPreviewEvidence(t);
+	const evidence = archive.directory;
 	const cleanups = [];
 	const report = path.join(evidence, "cleanup-rejection");
 	let f,
@@ -6822,82 +6938,91 @@ test("pending-upgrade fixture preserves receipts and retires keeper when command
 		keeper,
 		survivor;
 	// Register independent teardown before checkout acquisition can fail.
-	t.after(async () => {
-		const failures = [];
-		if (f) {
-			const groups = new Set();
-			for (const identity of fixtureCensus(f.directory)) {
-				if (groups.has(identity.group)) continue;
-				try {
-					if (!liveOwnedProcess(f.root, identity)) continue;
-					const signaled = signalFixtureGroup(identity, "SIGKILL", f.directory);
-					assert.ok(
-						signaled || !liveOwnedProcess(f.root, identity),
-						"Live owned group refused safety signal",
-					);
-					if (!signaled) continue;
-					groups.add(identity.group);
-					assert.equal(
-						await fixtureStopped(() => !processGroupRunning(identity.group)),
-						true,
-					);
-				} catch (error) {
-					failures.push(error);
+	t.after(() =>
+		archive.cleanup(async () => {
+			const failures = [];
+			if (f) {
+				const groups = new Set();
+				for (const identity of fixtureCensus(f.directory)) {
+					if (groups.has(identity.group)) continue;
+					try {
+						if (!liveOwnedProcess(f.root, identity)) continue;
+						const signaled = signalFixtureGroup(
+							identity,
+							"SIGKILL",
+							f.directory,
+						);
+						assert.ok(
+							signaled || !liveOwnedProcess(f.root, identity),
+							"Live owned group refused safety signal",
+						);
+						if (!signaled) continue;
+						groups.add(identity.group);
+						assert.equal(
+							await fixtureStopped(() => !processGroupRunning(identity.group)),
+							true,
+						);
+					} catch (error) {
+						failures.push(error);
+					}
 				}
 			}
-		}
-		try {
-			if (f)
-				assert.deepEqual(
-					fixtureCensus(f.directory),
-					[],
-					"Safety survivors retain ownership files",
+			try {
+				if (f)
+					assert.deepEqual(
+						fixtureCensus(f.directory),
+						[],
+						"Safety survivors retain ownership files",
+					);
+				for (const cleanup of cleanups) await cleanup();
+			} catch (error) {
+				failures.push(error);
+			}
+			try {
+				if (
+					siblingIdentity &&
+					liveOwnedProcess(siblingDirectory, siblingIdentity)
+				)
+					assert.equal(
+						signalFixtureGroup(siblingIdentity, "SIGTERM", siblingDirectory),
+						true,
+					);
+				if (siblingClosed)
+					await previewProbe(
+						siblingClosed,
+						"independent sibling teardown failed",
+					);
+				if (siblingDirectory)
+					fs.rmSync(siblingDirectory, { recursive: true, force: true });
+			} catch (error) {
+				failures.push(error);
+			}
+			fs.writeFileSync(
+				`${report}.safety.json`,
+				JSON.stringify(
+					{
+						keeper,
+						survivor,
+						sibling: siblingIdentity,
+						keeperRetired: !keeper || !liveOwnedProcess(f.root, keeper),
+						survivorRetired: !survivor || !liveOwnedProcess(f.root, survivor),
+						siblingRetired:
+							!siblingIdentity ||
+							!liveOwnedProcess(siblingDirectory, siblingIdentity),
+						fixtureRemoved: !f || !fs.existsSync(f.directory),
+						failures: failures.map((error) => error.message),
+					},
+					null,
+					2,
+				),
+			);
+			if (failures.length)
+				throw new AggregateError(
+					failures,
+					"Independent safety teardown failed",
 				);
-			for (const cleanup of cleanups) await cleanup();
-		} catch (error) {
-			failures.push(error);
-		}
-		try {
-			if (
-				siblingIdentity &&
-				liveOwnedProcess(siblingDirectory, siblingIdentity)
-			)
-				assert.equal(
-					signalFixtureGroup(siblingIdentity, "SIGTERM", siblingDirectory),
-					true,
-				);
-			if (siblingClosed)
-				await previewProbe(
-					siblingClosed,
-					"independent sibling teardown failed",
-				);
-			if (siblingDirectory)
-				fs.rmSync(siblingDirectory, { recursive: true, force: true });
-		} catch (error) {
-			failures.push(error);
-		}
-		fs.writeFileSync(
-			`${report}.safety.json`,
-			JSON.stringify(
-				{
-					keeper,
-					survivor,
-					sibling: siblingIdentity,
-					keeperRetired: !keeper || !liveOwnedProcess(f.root, keeper),
-					survivorRetired: !survivor || !liveOwnedProcess(f.root, survivor),
-					siblingRetired:
-						!siblingIdentity ||
-						!liveOwnedProcess(siblingDirectory, siblingIdentity),
-					fixtureRemoved: !f || !fs.existsSync(f.directory),
-					failures: failures.map((error) => error.message),
-				},
-				null,
-				2,
-			),
-		);
-		if (failures.length)
-			throw new AggregateError(failures, "Independent safety teardown failed");
-	});
+		}),
+	);
 	f = await lockGenerationCheckout({ after: (fn) => cleanups.push(fn) });
 	siblingDirectory = fs.mkdtempSync(
 		path.join(os.tmpdir(), "boat-pending-sibling-"),
@@ -7001,8 +7126,8 @@ const child=spawn(process.execPath,['-e',"require('fs').writeFileSync(process.ar
 });
 
 async function pendingUpgradePreview(t, mode) {
-	const evidence = process.env.BOAT_PENDING_UPGRADE_EVIDENCE;
-	assert.ok(evidence, "diagnostic evidence directory is required");
+	const archive = pendingPreviewEvidence(t);
+	const evidence = archive.directory;
 	const report = path.join(evidence, mode);
 	const cleanups = [];
 	const owner = t;
@@ -7016,7 +7141,9 @@ async function pendingUpgradePreview(t, mode) {
 	let f;
 	const receipts = { mode, phases: [], processes: [] };
 	owner.after(() =>
-		cleanupPendingPreview({ f, cleanups, baseCleanup, receipts, report }),
+		archive.cleanup(() =>
+			cleanupPendingPreview({ f, cleanups, baseCleanup, receipts, report }),
+		),
 	);
 	f = await lockGenerationCheckout(t);
 	receipts.directory = f.directory;

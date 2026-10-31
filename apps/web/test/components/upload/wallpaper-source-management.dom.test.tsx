@@ -62,6 +62,98 @@ function mount() {
   );
   return { ...render(ui), ui, client };
 }
+it('keeps add and replacement available after sixteen accepted upload rows and a withdrawal', async () => {
+  let saved: OwnedSources = { ...initial, sources: [], defaultSourceId: null };
+  const wallpaper = {
+    wallpaperId: 'same-wallpaper',
+    assetId: 'same-asset',
+    sourceId: 'first',
+    state: 'published' as const,
+    createdAt: 'now',
+  };
+  vi.mocked(ownedSources).mockImplementation(async () => saved);
+  vi.mocked(browserSourceBatchApi).mockReturnValue({
+    identifier: () => crypto.randomUUID(),
+    begin: async () => wallpaper,
+    wallpaper: async () => wallpaper,
+    list: async () => saved,
+    create: async (_asset, id, revision) => ({
+      candidateId: id,
+      status: 'awaiting-bytes',
+      expectedSourceSetRevision: revision,
+    }),
+    status: async () => {
+      throw new Error('Accepted files must not repeat');
+    },
+    upload: async (_asset, id) => ({
+      candidateId: id,
+      status: 'ready',
+      expectedSourceSetRevision: saved.sourceSetRevision,
+    }),
+    accept: async (_asset, id, revision, _correlation, _signal, mutation) => {
+      saved = {
+        ...saved,
+        sourceSetRevision: String(Number(revision) + 1),
+        sources: [
+          ...saved.sources.filter(
+            (source) =>
+              source.sourceId !==
+              (mutation?.operation === 'replace-one' ? mutation.targetSourceId : undefined)
+          ),
+          { sourceId: id },
+        ],
+        defaultSourceId: saved.defaultSourceId ?? id,
+      };
+      return {
+        candidateId: id,
+        status: 'accepted',
+        sourceId: id,
+        expectedSourceSetRevision: revision,
+      };
+    },
+    expectSource: async () => {},
+    cancel: async () => {},
+    wait: async () => {},
+  });
+  vi.mocked(withdrawSource).mockImplementation(async (_asset, id) => {
+    saved = {
+      ...saved,
+      sources: saved.sources.filter((source) => source.sourceId !== id),
+      sourceSetRevision: '19',
+    };
+  });
+  const view = mount();
+  const user = userEvent.setup();
+  const input = screen.getByLabelText('Add Sources to this Wallpaper');
+  await user.upload(
+    input,
+    Array.from({ length: 16 }, (_, i) => new File(['bytes'], `${i}.png`, { type: 'image/png' }))
+  );
+  await waitFor(() =>
+    expect(
+      screen
+        .getAllByTestId('source-upload-outcome')
+        .every((row) => row.textContent?.includes('Source accepted'))
+    ).toBe(true)
+  );
+  const withdraw = screen
+    .getAllByRole('button', { name: /^Withdraw Source/ })
+    .find((button) => !button.hasAttribute('disabled'));
+  if (!withdraw) throw new Error('Missing non-default Source');
+  await user.click(withdraw);
+  await screen.findByText('15 accepted Sources. Source revision 19.');
+  expect(input).toBeEnabled();
+  await user.upload(input, new File(['next'], 'next.png', { type: 'image/png' }));
+  await waitFor(() => expect(screen.getAllByTestId('source-upload-outcome')).toHaveLength(17));
+  await waitFor(() => expect(input).toBeEnabled());
+  const replacement = screen.getAllByLabelText(/^Replace Source /)[0];
+  if (!replacement) throw new Error('Missing replacement input');
+  expect(replacement).toBeEnabled();
+  await user.upload(replacement, new File(['replace'], 'replace.png', { type: 'image/png' }));
+  await waitFor(() => expect(screen.getAllByTestId('source-upload-outcome')).toHaveLength(18));
+  await waitFor(() => expect(input).toBeEnabled());
+  view.unmount();
+});
 it('selects another Default and withdraws the previous Source using each displayed revision', async () => {
   let saved = initial;
   vi.mocked(ownedSources).mockImplementation(async () => saved);

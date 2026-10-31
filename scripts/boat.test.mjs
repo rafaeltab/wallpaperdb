@@ -1109,6 +1109,7 @@ if(argv.includes('usage'))shutdownHold('usage');
 if(argv.includes('info')&&!argv.includes('fake-new-worker')){
  if(fs.existsSync(path.join(control,'info-error'))){console.log(JSON.stringify({code:fs.readFileSync(path.join(control,'info-error'),'utf8')}));process.exit(41);}
  if(fs.existsSync(path.join(control,'stopping'))){
+  if(fs.existsSync(path.join(control,'shutdown-persistent-stopping'))){console.log(JSON.stringify({sandbox:{id:'fake-worker',state:'stopping'}}));process.exit(0);}
   if(fs.existsSync(path.join(control,'stop-observed'))&&fs.existsSync(path.join(control,'shutdown-observe-stopping'))){fs.unlinkSync(path.join(control,'shutdown-observe-stopping'));console.log(JSON.stringify({state:'stopping'}));process.exit(0);}
   if(!fs.existsSync(path.join(control,'stop-observed'))){fs.writeFileSync(path.join(control,'stop-observed'),'yes');console.log(JSON.stringify({state:'stopping'}));process.exit(0);}
   fs.writeFileSync(path.join(control,'stop-completing'),'yes');
@@ -5001,7 +5002,7 @@ test("awake startup invalidates a stale receipt before any remote effects and ke
 });
 
 // Safety cleanup is independent of the controller verdict and never makes a green.
-async function shutdownCheckout(t, development = false) {
+async function shutdownCheckout(t, development = false, fixtureOptions = {}) {
 	let f;
 	const identities = [];
 	const safetySignals = [];
@@ -5037,7 +5038,7 @@ async function shutdownCheckout(t, development = false) {
 	});
 	f = development
 		? await developmentCheckout(t, { prepare: false })
-		: await lockGenerationCheckout(t);
+		: await lockGenerationCheckout(t, fixtureOptions);
 	f.local(
 		".boat/enrollment.json",
 		JSON.stringify({
@@ -5548,6 +5549,146 @@ test("shutdown wall clock incomplete live lock publication waits without bypassi
 	assert.equal(fs.existsSync(path.join(f.root, ".boat/lifecycle.lock")), true);
 });
 
+test("shutdown wall clock aggregate observation expiry retains the unresolved compute obligation", async (t) => {
+	const cleanupReport = path.join(
+		os.tmpdir(),
+		`boat-shutdown-aggregate-${process.pid}-${fixtureNow()}`,
+	);
+	const f = await shutdownCheckout(t, false, {
+		ownPackageGroups: true,
+		cleanupReport,
+	});
+	t.after(() =>
+		t.diagnostic(
+			JSON.stringify({
+				kind: "aggregate-owned-safety",
+				file: `${cleanupReport}.cleanup`,
+				receipt: JSON.parse(
+					fs.readFileSync(`${cleanupReport}.cleanup`, "utf8"),
+				),
+			}),
+		),
+	);
+	const before = f.json(".boat/state.json"),
+		sibling = fixtureProcess(before.daemon.pid);
+	flag(f, "shutdown-persistent-stopping");
+	const helper = "scripts/lib/boat-shutdown.mjs",
+		production = fs.readFileSync(path.join(f.root, helper), "utf8");
+	const mutant = process.env.BOAT_SHUTDOWN_AGGREGATE_MUTANT;
+	assert.ok(
+		!mutant || mutant === "renew",
+		"unknown aggregate sensitivity mode",
+	);
+	if (mutant) {
+		// Deliberately broken fixture only: renew the aggregate observation window,
+		// preserving the actual production per-call cap and disposal mechanism.
+		const remaining = "start + allocation[phase][1] * ratio",
+			cutoff = "start + cutoff * ratio";
+		assert.equal(production.split(remaining).length, 2);
+		assert.equal(production.split(cutoff).length, 2);
+		f.local(
+			helper,
+			production
+				.replace(
+					remaining,
+					'(phase === "observation" ? now() : start) + allocation[phase][1] * ratio',
+				)
+				.replace(
+					cutoff,
+					'(phase === "observation" ? now() : start) + cutoff * ratio',
+				),
+		);
+	}
+	t.diagnostic(
+		JSON.stringify({
+			kind: "aggregate-observation-input",
+			mode: mutant ?? "production",
+			productionHash: createHash("sha256").update(production).digest("hex"),
+			fixtureHash: createHash("sha256")
+				.update(fs.readFileSync(path.join(f.root, helper)))
+				.digest("hex"),
+			budgetMs: 18000,
+			observationCutoffMs: 16500,
+		}),
+	);
+	const start = fixtureNow(),
+		pending = f.run("boat-stop");
+	let result;
+	try {
+		result = await shutdownResult(t, f, pending);
+	} finally {
+		t.diagnostic(
+			JSON.stringify({
+				kind: "aggregate-observation-verdict",
+				makeIdentity: fixtureProcess(pending.child.pid),
+				makeElapsedMs: fixtureNow() - start,
+				closed: pending.closed,
+				beforeSafety: true,
+			}),
+		);
+	}
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(
+		result.output,
+		/Shutdown observation: deadline (exceeded; worker completion unresolved|exhausted before launch)/,
+	);
+	assert.ok(
+		fixtureNow() - start >= 16000,
+		"successful stopping must consume the aggregate window",
+	);
+	assert.ok(
+		fixtureNow() - start < 18000,
+		"Make must close within the selected fixture bound before safety",
+	);
+	assert.equal(pending.closed, true);
+	const after = shutdownLedger(f);
+	for (const key of ["id", "size", "cost", "runningSince"])
+		assert.equal(after[key], before[key]);
+	assert.equal(after.shutdownAttempt.status, "stopping-observed");
+	assert.equal(after.shutdownAttempt.completion, undefined);
+	assert.equal(after.shutdownAttempt.accountingAppliedAt, undefined);
+	assert.ok(
+		after.shutdownAttempt.errors.some(
+			(e) => e.includes("observation") && e.includes("deadline"),
+		),
+	);
+	const calls = shutdownCalls(f);
+	assert.equal(calls.filter((a) => a.includes("stop")).length, 1);
+	assert.equal(
+		calls
+			.flat()
+			.some((a) => ["new", "resume", "delete", "--force"].includes(a)),
+		false,
+	);
+	assert.deepEqual(fixtureProcess(sibling.pid), sibling);
+	const receipts = fs
+		.readFileSync(path.join(f.root, ".boat/shutdown-processes.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	const observations = receipts.filter(
+		(r) => r.phase === "observation" && r.terminal,
+	);
+	assert.ok(
+		observations.length >= 10,
+		"repeated successful metadata, not a single hung call",
+	);
+	assert.ok(
+		observations.every(
+			(r) =>
+				r.terminal.code === 0 &&
+				!r.failure &&
+				r.pipesClosed &&
+				r.unresolved.length === 0,
+		),
+	);
+	assert.ok(
+		receipts
+			.filter((r) => r.kind === "phase" && r.phase === "observation")
+			.every((r) => r.deadlineMs <= 16501),
+	);
+});
+
 // Ordinary cache has the existing 601 * 500 ms contention allowance. Do not
 // substitute a reduced counter/clock: this one public limit check pays that cost.
 test("ordinary lock unpublished pid retains ownership through its existing contention limit", async (t) => {
@@ -5759,8 +5900,8 @@ while True: time.sleep(0.01)
 	assert.deepEqual(fixtureProcess(sibling.pid), sibling);
 	assert.equal(shutdownCalls(f).filter((a) => a.includes("stop")).length, 1);
 	assert.equal(shutdownLedger(f).runningSince, null);
-	// The controller reports the captured escape; independent test safety owns
-	// its termination. This deliberately is not a successful cleanup assertion.
+	// Both failure verdicts precede the normal controlled release. Independent
+	// test safety is fallback only and supplies neither failure nor retirement proof.
 });
 
 for (const failure of ["fail-retire", "fail-stop", "none"])

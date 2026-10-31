@@ -1,4 +1,11 @@
 import fs from "node:fs";
+export function forwardPreviewDisconnect(req, res, upstream) {
+	const cancel = () => upstream.destroy();
+	req.once("aborted", cancel);
+	res.once("close", () => {
+		if (!res.writableFinished) cancel();
+	});
+}
 export function worktreeProcesses(root) {
 	const samples = [];
 	for (const name of fs.readdirSync("/proc")) {

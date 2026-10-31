@@ -18,6 +18,11 @@ import {
 	forwardPreviewDisconnect,
 	developmentWantedAfterCommand,
 } from "./lib/boat.mjs";
+import {
+	shutdownBudget,
+	finiteShutdownProcess,
+	retireShutdownTunnel,
+} from "./lib/boat-shutdown.mjs";
 import { snapshotLifecycle, snapshotExpired } from "./lib/boat-snapshot.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 import {
@@ -77,17 +82,30 @@ function execute(
 		collectOutput = false,
 		maxCaptureBytes = Infinity,
 		onFrame = () => {},
+		shutdown,
 	} = {},
 ) {
 	return new Promise((resolve, reject) => {
 		const start = Date.now();
+		if (
+			shutdown &&
+			performance.now() >= shutdown.deadline - shutdown.disposalMs
+		) {
+			reject(
+				new Error(
+					`Shutdown ${shutdown.phase}: deadline exhausted before launch`,
+				),
+			);
+			return;
+		}
 		const child = spawn(command, argv, {
 			cwd: root,
+			detached: !!shutdown,
 			env: { ...process.env, BOAT_NO_UPDATE: "1" },
 			stdio: [
-				input === undefined ? "inherit" : "pipe",
-				capture || streamFrames ? "pipe" : "inherit",
-				capture || streamFrames ? "pipe" : "inherit",
+				shutdown ? "pipe" : input === undefined ? "inherit" : "pipe",
+				capture || streamFrames || shutdown ? "pipe" : "inherit",
+				capture || streamFrames || shutdown ? "pipe" : "inherit",
 			],
 		});
 		let out = "",
@@ -95,15 +113,30 @@ function execute(
 			decoded = "",
 			outputOverflow = false,
 			captureOverflow = false;
+		const finite = shutdown && finiteShutdownProcess(child, shutdown);
+		let forwarded = 0,
+			forwardingOverflow = false;
+		if (shutdown && !capture && !streamFrames) {
+			const forward = (stream, bytes) => {
+				forwarded += bytes.length;
+				if (forwarded > 1024 * 1024) forwardingOverflow = true;
+				if (!forwardingOverflow && !stream.destroyed) stream.write(bytes);
+			};
+			child.stdout.on("data", (b) => forward(process.stdout, b));
+			child.stderr.on("data", (b) => forward(process.stderr, b));
+		}
 		if (capture) {
 			child.stdout.on("data", (b) => {
-				if (Buffer.byteLength(out) + b.length > maxCaptureBytes) {
+				if (
+					Buffer.byteLength(out) + b.length >
+					Math.min(maxCaptureBytes, shutdown ? 1024 * 1024 : Infinity)
+				) {
 					captureOverflow = true;
 					child.kill("SIGTERM");
 				} else out += b;
 			});
 			child.stderr.on("data", (b) => {
-				err += b;
+				err = (err + b).slice(shutdown ? -1000 : 0);
 			});
 		}
 		if (streamFrames) {
@@ -158,14 +191,14 @@ function execute(
 			});
 			child.stderr.on("data", (bytes) => emit(bytes, true));
 		}
-		if (input !== undefined) {
+		if (input !== undefined || shutdown) {
 			child.stdin.on("error", () => {});
 			child.stdin.end(input);
 		}
-		child.on("error", reject);
-		child.on("close", (code, signal) => {
+		if (!shutdown) child.on("error", reject);
+		const complete = (code, signal) => {
 			const status = code ?? (signal === "SIGINT" ? 130 : 143);
-			if (captureOverflow) {
+			if (captureOverflow || forwardingOverflow) {
 				reject(new Error("Captured transport output limit exceeded"));
 				return;
 			}
@@ -175,7 +208,7 @@ function execute(
 					code = JSON.parse(out.trim().split("\n").at(-1)).code;
 				} catch {}
 				const error = new Error(
-					`${path.basename(command)} failed (${status}); ${code ?? (capture ? err.slice(-1000) : "see command output")}`,
+					`${path.basename(command)} failed (${status}); ${shutdown ? (typeof code === "string" && /^[a-z_]{1,80}$/.test(code) ? code : "transport failure") : (code ?? (capture ? err.slice(-1000) : "see command output"))}`,
 				);
 				error.code = code;
 				reject(error);
@@ -187,30 +220,42 @@ function execute(
 					outputOverflow,
 					ms: Date.now() - start,
 				});
-		});
+		};
+		if (finite)
+			finite.then(({ code, signal }) => complete(code, signal), reject);
+		else child.on("close", complete);
 	});
 }
 const boat = async (argv, opts = {}) =>
 	execute(cli, ["--no-update", ...argv], opts);
-const json = async (argv) => {
-	const result = await boat(["--json", ...argv], { capture: true });
-	return parseBoatJson(result.out);
+const json = async (argv, opts = {}) => {
+	const result = await boat(["--json", ...argv], { ...opts, capture: true });
+	if (!opts.shutdown) return parseBoatJson(result.out);
+	try {
+		return parseBoatJson(result.out);
+	} catch {
+		throw new Error(
+			`Shutdown ${opts.shutdown.phase}: invalid metadata response`,
+		);
+	}
 };
 const ssh = (id, command, opts = {}) =>
 	boat(["ssh", id, "--", "bash", "-lc", command], opts);
-const retireWatchers = (id) =>
+const retireWatchers = (id, opts = {}) =>
 	ssh(
 		id,
 		`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && sudo -n "$(mise which node)" --input-type=module -`,
-		{ input: fs.readFileSync("scripts/boat-stop-watch.mjs") },
+		{ ...opts, input: fs.readFileSync("scripts/boat-stop-watch.mjs") },
 	);
 function owned() {
 	if (!config || config.root !== root)
 		throw new Error("This worktree is not enrolled");
 }
-async function lock(fn, name = "lifecycle", deadline = Infinity) {
+async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
 	const lockDir = path.join(dir, `${name}.lock`);
 	for (let attempt = 0; ; attempt++) {
+		if (shutdown && performance.now() >= shutdown.deadline)
+			throw new Error("Shutdown lock: deadline exceeded; no remote effects");
 		if (Date.now() >= deadline)
 			throw new Error(
 				"Asset migration command allowance exhausted while awaiting source ownership; no launch",
@@ -229,7 +274,16 @@ async function lock(fn, name = "lifecycle", deadline = Infinity) {
 				continue;
 			}
 			if (attempt > 600) throw new Error("Lifecycle lock timed out");
-			await wait(Math.min(500, deadline - Date.now()));
+			await wait(
+				Math.max(
+					1,
+					Math.min(
+						500,
+						deadline - Date.now(),
+						shutdown ? shutdown.deadline - performance.now() : Infinity,
+					),
+				),
+			);
 		}
 	}
 	try {
@@ -825,74 +879,130 @@ function daemon() {
 	s.daemon = worktreeProcesses(root).find((p) => p.pid === child.pid);
 	save(s);
 }
-async function stop(remove = false, targets) {
-	return lock(async () => {
-		let s = read(stateFile);
-		if (!s.id) return;
-		const result = await snapshots.stopCompute({
-			inspect: () => json(["info", s.id]),
-			retire: () => retireWatchers(s.id),
-			cleanup:
-				targets &&
-				(async () => {
-					await ssh(
-						s.id,
-						`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
-					);
-					const cleaned = read(stateFile);
-					cleaned.developmentWanted = developmentWantedAfterCommand(
-						cleaned.developmentWanted,
-						targets,
-						0,
-					);
-					if (!developmentWantedAfterCommand(true, targets, 0))
-						delete cleaned.reconciliationPending;
-					save(cleaned);
-				}),
-			request: () => json(["stop", s.id]),
-			wait,
-		});
-		// Read after the transition so accounting cannot overwrite DIRTY intent.
-		s = read(stateFile);
-		if (s.runningSince) {
-			s.cost = (s.cost ?? 0) + estimate(s.size, Date.now() - s.runningSince);
-			s.runningSince = null;
-			delete s.watcher;
-			save(s);
-			event("stopped", { id: s.id, estimatedCost: s.cost });
-		}
-		if (targets && result.cleanupSkipped) {
-			// Stopped compute cannot run cleanup. Cancel desired development without
-			// claiming physical teardown or qualifying the saved snapshot.
-			s.developmentWanted = developmentWantedAfterCommand(
-				s.developmentWanted,
-				targets,
-				0,
-			);
-			if (!developmentWantedAfterCommand(true, targets, 0))
-				delete s.reconciliationPending;
-			save(s);
-			console.log(
-				`Remote compute already stopped; development intent ${s.developmentWanted ? "preserved" : "cleared"}; physical cleanup was not performed; snapshot remains DIRTY.`,
-			);
-		}
-		const tunnel = read(path.join(dir, "cache-tunnel.json"));
-		if (liveOwnedProcess(root, tunnel)) {
-			try {
-				process.kill(-tunnel.pid, "SIGTERM");
-			} catch {}
-			fs.rmSync(path.join(dir, "cache-tunnel.json"), { force: true });
-		}
-		// Keep the provider's authoritative usage separately from the conservative ledger.
-		write(path.join(dir, "usage.json"), await json(["usage", s.id]));
-		if (result.error) throw new Error(result.error);
-		if (remove) {
-			await boat(["delete", s.id, "--yes"]);
-			event("deleted", { id: s.id });
-			delete s.id;
-			save(s);
-		}
+async function disposeShutdownTunnel(id, protectedPids, budget) {
+	const tunnelFile = path.join(dir, "cache-tunnel.json");
+	const tunnel = read(tunnelFile);
+	if (!tunnel.pid) return;
+	if (tunnel.id !== id)
+		throw new Error(
+			"Shutdown disposal: tunnel worker identity unresolved; record retained",
+		);
+	await retireShutdownTunnel(tunnel, protectedPids, budget.phase("disposal"));
+	fs.rmSync(tunnelFile, { force: true });
+}
+async function stop(remove = false, targets, { preserveIntent = false } = {}) {
+	const budget = shutdownBudget(config.shutdownBudgetMs, (receipt) => {
+		fs.appendFileSync(
+			path.join(dir, "shutdown-processes.jsonl"),
+			`${JSON.stringify(receipt)}\n`,
+			{ mode: 0o600 },
+		);
 	});
+	const outputErrors = [];
+	const outputFailure = () => {
+		if (!outputErrors.length)
+			outputErrors.push("Shutdown output forwarding failed");
+	};
+	process.stdout.on("error", outputFailure);
+	process.stderr.on("error", outputFailure);
+	try {
+		return await lock(
+			async () => {
+				let s = read(stateFile);
+				if (!s.id) return;
+				let result;
+				const protectedPids = [
+					process.pid,
+					read(path.join(dir, "cache-server.json")).pid,
+					s.daemon?.pid,
+					s.watcher?.pid,
+				];
+				const errors = [];
+				try {
+					result = await snapshots.stopCompute({
+						budget,
+						inspect: (opts) => json(["info", s.id], opts),
+						retire: (opts) => retireWatchers(s.id, opts),
+						cleanup:
+							targets &&
+							(async (opts) => {
+								await ssh(
+									s.id,
+									`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
+									opts,
+								);
+								if (preserveIntent) return;
+								const cleaned = read(stateFile);
+								cleaned.developmentWanted = developmentWantedAfterCommand(
+									cleaned.developmentWanted,
+									targets,
+									0,
+								);
+								if (!developmentWantedAfterCommand(true, targets, 0))
+									delete cleaned.reconciliationPending;
+								save(cleaned);
+							}),
+						request: (opts) => json(["stop", s.id], opts),
+						wait,
+					});
+					s = read(stateFile);
+					event("stopped", {
+						id: s.id,
+						estimatedCost: s.cost,
+						completion: result.completion,
+					});
+					if (targets && result.cleanupSkipped && !preserveIntent) {
+						s.developmentWanted = developmentWantedAfterCommand(
+							s.developmentWanted,
+							targets,
+							0,
+						);
+						if (!developmentWantedAfterCommand(true, targets, 0))
+							delete s.reconciliationPending;
+						save(s);
+						console.log(
+							`Remote compute already stopped or stopping; development intent ${s.developmentWanted ? "preserved" : "cleared"}; physical cleanup was not performed; snapshot remains DIRTY.`,
+						);
+					}
+					if (result.error) errors.push(result.error);
+					try {
+						write(
+							path.join(dir, "usage.json"),
+							await json(["usage", s.id], { shutdown: budget.phase("usage") }),
+						);
+					} catch (error) {
+						errors.push(`Usage after completed stop: ${error.message}`);
+					}
+				} catch (error) {
+					errors.push(error.message);
+				} finally {
+					try {
+						await disposeShutdownTunnel(s.id, protectedPids, budget);
+					} catch (error) {
+						errors.push(error.message);
+					}
+				}
+				errors.push(...outputErrors);
+				if (errors.length) throw new Error(errors.join("; "));
+				if (remove) {
+					// The later destructive delete retains its existing contract, outside the
+					// stop enclosure. This repair neither exercises nor bounds that request.
+					await boat(["delete", s.id, "--yes"]);
+					event("deleted", { id: s.id });
+					delete s.id;
+					save(s);
+				}
+			},
+			"lifecycle",
+			Infinity,
+			budget.phase("lock"),
+		);
+	} finally {
+		// A destroyed output stream can emit again during final error reporting.
+		// Keep its error handler until process exit, without retaining a live handle.
+		if (!process.stdout.destroyed) process.stdout.off("error", outputFailure);
+		if (!process.stderr.destroyed) process.stderr.off("error", outputFailure);
+	}
 }
 async function runAssetMigration(id, started, targets, expected, deadline) {
 	if (Date.now() >= deadline)
@@ -1695,12 +1805,7 @@ try {
 			);
 		else if (read(stateFile).runningSince) {
 			event("settle-stop", { owners: owners.owners });
-			const id = read(stateFile).id;
-			await ssh(
-				id,
-				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make stop BOAT_EXEC=worker`,
-			);
-			await stop();
+			await stop(false, ["stop"], { preserveIntent: true });
 		}
 	} else
 		throw new Error(

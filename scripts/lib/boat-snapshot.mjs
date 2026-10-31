@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { estimate, workerState } from "./boat.mjs";
 
 const stopped = (status) => ["archived", "stopped"].includes(status);
@@ -98,50 +99,157 @@ export function snapshotLifecycle({ load, persist }) {
 			persist(state);
 			return state;
 		},
-		async stopCompute({ inspect, retire, cleanup, request, wait }) {
-			// A bypassed cleanup, failed hook or forced provider stop cannot leave
-			// behind an old receipt. Record the obligation before any remote work.
-			dirty();
+		async stopCompute({ inspect, retire, cleanup, request, wait, budget }) {
+			const state = dirty();
+			const workerId = state.id;
+			let attempt =
+				state.shutdownAttempt?.workerId === workerId
+					? state.shutdownAttempt
+					: null;
+			if (!attempt)
+				attempt = {
+					id: randomUUID(),
+					workerId,
+					status: "not-submitted",
+					startedAt: new Date().toISOString(),
+					errors: [],
+				};
+			attempt.lastInvocationId = budget.id;
 			const errors = [];
+			const persistAttempt = () => {
+				const current = load();
+				current.shutdownAttempt = attempt;
+				persist(current);
+			};
+			const failure = (error) => {
+				errors.push(error.message);
+				attempt.errors = [...(attempt.errors ?? []), error.message].slice(-20);
+				persistAttempt();
+			};
+			const inspectWorker = async (phase) => {
+				attempt.phase = phase;
+				persistAttempt();
+				const info = await inspect({ shutdown: budget.phase(phase) });
+				const worker = info?.sandbox ?? info;
+				if (worker?.id !== undefined && worker.id !== workerId) {
+					const error = new Error(
+						"Shutdown inspection returned contradictory worker identity",
+					);
+					error.code = "wrong_worker";
+					throw error;
+				}
+				return { info, worker, status: workerState(info) };
+			};
+			const complete = (observation, cleanupSkipped) => {
+				// First durable replacement records proof. Accounting is a subsequent
+				// replacement, never inferred from transport timeout or a missing timestamp.
+				attempt.status = "completed-observed";
+				attempt.completion ??= {
+					workerId,
+					status: observation.status,
+					observedAt: new Date().toISOString(),
+					provider: {
+						id: observation.worker?.id,
+						state: observation.worker?.state,
+						status: observation.worker?.status,
+						stop: observation.worker?.stop,
+					},
+				};
+				persistAttempt();
+				const current = load();
+				if (!attempt.accountingAppliedAt) {
+					if (current.runningSince)
+						current.cost =
+							(current.cost ?? 0) +
+							estimate(
+								current.size,
+								Math.max(
+									0,
+									Date.parse(attempt.completion.observedAt) -
+										current.runningSince,
+								),
+							);
+					current.runningSince = null;
+					delete current.watcher;
+					attempt.accountingAppliedAt = new Date().toISOString();
+					current.shutdownAttempt = attempt;
+					persist(current);
+				}
+				return {
+					error: errors.join("; "),
+					cleanupSkipped,
+					completion: attempt.completion,
+				};
+			};
+			persistAttempt();
 			let initial;
 			try {
-				initial = workerState(await inspect());
+				initial = await inspectWorker("initial");
 			} catch (error) {
-				errors.push(error.message);
+				failure(error);
+				if (error.code === "wrong_worker") throw error;
 			}
-			if (!stopped(initial) && !stopping(initial)) {
-				try {
-					await retire();
-				} catch (error) {
-					errors.push(error.message);
+			if (stopped(initial?.status)) return complete(initial, true);
+			const earlierSubmission = attempt.status !== "not-submitted";
+			const cleanupSkipped = stopping(initial?.status) || earlierSubmission;
+			if (!cleanupSkipped) {
+				for (const [phase, hook] of [
+					["retirement", retire],
+					["cleanup", cleanup],
+				]) {
+					if (!hook) continue;
+					attempt.phase = phase;
+					persistAttempt();
+					try {
+						await hook({ shutdown: budget.phase(phase) });
+					} catch (error) {
+						failure(error);
+					}
 				}
+				// Durable before invoking the side effect. A later invocation observes,
+				// including after a crash between this write and local request spawning.
+				attempt.status = "submission-uncertain";
+				attempt.phase = "submission";
+				attempt.submittedAt = new Date().toISOString();
+				persistAttempt();
 				try {
-					await cleanup?.();
+					await request({ shutdown: budget.phase("submission") });
 				} catch (error) {
-					errors.push(error.message);
+					failure(error);
 				}
-				// Retirement or cleanup failure must not strand compute. Never escalate to force
-				// or retry an ambiguous request; observe within the existing bound.
-				try {
-					await request();
-				} catch (error) {
-					errors.push(error.message);
-				}
+			} else if (
+				stopping(initial?.status) &&
+				attempt.status !== "completed-observed"
+			) {
+				attempt.status = "stopping-observed";
+				persistAttempt();
 			}
-			for (let attempt = 0; attempt < 180; attempt++) {
-				const status = workerState(await inspect());
-				if (stopped(status))
-					return {
-						error: errors.join("; "),
-						cleanupSkipped: stopped(initial) || stopping(initial),
-					};
-				if (!stopping(status))
-					throw new Error(`Unexpected worker state during stop: ${status}`);
-				await wait(1000);
+			try {
+				while (budget.remaining("observation") > 0) {
+					const observation = await inspectWorker("observation");
+					if (stopped(observation.status))
+						return complete(observation, cleanupSkipped);
+					if (!stopping(observation.status))
+						throw new Error(
+							`Unexpected worker state during stop: ${typeof observation.status === "string" && /^[a-z_]{1,40}$/.test(observation.status) ? observation.status : "unrecognized"}`,
+						);
+					if (attempt.status !== "completed-observed")
+						attempt.status = "stopping-observed";
+					else
+						attempt.laterObservation = {
+							status: observation.status,
+							observedAt: new Date().toISOString(),
+						};
+					persistAttempt();
+					await wait(Math.min(1000, budget.remaining("observation")));
+				}
+				throw new Error(
+					"Shutdown observation: deadline exceeded; worker completion unresolved",
+				);
+			} catch (error) {
+				failure(error);
+				throw new Error(errors.join("; "));
 			}
-			throw new Error(
-				"Provider stop did not complete within 180 seconds; worker state must be inspected",
-			);
 		},
 	};
 }

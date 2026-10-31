@@ -959,12 +959,14 @@ async function lockGenerationCheckout(
 		"scripts/boat-route.mk",
 		"scripts/boat.mjs",
 		"scripts/boat-stop-watch.mjs",
+		"scripts/boat-owners.py",
 		"scripts/docker-validation.mjs",
 		"scripts/lib/docker-queue.mjs",
 		"scripts/lib/boat.mjs",
 		"scripts/lib/boat-cache.mjs",
 		"scripts/lib/boat-preparation.mjs",
 		"scripts/lib/boat-snapshot.mjs",
+		"scripts/lib/boat-shutdown.mjs",
 		"scripts/lib/boat-source-generation.mjs",
 		"scripts/lib/boat-asset-migration.mjs",
 		"scripts/package.json",
@@ -1062,6 +1064,7 @@ if(argv.includes('--lockfile-only')){
 		HOME: home,
 		PATH: `${bin}:${process.env.PATH}`,
 		FAKE_WORKER: worker,
+		FAKE_SOURCE: root,
 		FAKE_CONTROL: control,
 		MAKEFLAGS: "",
 		MFLAGS: "",
@@ -1092,13 +1095,21 @@ function shutdownHold(phase){
  process.on('SIGTERM',()=>{});
  while(!fs.existsSync(path.join(control,'shutdown-release-'+phase)))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
 }
+if(fs.existsSync(path.join(control,'shutdown-strict'))&&argv.some(a=>['new','resume','delete','--force'].includes(a)))throw Error('forbidden shutdown effect');
+if(argv.includes('info')&&fs.existsSync(path.join(control,'shutdown-pipe-holder'))){
+ fs.unlinkSync(path.join(control,'shutdown-pipe-holder'));
+ const code="const fs=require('fs'),path=require('path');const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');fs.writeFileSync(path.join(process.env.FAKE_CONTROL,'shutdown-entered-pipe'),JSON.stringify({pid:process.pid,startTicks:fields[19],group:Number(fields[2]),session:Number(fields[3]),state:JSON.parse(fs.readFileSync('.boat/state.json'))}));process.on('SIGTERM',()=>{});setInterval(()=>{},1000)";
+ cp.spawn(process.execPath,['-e',code],{stdio:['ignore',1,2]});
+ console.log(JSON.stringify({state:'ready'}));process.exit(0);
+}
 if(argv.includes('info'))shutdownHold(fs.existsSync(path.join(control,'stopping'))?'observation':'initial');
-if(argv.includes('ssh')&&argv.at(-1).includes('sudo -n'))shutdownHold('retirement');
+if(argv.includes('ssh')&&argv.at(-1).includes('sudo -n')){shutdownHold('retirement');if(fs.existsSync(path.join(control,'shutdown-output'))){shutdownHold('output');console.log('controlled retirement output');}}
 if(argv.includes('usage'))shutdownHold('usage');
 
 if(argv.includes('info')&&!argv.includes('fake-new-worker')){
  if(fs.existsSync(path.join(control,'info-error'))){console.log(JSON.stringify({code:fs.readFileSync(path.join(control,'info-error'),'utf8')}));process.exit(41);}
  if(fs.existsSync(path.join(control,'stopping'))){
+  if(fs.existsSync(path.join(control,'stop-observed'))&&fs.existsSync(path.join(control,'shutdown-observe-stopping'))){fs.unlinkSync(path.join(control,'shutdown-observe-stopping'));console.log(JSON.stringify({state:'stopping'}));process.exit(0);}
   if(!fs.existsSync(path.join(control,'stop-observed'))){fs.writeFileSync(path.join(control,'stop-observed'),'yes');console.log(JSON.stringify({state:'stopping'}));process.exit(0);}
   fs.writeFileSync(path.join(control,'stop-completing'),'yes');
   while(fs.existsSync(path.join(control,'pause-stop-completion'))&&!fs.existsSync(path.join(control,'release-stop-completion')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
@@ -1108,12 +1119,12 @@ if(argv.includes('info')&&!argv.includes('fake-new-worker')){
  }
  console.log(fs.existsSync(path.join(control,'provider-info'))?fs.readFileSync(path.join(control,'provider-info'),'utf8'):JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);
 }
-if(argv.includes('stop')){fs.writeFileSync(path.join(control,'stopping'),'yes');shutdownHold('submission');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
+if(argv.includes('stop')){fs.writeFileSync(path.join(control,'shutdown-request-state'),fs.readFileSync('.boat/state.json'));fs.writeFileSync(path.join(control,'stopping'),'yes');shutdownHold('submission');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
 if(argv.includes('info')&&argv.includes('fake-new-worker')){console.log(JSON.stringify({sandbox:{id:'fake-new-worker',state:'ready'}}));process.exit(0);}
 if(argv.includes('list')){console.log(fs.existsSync(path.join(control,'worker-list'))?fs.readFileSync(path.join(control,'worker-list'),'utf8'):JSON.stringify({sandboxes:[]}));process.exit(0);}
 if(argv.includes('limits')){if(fs.existsSync(path.join(control,'fail-limits'))){console.log(JSON.stringify({code:'limits_failed'}));process.exit(43);}console.log(JSON.stringify({canStart:true,nextStartDollars:0}));process.exit(0);}
 if(argv.includes('new')){fs.writeFileSync(path.join(control,'creation-state'),fs.readFileSync('.boat/state.json'));console.log(JSON.stringify({sandbox:{id:'fake-new-worker'}}));process.exit(0);}
-if(argv.includes('usage')){console.log('{}');process.exit(0);}
+if(argv.includes('usage')){if(fs.existsSync(path.join(control,'fail-usage')))process.exit(43);console.log('{}');process.exit(0);}
 if(argv.includes('snapshot')&&argv.includes('latest')){console.log(JSON.stringify({snapshot:{id:'snapshot-current',sandboxId:'fake-worker',chainId:'chain-current',generation:3,status:'completed',kind:'incremental',origin:'captured',createdAt:'2026-10-31T01:00:00Z',completedAt:'2026-10-31T01:00:01Z',fileCount:42}}));process.exit(0);}
 if((argv.includes('ssh')||argv.includes('exec'))&&fs.existsSync(path.join(control,'audit-startup')))fs.appendFileSync(path.join(control,'startup-state'),JSON.stringify(JSON.parse(fs.readFileSync('.boat/state.json','utf8')))+'\\n');
 if(argv.includes('ssh')&&argv.at(-1).includes('sudo -n')&&fs.existsSync(path.join(control,'fail-retire')))process.exit(31);
@@ -1209,11 +1220,20 @@ child.on('close',code=>{
 	});
 	save(".boat/cache-server.json", processRecord);
 	save(".boat/cache.json", { api: "http://127.0.0.1:12345", token: "fixture" });
+	const tunnelRecord = start(background, process.execPath, [
+		"-e",
+		"console.log('tunnel ready');setInterval(()=>{},1000)",
+	]);
+	await readiness.wait(
+		() => tunnelRecord.output().includes("tunnel ready"),
+		"fixture tunnel readiness",
+	);
 	save(".boat/cache-tunnel.json", {
-		...processRecord,
+		...worktreeProcesses(root).find((p) => p.pid === tunnelRecord.child.pid),
 		id: "fake-worker",
 		api: "http://127.0.0.1:12345",
 	});
+
 	const run = (...targets) => start(commands, "make", targets);
 	return {
 		directory,
@@ -4306,7 +4326,7 @@ test("tracked and previously synchronized untracked patch deletions reach genera
 	assert.equal(frozen.status, 0, frozen.output);
 });
 
-async function developmentCheckout(t) {
+async function developmentCheckout(t, { prepare = true } = {}) {
 	const f = await lockGenerationCheckout(t);
 	// Keep the real Make/controller path; control only remote process responses
 	// and Docker so restoration cannot touch a worker or the host's containers.
@@ -4337,6 +4357,11 @@ const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL,arg
 const apps=argv.includes('infra/docker-compose.apps.yml')||argv.includes('.boat/development-compose.json');
 fs.appendFileSync(path.join(control,'docker'),JSON.stringify(argv)+'\\n');
 if(argv.includes('up')&&apps&&fs.existsSync(path.join(control,'fail-apps')))process.exit(29);
+if(argv.includes('down')&&fs.existsSync(path.join(control,'shutdown-hang-cleanup'))){
+ const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
+ fs.writeFileSync(path.join(control,'shutdown-entered-cleanup'),JSON.stringify({pid:process.pid,startTicks:fields[19],group:Number(fields[2]),session:Number(fields[3]),state:JSON.parse(fs.readFileSync(path.join(process.env.FAKE_SOURCE,'.boat/state.json')))}));
+ process.on('SIGTERM',()=>{});while(true)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+}
 if(argv.includes('down')&&fs.existsSync(path.join(control,'fail-cleanup')))process.exit(30);
 if(apps){
  const image=path.join(control,'image-dependencies');
@@ -4370,10 +4395,12 @@ require('fs').appendFileSync(require('path').join(process.env.FAKE_CONTROL,'vali
 	const normal = () =>
 		f.run("run", "PACKAGE=asset", "SCRIPT=dev:configure", "BOAT_EXEC=remote")
 			.done;
-	const generated = await f.generate();
-	assert.equal(generated.status, 0, generated.output);
-	const prepared = await normal();
-	assert.equal(prepared.status, 0, prepared.output);
+	if (prepare) {
+		const generated = await f.generate();
+		assert.equal(generated.status, 0, generated.output);
+		const prepared = await normal();
+		assert.equal(prepared.status, 0, prepared.output);
+	}
 	return {
 		...f,
 		normal,
@@ -4973,57 +5000,525 @@ test("awake startup invalidates a stale receipt before any remote effects and ke
 
 // Safety cleanup is independent of the controller verdict and never makes a green.
 async function shutdownCheckout(t, development = false) {
- let f;
- const identities = [];
- t.after(async () => {
-  if (!f) return;
-  for (const name of fs.readdirSync(f.control).filter(n => n.startsWith("shutdown-entered-"))) {
-   const record = JSON.parse(fs.readFileSync(path.join(f.control, name)));
-   identities.push(record);
-   const current = fixtureProcess(record.pid);
-   if (current?.startTicks === record.startTicks) process.kill(record.pid, "SIGKILL");
-  }
-  await observed(() => identities.every(p => fixtureProcess(p.pid)?.startTicks !== p.startTicks), "independent shutdown safety disposal");
- });
- f = development ? await developmentCheckout(t) : await lockGenerationCheckout(t);
- f.local(".boat/enrollment.json", JSON.stringify({...f.json(".boat/enrollment.json"), shutdownBudgetMs: 18000}));
- // A fixture keeper stands in for shared cache/daemon resources, not a tunnel.
- f.local(".boat/cache-tunnel.json", "{}");
- fs.rmSync(path.join(f.control, "transport"), {force: true});
- return f;
+	let f;
+	const identities = [];
+	t.after(async () => {
+		if (!f) return;
+		for (const name of fs
+			.readdirSync(f.control)
+			.filter((n) => n.startsWith("shutdown-entered-"))) {
+			const record = JSON.parse(fs.readFileSync(path.join(f.control, name)));
+			identities.push(record);
+			const current = fixtureProcess(record.pid);
+			if (current?.startTicks === record.startTicks)
+				process.kill(record.pid, "SIGKILL");
+		}
+		await observed(
+			() =>
+				identities.every(
+					(p) => fixtureProcess(p.pid)?.startTicks !== p.startTicks,
+				),
+			"independent shutdown safety disposal",
+		);
+	});
+	f = development
+		? await developmentCheckout(t, { prepare: false })
+		: await lockGenerationCheckout(t);
+	f.local(
+		".boat/enrollment.json",
+		JSON.stringify({
+			...f.json(".boat/enrollment.json"),
+			shutdownBudgetMs: 18000,
+		}),
+	);
+	// A fixture keeper stands in for shared cache/daemon resources, not a tunnel.
+	// The fixture tunnel is independently owned; preserve the sibling cache/daemon.
+	fs.rmSync(path.join(f.control, "transport"), { force: true });
+	flag(f, "shutdown-strict");
+	return f;
 }
 async function shutdownResult(t, f, pending) {
- const start = fixtureNow();
- let timer;
- try {
-  return await Promise.race([pending.done, new Promise((_, reject) => {
-   timer = setTimeout(() => reject(new Error("independent shutdown wall clock watchdog expired")), 25000);
-  })]);
- } finally {
-  clearTimeout(timer);
-  const processes = fs.readdirSync(f.control).filter(n => n.startsWith("shutdown-entered-")).map(n => {
-   const record = JSON.parse(fs.readFileSync(path.join(f.control,n)));
-   return {phase:n, ...record, surviving:fixtureProcess(record.pid)};
-  });
-  t.diagnostic(JSON.stringify({elapsedMs:fixtureNow()-start, directory:f.directory, processes, closed:pending.closed}));
- }
+	const start = fixtureNow();
+	let timer;
+	try {
+		return await Promise.race([
+			pending.done,
+			new Promise((_, reject) => {
+				timer = setTimeout(
+					() =>
+						reject(
+							new Error("independent shutdown wall clock watchdog expired"),
+						),
+					25000,
+				);
+			}),
+		]);
+	} finally {
+		clearTimeout(timer);
+		const processes = fs
+			.readdirSync(f.control)
+			.filter((n) => n.startsWith("shutdown-entered-"))
+			.map((n) => {
+				const record = JSON.parse(fs.readFileSync(path.join(f.control, n)));
+				return { phase: n, ...record, surviving: fixtureProcess(record.pid) };
+			});
+		const evidence = fs.existsSync(
+			path.join(f.root, ".boat/shutdown-processes.jsonl"),
+		)
+			? fs
+					.readFileSync(
+						path.join(f.root, ".boat/shutdown-processes.jsonl"),
+						"utf8",
+					)
+					.trim()
+					.split("\n")
+					.map(JSON.parse)
+			: [];
+		t.diagnostic(
+			JSON.stringify({
+				elapsedMs: fixtureNow() - start,
+				directory: f.directory,
+				processes,
+				closed: pending.closed,
+				evidence,
+				state: f.json(".boat/state.json"),
+			}),
+		);
+	}
 }
 function shutdownDisposed(f, phase) {
- const record = JSON.parse(fs.readFileSync(path.join(f.control, "shutdown-entered-"+phase)));
- assert.notEqual(fixtureProcess(record.pid)?.startTicks, record.startTicks, "controller must dispose owned process before test safety cleanup");
- assert.equal(record.state.snapshotRecovery.status, "DIRTY");
+	const record = JSON.parse(
+		fs.readFileSync(path.join(f.control, "shutdown-entered-" + phase)),
+	);
+	assert.notEqual(
+		fixtureProcess(record.pid)?.startTicks,
+		record.startTicks,
+		"controller must dispose owned process before test safety cleanup",
+	);
+	assert.equal(record.state.snapshotRecovery.status, "DIRTY");
+	const receipts = fs
+		.readFileSync(path.join(f.root, ".boat/shutdown-processes.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.ok(
+		receipts.some(
+			(r) =>
+				r.observed?.some((p) => p.pid === record.pid) &&
+				r.unresolved.length === 0,
+		),
+		"owned cleanup receipt before safety",
+	);
 }
 
 test("shutdown wall clock initial info hang preserves single stop admission", async (t) => {
- const f = await shutdownCheckout(t);
- flag(f,"shutdown-hang-initial");
- const result = await shutdownResult(t,f,f.run("boat-stop"));
- assert.notEqual(result.status,0,result.output);
- assert.match(result.output,/initial.*deadline/i);
- shutdownDisposed(f,"initial");
- const calls = fs.readFileSync(path.join(f.control,"transport"),"utf8");
- assert.equal(calls.split("\n").filter(line => line.includes('"stop"')).length,1);
- assert.equal(f.json(".boat/state.json").runningSince,null);
+	const f = await shutdownCheckout(t);
+	flag(f, "shutdown-hang-initial");
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /initial.*deadline/i);
+	shutdownDisposed(f, "initial");
+	const calls = fs.readFileSync(path.join(f.control, "transport"), "utf8");
+	assert.equal(
+		calls.split("\n").filter((line) => line.includes('"stop"')).length,
+		1,
+	);
+	assert.equal(f.json(".boat/state.json").runningSince, null);
+});
+
+function shutdownCalls(f) {
+	return fs.existsSync(path.join(f.control, "transport"))
+		? fs
+				.readFileSync(path.join(f.control, "transport"), "utf8")
+				.trim()
+				.split("\n")
+				.map(JSON.parse)
+		: [];
+}
+function shutdownLedger(f) {
+	const state = f.json(".boat/state.json");
+	const mirror = JSON.parse(
+		fs.readFileSync(
+			path.join(
+				f.directory,
+				"home/.local/state/wallpaperdb-boat/557/fixture.worker.json",
+			),
+		),
+	);
+	assert.deepEqual(mirror, state);
+	assert.equal(state.snapshotRecovery.status, "DIRTY");
+	assert.equal(state.cleanReceipt, undefined);
+	return state;
+}
+for (const phase of ["retirement", "cleanup"])
+	test(`shutdown wall clock hung ${phase} still submits once and preserves intent`, async (t) => {
+		const f = await shutdownCheckout(t, phase === "cleanup");
+		const state = f.json(".boat/state.json");
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...state,
+				developmentWanted: true,
+				reconciliationPending: true,
+			}),
+		);
+		flag(f, "shutdown-hang-" + phase);
+		const result = await shutdownResult(
+			t,
+			f,
+			f.run(phase === "cleanup" ? "stop" : "boat-stop"),
+		);
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, new RegExp(phase + ".*deadline", "i"));
+		shutdownDisposed(f, phase);
+		assert.equal(shutdownCalls(f).filter((a) => a.includes("stop")).length, 1);
+		const after = shutdownLedger(f);
+		assert.equal(after.developmentWanted, true);
+		assert.equal(after.reconciliationPending, true);
+		assert.equal(after.runningSince, null);
+		assert.equal(after.shutdownAttempt.status, "completed-observed");
+		const submitted = JSON.parse(
+			fs.readFileSync(path.join(f.control, "shutdown-request-state")),
+		);
+		assert.equal(submitted.shutdownAttempt.status, "submission-uncertain");
+	});
+
+test("shutdown wall clock ambiguous submission observes completion without clearing stopping accounting", async (t) => {
+	const f = await shutdownCheckout(t);
+	const before = f.json(".boat/state.json");
+	flag(f, "shutdown-hang-submission");
+	flag(f, "pause-stop-completion");
+	const pending = f.run("boat-stop");
+	const resultPromise = shutdownResult(t, f, pending);
+	await observed(
+		() => fs.existsSync(path.join(f.control, "stop-completing")),
+		"completion inspection after timed out submission",
+	);
+	assert.equal(f.json(".boat/state.json").runningSince, before.runningSince);
+	assert.equal(f.json(".boat/state.json").cost, before.cost);
+	assert.equal(
+		f.json(".boat/state.json").shutdownAttempt.completion,
+		undefined,
+	);
+	flag(f, "release-stop-completion");
+	const result = await resultPromise;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /submission.*deadline/i);
+	shutdownDisposed(f, "submission");
+	const after = shutdownLedger(f);
+	assert.equal(after.runningSince, null);
+	assert.equal(after.shutdownAttempt.completion.workerId, "fake-worker");
+	assert.equal(after.shutdownAttempt.completion.status, "stopped");
+	assert.ok(after.shutdownAttempt.accountingAppliedAt);
+	assert.equal(shutdownCalls(f).filter((a) => a.includes("stop")).length, 1);
+});
+
+test("shutdown wall clock unresolved inspection retains obligation and later observes without resubmission", async (t) => {
+	const f = await shutdownCheckout(t);
+	const before = f.json(".boat/state.json");
+	flag(f, "shutdown-hang-observation");
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /observation.*deadline/i);
+	shutdownDisposed(f, "observation");
+	let after = shutdownLedger(f);
+	assert.equal(after.runningSince, before.runningSince);
+	assert.equal(after.cost, before.cost);
+	assert.equal(after.shutdownAttempt.completion, undefined);
+	fs.rmSync(path.join(f.control, "shutdown-hang-observation"));
+	flag(f, "sleep");
+	fs.rmSync(path.join(f.control, "stopping"));
+	const completed = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.equal(completed.status, 0, completed.output);
+	after = shutdownLedger(f);
+	assert.equal(after.runningSince, null);
+	assert.equal(shutdownCalls(f).filter((a) => a.includes("stop")).length, 1);
+});
+
+for (const failure of ["fail-usage", "shutdown-hang-usage"])
+	test(`shutdown wall clock ${failure} preserves completion prior usage and accounting once`, async (t) => {
+		const f = await shutdownCheckout(t);
+		f.local(".boat/usage.json", '{"prior":"exact bytes"}\n');
+		const canary = fixtureProcess(f.json(".boat/state.json").daemon.pid);
+		const tunnel = f.json(".boat/cache-tunnel.json");
+		flag(f, failure);
+		const result = await shutdownResult(t, f, f.run("boat-stop"));
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /Usage after completed stop/);
+		if (failure.startsWith("shutdown-hang")) shutdownDisposed(f, "usage");
+		const after = shutdownLedger(f);
+		assert.equal(after.runningSince, null);
+		assert.equal(after.shutdownAttempt.status, "completed-observed");
+		assert.equal(
+			fs.readFileSync(path.join(f.root, ".boat/usage.json"), "utf8"),
+			'{"prior":"exact bytes"}\n',
+		);
+		assert.notEqual(fixtureProcess(tunnel.pid)?.startTicks, tunnel.startTicks);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/cache-tunnel.json")),
+			false,
+		);
+		assert.deepEqual(
+			fixtureProcess(canary.pid),
+			canary,
+			"separately acquired cache sibling survives",
+		);
+		fs.rmSync(path.join(f.control, failure));
+		const second = await shutdownResult(t, f, f.run("boat-stop"));
+		assert.equal(second.status, 0, second.output);
+		assert.equal(shutdownLedger(f).cost, after.cost);
+		assert.equal(
+			shutdownLedger(f).shutdownAttempt.accountingAppliedAt,
+			after.shutdownAttempt.accountingAppliedAt,
+		);
+		assert.equal(shutdownCalls(f).filter((a) => a.includes("stop")).length, 1);
+	});
+
+test("shutdown wall clock leader exit cannot strand owned pipes or kill sibling canary", async (t) => {
+	const f = await shutdownCheckout(t);
+	const sibling = fixtureProcess(f.json(".boat/state.json").daemon.pid);
+	flag(f, "shutdown-pipe-holder");
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /initial.*deadline/i);
+	shutdownDisposed(f, "pipe");
+	assert.deepEqual(fixtureProcess(sibling.pid), sibling);
+	assert.equal(shutdownLedger(f).runningSince, null);
+	assert.equal(shutdownCalls(f).filter((a) => a.includes("stop")).length, 1);
+});
+
+test("shutdown wall clock live lock contention is bounded without remote effects", async (t) => {
+	const f = await shutdownCheckout(t);
+	const before = f.json(".boat/state.json");
+	const lock = path.join(f.root, ".boat/lifecycle.lock");
+	fs.mkdirSync(lock);
+	fs.writeFileSync(path.join(lock, "pid"), String(before.daemon.pid));
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Shutdown lock.*deadline/);
+	assert.equal(shutdownCalls(f).length, 0);
+	assert.deepEqual(f.json(".boat/state.json"), before);
+	assert.equal(
+		fs.readFileSync(path.join(lock, "pid"), "utf8"),
+		String(before.daemon.pid),
+	);
+	assert.ok(fixtureProcess(before.daemon.pid));
+});
+
+test("shutdown wall clock already stopping observes without cleanup or submission", async (t) => {
+	const f = await shutdownCheckout(t, true);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+			runningSince: null,
+		}),
+	);
+	flag(f, "stopping");
+	const result = await shutdownResult(t, f, f.run("stop"));
+	assert.equal(result.status, 0, result.output);
+	assert.match(
+		result.output,
+		/already stopped or stopping.*physical cleanup.*DIRTY/,
+	);
+	assert.equal(
+		shutdownCalls(f).some((a) => a.includes("ssh") || a.includes("stop")),
+		false,
+	);
+	const state = shutdownLedger(f);
+	assert.equal(state.developmentWanted, false);
+	assert.equal(state.runningSince, null);
+	assert.ok(state.shutdownAttempt.completion);
+});
+
+for (const value of [0, -1, 180001, 1.5, "18000"])
+	test(`shutdown wall clock rejects invalid budget ${JSON.stringify(value)} before effects`, async (t) => {
+		const f = await shutdownCheckout(t);
+		f.local(
+			".boat/enrollment.json",
+			JSON.stringify({
+				...f.json(".boat/enrollment.json"),
+				shutdownBudgetMs: value,
+			}),
+		);
+		const before = f.json(".boat/state.json");
+		const result = await shutdownResult(t, f, f.run("boat-stop"));
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /shutdownBudgetMs/);
+		assert.equal(shutdownCalls(f).length, 0);
+		assert.deepEqual(f.json(".boat/state.json"), before);
+	});
+
+test("shutdown wall clock wrong worker proof retains accounting and refuses submission", async (t) => {
+	const f = await shutdownCheckout(t);
+	const before = f.json(".boat/state.json");
+	fs.writeFileSync(
+		path.join(f.control, "provider-info"),
+		JSON.stringify({ sandbox: { id: "wrong-worker", state: "stopped" } }),
+	);
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /contradictory worker identity/);
+	const after = shutdownLedger(f);
+	assert.equal(after.runningSince, before.runningSince);
+	assert.equal(after.cost, before.cost);
+	assert.equal(after.shutdownAttempt.completion, undefined);
+	assert.equal(
+		shutdownCalls(f).some((a) => a.includes("stop")),
+		false,
+	);
+});
+
+test("shutdown wall clock cumulative pre-stop hangs preserve the submission reserve", async (t) => {
+	const f = await shutdownCheckout(t, true);
+	for (const phase of ["initial", "retirement", "cleanup"])
+		flag(f, "shutdown-hang-" + phase);
+	const result = await shutdownResult(t, f, f.run("stop"));
+	assert.notEqual(result.status, 0, result.output);
+	for (const phase of ["initial", "retirement", "cleanup"])
+		shutdownDisposed(f, phase);
+	const receipts = fs
+		.readFileSync(path.join(f.root, ".boat/shutdown-processes.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	const submission = receipts.find(
+		(r) => r.phase === "submission" && r.terminal,
+	);
+	assert.ok(
+		submission.elapsedMs <= 7500,
+		`submission completed inside its reserved cutoff: ${submission.elapsedMs}`,
+	);
+	assert.equal(shutdownCalls(f).filter((a) => a.includes("stop")).length, 1);
+	assert.equal(shutdownLedger(f).runningSince, null);
+});
+
+test("shutdown wall clock settle cleanup shares the budget and preserves desired development", async (t) => {
+	const f = await shutdownCheckout(t, true);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			developmentWanted: true,
+			reconciliationPending: true,
+		}),
+	);
+	f.env.T3CODE_HOME = path.join(f.directory, "t3");
+	fs.mkdirSync(path.join(f.env.T3CODE_HOME, "userdata"), { recursive: true });
+	execFileSync("python", [
+		"-c",
+		`import sqlite3,json,sys
+c=sqlite3.connect(sys.argv[1])
+c.execute('create table orchestration_v2_projection_threads(payload_json text)')
+c.execute('create table orchestration_v2_projection_runs(thread_id text,status text)')
+c.execute('insert into orchestration_v2_projection_threads values (?)',(json.dumps({'id':'settled-fixture','worktreePath':sys.argv[2],'settledOverride':'settled'}),))
+c.commit()`,
+		path.join(f.env.T3CODE_HOME, "userdata/statev2.sqlite"),
+		f.root,
+	]);
+	flag(f, "shutdown-hang-cleanup");
+	const result = await shutdownResult(t, f, f.run("boat-settle"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /cleanup.*deadline/i);
+	shutdownDisposed(f, "cleanup");
+	const calls = shutdownCalls(f);
+	assert.equal(calls.filter((a) => a.includes("stop")).length, 1);
+	assert.equal(
+		calls.filter(
+			(a) =>
+				a.includes("ssh") && a.at(-1).includes("make BOAT_EXEC=worker 'stop'"),
+		).length,
+		1,
+	);
+	const after = shutdownLedger(f);
+	assert.equal(after.developmentWanted, true);
+	assert.equal(after.reconciliationPending, true);
+	assert.equal(after.runningSince, null);
+});
+
+test("shutdown wall clock protected cache ownership fails disposal without killing the cache", async (t) => {
+	const f = await shutdownCheckout(t);
+	const canary = fixtureProcess(f.json(".boat/state.json").daemon.pid);
+	const tunnel = { ...f.json(".boat/state.json").daemon, id: "fake-worker" };
+	f.local(".boat/cache-tunnel.json", JSON.stringify(tunnel));
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /tunnel ownership unresolved/);
+	assert.deepEqual(f.json(".boat/cache-tunnel.json"), tunnel);
+	assert.deepEqual(fixtureProcess(canary.pid), canary);
+	assert.equal(shutdownLedger(f).runningSince, null);
+});
+
+test("shutdown wall clock interrupted accounting charges only through persisted completion", async (t) => {
+	const f = await shutdownCheckout(t);
+	const observedAt = "2026-10-31T01:00:00.000Z";
+	f.local(
+		".boat/state.json",
+		JSON.stringify({
+			...f.json(".boat/state.json"),
+			cost: 1,
+			runningSince: Date.parse(observedAt) - 3600000,
+			shutdownAttempt: {
+				id: "interrupted-attempt",
+				workerId: "fake-worker",
+				status: "completed-observed",
+				completion: { workerId: "fake-worker", status: "stopped", observedAt },
+			},
+		}),
+	);
+	flag(f, "sleep");
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.equal(result.status, 0, result.output);
+	assert.equal(shutdownLedger(f).cost, 1.072);
+	assert.equal(
+		shutdownLedger(f).shutdownAttempt.completion.observedAt,
+		observedAt,
+	);
+});
+
+test("shutdown wall clock later stopping inspection cannot downgrade completed proof", async (t) => {
+	const f = await shutdownCheckout(t);
+	flag(f, "fail-usage");
+	const first = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(first.status, 0, first.output);
+	const before = shutdownLedger(f);
+	flag(f, "stopping");
+	flag(f, "failed-stop-inspection");
+	flag(f, "shutdown-observe-stopping");
+	fs.rmSync(path.join(f.control, "stop-observed"));
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(result.status, 0, result.output);
+	const after = shutdownLedger(f);
+	assert.deepEqual(
+		after.shutdownAttempt.completion,
+		before.shutdownAttempt.completion,
+	);
+	assert.equal(after.shutdownAttempt.status, "completed-observed");
+	assert.equal(after.cost, before.cost);
+	assert.equal(after.runningSince, null);
+});
+
+test("shutdown wall clock closed output consumer still permits owned compute stop", async (t) => {
+	const f = await shutdownCheckout(t);
+	flag(f, "shutdown-output");
+	flag(f, "shutdown-hang-output");
+	const pending = f.run("boat-stop");
+	const resultPromise = shutdownResult(t, f, pending);
+	await observed(
+		() => fs.existsSync(path.join(f.control, "shutdown-entered-output")),
+		"controlled retirement output barrier",
+	);
+	pending.child.stdout.destroy();
+	flag(f, "shutdown-release-output");
+	const result = await resultPromise;
+	assert.equal(
+		shutdownCalls(f).filter((a) => a.includes("stop")).length,
+		1,
+		result.output,
+	);
+	assert.equal(shutdownLedger(f).runningSince, null);
 });
 
 for (const failure of ["fail-retire", "fail-stop", "none"])

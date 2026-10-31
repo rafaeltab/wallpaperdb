@@ -198,11 +198,12 @@ test("test tiers preserve sequential container execution", () => {
 	}
 });
 
-test("E2E task graphs retain only shared container suites and browser journeys", () => {
+test("E2E task graphs retain shared infrastructure and product/operations browser journeys", () => {
 	for (const [filter, expected] of [
 		[
 			"",
 			[
+				"@wallpaperdb/factory",
 				"@wallpaperdb/test-utils",
 				"@wallpaperdb/testcontainers",
 				"@wallpaperdb/web-e2e",
@@ -210,7 +211,7 @@ test("E2E task graphs retain only shared container suites and browser journeys",
 		],
 		[
 			"--filter=!@wallpaperdb/web-e2e",
-			["@wallpaperdb/test-utils", "@wallpaperdb/testcontainers"],
+			["@wallpaperdb/factory", "@wallpaperdb/test-utils", "@wallpaperdb/testcontainers"],
 		],
 	]) {
 		const result = spawnSync(

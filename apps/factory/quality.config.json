@@ -1,0 +1,12 @@
+{
+  "publicModules": [
+    "adapters/store",
+    "adapters/t3",
+    "adapters/github",
+    "http",
+    "platform",
+    "composition",
+    "adapters/clock"
+  ],
+  "allowedCapabilityDependencies": {}
+}

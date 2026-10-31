@@ -23,7 +23,9 @@
         "packages/test-logger/src/**"
     ],
     "tasks": {
-        "//#format": { "cache": false },
+        "//#format": {
+            "cache": false
+        },
         "start": {
             "cache": false,
             "persistent": true
@@ -144,8 +146,12 @@
         },
         "test:mutation": {
             "cache": false,
-            "dependsOn": ["^build"],
-            "outputs": ["reports/mutation/**"]
+            "dependsOn": [
+                "^build"
+            ],
+            "outputs": [
+                "reports/mutation/**"
+            ]
         },
         "test:integration": {
             "cache": true,
@@ -358,6 +364,21 @@
             ],
             "outputs": [
                 "coverage/unit/**"
+            ]
+        },
+        "@wallpaperdb/factory#test:integration": {
+            "dependsOn": [
+                "^build",
+                "build"
+            ],
+            "outputs": [
+                "coverage/integration/**"
+            ]
+        },
+        "@wallpaperdb/factory#test": {
+            "dependsOn": [
+                "^build",
+                "build"
             ]
         }
     }

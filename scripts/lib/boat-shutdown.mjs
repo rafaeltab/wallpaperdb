@@ -239,6 +239,15 @@ export function finiteShutdownProcess(child, phase) {
 
 export async function retireShutdownTunnel(record, protectedPids, phase) {
 	if (!record?.pid) return;
+	if (
+		!Number.isSafeInteger(record.pid) ||
+		record.pid <= 1 ||
+		typeof record.startTicks !== "string" ||
+		!/^\d+$/.test(record.startTicks)
+	)
+		throw new Error(
+			"Shutdown disposal: incomplete tunnel identity; record retained",
+		);
 	const current = identity(record.pid);
 	if (!current || current.zombie) {
 		const survivors = groupMembers({

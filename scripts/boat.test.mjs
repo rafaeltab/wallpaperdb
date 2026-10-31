@@ -1246,6 +1246,8 @@ child.on('close',code=>{
 		commands,
 		readiness,
 		run,
+		shutdownTunnel: () =>
+			start(background, "python", ["scripts/shutdown-tunnel.py"]),
 		writer: () =>
 			start(background, process.execPath, [
 				"-e",
@@ -5002,6 +5004,7 @@ test("awake startup invalidates a stale receipt before any remote effects and ke
 async function shutdownCheckout(t, development = false) {
 	let f;
 	const identities = [];
+	const safetySignals = [];
 	t.after(async () => {
 		if (!f) return;
 		for (const name of fs
@@ -5010,8 +5013,10 @@ async function shutdownCheckout(t, development = false) {
 			const record = JSON.parse(fs.readFileSync(path.join(f.control, name)));
 			identities.push(record);
 			const current = fixtureProcess(record.pid);
-			if (current?.startTicks === record.startTicks)
+			if (current?.startTicks === record.startTicks) {
+				safetySignals.push(current);
 				process.kill(record.pid, "SIGKILL");
+			}
 		}
 		await observed(
 			() =>
@@ -5019,6 +5024,15 @@ async function shutdownCheckout(t, development = false) {
 					(p) => fixtureProcess(p.pid)?.startTicks !== p.startTicks,
 				),
 			"independent shutdown safety disposal",
+		);
+		t.diagnostic(
+			JSON.stringify({
+				kind: "independent-test-safety",
+				signals: safetySignals,
+				identitiesGone: identities.every(
+					(p) => fixtureProcess(p.pid)?.startTicks !== p.startTicks,
+				),
+			}),
 		);
 	});
 	f = development
@@ -5403,6 +5417,7 @@ test("shutdown wall clock settle cleanup shares the budget and preserves desired
 			...f.json(".boat/state.json"),
 			developmentWanted: true,
 			reconciliationPending: true,
+			runningSince: null,
 		}),
 	);
 	f.env.T3CODE_HOME = path.join(f.directory, "t3");
@@ -5519,6 +5534,75 @@ test("shutdown wall clock closed output consumer still permits owned compute sto
 		result.output,
 	);
 	assert.equal(shutdownLedger(f).runningSince, null);
+});
+
+test("shutdown wall clock incomplete live lock publication waits without bypassing ownership", async (t) => {
+	const f = await shutdownCheckout(t);
+	const before = f.json(".boat/state.json");
+	fs.mkdirSync(path.join(f.root, ".boat/lifecycle.lock"));
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Shutdown lock.*deadline/);
+	assert.equal(shutdownCalls(f).length, 0);
+	assert.deepEqual(f.json(".boat/state.json"), before);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/lifecycle.lock")), true);
+});
+
+test("shutdown wall clock captured tunnel session escape remains unresolved before safety cleanup", async (t) => {
+	const f = await shutdownCheckout(t);
+	f.local(
+		"scripts/shutdown-tunnel.py",
+		`import os,sys,time,signal,json
+from pathlib import Path
+control=Path(os.environ['FAKE_CONTROL'])
+if os.fork()==0:
+ def escaped(_signal,_frame):
+  os.setsid()
+  fields=Path('/proc/self/stat').read_text().rsplit(') ',1)[1].split()
+  (control/'shutdown-entered-tunnel-escape').write_text(json.dumps({'pid':os.getpid(),'startTicks':fields[19],'group':int(fields[2]),'session':int(fields[3])}))
+ signal.signal(signal.SIGTERM,escaped)
+ (control/'shutdown-tunnel-child').write_text(str(os.getpid()))
+ while True: time.sleep(0.01)
+while not (control/'shutdown-tunnel-child').exists(): time.sleep(0.01)
+print('ready',flush=True)
+while True: time.sleep(0.01)
+`,
+	);
+	const local = f.shutdownTunnel();
+	await observed(
+		() => local.output().includes("ready"),
+		"owned tunnel child readiness",
+	);
+	const leader = fixtureProcess(local.child.pid);
+	const child = fixtureProcess(
+		Number(fs.readFileSync(path.join(f.control, "shutdown-tunnel-child"))),
+	);
+	f.local(
+		".boat/cache-tunnel.json",
+		JSON.stringify({ ...leader, id: "fake-worker" }),
+	);
+	const result = await shutdownResult(t, f, f.run("boat-stop"));
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /tunnel did not exit.*record retained/);
+	const escaped = fixtureProcess(child.pid);
+	assert.equal(escaped.startTicks, child.startTicks);
+	assert.notEqual(escaped.session, child.session);
+	assert.equal(f.json(".boat/cache-tunnel.json").startTicks, leader.startTicks);
+	const receipts = fs
+		.readFileSync(path.join(f.root, ".boat/shutdown-processes.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.ok(
+		receipts.some(
+			(r) =>
+				r.phase === "tunnel-disposal" &&
+				r.unresolved.some((p) => p.pid === child.pid),
+		),
+	);
+	assert.equal(shutdownLedger(f).runningSince, null);
+	// The controller reports the captured escape; independent test safety owns
+	// its termination. This deliberately is not a successful cleanup assertion.
 });
 
 for (const failure of ["fail-retire", "fail-stop", "none"])
@@ -7267,24 +7351,26 @@ test("transport loss leaves an independently live remote writer owned and blocks
 	assert.match(stillBlocked.output, /completion is uncertain/);
 });
 
-test("concurrent maintained execution wrapper edit rejects migration source acceptance", async (t) => {
-	const f = await pausedMigrations(t),
-		name = "scripts/boat-shell.mjs";
-	const before = migrationBytes(f.root),
-		captured = fs.readFileSync(path.join(f.root, name), "utf8"),
-		edited = `${captured}\n// concurrent wrapper edit\n`;
-	f.local(name, edited);
-	f.release();
-	const result = await f.pending;
-	assert.notEqual(result.status, 0, result.output);
-	assert.match(
-		result.output,
-		/Local generator inputs or old migration set changed: scripts\/boat-shell.mjs/,
-	);
-	assert.deepEqual(migrationBytes(f.root), before);
-	assert.equal(fs.readFileSync(path.join(f.root, name), "utf8"), edited);
-	assert.equal(fs.readFileSync(path.join(f.worker, name), "utf8"), captured);
-});
+for (const name of ["scripts/boat-shell.mjs", "scripts/lib/boat-shutdown.mjs"])
+	test(`concurrent maintained execution wrapper ${name} edit rejects migration source acceptance`, async (t) => {
+		const f = await pausedMigrations(t);
+		const before = migrationBytes(f.root),
+			captured = fs.readFileSync(path.join(f.root, name), "utf8"),
+			edited = `${captured}\n// concurrent wrapper edit\n`;
+		f.local(name, edited);
+		f.release();
+		const result = await f.pending;
+		assert.notEqual(result.status, 0, result.output);
+		assert.ok(
+			result.output.includes(
+				`Local generator inputs or old migration set changed: ${name}`,
+			),
+			result.output,
+		);
+		assert.deepEqual(migrationBytes(f.root), before);
+		assert.equal(fs.readFileSync(path.join(f.root, name), "utf8"), edited);
+		assert.equal(fs.readFileSync(path.join(f.worker, name), "utf8"), captured);
+	});
 
 // UNINTEGRATED pending-upgrade repair, awaiting parent review and sequential integration.
 // The fixture copies the actual production controller and Make entry point.

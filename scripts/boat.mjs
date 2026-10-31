@@ -266,7 +266,25 @@ async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
 			break;
 		} catch (e) {
 			if (e.code !== "EEXIST") throw e;
-			const pid = Number(fs.readFileSync(path.join(lockDir, "pid"), "utf8"));
+			let pid;
+			try {
+				pid = Number(fs.readFileSync(path.join(lockDir, "pid"), "utf8"));
+			} catch (error) {
+				if (error.code !== "ENOENT") throw error;
+				// mkdir/pid publication and owner release are separate filesystem steps.
+				// Missing publication never authorizes removing another owner's lock.
+				await wait(
+					Math.max(
+						1,
+						Math.min(
+							500,
+							deadline - Date.now(),
+							shutdown ? shutdown.deadline - performance.now() : Infinity,
+						),
+					),
+				);
+				continue;
+			}
 			try {
 				process.kill(pid, 0);
 			} catch {
@@ -1803,7 +1821,7 @@ try {
 			console.log(
 				"Remote cleanup skipped: another worktree owner remains active.",
 			);
-		else if (read(stateFile).runningSince) {
+		else if (read(stateFile).id) {
 			event("settle-stop", { owners: owners.owners });
 			await stop(false, ["stop"], { preserveIntent: true });
 		}

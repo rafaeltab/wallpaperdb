@@ -1070,14 +1070,23 @@
         "archiveLimit": "Archived hmr-observer.js observes body text only. It supplies neither source mutation nor restoration/deletion proof and cannot satisfy this procedure by itself."
       },
       "presence": {
-        "localPath": "apps/web/src/boat-548-presence.ts",
-        "containerPath": "/app/apps/web/src/boat-548-presence.ts",
-        "bytes": "export const boat548Presence = \"BOAT-548-PRESENCE\";\n",
-        "urlPath": "/web/src/boat-548-presence.ts",
-        "request": "From the same public browser document, fetch this path with cache: no-store and Accept: application/javascript. Record status and marker-present boolean only, not unrelated response bodies. One request deadline is 5000ms; poll every 1000ms until the phase deadline.",
-        "createMethod": "Before T0 require the local path absent, container path absent and public request 404 with marker absent. Create exactly bytes locally with exclusive-create semantics, never overwrite. Ordinary source synchronization/Compose watch delivers it. Require local and container SHA-256 equal bytes hash, HTTP 200 and BOAT-548-PRESENCE in response.",
+        "localPath": "apps/web/src/boat-548-presence.txt",
+        "containerPath": "/app/apps/web/src/boat-548-presence.txt",
+        "bytes": "BOAT-548-PRESENCE\n",
+        "urlPath": "/web/src/boat-548-presence.txt",
+        "request": "From the same public browser document, fetch exactly this path with cache: no-store and Accept: text/plain, without query parameters. Use an ordinary fetch, not a script/module request or import. Read arrayBuffer() and compare every response byte, including the final LF, with UTF-8 bytes and sha256. Record status, exact-bytes-match and marker-present booleans plus response SHA-256 only, not unrelated response bodies. One request deadline is 5000ms; poll every 1000ms until the phase deadline.",
+        "createMethod": "Before T0 require the local path absent, container path absent and public request 404 with marker absent. Create exactly bytes locally with exclusive-create semantics, never overwrite. Keep this raw .txt unimported under the existing watched apps/web/src; do not add it to public, routes, imports or configuration. Ordinary source synchronization/Compose watch delivers it. Require local and container SHA-256 equal bytes hash, HTTP 200 and exact response bytes with the same SHA-256.",
         "deleteMethod": "Only unlink the owned local regular file after its bytes hash still matches. Record deletion time. Require local lstat ENOENT, container test ! -e succeeds and the same public request returns 404 with marker absent. A Vite HTML fallback with status 200 fails absence proof. No manual remote deletion or cache-busting substitute.",
-        "sha256": "aef52fa476ee116854da152cb86cc0fbf9f41d4a5812a6f78ae241bef172d728"
+        "sha256": "6baee87d44729caf75804ae5add7146de3d56f1fdbca46ffd40bba5b612567ad",
+        "viteContract": {
+          "version": "7.3.0",
+          "lockfile": "pnpm-lock.yaml",
+          "packageSource": "vite/dist/node/chunks/config.js",
+          "sourceSha256": "79a983f161c1272ab1be6f7c292c4ec476c1b41784cb570a45b2c4f4c0591687",
+          "requestPath": "Locked source: isJSRequest excludes .txt. transformMiddleware only transforms script-destination, JS, import, CSS or HTML-proxy requests. This plain fetch meets none of those conditions; serveStaticMiddleware serves the raw file without moduleGraph registration. Its sirvOptions uses dev: true and extensions: []. Explicit Accept: text/plain makes htmlFallbackMiddleware return next without SPA rewrite when the file is absent; notFoundMiddleware returns 404.",
+          "hmrPath": "Locked source: onFileAddUnlink invokes handleHMRUpdate for create/delete. This unimported non-module file has no moduleGraph entries. With no unresolved-import modules added on create and no plugin adding modules or sending reloads, handleHMRUpdate takes its empty-modules, non-HTML branch and returns without updateModules or full-reload. Fetching a .ts instead registers a module; an unaccepted module with no importers can reach full-reload on deletion.",
+          "gate": "Before the admitted window require the locked runtime Vite version/source hash above, no import of this probe, no unresolved-import modules in Vite before creation, and unchanged pinned Vite/plugin configuration. Recheck this source contract if those inputs change. The original-document nonce/timeOrigin requirement remains mandatory through creation/deletion. Offline source inspection is not live qualification."
+        }
       },
       "sampling": {
         "commandTemplate": "make boat-sample ARGS='<absolute inventory.json> <absolute fresh output directory>'",
@@ -1112,7 +1121,7 @@
         "At T0: dispatch make check PACKAGE=asset FORCE=1 once in the owned development checkout with watcher active; record dispatch, actual process start, exit time/status and log SHA. Record its actual active interval separately from the observation window. Do not sleep, repeat checks, inject source changes or pad the command to claim 120 seconds of command activity. Require at least one complete health batch during that active interval or report insufficient overlap.",
         "At T0+10000ms: perform the exact public HMR text edit. Require visible editedText in the original document within 20000ms of the write.",
         "At T0+40000ms: restore exact original HMR source bytes. Require visible baselineText and editedText absent in the original document within 20000ms of restoration.",
-        "At T0+70000ms: exclusively create presence.localPath. Require local/runtime hashes and HTTP 200 with marker within 20000ms of creation.",
+        "At T0+70000ms: exclusively create presence.localPath. Require local/runtime hashes and HTTP 200 with exact response bytes and matching SHA-256 within 20000ms of creation.",
         "At T0+100000ms: delete the owned presence file. Require local/runtime absence and HTTP 404 with no marker within 20000ms of deletion.",
         "Through T0+120000ms and the final complete sample: keep the original browser document, watcher and sampler active even if the check exits earlier. Then await the check if still active under the existing command deadline; retain its full interval and failure. No missing phase may borrow evidence from another round.",
         "After the window: require original HMR source hash locally and inside web container, absence of the presence file locally/runtime/HTTP, unchanged document identity, and the same process/readiness receipts. Full make ci is a separate once-per-admitted-issue validation at frozen inputs with watcher active, after these temporary mutations are gone. No generated final SQL is preloaded. Failure leaves qualification pending."
@@ -1124,8 +1133,8 @@
           "make docker-run ARGS='docker inspect --format {{.Id}},{{.Image}},{{.State.Pid}},{{.State.StartedAt}},{{.RestartCount}} <owned app container IDs>'",
           "make docker-run ARGS='docker top <owned app container ID> -eo pid,ppid,lstart,comm'",
           "make docker-run ARGS='docker compose -p <owned project> -f infra/docker-compose.apps.yml exec -T web sha256sum /app/apps/web/src/routes/__root.tsx'",
-          "make docker-run ARGS='docker compose -p <owned project> -f infra/docker-compose.apps.yml exec -T web sha256sum /app/apps/web/src/routes/__root.tsx /app/apps/web/src/boat-548-presence.ts'",
-          "make docker-run ARGS='docker compose -p <owned project> -f infra/docker-compose.apps.yml exec -T web test ! -e /app/apps/web/src/boat-548-presence.ts'"
+          "make docker-run ARGS='docker compose -p <owned project> -f infra/docker-compose.apps.yml exec -T web sha256sum /app/apps/web/src/routes/__root.tsx /app/apps/web/src/boat-548-presence.txt'",
+          "make docker-run ARGS='docker compose -p <owned project> -f infra/docker-compose.apps.yml exec -T web test ! -e /app/apps/web/src/boat-548-presence.txt'"
         ],
         "events": "Retain owned Compose watch sync/restart/rebuild events and app lifecycle timestamps during the entire window, not only endpoint snapshots. Missing process/event evidence cannot prove zero restarts. The window permits no planned restart; public src edit/create/delete use sync. A dependency update in a separate admitted step must show its own expected restart, old/new loaded artifact hashes, and HTTP 200 recovery on all affected routes within 120000ms. Do not count a validation-only build as that update.",
         "failure": "Unexpected restart/recreate, changed process start identity, missed health deadline, changed source contracts, unintended runtime-built artifact churn, or incomplete source restoration fails the round. Retain evidence and perform owned cleanup without claiming qualification. Coordinator owns stop/resume/provider receipts.",

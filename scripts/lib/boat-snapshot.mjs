@@ -41,7 +41,7 @@ export function snapshotLifecycle({ load, persist }) {
 			persist(state);
 			return state;
 		},
-		async stopCompute({ inspect, retire, request, wait }) {
+		async stopCompute({ inspect, retire, cleanup, request, wait }) {
 			// A bypassed cleanup, failed hook or forced provider stop cannot leave
 			// behind an old receipt. Record the obligation before any remote work.
 			dirty();
@@ -58,7 +58,12 @@ export function snapshotLifecycle({ load, persist }) {
 				} catch (error) {
 					errors.push(error.message);
 				}
-				// Retirement failure must not strand compute. Never escalate to force
+				try {
+					await cleanup?.();
+				} catch (error) {
+					errors.push(error.message);
+				}
+				// Retirement or cleanup failure must not strand compute. Never escalate to force
 				// or retry an ambiguous request; observe within the existing bound.
 				try {
 					await request();

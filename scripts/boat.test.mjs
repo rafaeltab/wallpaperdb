@@ -2182,14 +2182,51 @@ for (const failure of [false, true])
 		);
 	});
 
-test("compute stop inspects a worker even when its local running timestamp is absent", async (t) => {
-	const f = await lockGenerationCheckout(t);
-	f.local(
-		".boat/state.json",
-		JSON.stringify({ ...f.json(".boat/state.json"), runningSince: null }),
-	);
-	const result = await f.run("boat-stop").done;
-	assert.equal(result.status, 0, result.output);
-	assert.equal(fs.existsSync(path.join(f.control, "sleep")), true);
-	assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
-});
+for (const caller of ["boat-stop", "stop"])
+	for (const provider of ["ready", "stopped"])
+		test(`missing timestamp ${caller} inspects ${provider} before deciding cleanup`, async (t) => {
+			const f = await developmentCheckout(t);
+			f.local(
+				".boat/state.json",
+				JSON.stringify({
+					...f.json(".boat/state.json"),
+					runningSince: null,
+					developmentWanted: true,
+				}),
+			);
+			if (provider === "stopped") flag(f, "sleep");
+			fs.rmSync(path.join(f.control, "transport"), { force: true });
+			const result = await f.run(caller).done;
+			assert.equal(result.status, 0, result.output);
+			const calls = f.transport();
+			assert.ok(
+				calls.some((argv) => argv.includes("info")),
+				"provider inspection must precede success",
+			);
+			assert.equal(
+				calls.filter((argv) => argv.includes("stop")).length,
+				provider === "ready" ? 1 : 0,
+			);
+			assert.equal(
+				calls.some((argv) => argv.includes("resume") || argv.includes("new")),
+				false,
+			);
+			assert.equal(fs.existsSync(path.join(f.control, "sleep")), true);
+			assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+			assert.equal(
+				f.json(".boat/state.json").developmentWanted,
+				!(caller === "stop" && provider === "ready"),
+			);
+			if (provider === "stopped")
+				assert.equal(
+					calls.some((argv) => argv.includes("ssh") || argv.includes("exec")),
+					false,
+				);
+			if (caller === "stop" && provider === "ready")
+				assert.equal(
+					calls.filter((argv) =>
+						argv.at(-1).includes("make BOAT_EXEC=worker 'stop'"),
+					).length,
+					1,
+				);
+		});

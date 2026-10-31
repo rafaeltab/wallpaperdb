@@ -624,13 +624,30 @@ function daemon() {
 	s.daemon = worktreeProcesses(root).find((p) => p.pid === child.pid);
 	save(s);
 }
-async function stop(remove = false) {
+async function stop(remove = false, targets) {
 	return lock(async () => {
 		let s = read(stateFile);
 		if (!s.id) return;
 		const result = await snapshots.stopCompute({
 			inspect: () => json(["info", s.id]),
 			retire: () => retireWatchers(s.id),
+			cleanup:
+				targets &&
+				(async () => {
+					await ssh(
+						s.id,
+						`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker ${targets.map(quote).join(" ")}`,
+					);
+					const cleaned = read(stateFile);
+					cleaned.developmentWanted = developmentWantedAfterCommand(
+						cleaned.developmentWanted,
+						targets,
+						0,
+					);
+					if (!developmentWantedAfterCommand(true, targets, 0))
+						delete cleaned.reconciliationPending;
+					save(cleaned);
+				}),
 			request: () => json(["stop", s.id]),
 			wait,
 		});
@@ -663,14 +680,14 @@ async function stop(remove = false) {
 }
 async function command() {
 	owned();
-	admit();
 	const targets = args
 		.slice(args.indexOf("--") + 1)
 		.filter((v) => !v.startsWith("BOAT_EXEC="));
-	if (targets[0] === "stop" && !read(stateFile).runningSince) {
-		console.log("Remote environment is already stopped");
+	if (targets[0] === "stop") {
+		await stop(false, targets);
 		return;
 	}
+	admit();
 	const { id, resumed } = await ensure();
 	const lease = path.join(dir, `command-${process.pid}.json`);
 	write(lease, {
@@ -762,15 +779,11 @@ async function command() {
 			delete s.reconciliationPending;
 		save(s);
 	} finally {
-		try {
-			if (targets[0] === "stop") await stop();
-		} finally {
-			if (resumed) console.log("Remote environment resumed from sleep");
-			fs.rmSync(lease, { force: true });
-			const s = read(stateFile);
-			s.lastActivity = Date.now();
-			save(s);
-		}
+		if (resumed) console.log("Remote environment resumed from sleep");
+		fs.rmSync(lease, { force: true });
+		const s = read(stateFile);
+		s.lastActivity = Date.now();
+		save(s);
 	}
 }
 function resourceSample() {

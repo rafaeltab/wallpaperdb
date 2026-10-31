@@ -51,11 +51,13 @@ try {
     throw new Error('noncanonical-picture');
   if (animated && (metadata.loop === undefined || metadata.delay?.length !== frames))
     throw new Error('invalid-image');
-  // Full strict decoding verifies mandatory facts. Sequential per-frame decoding avoids a whole-animation pixel allocation.
-  for (let page = 0; page < frames; page++)
+  // Decode every frame strictly. Small-frame batches avoid repeated native startup/parser
+  // work while retaining the same pixel ceiling as a single permitted frame.
+  const batchSize = Math.max(1, Math.min(32, Math.floor(options.maxPixels / (width * height))));
+  for (let page = 0; page < frames; page += batchSize)
     await sharp(bytes, {
       page,
-      pages: 1,
+      pages: Math.min(batchSize, frames - page),
       limitInputPixels: options.maxPixels,
       failOn: 'warning',
     }).stats();

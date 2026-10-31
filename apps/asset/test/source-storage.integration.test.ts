@@ -15,6 +15,91 @@ const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3Tes
 const tester = new Tester().withS3().withS3Bucket('source-private');
 beforeAll(() => tester.setup(), 60000);
 afterAll(() => tester.destroy());
+it.each(['valid', 'corrupt-final-frame'] as const)(
+  'inspects the permitted 1850-frame square-one picture (%s)',
+  async (condition) => {
+    const chunk = (tag: string, body: Buffer) => {
+      const out = Buffer.alloc(8 + body.length + (body.length % 2));
+      out.write(tag);
+      out.writeUInt32LE(body.length, 4);
+      body.copy(out, 8);
+      return out;
+    };
+    const stills = await Promise.all(
+      ['black', 'white'].map((background) =>
+        sharp({ create: { width: 1, height: 1, channels: 3, background } })
+          .webp({ lossless: true })
+          .toBuffer()
+      )
+    );
+    const extended = Buffer.alloc(10);
+    extended[0] = 2;
+    const header = Buffer.alloc(16);
+    header.writeUIntLE(10000000, 12, 3);
+    header[15] = 2;
+    const payload = Buffer.concat([
+      Buffer.from('WEBP'),
+      chunk('VP8X', extended),
+      chunk('ANIM', Buffer.alloc(6)),
+      ...Array.from({ length: 1850 }, (_, index) =>
+        chunk('ANMF', Buffer.concat([header, stills[index % 2].subarray(12)]))
+      ),
+    ]);
+    const riff = Buffer.alloc(8);
+    riff.write('RIFF');
+    riff.writeUInt32LE(payload.length, 4);
+    const bytes = Buffer.concat([riff, payload]);
+    // Keep the final lossless frame header, but destroy its compressed pixel data.
+    if (condition === 'corrupt-final-frame') bytes.fill(0, bytes.length - 11);
+    const s3 = tester.getS3();
+    const runtime = ManagedRuntime.make(
+      sourceStorageLayer({
+        endpoint: s3.endpoints.fromHost,
+        region: 'us-east-1',
+        accessKeyId: s3.options.accessKey,
+        secretAccessKey: s3.options.secretKey,
+        bucket: 'source-private',
+      })
+    );
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    const id = `long-animation-${condition}`;
+    try {
+      await runtime.runPromise(SourceBytes.use((storage) => storage.put(id, bytes, digest)));
+      const inspected = await runtime.runPromise(
+        MandatoryInspection.use((inspector) =>
+          inspector.inspect(id, {
+            ...initialSourcePolicies.picture,
+            admission: {
+              ...initialSourcePolicies.picture.admission,
+              squareSize: 1,
+              maxBytes: bytes.length,
+            },
+          })
+        )
+      );
+      if (condition === 'corrupt-final-frame') {
+        expect(inspected).toEqual({ kind: 'rejected', reason: 'invalid-image' });
+        return;
+      }
+      expect(inspected).toEqual({
+        kind: 'verified',
+        facts: {
+          model: 'animated-sdr-webp',
+          mimeType: 'image/webp',
+          width: 1,
+          height: 1,
+          hasAlpha: false,
+          orientation: 1,
+          digest,
+          byteLength: bytes.length,
+          animation: { frames: 1850, loop: 0, delaysMs: Array(1850).fill(10000000) },
+        },
+      });
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
 function pngChunk(kind: string, data: Buffer): Buffer {
   const chunk = Buffer.alloc(data.length + 12);
   chunk.writeUInt32BE(data.length);

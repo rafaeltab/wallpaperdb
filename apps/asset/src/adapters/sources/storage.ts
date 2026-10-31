@@ -222,9 +222,13 @@ export function sourceStorageLayer(options: Options) {
             if (signal.aborted) abort();
             const output: Buffer[] = [];
             let size = 0;
+            // Each WebP ANMF needs at least 24 encoded bytes (chunk + frame header).
+            // Its timing uses at most nine JSON bytes (eight digits + separator).
+            // The remaining scalar facts and rejection envelope fit within 1 KiB.
+            const maxFactsBytes = 1024 + 9 * Math.floor(policy.admission.maxBytes / 24);
             child.stdout.on('data', (chunk) => {
               size += chunk.length;
-              if (size > 16384) worker.kill();
+              if (size > maxFactsBytes) worker.kill();
               else output.push(chunk);
             });
             // Diagnostics never include arbitrary input bytes.

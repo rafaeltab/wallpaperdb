@@ -1229,30 +1229,183 @@ test("tracked and previously synchronized untracked patch deletions reach genera
 	assert.equal(frozen.status, 0, frozen.output);
 });
 
-test("ordinary routed commands still require a frozen lock and generator resume does not restore development", async (t) => {
+async function sleepingDevelopmentCheckout(t) {
 	const f = await lockGenerationCheckout(t);
-	const normal = await f.run(
-		"run",
-		"PACKAGE=asset",
-		"SCRIPT=dev:configure",
-		"BOAT_EXEC=remote",
-	).done;
-	assert.notEqual(normal.status, 0);
-	assert.match(normal.output, /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/);
+	// Keep the real Make/controller path; control only remote process responses
+	// and Docker so restoration cannot touch a worker or the host's containers.
+	const transport = path.join(f.root, ".mise/boat/boat");
+	fs.writeFileSync(
+		transport,
+		fs.readFileSync(transport, "utf8").replace(
+			"const command=argv.at(-1)",
+			`if(argv.includes('--status')){console.log(JSON.stringify({running:!fs.existsSync(path.join(control,'fail-watch')),stdout:'Watch enabled'}));process.exit(0);}
+if(argv.includes('--detach')){console.log(JSON.stringify({processId:557}));process.exit(0);}
+if(argv.includes('ssh')&&argv.at(-1).includes('SCRIPT=boat:ready')){if(argv.at(-1).includes('ARGS=--once'))process.exit(0);console.error('fixture ends preview at readiness');process.exit(37);}
+const command=argv.at(-1)`,
+		),
+	);
+	fs.writeFileSync(
+		path.join(f.directory, "home/.local/bin/docker"),
+		`#!${process.execPath}
+const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL,argv=process.argv.slice(2);
+fs.appendFileSync(path.join(control,'docker'),JSON.stringify(argv)+'\\n');
+if(argv.includes('up')&&argv.includes('infra/docker-compose.apps.yml')&&fs.existsSync(path.join(control,'fail-apps')))process.exit(29);
+if(argv.includes('down')&&fs.existsSync(path.join(control,'fail-cleanup')))process.exit(30);
+`,
+		{ mode: 0o755 },
+	);
 	f.local(
 		".boat/state.json",
 		JSON.stringify({ ...f.json(".boat/state.json"), developmentWanted: true }),
 	);
 	flag(f, "sleep");
+	return {
+		...f,
+		normal: () =>
+			f.run(
+				"run",
+				"PACKAGE=asset",
+				"SCRIPT=dev:configure",
+				"BOAT_EXEC=remote",
+			).done,
+		transport: () =>
+			fs
+				.readFileSync(path.join(f.control, "transport"), "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line)),
+	};
+}
+
+test("ordinary commands reconcile development after generator resume and frozen preparation", async (t) => {
+	const f = await sleepingDevelopmentCheckout(t);
 	const result = await f.generate();
 	assert.equal(result.status, 0, result.output);
 	assert.match(result.output, /Remote environment resumed from sleep/);
 	assert.equal(f.json(".boat/state.json").developmentWanted, true);
+	assert.equal(f.json(".boat/state.json").reconciliationPending, true);
 	assert.doesNotMatch(
 		fs.readFileSync(path.join(f.control, "transport"), "utf8"),
 		/make infra-start|make apps-start/,
 	);
+	const restored = await f.normal();
+	assert.equal(restored.status, 0, restored.output);
+	assert.equal(f.json(".boat/state.json").developmentWanted, true);
+	assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+	assert.equal(f.json(".boat/state.json").watcher, 557);
+	const calls = f.transport();
+	const restoration = calls.findIndex((argv) =>
+		argv.at(-1).includes("make apps-start ARGS=--no-build"),
+	);
+	assert.ok(restoration > 0);
+	assert.ok(
+		calls.slice(0, restoration).some((argv) =>
+			argv.at(-1).includes("make install BOAT_EXEC=worker"),
+		),
+	);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.control, "calls"), "utf8").trim().split("\n"),
+		["generate", "frozen"],
+	);
+	const docker = fs.readFileSync(path.join(f.control, "docker"), "utf8");
+	assert.match(docker, /"up","-d","--no-build"/);
+	const repeated = await f.normal();
+	assert.equal(repeated.status, 0, repeated.output);
+	assert.equal(fs.readFileSync(path.join(f.control, "docker"), "utf8"), docker);
 });
+
+for (const failure of ["fail-apps", "fail-watch"])
+	test(`deferred reconciliation survives failed generation, frozen preparation and ${failure}`, async (t) => {
+		const f = await sleepingDevelopmentCheckout(t);
+		flag(f, "fail");
+		const failed = await f.generate();
+		assert.notEqual(failed.status, 0);
+		assert.match(failed.output, /Lock generator failed/);
+		assert.match(failed.output, /Remote environment resumed from sleep/);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+		const invalid = await f.normal();
+		assert.notEqual(invalid.status, 0);
+		assert.match(invalid.output, /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+		fs.unlinkSync(path.join(f.control, "fail"));
+		for (let i = 0; i < 2; i++) {
+			const generated = await f.generate();
+			assert.equal(generated.status, 0, generated.output);
+			assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+		}
+		assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
+		flag(f, failure);
+		const incomplete = await f.normal();
+		assert.notEqual(incomplete.status, 0);
+		assert.equal(f.json(".boat/state.json").developmentWanted, true);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+		fs.unlinkSync(path.join(f.control, failure));
+		const retried = await f.normal();
+		assert.equal(retried.status, 0, retried.output);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+		assert.equal(f.json(".boat/state.json").watcher, 557);
+		assert.equal(
+			f.transport().filter((argv) =>
+				argv.at(-1).includes("make apps-start ARGS=--no-build"),
+			).length,
+			2,
+		);
+		assert.equal(
+			f.transport().filter((argv) => argv.includes("--detach")).length,
+			failure === "fail-watch" ? 2 : 1,
+		);
+	});
+
+test("preview reconciles pending development despite a healthy readiness probe", async (t) => {
+	const f = await sleepingDevelopmentCheckout(t);
+	const generated = await f.generate();
+	assert.equal(generated.status, 0, generated.output);
+	flag(f, "fail-apps");
+	const incomplete = await f.run("boat-preview").done;
+	assert.notEqual(incomplete.status, 0);
+	assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+	fs.unlinkSync(path.join(f.control, "fail-apps"));
+	const preview = await f.run("boat-preview").done;
+	assert.notEqual(preview.status, 0);
+	assert.match(preview.output, /fixture ends preview at readiness/);
+	assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+	assert.equal(f.json(".boat/state.json").watcher, 557);
+	const calls = f.transport();
+	assert.ok(calls.some((argv) => argv.includes("--detach")));
+	assert.ok(calls.some((argv) => argv.at(-1).includes("ARGS=--once")));
+	assert.equal(
+		calls.filter((argv) =>
+			argv.at(-1).includes("make apps-start ARGS=--no-build"),
+		).length,
+		2,
+	);
+});
+
+for (const [targets, failure, pending] of [
+	[["apps-stop"], false, undefined],
+	[["apps-stop", "SERVICE=web"], false, true],
+	[["apps-stop"], true, true],
+])
+	test(`unwanted pending development follows existing cleanup semantics for ${targets.join(" ")} with failure=${failure}`, async (t) => {
+		const f = await sleepingDevelopmentCheckout(t);
+		const generated = await f.generate();
+		assert.equal(generated.status, 0, generated.output);
+		f.local(
+			".boat/state.json",
+			JSON.stringify({ ...f.json(".boat/state.json"), developmentWanted: false }),
+		);
+		if (failure) flag(f, "fail-cleanup");
+		const result = await f.run(...targets).done;
+		assert.equal(result.status === 0, !failure, result.output);
+		assert.equal(f.json(".boat/state.json").developmentWanted, false);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, pending);
+		assert.equal(
+			f.transport().some((argv) =>
+				argv.at(-1).includes("make apps-start ARGS=--no-build"),
+			),
+			false,
+		);
+	});
 
 for (const phase of ["sync", "", "collect"])
 	test(`source synchronization and a second generator wait through ${phase || "generation"} and acceptance`, async (t) => {

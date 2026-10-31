@@ -274,6 +274,8 @@ async function ensure() {
 					);
 					s.runningSince = Date.now();
 					delete s.watcher;
+					if (config.mode === "development" && s.developmentWanted)
+						s.reconciliationPending = true;
 					resumed = true;
 				} catch (error) {
 					if (error.code !== "snapshot_data_expired") throw error;
@@ -585,6 +587,30 @@ async function prepare(id) {
 	});
 }
 
+// Preparation must accept the frozen lock before restoring ordinary processes.
+// Keep the obligation durable when a generator or a failed attempt defers it.
+async function reconcileDevelopment(id, foreground = false) {
+	return lock(async () => {
+		const state = read(stateFile);
+		if (
+			config.mode !== "development" ||
+			!state.developmentWanted ||
+			!state.reconciliationPending
+		)
+			return;
+		delete state.watcher;
+		save(state);
+		await ssh(
+			id,
+			`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`,
+		);
+		if (!foreground) await watchDevelopment(id);
+		const reconciled = read(stateFile);
+		delete reconciled.reconciliationPending;
+		save(reconciled);
+	});
+}
+
 function daemon() {
 	const s = read(stateFile);
 	if (liveOwnedProcess(root, s.daemon)) return;
@@ -684,17 +710,7 @@ async function command() {
 		await sync(id);
 		await prepare(id);
 		await cache(id);
-		if (
-			resumed &&
-			config.mode === "development" &&
-			read(stateFile).developmentWanted
-		) {
-			await ssh(
-				id,
-				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`,
-			);
-			if (targets[0] !== "dev") await watchDevelopment(id);
-		}
+		await reconcileDevelopment(id, targets[0] === "dev");
 		if (["dev", "apps-start"].includes(targets[0])) {
 			const s = read(stateFile);
 			s.developmentWanted = true;
@@ -744,6 +760,8 @@ async function command() {
 			targets,
 			result.status,
 		);
+		if (!developmentWantedAfterCommand(true, targets, result.status))
+			delete s.reconciliationPending;
 		save(s);
 		if (targets[0] === "stop" && result.status === 0) await stop();
 	} finally {
@@ -975,6 +993,7 @@ async function preview() {
 			const lease = read(path.join(dir, name));
 			return lease.development && liveOwnedProcess(root, lease);
 		});
+	await reconcileDevelopment(id, foreground);
 	// Readiness belongs to the app, independent of the process that started it.
 	const health = await ssh(
 		id,

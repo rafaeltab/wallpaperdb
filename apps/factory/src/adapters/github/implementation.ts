@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { z } from 'zod';
 import { type Issues, Unavailable } from '../../capabilities/job/index.js';
 import { command } from '../../platform/index.js';
+import { publication } from './publication.js';
 const issueSchema = z.object({
   number: z.number().int(),
   state: z.enum(['OPEN', 'CLOSED']),
@@ -18,6 +19,7 @@ const blockersSchema = z.array(
 export function githubIssues(config: {
   project: string;
   base: string;
+  prBase?: string;
   prerequisites: readonly { issue: number; pr: number; commit: string }[];
 }): Issues {
   const gh = (args: string[], signal?: AbortSignal) =>
@@ -80,6 +82,7 @@ export function githubIssues(config: {
     return blockersReady;
   }
   return {
+    pullRequest: publication(gh, config.prBase ?? 'main'),
     inspect: (number) =>
       Effect.tryPromise({
         try: async (signal) => {

@@ -20,6 +20,10 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
         .refine((value) => /^https?:/.test(value))
         .optional(),
       FACTORY_T3_PROJECT_ID: z.string().min(1),
+      FACTORY_PR_BASE: z
+        .string()
+        .regex(/^[A-Za-z0-9][A-Za-z0-9/_.-]*$/)
+        .default('main'),
       FACTORY_BASE: z.string().regex(/^[a-f0-9]{40}$/),
       FACTORY_T3_BINARY: z.string().startsWith('/'),
       FACTORY_STATE: z.string().startsWith('/'),
@@ -71,6 +75,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       Issues,
       githubIssues({
         project,
+        prBase: configuration.FACTORY_PR_BASE,
         base: configuration.FACTORY_BASE,
         prerequisites: configuration.FACTORY_PREREQUISITES,
       })
@@ -79,6 +84,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       Execution,
       t3Execution({
         project,
+        prBase: configuration.FACTORY_PR_BASE,
         projectId: configuration.FACTORY_T3_PROJECT_ID,
         binary: configuration.FACTORY_T3_BINARY,
       })
@@ -113,9 +119,22 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
     throw cause;
   }
 
+  let observing: Promise<unknown> | undefined;
+  const observationTimer = setInterval(() => {
+    if (observing) return;
+    observing = runtime
+      .runPromise(job.status().pipe(Effect.catch((error) => Effect.logError(error))), {
+        signal: requests.signal,
+      })
+      .finally(() => {
+        observing = undefined;
+      });
+    void observing.catch(() => undefined);
+  }, 1000);
   let closing: Promise<void> | undefined;
   const close = () =>
     (closing ??= (async () => {
+      clearInterval(observationTimer);
       const deadline = setTimeout(() => {
         requests.abort();
         app.server.closeAllConnections();
@@ -125,6 +144,7 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
       } finally {
         clearTimeout(deadline);
         requests.abort();
+        await observing?.catch(() => undefined);
         await runtime.dispose();
       }
     })());

@@ -10,6 +10,7 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
     Layer.succeed(Time, { now: () => Clock.currentTimeMillis }),
     Layer.succeed(JobStore, store),
     Layer.succeed(Issues, {
+      pullRequest: () => Effect.succeed({ kind: 'absent' as const }),
       inspect: () =>
         Effect.succeed({
           open: true,
@@ -20,6 +21,8 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
         }),
     }),
     Layer.succeed(Execution, {
+      inspectStage: () => Effect.succeed(null),
+      sendStage: () => Effect.void,
       launch: () =>
         Effect.flatMap(store.read(), (intent) =>
           Effect.sync(() => {

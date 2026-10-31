@@ -13,6 +13,13 @@ const reply = (value) => console.log(JSON.stringify(value));
 if (basename(process.argv[1]) === 'gh') {
   if (config.githubMalformed) console.log('{}');
   else if (args[0] === 'api') reply([config.blockers ?? []]);
+  else if (args[0] === 'pr' && args[1] === 'list')
+    reply(
+      config.prs ??
+        (existsSync(join(config.directory, 'pr.json'))
+          ? [JSON.parse(readFileSync(join(config.directory, 'pr.json'), 'utf8'))]
+          : [])
+    );
   else if (args[0] === 'pr') reply({ headRefOid: config.prHead ?? 'a'.repeat(40), state: 'OPEN' });
   else
     reply({
@@ -46,12 +53,40 @@ else if (args[1] === 'start') {
       model: 'gpt-6.1-sol',
       branch: flag('--branch'),
       worktreePath: worktree,
-      status: 'running',
+      status: config.complete ? 'completed' : 'running',
+      latestRunId: 'run-1',
+      runCount: 1,
       pendingRequestCount: 0,
     })
   );
   if (config.lost) process.exit(1);
   reply({ threadId: 'thread-live', projectId: 'project-id', runId: 'run-1' });
+} else if (args[1] === 'send') {
+  const path = join(config.directory, 'resource.json');
+  const resource = JSON.parse(readFileSync(path, 'utf8'));
+  const index = Number(args[3].match(/Stage (\d) of factory/)[1]);
+  resource.runCount = index + 1;
+  resource.latestRunId = `run-${index + 1}`;
+  if (index === 2) {
+    const pr = {
+      url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
+      headRefName: resource.branch,
+      baseRefName: 'main',
+      headRefOid: config.base,
+      baseRefOid: config.base,
+      state: 'OPEN',
+      isDraft: false,
+      mergeable: 'MERGEABLE',
+      statusCheckRollup: ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].map(
+        (name) => ({ name, status: 'COMPLETED', conclusion: 'SUCCESS' })
+      ),
+    };
+    writeFileSync(join(config.directory, 'pr.json'), JSON.stringify(pr));
+    resource.pullRequests = [{ url: pr.url }];
+  }
+  writeFileSync(path, JSON.stringify(resource));
+  if (config.lostSend || (config.lostPublication && index === 2)) process.exit(1);
+  reply({ threadId: resource.threadId, runId: resource.latestRunId });
 } else {
   if (args[1] === 'list' && config.delayObserve) {
     writeFileSync(join(config.directory, 'observing.pid'), String(process.pid));
@@ -66,6 +101,29 @@ else if (args[1] === 'start') {
   else if (args[1] === 'show')
     reply({
       thread: resource ? { ...resource, ...config.overrides } : null,
-      messages: [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }],
+      messages: (config.holdPublication && resource?.runCount === 3 ? [] : config.messages) ??
+        (config.complete && resource
+          ? [
+              {
+                role: 'assistant',
+                runId: resource.latestRunId,
+                text: JSON.stringify({
+                  jobId: resource.title.slice(8),
+                  stage: ['implementation', 'review', 'publication'][resource.runCount - 1],
+                  base: config.base,
+                  commit: config.base,
+                  outcome: [
+                    '<TASK>COMPLETE</TASK>',
+                    '<REVIEW>COMPLETE</REVIEW>',
+                    '<PR>CREATED</PR>',
+                  ][resource.runCount - 1],
+                  tests: true,
+                  coverage: true,
+                  crap: true,
+                  reviews: resource.runCount > 1,
+                }),
+              },
+            ]
+          : null) ?? [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }],
     });
 }

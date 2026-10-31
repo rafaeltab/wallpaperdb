@@ -1,7 +1,23 @@
-import { workerState } from "./boat.mjs";
+import { estimate, workerState } from "./boat.mjs";
 
 const stopped = (status) => ["archived", "stopped"].includes(status);
 const stopping = (status) => ["archiving", "stopping"].includes(status);
+
+// dataExpiredAt records completed deletion, not a future retention deadline.
+// https://docs.boat.dev/api-reference/sandboxes/get-sandbox
+export function snapshotExpired(worker, now = Date.now()) {
+	const at = worker.dataExpiredAt;
+	return (
+		stopped(workerState(worker)) &&
+		worker.snapshotAvailable === false &&
+		typeof at === "string" &&
+		/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(
+			at,
+		) &&
+		Number.isFinite(Date.parse(at)) &&
+		Date.parse(at) <= now
+	);
+}
 
 // Snapshot contents and readiness disagree about Compose reconstruction:
 // https://docs.boat.dev/snapshots/whats-saved.md#docker
@@ -21,6 +37,47 @@ export function snapshotLifecycle({ load, persist }) {
 		return state;
 	}
 	return {
+		inspectIdentity({ info, error }) {
+			const state = load();
+			const worker = info?.sandbox ?? info;
+			const reason =
+				error?.code === "not_found"
+					? "not_found"
+					: worker?.id === state.id && snapshotExpired(worker)
+						? "expired"
+						: null;
+			if (!reason) return state;
+			const now = Date.now();
+			state.retiredWorkers = [
+				...(state.retiredWorkers ?? []),
+				{
+					id: state.id,
+					size: state.size,
+					cost: state.cost ?? 0,
+					runningSince: state.runningSince,
+					snapshotRecovery: state.snapshotRecovery,
+					reason,
+					observedAt: new Date(now).toISOString(),
+					dataExpiredAt: worker?.dataExpiredAt,
+				},
+			];
+			if (state.runningSince)
+				state.cost =
+					(state.cost ?? 0) +
+					estimate(state.size, Math.max(0, now - state.runningSince));
+			state.runningSince = null;
+			const previousWorkerId = state.id;
+			delete state.id;
+			delete state.watcher;
+			delete state.cleanReceipt;
+			state.snapshotRecovery = {
+				status: "RECONSTRUCTING",
+				previousWorkerId,
+				reason,
+			};
+			persist(state);
+			return state;
+		},
 		startup(info) {
 			const state = load();
 			const status = info && workerState(info);

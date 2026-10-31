@@ -18,7 +18,7 @@ import {
 	forwardPreviewDisconnect,
 	developmentWantedAfterCommand,
 } from "./lib/boat.mjs";
-import { snapshotLifecycle } from "./lib/boat-snapshot.mjs";
+import { snapshotLifecycle, snapshotExpired } from "./lib/boat-snapshot.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 import {
 	fingerprint,
@@ -224,27 +224,36 @@ function admit() {
 async function ensure() {
 	return lock(async () => {
 		admit();
-		let s = snapshots.startup();
+		let s = read(stateFile);
 		let existingInfo;
 		if (s.id) {
+			let inspectionError;
 			try {
 				existingInfo = await json(["info", s.id]);
 			} catch (error) {
 				if (error.code !== "not_found") throw error;
-				event("lost-worker", { id: s.id });
-				delete s.id;
-				delete s.watcher;
+				inspectionError = error;
+			}
+			const priorId = s.id;
+			s = snapshots.inspectIdentity({
+				info: existingInfo,
+				error: inspectionError,
+			});
+			if (!s.id) {
+				event(inspectionError ? "lost-worker" : "expired", { id: priorId });
+				existingInfo = undefined;
 				for (const name of ["prepared.json", "manifest.json"])
 					fs.rmSync(path.join(dir, name), { force: true });
 			}
 		}
 		if (!s.id) {
+			s = snapshots.startup();
 			const name = `wallpaperdb-557-${config.cohort}-${config.key}`;
 			const listed = await json(["list", "--all"]);
 			const matches = listed.sandboxes.filter(
 				(worker) =>
 					worker.name === name &&
-					!worker.dataExpiredAt &&
+					!snapshotExpired(worker) &&
 					worker.state !== "deleted",
 			);
 			if (matches.length > 1)
@@ -277,6 +286,7 @@ async function ensure() {
 				);
 		}
 		if (!s.id) {
+			admit();
 			const limits = await json(["limits"]);
 			if (!limits.canStart || limits.nextStartDollars > 0)
 				throw new Error(
@@ -298,15 +308,18 @@ async function ensure() {
 					"Create returned no worker ID; inspect Boat list before retrying",
 				);
 			s = {
+				...s,
 				id,
 				size: config.size,
 				cost: s.cost ?? 0,
 				runningSince: Date.now(),
 				lastActivity: Date.now(),
 			};
+			if (s.developmentWanted) s.reconciliationPending = true;
 			save(s);
 			event("created", { id });
 		}
+		s = snapshots.startup();
 		s.lastActivity = Date.now();
 		save(s);
 		await ssh(

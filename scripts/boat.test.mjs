@@ -800,7 +800,12 @@ async function lockGenerationCheckout(t) {
 	const background = [];
 	t.after(async () => {
 		if (fs.existsSync(control))
-			for (const name of ["release", "release-sync", "release-collect"])
+			for (const name of [
+				"release",
+				"release-sync",
+				"release-collect",
+				"release-stop-completion",
+			])
 				fs.writeFileSync(path.join(control, name), "yes");
 		try {
 			await stopLockFixtureChildren(commands, true);
@@ -943,8 +948,23 @@ if(argv.includes('--lockfile-only')){
 const fs=require('fs'),cp=require('child_process'),path=require('path');
 const argv=process.argv.slice(2),control=process.env.FAKE_CONTROL;
 fs.appendFileSync(path.join(control,'transport'),JSON.stringify(argv)+'\\n');
-if(argv.includes('info')){console.log(fs.existsSync(path.join(control,'provider-info'))?fs.readFileSync(path.join(control,'provider-info'),'utf8'):JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);}
-if(argv.includes('stop')){fs.writeFileSync(path.join(control,'sleep'),'yes');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
+if(argv.includes('info')&&!argv.includes('fake-new-worker')){
+ if(fs.existsSync(path.join(control,'info-error'))){console.log(JSON.stringify({code:fs.readFileSync(path.join(control,'info-error'),'utf8')}));process.exit(41);}
+ if(fs.existsSync(path.join(control,'stopping'))){
+  if(!fs.existsSync(path.join(control,'stop-observed'))){fs.writeFileSync(path.join(control,'stop-observed'),'yes');console.log(JSON.stringify({state:'stopping'}));process.exit(0);}
+  fs.writeFileSync(path.join(control,'stop-completing'),'yes');
+  while(fs.existsSync(path.join(control,'pause-stop-completion'))&&!fs.existsSync(path.join(control,'release-stop-completion')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+  if(fs.existsSync(path.join(control,'failed-stop-inspection'))){console.log(JSON.stringify({code:'inspection_failed'}));process.exit(42);}
+  if(fs.existsSync(path.join(control,'incomplete-stop'))){console.log(JSON.stringify({state:'ready',stop:{id:'stop-current',status:'failing'}}));process.exit(0);}
+  fs.writeFileSync(path.join(control,'sleep'),'yes');fs.unlinkSync(path.join(control,'stopping'));
+ }
+ console.log(fs.existsSync(path.join(control,'provider-info'))?fs.readFileSync(path.join(control,'provider-info'),'utf8'):JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);
+}
+if(argv.includes('stop')){fs.writeFileSync(path.join(control,'stopping'),'yes');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
+if(argv.includes('info')&&argv.includes('fake-new-worker')){console.log(JSON.stringify({sandbox:{id:'fake-new-worker',state:'ready'}}));process.exit(0);}
+if(argv.includes('list')){console.log(fs.existsSync(path.join(control,'worker-list'))?fs.readFileSync(path.join(control,'worker-list'),'utf8'):JSON.stringify({sandboxes:[]}));process.exit(0);}
+if(argv.includes('limits')){if(fs.existsSync(path.join(control,'fail-limits'))){console.log(JSON.stringify({code:'limits_failed'}));process.exit(43);}console.log(JSON.stringify({canStart:true,nextStartDollars:0}));process.exit(0);}
+if(argv.includes('new')){fs.writeFileSync(path.join(control,'creation-state'),fs.readFileSync('.boat/state.json'));console.log(JSON.stringify({sandbox:{id:'fake-new-worker'}}));process.exit(0);}
 if(argv.includes('usage')){console.log('{}');process.exit(0);}
 if(argv.includes('snapshot')&&argv.includes('latest')){console.log(JSON.stringify({snapshot:{id:'snapshot-current',sandboxId:'fake-worker',chainId:'chain-current',generation:3,status:'completed',kind:'incremental',origin:'captured',createdAt:'2026-10-31T01:00:00Z',completedAt:'2026-10-31T01:00:01Z',fileCount:42}}));process.exit(0);}
 if((argv.includes('ssh')||argv.includes('exec'))&&fs.existsSync(path.join(control,'audit-startup')))fs.appendFileSync(path.join(control,'startup-state'),JSON.stringify(JSON.parse(fs.readFileSync('.boat/state.json','utf8')))+'\\n');
@@ -2230,3 +2250,210 @@ for (const caller of ["boat-stop", "stop"])
 					1,
 				);
 		});
+
+for (const response of ["accepted", "ambiguous"])
+	test(`stop accounting waits for observed completion after ${response} request`, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		const before = f.json(".boat/state.json");
+		flag(f, "pause-stop-completion");
+		if (response === "ambiguous") flag(f, "fail-stop");
+		const pending = f.run("boat-stop");
+		await observed(
+			() => fs.existsSync(path.join(f.control, "stop-observed")),
+			"provider stopping observation",
+		);
+		assert.equal(f.json(".boat/state.json").runningSince, before.runningSince);
+		assert.equal(f.json(".boat/state.json").cost, before.cost);
+		assert.equal(fs.existsSync(path.join(f.control, "sleep")), false);
+		assert.equal(pending.closed, false);
+		flag(f, "release-stop-completion");
+		const result = await pending.done;
+		assert.equal(result.status === 0, response === "accepted", result.output);
+		assert.equal(fs.existsSync(path.join(f.control, "sleep")), true);
+		assert.equal(f.json(".boat/state.json").runningSince, null);
+		assert.ok(f.json(".boat/state.json").cost > before.cost);
+		assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+	});
+
+for (const transition of ["failed-stop-inspection", "incomplete-stop"])
+	test(`stop accounting retains obligation after ${transition} and DIRTY blocks a ready worker`, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		flag(f, transition);
+		const before = f.json(".boat/state.json");
+		const result = await f.run("boat-stop").done;
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(
+			result.output,
+			transition === "incomplete-stop"
+				? /Unexpected worker state/
+				: /inspection_failed/,
+		);
+		assert.equal(f.json(".boat/state.json").runningSince, before.runningSince);
+		assert.equal(f.json(".boat/state.json").cost, before.cost);
+		assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
+		assert.equal(fs.existsSync(path.join(f.control, "sleep")), false);
+		fs.rmSync(path.join(f.control, "stopping"));
+		fs.rmSync(path.join(f.control, "transport"));
+		const denied = await f.generate();
+		assert.match(denied.output, /DIRTY.*snapshot/i);
+		const calls = fs.existsSync(path.join(f.control, "transport"))
+			? fs.readFileSync(path.join(f.control, "transport"), "utf8")
+			: "";
+		assert.doesNotMatch(calls, /"resume"|"new"|"ssh"|"exec"/);
+		assert.equal(f.json(".boat/state.json").runningSince, before.runningSince);
+	});
+
+for (const evidence of [
+	"not_found",
+	"expired",
+	"available",
+	"invalid-expiry",
+	"future-expiry",
+	"unknown-info-error",
+	"error-state",
+	"wrong-worker",
+	"contradictory-availability",
+	"missing-expiry",
+])
+	test(`identity inspection reconstructs only proven loss for ${evidence}`, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		const before = {
+			...f.json(".boat/state.json"),
+			cost: 0.25,
+			runningSince: evidence === "not_found" ? Date.now() - 60000 : null,
+			developmentWanted: true,
+			reconciliationPending: true,
+			cleanReceipt: { clean: true },
+			snapshotRecovery: {
+				status: "DIRTY",
+				workerId: "fake-worker",
+				reason: "prior-stop-failed",
+			},
+		};
+		f.local(".boat/state.json", JSON.stringify(before));
+		f.local(".boat/prepared.json", JSON.stringify({ dependencies: "stale" }));
+		if (evidence === "not_found" || evidence === "unknown-info-error")
+			fs.writeFileSync(
+				path.join(f.control, "info-error"),
+				evidence === "not_found" ? "not_found" : "provider_unavailable",
+			);
+		else
+			fs.writeFileSync(
+				path.join(f.control, "provider-info"),
+				JSON.stringify({
+					sandbox: {
+						id: evidence === "wrong-worker" ? "other-worker" : before.id,
+						state: evidence === "error-state" ? "error" : "archived",
+						dataExpiredAt: ["available", "missing-expiry"].includes(evidence)
+							? null
+							: evidence === "invalid-expiry"
+								? "invalid"
+								: evidence === "future-expiry"
+									? new Date(Date.now() + 86400000).toISOString()
+									: new Date(Date.now() - 60000).toISOString(),
+						snapshotAvailable: [
+							"available",
+							"contradictory-availability",
+						].includes(evidence),
+					},
+				}),
+			);
+		const result = await f.generate();
+		const allowed = ["not_found", "expired"].includes(evidence);
+		assert.equal(result.status === 0, allowed, result.output);
+		const calls = fs.existsSync(path.join(f.control, "transport"))
+			? fs
+					.readFileSync(path.join(f.control, "transport"), "utf8")
+					.trim()
+					.split("\n")
+					.map((line) => JSON.parse(line))
+			: [];
+		if (allowed)
+			assert.equal(
+				calls[0].includes("info"),
+				true,
+				"read-only identity evidence must be consulted",
+			);
+		assert.equal(
+			calls.some((argv) => argv.includes("resume")),
+			false,
+		);
+		const after = f.json(".boat/state.json");
+		if (allowed) {
+			assert.equal(calls.filter((argv) => argv.includes("new")).length, 1);
+			assert.equal(after.id, "fake-new-worker");
+			assert.equal(after.developmentWanted, true);
+			assert.equal(after.reconciliationPending, true);
+			assert.ok(after.cost >= before.cost);
+			if (evidence === "not_found") assert.ok(after.cost > before.cost);
+			const prior = after.retiredWorkers.at(-1);
+			assert.equal(prior.id, before.id);
+			assert.equal(prior.runningSince, before.runningSince);
+			assert.equal(prior.snapshotRecovery.status, "DIRTY");
+			assert.equal(prior.reason, evidence);
+			assert.equal(
+				fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+				false,
+			);
+			const creation = JSON.parse(
+				fs.readFileSync(path.join(f.control, "creation-state")),
+			);
+			assert.equal(creation.cleanReceipt, undefined);
+			assert.notEqual(creation.snapshotRecovery.status, "DIRTY");
+			assert.equal(creation.retiredWorkers.at(-1).id, before.id);
+		} else {
+			assert.equal(after.id, before.id);
+			assert.equal(after.cost, before.cost);
+			assert.equal(after.runningSince, before.runningSince);
+			assert.equal(after.snapshotRecovery.status, "DIRTY");
+			assert.equal(
+				calls.some(
+					(argv) =>
+						argv.includes("new") ||
+						argv.includes("ssh") ||
+						argv.includes("exec") ||
+						argv.includes("list"),
+				),
+				false,
+			);
+		}
+	});
+
+test("known-lost reconstruction preserves identity evidence and cost across failed admission", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	const before = {
+		...f.json(".boat/state.json"),
+		cost: 0.25,
+		runningSince: Date.now() - 60000,
+		snapshotRecovery: { status: "DIRTY", workerId: "fake-worker" },
+	};
+	f.local(".boat/state.json", JSON.stringify(before));
+	fs.writeFileSync(path.join(f.control, "info-error"), "not_found");
+	flag(f, "fail-limits");
+	const failed = await f.generate();
+	assert.match(failed.output, /limits_failed/);
+	const pending = f.json(".boat/state.json");
+	assert.equal(pending.id, undefined);
+	assert.ok(pending.cost > before.cost);
+	assert.equal(pending.retiredWorkers.length, 1);
+	assert.equal(pending.retiredWorkers[0].id, before.id);
+	assert.equal(pending.retiredWorkers[0].snapshotRecovery.status, "DIRTY");
+	assert.equal(fs.existsSync(path.join(f.control, "creation-state")), false);
+	fs.rmSync(path.join(f.control, "fail-limits"));
+	const retried = await f.generate();
+	assert.equal(retried.status, 0, retried.output);
+	const after = f.json(".boat/state.json");
+	assert.equal(after.cost, pending.cost);
+	assert.deepEqual(after.retiredWorkers, pending.retiredWorkers);
+	assert.equal(after.id, "fake-new-worker");
+	const calls = fs
+		.readFileSync(path.join(f.control, "transport"), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	assert.equal(calls.filter((argv) => argv.includes("new")).length, 1);
+	assert.equal(
+		calls.some((argv) => argv.includes("resume")),
+		false,
+	);
+});

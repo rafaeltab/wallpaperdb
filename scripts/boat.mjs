@@ -584,28 +584,42 @@ async function prepare(id) {
 			persist: (record) => write(path.join(dir, "prepared.json"), record),
 		});
 		event("preparation", { changed: result.changed, ms: Date.now() - started });
+		return dependencies;
 	});
 }
 
 // Preparation must accept the frozen lock before restoring ordinary processes.
 // Keep the obligation durable when a generator or a failed attempt defers it.
-async function reconcileDevelopment(id, foreground = false) {
+async function reconcileDevelopment(
+	id,
+	dependencies,
+	{ foreground = false, requested = false } = {},
+) {
 	return lock(async () => {
 		const state = read(stateFile);
 		if (
 			config.mode !== "development" ||
-			!state.developmentWanted ||
-			!state.reconciliationPending
+			(!state.developmentWanted && !requested)
 		)
 			return;
+		if (!dependencies)
+			throw new Error("Development requires prepared dependencies");
+		// Host installation does not establish what is baked into app images.
+		// Unknown or changed image inputs require a build, including on retry.
+		const rebuild =
+			state.developmentDependencies?.id !== id ||
+			state.developmentDependencies?.dependencies !== dependencies;
+		if (!state.reconciliationPending && !rebuild) return;
+		state.reconciliationPending = true;
 		delete state.watcher;
 		save(state);
 		await ssh(
 			id,
-			`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=--no-build BOAT_EXEC=worker`,
+			`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && make run PACKAGE=scripts SCRIPT=boat:stop-watch BOAT_EXEC=worker && make stop BOAT_EXEC=worker && make infra-start BOAT_EXEC=worker && make apps-start ARGS=${rebuild ? "--build" : "--no-build"} BOAT_EXEC=worker`,
 		);
 		if (!foreground) await watchDevelopment(id);
 		const reconciled = read(stateFile);
+		reconciled.developmentDependencies = { id, dependencies };
 		delete reconciled.reconciliationPending;
 		save(reconciled);
 	});
@@ -708,9 +722,11 @@ async function command() {
 			return;
 		}
 		await sync(id);
-		await prepare(id);
+		const dependencies = await prepare(id);
 		await cache(id);
-		await reconcileDevelopment(id, targets[0] === "dev");
+		await reconcileDevelopment(id, dependencies, {
+			foreground: targets[0] === "dev",
+		});
 		if (["dev", "apps-start"].includes(targets[0])) {
 			const s = read(stateFile);
 			s.developmentWanted = true;
@@ -755,6 +771,14 @@ async function command() {
 		});
 		process.exitCode = result.status;
 		const s = read(stateFile);
+		// Only the unqualified full-stack command guarantees the default build.
+		// Partial services and custom arguments cannot acknowledge all images.
+		if (
+			result.status === 0 &&
+			targets.length === 1 &&
+			targets[0] === "apps-start"
+		)
+			s.developmentDependencies = { id, dependencies };
 		s.developmentWanted = developmentWantedAfterCommand(
 			s.developmentWanted,
 			targets,
@@ -982,7 +1006,7 @@ async function preview() {
 	});
 	process.once("exit", () => fs.rmSync(startupLease, { force: true }));
 	await sync(id);
-	await prepare(id);
+	const dependencies = await prepare(id);
 	daemon();
 	await cache(id);
 	const started = Date.now();
@@ -993,7 +1017,7 @@ async function preview() {
 			const lease = read(path.join(dir, name));
 			return lease.development && liveOwnedProcess(root, lease);
 		});
-	await reconcileDevelopment(id, foreground);
+	await reconcileDevelopment(id, dependencies, { foreground, requested: true });
 	// Readiness belongs to the app, independent of the process that started it.
 	const health = await ssh(
 		id,

@@ -887,7 +887,7 @@ if(argv.includes('--lockfile-only')){
  if(fs.existsSync(path.join(control,'directory'))){fs.unlinkSync(path.join(root,'pnpm-lock.yaml'));fs.mkdirSync(path.join(root,'pnpm-lock.yaml'));}
  if(fs.existsSync(path.join(control,'symlink'))){fs.unlinkSync(path.join(root,'pnpm-lock.yaml'));fs.symlinkSync(path.join(control,'outside'),path.join(root,'pnpm-lock.yaml'));}
  process.exit(fs.existsSync(path.join(control,'fail'))?23:0);})();
-}else{if(!argv.includes('--frozen-lockfile'))throw Error('normal install is not frozen');fs.appendFileSync(path.join(control,'calls'),'frozen\\n');if(fs.readFileSync(path.join(root,'pnpm-lock.yaml'),'utf8')!==expected()){console.error('ERR_PNPM_LOCKFILE_CONFIG_MISMATCH');process.exit(17);}}
+}else{if(!argv.includes('--frozen-lockfile'))throw Error('normal install is not frozen');fs.appendFileSync(path.join(control,'calls'),'frozen\\n');if(fs.readFileSync(path.join(root,'pnpm-lock.yaml'),'utf8')!==expected()){console.error('ERR_PNPM_LOCKFILE_CONFIG_MISMATCH');process.exit(17);}fs.writeFileSync(path.join(control,'installed-dependencies'),fs.readFileSync(path.join(root,'pnpm-lock.yaml')));}
 `,
 		0o755,
 	);
@@ -1449,23 +1449,37 @@ const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL,arg
 fs.appendFileSync(path.join(control,'docker'),JSON.stringify(argv)+'\\n');
 if(argv.includes('up')&&argv.includes('infra/docker-compose.apps.yml')&&fs.existsSync(path.join(control,'fail-apps')))process.exit(29);
 if(argv.includes('down')&&fs.existsSync(path.join(control,'fail-cleanup')))process.exit(30);
+if(argv.includes('infra/docker-compose.apps.yml')){
+ const image=path.join(control,'image-dependencies');
+ if(argv.includes('build')||argv.includes('--build')){
+  if(fs.existsSync(path.join(control,'fail-build')))process.exit(32);
+  fs.writeFileSync(image,fs.readFileSync(path.join(process.env.FAKE_WORKER,'pnpm-lock.yaml')));
+ }
+ if(argv.includes('up')){
+  if(!fs.existsSync(image))throw Error('No application image');
+  fs.writeFileSync(path.join(control,'running-dependencies'),fs.readFileSync(image));
+ }
+}
 `,
 		{ mode: 0o755 },
 	);
-	f.local(
-		".boat/state.json",
-		JSON.stringify({ ...f.json(".boat/state.json"), developmentWanted: true }),
-	);
+	const normal = () =>
+		f.run("run", "PACKAGE=asset", "SCRIPT=dev:configure", "BOAT_EXEC=remote")
+			.done;
+	const generated = await f.generate();
+	assert.equal(generated.status, 0, generated.output);
+	const prepared = await normal();
+	assert.equal(prepared.status, 0, prepared.output);
+	const built = await f.run("apps-start").done;
+	assert.equal(built.status, 0, built.output);
+	for (const name of ["calls", "transport", "docker"])
+		fs.rmSync(path.join(f.control, name), { force: true });
 	flag(f, "sleep");
 	return {
 		...f,
-		normal: () =>
-			f.run(
-				"run",
-				"PACKAGE=asset",
-				"SCRIPT=dev:configure",
-				"BOAT_EXEC=remote",
-			).done,
+		normal,
+		dependencies: (name) =>
+			JSON.parse(fs.readFileSync(path.join(f.control, `${name}-dependencies`))),
 		transport: () =>
 			fs
 				.readFileSync(path.join(f.control, "transport"), "utf8")
@@ -1496,14 +1510,17 @@ test("ordinary commands reconcile development after generator resume and frozen 
 		argv.at(-1).includes("make apps-start ARGS=--no-build"),
 	);
 	assert.ok(restoration > 0);
-	assert.ok(
-		calls.slice(0, restoration).some((argv) =>
-			argv.at(-1).includes("make install BOAT_EXEC=worker"),
-		),
+	assert.equal(
+		calls.some((argv) => argv.at(-1).includes("make install BOAT_EXEC=worker")),
+		false,
+	);
+	assert.equal(
+		f.dependencies("running").inputs["patches/dependency.patch"],
+		"original patch\n",
 	);
 	assert.deepEqual(
 		fs.readFileSync(path.join(f.control, "calls"), "utf8").trim().split("\n"),
-		["generate", "frozen"],
+		["generate"],
 	);
 	const docker = fs.readFileSync(path.join(f.control, "docker"), "utf8");
 	assert.match(docker, /"up","-d","--no-build"/);
@@ -1512,9 +1529,83 @@ test("ordinary commands reconcile development after generator resume and frozen 
 	assert.equal(fs.readFileSync(path.join(f.control, "docker"), "utf8"), docker);
 });
 
-for (const failure of ["fail-apps", "fail-watch"])
+for (const entry of ["normal", "preview"])
+	for (const [name, changed] of [
+		["patches/dependency.patch", "changed dependency B\n"],
+		[
+			"apps/user/package.json",
+			'{"scripts":{},"dependencies":{"example":"2.0.0"}}\n',
+		],
+	])
+		test(`restoration through ${entry} runs newly prepared image dependencies after changing ${name}`, async (t) => {
+			const f = await sleepingDevelopmentCheckout(t);
+			const original = f.dependencies("running").inputs[name];
+			assert.notEqual(original, changed);
+			f.local(name, changed);
+			const generated = await f.generate();
+			assert.equal(generated.status, 0, generated.output);
+			// Generators never prepare or restore runtime, even after waking it.
+			assert.equal(f.dependencies("installed").inputs[name], original);
+			assert.equal(f.dependencies("running").inputs[name], original);
+			const restored = await (entry === "normal"
+				? f.normal()
+				: f.run("boat-preview").done);
+			if (entry === "normal") assert.equal(restored.status, 0, restored.output);
+			else assert.match(restored.output, /fixture ends preview at readiness/);
+			assert.equal(f.dependencies("installed").inputs[name], changed);
+			assert.equal(f.dependencies("running").inputs[name], changed);
+			assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+			const docker = fs.readFileSync(path.join(f.control, "docker"), "utf8");
+			const repeated = await f.normal();
+			assert.equal(repeated.status, 0, repeated.output);
+			assert.equal(
+				fs.readFileSync(path.join(f.control, "docker"), "utf8"),
+				docker,
+			);
+		});
+
+for (const identity of ["missing", "other-worker"])
+	test(`restoration rebuilds owned images when their dependency identity is ${identity}`, async (t) => {
+		const f = await sleepingDevelopmentCheckout(t);
+		const state = f.json(".boat/state.json");
+		if (identity === "missing") delete state.developmentDependencies;
+		else state.developmentDependencies.id = "a-different-worker";
+		f.local(".boat/state.json", JSON.stringify(state));
+		fs.writeFileSync(
+			path.join(f.control, "image-dependencies"),
+			'{"inputs":{"patches/dependency.patch":"unknown stale image"}}',
+		);
+		const restored = await f.normal();
+		assert.equal(restored.status, 0, restored.output);
+		assert.equal(
+			f.dependencies("running").inputs["patches/dependency.patch"],
+			"original patch\n",
+		);
+		assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+	});
+
+test("a healthy preview with no saved development intent rebuilds images of unknown identity", async (t) => {
+	const f = await sleepingDevelopmentCheckout(t);
+	const state = f.json(".boat/state.json");
+	state.developmentWanted = false;
+	delete state.developmentDependencies;
+	f.local(".boat/state.json", JSON.stringify(state));
+	fs.writeFileSync(
+		path.join(f.control, "image-dependencies"),
+		'{"inputs":{"patches/dependency.patch":"unknown stale image"}}',
+	);
+	const preview = await f.run("boat-preview").done;
+	assert.match(preview.output, /fixture ends preview at readiness/);
+	assert.equal(
+		f.dependencies("running").inputs["patches/dependency.patch"],
+		"original patch\n",
+	);
+});
+
+for (const failure of ["fail-build", "fail-apps", "fail-watch"])
 	test(`deferred reconciliation survives failed generation, frozen preparation and ${failure}`, async (t) => {
 		const f = await sleepingDevelopmentCheckout(t);
+		f.local("patches/dependency.patch", "changed dependency B\n");
 		flag(f, "fail");
 		const failed = await f.generate();
 		assert.notEqual(failed.status, 0);
@@ -1537,15 +1628,24 @@ for (const failure of ["fail-apps", "fail-watch"])
 		assert.notEqual(incomplete.status, 0);
 		assert.equal(f.json(".boat/state.json").developmentWanted, true);
 		assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+		assert.notEqual(
+			f.json(".boat/state.json").developmentDependencies.dependencies,
+			f.json(".boat/prepared.json").dependencies,
+		);
 		fs.unlinkSync(path.join(f.control, failure));
 		const retried = await f.normal();
 		assert.equal(retried.status, 0, retried.output);
 		assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
 		assert.equal(f.json(".boat/state.json").watcher, 557);
 		assert.equal(
-			f.transport().filter((argv) =>
-				argv.at(-1).includes("make apps-start ARGS=--no-build"),
-			).length,
+			f.dependencies("running").inputs["patches/dependency.patch"],
+			"changed dependency B\n",
+		);
+		assert.equal(
+			f
+				.transport()
+				.filter((argv) => argv.at(-1).includes("make apps-start ARGS=--build"))
+				.length,
 			2,
 		);
 		assert.equal(
@@ -1590,7 +1690,10 @@ for (const [targets, failure, pending] of [
 		assert.equal(generated.status, 0, generated.output);
 		f.local(
 			".boat/state.json",
-			JSON.stringify({ ...f.json(".boat/state.json"), developmentWanted: false }),
+			JSON.stringify({
+				...f.json(".boat/state.json"),
+				developmentWanted: false,
+			}),
 		);
 		if (failure) flag(f, "fail-cleanup");
 		const result = await f.run(...targets).done;
@@ -1598,9 +1701,11 @@ for (const [targets, failure, pending] of [
 		assert.equal(f.json(".boat/state.json").developmentWanted, false);
 		assert.equal(f.json(".boat/state.json").reconciliationPending, pending);
 		assert.equal(
-			f.transport().some((argv) =>
-				argv.at(-1).includes("make apps-start ARGS=--no-build"),
-			),
+			f
+				.transport()
+				.some((argv) =>
+					argv.at(-1).includes("make apps-start ARGS=--no-build"),
+				),
 			false,
 		);
 	});

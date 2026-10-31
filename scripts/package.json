@@ -27,7 +27,8 @@
 		"test:mutation": "node mutation.mjs",
 		"check-types": "tsc --project tsconfig.json",
 		"format:files": "biome format --write",
-		"test:operator-inbox": "node --test operator-inbox.test.mjs"
+		"test:operator-inbox": "node --test operator-inbox.test.mjs",
+		"dependencies:lock": "cd .. && mise exec -- pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",

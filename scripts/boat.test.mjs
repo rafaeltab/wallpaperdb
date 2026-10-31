@@ -742,3 +742,254 @@ test("real Turbo restores an eligible build through authenticated HTTP into a fr
 		),
 	);
 });
+
+// Exercise real Make routing, controller, archives and the maintained package script.
+// Only Boat, mise and pnpm are controlled external processes. No worker is contacted.
+async function lockGenerationCheckout(t) {
+	const directory = fs.mkdtempSync(
+		path.join(os.tmpdir(), "boat-lock-command-"),
+	);
+	const root = path.join(directory, "source");
+	const worker = path.join(directory, "worker");
+	const home = path.join(directory, "home");
+	const bin = path.join(home, ".local/bin");
+	const control = path.join(directory, "control");
+	const repository = path.resolve(import.meta.dirname, "..");
+	const put = (name, bytes, mode) => {
+		fs.mkdirSync(path.dirname(name), { recursive: true });
+		fs.writeFileSync(name, bytes, { mode });
+	};
+	const local = (name, bytes) => put(path.join(root, name), bytes);
+	const json = (name) => JSON.parse(fs.readFileSync(path.join(root, name)));
+	for (const name of [
+		"Makefile",
+		"scripts/boat-route.mk",
+		"scripts/boat.mjs",
+		"scripts/lib/boat.mjs",
+		"scripts/lib/boat-cache.mjs",
+		"scripts/lib/boat-preparation.mjs",
+		"scripts/package.json",
+	]) {
+		local(name, fs.readFileSync(path.join(repository, name)));
+	}
+	local("scripts/mise-shell.sh", '#!/bin/sh\nexec sh "$@"\n');
+	fs.chmodSync(path.join(root, "scripts/mise-shell.sh"), 0o755);
+	for (const name of [
+		"scripts/setup-worktree.mjs",
+		"scripts/toolchain.mjs",
+		"scripts/lib/env-pipeline.mjs",
+		"scripts/lib/worktree-project.mjs",
+	])
+		local(name, "// fixture setup has no side effects\n");
+	for (const name of ["mise.lock", "mise.toml", ".npmrc"])
+		local(name, "# fixture\n");
+	local("pnpm-workspace.yaml", "packages: []\n");
+	local("package.json", '{"private":true}\n');
+	local("apps/user/package.json", '{"scripts":{}}\n');
+	local("apps/user/.env.example", "CLERK_DOMAIN=example.clerk.accounts.dev\n");
+	local("apps/asset/package.json", '{"scripts":{"dev:configure":"true"}}\n');
+	local("patches/dependency.patch", "original patch\n");
+	local("notes.txt", "original unrelated source\n");
+	local(
+		".gitignore",
+		".boat/\n.mise/\n.worktree\n.env\n.authority.json\n.generated.conf\n.operator-inbox.json\n.workflow.json\n",
+	);
+	local(".worktree", "INGRESS_PORT=9120\n");
+	local("infra/.env", "# private\n");
+	local("apps/user/.env", "CLERK_DOMAIN=example.clerk.accounts.dev\n");
+	for (const name of generatedAuthority) local(name, "{}\n");
+	local(
+		generatedAuthority[0],
+		JSON.stringify({
+			identityProviders: {
+				clerk: {
+					issuer: "https://example.clerk.accounts.dev",
+					jwksUrl: "https://example.clerk.accounts.dev/.well-known/jwks.json",
+					authorizedParties: ["http://localhost:9120", "http://127.0.0.1:9120"],
+				},
+			},
+		}),
+	);
+	local("infra/postgres/init/fixture.sql", "-- fixture\n");
+	// This fake models a stale lock, deterministic generation and frozen validation.
+	put(
+		path.join(bin, "pnpm"),
+		`#!${process.execPath}
+const fs=require('fs'),path=require('path'),cp=require('child_process');
+const argv=process.argv.slice(2), root=process.env.FAKE_WORKER, control=process.env.FAKE_CONTROL;
+function expected(){const inputs={};function visit(dir){for(const entry of fs.readdirSync(path.join(root,dir),{withFileTypes:true})){const name=path.posix.join(dir,entry.name);if(entry.isDirectory()&&!['.git','.boat','.mise'].includes(entry.name))visit(name);else if(entry.isFile()&&(/(^|\\/)(package.json|\\.npmrc)$/.test(name)||name==='pnpm-workspace.yaml'||name.startsWith('patches/')))inputs[name]=fs.readFileSync(path.join(root,name),'utf8');}}visit('');return JSON.stringify({resolutions:{unrelated:'preserved@1.0.0'},inputs},null,2)+'\\n';}
+if(argv[0]==='--filter') {const pkg=argv[1].split('/')[1],script=argv[3];const cwd=path.join(process.cwd(),pkg==='scripts'?'scripts':'apps/'+pkg);const command=JSON.parse(fs.readFileSync(path.join(cwd,'package.json'))).scripts[script];if(!command)throw Error('missing maintained script '+script);process.exit(cp.spawnSync(command,{cwd,shell:true,stdio:'inherit',env:process.env}).status??1);}
+if(argv[0]!=='install')throw Error('unexpected pnpm '+argv);
+if(argv.includes('--lockfile-only')){
+ if(JSON.stringify(argv)!==JSON.stringify(['install','--lockfile-only','--no-frozen-lockfile','--ignore-scripts']))throw Error('generator flags changed');
+ fs.appendFileSync(path.join(control,'calls'),'generate\\n');
+ fs.writeFileSync(path.join(control,'entered'),'yes');
+ (async()=>{while(fs.existsSync(path.join(control,'pause'))&&!fs.existsSync(path.join(control,'release')))await new Promise(r=>setTimeout(r,10));
+ fs.writeFileSync(path.join(root,'pnpm-lock.yaml'),expected());
+ if(fs.existsSync(path.join(control,'symlink'))){fs.unlinkSync(path.join(root,'pnpm-lock.yaml'));fs.symlinkSync(path.join(control,'outside'),path.join(root,'pnpm-lock.yaml'));}
+ process.exit(fs.existsSync(path.join(control,'fail'))?23:0);})();
+}else{if(!argv.includes('--frozen-lockfile'))throw Error('normal install is not frozen');fs.appendFileSync(path.join(control,'calls'),'frozen\\n');if(fs.readFileSync(path.join(root,'pnpm-lock.yaml'),'utf8')!==expected()){console.error('ERR_PNPM_LOCKFILE_CONFIG_MISMATCH');process.exit(17);}}
+`,
+		0o755,
+	);
+	put(
+		path.join(bin, "mise"),
+		`#!/bin/sh\nif [ "$1" = exec ]; then shift; [ "$1" != -- ] || shift; exec "$@"; fi\nexit 0\n`,
+		0o755,
+	);
+	fs.mkdirSync(control);
+	local("pnpm-lock.yaml", "stale lock\n");
+	execFileSync("git", ["init", "-q", root]);
+	const git = (...args) =>
+		execFileSync("git", ["-C", root, ...args])
+			.toString()
+			.trim();
+	git("add", ".");
+	git(
+		"-c",
+		"user.name=Test",
+		"-c",
+		"user.email=test@example.com",
+		"commit",
+		"-qm",
+		"fixture",
+	);
+	fs.cpSync(root, worker, { recursive: true });
+	const env = {
+		...process.env,
+		HOME: home,
+		PATH: `${bin}:${process.env.PATH}`,
+		FAKE_WORKER: worker,
+		FAKE_CONTROL: control,
+		MAKEFLAGS: "",
+		MFLAGS: "",
+		MAKEOVERRIDES: "",
+		BOAT_EXEC: "",
+	};
+	put(
+		path.join(root, ".mise/boat/boat"),
+		`#!${process.execPath}
+const fs=require('fs'),cp=require('child_process'),path=require('path');
+const argv=process.argv.slice(2),control=process.env.FAKE_CONTROL;
+fs.appendFileSync(path.join(control,'transport'),JSON.stringify(argv)+'\\n');
+if(argv.includes('info')){console.log(JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);}
+if(argv.includes('resume')){fs.unlinkSync(path.join(control,'sleep'));console.log('{}');process.exit(0);}
+const command=argv.at(-1).replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER);
+if(argv.includes('ssh')&&(command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')||command.includes('sudo -n')||command.includes('--input-type=module -')))process.exit(0);
+if(!argv.includes('ssh')&&!argv.includes('exec'))throw Error('unexpected Boat '+argv);
+const stream=argv.includes('--stream'),child=cp.spawn('bash',['-c',command],{env:process.env,stdio:['pipe',stream?'pipe':'inherit',stream?'pipe':'inherit']});
+process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});
+if(stream)for(const type of ['stdout','stderr'])child[type].on('data',b=>console.log(JSON.stringify({type,data:b.toString()})));
+child.on('close',code=>process.exit(code??1));
+`,
+		0o755,
+	);
+	const keeper = spawn(
+		process.execPath,
+		["-e", "console.log('ready');setInterval(()=>{},1000)"],
+		{ cwd: root, stdio: ["ignore", "pipe", "pipe"] },
+	);
+	await once(keeper.stdout, "data");
+	t.after(async () => {
+		keeper.kill();
+		await once(keeper, "close");
+		fs.rmSync(directory, { recursive: true, force: true });
+	});
+	const processRecord = worktreeProcesses(root).find(
+		(p) => p.pid === keeper.pid,
+	);
+	const save = (name, value) => local(name, JSON.stringify(value));
+	save(".boat/enrollment.json", {
+		root,
+		base: git("rev-parse", "HEAD"),
+		key: "fixture",
+		cohort: "smoke",
+		mode: "development",
+		size: "large",
+	});
+	save(".boat/state.json", {
+		id: "fake-worker",
+		size: "large",
+		cost: 0,
+		runningSince: Date.now(),
+		lastActivity: Date.now(),
+		daemon: processRecord,
+	});
+	save(".boat/cache-server.json", processRecord);
+	save(".boat/cache.json", { api: "http://127.0.0.1:12345", token: "fixture" });
+	save(".boat/cache-tunnel.json", {
+		...processRecord,
+		id: "fake-worker",
+		api: "http://127.0.0.1:12345",
+	});
+	const run = (...targets) => {
+		const child = spawn("make", targets, {
+			cwd: root,
+			env,
+			stdio: ["ignore", "pipe", "pipe"],
+		});
+		let output = "";
+		child.stdout.on("data", (b) => (output += b));
+		child.stderr.on("data", (b) => (output += b));
+		const done = new Promise((resolve, reject) => {
+			child.on("error", reject);
+			child.on("close", (status) => resolve({ status, output }));
+		});
+		return { child, done };
+	};
+	return {
+		directory,
+		root,
+		worker,
+		control,
+		env,
+		local,
+		json,
+		run,
+		generate: () =>
+			run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock").done,
+	};
+}
+
+test("public lock generation repairs stale dependency inputs before frozen preparation and returns only the lock", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	f.local("patches/dependency.patch", "changed tracked patch\n");
+	f.local("patches/new.patch", "new untracked patch\n");
+	const first = await f.generate();
+	assert.equal(first.status, 0, first.output);
+	const accepted = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8");
+	const lock = JSON.parse(accepted);
+	assert.equal(
+		lock.inputs["patches/dependency.patch"],
+		"changed tracked patch\n",
+	);
+	assert.equal(lock.inputs["patches/new.patch"], "new untracked patch\n");
+	assert.deepEqual(lock.resolutions, { unrelated: "preserved@1.0.0" });
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"), "utf8"),
+		accepted,
+	);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+	const normal = await f.run(
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		"BOAT_EXEC=remote",
+	).done;
+	assert.equal(normal.status, 0, normal.output);
+	assert.match(
+		fs.readFileSync(path.join(f.control, "calls"), "utf8"),
+		/generate\nfrozen\n/,
+	);
+	const prepared = fs.readFileSync(path.join(f.root, ".boat/prepared.json"));
+	const second = await f.generate();
+	assert.equal(second.status, 0, second.output);
+	assert.equal(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8"),
+		accepted,
+	);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.root, ".boat/prepared.json")),
+		prepared,
+	);
+});

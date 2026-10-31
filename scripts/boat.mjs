@@ -15,6 +15,7 @@ import {
 	meaningfulPreviewRequest,
 	worktreeProcesses,
 	liveOwnedProcess,
+	forwardPreviewDisconnect,
 } from "./lib/boat.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 import {
@@ -916,9 +917,15 @@ async function preview() {
 			},
 		);
 		upstream.on("error", () => {
+			if (res.destroyed) return;
+			if (res.headersSent) {
+				res.destroy();
+				return;
+			}
 			res.writeHead(503);
 			res.end("Remote application is not ready");
 		});
+		forwardPreviewDisconnect(req, res, upstream);
 		req.pipe(upstream);
 	});
 	server.on("upgrade", (req, socket, head) => {

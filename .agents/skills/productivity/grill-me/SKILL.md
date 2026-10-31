@@ -4,4 +4,4 @@ description: A relentless interview to sharpen a plan or design.
 disable-model-invocation: true
 ---
 
-Load $grilling and follow it.
+Load the [grilling skill](../grilling/SKILL.md) and follow it.

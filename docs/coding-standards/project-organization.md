@@ -14,6 +14,7 @@ Scope: module organization, documentation, and shared testing principles apply p
 
 ## Documentation
 
+- For skills, these rules apply to repository-authored skills and our local additions or edits to third-party skills. Untouched third-party skill content, including supporting references, is exempt; a local customization does not require rewriting unrelated upstream content.
 - Documentation must contain only information another agent will need for a concrete repository task. Speculative future usefulness does not justify a document or section.
 - Refer to skills using `$<skillname>` syntax, such as `$write-readme`, rather than Markdown links.
 - Creating or editing README files requires $write-readme.

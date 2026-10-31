@@ -9624,7 +9624,18 @@ test("preview replacement ordering oracle rejects a forward started before retir
 	});
 });
 
-for (const kind of [
+function previewProgressInventory(f) {
+	return fs
+		.readdirSync(path.join(f.root, ".boat"))
+		.filter((name) => /^preview-progress-[0-9a-f-]+\.json$/.test(name))
+		.sort()
+		.map((name) => ({
+			name,
+			bytes: fs.readFileSync(path.join(f.root, ".boat", name), "utf8"),
+		}));
+}
+
+for (const scenario of [
 	"start",
 	"spawn",
 	"listen",
@@ -9632,16 +9643,22 @@ for (const kind of [
 	"unknown",
 	"contention",
 	"lease-changed",
-])
-	test(`preview acquisition ${kind} failure closes owned resources without readiness`, async (t) => {
+	"contention-progress-mutant",
+]) {
+	const mutant = scenario === "contention-progress-mutant";
+	const kind = mutant ? "contention" : scenario;
+	const name = mutant
+		? "preview contention progress oracle rejects creation after failed exclusive acquisition"
+		: `preview acquisition ${scenario} failure closes owned resources without readiness`;
+	test(name, async (t) => {
 		const archive = pendingPreviewEvidence(t);
-		await archive.scenario(async () => {
-			let keeper, prior;
+		const verification = archive.scenario(async () => {
+			let keeper, prior, progressBefore, moduleRevision;
 			const f = await pendingUpgradePreview(
 				t,
 				"managed",
 				archive,
-				`acquisition-${kind}`,
+				`acquisition-${scenario}`,
 				{
 					startupFailure: true,
 					beforeStart: async (fixture, { port }, cleanup) => {
@@ -9651,11 +9668,51 @@ for (const kind of [
 							flag(fixture, "hold-forward-start");
 						if (kind === "contention") {
 							keeper = fixture.json(".boat/state.json").daemon;
+							const generation = "11111111-1111-4111-8111-111111111111";
+							const name = `preview-progress-${generation}.json`;
 							prior = JSON.stringify({
 								...keeper,
-								generation: "existing-acquisition",
+								generation,
+								progress: name,
 							});
 							fixture.local(".boat/preview-acquisition.json", prior);
+							fixture.local(
+								`.boat/${name}`,
+								JSON.stringify({
+									...keeper,
+									generation,
+									phase: "unresolved",
+									failure: "preexisting foreign progress fixture",
+								}),
+							);
+							progressBefore = previewProgressInventory(fixture);
+							const modulePath = path.join(
+								fixture.root,
+								"scripts/lib/boat-preview.mjs",
+							);
+							const original = fs.readFileSync(modulePath, "utf8");
+							if (mutant) {
+								const guard =
+									"if (acquired || published) write(progress, state);";
+								assert.equal(original.split(guard).length, 2);
+								fs.writeFileSync(
+									modulePath,
+									original.replace(guard, "write(progress, state);"),
+								);
+							}
+							moduleRevision = {
+								mutant,
+								originalSha256: createHash("sha256")
+									.update(original)
+									.digest("hex"),
+								sha256: createHash("sha256")
+									.update(fs.readFileSync(modulePath))
+									.digest("hex"),
+							};
+							fs.copyFileSync(
+								modulePath,
+								path.join(archive.directory, `${scenario}.mjs`),
+							);
 						}
 						if (kind === "unknown") {
 							keeper = fixture.json(".boat/state.json").daemon;
@@ -9776,8 +9833,53 @@ for (const kind of [
 			f.phase(
 				"failure observed and owned resources naturally closed before fixture cleanup",
 			);
+			if (kind === "contention") {
+				const after = previewProgressInventory(f);
+				f.receipts.contentionProgress = {
+					before: progressBefore,
+					after,
+					moduleRevision,
+					oldOraclePassed: true,
+					observedBeforeFixtureCleanup: true,
+					commandTerminal: f.command.terminal,
+					commandClosed: f.command.closed,
+				};
+				try {
+					assert.deepEqual(
+						after,
+						progressBefore,
+						"failed exclusive acquisition preserves the progress inventory",
+					);
+				} catch (error) {
+					f.receipts.progressCounterexample = {
+						candidateQualified: false,
+						rejectedBeforeFixtureCleanup: true,
+						name: error.name,
+						message: error.message,
+						stack: error.stack,
+					};
+					f.phase(
+						"owning progress-inventory assertion rejected before fixture safety",
+					);
+					throw error;
+				}
+				f.phase(
+					"failed exclusive acquisition preserved foreign progress before cleanup",
+				);
+			}
 		});
+		if (mutant)
+			await assert.rejects(
+				verification,
+				(error) =>
+					error.code === "ERR_ASSERTION" &&
+					error.message.startsWith(
+						"failed exclusive acquisition preserves the progress inventory",
+					),
+			);
+		else await verification;
 	});
+}
 
 for (const exitCode of [0, 47, 48])
 	test(`preview lifetime reports post-ready forward exit ${exitCode} and retires ingress`, async (t) => {

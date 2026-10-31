@@ -976,12 +976,12 @@ if(argv.includes('resume')){fs.unlinkSync(path.join(control,'sleep'));console.lo
 const command=argv.at(-1).replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER);
 if(argv.includes('ssh')&&(command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')||command.includes('sudo -n')||command.includes('--input-type=module -')))process.exit(0);
 if(!argv.includes('ssh')&&!argv.includes('exec'))throw Error('unexpected Boat '+argv);
-if(command.includes('base64 -w0')){
+if(command.includes('base64 -w0')||command.includes('collect-migrations')){
  fs.writeFileSync(path.join(control,'collecting'),'yes');
  if(fs.existsSync(path.join(control,'transfer-fail')))process.exit(31);
  if(fs.existsSync(path.join(control,'framed'))){console.log(JSON.stringify({type:'stdout',data:'invalid framed payload'}));process.exit(0);}
 }
-const pause=command.includes('tar -xzf -')?'sync':command.includes('base64 -w0')?'collect':null;
+const pause=command.includes('tar -xzf -')?'sync':(command.includes('base64 -w0')||command.includes('collect-migrations'))?'collect':null;
 if(pause&&fs.existsSync(path.join(control,'pause-'+pause))){fs.writeFileSync(path.join(control,'entered-'+pause),'yes');while(!fs.existsSync(path.join(control,'release-'+pause))||fs.existsSync(path.join(control,'ignore-release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);}
 const stream=argv.includes('--stream'),child=cp.spawn('bash',['-c',command],{env:process.env,stdio:['pipe',stream?'pipe':'inherit',stream?'pipe':'inherit']});
 process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});
@@ -2540,7 +2540,25 @@ fs.appendFileSync(path.join(control,'migration-starts'),JSON.stringify(JSON.pars
 fs.writeFileSync(path.join(control,'migration-entered'),'yes');
 (async()=>{while(fs.existsSync(path.join(control,'migration-pause'))&&!fs.existsSync(path.join(control,'migration-release')))await new Promise(r=>setTimeout(r,10));
 const result=cp.spawnSync(process.execPath,[${JSON.stringify(path.join(repository, "apps/asset/node_modules/drizzle-kit/bin.cjs"))},...process.argv.slice(2)],{env:{...process.env,DATABASE_URL:'postgres://unused:unused@127.0.0.1/unused'},stdio:'inherit'});
-process.exit(result.status??1);
+const journal=JSON.parse(fs.readFileSync('drizzle/meta/_journal.json')),tag=journal.entries.at(-1).tag;
+const mode=fs.existsSync(path.join(control,'migration-mode'))?fs.readFileSync(path.join(control,'migration-mode'),'utf8'):'';
+const snapshot='drizzle/meta/'+tag.split('_')[0]+'_snapshot.json';
+if(mode==='incomplete')fs.unlinkSync(snapshot);
+if(mode==='orphan')fs.writeFileSync('drizzle/9999_orphan.sql','-- unjournalled');
+if(mode==='old-sql')fs.appendFileSync('drizzle/'+journal.entries[0].tag+'.sql','-- rewritten');
+if(mode==='old-journal'){journal.entries[0].when+=1;fs.writeFileSync('drizzle/meta/_journal.json',JSON.stringify(journal));}
+if(mode==='chain'){const value=JSON.parse(fs.readFileSync(snapshot));value.prevId='00000000-0000-0000-0000-000000000000';fs.writeFileSync(snapshot,JSON.stringify(value));}
+if(mode==='symlink'){fs.unlinkSync(snapshot);fs.symlinkSync(path.join(control,'outside'),snapshot);}
+if(mode==='meta-symlink'){fs.renameSync('drizzle/meta',path.join(control,'outside-meta'));fs.symlinkSync(path.join(control,'outside-meta'),'drizzle/meta');}
+if(mode==='invalid-path')fs.writeFileSync('drizzle/private.env','not source');
+if(mode==='missing-sql')fs.unlinkSync('drizzle/'+tag+'.sql');
+if(mode==='unjournalled'){journal.entries.pop();fs.writeFileSync('drizzle/meta/_journal.json',JSON.stringify(journal));}
+if(mode==='timestamp'){journal.entries.at(-1).when=journal.entries.at(-2).when;fs.writeFileSync('drizzle/meta/_journal.json',JSON.stringify(journal));}
+if(mode==='duplicate-id'){const value=JSON.parse(fs.readFileSync(snapshot));value.id=value.prevId;fs.writeFileSync(snapshot,JSON.stringify(value));}
+if(mode==='unsafe-tag'){journal.entries.at(-1).tag='../outside';fs.writeFileSync('drizzle/meta/_journal.json',JSON.stringify(journal));}
+if(mode==='oversized')fs.writeFileSync('drizzle/'+tag+'.sql',Buffer.alloc(8*1024*1024+1,'x'));
+if(mode==='multiple-appends'){const value=JSON.parse(fs.readFileSync(snapshot));value.prevId=value.id;value.id='12345678-1234-1234-1234-123456789abc';fs.writeFileSync('drizzle/meta/0019_snapshot.json',JSON.stringify(value));fs.writeFileSync('drizzle/0019_extra.sql','-- second append');journal.entries.push({...journal.entries.at(-1),idx:19,tag:'0019_extra',when:journal.entries.at(-1).when+1});fs.writeFileSync('drizzle/meta/_journal.json',JSON.stringify(journal));}
+process.exit(fs.existsSync(path.join(control,'migration-fail'))?23:result.status??1);
 })();
 `,
 		{ mode: 0o755 },
@@ -2609,3 +2627,764 @@ test("public migration generation returns native SQL, snapshot and journal as a 
 	assert.deepEqual(migrationBytes(f.worker), remote);
 });
 
+async function pausedMigrations(t, phase = "generate") {
+	const f = await migrationGenerationCheckout(t);
+	flag(f, phase === "generate" ? "migration-pause" : `pause-${phase}`);
+	if (phase === "sync") f.local("notes.txt", "force captured upload\n");
+	const pending = f.migrations();
+	await observed(
+		() =>
+			fs.existsSync(
+				path.join(
+					f.control,
+					phase === "generate" ? "migration-entered" : `entered-${phase}`,
+				),
+			),
+		`native migration ${phase}`,
+	);
+	return {
+		...f,
+		pending,
+		release: () =>
+			flag(f, phase === "generate" ? "migration-release" : `release-${phase}`),
+	};
+}
+for (const [name, edit] of [
+	[
+		"schema",
+		(f) =>
+			f.local("apps/asset/src/db/schema.ts", "// concurrent local schema\n"),
+	],
+	[
+		"schema import addition",
+		(f) => f.local("apps/asset/src/db/extra.ts", "export const extra = 1;\n"),
+	],
+	[
+		"schema deletion",
+		(f) => fs.unlinkSync(path.join(f.root, "apps/asset/src/db/schema.ts")),
+	],
+	[
+		"config",
+		(f) =>
+			f.local("apps/asset/drizzle.config.ts", "// concurrent local config\n"),
+	],
+	[
+		"manifest",
+		(f) => f.local("apps/asset/package.json", '{"concurrent":true}\n'),
+	],
+	[
+		"dependency",
+		(f) => f.local("patches/dependency.patch", "local changed dependency\n"),
+	],
+	[
+		"journal",
+		(f) =>
+			f.local(
+				"apps/asset/drizzle/meta/_journal.json",
+				JSON.stringify({
+					...f.json("apps/asset/drizzle/meta/_journal.json"),
+					local: true,
+				}),
+			),
+	],
+	[
+		"old SQL",
+		(f) =>
+			f.local(
+				"apps/asset/drizzle/0000_mute_the_professor.sql",
+				"-- local SQL\n",
+			),
+	],
+	[
+		"old snapshot",
+		(f) => f.local("apps/asset/drizzle/meta/0000_snapshot.json", "{}\n"),
+	],
+	[
+		"new output",
+		(f) =>
+			f.local(
+				"apps/asset/drizzle/9999_local.sql",
+				"-- local untracked output\n",
+			),
+	],
+	[
+		"output deletion",
+		(f) =>
+			fs.unlinkSync(
+				path.join(f.root, "apps/asset/drizzle/meta/0017_snapshot.json"),
+			),
+	],
+])
+	test(`native migration return preserves concurrent local ${name}`, async (t) => {
+		const f = await pausedMigrations(t);
+		edit(f);
+		const before = migrationBytes(f.root),
+			schema = fs.existsSync(path.join(f.root, "apps/asset/src/db/schema.ts"))
+				? fs.readFileSync(path.join(f.root, "apps/asset/src/db/schema.ts"))
+				: null;
+		f.release();
+		const result = await f.pending;
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /proposal retained at|retained evidence at/);
+		assert.deepEqual(migrationBytes(f.root), before);
+		if (schema)
+			assert.deepEqual(
+				fs.readFileSync(path.join(f.root, "apps/asset/src/db/schema.ts")),
+				schema,
+			);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+			false,
+		);
+		const proposal = result.output.match(/proposal retained at ([^\n;]+)/)?.[1];
+		assert.ok(proposal, result.output);
+		assert.equal(path.relative(f.root, proposal).startsWith(".."), true);
+		assert.equal(
+			JSON.parse(
+				fs.readFileSync(
+					path.join(proposal, "apps/asset/drizzle/meta/_journal.json"),
+				),
+			).entries.length,
+			19,
+		);
+	});
+
+test("migration upload uses captured schema imports and leaves unrelated concurrent edits pending", async (t) => {
+	const f = await migrationGenerationCheckout(t);
+	const schema = fs.readFileSync(
+		path.join(f.root, "apps/asset/src/db/schema.ts"),
+		"utf8",
+	);
+	f.local("apps/asset/src/db/schema.ts", `import './extra';\n${schema}`);
+	f.local("apps/asset/src/db/extra.ts", "export const extra = 1;\n");
+	flag(f, "pause-sync");
+	const pending = f.migrations();
+	await observed(
+		() => fs.existsSync(path.join(f.control, "entered-sync")),
+		"captured migration upload",
+	);
+	f.local(
+		"apps/asset/src/db/extra.ts",
+		"throw Error('new local code must not run remotely');\n",
+	);
+	flag(f, "release-sync");
+	const result = await pending;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(
+		result.output,
+		/Local generator inputs or old migration set changed/,
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "apps/asset/src/db/extra.ts"), "utf8"),
+		"export const extra = 1;\n",
+	);
+	assert.equal(
+		f.json("apps/asset/drizzle/meta/_journal.json").entries.length,
+		18,
+	);
+});
+
+for (const mode of [
+	"incomplete",
+	"orphan",
+	"chain",
+	"symlink",
+	"meta-symlink",
+	"invalid-path",
+	"old-sql",
+	"old-journal",
+	"generator-failure",
+	"missing-sql",
+	"unjournalled",
+	"timestamp",
+	"duplicate-id",
+	"unsafe-tag",
+	"oversized",
+	"multiple-appends",
+	"transfer-failure",
+])
+	test(`native migration return rejects ${mode} and next public sync restores local outputs`, async (t) => {
+		const f = await migrationGenerationCheckout(t),
+			before = migrationBytes(f.root);
+		fs.writeFileSync(
+			path.join(f.control, "outside"),
+			"private outside bytes\n",
+		);
+		if (mode === "generator-failure") flag(f, "migration-fail");
+		else if (mode === "transfer-failure") flag(f, "transfer-fail");
+		else fs.writeFileSync(path.join(f.control, "migration-mode"), mode);
+		const result = await f.migrations();
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /proposal retained at|retained evidence at/);
+		assert.deepEqual(migrationBytes(f.root), before);
+		assert.equal(
+			fs.readFileSync(path.join(f.control, "outside"), "utf8"),
+			"private outside bytes\n",
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+			false,
+		);
+		const next = await f.run(
+			"run",
+			"PACKAGE=asset",
+			"SCRIPT=dev:configure",
+			"BOAT_EXEC=remote",
+		).done;
+		assert.equal(next.status, 0, next.output);
+		assert.deepEqual(migrationBytes(f.worker), before);
+	});
+
+test("migration acceptance acknowledges only returned outputs and later sync retains the accepted set", async (t) => {
+	const f = await pausedMigrations(t);
+	const before = f.json(".boat/manifest.json")["notes.txt"];
+	f.local("notes.txt", "pending unrelated local source\n");
+	f.release();
+	const result = await f.pending;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(f.json(".boat/manifest.json")["notes.txt"], before);
+	const accepted = migrationBytes(f.root);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8"),
+		"original unrelated source\n",
+	);
+	const next = await f.run(
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		"BOAT_EXEC=remote",
+	).done;
+	assert.equal(next.status, 0, next.output);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8"),
+		"pending unrelated local source\n",
+	);
+	assert.deepEqual(migrationBytes(f.worker), accepted);
+});
+
+for (const phase of ["sync", "generate", "collect"])
+	test(`daemon sync and both maintained generators serialize through native migration ${phase}`, async (t) => {
+		const f = await pausedMigrations(t, phase);
+		f.local("notes.txt", "concurrent unrelated edit\n");
+		f.daemon();
+		const second = f.migrations(),
+			lock = f.generate();
+		await observed(
+			() =>
+				fs
+					.readdirSync(path.join(f.root, ".boat"))
+					.filter((name) => /^command-\d+\.json$/.test(name)).length === 3,
+			"overlapping source commands",
+		);
+		f.release();
+		for (const result of await Promise.all([f.pending, second, lock]))
+			assert.equal(result.status, 0, result.output);
+		const starts = fs
+			.readFileSync(path.join(f.control, "migration-starts"), "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		assert.deepEqual(
+			starts.map((j) => j.entries.length),
+			[18, 19],
+		);
+		assert.deepEqual(migrationBytes(f.worker), migrationBytes(f.root));
+		assert.equal(
+			f.json("apps/asset/drizzle/meta/_journal.json").entries.length,
+			19,
+		);
+	});
+
+// Faults occur inside real filesystem publication in the controller process.
+// These controls prove exclusive creation and rollback through public Make.
+for (const mode of [
+	"link-failure",
+	"new-path-conflict",
+	"journal-edit",
+	"published-edit",
+	"commit-failure",
+])
+	test(`public migration publication rolls back safely on ${mode}`, async (t) => {
+		const f = await migrationGenerationCheckout(t),
+			before = migrationBytes(f.root);
+		const hook = path.join(f.directory, "publication.cjs"),
+			report = path.join(f.control, "publication.json");
+		fs.writeFileSync(
+			hook,
+			`
+const fs=require('fs'),path=require('path');
+const root=${JSON.stringify(f.root)},mode=${JSON.stringify(mode)},report=${JSON.stringify(report)};
+const link=fs.linkSync,rename=fs.renameSync;let added=[];
+fs.linkSync=function(from,to){
+ if(!to.startsWith(root+'/apps/asset/drizzle/'))return link(from,to);
+ if(added.length===1&&mode==='link-failure')throw Error('controlled publication I/O failure');
+ if(added.length===1&&mode==='new-path-conflict'){fs.writeFileSync(to,'concurrent local new path',{flag:'wx'});fs.writeFileSync(report,JSON.stringify({name:path.relative(root,to),bytes:'concurrent local new path'}));}
+ const result=link(from,to);added.push(to);
+ if(added.length===2&&mode==='journal-edit'){const name='apps/asset/drizzle/meta/_journal.json',value=JSON.parse(fs.readFileSync(path.join(root,name)));value.localEdit=true;const bytes=JSON.stringify(value);fs.writeFileSync(path.join(root,name),bytes);fs.writeFileSync(report,JSON.stringify({name,bytes}));}
+ if(added.length===2&&mode==='published-edit'){fs.writeFileSync(added[0],'local edit of new output');fs.writeFileSync(report,JSON.stringify({name:path.relative(root,added[0]),bytes:'local edit of new output'}));}
+ return result;
+};
+fs.renameSync=function(from,to){if(to===root+'/apps/asset/drizzle/meta/_journal.json'&&mode==='commit-failure')throw Error('controlled journal commit failure');return rename(from,to);};
+`,
+		);
+		f.env.NODE_OPTIONS = `--require=${hook}`;
+		const result = await f.migrations();
+		assert.notEqual(result.status, 0, result.output);
+		const expected = { ...before };
+		if (fs.existsSync(report)) {
+			const edit = JSON.parse(fs.readFileSync(report));
+			expected[edit.name] = edit.bytes;
+		}
+		assert.deepEqual(migrationBytes(f.root), expected);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/migration-return-pending.json")),
+			true,
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+			false,
+		);
+	});
+
+test("journal readers see complete old or new native migration sets throughout publication", async (t) => {
+	const f = await migrationGenerationCheckout(t),
+		repository = path.resolve(import.meta.dirname, "..");
+	const hook = path.join(f.directory, "reader.cjs"),
+		observations = path.join(f.control, "readers");
+	fs.writeFileSync(
+		hook,
+		`
+const fs=require('fs'),path=require('path');
+const root=${JSON.stringify(f.root)},readMigrationFiles=require(${JSON.stringify(path.join(repository, "apps/asset/node_modules/drizzle-orm/migrator.cjs"))}).readMigrationFiles;
+function observe(){const result=readMigrationFiles({migrationsFolder:path.join(root,'apps/asset/drizzle')});fs.appendFileSync(${JSON.stringify(observations)},String(result.length)+'\\n');}
+const link=fs.linkSync,rename=fs.renameSync;
+fs.linkSync=function(from,to){const result=link(from,to);if(to.startsWith(root+'/apps/asset/drizzle/'))observe();return result;};
+fs.renameSync=function(from,to){if(to===root+'/apps/asset/drizzle/meta/_journal.json')observe();const result=rename(from,to);if(to===root+'/apps/asset/drizzle/meta/_journal.json')observe();return result;};
+`,
+	);
+	f.env.NODE_OPTIONS = `--require=${hook}`;
+	const result = await f.migrations();
+	assert.equal(result.status, 0, result.output);
+	assert.deepEqual(
+		fs.readFileSync(observations, "utf8").trim().split("\n").map(Number),
+		[18, 18, 18, 19],
+	);
+});
+
+for (const kind of ["schema-link", "schema-parent-link", "output-link"])
+	test(`public migration generation rejects local ${kind} without following it`, async (t) => {
+		const f = await migrationGenerationCheckout(t),
+			before = migrationBytes(f.root);
+		const outside = path.join(f.control, "outside-source");
+		fs.mkdirSync(outside);
+		fs.writeFileSync(
+			path.join(outside, "schema.ts"),
+			"throw Error('outside input must not execute');\n",
+		);
+		if (kind === "schema-parent-link") {
+			fs.renameSync(
+				path.join(f.root, "apps/asset/src/db"),
+				path.join(f.root, "apps/asset/src/old-db"),
+			);
+			fs.symlinkSync(outside, path.join(f.root, "apps/asset/src/db"));
+		} else {
+			const name =
+				kind === "schema-link"
+					? "apps/asset/src/db/schema.ts"
+					: "apps/asset/drizzle/meta/0017_snapshot.json";
+			fs.unlinkSync(path.join(f.root, name));
+			fs.symlinkSync(path.join(outside, "schema.ts"), path.join(f.root, name));
+		}
+		const initial = migrationBytes(f.root);
+		const result = await f.migrations();
+		assert.notEqual(result.status, 0, result.output);
+		assert.deepEqual(migrationBytes(f.root), initial);
+		assert.equal(
+			fs.existsSync(path.join(f.control, "migration-entered")),
+			false,
+		);
+		assert.equal(
+			fs.readFileSync(path.join(outside, "schema.ts"), "utf8"),
+			"throw Error('outside input must not execute');\n",
+		);
+		if (kind !== "output-link")
+			assert.deepEqual(migrationBytes(f.root), before);
+	});
+
+for (const mode of ["framed", "unsafe-transfer", "duplicate-transfer"])
+	test(`public migration collection rejects ${mode} without extracting worker paths`, async (t) => {
+		const f = await migrationGenerationCheckout(t),
+			before = migrationBytes(f.root);
+		const transport = path.join(f.root, ".mise/boat/boat");
+		if (mode === "framed") flag(f, "framed");
+		else
+			fs.writeFileSync(
+				transport,
+				fs.readFileSync(transport, "utf8").replace(
+					"if(command.includes('base64 -w0')||command.includes('collect-migrations')){",
+					`
+if(command.includes('collect-migrations')){console.log(JSON.stringify(${
+						mode === "unsafe-transfer"
+							? JSON.stringify([["../outside", "ZXZpbA=="]])
+							: JSON.stringify([
+									["apps/asset/drizzle/meta/_journal.json", "e30="],
+									["apps/asset/drizzle/meta/_journal.json", "e30="],
+								])
+					}));process.exit(0);}
+if(command.includes('base64 -w0')||command.includes('collect-migrations')){`,
+				),
+			);
+		const result = await f.migrations();
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /output collection failed/);
+		assert.deepEqual(migrationBytes(f.root), before);
+		assert.equal(fs.existsSync(path.join(f.directory, "outside")), false);
+	});
+
+test("native Drizzle zero-exit schema exception fails without accepting an unchanged tree", async (t) => {
+	const f = await migrationGenerationCheckout(t),
+		before = migrationBytes(f.root);
+	f.local(
+		"apps/asset/src/db/schema.ts",
+		"throw new Error('controlled invalid schema');\n",
+	);
+	const result = await f.migrations();
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /controlled invalid schema/);
+	assert.match(result.output, /Drizzle did not confirm successful generation/);
+	assert.deepEqual(migrationBytes(f.root), before);
+});
+
+test("uncollected remote proposal is retained before restoration and retention failure blocks destructive repair", async (t) => {
+	const f = await migrationGenerationCheckout(t),
+		before = migrationBytes(f.root);
+	flag(f, "transfer-fail");
+	const generated = await f.migrations();
+	assert.notEqual(generated.status, 0, generated.output);
+	const proposal = migrationBytes(f.worker);
+	const transport = path.join(f.root, ".mise/boat/boat");
+	fs.writeFileSync(
+		transport,
+		fs
+			.readFileSync(transport, "utf8")
+			.replace(
+				"const command=argv.at(-1)",
+				"if(argv.at(-1).includes('retain-migrations')&&fs.existsSync(path.join(control,'retain-fail')))process.exit(67);\nconst command=argv.at(-1)",
+			),
+	);
+	flag(f, "retain-fail");
+	const failed = await f.run(
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		"BOAT_EXEC=remote",
+	).done;
+	assert.notEqual(failed.status, 0, failed.output);
+	assert.deepEqual(migrationBytes(f.worker), proposal);
+	assert.deepEqual(migrationBytes(f.root), before);
+	fs.unlinkSync(path.join(f.control, "retain-fail"));
+	const marker = f.json(".boat/migration-return-pending.json");
+	const restored = await f.run(
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		"BOAT_EXEC=remote",
+	).done;
+	assert.equal(restored.status, 0, restored.output);
+	assert.deepEqual(migrationBytes(f.worker), before);
+	const retained = path.join(
+		f.worker,
+		".boat/source-proposals",
+		marker.id,
+		"drizzle",
+	);
+	assert.equal(
+		JSON.parse(fs.readFileSync(path.join(retained, "meta/_journal.json")))
+			.entries.length,
+		19,
+	);
+	for (const [name, bytes] of Object.entries(proposal))
+		assert.equal(
+			fs.readFileSync(
+				path.join(retained, name.slice("apps/asset/drizzle/".length)),
+				"utf8",
+			),
+			bytes,
+		);
+});
+
+for (const phase of ["first-addition", "second-addition", "journal-commit"])
+	test(`next public Make recovers a controller killed after ${phase} before consuming snapshots`, async (t) => {
+		const f = await migrationGenerationCheckout(t),
+			before = migrationBytes(f.root);
+		const hook = path.join(f.directory, "crash.cjs");
+		fs.writeFileSync(
+			hook,
+			`
+const fs=require('fs'),root=${JSON.stringify(f.root)},flag=${JSON.stringify(path.join(f.control, "crashed"))};
+let count=0;const link=fs.linkSync,rename=fs.renameSync;
+function crash(){if(fs.existsSync(flag))return;fs.writeFileSync(flag,'yes');process.kill(process.pid,'SIGKILL');}
+fs.linkSync=function(from,to){const result=link(from,to);if(to.startsWith(root+'/apps/asset/drizzle/')){count++;if(count===${phase === "first-addition" ? 1 : phase === "second-addition" ? 2 : -1})crash();}return result;};
+fs.renameSync=function(from,to){const result=rename(from,to);if(to===root+'/apps/asset/drizzle/meta/_journal.json'&&${phase === "journal-commit"})crash();return result;};
+`,
+		);
+		f.env.NODE_OPTIONS = `--require=${hook}`;
+		const killed = await f.migrations();
+		assert.notEqual(killed.status, 0, killed.output);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/migration-publication.json")),
+			true,
+		);
+		const next = await f.run(
+			"run",
+			"PACKAGE=asset",
+			"SCRIPT=dev:configure",
+			"BOAT_EXEC=remote",
+		).done;
+		assert.equal(next.status, 0, next.output);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/migration-publication.json")),
+			false,
+		);
+		if (phase !== "journal-commit")
+			assert.deepEqual(migrationBytes(f.root), before);
+		else
+			assert.equal(
+				f.json("apps/asset/drizzle/meta/_journal.json").entries.length,
+				19,
+			);
+		assert.deepEqual(migrationBytes(f.worker), migrationBytes(f.root));
+		const again = await f.migrations();
+		assert.equal(again.status, 0, again.output);
+		assert.equal(
+			f.json("apps/asset/drizzle/meta/_journal.json").entries.length,
+			19,
+		);
+	});
+
+test("interrupted publication preserves an edited orphan and blocks further source consumers", async (t) => {
+	const f = await migrationGenerationCheckout(t);
+	const hook = path.join(f.directory, "crash.cjs");
+	fs.writeFileSync(
+		hook,
+		`const fs=require('fs'),link=fs.linkSync;fs.linkSync=function(from,to){const result=link(from,to);if(to.startsWith(${JSON.stringify(`${f.root}/apps/asset/drizzle/`)}))process.kill(process.pid,'SIGKILL');return result;};`,
+	);
+	f.env.NODE_OPTIONS = `--require=${hook}`;
+	const killed = await f.migrations();
+	assert.notEqual(killed.status, 0, killed.output);
+	delete f.env.NODE_OPTIONS;
+	const intent = f.json(".boat/migration-publication.json"),
+		name = intent.additions[0].name;
+	f.local(name, "concurrent local orphan edit\n");
+	const before = migrationBytes(f.root);
+	for (const pending of [
+		f.migrations(),
+		f.run("run", "PACKAGE=asset", "SCRIPT=dev:configure", "BOAT_EXEC=remote")
+			.done,
+	]) {
+		const result = await pending;
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /recovery conflict/);
+	}
+	assert.deepEqual(migrationBytes(f.root), before);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/migration-publication.json")),
+		true,
+	);
+});
+
+test("captured untracked schema helper is a valid native generator input and modes are preserved", async (t) => {
+	const f = await migrationGenerationCheckout(t);
+	f.local("apps/asset/src/db/helper.ts", "export const harmless = 1;\n");
+	f.local(
+		"apps/asset/src/db/schema.ts",
+		"import './helper';\n" +
+			fs.readFileSync(path.join(f.root, "apps/asset/src/db/schema.ts"), "utf8"),
+	);
+	fs.chmodSync(path.join(f.root, "apps/asset/src/db/helper.ts"), 0o640);
+	fs.chmodSync(path.join(f.root, "apps/asset/src/db/schema.ts"), 0o640);
+	const result = await f.migrations();
+	assert.equal(result.status, 0, result.output);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "apps/asset/src/db/helper.ts"), "utf8"),
+		"export const harmless = 1;\n",
+	);
+	assert.equal(
+		fs.statSync(path.join(f.worker, "apps/asset/src/db/helper.ts")).mode &
+			0o777,
+		0o640,
+	);
+	const before = Object.fromEntries(
+		Object.keys(migrationBytes(f.root)).map((name) => [
+			name,
+			fs.statSync(path.join(f.root, name)).mtimeMs,
+		]),
+	);
+	const again = await f.migrations();
+	assert.equal(again.status, 0, again.output);
+	for (const [name, mtime] of Object.entries(before))
+		assert.equal(fs.statSync(path.join(f.root, name)).mtimeMs, mtime);
+});
+
+test("observed remote schema mutation rejects source return and remains pending for restoration", async (t) => {
+	const f = await pausedMigrations(t, "collect"),
+		before = migrationBytes(f.root);
+	fs.writeFileSync(
+		path.join(f.worker, "apps/asset/src/db/schema.ts"),
+		"// remote concurrent mutation\n",
+	);
+	f.release();
+	const result = await f.pending;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Worker generation inputs changed/);
+	assert.deepEqual(migrationBytes(f.root), before);
+	assert.equal(
+		f.json(".boat/manifest.json")["apps/asset/src/db/schema.ts"],
+		null,
+	);
+	const restored = await f.run("build", "PACKAGE=asset").done;
+	assert.equal(restored.status, 0, restored.output);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.worker, "apps/asset/src/db/schema.ts")),
+		fs.readFileSync(path.join(f.root, "apps/asset/src/db/schema.ts")),
+	);
+});
+
+test("unsupported generator flags fail visibly rather than bypass source return", async (t) => {
+	const f = await migrationGenerationCheckout(t);
+	const result = await f.run(
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=db:generate",
+		"ARGS=--name=unsupported",
+	).done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /extra arguments are unsupported/);
+	assert.equal(fs.existsSync(path.join(f.control, "migration-entered")), false);
+});
+
+for (const mode of [
+	"hash",
+	"length",
+	"truncated",
+	"nonregular",
+	"absolute",
+	"backslash",
+])
+	test(`public migration return validates transfer ${mode}`, async (t) => {
+		const f = await migrationGenerationCheckout(t),
+			before = migrationBytes(f.root);
+		const transport = path.join(f.root, ".mise/boat/boat");
+		fs.writeFileSync(
+			transport,
+			fs.readFileSync(transport, "utf8").replace(
+				"if(command.includes('base64 -w0')||command.includes('collect-migrations')){",
+				`
+if(command.includes('collect-migrations')){
+ const records=JSON.parse(cp.execFileSync('bash',['-c',command],{env:process.env}));
+ const mode=${JSON.stringify(mode)},record=records[0];
+ if(mode==='hash')record.sha256='0'.repeat(64);
+ if(mode==='length')record.size++;
+ if(mode==='truncated')record.data=record.data.slice(0,-1);
+ if(mode==='nonregular')record.type='hardlink';
+ if(mode==='absolute')record.name='/tmp/outside';
+ if(mode==='backslash')record.name='apps'+String.fromCharCode(92)+'asset'+String.fromCharCode(92)+'drizzle'+String.fromCharCode(92)+'0018_invalid.sql';
+ console.log(JSON.stringify(records));process.exit(0);
+}
+if(command.includes('base64 -w0')||command.includes('collect-migrations')){`,
+			),
+		);
+		const result = await f.migrations();
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /output collection failed/);
+		assert.deepEqual(migrationBytes(f.root), before);
+	});
+
+test("local ignored output and mode changes participate in the final source comparison", async (t) => {
+	const f = await pausedMigrations(t);
+	f.local(
+		".gitignore",
+		fs.readFileSync(path.join(f.root, ".gitignore"), "utf8") +
+			"apps/asset/drizzle/ignored*\n",
+	);
+	f.local("apps/asset/drizzle/ignored.sql", "-- local ignored occupant\n");
+	const file = path.join(f.root, "apps/asset/src/db/schema.ts");
+	fs.chmodSync(file, 0o640);
+	const before = migrationBytes(f.root);
+	f.release();
+	const result = await f.pending;
+	assert.notEqual(result.status, 0, result.output);
+	assert.deepEqual(migrationBytes(f.root), before);
+	assert.equal(fs.statSync(file).mode & 0o777, 0o640);
+});
+
+test("remote proposal retention rejects a symlinked evidence ancestor before restoration", async (t) => {
+	const f = await migrationGenerationCheckout(t);
+	flag(f, "transfer-fail");
+	const failed = await f.migrations();
+	assert.notEqual(failed.status, 0, failed.output);
+	const proposal = migrationBytes(f.worker),
+		outside = path.join(f.control, "outside-evidence");
+	fs.mkdirSync(outside);
+	fs.mkdirSync(path.join(f.worker, ".boat"), { recursive: true });
+	fs.symlinkSync(outside, path.join(f.worker, ".boat/source-proposals"));
+	const next = await f.run("build", "PACKAGE=asset").done;
+	assert.notEqual(next.status, 0, next.output);
+	assert.deepEqual(fs.readdirSync(outside), []);
+	assert.deepEqual(migrationBytes(f.worker), proposal);
+});
+
+test("post-commit verification preserves concurrent edits and leaves recovery blocked", async (t) => {
+	const f = await migrationGenerationCheckout(t),
+		hook = path.join(f.directory, "post-commit.cjs");
+	fs.writeFileSync(
+		hook,
+		`const fs=require('fs'),rename=fs.renameSync,root=${JSON.stringify(f.root)};
+fs.renameSync=function(from,to){const result=rename(from,to);if(to===root+'/apps/asset/drizzle/meta/_journal.json'){const journal=JSON.parse(fs.readFileSync(to)),sql=root+'/apps/asset/drizzle/'+journal.entries.at(-1).tag+'.sql';fs.writeFileSync(sql,'-- concurrent post-commit edit');}return result;};`,
+	);
+	f.env.NODE_OPTIONS = `--require=${hook}`;
+	const result = await f.migrations();
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /source verification conflict/);
+	const journal = f.json("apps/asset/drizzle/meta/_journal.json");
+	assert.equal(journal.entries.length, 19);
+	assert.equal(
+		fs.readFileSync(
+			path.join(
+				f.root,
+				"apps/asset/drizzle",
+				`${journal.entries.at(-1).tag}.sql`,
+			),
+			"utf8",
+		),
+		"-- concurrent post-commit edit",
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/migration-publication.json")),
+		true,
+	);
+	delete f.env.NODE_OPTIONS;
+	const next = await f.run("build", "PACKAGE=asset").done;
+	assert.notEqual(next.status, 0, next.output);
+	assert.match(next.output, /recovery conflict/);
+});
+
+test("generation rejects symlinked inputs without reading the outside target", async (t) => {
+	const f = await migrationGenerationCheckout(t),
+		outside = path.join(f.control, "outside-input"),
+		readFlag = path.join(f.control, "outside-read"),
+		hook = path.join(f.directory, "read-guard.cjs");
+	fs.writeFileSync(outside, "outside bytes must not enter a source snapshot\n");
+	const schema = path.join(f.root, "apps/asset/src/db/schema.ts");
+	fs.unlinkSync(schema);
+	fs.symlinkSync(outside, schema);
+	fs.writeFileSync(
+		hook,
+		`const fs=require('fs'),read=fs.readFileSync;fs.readFileSync=function(file,...args){if(typeof file==='string'){try{if(fs.realpathSync(file)===${JSON.stringify(outside)})fs.writeFileSync(${JSON.stringify(readFlag)},'read');}catch{}}return read.call(fs,file,...args);};`,
+	);
+	f.env.NODE_OPTIONS = `--require=${hook}`;
+	const result = await f.migrations();
+	assert.notEqual(result.status, 0, result.output);
+	assert.equal(fs.existsSync(readFlag), false);
+	assert.equal(fs.readlinkSync(schema), outside);
+});

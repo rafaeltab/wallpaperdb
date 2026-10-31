@@ -1,0 +1,189 @@
+{
+	"version": 1,
+	"issue": "https://github.com/rafaeltab/wallpaperdb/issues/553",
+	"purpose": "Fixed #553 replay input for authorized #557 hillclimb, sole infrastructure PR #614. Definition only; no live qualification or product winner selection.",
+	"scope": "https://github.com/rafaeltab/wallpaperdb/issues/557#issuecomment-6543467933",
+	"productBase": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+	"productReference": "53c18f26c4c7261e1756ba67e0f715b9941ef5ee",
+	"referencePullRequest": "https://github.com/rafaeltab/wallpaperdb/pull/621",
+	"referencePullRequestState": "CLOSED",
+	"initialOverlay": "c277c2c386e9d2fdcd56485e0594157e7c5a1d38",
+	"infrastructureBase": "89b68d5307933704ee70e23e5658829746bd347e",
+	"constraints": [
+		"Freeze the actual infrastructure SHA at execution. This historical infrastructure base is provenance, not a qualification of the current head.",
+		"Only this descriptor belongs in #614. Apply the explicit product allowlist as disposable edits in an isolated #553 checkout. Never cherry-pick the reference head or combine #548 product edits, databases, dependencies or Compose identities with #553.",
+		"No product PR, push, GitHub mutation, implementation repair, live application, browser, provider or paid operation is authorized by descriptor preparation.",
+		"Future execution uses ordinary Make. Root alone handles worker enrollment, cache, tunnels, accounting and stop receipts. make install is local, not remote preparation.",
+		"Preserve HTTP 10000 ms connection/request deadlines, 60000 ms integration test deadline and existing shutdown/cancellation bounds. No timeout increases, quotas, weakened assertions or coordinator emergency artifact transfers count clean."
+	],
+	"inputs": {
+		"productPathAllowlist": [
+			"apps/asset/src/adapters/sources/inspect-worker.ts",
+			"apps/asset/src/adapters/sources/storage.ts",
+			"apps/asset/test/source-storage.integration.test.ts"
+		],
+		"baseline": [
+			{
+				"path": "apps/asset/src/adapters/sources/inspect-worker.ts",
+				"gitBlob": "63849b65fb9abe2f5c3aa2dfc8b7e7483ca61a52",
+				"sha256": "593533808d86e69d6c285c83a29ba2b2218031dfdd0474b7479bcf3b3abc626c"
+			},
+			{
+				"path": "apps/asset/src/adapters/sources/storage.ts",
+				"gitBlob": "82874c17a096fb7b448a2efea21b514b331fa7bc",
+				"sha256": "ec3d7789f153dc521f5a29bf17e70c6d0c77d48fc9ddb0399aaf05ab1702262f"
+			},
+			{
+				"path": "apps/asset/test/source-storage.integration.test.ts",
+				"gitBlob": "fc37bffc2a9dafd0a40d7bbf23788264c2ff7eef",
+				"sha256": "1eab724f88756398b9ab538606c8e353fe3efc9129e536625d1f28c4e8a21628"
+			}
+		],
+		"reference": [
+			{
+				"path": "apps/asset/src/adapters/sources/inspect-worker.ts",
+				"gitBlob": "a01f9d8d4b00eeef4e1c86e4bcb0f9e5c3690489",
+				"sha256": "b1a35d239500f8fc193ff6bf1a3e54686737171e510024a7365c551d787583a5"
+			},
+			{
+				"path": "apps/asset/src/adapters/sources/storage.ts",
+				"gitBlob": "539ad3178a53b7000a391ca4990dc78b88319128",
+				"sha256": "72985a5031bb87e54598d27ffb03c36c4343987704cd01d661c323c215fb1a14"
+			},
+			{
+				"path": "apps/asset/test/source-storage.integration.test.ts",
+				"gitBlob": "735c4ff2598ecfa069a8bbcab47ddf52322aeb5b",
+				"sha256": "c5f856769dadc2c145ff6386c27210b98107350cba92c4d457e1eb94f62b2675"
+			}
+		],
+		"productPatch": {
+			"path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/553/product.patch",
+			"sha256": "6c17b016d1b2b89e3e38687e046a48defd7e303923ca9e49629744e902cb6d21"
+		},
+		"originalComparisonDiagnosticOnly": {
+			"path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/553/original-comparison.patch",
+			"sha256": "3a991591d7f951506d836b5edc38a81d4a381be06ed941b825e0d08eae7e5d59"
+		},
+		"selection": "The three product paths are exactly the product diff from initialOverlay to productReference. Exclude infra/docker-compose.apps.yml, scripts/boat.mjs, scripts/boat.test.mjs, scripts/lib/boat.mjs and packages/biome-test-rules/test/integration.test.mjs. Common infrastructure belongs to #614 once."
+	},
+	"staging": [
+		"Confirm each baseline product path matches productBase; stop and preserve unexpected edits. Retain full comparison and verify patch SHA256 and full-index blob identities.",
+		"Stage only the reference test first, leaving production sources at productBase. Run the focused before case and authenticated large/small HTTP cases independently; retain failures and durable statuses.",
+		"Stage the two reference production files only after before evidence. This is a historical product control, not a selected production repair. Repeat the exact fixtures and HTTP workflow.",
+		"Record local, remote and container source hashes before/after each edit; generation uses the instrumented test described below and restores the pinned reference test before ordinary checks.",
+		"Remove only trial-owned source probes/artifacts, verify remote deletion, restore baseline product bytes and HMR source, and retain separate infrastructure/product/check/evidence verdicts."
+	],
+	"fixtures": {
+		"large": {
+			"path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/553/553-animation.webp",
+			"sha256": "4dbbdce9b357a86a5a11c451c99a6e1389ee93be0cf3df8e0547e1602d1c6450",
+			"byteLength": 88844,
+			"frames": 1850,
+			"width": 1,
+			"height": 1,
+			"delaysMs": {
+				"count": 1850,
+				"each": 10000000
+			},
+			"loop": 0,
+			"squareSize": 1,
+			"provenance": "Actual C fixture retained from /tmp/553-animation.webp; digest also appears in 553-live-report.json durable sources facts."
+		},
+		"small": {
+			"path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/553/553-small.webp",
+			"sha256": "8bbb86414513646b165dafe0ad79539a4ee785116fc339fb18a8f81efcf17381",
+			"byteLength": 140,
+			"frames": 2,
+			"width": 1,
+			"height": 1,
+			"delaysMs": [100, 200],
+			"loop": 3,
+			"provenance": "Offline byte transformation of retained large fixture using exact historical browser expression at position 379. No encoder or application executed."
+		},
+		"sizeLimit": "Historical 92544-byte input and 16902-byte facts are diagnostic for the old encoder/probe, not universal assertions. Replay freezes these actual 88844-byte bytes and SHA256. Do not claim default squareSize=512 capacity.",
+		"generator": {
+			"command": "make test-focused PACKAGE=asset ARGS='--config vitest.integration.config.ts test/source-storage.integration.test.ts -t 1850-frame'",
+			"source": {
+				"path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/553/fixture-writer-source-storage.integration.test.ts",
+				"sha256": "5ab23163476a0dc0fd43b487f24ea87440750b358d3bf0450b8ac7ab34d586bd"
+			},
+			"destination": "apps/asset/test/source-storage.integration.test.ts",
+			"derivation": "Exact reference owning test plus one conditional write immediately after Buffer.concat([riff, payload]), before corrupt-final-frame mutation. Historical artifact write is recorded at thread positions 99/132. The valid-case algorithm is maintained in the reference test. No copied standalone encoder or remote shell generator.",
+			"output": "/tmp/553-animation.webp",
+			"expected": "Run actual generation through the maintained public test-focused Make path on the worker; require fixture digest and size to match frozen large bytes. Save command exit separately: baseline inspection may fail after writing the artifact. Restore reference test bytes before checks. Derive the small control using pinned position 379 transformation and verify its digest.",
+			"returnPrerequisite": {
+				"status": "unqualified",
+				"requirement": "The Make generator must publish a declared artifact safely to local authority for browser upload, compare command-start local hashes, reject conflicting local edits without losing either version, and survive the next outbound sync.",
+				"knownGap": "C required a coordinator transfer of remote /tmp/553-animation.webp. That historical intervention is not a maintained generated-output return contract. The instrumented source alone does not implement return. Root must qualify this prerequisite in #614 before a clean #553 round; do not silently use retained local bytes as generation/return evidence."
+			}
+		}
+	},
+	"historicalSources": {
+		"availability": "External archive on this host is required. Fresh clones lacking it are incomplete, not a pass.",
+		"records": {
+			"path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/553/historical-source-records.json",
+			"sha256": "6e0c81e2e40eb0da876b2416de3c2338510d67805bb92218c2ad522ba95d5210"
+		},
+		"browserExpressions": {
+			"path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/553/historical-browser-expressions.json",
+			"sha256": "b3834239e32589a4d131ec20b60bcc5a890ec8a821d6fa86f4eb2ee683270f69"
+		},
+		"research": {
+			"path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/553/research.md",
+			"sha256": "da87657ae1d89b4b0570c1967f64fb6b6f65d37f4bac18bcdeb3eeb5a3222b65"
+		},
+		"provenance": "Recovered read-only from C #553 T3 activity by exact threadId, itemId and position retained in records. Expressions are exact input.expression strings. This archive contains sources, not a new executed result.",
+		"unsafeAssertionsAndCorrections": [
+			"Position 394 prints PASS unconditionally. Positions 375/379 return checks without throwing. Before future use, enforce all expected statuses, durable candidate state and exact persisted frame/delay/loop/digest/size assertions. Printed checks alone cannot pass.",
+			"Positions 181/371/375/379 contain historical profile version, attachment, asset, candidate and source-set revisions. Obtain fresh IDs and versions from successful isolated HTTP responses. Never reuse historical IDs or assume sources[0] is the accepted source; match sourceId from accept.",
+			"Position 202 calls response.json on an empty 502 and loses status evidence. Use the position 371 text-first response handling; assert HTTP status and capture sanitized error separately.",
+			"Positions 238/244 are worker-native diagnostic scripts with a fixed user, port and candidate. Original DELETE session cleanup was wrong; position 244 corrects it to POST /sessions/{id}/revoke. Revoke owned fresh sessions in finally. Never log tokens or environment values.",
+			"Position 379 assumes ANIM loop byte offset 42 for these pinned bytes. Verify RIFF/chunk layout and bounds before transforming. Do not generalize the offset to arbitrary WebP.",
+			"Position 390 accepts marker absence anywhere in body. Observe the exact header element, verify baseline and mutated text, require both observer events and unchanged performance.timeOrigin. A reload or preview restart cannot count same-document HMR.",
+			"Do not run archived snippets blindly. A corrected scenario executor remains a prerequisite; this descriptor does not implement one or claim the unsafe historical snippets qualify a round."
+		]
+	},
+	"live": {
+		"startup": [
+			"make run PACKAGE=asset SCRIPT=dev:configure",
+			"make infra-start",
+			"make dev"
+		],
+		"prerequisites": "Coordinator supplies isolated enrolled large worker, healthy private preview and browser prerequisites. Prove authorized squareSize=1 in desired authority, remote file, mounted running configuration and GET /asset/asset-types/picture/policy; preserve all other policy/deadline values. Require actual signed-in Clerk session and fresh session tokens kept private.",
+		"steps": [
+			"Record startup, readiness, runtime source/configuration hashes and protected preview authentication. POST /user/profile/me/ensure, read current profile version, POST /user/profile/me/picture-attachments and poll that attachment until assetId/awaiting-source. Historical source positions 175/179/181/183.",
+			"POST /asset/assets/{assetId}/source-candidates with operation add and current expectedSourceSetRevision. PUT exact generated large bytes to /source-candidates/{candidateId}/bytes using Clerk Bearer authentication. Assert 200/ready and separate GET ready.",
+			"PUT /user/profile/me/picture-attachments/{attachmentId}/first-source with candidateId and fresh intentId; assert 202. POST candidate /accept with operation add and expected revision; assert 200/accepted. Independently GET candidate and /asset/assets/{assetId}/sources. Match returned sourceId and assert durable accepted, exact digest, byteLength, dimensions, animated-sdr-webp, all 1850 delays and loop 0.",
+			"Independently run small control with two frames, [100,200] ms, loop 3. Use fresh isolated data if long case failed; otherwise replace-set using current revision. Assert PUT ready, accept accepted, subsequent candidate GET and persisted sources facts. Keep its outcome even if another case fails.",
+			"Measure client PUT duration through full response consumption and server request processing interval with correlated request ID and timestamps. C observations 2472.1/2423.531 ms large and 225.5/203.742 ms small are historical, not new thresholds or passes.",
+			"For a new baseline HTTP failure, retain proxied and worker-native requests to the same application/input/configuration under unchanged deadlines, candidate GET status and native process observations. Matching 10-second errors locate an application barrier; they do not prove output overflow or qualify blocked acceptance steps."
+		],
+		"cancellationAndReaping": "Run the owning real-S3 stalled-GET request cancellation and runtime-shutdown tests independently through Make. Observe actual inspector PID alive before abort/dispose, interruption rather than arbitrary failure, PID exit/reaping and upstream request closure before releasing the stall. Preserve successful inspection control. Runtime-dispose or proxy cleanup after the assertion cannot manufacture observed release. HTTP abort control must likewise observe underlying work termination; adapter-only cancellation does not qualify HTTP lifetime.",
+		"sourceEditDeletionHmr": {
+			"source": "apps/web/src/routes/__root.tsx",
+			"sequence": "Record initial source hash and document timeOrigin. Edit only visible header label to a unique trial marker, observe exact header in same document with MutationObserver timestamps, restore bytes and observe baseline with identical timeOrigin. Add a trial-owned source module imported by that header; prove its marker at runtime, then remove import and module, verify remote and container deletion and restored display without reload. Restore all original bytes and record before/after hashes.",
+			"failure": "Missed marker, stale file, lost edit, full reload, restart replacing document, or missing deletion observation is fail/incomplete. No preview restart or manual source transfer counts HMR."
+		}
+	},
+	"validation": {
+		"focusedCommands": [
+			"make test-focused PACKAGE=asset ARGS='--config vitest.integration.config.ts test/source-storage.integration.test.ts -t 1850-frame'",
+			"make test-focused PACKAGE=asset ARGS='--config vitest.integration.config.ts test/source-storage.integration.test.ts -t preserves'",
+			"make test-focused PACKAGE=asset ARGS='--config vitest.integration.config.ts test/source-storage.integration.test.ts -t reaps'",
+			"make test-focused PACKAGE=asset ARGS='--config vitest.integration.config.ts test/source-storage.integration.test.ts'"
+		],
+		"unitCommand": "make test-unit PACKAGE=asset FORCE=1",
+		"concurrentCheck": {
+			"command": "make check PACKAGE=asset FORCE=1",
+			"observationSeconds": 120,
+			"requirements": "Root aligns this command with the frozen admitted subset while dev watchers and authenticated live stacks remain active. Record actual command-active interval separately from the 120-second window. Require zero observed readiness failures, unexpected restarts, transport errors, stale dependency identities or source loss; record bounded route probes and restart/error events. Cache hit or idle padding cannot replace execution."
+		},
+		"fullCi": {
+			"command": "make ci FORCE=1",
+			"scope": "All workspaces, with development watcher active. Local CI excludes E2E; browser/container E2E remain separate. Record exit code, tasks, logs and interrupted tasks.",
+			"historicalFailure": "C make ci at productReference failed after 8m57.831s, 97/107 tasks successful, variant-generator events-consumer.integration.test.ts capacity recovery purge=true reported NatsError: no message found. Asset integration 302/302 passed. Cause remains unclassified; do not call pre-existing flake or Boat defect without discriminating evidence."
+		}
+	},
+	"promotion": "No live run performed by preparation. Earlier subsets remain unqualified. Root integrates only when appropriate under the authoritative scope comment, freezes infrastructure/workload identities and requires two consecutive clean observed cold/warm rounds. No accumulating green steps across failed rounds. Separate Boat workflow, product scenario, automated command exit and evidence completeness; missing prerequisites remain incomplete.",
+	"evidenceAndCleanup": "Write fresh external run receipts with run/subset IDs, exact revisions/hashes, command argv/exit/timestamps, source/config/runtime identities, fixture generation/return/conflict evidence, authenticated HTTP and durable facts, process release, HMR/deletion, 120-second health/restarts, CI and separate verdicts. Never overwrite C receipts. Sanitize by allowlist; no credentials, signed URLs or auth files. Record applicable actual application video externally. Root owns cost/admission and worker/cache/tunnel lifecycle. On success/failure/interruption clean only trial-owned data/probes/helpers through ordinary Make, apps-stop/infra-stop, prove empty scoped resources and developmentWanted=false, then root records provider stop/accounting and non-resuming inspection."
+}

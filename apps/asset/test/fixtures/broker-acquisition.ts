@@ -28,7 +28,6 @@ export function brokerAcquisitionContract(start: (url: string) => Acquisition) {
         if (ending === 'cancellation') controller.abort();
         if (ending === 'disposal') await runtime.dispose();
         expect((await acquisition)._tag).toBe('Failure');
-        await runtime.dispose();
         await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0);
       } finally {
         try {

@@ -46,7 +46,6 @@ for (const ending of ['timeout', 'cancellation', 'disposal'] as const) {
       if (ending === 'disposal') await runtime.dispose();
       const result = await acquisition;
       expect(result._tag).toBe('Failure');
-      await runtime.dispose();
       await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0);
     } finally {
       try {

@@ -37,6 +37,66 @@ beforeEach(async () => {
     'TRUNCATE wallpaper_workflow_quarantine, wallpaper_workflow_outbox, wallpaper_source_intents, wallpaper_intents'
   );
 });
+it.each([1, 10])(
+  'cancels %i locked lists and releases their backends before the lock owner resumes',
+  async (count) => {
+    const url = new URL(databaseUrl());
+    url.searchParams.set('application_name', 'wallpaper-list-cancellation');
+    const runtime = ManagedRuntime.make(
+      workflowPostgresLayer({
+        databaseUrl: url.href,
+        maxAttempts: 3,
+        retryDelayMs: 0,
+        leaseMs: 60000,
+      })
+    );
+    const blocker = await pool.connect();
+    const controller = new AbortController();
+    const owner = { namespace: 'authors', subject: 'list-owner' };
+    let pending: ReturnType<typeof runtime.runPromiseExit>[] = [];
+    try {
+      await runtime.runPromise(WorkflowStore);
+      await blocker.query('BEGIN');
+      await blocker.query('LOCK TABLE wallpaper_intents IN ACCESS EXCLUSIVE MODE');
+      pending = Array.from({ length: count }, () =>
+        runtime.runPromiseExit(
+          WorkflowStore.use((s) => s.list(owner)),
+          { signal: controller.signal }
+        )
+      );
+      let pids: number[] = [];
+      await expect
+        .poll(async () => {
+          const result = await pool.query<{ pid: number }>(
+            "SELECT pid FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'",
+            ['wallpaper-list-cancellation']
+          );
+          pids = result.rows.map((row) => row.pid);
+          return pids.length;
+        })
+        .toBe(count);
+      controller.abort();
+      const results = await Promise.all(pending);
+      expect(results.every(Exit.isFailure)).toBe(true);
+      await expect
+        .poll(
+          async () =>
+            (await pool.query('SELECT pid FROM pg_stat_activity WHERE pid=ANY($1::int[])', [pids]))
+              .rows,
+          { timeout: 1000 }
+        )
+        .toEqual([]);
+      await blocker.query('ROLLBACK');
+      expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([]);
+    } finally {
+      controller.abort();
+      await blocker.query('ROLLBACK');
+      await Promise.all(pending);
+      blocker.release();
+      await runtime.dispose();
+    }
+  }
+);
 it('durably reserves one identity and its command across concurrent callers and restart', async () => {
   const layer = () =>
     workflowPostgresLayer({
@@ -249,98 +309,102 @@ function recoveryRuntime(maxAttempts = 1) {
     )
   );
 }
-it.each([
-  'transition',
-  'complete',
-  'cancellation',
-])('owns a checked-out client through %s and continues on a fresh client', async (operation) => {
-  const url = new URL(databaseUrl());
-  const application = `wallpaper-disconnect-${operation}`;
-  url.searchParams.set('application_name', application);
-  const runtime = ManagedRuntime.make(
-    workflowPostgresLayer({
-      databaseUrl: url.toString(),
-      maxAttempts: 3,
-      retryDelayMs: 0,
-      leaseMs: 60_000,
-    })
-  );
-  const owner = { namespace: 'authors', subject: application };
-  const blocker = await pool.connect();
-  const cancellation = new AbortController();
-  let pending: ReturnType<typeof runtime.runPromiseExit> | undefined;
-  try {
-    const wallpaper = await runtime.runPromise(WorkflowStore.use((s) => s.begin(owner, 'loss')));
-    const publication = await claim(runtime);
-    await blocker.query('BEGIN');
-    await blocker.query('SELECT id FROM wallpaper_intents WHERE id=$1 FOR UPDATE', [wallpaper.id]);
-    pending = runtime.runPromiseExit(
-      operation !== 'complete'
-        ? WorkflowStore.use((s) =>
-            s.change({ kind: 'wallpaper', id: wallpaper.id }, (current) => {
-              if (!current) throw new Error('Expected Wallpaper');
-              return { wallpaper: { ...current, assetId: 'must-not-commit' }, result: undefined };
-            })
-          )
-        : WorkflowDelivery.use((s) => s.complete(publication)),
-      { signal: cancellation.signal }
-    );
-    let pid: number | undefined;
-    await expect
-      .poll(async () => {
-        const result = await pool.query<{ pid: number }>(
-          "SELECT pid FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'",
-          [application]
-        );
-        pid = result.rows[0]?.pid;
-        return pid !== undefined;
+it.each(['transition', 'complete', 'cancellation'])(
+  'owns a checked-out client through %s and continues on a fresh client',
+  async (operation) => {
+    const url = new URL(databaseUrl());
+    const application = `wallpaper-disconnect-${operation}`;
+    url.searchParams.set('application_name', application);
+    const runtime = ManagedRuntime.make(
+      workflowPostgresLayer({
+        databaseUrl: url.toString(),
+        maxAttempts: 3,
+        retryDelayMs: 0,
+        leaseMs: 60_000,
       })
-      .toBe(true);
-    if (pid === undefined) throw new Error('Expected blocked Wallpaper backend');
-    if (operation === 'cancellation') cancellation.abort();
-    else
-      expect(
-        (await pool.query('SELECT pg_terminate_backend($1) AS terminated', [pid])).rows
-      ).toEqual([{ terminated: true }]);
-    const result = await pending;
-    expect(Exit.isFailure(result)).toBe(true);
-    if (!Exit.isFailure(result)) throw new Error('Expected connection failure');
-    expect(Cause.hasDies(result.cause)).toBe(false);
-    if (operation === 'cancellation') expect(Cause.hasInterrupts(result.cause)).toBe(true);
-    else expect(Cause.squash(result.cause)).toMatchObject({ _tag: 'WorkflowFailure', operation });
-    // The server can observe the closed socket once the blocked query resumes.
-    await blocker.query('ROLLBACK');
-    await expect
-      .poll(
-        async () => (await pool.query('SELECT pid FROM pg_stat_activity WHERE pid=$1', [pid])).rows
-      )
-      .toEqual([]);
-    expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([wallpaper]);
-    expect(
-      (await pool.query('SELECT id, status, lease_id FROM wallpaper_workflow_outbox')).rows
-    ).toEqual([{ id: publication.id, status: 'leased', lease_id: publication.leaseId }]);
-    await runtime.runPromise(
-      WorkflowStore.use((s) =>
-        s.change({ kind: 'wallpaper', id: wallpaper.id }, (current) => {
-          if (!current) throw new Error('Expected Wallpaper');
-          return { wallpaper: { ...current, assetId: 'fresh-client' }, result: undefined };
-        })
-      )
     );
-    await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(publication)));
-    expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([
-      { ...wallpaper, assetId: 'fresh-client', attentionRequired: false },
-    ]);
-    expect((await pool.query('SELECT id, status FROM wallpaper_workflow_outbox')).rows).toEqual([
-      { id: publication.id, status: 'published' },
-    ]);
-  } finally {
-    await blocker.query('ROLLBACK');
-    blocker.release();
-    await pending;
-    await runtime.dispose();
+    const owner = { namespace: 'authors', subject: application };
+    const blocker = await pool.connect();
+    const cancellation = new AbortController();
+    let pending: ReturnType<typeof runtime.runPromiseExit> | undefined;
+    try {
+      const wallpaper = await runtime.runPromise(WorkflowStore.use((s) => s.begin(owner, 'loss')));
+      const publication = await claim(runtime);
+      await blocker.query('BEGIN');
+      await blocker.query('SELECT id FROM wallpaper_intents WHERE id=$1 FOR UPDATE', [
+        wallpaper.id,
+      ]);
+      pending = runtime.runPromiseExit(
+        operation !== 'complete'
+          ? WorkflowStore.use((s) =>
+              s.change({ kind: 'wallpaper', id: wallpaper.id }, (current) => {
+                if (!current) throw new Error('Expected Wallpaper');
+                return { wallpaper: { ...current, assetId: 'must-not-commit' }, result: undefined };
+              })
+            )
+          : WorkflowDelivery.use((s) => s.complete(publication)),
+        { signal: cancellation.signal }
+      );
+      let pid: number | undefined;
+      await expect
+        .poll(async () => {
+          const result = await pool.query<{ pid: number }>(
+            "SELECT pid FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock'",
+            [application]
+          );
+          pid = result.rows[0]?.pid;
+          return pid !== undefined;
+        })
+        .toBe(true);
+      if (pid === undefined) throw new Error('Expected blocked Wallpaper backend');
+      if (operation === 'cancellation') cancellation.abort();
+      else
+        expect(
+          (await pool.query('SELECT pg_terminate_backend($1) AS terminated', [pid])).rows
+        ).toEqual([{ terminated: true }]);
+      const result = await pending;
+      expect(Exit.isFailure(result)).toBe(true);
+      if (!Exit.isFailure(result)) throw new Error('Expected connection failure');
+      expect(Cause.hasDies(result.cause)).toBe(false);
+      if (operation === 'cancellation') expect(Cause.hasInterrupts(result.cause)).toBe(true);
+      else expect(Cause.squash(result.cause)).toMatchObject({ _tag: 'WorkflowFailure', operation });
+      // The server can observe the closed socket once the blocked query resumes.
+      await blocker.query('ROLLBACK');
+      await expect
+        .poll(
+          async () =>
+            (await pool.query('SELECT pid FROM pg_stat_activity WHERE pid=$1', [pid])).rows
+        )
+        .toEqual([]);
+      expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([
+        wallpaper,
+      ]);
+      expect(
+        (await pool.query('SELECT id, status, lease_id FROM wallpaper_workflow_outbox')).rows
+      ).toEqual([{ id: publication.id, status: 'leased', lease_id: publication.leaseId }]);
+      await runtime.runPromise(
+        WorkflowStore.use((s) =>
+          s.change({ kind: 'wallpaper', id: wallpaper.id }, (current) => {
+            if (!current) throw new Error('Expected Wallpaper');
+            return { wallpaper: { ...current, assetId: 'fresh-client' }, result: undefined };
+          })
+        )
+      );
+      await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(publication)));
+      expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([
+        { ...wallpaper, assetId: 'fresh-client', attentionRequired: false },
+      ]);
+      expect((await pool.query('SELECT id, status FROM wallpaper_workflow_outbox')).rows).toEqual([
+        { id: publication.id, status: 'published' },
+      ]);
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+      await pending;
+      await runtime.dispose();
+    }
   }
-});
+);
 function resultEvent(w: Wallpaper) {
   return {
     specversion: '1.0',
@@ -553,44 +617,44 @@ it('closes completed confirmation recovery without reopening recovered redeliver
   }
 });
 
-it.each([
-  'asset-create',
-  'publication',
-])('reconciles recovered %s completion only for the current lease', async (destination) => {
-  const runtime = recoveryRuntime();
-  try {
-    const w = await runtime.runPromise(
-      WorkflowStore.use((s) =>
-        s.begin({ namespace: 'authors', subject: destination }, 'request', {
-          traceparent: '00-11111111111111111111111111111111-2222222222222222-01',
-        })
-      )
-    );
-    let original = await claim(runtime);
-    if (destination === 'publication') {
+it.each(['asset-create', 'publication'])(
+  'reconciles recovered %s completion only for the current lease',
+  async (destination) => {
+    const runtime = recoveryRuntime();
+    try {
+      const w = await runtime.runPromise(
+        WorkflowStore.use((s) =>
+          s.begin({ namespace: 'authors', subject: destination }, 'request', {
+            traceparent: '00-11111111111111111111111111111111-2222222222222222-01',
+          })
+        )
+      );
+      let original = await claim(runtime);
+      if (destination === 'publication') {
+        await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(original)));
+        await publish(runtime, w);
+        original = await claim(runtime);
+      } else await attach(runtime, w); // Asset applied a command whose acknowledgement was lost.
+      await runtime.runPromise(WorkflowDelivery.use((s) => s.failed(original)));
+      expect(await read(runtime, w)).toMatchObject({ attentionRequired: true });
+      expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.recover(original.id)))).toBe(
+        true
+      );
+      const recovered = await claim(runtime);
+      expect(recovered).toMatchObject({
+        id: original.id,
+        event: original.event,
+        destination: original.destination,
+      });
       await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(original)));
-      await publish(runtime, w);
-      original = await claim(runtime);
-    } else await attach(runtime, w); // Asset applied a command whose acknowledgement was lost.
-    await runtime.runPromise(WorkflowDelivery.use((s) => s.failed(original)));
-    expect(await read(runtime, w)).toMatchObject({ attentionRequired: true });
-    expect(await runtime.runPromise(WorkflowDelivery.use((s) => s.recover(original.id)))).toBe(
-      true
-    );
-    const recovered = await claim(runtime);
-    expect(recovered).toMatchObject({
-      id: original.id,
-      event: original.event,
-      destination: original.destination,
-    });
-    await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(original)));
-    expect(await read(runtime, w)).toMatchObject({ attentionRequired: true });
-    await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(recovered)));
-    expect(await read(runtime, w)).toMatchObject({ attentionRequired: false });
-  } finally {
-    await runtime.dispose();
+      expect(await read(runtime, w)).toMatchObject({ attentionRequired: true });
+      await runtime.runPromise(WorkflowDelivery.use((s) => s.complete(recovered)));
+      expect(await read(runtime, w)).toMatchObject({ attentionRequired: false });
+    } finally {
+      await runtime.dispose();
+    }
   }
-});
+);
 it('counts abandoned claims across restart, fences stale leases and recovers the original occurrence', async () => {
   let runtime = recoveryRuntime(2);
   try {

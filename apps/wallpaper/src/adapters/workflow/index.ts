@@ -39,30 +39,35 @@ function decide<A>(transition: () => A): A {
 export function workflowPostgresLayer(options: Options) {
   return Layer.effectContext(
     Effect.gen(function* () {
-      const pool = yield* Effect.acquireRelease(
-        Effect.sync(() => {
-          const p = new Pool({
-            connectionString: options.databaseUrl,
-            max: 10,
-            connectionTimeoutMillis: 2000,
-            statement_timeout: 5000,
-            idle_in_transaction_session_timeout: 5000,
-          });
-          p.on('error', (cause) => {
-            void Effect.runPromise(
-              Effect.logError('Wallpaper idle database connection failed', { cause })
-            );
-          });
-          return p;
-        }),
-        (p) => Effect.promise(() => p.end())
-      );
+      const poolFor = (max: number) =>
+        Effect.acquireRelease(
+          Effect.sync(() => {
+            const p = new Pool({
+              connectionString: options.databaseUrl,
+              max,
+              connectionTimeoutMillis: 2000,
+              statement_timeout: 5000,
+              idle_in_transaction_session_timeout: 5000,
+            });
+            p.on('error', (cause) => {
+              void Effect.runPromise(
+                Effect.logError('Wallpaper idle database connection failed', { cause })
+              );
+            });
+            return p;
+          }),
+          (p) => Effect.promise(() => p.end())
+        );
+      const pool = yield* poolFor(10);
+      // A blocked work pool must not prevent cancellation from reaching PostgreSQL.
+      const cancellations = yield* poolFor(1);
       type Database = ReturnType<typeof drizzle>;
       const query = <A>(operation: string, run: (db: Database) => Promise<A>) =>
         Effect.tryPromise({
           try: async (signal) => {
             const client = await pool.connect();
             let released = false;
+            let backendPid: number | undefined;
             let connectionFailure: Error | undefined;
             // pg emits borrowed-client errors in addition to rejecting queries.
             const connectionError = (cause: Error) => {
@@ -72,11 +77,37 @@ export function workflowPostgresLayer(options: Options) {
             const abort = () => {
               if (!released) {
                 released = true;
-                client.release(true);
+                if (backendPid === undefined) client.release(true);
+                else {
+                  // Retain this checkout until cancellation finishes so the PID cannot
+                  // be reused by another operation on the same pooled connection.
+                  void cancellations
+                    .query('SELECT pg_cancel_backend($1)', [backendPid])
+                    .catch((cause) =>
+                      Effect.runPromise(
+                        Effect.logError('Wallpaper database cancellation failed', { cause })
+                      )
+                    )
+                    .finally(() => client.release(true));
+                }
               }
             };
             signal.addEventListener('abort', abort, { once: true });
             try {
+              if (signal.aborted) {
+                abort();
+                throw new Error('Wallpaper operation cancelled');
+              }
+              // List is read-only. Transactional operations retain immediate socket
+              // destruction, which prevents their continuations from committing.
+              if (operation === 'list') {
+                const identity = await client.query<{ pid: number }>(
+                  'SELECT pg_backend_pid() AS pid'
+                );
+                backendPid = identity.rows[0]?.pid;
+                if (backendPid === undefined)
+                  throw new Error('Wallpaper database identity unavailable');
+              }
               if (signal.aborted) {
                 abort();
                 throw new Error('Wallpaper operation cancelled');

@@ -1225,6 +1225,7 @@ child.on('close',code=>{
 		"-e",
 		"console.log('tunnel ready');setInterval(()=>{},1000)",
 	]);
+	t.after(() => stopLockFixtureChildren([tunnelRecord]));
 	await readiness.wait(
 		() => tunnelRecord.output().includes("tunnel ready"),
 		"fixture tunnel readiness",

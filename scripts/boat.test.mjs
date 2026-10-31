@@ -8279,9 +8279,9 @@ const child=spawn(process.execPath,['-e',"require('fs').writeFileSync(process.ar
 	});
 });
 
-async function pendingUpgradePreview(t, mode, archive) {
+async function pendingUpgradePreview(t, mode, archive, retirement = false) {
 	const evidence = archive.directory;
-	const report = path.join(evidence, mode);
+	const report = path.join(evidence, retirement || mode);
 	const cleanups = [];
 	const owner = t;
 	let baseCleanup;
@@ -8468,11 +8468,25 @@ if(argv.includes('--detach')){console.log(JSON.stringify({processId:557}));proce
 if(argv.includes('forward')){
  if(argv.includes('--reverse'))throw Error('unexpected reverse forward');
  if(argv[argv.indexOf('--local')+1]!==${JSON.stringify(String(privatePort))}||argv[argv.indexOf('--remote')+1]!==${JSON.stringify(String(port))})throw Error('unexpected forward ports');
+ ${
+		retirement
+			? `const identity=()=>{const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');return {pid:process.pid,startTicks:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()};};
+ const event=(event,detail={})=>fs.appendFileSync(path.join(control,'retirement-events'),JSON.stringify({event,at:Date.now(),...identity(),...detail})+'\\n');
+ event('forward-born');process.once('exit',code=>event('forward-exited',{code}));`
+			: ""
+ }
  const net=require('net'),peers=new Set();let sequence=0;
  const trace=(connection,event,detail={})=>fs.appendFileSync(path.join(control,'forward-events'),JSON.stringify({pid:process.pid,connection,event,at:Date.now(),...detail})+'\\n');
  const server=net.createServer(socket=>{const connection=++sequence;trace(connection,'downstream-connected',{remotePort:socket.remotePort});const peer=net.connect(${upstreamPort},'127.0.0.1');peer.on('connect',()=>trace(connection,'upstream-connected',{localPort:peer.localPort}));peers.add(socket);peers.add(peer);for(const [role,p] of [['downstream',socket],['upstream',peer]]){p.on('error',()=>{});p.on('end',()=>trace(connection,role+'-end'));p.on('close',()=>{trace(connection,role+'-close');peers.delete(p);socket.destroy();peer.destroy();});}socket.pipe(peer).pipe(socket);});
- server.listen(${privatePort},'127.0.0.1',()=>fs.writeFileSync(path.join(control,'forward-ready'),String(process.pid)));
- process.on('SIGTERM',()=>{for(const p of peers)p.destroy();server.close(()=>process.exit(0));});
+ server.listen(${privatePort},'127.0.0.1',()=>{fs.writeFileSync(path.join(control,'forward-ready'),String(process.pid));${retirement ? "event('forward-listening');" : ""}});
+ ${
+		retirement
+			? `server.on('error',error=>{event('forward-error',{code:error.code});throw error;});
+ let closing=false;
+ const finish=()=>{if(closing)return;closing=true;for(const p of peers)p.destroy();server.close(()=>{event('forward-closed');process.exit(0);});};
+ process.on('SIGTERM',()=>{event('forward-term');if(!fs.existsSync(path.join(control,'hold-forward-'+process.pid)))finish();else {const timer=setInterval(()=>{if(fs.existsSync(path.join(control,'release-forward-'+process.pid))){clearInterval(timer);finish();}},10);}});`
+			: "process.on('SIGTERM',()=>{for(const p of peers)p.destroy();server.close(()=>process.exit(0));});"
+ }
 }else if(argv.includes('ssh')){
  const command=argv.at(-1);
  const allowed=command.startsWith('mkdir -p /home/user/wallpaperdb;') || command.startsWith('cd /home/user/wallpaperdb && tar -xzf -') || command.includes('mise trust && make install BOAT_EXEC=worker') || command.includes('chmod a+rx infra/postgres/init') || command.includes('SCRIPT=boat:ready') || command.includes('--input-type=module -') || command.includes('cat > /home/user/wallpaperdb/.boat/cache.json');
@@ -8509,7 +8523,18 @@ if(argv.includes('forward')){
 	let tunnel;
 	t.after(async () => {
 		const owned = fixtureCensus(f.directory);
-		receipts.processes = owned;
+		receipts.processes = [...(receipts.processes ?? []), ...owned];
+		if (retirement) {
+			for (const record of readPreviewRetirementEvents(f).filter(
+				(e) => e.event === "forward-born",
+			)) {
+				receipts.processes.push(record);
+				fs.writeFileSync(
+					path.join(f.control, `release-forward-${record.pid}`),
+					"yes",
+				);
+			}
+		}
 		receipts.transport = fs
 			.readFileSync(path.join(f.control, "transport"), "utf8")
 			.trim()
@@ -8519,28 +8544,64 @@ if(argv.includes('forward')){
 			tunnel = fixtureProcess(
 				Number(fs.readFileSync(path.join(f.control, "forward-ready"), "utf8")),
 			);
-		if (tunnel && liveOwnedProcess(f.root, tunnel)) {
+		if (!retirement && tunnel && liveOwnedProcess(f.root, tunnel)) {
 			assert.equal(signalFixtureGroup(tunnel, "SIGTERM", f.directory), true);
 			assert.equal(
 				await fixtureStopped(() => !liveOwnedProcess(f.root, tunnel)),
 				true,
 			);
 		}
-		const cleanup = await stopLockFixtureChildren(f.commands);
-		receipts.commandCleanup = cleanup;
-		receipts.controllerOutput = command.output();
-		receipts.forwardEvents = fs
-			.readFileSync(path.join(f.control, "forward-events"), "utf8")
-			.trim()
-			.split("\n")
-			.map((line) => JSON.parse(line));
-		receipts.survivingCommandGroups = f.commands
-			.filter((p) => processGroupRunning(p.child.pid))
-			.map((p) => p.child.pid);
-		receipts.tunnelTerminated = !tunnel || !liveOwnedProcess(f.root, tunnel);
-		phase("controlled endpoints and preview commands stopped");
+		try {
+			const cleanup = await stopLockFixtureChildren(
+				f.commands,
+				false,
+				retirement
+					? {
+							directory: f.directory,
+							excludedGroups: new Set([
+								f.json(".boat/state.json").daemon.pid,
+								f.json(".boat/cache-tunnel.json").pid,
+							]),
+						}
+					: undefined,
+			);
+			if (retirement)
+				receipts.retirementEvents = readPreviewRetirementEvents(f);
+			receipts.commandCleanup = cleanup;
+			receipts.controllerOutput = command.output();
+			if (retirement)
+				receipts.commandResults = await Promise.all(
+					f.commands.map((p) => p.done),
+				);
+			receipts.forwardEvents = fs
+				.readFileSync(path.join(f.control, "forward-events"), "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line));
+			receipts.survivingCommandGroups = f.commands
+				.filter((p) => processGroupRunning(p.child.pid))
+				.map((p) => p.child.pid);
+			receipts.tunnelTerminated = !tunnel || !liveOwnedProcess(f.root, tunnel);
+			phase("controlled endpoints and preview commands stopped");
+		} catch (error) {
+			if (retirement) receipts.retirementCleanupError = error.message;
+			throw error;
+		} finally {
+			if (retirement) {
+				receipts.retirementEvents = readPreviewRetirementEvents(f);
+				receipts.retirementCommandDiagnostics = f.commands.map((record) => ({
+					pid: record.child.pid,
+					terminal: record.terminal,
+					closed: record.closed,
+					groupRunning: processGroupRunning(record.child.pid),
+					output: record.output(),
+				}));
+				phase("replacement cleanup attempt recorded before control disposal");
+			}
+		}
 	});
 	await f.readiness.wait(() => {
+		if (retirement) receipts.processes.push(...fixtureCensus(f.directory));
 		if (command.terminal) assert.fail(command.output());
 		return (
 			command.output().includes("Private preview proxy") &&
@@ -8622,6 +8683,9 @@ if(argv.includes('forward')){
 		arrival,
 		clients,
 		privatePort,
+		port,
+		command,
+		tunnel,
 	};
 }
 
@@ -8995,3 +9059,385 @@ for (const mode of ["foreground", "managed"])
 			);
 		});
 	});
+
+function readPreviewRetirementEvents(f) {
+	const name = path.join(f.control, "retirement-events");
+	if (!fs.existsSync(name)) return [];
+	return fs
+		.readFileSync(name, "utf8")
+		.trim()
+		.split("\n")
+		.filter(Boolean)
+		.map((line) => JSON.parse(line));
+}
+
+// Attribute LISTEN inodes to the exact live process, rather than infer ownership
+// from an open port or a successful request through a stale forward.
+function previewListenerOwner(identity, port) {
+	const before = fixtureProcess(identity.pid);
+	if (!before || before.startTicks !== identity.startTicks) return [];
+	const inodes = new Set(
+		fs.readdirSync(`/proc/${identity.pid}/fd`).flatMap((fd) => {
+			try {
+				return [
+					fs
+						.readlinkSync(`/proc/${identity.pid}/fd/${fd}`)
+						.match(/^socket:\[(\d+)\]$/)?.[1],
+				];
+			} catch (error) {
+				if (error.code === "ENOENT") return [];
+				throw error;
+			}
+		}),
+	);
+	const listeners = fs
+		.readFileSync("/proc/net/tcp", "utf8")
+		.trim()
+		.split("\n")
+		.slice(1)
+		.flatMap((line) => {
+			const fields = line.trim().split(/\s+/);
+			return fields[3] === "0A" &&
+				parseInt(fields[1].split(":")[1], 16) === port &&
+				inodes.has(fields[9])
+				? [{ port, inode: fields[9] }]
+				: [];
+		});
+	assert.equal(fixtureProcess(identity.pid)?.startTicks, before.startTicks);
+	return listeners;
+}
+
+async function previewReplacementResponse(f) {
+	const client = f.request("/healthy");
+	const [response] = await previewProbe(
+		once(client, "response"),
+		"replacement HTTP response missing",
+	);
+	let body = "";
+	response.on("data", (bytes) => {
+		body += bytes;
+	});
+	await previewProbe(
+		once(response, "end"),
+		"replacement HTTP response incomplete",
+	);
+	return { status: response.statusCode, body };
+}
+
+for (const delayed of [false, true])
+	test(`preview replacement ${delayed ? "delayed" : "normal"} forward retirement preserves a usable replacement`, async (t) => {
+		const archive = pendingPreviewEvidence(t);
+		const hooks = [];
+		const owner = { after: (fn) => hooks.push(fn) };
+		// One archive owns both fixtures until all cleanup and sibling checks finish.
+		const fixtureArchive = {
+			directory: archive.directory,
+			cleanup: (fn) => fn(),
+		};
+		let sibling, siblingSocket, siblingIdentity;
+		t.after(() =>
+			archive.cleanup(async () => {
+				const failures = [];
+				try {
+					if (hooks[1]) await hooks[1]();
+				} catch (error) {
+					failures.push(error);
+				}
+				try {
+					if (sibling && siblingSocket) {
+						assert.equal(liveOwnedProcess(sibling.root, siblingIdentity), true);
+						assert.equal(liveOwnedProcess(sibling.root, sibling.tunnel), true);
+						await sibling.healthy(true);
+						await previewFrame(siblingSocket, "after-target-cleanup");
+						sibling.receipts.survivedTargetCleanup = {
+							preview: siblingIdentity,
+							forward: sibling.tunnel,
+							http: true,
+							frameExchange: true,
+						};
+						sibling.phase("sibling unchanged after target cleanup");
+					}
+				} catch (error) {
+					failures.push(error);
+				}
+				try {
+					if (hooks[0]) await hooks[0]();
+				} catch (error) {
+					failures.push(error);
+				}
+				if (failures.length)
+					throw new AggregateError(
+						failures,
+						"Replacement fixture cleanup failed",
+					);
+			}),
+		);
+		await archive.scenario(async () => {
+			sibling = await pendingUpgradePreview(
+				owner,
+				"managed",
+				fixtureArchive,
+				`replacement-sibling-${delayed}`,
+			);
+			const f = await pendingUpgradePreview(
+				owner,
+				"managed",
+				fixtureArchive,
+				`replacement-${delayed}`,
+			);
+			const old = fixtureProcess(f.json(".boat/preview-process.json").pid);
+			const oldForward = f.tunnel;
+			f.receipts.old = old;
+			f.receipts.oldForward = oldForward;
+			f.receipts.initialListeners = {
+				preview: previewListenerOwner(old, f.port),
+				forward: previewListenerOwner(oldForward, f.privatePort),
+			};
+			assert.equal(f.receipts.initialListeners.preview.length, 1);
+			assert.equal(f.receipts.initialListeners.forward.length, 1);
+			await f.healthy(true);
+			await f.healthy(false);
+			siblingIdentity = fixtureProcess(
+				sibling.json(".boat/preview-process.json").pid,
+			);
+			const [siblingResponse, socket] = await previewProbe(
+				once(sibling.request("/ws-healthy", true, true), "upgrade"),
+				"sibling upgrade missing",
+			);
+			siblingSocket = socket;
+			assert.equal(siblingResponse.statusCode, 101);
+			sibling.clients.add(siblingSocket);
+			await previewFrame(siblingSocket, "before-replacement");
+			if (delayed) flag(f, `hold-forward-${oldForward.pid}`);
+			f.phase(
+				"old listener and forward identities verified; replacement invoked",
+			);
+			const replacement = f.run(
+				"boat-preview",
+				"BOAT_EXEC=local",
+				"SHELL=/bin/sh",
+				"boat_routed_goals=",
+			);
+			// The same existing readiness bound applies to this new command.
+			const readiness = lockFixtureReadiness();
+			if (delayed) {
+				await readiness.wait(
+					() =>
+						readPreviewRetirementEvents(f).some(
+							(e) => e.pid === oldForward.pid && e.event === "forward-term",
+						),
+					"original forward acknowledges TERM",
+				);
+				// Observe within the existing one-second bound, then release even if
+				// a corrected controller is still waiting for predecessor retirement.
+				// Actual bind failure and inode ownership, not elapsed time, prove red.
+				f.receipts.prematureReadiness = await fixtureStopped(
+					() =>
+						replacement.output().includes("Private preview proxy") &&
+						readPreviewRetirementEvents(f).some(
+							(e) => e.pid !== oldForward.pid && e.event === "forward-error",
+						),
+				);
+				if (f.receipts.prematureReadiness) {
+					const current = fixtureProcess(
+						f.json(".boat/preview-process.json").pid,
+					);
+					assert.equal(
+						previewListenerOwner(oldForward, f.privatePort).length,
+						1,
+					);
+					assert.equal(liveOwnedProcess(f.root, old), true);
+					f.receipts.beforeRelease = await previewReplacementResponse(f);
+					assert.equal(f.receipts.beforeRelease.status, 200);
+					f.receipts.overlapListeners = {
+						replacement: previewListenerOwner(current, f.port),
+						oldForward: previewListenerOwner(oldForward, f.privatePort),
+					};
+					f.phase(
+						"replacement advertises ready with old forward still owning private listener",
+					);
+				}
+				flag(f, `release-forward-${oldForward.pid}`);
+			}
+			await readiness.wait(() => {
+				f.receipts.processes.push(...fixtureCensus(f.directory));
+				if (replacement.terminal) assert.fail(replacement.output());
+				return (
+					replacement.output().includes("Private preview proxy") &&
+					readPreviewRetirementEvents(f).filter(
+						(e) => e.event === "forward-born",
+					).length === 2
+				);
+			}, "replacement controller publishes readiness");
+			const current = fixtureProcess(f.json(".boat/preview-process.json").pid);
+			const born = readPreviewRetirementEvents(f).filter(
+				(e) => e.event === "forward-born",
+			);
+			const newForward = born.find((e) => e.pid !== oldForward.pid);
+			assert.ok(current && current.pid !== old.pid);
+			assert.ok(newForward);
+			f.receipts.replacement = current;
+			f.receipts.replacementForward = newForward;
+			f.receipts.processes.push(old, oldForward, current, newForward);
+			assert.equal(previewListenerOwner(current, f.port).length, 1);
+			assert.deepEqual(previewListenerOwner(old, f.port), []);
+			if (f.receipts.prematureReadiness) {
+				const events = readPreviewRetirementEvents(f);
+				assert.equal(
+					events.find(
+						(e) => e.pid === newForward.pid && e.event === "forward-error",
+					).code,
+					"EADDRINUSE",
+				);
+				assert.ok(
+					events.find(
+						(e) => e.pid === oldForward.pid && e.event === "forward-term",
+					).at <= newForward.at,
+				);
+			}
+
+			assert.equal(
+				await fixtureStopped(() => !liveOwnedProcess(f.root, oldForward)),
+				true,
+				"original forward retires",
+			);
+			const oldResult = await previewProbe(
+				f.command.done,
+				"original preview command did not close",
+			);
+			assert.equal(oldResult.status, 0, oldResult.output);
+			assert.equal(liveOwnedProcess(f.root, old), false);
+			assert.equal(
+				f.json(".boat/preview-process.json").pid,
+				current.pid,
+				"predecessor exit preserves replacement ownership",
+			);
+			f.receipts.originalResult = oldResult;
+			f.receipts.afterRetirement = await previewReplacementResponse(f);
+			f.receipts.replacementOutput = replacement.output();
+			f.receipts.replacementTerminal = replacement.terminal;
+			f.receipts.finalListeners = {
+				old: previewListenerOwner(old, f.port),
+				replacement: previewListenerOwner(current, f.port),
+				oldForward: previewListenerOwner(oldForward, f.privatePort),
+				newForward: previewListenerOwner(newForward, f.privatePort),
+			};
+			await sibling.healthy(true);
+			await previewFrame(siblingSocket, "after-replacement");
+			assert.equal(liveOwnedProcess(sibling.root, sibling.tunnel), true);
+			f.receipts.siblingSurvived = {
+				preview: sibling.json(".boat/preview-process.json"),
+				forward: sibling.tunnel,
+				frameExchange: true,
+				http: true,
+			};
+			f.phase(
+				"original retired; replacement response and sibling lifetime observed",
+			);
+			assert.equal(
+				f.receipts.afterRetirement.status,
+				200,
+				"advertised replacement must remain usable after the original forward retires",
+			);
+			assert.equal(
+				f.receipts.afterRetirement.body,
+				"authenticated fixture control",
+			);
+			assert.equal(f.receipts.finalListeners.newForward.length, 1);
+		});
+	});
+
+// Qualify cleanup rejection after a held forward has accepted TERM. The injected
+// command-result failure cannot supply a green cleanup verdict or delete controls.
+test("preview replacement fixture retains evidence after delayed cleanup rejection", async (t) => {
+	const archive = pendingPreviewEvidence(t);
+	const hooks = [];
+	let f, originalDone;
+	t.after(async () => {
+		if (!f) {
+			if (hooks[0]) await hooks[0]();
+			return;
+		}
+		f.command.done = originalDone ?? f.command.done;
+		if (fs.existsSync(f.directory)) {
+			// Independent safety on qualifier failure cannot provide its verdict.
+			await stopLockFixtureChildren(f.commands, false, {
+				directory: f.directory,
+				excludedGroups: new Set(),
+			});
+			assert.deepEqual(fixtureCensus(f.directory), []);
+			fs.rmSync(f.directory, { recursive: true });
+		}
+	});
+	await archive.scenario(async () => {
+		f = await pendingUpgradePreview(
+			{ after: (fn) => hooks.push(fn) },
+			"managed",
+			archive,
+			"replacement-cleanup-rejection",
+		);
+		const old = fixtureProcess(f.json(".boat/preview-process.json").pid);
+		flag(f, `hold-forward-${f.tunnel.pid}`);
+		assert.equal(liveOwnedProcess(f.root, old), true);
+		process.kill(old.pid, "SIGTERM");
+		assert.equal(
+			await fixtureStopped(() =>
+				readPreviewRetirementEvents(f).some((e) => e.event === "forward-term"),
+			),
+			true,
+		);
+		assert.equal(previewListenerOwner(f.tunnel, f.privatePort).length, 1);
+		originalDone = f.command.done;
+		f.command.done = originalDone.then(() => {
+			throw new Error("intentional replacement command result rejection");
+		});
+		f.command.done.catch(() => {});
+		await assert.rejects(
+			hooks[0](),
+			/intentional replacement command result rejection/,
+		);
+		const report = path.join(
+			archive.directory,
+			"replacement-cleanup-rejection.json",
+		);
+		const receipt = JSON.parse(fs.readFileSync(report, "utf8"));
+		assert.equal(
+			receipt.fixtureRemoved,
+			false,
+			"rejected cleanup preserves controls",
+		);
+		assert.match(
+			receipt.retirementCleanupError,
+			/intentional replacement command result rejection/,
+		);
+		assert.ok(
+			receipt.retirementEvents.some(
+				(event) => event.event === "forward-closed",
+			),
+		);
+		assert.equal(
+			receipt.retirementCommandDiagnostics.every(
+				(record) => record.closed && !record.groupRunning,
+			),
+			true,
+		);
+		assert.deepEqual(receipt.survivingOwnedProcesses, []);
+		assert.equal(
+			receipt.processTermination.every((p) => p.terminated),
+			true,
+		);
+		assert.equal(fs.existsSync(path.join(f.root, ".boat/state.json")), true);
+		assert.equal(
+			liveOwnedProcess(f.root, f.tunnel),
+			false,
+			"held forward was released and retired before rejection",
+		);
+		fs.copyFileSync(report, `${report}.rejected`);
+		// Dispose only after exact retirement and the rejection verdict are retained.
+		f.command.done = originalDone;
+		await previewProbe(originalDone, "genuine command pipes did not close");
+		assert.deepEqual(fixtureCensus(f.directory), []);
+		fs.rmSync(f.directory, { recursive: true });
+		assert.equal(fs.existsSync(f.directory), false);
+	});
+});

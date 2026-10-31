@@ -2307,13 +2307,60 @@ function migrationProcess(pid) {
 	}
 }
 
-for (const [leaderExit, release] of [
-	[7, false],
-	[0, false],
-	[7, true],
-	[0, true],
+async function migrationDescendantDeadline(owned, commandDeadline) {
+	const startedAt = Date.now();
+	assert(
+		commandDeadline > startedAt && commandDeadline - startedAt < 5000,
+		"descendant deadline observation must start within the existing fixture bound",
+	);
+	let terminatedAt;
+	while (Date.now() < commandDeadline) {
+		const current = migrationProcess(owned.pid);
+		if (
+			terminatedAt === undefined &&
+			(!current ||
+				current.startTicks !== owned.startTicks ||
+				["Z", "X"].includes(current.state))
+		)
+			terminatedAt = Date.now();
+		await new Promise((resolve) =>
+			setTimeout(
+				resolve,
+				Math.max(0, Math.min(10, commandDeadline - Date.now())),
+			),
+		);
+	}
+	const current = migrationProcess(owned.pid);
+	const atDeadline = current?.startTicks === owned.startTicks ? current : null;
+	return {
+		commandDeadline,
+		startedAt,
+		sampledAt: Date.now(),
+		atDeadline,
+		terminatedAt,
+	};
+}
+
+function assertMigrationDescendantDeadline(evidence) {
+	assert(
+		!evidence.atDeadline || ["Z", "X"].includes(evidence.atDeadline.state),
+		"owned descendant must terminate by its command deadline",
+	);
+	assert(
+		evidence.terminatedAt !== undefined &&
+			evidence.terminatedAt <= evidence.commandDeadline,
+		"owned descendant termination must be independently observed before its command deadline",
+	);
+}
+
+for (const [leaderExit, release, lateCleanup] of [
+	[7, false, false],
+	[0, false, false],
+	[7, true, false],
+	[0, true, false],
+	[0, false, true],
 ])
-	test(`Asset migration group ownership survives leader exit ${leaderExit}, released=${release}`, async (t) => {
+	test(`Asset migration group ownership survives leader exit ${leaderExit}, released=${release}, lateCleanup=${lateCleanup}`, async (t) => {
 		const f = await assetExecutionCheckout(t);
 		const controller = "scripts/boat.mjs";
 		f.local(
@@ -2325,6 +2372,20 @@ for (const [leaderExit, release] of [
 					"const entered = Date.now() - 176_000;",
 				),
 		);
+		if (lateCleanup) {
+			// Fault injection in the private fixture only. Advertised deadline stays
+			// unchanged; the held descendant is released just beyond that deadline.
+			const helper = "scripts/lib/boat-asset-migration.mjs";
+			const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+			const anchor = /\$\{deadline\},\$\{request\.deadline\},\{fs/g;
+			assert.equal([...source.matchAll(anchor)].length, 1);
+			f.local(
+				helper,
+				source.replace(anchor, (match) =>
+					match.replace("request.deadline", "request.deadline + 2000"),
+				),
+			);
+		}
 		const pnpm = path.join(f.directory, "home/.local/bin/pnpm");
 		fs.writeFileSync(
 			pnpm,
@@ -2358,6 +2419,23 @@ console.log('package leader exited ${leaderExit}');process.exit(${leaderExit});
 			Number(fs.readFileSync(path.join(f.control, "descendant-pid"), "utf8")),
 		);
 		assert(owned && owned.group === owned.session && owned.group !== owned.pid);
+		const instance = JSON.parse(
+			running.output().match(/asset-migration instance (\{[^\n]+\})/)[1],
+		);
+		assert(
+			instance.commandDeadline > Date.now(),
+			"deadline observation must start while the descendant is still owned and live",
+		);
+		let atCompletion, completedAt;
+		const completed = running.done.then((result) => {
+			atCompletion = migrationProcess(owned.pid);
+			completedAt = Date.now();
+			return result;
+		});
+		const deadlineObservation = migrationDescendantDeadline(
+			owned,
+			instance.commandDeadline,
+		);
 		if (release) {
 			assert.doesNotMatch(
 				fs.readFileSync(path.join(f.control, "runtime-output"), "utf8"),
@@ -2365,24 +2443,35 @@ console.log('package leader exited ${leaderExit}');process.exit(${leaderExit});
 			);
 			fs.writeFileSync(path.join(f.control, "release-descendant"), "yes");
 		}
-		const result = await running.done;
-		const atCompletion = migrationProcess(owned.pid);
-		const instance = JSON.parse(
-			result.output.match(/asset-migration instance (\{[^\n]+\})/)[1],
+		const deadlineEvidence = await deadlineObservation;
+		t.diagnostic(
+			JSON.stringify({ leaderExit, release, lateCleanup, deadlineEvidence }),
 		);
-		if (!release)
-			await observed(
-				() => Date.now() >= instance.commandDeadline + 20,
-				"command deadline passage",
+		// This assertion precedes awaiting command completion or safety teardown.
+		if (lateCleanup) {
+			assert.throws(
+				() => assertMigrationDescendantDeadline(deadlineEvidence),
+				/owned descendant must terminate by its command deadline/,
 			);
-		const afterDeadline = migrationProcess(owned.pid);
+			assert.equal(
+				completedAt,
+				undefined,
+				"late cleanup must still be pending when the deadline assertion rejects it",
+			);
+			// A barrier makes eventual clean completion causally later than the
+			// observed deadline failure, independent of timer scheduling jitter.
+			fs.writeFileSync(path.join(f.control, "release-descendant"), "yes");
+		} else assertMigrationDescendantDeadline(deadlineEvidence);
+		const result = await completed;
 		t.diagnostic(
 			JSON.stringify({
 				leaderExit,
 				release,
+				lateCleanup,
 				commandDeadline: instance.commandDeadline,
 				atCompletion,
-				afterDeadline,
+				completedAt,
+				deadlineEvidence,
 				output: result.output,
 			}),
 		);
@@ -2390,17 +2479,25 @@ console.log('package leader exited ${leaderExit}');process.exit(${leaderExit});
 			!atCompletion || ["Z", "X"].includes(atCompletion.state),
 			"completion must follow termination of live owned descendants, before safety teardown",
 		);
-		assert(
-			!afterDeadline || ["Z", "X"].includes(afterDeadline.state),
-			"owned descendant must not survive its command allowance",
-		);
+		if (lateCleanup) {
+			assert.equal(result.status, 0, result.output);
+			assert.match(result.output, /asset-migration completed [a-f0-9]+ 0/);
+			assert(
+				completedAt > instance.commandDeadline,
+				"the sensitivity control must actually complete late",
+			);
+		}
 		if (release) {
+			assert(
+				completedAt < instance.commandDeadline,
+				"released descendants must preserve prompt command completion",
+			);
 			assert.equal(result.status === 0, leaderExit === 0, result.output);
 			assert.match(
 				result.output,
 				new RegExp(`asset-migration completed [a-f0-9]+ ${leaderExit}`),
 			);
-		} else {
+		} else if (!lateCleanup) {
 			assert.notEqual(result.status, 0, result.output);
 			assert.match(result.output, /command deadline exhausted/);
 		}

@@ -6738,7 +6738,7 @@ function previewProbe(promise, description, ms = 1000) {
 }
 
 // Evidence belongs to the caller when supplied. Private fallback archives are
-// released only after the owning fixture's actual cleanup and verification.
+// released only after every scenario and the actual cleanup verify successfully.
 function pendingPreviewEvidence(
 	t,
 	supplied = process.env.BOAT_PENDING_UPGRADE_EVIDENCE,
@@ -6747,12 +6747,30 @@ function pendingPreviewEvidence(
 	const directory =
 		supplied ||
 		fs.mkdtempSync(path.join(os.tmpdir(), "boat-pending-preview-evidence-"));
+	let started = false;
+	let running = 0;
+	let failed = false;
 	return {
 		directory,
+		async scenario(verify) {
+			started = true;
+			running++;
+			try {
+				return await verify();
+			} catch (error) {
+				failed = true;
+				throw error;
+			} finally {
+				running--;
+			}
+		},
 		async cleanup(cleanup) {
 			try {
 				await cleanup();
-				if (owned) fs.rmSync(directory, { recursive: true });
+				if (owned && started && running === 0 && !failed)
+					fs.rmSync(directory, { recursive: true });
+				else if (owned)
+					t.diagnostic(`Pending preview evidence retained at ${directory}`);
 			} catch (error) {
 				t.diagnostic(`Pending preview evidence retained at ${directory}`);
 				throw error;
@@ -6781,6 +6799,10 @@ test("pending-preview evidence preserves ownership until cleanup settles", async
 		false,
 	);
 	assert.equal(fs.statSync(fallback.directory).mode & 0o777, 0o700);
+	assert.equal(
+		await fallback.scenario(async () => "verified scenario"),
+		"verified scenario",
+	);
 	const receipt = path.join(fallback.directory, "cleanup.json");
 	fs.writeFileSync(receipt, "ownership before retirement");
 	let release;
@@ -6810,6 +6832,7 @@ test("pending-preview evidence preserves ownership until cleanup settles", async
 
 	const failed = pendingPreviewEvidence(owner, "");
 	directories.push(failed.directory);
+	await failed.scenario(async () => {});
 	const retained = path.join(failed.directory, "cleanup.json");
 	const failure = new Error("controlled cleanup rejection");
 	await assert.rejects(
@@ -6852,6 +6875,188 @@ test("pending-preview evidence preserves ownership until cleanup settles", async
 	);
 	assert.equal(fs.readFileSync(callerReceipt, "utf8"), "caller-owned archive");
 });
+
+// Contain intentional assertion failures in child test runs. Their independent
+// parent safety cleanup happens only after receipt-retention assertions.
+if (process.env.BOAT_PENDING_SCENARIO_CONTROL) {
+	test("pending-preview intentional evidence failure", async (t) => {
+		const kind = process.env.BOAT_PENDING_SCENARIO_CONTROL;
+		assert.ok(["top-level", "nested"].includes(kind));
+		const report = process.env.BOAT_PENDING_SCENARIO_REPORT;
+		const archive = pendingPreviewEvidence(t);
+		return archive.scenario(async () => {
+			const f = await pendingUpgradePreview(t, "foreground", archive);
+			fs.writeFileSync(
+				report,
+				JSON.stringify({ archive: archive.directory, fixture: f.directory }),
+			);
+			t.after(() =>
+				fs.writeFileSync(
+					`${report}.teardown`,
+					JSON.stringify(f.receipts, null, 2),
+				),
+			);
+			const assertion = async () => {
+				const client = f.request("/healthy");
+				const [response] = await previewProbe(
+					once(client, "response"),
+					"controlled protocol response missing",
+				);
+				response.resume();
+				await previewProbe(
+					once(response, "end"),
+					"controlled protocol response incomplete",
+				);
+				f.receipts.intentionalFailure = {
+					kind,
+					observedStatus: response.statusCode,
+					expectedStatus: 101,
+				};
+				f.phase(`intentional ${kind} assertion recorded before cleanup`);
+				if (kind === "top-level")
+					assert.fail("intentional top-level scenario assertion");
+				assert.equal(
+					response.statusCode,
+					101,
+					"intentional nested protocol status assertion",
+				);
+			};
+			if (kind === "top-level") await assertion();
+			else {
+				await t.test("nested protocol assertion", () =>
+					archive.scenario(assertion),
+				);
+				f.receipts.rootContinuedAfterNestedFailure = true;
+			}
+		});
+	});
+}
+
+for (const kind of ["top-level", "nested"])
+	test(`pending-preview evidence retains failed ${kind} scenario after successful cleanup`, async (t) => {
+		const directory = fs.mkdtempSync(
+			path.join(os.tmpdir(), "boat-preview-retention-control-"),
+		);
+		const report = path.join(directory, "report.json");
+		const saved =
+			process.env.BOAT_PENDING_UPGRADE_EVIDENCE &&
+			path.join(
+				process.env.BOAT_PENDING_UPGRADE_EVIDENCE,
+				`${kind}-retention-control`,
+			);
+		if (saved) fs.mkdirSync(saved, { recursive: true });
+		let runner, runnerIdentity, done;
+		t.after(async () => {
+			if (runner) {
+				const safety = await emergencyLockFixtureCleanup({
+					runner,
+					runnerIdentity,
+					done,
+					directory,
+				});
+				if (saved)
+					fs.writeFileSync(
+						path.join(saved, "safety.json"),
+						JSON.stringify(safety, null, 2),
+					);
+			} else fs.rmSync(directory, { recursive: true, force: true });
+		});
+		runner = spawn(
+			process.execPath,
+			[
+				"--test",
+				"--test-name-pattern=^pending-preview intentional evidence failure$",
+				fileURLToPath(import.meta.url),
+			],
+			{
+				cwd: directory,
+				detached: true,
+				stdio: ["ignore", "pipe", "pipe"],
+				env: {
+					...process.env,
+					NODE_TEST_CONTEXT: undefined,
+					NODE_OPTIONS: "",
+					TMPDIR: directory,
+					BOAT_PENDING_UPGRADE_EVIDENCE: undefined,
+					BOAT_PENDING_SCENARIO_CONTROL: kind,
+					BOAT_PENDING_SCENARIO_REPORT: report,
+				},
+			},
+		);
+		runnerIdentity = fixtureProcess(runner.pid);
+		const output = lockFixtureOutput();
+		runner.stdout.on("data", output.capture);
+		runner.stderr.on("data", output.capture);
+		let closed = false;
+		done = once(runner, "close").then((result) => {
+			closed = true;
+			return result;
+		});
+		await observed(
+			() => closed,
+			"intentional preview failure completed actual cleanup",
+		);
+		const [status, signal] = await done;
+		const metadata = JSON.parse(fs.readFileSync(report, "utf8"));
+		const teardown = JSON.parse(fs.readFileSync(`${report}.teardown`, "utf8"));
+		const beforeSafety = {
+			status,
+			signal,
+			archive: metadata.archive,
+			archiveExists: fs.existsSync(metadata.archive),
+			fixtureCensus: fixtureCensus(directory),
+			teardown,
+		};
+		if (saved) {
+			fs.writeFileSync(path.join(saved, "runner.log"), output.read());
+			fs.writeFileSync(
+				path.join(saved, "before-safety.json"),
+				JSON.stringify(beforeSafety, null, 2),
+			);
+			if (beforeSafety.archiveExists)
+				fs.cpSync(metadata.archive, path.join(saved, "retained"), {
+					recursive: true,
+				});
+		}
+		assert.equal(status, 1, output.read());
+		assert.equal(signal, null, output.read());
+		assert.match(
+			output.read(),
+			kind === "top-level"
+				? /intentional top-level scenario assertion/
+				: /intentional nested protocol status assertion/,
+		);
+		assert.equal(teardown.fixtureRemoved, true);
+		assert.equal(teardown.tunnelTerminated, true);
+		assert.deepEqual(teardown.survivingOwnedProcesses, []);
+		assert.deepEqual(teardown.survivingCommandGroups, []);
+		assert.ok(teardown.processTermination.every((record) => record.terminated));
+		assert.deepEqual(
+			beforeSafety.fixtureCensus,
+			[],
+			"real cleanup succeeded before independent safety cleanup",
+		);
+		if (kind === "nested")
+			assert.equal(teardown.rootContinuedAfterNestedFailure, true);
+		assert.equal(
+			beforeSafety.archiveExists,
+			true,
+			"failed scenario receipts survive successful cleanup before safety teardown",
+		);
+		const retained = JSON.parse(
+			fs.readFileSync(path.join(metadata.archive, "foreground.json"), "utf8"),
+		);
+		assert.deepEqual(retained, teardown, "exact final receipt retained");
+		assert.deepEqual(retained.intentionalFailure, {
+			kind,
+			observedStatus: 200,
+			expectedStatus: 101,
+		});
+		assert.match(
+			output.read(),
+			new RegExp(`Pending preview evidence retained at ${metadata.archive}`),
+		);
+	});
 
 async function cleanupPendingPreview({
 	f,
@@ -7023,110 +7228,111 @@ test("pending-upgrade fixture preserves receipts and retires keeper when command
 				);
 		}),
 	);
-	f = await lockGenerationCheckout({ after: (fn) => cleanups.push(fn) });
-	siblingDirectory = fs.mkdtempSync(
-		path.join(os.tmpdir(), "boat-pending-sibling-"),
-	);
-	sibling = spawn(
-		process.execPath,
-		["-e", "console.log('ready');setInterval(()=>{},1000)"],
-		{
-			cwd: siblingDirectory,
-			detached: true,
-			stdio: ["ignore", "pipe", "pipe"],
-		},
-	);
-	siblingClosed = once(sibling, "close");
-	let siblingOutput = "";
-	sibling.stdout.on("data", (bytes) => {
-		siblingOutput += bytes;
-	});
-	siblingIdentity = fixtureProcess(sibling.pid);
-	keeper = f.json(".boat/state.json").daemon;
-	// Independent safety teardown runs after all failure-path assertions, and
-	// never supplies the verdict of the cleanup under test.
+	return archive.scenario(async () => {
+		f = await lockGenerationCheckout({ after: (fn) => cleanups.push(fn) });
+		siblingDirectory = fs.mkdtempSync(
+			path.join(os.tmpdir(), "boat-pending-sibling-"),
+		);
+		sibling = spawn(
+			process.execPath,
+			["-e", "console.log('ready');setInterval(()=>{},1000)"],
+			{
+				cwd: siblingDirectory,
+				detached: true,
+				stdio: ["ignore", "pipe", "pipe"],
+			},
+		);
+		siblingClosed = once(sibling, "close");
+		let siblingOutput = "";
+		sibling.stdout.on("data", (bytes) => {
+			siblingOutput += bytes;
+		});
+		siblingIdentity = fixtureProcess(sibling.pid);
+		keeper = f.json(".boat/state.json").daemon;
+		// Independent safety teardown runs after all failure-path assertions, and
+		// never supplies the verdict of the cleanup under test.
 
-	await f.readiness.wait(
-		() => siblingOutput.includes("ready"),
-		"unrelated sibling ready",
-	);
-	assert.ok(siblingIdentity);
-	f.local(
-		"cleanup-holder.cjs",
-		`const {spawn}=require('child_process');const fs=require('fs');
+		await f.readiness.wait(
+			() => siblingOutput.includes("ready"),
+			"unrelated sibling ready",
+		);
+		assert.ok(siblingIdentity);
+		f.local(
+			"cleanup-holder.cjs",
+			`const {spawn}=require('child_process');const fs=require('fs');
 const child=spawn(process.execPath,['-e',"require('fs').writeFileSync(process.argv[1],String(process.pid));setInterval(()=>{},1000)",process.argv[2]],{detached:true,stdio:['ignore',process.stdout,process.stderr]});child.unref();`,
-	);
-	fs.appendFileSync(
-		path.join(f.root, "Makefile"),
-		`\npending-cleanup-control:\n\t@${process.execPath} cleanup-holder.cjs ${path.join(f.control, "holder-ready")}\n`,
-	);
-	const command = f.run(
-		"pending-cleanup-control",
-		"BOAT_EXEC=local",
-		"SHELL=/bin/sh",
-		"boat_routed_goals=",
-	);
-	await f.readiness.wait(
-		() =>
-			fs.existsSync(path.join(f.control, "holder-ready")) &&
-			command.terminal !== null,
-		"detached pipe holder outlives command leader",
-	);
-	survivor = fixtureProcess(
-		Number(fs.readFileSync(path.join(f.control, "holder-ready"), "utf8")),
-	);
-	assert.ok(survivor);
-	assert.equal(
-		command.closed,
-		false,
-		"detached child holds command pipes open",
-	);
-	const receipts = { processes: [fixtureProcess(keeper.pid), survivor] };
-	await assert.rejects(
-		cleanupPendingPreview({
-			f,
-			cleanups,
-			baseCleanup: cleanups[0],
-			receipts,
-			report,
-		}),
-		/Owned pending-preview process survived; fixture files retained/,
-	);
-	const saved = JSON.parse(fs.readFileSync(`${report}.json`, "utf8"));
-	assert.match(
-		saved.preservationCommandCleanupError,
-		/Owned lock fixture process groups did not exit/,
-	);
-	assert.equal(saved.preservationKeeperTerminated, true);
-	assert.equal(
-		liveOwnedProcess(f.root, keeper),
-		false,
-		"exact keeper retired despite command rejection",
-	);
-	assert.equal(saved.fixtureRemoved, false);
-	assert.equal(fs.existsSync(path.join(f.root, ".boat/state.json")), true);
-	assert.ok(
-		saved.survivingOwnedProcesses.some(
-			(p) => p.pid === survivor.pid && p.startTicks === survivor.startTicks,
-		),
-	);
-	assert.equal(
-		saved.processTermination.find((p) => p.pid === keeper.pid).terminated,
-		true,
-	);
-	assert.equal(
-		saved.processTermination.find((p) => p.pid === survivor.pid).terminated,
-		false,
-	);
-	assert.equal(
-		liveOwnedProcess(siblingDirectory, siblingIdentity),
-		true,
-		"unrelated sibling protected",
-	);
+		);
+		fs.appendFileSync(
+			path.join(f.root, "Makefile"),
+			`\npending-cleanup-control:\n\t@${process.execPath} cleanup-holder.cjs ${path.join(f.control, "holder-ready")}\n`,
+		);
+		const command = f.run(
+			"pending-cleanup-control",
+			"BOAT_EXEC=local",
+			"SHELL=/bin/sh",
+			"boat_routed_goals=",
+		);
+		await f.readiness.wait(
+			() =>
+				fs.existsSync(path.join(f.control, "holder-ready")) &&
+				command.terminal !== null,
+			"detached pipe holder outlives command leader",
+		);
+		survivor = fixtureProcess(
+			Number(fs.readFileSync(path.join(f.control, "holder-ready"), "utf8")),
+		);
+		assert.ok(survivor);
+		assert.equal(
+			command.closed,
+			false,
+			"detached child holds command pipes open",
+		);
+		const receipts = { processes: [fixtureProcess(keeper.pid), survivor] };
+		await assert.rejects(
+			cleanupPendingPreview({
+				f,
+				cleanups,
+				baseCleanup: cleanups[0],
+				receipts,
+				report,
+			}),
+			/Owned pending-preview process survived; fixture files retained/,
+		);
+		const saved = JSON.parse(fs.readFileSync(`${report}.json`, "utf8"));
+		assert.match(
+			saved.preservationCommandCleanupError,
+			/Owned lock fixture process groups did not exit/,
+		);
+		assert.equal(saved.preservationKeeperTerminated, true);
+		assert.equal(
+			liveOwnedProcess(f.root, keeper),
+			false,
+			"exact keeper retired despite command rejection",
+		);
+		assert.equal(saved.fixtureRemoved, false);
+		assert.equal(fs.existsSync(path.join(f.root, ".boat/state.json")), true);
+		assert.ok(
+			saved.survivingOwnedProcesses.some(
+				(p) => p.pid === survivor.pid && p.startTicks === survivor.startTicks,
+			),
+		);
+		assert.equal(
+			saved.processTermination.find((p) => p.pid === keeper.pid).terminated,
+			true,
+		);
+		assert.equal(
+			saved.processTermination.find((p) => p.pid === survivor.pid).terminated,
+			false,
+		);
+		assert.equal(
+			liveOwnedProcess(siblingDirectory, siblingIdentity),
+			true,
+			"unrelated sibling protected",
+		);
+	});
 });
 
-async function pendingUpgradePreview(t, mode) {
-	const archive = pendingPreviewEvidence(t);
+async function pendingUpgradePreview(t, mode, archive) {
 	const evidence = archive.directory;
 	const report = path.join(evidence, mode);
 	const cleanups = [];
@@ -7497,307 +7703,337 @@ async function previewFrame(socket, text) {
 
 for (const mode of ["foreground", "managed"])
 	test(`pending-upgrade diagnostic via production ${mode} preview`, async (t) => {
-		const f = await pendingUpgradePreview(t, mode);
-		let sibling;
-		await t.test(
-			"healthy authentication and successful 101 duplex control",
-			{ timeout: 3000 },
-			async () => {
-				await f.healthy(false);
-				await f.healthy(true);
-				const client = f.request("/ws-sibling", true, true);
-				const [response, socket, head] = await previewProbe(
-					once(client, "upgrade"),
-					"successful 101 missing",
-				);
-				assert.equal(response.statusCode, 101);
-				assert.equal(
-					response.headers["sec-websocket-protocol"],
-					"boat-diagnostic",
-				);
-				assert.equal(
-					response.headers["sec-websocket-accept"],
-					"s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
-				);
-				assert.equal(head.length, 0);
-				f.clients.add(socket);
-				sibling = socket;
-				await previewFrame(sibling, "before-disconnect");
-				f.phase("authentication and successful 101 duplex passed");
-			},
-		);
-		await t.test(
-			"ordinary HTTP cancellation remains healthy",
-			{ timeout: 3000 },
-			async () => {
-				const arrived = f.arrival("/http-pending");
-				const client = f.request("/http-pending");
-				const upstream = await previewProbe(
-					arrived,
-					"ordinary HTTP did not reach upstream",
-				);
-				client.destroy();
-				await previewProbe(
-					upstream.closed,
-					"ordinary HTTP survived downstream cancellation",
-				);
-				await f.healthy(true);
-				f.phase("ordinary HTTP cancellation and next request passed");
-			},
-		);
-		await t.test(
-			"same forwarder cancels a pending upgrade with production proxy bypassed",
-			{ timeout: 3000 },
-			async () => {
-				const arrived = f.arrival("/ws-pending");
-				const client = f.request("/ws-pending", true, true, f.privatePort);
-				let received101 = false;
-				client.on("upgrade", () => {
-					received101 = true;
-				});
-				const [socket] = await previewProbe(
-					once(client, "socket"),
-					"bypass client socket missing",
-				);
-				const upstream = await previewProbe(
-					arrived,
-					"bypass handshake did not reach same upstream",
-				);
-				const downstreamPort = socket.localPort;
-				const upstreamPort = upstream.socket.remotePort;
-				const closed = once(socket, "close");
-				socket.destroy();
-				await previewProbe(closed, "bypass client socket did not close");
-				await previewProbe(
-					upstream.closed,
-					"controlled forwarder retained a bypassed pending upgrade",
-				);
-				assert.equal(socket.destroyed, true);
-				assert.equal(upstream.socket.destroyed, true);
-				assert.equal(received101, false);
-				f.receipts.bypassControl = {
-					downstreamPort,
-					upstreamPort,
-					disconnectMethod: "destroy",
-					downstreamSocketDestroyed: socket.destroyed,
-					upstreamSocketDestroyed: upstream.socket.destroyed,
-					received101,
-				};
-				f.phase(
-					"same controlled forwarder cancellation passed with proxy bypassed",
-				);
-			},
-		);
-		await t.test(
-			"pending upstream handshake terminates after actual downstream socket destruction",
-			{ timeout: 3000 },
-			async () => {
-				const arrived = f.arrival("/ws-pending");
-				const client = f.request("/ws-pending", true, true);
-				let received101 = false;
-				client.on("upgrade", () => {
-					received101 = true;
-				});
-				const [socket] = await previewProbe(
-					once(client, "socket"),
-					"downstream socket missing",
-				);
-				const upstream = await previewProbe(
-					arrived,
-					"pending handshake did not reach upstream",
-				);
-				assert.equal(received101, false);
-				const downstreamPort = socket.localPort;
-				const upstreamPort = upstream.socket.remotePort;
-				const closed = once(socket, "close");
-				f.phase("upstream handshake held without 101");
-				socket.destroy();
-				await previewProbe(closed, "actual downstream socket did not close");
-				f.phase("actual downstream socket closed");
-				try {
-					await previewProbe(
-						upstream.closed,
-						"Pending upstream WebSocket handshake survived downstream socket closure for 1000ms",
-					);
-					assert.equal(upstream.socket.destroyed, true);
-					f.receipts.pendingCancelled = {
-						downstreamPort,
-						upstreamPort,
-						downstreamSocketDestroyed: socket.destroyed,
-						upstreamSocketDestroyed: upstream.socket.destroyed,
-						received101,
-					};
-					f.phase("pending upstream handshake cancelled");
-				} catch (error) {
-					f.receipts.pendingAfterDeadline = {
-						downstreamPort,
-						upstreamPort,
-						socketDestroyed: upstream.socket.destroyed,
-						requestDestroyed: upstream.req.destroyed,
-						disconnectMethod: "destroy",
-						downstreamSocketDestroyed: socket.destroyed,
-						received101,
-					};
-					assert.equal(received101, false);
-					f.phase("pending upstream handshake remained open at deadline");
-					throw error;
-				}
-			},
-		);
-		await t.test(
-			"late 101 transition retains duplex and cancels its established peer",
-			{ timeout: 3000 },
-			async () => {
-				const arrived = f.arrival("/ws-late");
-				const client = f.request("/ws-late", true, true);
-				const upgraded = once(client, "upgrade");
-				const upstream = await previewProbe(arrived, "late handshake missing");
-				upstream.establish();
-				const [response, socket] = await previewProbe(
-					upgraded,
-					"late 101 missing",
-				);
-				assert.equal(response.statusCode, 101);
-				f.clients.add(socket);
-				await previewFrame(socket, "late-transition");
-				const closed = once(socket, "close");
-				socket.destroy();
-				await previewProbe(closed, "late downstream did not close");
-				await previewProbe(
-					upstream.closed,
-					"late upgraded peer survived downstream close",
-				);
-				assert.equal(upstream.socket.destroyed, true);
-				f.phase("late 101 duplex and established peer retirement passed");
-			},
-		);
-		await t.test(
-			"upstream handshake error closes downstream and preserves sibling",
-			{ timeout: 3000 },
-			async () => {
-				const client = f.request("/ws-upstream-error", true, true);
-				const [socket] = await previewProbe(
-					once(client, "socket"),
-					"error downstream missing",
-				);
-				await previewProbe(
-					once(socket, "close"),
-					"upstream error did not close downstream",
-				);
-				assert.equal(socket.destroyed, true);
-				await previewFrame(sibling, "after-upstream-error");
-				await f.healthy(true);
-				f.phase(
-					"upstream error closes affected downstream and preserves sibling",
-				);
-			},
-		);
-		await t.test(
-			"healthy upstream completion flushes its final frame and closes downstream",
-			{ timeout: 3000 },
-			async () => {
-				const arrived = f.arrival("/ws-late");
-				const client = f.request("/ws-late", true, true);
-				const upgraded = once(client, "upgrade");
-				const upstream = await previewProbe(
-					arrived,
-					"completion upstream missing",
-				);
-				upstream.establish();
-				const [, socket] = await previewProbe(
-					upgraded,
-					"completion 101 missing",
-				);
-				f.clients.add(socket);
-				const closed = once(socket, "close");
-				await previewFrame(socket, "healthy-completion");
-				await previewProbe(
-					closed,
-					"healthy completion did not close downstream",
-				);
-				await previewProbe(
-					upstream.closed,
-					"healthy completion retained upstream",
-				);
-				await f.healthy(true);
-				f.phase(
-					"healthy upstream completion flushed final frame and retired sockets",
-				);
-			},
-		);
-		await t.test(
-			"pending downstream ECONNRESET retires only its own lifetime",
-			{ timeout: 3000 },
-			async () => {
-				const arrived = f.arrival("/ws-pending-reset");
-				const client = f.request("/ws-pending-reset", true, true);
-				const [socket] = await previewProbe(
-					once(client, "socket"),
-					"reset downstream missing",
-				);
-				const upstream = await previewProbe(arrived, "reset upstream missing");
-				const closed = once(socket, "close");
-				socket.resetAndDestroy();
-				await previewProbe(closed, "reset downstream did not close");
-				await previewProbe(
-					upstream.closed,
-					"reset pending upstream survived downstream close",
-				);
-				await previewFrame(sibling, "after-reset");
-				await f.healthy(true);
-				f.receipts.resetControl = {
-					disconnectMethod: "resetAndDestroy",
-					downstreamSocketDestroyed: socket.destroyed,
-					upstreamSocketDestroyed: upstream.socket.destroyed,
-					siblingDestroyed: sibling.destroyed,
-				};
-				f.phase("pending reset retirement, sibling and next request passed");
-			},
-		);
-		await t.test(
-			"101 racing actual downstream closure cannot retain a peer",
-			{ timeout: 3000 },
-			async () => {
-				const arrived = f.arrival("/ws-late");
-				const client = f.request("/ws-late", true, true);
-				let received101 = false;
-				client.on("upgrade", (_response, peer) => {
-					received101 = true;
-					f.clients.add(peer);
-				});
-				const [socket] = await previewProbe(
-					once(client, "socket"),
-					"racing downstream missing",
-				);
-				const upstream = await previewProbe(arrived, "racing upstream missing");
-				const closed = once(socket, "close");
-				socket.destroy();
-				await previewProbe(closed, "racing downstream did not close");
-				const upstreamOpenAt101 = !upstream.socket.destroyed;
-				upstream.establish();
-				await previewProbe(upstream.closed, "101 race retained upstream peer");
-				assert.equal(received101, false);
-				assert.equal(upstream.socket.destroyed, true);
-				f.receipts.late101Race = {
-					downstreamClosedBefore101: true,
-					upstreamOpenAt101,
-					received101,
-					upstreamSocketDestroyed: upstream.socket.destroyed,
-				};
-				f.phase("101 racing downstream closure retired upstream peer");
-			},
-		);
-		await t.test(
-			"unrelated sibling and next request survive cancellation",
-			{ timeout: 3000 },
-			async () => {
-				assert.ok(sibling);
-				assert.equal(sibling.destroyed, false);
-				await previewFrame(sibling, "after-disconnect");
-				await f.healthy(true);
-				f.phase(
-					"sibling duplex and next request passed after cancellation deadline",
-				);
-			},
-		);
+		const archive = pendingPreviewEvidence(t);
+		return archive.scenario(async () => {
+			const f = await pendingUpgradePreview(t, mode, archive);
+			let sibling;
+			await t.test(
+				"healthy authentication and successful 101 duplex control",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						await f.healthy(false);
+						await f.healthy(true);
+						const client = f.request("/ws-sibling", true, true);
+						const [response, socket, head] = await previewProbe(
+							once(client, "upgrade"),
+							"successful 101 missing",
+						);
+						assert.equal(response.statusCode, 101);
+						assert.equal(
+							response.headers["sec-websocket-protocol"],
+							"boat-diagnostic",
+						);
+						assert.equal(
+							response.headers["sec-websocket-accept"],
+							"s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
+						);
+						assert.equal(head.length, 0);
+						f.clients.add(socket);
+						sibling = socket;
+						await previewFrame(sibling, "before-disconnect");
+						f.phase("authentication and successful 101 duplex passed");
+					}),
+			);
+			await t.test(
+				"ordinary HTTP cancellation remains healthy",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						const arrived = f.arrival("/http-pending");
+						const client = f.request("/http-pending");
+						const upstream = await previewProbe(
+							arrived,
+							"ordinary HTTP did not reach upstream",
+						);
+						client.destroy();
+						await previewProbe(
+							upstream.closed,
+							"ordinary HTTP survived downstream cancellation",
+						);
+						await f.healthy(true);
+						f.phase("ordinary HTTP cancellation and next request passed");
+					}),
+			);
+			await t.test(
+				"same forwarder cancels a pending upgrade with production proxy bypassed",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						const arrived = f.arrival("/ws-pending");
+						const client = f.request("/ws-pending", true, true, f.privatePort);
+						let received101 = false;
+						client.on("upgrade", () => {
+							received101 = true;
+						});
+						const [socket] = await previewProbe(
+							once(client, "socket"),
+							"bypass client socket missing",
+						);
+						const upstream = await previewProbe(
+							arrived,
+							"bypass handshake did not reach same upstream",
+						);
+						const downstreamPort = socket.localPort;
+						const upstreamPort = upstream.socket.remotePort;
+						const closed = once(socket, "close");
+						socket.destroy();
+						await previewProbe(closed, "bypass client socket did not close");
+						await previewProbe(
+							upstream.closed,
+							"controlled forwarder retained a bypassed pending upgrade",
+						);
+						assert.equal(socket.destroyed, true);
+						assert.equal(upstream.socket.destroyed, true);
+						assert.equal(received101, false);
+						f.receipts.bypassControl = {
+							downstreamPort,
+							upstreamPort,
+							disconnectMethod: "destroy",
+							downstreamSocketDestroyed: socket.destroyed,
+							upstreamSocketDestroyed: upstream.socket.destroyed,
+							received101,
+						};
+						f.phase(
+							"same controlled forwarder cancellation passed with proxy bypassed",
+						);
+					}),
+			);
+			await t.test(
+				"pending upstream handshake terminates after actual downstream socket destruction",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						const arrived = f.arrival("/ws-pending");
+						const client = f.request("/ws-pending", true, true);
+						let received101 = false;
+						client.on("upgrade", () => {
+							received101 = true;
+						});
+						const [socket] = await previewProbe(
+							once(client, "socket"),
+							"downstream socket missing",
+						);
+						const upstream = await previewProbe(
+							arrived,
+							"pending handshake did not reach upstream",
+						);
+						assert.equal(received101, false);
+						const downstreamPort = socket.localPort;
+						const upstreamPort = upstream.socket.remotePort;
+						const closed = once(socket, "close");
+						f.phase("upstream handshake held without 101");
+						socket.destroy();
+						await previewProbe(
+							closed,
+							"actual downstream socket did not close",
+						);
+						f.phase("actual downstream socket closed");
+						try {
+							await previewProbe(
+								upstream.closed,
+								"Pending upstream WebSocket handshake survived downstream socket closure for 1000ms",
+							);
+							assert.equal(upstream.socket.destroyed, true);
+							f.receipts.pendingCancelled = {
+								downstreamPort,
+								upstreamPort,
+								downstreamSocketDestroyed: socket.destroyed,
+								upstreamSocketDestroyed: upstream.socket.destroyed,
+								received101,
+							};
+							f.phase("pending upstream handshake cancelled");
+						} catch (error) {
+							f.receipts.pendingAfterDeadline = {
+								downstreamPort,
+								upstreamPort,
+								socketDestroyed: upstream.socket.destroyed,
+								requestDestroyed: upstream.req.destroyed,
+								disconnectMethod: "destroy",
+								downstreamSocketDestroyed: socket.destroyed,
+								received101,
+							};
+							assert.equal(received101, false);
+							f.phase("pending upstream handshake remained open at deadline");
+							throw error;
+						}
+					}),
+			);
+			await t.test(
+				"late 101 transition retains duplex and cancels its established peer",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						const arrived = f.arrival("/ws-late");
+						const client = f.request("/ws-late", true, true);
+						const upgraded = once(client, "upgrade");
+						const upstream = await previewProbe(
+							arrived,
+							"late handshake missing",
+						);
+						upstream.establish();
+						const [response, socket] = await previewProbe(
+							upgraded,
+							"late 101 missing",
+						);
+						assert.equal(response.statusCode, 101);
+						f.clients.add(socket);
+						await previewFrame(socket, "late-transition");
+						const closed = once(socket, "close");
+						socket.destroy();
+						await previewProbe(closed, "late downstream did not close");
+						await previewProbe(
+							upstream.closed,
+							"late upgraded peer survived downstream close",
+						);
+						assert.equal(upstream.socket.destroyed, true);
+						f.phase("late 101 duplex and established peer retirement passed");
+					}),
+			);
+			await t.test(
+				"upstream handshake error closes downstream and preserves sibling",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						const client = f.request("/ws-upstream-error", true, true);
+						const [socket] = await previewProbe(
+							once(client, "socket"),
+							"error downstream missing",
+						);
+						await previewProbe(
+							once(socket, "close"),
+							"upstream error did not close downstream",
+						);
+						assert.equal(socket.destroyed, true);
+						await previewFrame(sibling, "after-upstream-error");
+						await f.healthy(true);
+						f.phase(
+							"upstream error closes affected downstream and preserves sibling",
+						);
+					}),
+			);
+			await t.test(
+				"healthy upstream completion flushes its final frame and closes downstream",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						const arrived = f.arrival("/ws-late");
+						const client = f.request("/ws-late", true, true);
+						const upgraded = once(client, "upgrade");
+						const upstream = await previewProbe(
+							arrived,
+							"completion upstream missing",
+						);
+						upstream.establish();
+						const [, socket] = await previewProbe(
+							upgraded,
+							"completion 101 missing",
+						);
+						f.clients.add(socket);
+						const closed = once(socket, "close");
+						await previewFrame(socket, "healthy-completion");
+						await previewProbe(
+							closed,
+							"healthy completion did not close downstream",
+						);
+						await previewProbe(
+							upstream.closed,
+							"healthy completion retained upstream",
+						);
+						await f.healthy(true);
+						f.phase(
+							"healthy upstream completion flushed final frame and retired sockets",
+						);
+					}),
+			);
+			await t.test(
+				"pending downstream ECONNRESET retires only its own lifetime",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						const arrived = f.arrival("/ws-pending-reset");
+						const client = f.request("/ws-pending-reset", true, true);
+						const [socket] = await previewProbe(
+							once(client, "socket"),
+							"reset downstream missing",
+						);
+						const upstream = await previewProbe(
+							arrived,
+							"reset upstream missing",
+						);
+						const closed = once(socket, "close");
+						socket.resetAndDestroy();
+						await previewProbe(closed, "reset downstream did not close");
+						await previewProbe(
+							upstream.closed,
+							"reset pending upstream survived downstream close",
+						);
+						await previewFrame(sibling, "after-reset");
+						await f.healthy(true);
+						f.receipts.resetControl = {
+							disconnectMethod: "resetAndDestroy",
+							downstreamSocketDestroyed: socket.destroyed,
+							upstreamSocketDestroyed: upstream.socket.destroyed,
+							siblingDestroyed: sibling.destroyed,
+						};
+						f.phase(
+							"pending reset retirement, sibling and next request passed",
+						);
+					}),
+			);
+			await t.test(
+				"101 racing actual downstream closure cannot retain a peer",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						const arrived = f.arrival("/ws-late");
+						const client = f.request("/ws-late", true, true);
+						let received101 = false;
+						client.on("upgrade", (_response, peer) => {
+							received101 = true;
+							f.clients.add(peer);
+						});
+						const [socket] = await previewProbe(
+							once(client, "socket"),
+							"racing downstream missing",
+						);
+						const upstream = await previewProbe(
+							arrived,
+							"racing upstream missing",
+						);
+						const closed = once(socket, "close");
+						socket.destroy();
+						await previewProbe(closed, "racing downstream did not close");
+						const upstreamOpenAt101 = !upstream.socket.destroyed;
+						upstream.establish();
+						await previewProbe(
+							upstream.closed,
+							"101 race retained upstream peer",
+						);
+						assert.equal(received101, false);
+						assert.equal(upstream.socket.destroyed, true);
+						f.receipts.late101Race = {
+							downstreamClosedBefore101: true,
+							upstreamOpenAt101,
+							received101,
+							upstreamSocketDestroyed: upstream.socket.destroyed,
+						};
+						f.phase("101 racing downstream closure retired upstream peer");
+					}),
+			);
+			await t.test(
+				"unrelated sibling and next request survive cancellation",
+				{ timeout: 3000 },
+				() =>
+					archive.scenario(async () => {
+						assert.ok(sibling);
+						assert.equal(sibling.destroyed, false);
+						await previewFrame(sibling, "after-disconnect");
+						await f.healthy(true);
+						f.phase(
+							"sibling duplex and next request passed after cancellation deadline",
+						);
+					}),
+			);
+		});
 	});

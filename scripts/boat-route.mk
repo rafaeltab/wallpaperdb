@@ -40,6 +40,9 @@ boat-test: ## Run prototype orchestration tests locally
 boat-cache: ## Start the private cohort cache gateway without a worker
 	@node scripts/boat.mjs cache
 .PHONY: boat-await
+.PHONY: boat-sample
+boat-sample: ## Collect aligned read-only host, worker and application samples (ARGS=inventory output)
+	@node scripts/boat-sample.mjs $(ARGS)
 boat-await: ## Wait for coordinator enrollment before measured implementation
 	@while [ ! -f .boat/launch-ready ]; do sleep 1; done
 .PHONY: boat-bootstrap

@@ -1,4 +1,18 @@
 import fs from "node:fs";
+export function developmentWantedAfterCommand(wanted, targets, status) {
+	if (status !== 0) return wanted;
+	const service = targets.find((value) => value.startsWith("SERVICE="));
+	if (["stop", "apps-stop"].includes(targets[0]) && !service?.slice(8).trim())
+		return false;
+	return wanted;
+}
+export function forwardPreviewDisconnect(req, res, upstream) {
+	const cancel = () => upstream.destroy();
+	req.once("aborted", cancel);
+	res.once("close", () => {
+		if (!res.writableFinished) cancel();
+	});
+}
 export function worktreeProcesses(root) {
 	const samples = [];
 	for (const name of fs.readdirSync("/proc")) {
@@ -124,5 +138,14 @@ export function meaningfulPreviewRequest(url, headers) {
 	return (
 		headers["sec-fetch-mode"] === "navigate" ||
 		(url === "/__boat557/activity" && headers["x-boat-activity"] === "1")
+	);
+}
+
+export function liveOwnedProcess(root, record) {
+	return (
+		!!record?.startTicks &&
+		worktreeProcesses(root).some(
+			(p) => p.pid === record.pid && p.startTicks === record.startTicks,
+		)
 	);
 }

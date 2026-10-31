@@ -2,7 +2,7 @@
 	"protocol": "https://github.com/rafaeltab/wallpaperdb/issues/557",
 	"applicationBase": "dc17dead07c1d1f66e1806412cb7623812601bf1",
 	"infrastructureOverlay": "Use the committed prototype head containing this manifest, record its exact SHA at launch.",
-	"launchState": "first-a-recorded-incomplete-development-verification; revised-launch-requires-explicit-authorization-and-new-overlay-freeze",
+	"launchState": "C authorized by issuecomment-6534834968; five children gated on single-worker qualification",
 	"priorRunEvidence": "https://github.com/rafaeltab/wallpaperdb/issues/557#issuecomment-6507918534",
 	"target": {
 		"providerInstanceId": "codex",
@@ -13,6 +13,12 @@
 		}
 	},
 	"cohorts": {
+		"c": {
+			"mode": "development",
+			"size": "large",
+			"count": 5,
+			"development": "remote"
+		},
 		"a": {
 			"mode": "validation",
 			"size": "large",
@@ -47,10 +53,31 @@
 		"record cleanup of owned application processes and coordinator-managed worker resources"
 	],
 	"cohortCompletionRequired": [
+		"C uses the frozen liveScenarios below, concurrent validation commands and aligned host/worker sampling while five stacks remain healthy; no historical causal ranking",
 		"observe all five development stacks healthy and active during a measured overlapping interval, recording duration and host/worker resource samples",
 		"preserve incomplete issues and failed measurements instead of counting disclosure as completion",
 		"record the revised infrastructure overlay for both compared runs; preserve the original frozen base and incomplete A evidence"
 	],
+	"liveScenarios": {
+		"554": "Authenticated real Sources UI: accept 16 valid small images, withdraw one, add one, replace an active Source without reload. Retain completed and failed rows. Exercise an independent failed-item retry, saved candidate recovery and server limit rejection control. Record actions and server membership counts.",
+		"548": "Authenticated real Asset API plus PostgreSQL: fixed retained histories of 32 and 2048 candidates, same active membership; measure persistence operations for lookup, equal replay, conflicting reuse, exact status and two pages. Retain statement/row evidence and rollback/concurrency controls. Do not impose a lifetime quota or discard replay history.",
+		"547": "Running production User and Wallpaper acquisition paths and equivalent Asset worker startup against an owned TCP peer that accepts but sends no NATS INFO. Record native accepted socket closure after timeout/cancellation/disposal, plus a real healthy NATS connection/shutdown control. A caller timeout alone fails.",
+		"551": "Authenticated actual Wallpaper UI list request held by an owned PostgreSQL lock. Identify the exact isolated request/backend pending operation before navigating away, observe cancellation and lock release, then perform a successful list control. Coordinator health/GraphQL requests must not contaminate identification. Also verify bounded shutdown.",
+		"553": "Submit the recorded permitted 1850-frame animated WebP with squareSize=1 through authenticated HTTP and real candidate inspection. Verify durable terminal status, 1850 frames, timing and loop, plus a small animated control. Retain elapsed HTTP and processing durations and cancellation/reaping controls. Adapter-only success, longer infrastructure timeouts or a new Author restriction fail."
+	},
+	"concurrentValidation": {
+		"durationSeconds": 120,
+		"samplingIntervalSeconds": 10,
+		"commands": {
+			"554": "make check PACKAGE=web FORCE=1",
+			"548": "make check PACKAGE=asset FORCE=1",
+			"547": "make check PACKAGE=user FORCE=1",
+			"551": "make check PACKAGE=wallpaper FORCE=1",
+			"553": "make check PACKAGE=asset FORCE=1"
+		},
+		"protocol": "All children keep development stacks active and wait at .boat/validation-ready after changed-path verification. Coordinator freezes exact heads and starts this command set together using ordinary routed Make. Retain failures without counting the gate passed. Release scoped cleanup only after aligned observation. FORCE=1 requires actual execution rather than a cached check replay. The 120-second aligned window begins at release; record command completion and any continued work separately.",
+		"sampler": "make boat-sample ARGS='<private inventory> <private evidence directory>'; 10-second rounds contain host before/after and all worker/readiness timestamps"
+	},
 	"inputs": [
 		{
 			"issue": 554,

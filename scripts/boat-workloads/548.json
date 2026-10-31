@@ -1,0 +1,1229 @@
+{
+  "formatVersion": 1,
+  "kind": "fixed-boat-workload",
+  "issue": 548,
+  "parentIssue": 557,
+  "scopeComment": "https://github.com/rafaeltab/wallpaperdb/issues/557#issuecomment-6543467933",
+  "state": "definition-only; not executed or qualified",
+  "admission": {
+    "requires": "Coordinator qualifies the first narrow #547 repair before actual #548; integrate and live-qualify one infrastructure fix at a time.",
+    "infrastructurePr": 614,
+    "productPr": "Closed #622 is reference data only. Do not reopen, publish, select or merge a product repair.",
+    "compute": "No live compute authorized by descriptor preparation. Root owns admission, provider operations and cumulative cost receipts.",
+    "repeats": "Two consecutive complete clean rounds at identical infrastructure/workload pins, fresh or deliberately restored then warm. Reset affected promotion counts on infrastructure changes.",
+    "integrationBoundary": "Prepared against root 94d6528318c747fd31fed8ab631a01e0d7d75801. Root owns the active full #547 LIVE window. This future #548 definition remains UNINTEGRATED throughout that window; this commit authorizes no admission, worker, app, browser, provider or GitHub operation. All 20 product PRs are closed reference data; #614 is the sole infrastructure PR.",
+    "routineVersions": "Routine necessary native pnpm version/lock output is delegated engineering work with tests and evidence. Preserve full output and do not repeat incidental version objections. This does not authorize new capabilities or material compatibility/security/billing commitments."
+  },
+  "pins": {
+    "applicationBase": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+    "infrastructureSource": "89b68d5307933704ee70e23e5658829746bd347e",
+    "initialOverlayComparison": "c277c2c386e9d2fdcd56485e0594157e7c5a1d38",
+    "closedC622Reference": "62f34b46405ecd1fb3d6b7101e0590afff2e985d",
+    "identityRule": "Record the actual tested infrastructure SHA separately. Never report historical measured C or corrective C as a new pass.",
+    "sourceAllowlist": [
+      {
+        "path": "apps/asset/drizzle/0018_spicy_valeria_richards.sql",
+        "applicationBase": null,
+        "reference": {
+          "blob": "a2bd498b1aa3c84cc166d657b20406253201f92b",
+          "sha256": "504f1b0abf6581cc3aff30c831dfc89ea9c9667eb8babfa0c5cef1586b87fd2b"
+        },
+        "role": "diagnostic-generated-control"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0018_snapshot.json",
+        "applicationBase": null,
+        "reference": {
+          "blob": "f5091b6e766d5bb3f522cafbfc70344ed37340a6",
+          "sha256": "693fcdd351f1d3693283eb7c4aae32a3929cd8d4835b71db0c204db23da760f4"
+        },
+        "role": "diagnostic-generated-control"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/_journal.json",
+        "applicationBase": {
+          "blob": "0136e28e11a2658d9a9e9f69ac0d90a357fe683c",
+          "sha256": "688b2d876d1d4f9f9450b9d923a56aae10d16eed022df85208422d7b5aea9e80"
+        },
+        "reference": {
+          "blob": "d0f797803543fa86a75566fb8601299b541a7546",
+          "sha256": "2a4774de756cd03a0f6565c0b63d8464773332d6bfd3cef3d22caa5aa39751f5"
+        },
+        "role": "diagnostic-generated-control"
+      },
+      {
+        "path": "apps/asset/package.json",
+        "applicationBase": {
+          "blob": "846eaf95be1e4d6b52e6a5486a91ac57587d354a",
+          "sha256": "08bf8778fe9c8f615fd56f0d9c6aa61c223783a9d68108580edbec9e29c2d4b1"
+        },
+        "reference": {
+          "blob": "34577310c944e5a6924d2d3624a369c3024709c1",
+          "sha256": "5d9a0ce17730001ce182f01b3d772809e839d9c9d5faa142b84bb5c4bd1c40a5"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/scripts/migrate-source-history.ts",
+        "applicationBase": null,
+        "reference": {
+          "blob": "b9a4186838a630f9a22632a4109f1ef3a975e63d",
+          "sha256": "520920ab398957350e3faed420fd414325a2d4f10ade3c59e1fa305248fd4d84"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/src/adapters/cleanup/postgres.ts",
+        "applicationBase": {
+          "blob": "5c4a1aa48b27b268070a41b13fc5623296188fea",
+          "sha256": "67d5252b080e25201fb0227e66e3e54f9cf5b95d459ab224d3d59541cbc3c1aa"
+        },
+        "reference": {
+          "blob": "a65e4e7d886ff47ea5f0e3951d2bdc5620ee1302",
+          "sha256": "1ce7dc4af26a135fd5426f8dcb567b40f6865cc926b5968067eb010da1e2542e"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/src/adapters/lifecycle/index.ts",
+        "applicationBase": {
+          "blob": "f77418d9439a25844e26bbf631686efa4a9c74c2",
+          "sha256": "da64159ca1968418196fa23989408129c2fdd4e9932841ae7c5c6f390a098c7d"
+        },
+        "reference": {
+          "blob": "c380f45d918a8237739253b433a58930bbb41d39",
+          "sha256": "94a577aa3daf2f415e4e54a2044c158bbf6e90a6cd0ad4ae0805f67406b76427"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/src/adapters/sources/postgres.ts",
+        "applicationBase": {
+          "blob": "fe7ba8da843010731b711cf42517f5e286fe585f",
+          "sha256": "1336064b62c363c2db9571107ff105f3d552048740699ec32e8f263d149627a0"
+        },
+        "reference": {
+          "blob": "4edaecd809d7be0fdb1cf2b9ff2c90eef9030bfb",
+          "sha256": "f00db006e0363a2e7f6e1716fd9adca0bde5d0ba4c65e3fd54569fa13b8c68be"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/src/capabilities/sources/contract.ts",
+        "applicationBase": {
+          "blob": "f64afa47b8ba9ca7446b855e1cb45f4e0e2dba1f",
+          "sha256": "ba1eb3cf9bf786055ffe15aac8c47ccb8773763c6032a61ba1748c86ecad2bf4"
+        },
+        "reference": {
+          "blob": "32690a8f1debc8356faf355c57736b21bc3b4744",
+          "sha256": "66eaf7a29bd5e9ae070c3f01f7fed48dfc19040ccf40132f0ab58765d64ccbec"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/src/capabilities/sources/implementation.ts",
+        "applicationBase": {
+          "blob": "dc5c1f29e59c7caadb4be9ad80eb9754ebe62cca",
+          "sha256": "7eb33eb9b4488cb7556a838e18a2603bafbf361dcd4abd630e467e9aab1b0649"
+        },
+        "reference": {
+          "blob": "ee6d16a4851cb192138fc69bcc3cff7d55c9a0f1",
+          "sha256": "a660c9b7116eef472c07789b9461ae5c5e1f76d0dbecbc545f53c318d4655051"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/src/db/schema.ts",
+        "applicationBase": {
+          "blob": "060a6736c6550297dfb2b21f6363c328ead092f5",
+          "sha256": "5c620283fef66bf16ba7b06cd5394fa1f803f71c51c6b20ae503e3f779de90de"
+        },
+        "reference": {
+          "blob": "19cb1db6ba8e4722675fd9795f08ba83a990355a",
+          "sha256": "6b2e37172f5b301573de801e5acd4b4c95136027e9c116c407abf79b4d709665"
+        },
+        "role": "schema-mutation"
+      },
+      {
+        "path": "apps/asset/test/fixtures/source-query-work.ts",
+        "applicationBase": null,
+        "reference": {
+          "blob": "5b30cb3e5694b09609a59fd209d264f043d0fb56",
+          "sha256": "6d987e2f7049126a6cf004f6b38062f327525ccebf9d7d27fc3ed756c41713a4"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/test/fixtures/source-window-contract.ts",
+        "applicationBase": null,
+        "reference": {
+          "blob": "386801fcc0ce644ce66684e80a5f7a21cd31b594",
+          "sha256": "01d2cbf048ce41070b053ec4743b9501dfb178480d48548338fe3e0a90229fdf"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/test/fixtures/source-window.ts",
+        "applicationBase": null,
+        "reference": {
+          "blob": "71707d4032b91f70180452d2a09dc490c6bfb9f8",
+          "sha256": "b19252cdc5815498f0c4bb6f2b2c9c64610d2e5cafd14297e3ea0b7db1ed561d"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/test/source-composition.integration.test.ts",
+        "applicationBase": {
+          "blob": "b7d7578f90b4e0b47f758c3ec1309dceee5f626f",
+          "sha256": "21fe1c1316814e0f4c4a9920ff5bc254ed41e89fd0caef0b824367a7fe7bf158"
+        },
+        "reference": {
+          "blob": "3a5be6b3b57a35bb749ee36096c963cd54ae2f0d",
+          "sha256": "0c7130100346f6e75d9fb6067bdc0b5c7e27f0d4b372c6587bed3945d7c0719b"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/test/source-postgres.integration.test.ts",
+        "applicationBase": {
+          "blob": "d96831577a4890ebe9ce7745f028d845fac9c32f",
+          "sha256": "721bd0a6c2234968c83a2c54146ad6ed340e064dd14e9068f7bc1ee5011dfcf3"
+        },
+        "reference": {
+          "blob": "b6150cca1b8053d481c3b56c5257e262d0399f18",
+          "sha256": "1d23a84589b86ce8798e6c4a2e54357e529a62768eb8bbe9820e18ec2c67c15c"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/test/source-window.unit.test.ts",
+        "applicationBase": null,
+        "reference": {
+          "blob": "11af9b8e3780ffd0c9802f195b2920a54fb6f5b8",
+          "sha256": "2eb1f8a332c3b9fa0ddd5e5a1e20d10bf77cd0b752c6d1de93c9d21dcf7bdf90"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/test/sources-decisions.unit.test.ts",
+        "applicationBase": {
+          "blob": "669051b68b861ac56dc34adc27159a12c569655f",
+          "sha256": "78054489508aafaf820bfee3ac6f3b69663411fe3244a043b75f261a3f85beb1"
+        },
+        "reference": {
+          "blob": "6dae97365b31aaf562363f6b74453dd37698ad4a",
+          "sha256": "f4608e0a3e3b49fc24aab7591ced69aadeb7adfe0277608a6d813d50ab3d9c9e"
+        },
+        "role": "fixed-product-input"
+      },
+      {
+        "path": "apps/asset/test/sources.unit.test.ts",
+        "applicationBase": {
+          "blob": "5f14337148ae8cf21d9b50682d04a73e5a71e1d0",
+          "sha256": "b4406f4c7524b5ba7d6bb43ecdc05435f7e9e55efe45351194958bdb2ae68c50"
+        },
+        "reference": {
+          "blob": "cd6097f57a8bc95f08d4e94a2355decc4b1cc849",
+          "sha256": "332ea3a5c24a33fd115fb55833eb78c74b7f06c7c238cd3689a2f15c8242ed91"
+        },
+        "role": "fixed-product-input"
+      }
+    ],
+    "productInputPatch": {
+      "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/workloads/548/v1/product-input.patch",
+      "sha256": "2417fe280fb18016b7bb01a5871fbfcdc6a7ef3796adb227c7d780f80f254fef"
+    },
+    "patchConstruction": "git diff --full-index --binary applicationBase closedC622Reference -- explicit non-generated sourceAllowlist paths; apply only in disposable replay checkout, never infrastructure source.",
+    "excluded": "No infra/docker-compose.apps.yml, scripts/boat*, shared test-cache repairs, other issue products or whole-head cherry-pick."
+  },
+  "before": {
+    "schema": {
+      "path": "apps/asset/src/db/schema.ts",
+      "blob": "060a6736c6550297dfb2b21f6363c328ead092f5",
+      "sha256": "5c620283fef66bf16ba7b06cd5394fa1f803f71c51c6b20ae503e3f779de90de"
+    },
+    "migrationSet": [
+      {
+        "path": "apps/asset/drizzle/0000_mute_the_professor.sql",
+        "blob": "9a755dbc54bcdaa17d1d09e8ee0171a587a03836",
+        "sha256": "2159b6e7bf794853c22be2785d1f66e696404d547359d4e621b216432f884d2c"
+      },
+      {
+        "path": "apps/asset/drizzle/0001_pretty_stellaris.sql",
+        "blob": "1d86d44a3a8f3ace0deaf4e00bbf4e755f331852",
+        "sha256": "3959d5c83068a11760f8c4307a3f6e90ce4ecc5daf4d41678c323cdbe699e283"
+      },
+      {
+        "path": "apps/asset/drizzle/0002_plain_zombie.sql",
+        "blob": "36a6da74a281d491ed04410c369e1e001beabf56",
+        "sha256": "a5a0fdf0eaabd794b56af131695a7908e1a5e152f6b40945d869478ccf0dc1f6"
+      },
+      {
+        "path": "apps/asset/drizzle/0003_freezing_skrulls.sql",
+        "blob": "d151b097352651da1fd4d0ff0719eb0068c57846",
+        "sha256": "e5dffb319fab43eec192bf49a8dd20bad6819e15cd1d3d05be4d04eeaf241a1e"
+      },
+      {
+        "path": "apps/asset/drizzle/0004_bumpy_black_tom.sql",
+        "blob": "b92083851ba1fde6fe4a2ac6de403fb55729d461",
+        "sha256": "16649178ffbfffe1da798c777b8bfabe931a4b24ddbe94287afa5dc0cb7a1286"
+      },
+      {
+        "path": "apps/asset/drizzle/0005_faithful_secret_warriors.sql",
+        "blob": "14407e464b8d59205c6c26e008d90545b68d691c",
+        "sha256": "d8fc1878dbc5b78ca37b608ca82698089a3cdebf757e082197945dcf0f7ee661"
+      },
+      {
+        "path": "apps/asset/drizzle/0006_lean_bastion.sql",
+        "blob": "faea394051790b62138cf8a6881bb8ae8963c189",
+        "sha256": "3375417b9824ae193fd5bf5f814f1eb1fe77e79bebbf5a7a75e3cf2117049183"
+      },
+      {
+        "path": "apps/asset/drizzle/0007_perpetual_agent_zero.sql",
+        "blob": "d0f13c3ae5e14ae1b565d31c2e6a2b88d6e3c61e",
+        "sha256": "0c5f8534da2fd680bb78e18dbfe4ad738cc495edbb30db34301fd44bfd5a1118"
+      },
+      {
+        "path": "apps/asset/drizzle/0008_cool_iron_fist.sql",
+        "blob": "4f8e1203e4ac2db099a090e689da352952d8d863",
+        "sha256": "87dabf358102a6a0ee2cd60d01ec57cab61eaedc2794c4c86b45e167002c183f"
+      },
+      {
+        "path": "apps/asset/drizzle/0009_empty_menace.sql",
+        "blob": "f94f383b10a74b7d72beb00faa8ffcd08c693479",
+        "sha256": "d26264bebd7bdabbbdbfff53a402f09ca5d8148bf72b32082baa65679dcf26e1"
+      },
+      {
+        "path": "apps/asset/drizzle/0010_milky_stingray.sql",
+        "blob": "01de26a1e498f3d106cffa8d5e023a3328a5af44",
+        "sha256": "efb200e29b5d9144f430f1e29636b68d0c387d91ac413be66f9ea371460ba3a0"
+      },
+      {
+        "path": "apps/asset/drizzle/0011_cooing_stellaris.sql",
+        "blob": "60c7d32a6e08039a1cde533e83c8ecbb5d5712fb",
+        "sha256": "2f374928dfe7bffc5ae5faab2023e77d6fc01e3886f94a27d80cc49b02fba901"
+      },
+      {
+        "path": "apps/asset/drizzle/0012_majestic_retro_girl.sql",
+        "blob": "8f5aff13b076bb799b8cb74c33eed82699b213c0",
+        "sha256": "6d16a3b7965e8c63d53b5ec1f8d2902b7deca35ccfd7323099bb50fbaebac3cf"
+      },
+      {
+        "path": "apps/asset/drizzle/0013_talented_nextwave.sql",
+        "blob": "bca2cee3d4cf69c7f6563f811a44908ce93a34fb",
+        "sha256": "e1a506d4ce9b0c44f27453fa760c564ef3b6d847ca135f80d54b81eb75c57b9b"
+      },
+      {
+        "path": "apps/asset/drizzle/0014_striped_puma.sql",
+        "blob": "dd2ce9d6ca397be7db7e8257b200db108dfed16b",
+        "sha256": "d6971ec44a8fe910264edcd9f54dbd726a57299e11ddd0e89fb37a4327662c83"
+      },
+      {
+        "path": "apps/asset/drizzle/0015_even_dexter_bennett.sql",
+        "blob": "b0505385175d548775bbcf8069c625e9179c1692",
+        "sha256": "89ae59f66bcdadd2c9879596d45bc60cde19c8580a0ea70f24fd1c506f3e0d6a"
+      },
+      {
+        "path": "apps/asset/drizzle/0016_faulty_exodus.sql",
+        "blob": "3a02c31cbcfbf90a3de67baac9067342be60fbd7",
+        "sha256": "4956682bb10beea66ebe5d41e5679a9f5ee96658e12da8f90de02395a637e181"
+      },
+      {
+        "path": "apps/asset/drizzle/0017_romantic_rictor.sql",
+        "blob": "520791f79a2330be1e5479a97de1fa083f0c2374",
+        "sha256": "9b78172d06e4dab282991c285d44d376f8e56d06091b3cf82dc4a0975b55c68b"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0000_snapshot.json",
+        "blob": "12f36412b280a104b16820375c1424b7b9cc50f0",
+        "sha256": "0ba703b92492a042946f303dc01924e20d5650f8c8e2e7d739cf670f4f4a0341"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0001_snapshot.json",
+        "blob": "2e96af2906511772bad6c14e98544f102d1dbb72",
+        "sha256": "d362815dfbe0bd099d7ed0c2140f9d46bd2ebe0549487532e8e08a37c822e6c0"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0002_snapshot.json",
+        "blob": "7d76c7210b5cca15ce94f8b04befadb31bd1ca82",
+        "sha256": "ee2491512386cb4203c1491b41154d459bce8f1c91fd2d8e8b22db37ade1234a"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0003_snapshot.json",
+        "blob": "906e688252dc23182381bd0a313d7a4a3d61a679",
+        "sha256": "4bf6fb1cb4eb29b92700ef5a2c9c492cb795469f0d0273aae9359c78a58e69f3"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0004_snapshot.json",
+        "blob": "87eeb01194324916aba47df925ef191d8066292c",
+        "sha256": "248dac99be7b5ca7cc9164220b8609c029396c6411a2024fca4e348ea36dca95"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0005_snapshot.json",
+        "blob": "e9a0a6f60032fa38d2051ba584b55078aa04f34d",
+        "sha256": "ed84043dd8352d267f63a47490a203e3129dc3aa88de0b3e56250bfc68b69f91"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0006_snapshot.json",
+        "blob": "57a91bef3840785c676853f9446374473bf316c5",
+        "sha256": "cf2d6be1ab5c69a04a1d2589190968dde05419a4a8c74d54938c1597b2a52e7c"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0007_snapshot.json",
+        "blob": "23614634abbf74124ebc715d37c9ed27b02690cb",
+        "sha256": "430160e2e9f84750e0032adc994580cd60aa779270447c59a8f9a1dba975c7b6"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0008_snapshot.json",
+        "blob": "8a74ceca6c393fc0fb165fc2a99fb6d7d5035585",
+        "sha256": "bd44766a73d6f292ace7a34ffa2b2fbe9633c77ba5834c671478058007bb670a"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0009_snapshot.json",
+        "blob": "c0a45bd1aa8136de28928445960326a12677f316",
+        "sha256": "ca09bd19a4f9183093efc22c72d39bbb4d90e04cef9e74be61999bbb2e32a664"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0010_snapshot.json",
+        "blob": "ab43200663e3308b3f945174143502c0f56e2d8f",
+        "sha256": "9466d9f487a0b0e8117e6cae5d9a19299a148329fe3613f733d4542e3df93f38"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0011_snapshot.json",
+        "blob": "3ba03841f2a5190ea5283f61b5ac5371a41b6c78",
+        "sha256": "1a3d2a839b28842810add049a253c7296281a4d9683e2dd0ef3ed34b9c1354e5"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0012_snapshot.json",
+        "blob": "a9208fbcfbd4a1a3af58cfdb20d246e65abd3bc5",
+        "sha256": "7b015f54fcd9f72c2ed603c0eaed028c03f8a4562c8a4dadfaddfac4d6d5a6d9"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0013_snapshot.json",
+        "blob": "f36e94d8f1253328216f0fe300c8446cb2c9ae24",
+        "sha256": "11a010682a4bcb7ed61f248ef6ea5d48d23c87e576b7cc82e57b8b2dbce7d334"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0014_snapshot.json",
+        "blob": "d68d16799f9a581dab214cea4f3420493337eb68",
+        "sha256": "7fbbd9b7fbdc6886e06c8ac16d39d8b250edef3d7b14ddbeb42da7334353e041"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0015_snapshot.json",
+        "blob": "220e5bdb9a13be07675506b95ba2211530b5a8d5",
+        "sha256": "cdf72d5f831f83125ba39b4771797a147ecfed0ec9fc3ecfb0b0ff612de99b2b"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0016_snapshot.json",
+        "blob": "60d28261ed7e41fa8a95a9130229390573d87b53",
+        "sha256": "5bc343846ed67602b2479c44fb30fd7b92bc9bb1eb9d06b1f5a60487340725ac"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0017_snapshot.json",
+        "blob": "6bc64f715389f62f3284b5fdefb6fdc0de5d8e08",
+        "sha256": "b97799a5b145ad825bb8b39ffa1a36f67d1f2960b0103bbb386ba973b2c4d146"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/_journal.json",
+        "blob": "0136e28e11a2658d9a9e9f69ac0d90a357fe683c",
+        "sha256": "688b2d876d1d4f9f9450b9d923a56aae10d16eed022df85208422d7b5aea9e80"
+      }
+    ],
+    "journalLastIndex": 17,
+    "required": "Before mutation, verify application-base schema and complete old migration set exactly; no source_candidates table definition or next_candidate_ordinal schema field; migration 18 SQL/snapshot absent. Preserve old journal entries.",
+    "runtime": "Use a separate owned worktree, worker, Compose project and database, with no #553 Asset edits or shared mutable data. Seed legacy candidates before canonical migration when testing deployed backfill."
+  },
+  "generation": {
+    "input": "Apply only non-generated sourceAllowlist changes from applicationBase to reference. Start with old migration set, including old journal. Do not copy the final journal.",
+    "command": "make run PACKAGE=asset SCRIPT=db:generate",
+    "outputsRoot": "apps/asset/drizzle",
+    "expected": "One new SQL migration, corresponding snapshot and journal entry 18, returned together to local source by the command. Names/timestamps may differ from historical generation; record actual paths/blobs/SHA-256 rather than forcing historical bytes.",
+    "semanticChecks": [
+      "SQL creates source_candidates, next_candidate_ordinal and replay/page/source/pending indexes matching the fixed schema.",
+      "New journal entry names the generated SQL and snapshot; snapshot previous-id chain is coherent; old entries and files preserved.",
+      "All outputs are regular in-root files; no secrets, dependencies, build output or unrelated source imported.",
+      "Local command-start input/output hashes still match on acceptance. Concurrent local schema or journal edits win; generator reports nonzero conflict and retains proposal outside source.",
+      "Generator/transfer failure cannot partially publish the set or mark preparation complete.",
+      "Next normal routed make build PACKAGE=asset retains the accepted local/worker set; repeat db:generate unchanged produces no new source diff."
+    ],
+    "controlOnly": [
+      {
+        "path": "apps/asset/drizzle/0018_spicy_valeria_richards.sql",
+        "blob": "a2bd498b1aa3c84cc166d657b20406253201f92b",
+        "sha256": "504f1b0abf6581cc3aff30c831dfc89ea9c9667eb8babfa0c5cef1586b87fd2b"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/0018_snapshot.json",
+        "blob": "f5091b6e766d5bb3f522cafbfc70344ed37340a6",
+        "sha256": "693fcdd351f1d3693283eb7c4aae32a3929cd8d4835b71db0c204db23da760f4"
+      },
+      {
+        "path": "apps/asset/drizzle/meta/_journal.json",
+        "blob": "d0f797803543fa86a75566fb8601299b541a7546",
+        "sha256": "2a4774de756cd03a0f6565c0b63d8464773332d6bfd3cef3d22caa5aa39751f5"
+      }
+    ],
+    "forbiddenHistoricalJournal": {
+      "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/548-_journal.json",
+      "sha256": "688b2d876d1d4f9f9450b9d923a56aae10d16eed022df85208422d7b5aea9e80"
+    },
+    "journalWarning": "Loose historical journal ends at 17 and cannot be used as final migration input or proof that 18 ran. Complete committed reference set ends at 18 and is diagnostic/control only.",
+    "state": "Pending future implementation and qualification. Actual Drizzle generation, complete journal through diagnostic entry 18, safe atomic local return and container-canonical migration are requirements, not implemented by this descriptor. Never preload generated final SQL/snapshot/journal as generation input."
+  },
+  "runtime": {
+    "route": "All application development/validation uses ordinary routed Make in an already enrolled owned development checkout. Do not use BOAT_EXEC overrides, SSH recipes or raw pnpm/turbo.",
+    "localSetup": "make install is local, not remote preparation. Do not count it as a remote frozen install. Normal make build/check triggers controller preparation. No manual artifact transfer counts as clean.",
+    "sequence": [
+      "make build PACKAGE=asset",
+      "make dev",
+      "make run PACKAGE=asset SCRIPT=db:generate",
+      "make build PACKAGE=asset",
+      "make run PACKAGE=asset SCRIPT=db:generate",
+      "make migrate PACKAGE=asset",
+      "make boat-preview"
+    ],
+    "migrationGate": {
+      "state": "known-unqualified, separate from generated-source return",
+      "command": "make migrate PACKAGE=asset",
+      "cause": "Canonical Make migration runs on worker host, but generated development DATABASE_URL addresses postgres on Docker network. Historical command failed ENOTFOUND postgres. drizzle/scripts also lacked awaited container delivery.",
+      "requiredEvidence": "Prove intended generated SQL, journal, snapshot, package db:migrate command and backfill bytes in actual running migration/application context. Canonical entry point must apply schema and backfill in the owned real database. Check column, retained candidates, emptied embedded history and next ordinal; rerun preserves exact candidate JSON. Health or SQL-applied log alone is insufficient.",
+      "disposition": "Do not repair in this definition. Record failure and leave qualification pending; no credential rewrite, manual container copy/exec substitute, second migration or claimed pass."
+    },
+    "preservation": [
+      "Preserve updates to built workspace dependencies consumed by running applications. Record changed runtime source and dist hashes, actual loaded artifact identity, expected owning service restart and readiness recovery. A validation build alone is not runtime delivery proof. Use ordinary Make preparation/watch behavior; no manual dist transfer or controller repair in this definition.",
+      "With no intended runtime source/dependency input change, forced validation must cause zero application restart/recreation and zero runtime artifact churn. Record before/after source, dependency, image and process identities. Validation-only output must not masquerade as a runtime dependency update. The public HMR and presence probes below are the only additional mutations in this fixed window."
+    ]
+  },
+  "live": {
+    "historicalSources": {
+      "directory": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/workloads/548/v1",
+      "provenance": {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/workloads/548/v1/provenance.json",
+        "sha256": "db6d9faba8c531df01423a735cc1653ebae5e0d3f0c948cb8035c118aa2f1abe"
+      },
+      "files": [
+        {
+          "file": "01-create-wallpapers.js",
+          "sha256": "9b88017222c03a9c56a3d7b403e905c5d3d8808adcf7531afcb172aed32c50c6",
+          "sourceSession": "/home/rafaeltab/.codex/sessions/2026/10/30/rollout-2026-10-30T23-31-27-01a18f27-6aeb-7570-b2f6-ed1560a1232c.jsonl",
+          "line": 1246,
+          "eventId": "exec-f47b21dd-8772-4362-96c8-7422d8eb584e",
+          "tool": "preview_evaluate",
+          "encoding": "UTF-8 expression, no appended newline"
+        },
+        {
+          "file": "hmr-observer.js",
+          "sha256": "68a85dc1ebed5d80c834e594c8b1bf68106a4e6f9ec14d202fc13b7b54f6b337",
+          "sourceSession": "/home/rafaeltab/.codex/sessions/2026/10/30/rollout-2026-10-30T23-31-27-01a18f27-6aeb-7570-b2f6-ed1560a1232c.jsonl",
+          "line": 1252,
+          "eventId": "exec-7816a213-4d60-4c73-9c40-b8d48bd621a6",
+          "tool": "preview_evaluate",
+          "encoding": "UTF-8 expression, no appended newline"
+        },
+        {
+          "file": "02-resolve-assets.js",
+          "sha256": "301af8edaccb402ecc8c6c551964748dac3f9e41e03d3b973d2f85eac2b771fa",
+          "sourceSession": "/home/rafaeltab/.codex/sessions/2026/10/30/rollout-2026-10-30T23-31-27-01a18f27-6aeb-7570-b2f6-ed1560a1232c.jsonl",
+          "line": 1262,
+          "eventId": "exec-8147195f-1104-4556-a934-86e524c3a8e9",
+          "tool": "preview_evaluate",
+          "encoding": "UTF-8 expression, no appended newline"
+        },
+        {
+          "file": "03-seed-cancelled-history.js",
+          "sha256": "25d1f4158e742d214ee6c429810a62d02ceeeeb79ede536f03756c4e8abeb93e",
+          "sourceSession": "/home/rafaeltab/.codex/sessions/2026/10/30/rollout-2026-10-30T23-31-27-01a18f27-6aeb-7570-b2f6-ed1560a1232c.jsonl",
+          "line": 1267,
+          "eventId": "exec-a8b2457a-9c3d-4bb9-9101-73173272fe32",
+          "tool": "preview_evaluate",
+          "encoding": "UTF-8 expression, no appended newline"
+        },
+        {
+          "file": "04-http-replay-conflict-status-page.js",
+          "sha256": "c0f959663572976c94fe8c0b3cdfdc3d1e90ec5c60357f5c4889994d5ea132ca",
+          "sourceSession": "/home/rafaeltab/.codex/sessions/2026/10/30/rollout-2026-10-30T23-31-27-01a18f27-6aeb-7570-b2f6-ed1560a1232c.jsonl",
+          "line": 1335,
+          "eventId": "exec-e2357e6d-9030-4d47-b582-a49d493654fa",
+          "tool": "preview_evaluate",
+          "encoding": "UTF-8 expression, no appended newline"
+        },
+        {
+          "file": "05-http-page2-negative.js",
+          "sha256": "6922eb6bc381067d5244e2d6a8c4fe86ed8b742ba90d60e7dd6850d877b9c3c3",
+          "sourceSession": "/home/rafaeltab/.codex/sessions/2026/10/30/rollout-2026-10-30T23-31-27-01a18f27-6aeb-7570-b2f6-ed1560a1232c.jsonl",
+          "line": 1342,
+          "eventId": "exec-e1ed1932-468e-4fed-b1dd-b00e18610dfa",
+          "tool": "preview_evaluate",
+          "encoding": "UTF-8 expression, no appended newline"
+        },
+        {
+          "file": "boat548-live.mjs",
+          "sha256": "3f3ef8f511c7c1798b90a48549a7a22c6f4a606d5c6f69045539832e663546c8",
+          "sourceSession": "/home/rafaeltab/.codex/sessions/2026/10/30/rollout-2026-10-30T23-31-27-01a18f27-6aeb-7570-b2f6-ed1560a1232c.jsonl",
+          "line": 1359,
+          "eventId": "exec-413ebbd1-301a-48d6-81a6-147a8faa4961",
+          "originalPath": "/home/rafaeltab/.t3/worktrees/wallpaperdb/t3-93daf8d6/apps/asset/scripts/boat548-live.mjs",
+          "encoding": "UTF-8 FileChange content"
+        },
+        {
+          "file": "06-http-concurrent-replay-stale.js",
+          "sha256": "db18995e28106530e279df8c4f17a01049224c86f8a06d8429346f90cec7ca58",
+          "sourceSession": "/home/rafaeltab/.codex/sessions/2026/10/30/rollout-2026-10-30T23-31-27-01a18f27-6aeb-7570-b2f6-ed1560a1232c.jsonl",
+          "line": 1442,
+          "eventId": "exec-c1872327-7140-4872-9c72-759d0d83996e",
+          "tool": "preview_evaluate",
+          "encoding": "UTF-8 expression, no appended newline"
+        },
+        {
+          "file": "receipt-export.js",
+          "sha256": "d6c3a8b188e3ac4e019d1132c1f20e1f85eaf51752413cb6c607cd239d4504d9",
+          "sourceSession": "/home/rafaeltab/.codex/sessions/2026/10/30/rollout-2026-10-30T23-31-27-01a18f27-6aeb-7570-b2f6-ed1560a1232c.jsonl",
+          "line": 1472,
+          "eventId": "exec-c4c61ebe-c5fb-415b-8e00-635fb6242d3a",
+          "tool": "preview_evaluate",
+          "encoding": "UTF-8 expression, no appended newline"
+        }
+      ]
+    },
+    "histories": [
+      32,
+      2048
+    ],
+    "equalActiveMembership": {
+      "sources": 0,
+      "nonterminalCandidates": 0,
+      "sourceSetRevision": "0",
+      "deliveryRevision": "0"
+    },
+    "httpSequence": [
+      "Authenticate through protected preview with Clerk; keep tokens private. Create fresh Wallpaper per history, resolve its Asset ID. Historical fixed idempotency keys require isolated/reset data.",
+      "For each history index i, POST /asset/assets/{assetId}/source-candidates with operation add, expectedSourceSetRevision 0 and history-i key; require 201, then DELETE returned candidate and require 200/cancelled.",
+      "GET oldest exact candidate requires 200, identical candidate ID and cancelled status. Equal history-0 replay requires 201 and same candidate ID/status; revision 1 reuse requires 409.",
+      "GET sources requires 200 and newest 32 cancelled outcomes in reverse ordinal order. Use returned nextCandidateCursor for history 2048 to fetch next 32 with no overlap and correct ordering. History 32 has no next cursor; historical synthetic 0:oldest cursor returned an empty second page.",
+      "GET missing candidate requires 404; unsigned sources requires 401.",
+      "Two simultaneous identical concurrency-control creates at revision 0 require 201/201 and same candidate ID; cancel once requires 200/cancelled. New stale-revision-control at 999999 requires 409 and no persisted mutation."
+    ],
+    "databaseEvidence": [
+      "Before concurrency controls, retained counts exactly 32/2048, next ordinal 32/2048, embedded candidates 0, active sources 0; bounded membership bytes at both sizes. Historical live membership was 385 bytes; integration fixture was 320, not a universal byte requirement.",
+      "Capture actual pg statements and returned-row counts at production adapter boundary using committed source-query-work fixture; EXPLAIN ANALYZE SELECTs under same conditions after ANALYZE. Do not infer bounded work from latency alone.",
+      "Committed sourceQueryWork requires fewer than 32 observed queries per operation, candidate results <=33, candidate SELECT examined rows <=64, candidate writes affected rows <=1. It sums candidate relation rows plus rows removed by filter times loops.",
+      "Historical standalone probe EXPLAINs status primary key, replay key, first page and ordinal cursor page, and pending count. Retain plans/index names and actual rows/buffers, not only the index definitions.",
+      "Transaction rollback control locks owned Asset, temporarily writes revision 999999, ROLLBACK restores revision 0. This proves DB rollback, not application exception rollback; use owning integration test for that guarantee."
+    ],
+    "expectedIndexes": [
+      "source_candidates_pkey",
+      "source_candidate_replay",
+      "source_candidate_page",
+      "source_candidate_source",
+      "source_candidate_pending"
+    ],
+    "unsafeOrMissingAssertions": [
+      "Historical PostgreSQL probe hard-codes two old Asset IDs; never execute unchanged on another database. Rebind to newly created receipt IDs in reviewed temporary source and hash that adaptation separately.",
+      "Historical probe was manually copied into container; this is failure/intervention evidence, never a clean delivery path. Its EXPLAIN queries are manually reconstructed, not traced HTTP statements, and it logs plans without asserting index choice/work limits.",
+      "HTTP historical controls omit explicit status-body cancelled checks, page1 HTTP status, page identity/order/non-overlap, active membership assertions and no-mutation checks after conflict/stale revision. Require these independently; historical JSON alone does not pass them.",
+      "Global Client.prototype.query interception must stay serial and restore descriptor; re-EXPLAIN occurs after transaction, so retain that measurement limit. Candidate row estimator does not measure every PostgreSQL buffer or hidden operation.",
+      "Historical HTTP seeding is asynchronous and lacks an overall deadline. Observe completion/errors with bounded existing application/test deadlines; do not increase timeouts or retry opaque failures.",
+      "Historical fixed assets, dates, idempotency keys and sessionStorage are provenance, not reusable live state. No stored token/session can be committed.",
+      "Canonical container migration/backfill and safe generated-output return are still unqualified. Existing integration backfill fixture starts after SQL migration; it does not prove canonical deployment context."
+    ],
+    "historicalObservedControls": [
+      {
+        "history": 32,
+        "status": {
+          "http": 200,
+          "outcome": "cancelled"
+        },
+        "replay": {
+          "http": 201,
+          "outcome": "cancelled"
+        },
+        "conflictHttp": 409,
+        "pages": [
+          {
+            "http": 200,
+            "candidateCount": 32,
+            "nextCursor": null
+          },
+          {
+            "http": 200,
+            "candidateCount": 0,
+            "nextCursor": null
+          }
+        ],
+        "missingHttp": 404,
+        "unsignedHttp": 401
+      },
+      {
+        "history": 2048,
+        "status": {
+          "http": 200,
+          "outcome": "cancelled"
+        },
+        "replay": {
+          "http": 201,
+          "outcome": "cancelled"
+        },
+        "conflictHttp": 409,
+        "pages": [
+          {
+            "http": 200,
+            "candidateCount": 32,
+            "nextCursor": "2016:candidate_c60ebe24-4792-4137-805d-244f3e4697be"
+          },
+          {
+            "http": 200,
+            "candidateCount": 32,
+            "nextCursor": "1984:candidate_7e1d7703-216f-4484-b6b7-f007c64e3448"
+          }
+        ],
+        "missingHttp": 404,
+        "unsignedHttp": 401
+      }
+    ],
+    "historicalObservedDatabase": [
+      {
+        "at": "2026-10-31T00:17:28.171Z",
+        "size": 32,
+        "assetId": "asset_ffda226f-03ba-4b8c-bc11-b75632b5049e",
+        "facts": {
+          "next_candidate_ordinal": 32,
+          "membership_bytes": 385,
+          "embedded_candidates": 0,
+          "active_sources": 0,
+          "retained": "32"
+        }
+      },
+      {
+        "size": 32,
+        "operation": "lookup/status",
+        "statement": "SELECT * FROM source_candidates WHERE asset_id=$1 AND id=$2 LIMIT 1",
+        "nodes": [
+          {
+            "type": "Limit",
+            "index": null,
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 3
+          },
+          {
+            "type": "Index Scan",
+            "index": "source_candidates_pkey",
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 3
+          }
+        ]
+      },
+      {
+        "size": 32,
+        "operation": "equal replay/conflict lookup",
+        "statement": "SELECT * FROM source_candidates WHERE asset_id=$1 AND idempotency_key=$2 LIMIT 1",
+        "nodes": [
+          {
+            "type": "Limit",
+            "index": null,
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 3
+          },
+          {
+            "type": "Index Scan",
+            "index": "source_candidate_replay",
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 3
+          }
+        ]
+      },
+      {
+        "size": 32,
+        "operation": "page1",
+        "statement": "SELECT * FROM source_candidates WHERE asset_id=$1 ORDER BY ordinal DESC LIMIT 33",
+        "nodes": [
+          {
+            "type": "Limit",
+            "index": null,
+            "rows": 32,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 10
+          },
+          {
+            "type": "Index Scan",
+            "index": "source_candidate_page",
+            "rows": 32,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 10
+          }
+        ]
+      },
+      {
+        "size": 32,
+        "operation": "page2",
+        "statement": "SELECT * FROM source_candidates WHERE asset_id=$1 AND ordinal<$2 ORDER BY ordinal DESC LIMIT 33",
+        "nodes": [
+          {
+            "type": "Limit",
+            "index": null,
+            "rows": 0,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 2
+          },
+          {
+            "type": "Index Scan",
+            "index": "source_candidate_page",
+            "rows": 0,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 2
+          }
+        ]
+      },
+      {
+        "size": 32,
+        "operation": "pending count",
+        "statement": "SELECT count(*) FROM source_candidates WHERE asset_id=$1 AND status NOT IN ('accepted','rejected','cancelled') AND expires_at>now()",
+        "nodes": [
+          {
+            "type": "Aggregate",
+            "index": null,
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 1
+          },
+          {
+            "type": "Index Only Scan",
+            "index": "source_candidate_pending",
+            "rows": 0,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 1
+          }
+        ]
+      },
+      {
+        "size": 32,
+        "operation": "live PostgreSQL rollback",
+        "inside": "999999",
+        "after": "0"
+      },
+      {
+        "at": "2026-10-31T00:17:28.183Z",
+        "size": 2048,
+        "assetId": "asset_082c3a9e-e3ff-47fe-82fe-8a6f1f7b74ac",
+        "facts": {
+          "next_candidate_ordinal": 2048,
+          "membership_bytes": 385,
+          "embedded_candidates": 0,
+          "active_sources": 0,
+          "retained": "2048"
+        }
+      },
+      {
+        "size": 2048,
+        "operation": "lookup/status",
+        "statement": "SELECT * FROM source_candidates WHERE asset_id=$1 AND id=$2 LIMIT 1",
+        "nodes": [
+          {
+            "type": "Limit",
+            "index": null,
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 3
+          },
+          {
+            "type": "Index Scan",
+            "index": "source_candidates_pkey",
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 3
+          }
+        ]
+      },
+      {
+        "size": 2048,
+        "operation": "equal replay/conflict lookup",
+        "statement": "SELECT * FROM source_candidates WHERE asset_id=$1 AND idempotency_key=$2 LIMIT 1",
+        "nodes": [
+          {
+            "type": "Limit",
+            "index": null,
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 3
+          },
+          {
+            "type": "Index Scan",
+            "index": "source_candidate_replay",
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 3
+          }
+        ]
+      },
+      {
+        "size": 2048,
+        "operation": "page1",
+        "statement": "SELECT * FROM source_candidates WHERE asset_id=$1 ORDER BY ordinal DESC LIMIT 33",
+        "nodes": [
+          {
+            "type": "Limit",
+            "index": null,
+            "rows": 33,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 9
+          },
+          {
+            "type": "Index Scan",
+            "index": "source_candidate_page",
+            "rows": 33,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 9
+          }
+        ]
+      },
+      {
+        "size": 2048,
+        "operation": "page2",
+        "statement": "SELECT * FROM source_candidates WHERE asset_id=$1 AND ordinal<$2 ORDER BY ordinal DESC LIMIT 33",
+        "nodes": [
+          {
+            "type": "Limit",
+            "index": null,
+            "rows": 33,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 9
+          },
+          {
+            "type": "Index Scan",
+            "index": "source_candidate_page",
+            "rows": 33,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 9
+          }
+        ]
+      },
+      {
+        "size": 2048,
+        "operation": "pending count",
+        "statement": "SELECT count(*) FROM source_candidates WHERE asset_id=$1 AND status NOT IN ('accepted','rejected','cancelled') AND expires_at>now()",
+        "nodes": [
+          {
+            "type": "Aggregate",
+            "index": null,
+            "rows": 1,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 1
+          },
+          {
+            "type": "Index Only Scan",
+            "index": "source_candidate_pending",
+            "rows": 0,
+            "loops": 1,
+            "removedByFilter": 0,
+            "sharedHitBlocks": 1
+          }
+        ]
+      },
+      {
+        "size": 2048,
+        "operation": "live PostgreSQL rollback",
+        "inside": "999999",
+        "after": "0"
+      }
+    ]
+  },
+  "verification": {
+    "executeNow": false,
+    "existingCommands": [
+      "make test-focused PACKAGE=asset ARGS='test/source-window.unit.test.ts test/sources.unit.test.ts test/sources-decisions.unit.test.ts'",
+      "make test-focused PACKAGE=asset ARGS='test/source-postgres.integration.test.ts test/source-composition.integration.test.ts'",
+      "make check PACKAGE=asset FORCE=1",
+      "make ci"
+    ],
+    "boundaries": "Capability/window decisions, real PostgreSQL persistence/backfill/rollback/concurrency, real HTTP composition and protected deployed HTTP/DB each retain their own evidence. Pre-repair failure and corrected test-only reference are separate.",
+    "requiredReceipts": [
+      "Actual infra/application/fixture/descriptor identities and before/after input/output hashes; attempted commands, statuses and cold/warm conditions.",
+      "Generation, safe conflict/failure controls, next-command stability, canonical migration/backfill, HTTP and DB assertions each get explicit outcomes.",
+      "Public developmentWindow edit/restoration, creation/deletion, unchanged-document/timeOrigin, runtime hashes and absence, owned process/restart events and readiness receipts. Historical authenticated product scenarios retain separate protected recording.",
+      "Execute developmentWindow exactly: aligned 120-second observation with actual forced Asset check active interval separately recorded. Full CI once per admitted issue at frozen inputs with watcher active. Original #548 full CI failure remains unresolved evidence.",
+      "Owned cleanup and non-resuming inspection/stop-resume intent, cost receipts and root promotion decision. No combination of passing substeps from failed rounds."
+    ],
+    "sourceContracts": [
+      {
+        "path": "Makefile",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "6401a6419975f6c77295879b9dc700ed8417eef8",
+        "sha256": "b5e1705077b9779add6271bb35ca44ce75b5dd9738657c3b3482dd827bf12ccb"
+      },
+      {
+        "path": "scripts/boat-route.mk",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "7dd161df588bde8ed65109100b2479b83a5d27aa",
+        "sha256": "a7278277a9cff29653c65492f1dac0e4c45fdbd8b9162ce84c985c37e644328f"
+      },
+      {
+        "path": "scripts/boat-sample.mjs",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "cb600c6dc1284c763676adbbbad0ccbb83f6d010",
+        "sha256": "8beb4bfaed38e2ecdf222ac9d46f5c31b0c2679c8a0968f9add689f897b592ec"
+      },
+      {
+        "path": "scripts/lib/boat-sample.mjs",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "039484e79f5741523282e58a0b95382ab7352c4f",
+        "sha256": "a31303340f73d4b06d0ceea0ffdb813647d1416fdd1ba2e24657a9c27a4c9df4"
+      },
+      {
+        "path": "scripts/boat.mjs",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "7d57a026b3918d16d17c1156221295126ba44c3d",
+        "sha256": "1212fea5bdc4377f6ca1d20c3163ceed2cdd7dacaa76dd65b30b6f9402609f76"
+      },
+      {
+        "path": "scripts/boat-watch.mjs",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "169f1d22f8c852b86fe95b7b478f2e22b1619278",
+        "sha256": "e2a9d76f5d9eeaa8b725c46054f5a007a7b08de38a0a8693b099accf4e99e35f"
+      },
+      {
+        "path": "infra/docker-compose.apps.yml",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "b0e83b439f309160a874b691fd0cb760ba0ea9c9",
+        "sha256": "85344e89dcfbcd0001aedbbee541abe0c7a9befe1d29c3bef7c015bf351a7085"
+      },
+      {
+        "path": "infra/caddy/Caddyfile",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "2f73910b44e1ff2da6b00b0c48253e502da25b99",
+        "sha256": "f51965e7910b583ce2b8d7b4e70d29c3e7614bd51d3357fc5e3e06aadc087eb1"
+      },
+      {
+        "path": "apps/web/vite.config.ts",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "580352ed862c7c3d233924f5800dc8cbf8b75e37",
+        "sha256": "3d4248ce3ca5223a0dfc6b47b88b26e621addd5ff386b6b839cdb62be58c92de"
+      },
+      {
+        "path": "apps/asset/package.json",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "846eaf95be1e4d6b52e6a5486a91ac57587d354a",
+        "sha256": "08bf8778fe9c8f615fd56f0d9c6aa61c223783a9d68108580edbec9e29c2d4b1"
+      },
+      {
+        "path": "apps/web/Dockerfile.dev",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "32be28a971a0f1d36f2db429e224633bc2e6975f",
+        "sha256": "c7f508ab995d0796f3be7361da96fdd4bf4ce4d89c2f778e0f6dd2b93122e9eb"
+      },
+      {
+        "path": "apps/asset/Dockerfile.dev",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "6906cd8f0b5d0c4b0033103713473df7aa78b406",
+        "sha256": "baf74e87e95f5c523e87aeef811ef1b73a0fe6c88286b46808c49cf47a5a5358"
+      },
+      {
+        "path": "scripts/entrypoint.sh",
+        "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+        "blob": "e69f9baa70dc7f55b88772b6ec2eb1779ffa9da9",
+        "sha256": "eeb370af4e4d1029d2c1187d3d4b1dde7aa5d223f74f48d6ff73d710fbd09dd1"
+      }
+    ],
+    "developmentWindow": {
+      "state": "Declarative future procedure only. Do not execute during descriptor preparation or the active #547 window.",
+      "scope": "Exactly one admitted #548 owned development stack. Keep the same watcher, public browser document and sampler throughout. No private authentication is needed for these public probes; authenticated historical product scenarios remain separate. No token, environment dump, sessionStorage, credential or raw secret logging.",
+      "publicHmr": {
+        "source": {
+          "path": "apps/web/src/routes/__root.tsx",
+          "commit": "94d6528318c747fd31fed8ab631a01e0d7d75801",
+          "blob": "1c0411499698c643eaf4be19f142957856b3a88c",
+          "sha256": "63682b452d4fa5f350646c90d533595b9ad483f794739d0983ab3b23b605dc62",
+          "applicationBase": "dc17dead07c1d1f66e1806412cb7623812601bf1",
+          "anchor": "                  <span className=\"text-xl font-bold text-foreground hidden sm:inline\">\n                    WallpaperDB\n                  </span>",
+          "replacement": "                  <span className=\"text-xl font-bold text-foreground hidden sm:inline\">\n                    WallpaperDB BOAT-548-HMR\n                  </span>",
+          "expectedOccurrences": 1
+        },
+        "urlPath": "/web/",
+        "viewportMinimumWidth": 1024,
+        "selector": "header span.text-xl.font-bold.text-foreground",
+        "baselineText": "WallpaperDB",
+        "editedText": "WallpaperDB BOAT-548-HMR",
+        "editMethod": "Require the pinned regular local file, exact blob/SHA-256 and one anchor occurrence before editing. Replace only anchor with replacement in the owned local source; record write time and edited SHA-256. Ordinary development synchronization must deliver it. Do not modify worker/container source directly.",
+        "restoreMethod": "After observing editedText, require the current local file still equals the recorded edited bytes. Restore the exact pinned original bytes locally and record write time. On conflict stop without overwriting newer work. Require original blob/SHA-256 and baselineText after restoration.",
+        "documentProof": "Before T0 record URL, performance.timeOrigin and a random document-only nonce on window. Poll selector text, timeOrigin and nonce every 1000ms through T0+120s. Require exact visible text and unchanged timeOrigin/nonce for edit, restore and final receipt. Do not reload, navigate, replace the page or reinitialize the nonce. DOM writes cannot stand in for source HMR. A changed document fails this round.",
+        "archiveLimit": "Archived hmr-observer.js observes body text only. It supplies neither source mutation nor restoration/deletion proof and cannot satisfy this procedure by itself."
+      },
+      "presence": {
+        "localPath": "apps/web/src/boat-548-presence.txt",
+        "containerPath": "/app/apps/web/src/boat-548-presence.txt",
+        "bytes": "BOAT-548-PRESENCE\n",
+        "urlPath": "/web/src/boat-548-presence.txt",
+        "request": "From the same public browser document, fetch exactly this path with cache: no-store and Accept: text/plain, without query parameters. Use an ordinary fetch, not a script/module request or import. Read arrayBuffer() and compare every response byte, including the final LF, with UTF-8 bytes and sha256. Record status, exact-bytes-match and marker-present booleans plus response SHA-256 only, not unrelated response bodies. One request deadline is 5000ms; poll every 1000ms until the phase deadline.",
+        "createMethod": "Before T0 require the local path absent, container path absent and public request 404 with marker absent. Create exactly bytes locally with exclusive-create semantics, never overwrite. Keep this raw .txt unimported under the existing watched apps/web/src; do not add it to public, routes, imports or configuration. Ordinary source synchronization/Compose watch delivers it. Require local and container SHA-256 equal bytes hash, HTTP 200 and exact response bytes with the same SHA-256.",
+        "deleteMethod": "Only unlink the owned local regular file after its bytes hash still matches. Record deletion time. Require local lstat ENOENT, container test ! -e succeeds and the same public request returns 404 with marker absent. A Vite HTML fallback with status 200 fails absence proof. No manual remote deletion or cache-busting substitute.",
+        "sha256": "6baee87d44729caf75804ae5add7146de3d56f1fdbca46ffd40bba5b612567ad",
+        "viteContract": {
+          "version": "7.3.0",
+          "lockfile": "pnpm-lock.yaml",
+          "packageSource": "vite/dist/node/chunks/config.js",
+          "sourceSha256": "79a983f161c1272ab1be6f7c292c4ec476c1b41784cb570a45b2c4f4c0591687",
+          "requestPath": "Locked source: isJSRequest excludes .txt. transformMiddleware only transforms script-destination, JS, import, CSS or HTML-proxy requests. This plain fetch meets none of those conditions; serveStaticMiddleware serves the raw file without moduleGraph registration. Its sirvOptions uses dev: true and extensions: []. Explicit Accept: text/plain makes htmlFallbackMiddleware return next without SPA rewrite when the file is absent; notFoundMiddleware returns 404.",
+          "hmrPath": "Locked source: onFileAddUnlink invokes handleHMRUpdate for create/delete. This unimported non-module file has no moduleGraph entries. With no unresolved-import modules added on create and no plugin adding modules or sending reloads, handleHMRUpdate takes its empty-modules, non-HTML branch and returns without updateModules or full-reload. Fetching a .ts instead registers a module; an unaccepted module with no importers can reach full-reload on deletion.",
+          "gate": "Before the admitted window require the locked runtime Vite version/source hash above, no import of this probe, no unresolved-import modules in Vite before creation, and unchanged pinned Vite/plugin configuration. Recheck this source contract if those inputs change. The original-document nonce/timeOrigin requirement remains mandatory through creation/deletion. Offline source inspection is not live qualification."
+        }
+      },
+      "sampling": {
+        "commandTemplate": "make boat-sample ARGS='<absolute inventory.json> <absolute fresh output directory>'",
+        "inventory": [
+          {
+            "issue": 548,
+            "worktreePath": "<absolute admitted owned #548 worktree>"
+          }
+        ],
+        "selection": "Exactly the singleton issue 548. Bind the placeholder to the coordinator-admitted absolute worktree before T0 and freeze inventory SHA-256 in receipts. No other active root/worker stack belongs in this sample; no empty, duplicate or implicit selection.",
+        "interface": "Run the pinned sampler from the frozen infrastructure checkout. Two positional arguments only, with optional --once for preflight. Continuous observation must omit --once. No invented --duration, --interval, --routes or --issues flags. Sampler reads each selected .boat/state.json and .worktree, performs read-only worker SSH internally and never resumes a worker. No direct operator SSH or provider operations.",
+        "routes": [
+          "/web/",
+          "/ingestor/ready",
+          "/asset/ready",
+          "/wallpaper/ready",
+          "/gateway/ready",
+          "/variant-generator/ready",
+          "/color-extractor/ready",
+          "/user/ready"
+        ],
+        "address": "Sampler uses http://127.0.0.1:<selected .worktree INGRESS_PORT>. Public browser uses the owned make boat-preview URL with the same paths. Do not freeze a historical port or remote hostname.",
+        "cadenceMs": 10000,
+        "httpDeadlineMs": 5000,
+        "workerDeadlineMs": 20000,
+        "actualCadence": "Sampler starts a new batch after max(0, 10000 - batch duration). Routes and selected stacks run concurrently; slow batches reduce cadence. Retain actual started/ended timestamps. Reject batch duration or adjacent start gap greater than 25000ms; do not claim ideal fixed cadence from configuration alone.",
+        "window": "T0 is the first continuous batch started after readiness and immediately before forced-check dispatch. Require at least 120000ms from T0 through a complete batch started at or after T0+120000ms, at least 7 complete batches, and no missing route or stack. After that final batch, create output/sampling-stop and await sampler exit within 25000ms. Existing stop file or reused output invalidates the run.",
+        "assertions": "Every batch must contain exactly issue 548, the same owned worker id, all eight routes exactly once, no error/stopped result and allHealthy=true. Require HTTP 200 for every route, stronger than sampler healthy which accepts 200-399. Worker resource errors are failures even if healthy=true. Keep aligned-samples.jsonl and its SHA-256; sample failures remain failures without selective retry."
+      },
+      "schedule": [
+        "Before T0: verify source contracts and HMR source; record application/infrastructure/descriptor SHA, inventory hash, complete input manifest, runtime-built dependency hashes, worker/Compose/watcher/process identities. Start with make dev and make boat-preview only after admission. Require all eight routes HTTP 200 within 120000ms of startup, using pinned sampler --once preflight and unchanged public document baseline. Require presence path absent in local source, runtime container and HTTP.",
+        "At T0: dispatch make check PACKAGE=asset FORCE=1 once in the owned development checkout with watcher active; record dispatch, actual process start, exit time/status and log SHA. Record its actual active interval separately from the observation window. Do not sleep, repeat checks, inject source changes or pad the command to claim 120 seconds of command activity. Require at least one complete health batch during that active interval or report insufficient overlap.",
+        "At T0+10000ms: perform the exact public HMR text edit. Require visible editedText in the original document within 20000ms of the write.",
+        "At T0+40000ms: restore exact original HMR source bytes. Require visible baselineText and editedText absent in the original document within 20000ms of restoration.",
+        "At T0+70000ms: exclusively create presence.localPath. Require local/runtime hashes and HTTP 200 with exact response bytes and matching SHA-256 within 20000ms of creation.",
+        "At T0+100000ms: delete the owned presence file. Require local/runtime absence and HTTP 404 with no marker within 20000ms of deletion.",
+        "Through T0+120000ms and the final complete sample: keep the original browser document, watcher and sampler active even if the check exits earlier. Then await the check if still active under the existing command deadline; retain its full interval and failure. No missing phase may borrow evidence from another round.",
+        "After the window: require original HMR source hash locally and inside web container, absence of the presence file locally/runtime/HTTP, unchanged document identity, and the same process/readiness receipts. Full make ci is a separate once-per-admitted-issue validation at frozen inputs with watcher active, after these temporary mutations are gone. No generated final SQL is preloaded. Failure leaves qualification pending."
+      ],
+      "processReceipts": {
+        "beforeAfter": "Freeze owned worktree, worker id/runningSince, Compose project, watcher id/start identity and local daemon/process start identities. For each app record container ID, image ID, State.Pid, State.StartedAt and RestartCount before/after. Never dump Config.Env or complete private state/enrollment files. Include every owned container child process PID, PPID, start time and executable name, since a tsx/node child can restart while container PID/RestartCount stay unchanged. Exclude command arguments and environment.",
+        "commands": [
+          "make docker-run ARGS='docker compose -p <owned project> -f infra/docker-compose.apps.yml ps --all --format json'",
+          "make docker-run ARGS='docker inspect --format {{.Id}},{{.Image}},{{.State.Pid}},{{.State.StartedAt}},{{.RestartCount}} <owned app container IDs>'",
+          "make docker-run ARGS='docker top <owned app container ID> -eo pid,ppid,lstart,comm'",
+          "make docker-run ARGS='docker compose -p <owned project> -f infra/docker-compose.apps.yml exec -T web sha256sum /app/apps/web/src/routes/__root.tsx'",
+          "make docker-run ARGS='docker compose -p <owned project> -f infra/docker-compose.apps.yml exec -T web sha256sum /app/apps/web/src/routes/__root.tsx /app/apps/web/src/boat-548-presence.txt'",
+          "make docker-run ARGS='docker compose -p <owned project> -f infra/docker-compose.apps.yml exec -T web test ! -e /app/apps/web/src/boat-548-presence.txt'"
+        ],
+        "events": "Retain owned Compose watch sync/restart/rebuild events and app lifecycle timestamps during the entire window, not only endpoint snapshots. Missing process/event evidence cannot prove zero restarts. The window permits no planned restart; public src edit/create/delete use sync. A dependency update in a separate admitted step must show its own expected restart, old/new loaded artifact hashes, and HTTP 200 recovery on all affected routes within 120000ms. Do not count a validation-only build as that update.",
+        "failure": "Unexpected restart/recreate, changed process start identity, missed health deadline, changed source contracts, unintended runtime-built artifact churn, or incomplete source restoration fails the round. Retain evidence and perform owned cleanup without claiming qualification. Coordinator owns stop/resume/provider receipts.",
+        "commandUse": "Expand templates only with the frozen owned project/container IDs. Capture inspect/top before T0, at each mutation/restoration/deletion boundary and after the final sample. Use header-only sha256sum before/after, the two-file sha256sum only while presence exists, and test ! -e before creation and after deletion. Retain exit statuses. These ordinary routed read-only commands and sampler traffic do not extend the forced-check active interval."
+      }
+    }
+  },
+  "historicalEvidence": {
+    "root": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c",
+    "files": [
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-live.json",
+        "sha256": "a159ce7efc4d718c92aebcff55de8d1f4fafc5dddf649c02b747e22e7fad907d"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-live-pg.log",
+        "sha256": "813e0f338b6ae90e47887dcfc169cfa2666c713502ebca59f5b8afbd83ff41d3"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-query-evidence.log",
+        "sha256": "8da2892d25c3309fa8821fe43f6a59fa27d303b2be19a14799d3941383c4cbcc"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-red.log",
+        "sha256": "d7271bec4cc1e28abc7575c1f4d44ae0b7fc34c1ef8e1f033093e606f45c726a"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-remediation-red.log",
+        "sha256": "dab8bbd2f638ce7e1340ecb8003da0bc9bed9be83b9b3dab6d5e1ea6cf9975a3"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-remediation-green.log",
+        "sha256": "4b014cb54b62356b1325844d5487dfd2ff1d40a40fc2923f391f6f410d411eea"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-owning-final.log",
+        "sha256": "92f109584a74a72de5f497381c2bab3dff1d1acc89b9d7394021f0e291ff6ded"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-contract-2.log",
+        "sha256": "775978fd61cac0c9b5778f38432f1bd55b2db6c86128030f26a3ec3a34f6fab7"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-check-final.log",
+        "sha256": "9fdae60499f426952881a7e0879311bbe15f91dfee26d078f533416f733a62d5"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-ci.log",
+        "sha256": "c8264b7f90858cb18c38c113cefcba4143fc32ecdc2bafce83ffd4ed2d22e833"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-generate-2.log",
+        "sha256": "424e7dfb73f8a8e327b988e5e2df8ff88ebdadf4b83fefcec1b891ab39223bb4"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-generate-transfer.log",
+        "sha256": "29269df9ef1aad0a1c473fd4bef4937f4b370f6904b0a9cda3e09e04b0a214cf"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-migrate.log",
+        "sha256": "f79d2247626c43b494d9b8afac056d1f2ff1bf0f0f63ad6b6f692f336c876e36"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-container-migrate.log",
+        "sha256": "30258d3090ef4bc5ec5c8ffe5bfeb785b1ab1c33730d73c0082965c26a8ff522"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-container-migrate-2.log",
+        "sha256": "7cf5439361db18c7508f3d3b5ed878fe8d3e1d17e1c52fca0844958bb83b019c"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-container-backfill.log",
+        "sha256": "20fea31e24fe1260d4c482ff99b274f47f0b6c8854ca2be7f8151efb5482f23e"
+      },
+      {
+        "path": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/evidence/2026-10-30-c/retained-child-logs/548/boat-548-live-copy.log",
+        "sha256": "01ba21763054bdfc90dcd4c72af85f99b088a5f03782bef96f557e91374fc1dd"
+      }
+    ],
+    "research": [
+      {
+        "path": "/tmp/boat-547-548-source-generation-research-20261031.txt",
+        "sha256": "d61086dc9106f469384b2e8116a55e0efa77f1ff0d747ac7a44698776f2032d7"
+      },
+      {
+        "path": "/tmp/boat-hillclimb-replay-research-20261031.md",
+        "sha256": "da87657ae1d89b4b0570c1967f64fb6b6f65d37f4bac18bcdeb3eeb5a3222b65"
+      }
+    ],
+    "claim": "Historical sources/results only. No test, HTTP/DB scenario, generation, remote preparation, application startup, provider inspection or paid operation executed for this definition."
+  }
+}

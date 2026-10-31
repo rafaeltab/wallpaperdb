@@ -8,16 +8,25 @@
 		"wallpaperdb-crap": "./crap.mts"
 	},
 	"scripts": {
+		"boat:stop-watch": "cd .. && node scripts/boat-stop-watch.mjs",
+		"boat:cache-proof": "cd .. && node scripts/boat-cache-proof.mjs",
 		"boat:watch": "node boat-watch.mjs",
 		"boat:probe": "node boat-probe.mjs",
 		"boat:ready": "cd .. && node --experimental-strip-types scripts/boat-ready.mjs",
-		"boat:lint": "biome lint boat.mjs boat.test.mjs boat-shell.mjs boat-ready.mjs boat-probe.mjs boat-watch.mjs lib/boat.mjs lib/boat-cache.mjs",
+		"boat:lint": "biome lint boat.mjs boat.test.mjs boat-shell.mjs boat-ready.mjs boat-probe.mjs boat-watch.mjs lib/boat.mjs lib/boat-cache.mjs lib/boat-snapshot.mjs lib/boat-shutdown.mjs lib/boat-source-generation.mjs lib/boat-asset-migration.mjs",
 		"boat:cache-login": "cd .. && turbo login",
 		"test:boat": "node --test boat.test.mjs",
+		"test:asset-migration": "node --test --test-name-pattern='Asset migration' boat.test.mjs",
+		"test:boat-focused": "node --test",
+		"test:boat-pending-evidence": "node --test --test-name-pattern='^pending-preview evidence' boat.test.mjs",
+		"test:boat-pending-cleanup": "node --test --test-name-pattern='^pending-upgrade fixture' boat.test.mjs",
+		"test:boat-pending-diagnostic": "node --test --test-name-pattern='^(pending-upgrade|preview forwards downstream|preview retains)' boat.test.mjs",
+		"test:boat-sample": "node --test boat-sample.test.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:docker-queue": "cd .. && node --test scripts/docker-validation.test.mjs",
 		"test:toolchain": "cd .. && node --test scripts/toolchain.test.mjs",
+		"test:compose-watch": "cd .. && node --test scripts/compose-watch.test.mjs",
 		"test:pr-history": "cd .. && node --test scripts/pr-history.test.mjs",
 		"test:pr-history-status": "cd .. && node --test scripts/pr-history-status.test.mjs",
 		"check:pr-history": "node check-pr-history.mjs",
@@ -25,7 +34,8 @@
 		"test:mutation": "node mutation.mjs",
 		"check-types": "tsc --project tsconfig.json",
 		"format:files": "biome format --write",
-		"test:operator-inbox": "node --test operator-inbox.test.mjs"
+		"test:operator-inbox": "node --test operator-inbox.test.mjs",
+		"dependencies:lock": "cd .. && mise exec -- pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts"
 	},
 	"dependencies": {
 		"@wallpaperdb/crap-typescript-core": "workspace:*",
@@ -34,6 +44,7 @@
 		"@stryker-mutator/vitest-runner": "10.0.0"
 	},
 	"devDependencies": {
+		"esbuild": "^0.27.2",
 		"@biomejs/biome": "2.6.2",
 		"@types/istanbul-lib-coverage": "2.0.6",
 		"@types/node": "^26.0.1",

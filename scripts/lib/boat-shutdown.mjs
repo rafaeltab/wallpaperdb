@@ -247,7 +247,12 @@ export function finiteShutdownProcess(child, phase) {
 	});
 }
 
-export async function retireShutdownTunnel(record, protectedPids, phase) {
+export async function retireShutdownTunnel(
+	record,
+	protectedPids,
+	phase,
+	persist,
+) {
 	if (!record?.pid) return;
 	if (
 		!Number.isSafeInteger(record.pid) ||
@@ -258,15 +263,58 @@ export async function retireShutdownTunnel(record, protectedPids, phase) {
 		throw new Error(
 			"Shutdown disposal: incomplete tunnel identity; record retained",
 		);
+	const captured = record.shutdownOwnership?.captured ?? [];
+	if (
+		!Array.isArray(captured) ||
+		captured.some(
+			(p) =>
+				!Number.isSafeInteger(p.pid) ||
+				p.pid <= 1 ||
+				typeof p.birth !== "string" ||
+				!/^\d+$/.test(p.birth),
+		)
+	)
+		throw new Error(
+			"Shutdown disposal: captured tunnel identity invalid; record retained",
+		);
+	const observed = new Map(captured.map((p) => [`${p.pid}:${p.birth}`, p]));
+	const retain = (members) =>
+		persist({
+			...record,
+			shutdownOwnership: {
+				captured: [...observed.values()],
+				unresolved: members,
+				observedAt: new Date().toISOString(),
+			},
+		});
+	const capturedSurvivors = () =>
+		[...observed.values()].flatMap((p) => {
+			const live = identity(p.pid);
+			return live && !live.zombie && live.birth === p.birth ? [live] : [];
+		});
 	const current = identity(record.pid);
 	if (!current || current.zombie) {
-		const survivors = groupMembers({
+		const group = groupMembers({
 			group: record.pid,
 			session: record.pid,
 			birth: record.startTicks,
 		});
+		for (const p of group) observed.set(`${p.pid}:${p.birth}`, p);
+		const survivors = [
+			...new Map(
+				[...group, ...capturedSurvivors()].map((p) => [
+					`${p.pid}:${p.birth}`,
+					p,
+				]),
+			).values(),
+		];
+		retain(survivors);
 		if (survivors.length) {
-			phase.record({ phase: "tunnel-disposal", unresolved: survivors });
+			phase.record({
+				phase: "tunnel-disposal",
+				observed: [...observed.values()],
+				unresolved: survivors,
+			});
 			throw new Error(
 				"Shutdown disposal: tunnel leader unavailable; ownership record retained",
 			);
@@ -296,16 +344,31 @@ export async function retireShutdownTunnel(record, protectedPids, phase) {
 		throw new Error(
 			"Shutdown disposal: tunnel group overlaps protected resources; record retained",
 		);
-	const observed = new Map(members.map((p) => [`${p.pid}:${p.birth}`, p]));
+	for (const p of members) observed.set(`${p.pid}:${p.birth}`, p);
+	retain([
+		...new Map(
+			[...members, ...capturedSurvivors()].map((p) => [
+				`${p.pid}:${p.birth}`,
+				p,
+			]),
+		).values(),
+	]);
 	const remaining = () => {
 		const group = groupMembers(leader);
+		const previousSize = observed.size;
 		for (const p of group) observed.set(`${p.pid}:${p.birth}`, p);
-		for (const p of observed.values()) {
-			const live = identity(p.pid);
-			if (live && !live.zombie && live.birth === p.birth && !same(live, p))
-				group.push(live);
-		}
-		return group;
+		const live = [
+			...new Map(
+				[...group, ...capturedSurvivors()].map((p) => [
+					`${p.pid}:${p.birth}`,
+					p,
+				]),
+			).values(),
+		];
+		// Persist newly acquired identities before any later signal. Keep their
+		// original authority even if a later observation finds a session escape.
+		if (observed.size !== previousSize) retain(live);
+		return live;
 	};
 	signalOwned(members, "SIGTERM");
 	while (members.length && now() < phase.deadline) {
@@ -317,6 +380,7 @@ export async function retireShutdownTunnel(record, protectedPids, phase) {
 		await pause(Math.max(1, Math.min(20, phase.deadline - now())));
 		members = remaining();
 	}
+	retain(members);
 	phase.record({
 		phase: "tunnel-disposal",
 		leader,

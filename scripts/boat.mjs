@@ -905,7 +905,12 @@ async function disposeShutdownTunnel(id, protectedPids, budget) {
 		throw new Error(
 			"Shutdown disposal: tunnel worker identity unresolved; record retained",
 		);
-	await retireShutdownTunnel(tunnel, protectedPids, budget.phase("disposal"));
+	await retireShutdownTunnel(
+		tunnel,
+		protectedPids,
+		budget.phase("disposal"),
+		(updated) => write(tunnelFile, updated),
+	);
 	fs.rmSync(tunnelFile, { force: true });
 }
 async function stop(remove = false, targets, { preserveIntent = false } = {}) {

@@ -10,7 +10,96 @@ import {
 	meaningfulPreviewRequest,
 	worktreeProcesses,
 	liveOwnedProcess,
+	forwardPreviewDisconnect,
 } from "./lib/boat.mjs";
+import http from "node:http";
+import { once } from "node:events";
+
+test("preview forwards downstream cancellation after the request body completes", async (t) => {
+	let disconnected;
+	const closed = new Promise((resolve) => {
+		disconnected = resolve;
+	});
+	const upstream = http.createServer((req, res) => {
+		req.resume();
+		res.on("close", disconnected);
+	});
+	upstream.listen(0, "127.0.0.1");
+	await once(upstream, "listening");
+	const proxy = http.createServer((req, res) => {
+		const request = http.request(
+			{ hostname: "127.0.0.1", port: upstream.address().port },
+			(response) => response.pipe(res),
+		);
+		request.on("error", () => {});
+		forwardPreviewDisconnect(req, res, request);
+		req.pipe(request);
+	});
+	proxy.listen(0, "127.0.0.1");
+	await once(proxy, "listening");
+	t.after(() => {
+		proxy.closeAllConnections();
+		proxy.close();
+		upstream.closeAllConnections();
+		upstream.close();
+	});
+	const arrived = once(upstream, "request");
+	const client = http.get({
+		hostname: "127.0.0.1",
+		port: proxy.address().port,
+	});
+	client.on("error", () => {});
+	await arrived;
+	client.destroy();
+	await Promise.race([
+		closed,
+		new Promise((_, reject) => {
+			const timer = setTimeout(
+				() =>
+					reject(
+						new Error("Upstream request survived downstream cancellation"),
+					),
+				1000,
+			);
+			timer.unref();
+		}),
+	]);
+});
+
+test("preview retains a normally completed response", async (t) => {
+	const upstream = http.createServer((req, res) => res.end("healthy control"));
+	upstream.listen(0, "127.0.0.1");
+	await once(upstream, "listening");
+	const proxy = http.createServer((req, res) => {
+		const request = http.request(
+			{ hostname: "127.0.0.1", port: upstream.address().port },
+			(response) => response.pipe(res),
+		);
+		forwardPreviewDisconnect(req, res, request);
+		req.pipe(request);
+	});
+	proxy.listen(0, "127.0.0.1");
+	await once(proxy, "listening");
+	t.after(() => {
+		proxy.close();
+		upstream.close();
+	});
+	const body = await new Promise((resolve, reject) => {
+		http
+			.get(
+				{ hostname: "127.0.0.1", port: proxy.address().port },
+				(response) => {
+					let text = "";
+					response.on("data", (chunk) => {
+						text += chunk;
+					});
+					response.on("end", () => resolve(text));
+				},
+			)
+			.on("error", reject);
+	});
+	assert.equal(body, "healthy control");
+});
 test("worktree process measurement includes its own process without command arguments", () => {
 	const sample = worktreeProcesses(process.cwd()).find(
 		(p) => p.pid === process.pid,

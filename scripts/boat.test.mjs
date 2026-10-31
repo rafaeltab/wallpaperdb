@@ -1253,6 +1253,7 @@ process.exit(cp.spawnSync(script,{shell:true,stdio:'inherit',env:process.env}).s
 			`#!${process.execPath}
 const fs=require('fs'),path=require('path'),c=process.env.FAKE_CONTROL;
 fs.appendFileSync(path.join(c,'effects'),JSON.stringify({phase:${JSON.stringify(phase)},cwd:process.cwd(),url:process.env.DATABASE_URL})+'\\n');
+if(${JSON.stringify(phase)}==='sql'&&fs.existsSync(path.join(c,'hold-sql'))){fs.writeFileSync(path.join(c,'sql-pid'),String(process.pid));while(true)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);}
 if(process.env.DATABASE_URL==='docker-only'&&process.cwd()!==${JSON.stringify(path.join(runtime, "apps/asset"))}){console.error('getaddrinfo ENOTFOUND postgres');process.exit(19);}
 process.exit(fs.existsSync(path.join(c,${JSON.stringify("fail-" + phase)}))?23:0);
 `,
@@ -1269,6 +1270,8 @@ process.exit(cp.spawnSync('pnpm',['run','db:migrate'],{cwd:path.join(process.cwd
 		`#!${process.execPath}
 const fs=require('fs'),path=require('path'),cp=require('child_process'),a=process.argv.slice(2),c=process.env.FAKE_CONTROL;
 fs.appendFileSync(path.join(c,'docker'),JSON.stringify(a)+'\\n');
+const context=a[0]==='--context'?a.splice(0,2)[1]:undefined;
+if(process.env.FAKE_DOCKER_CONTEXT&&context!==process.env.FAKE_DOCKER_CONTEXT)throw Error('Docker context lost');
 if(a[0]==='compose'&&a.includes('ps')){if(!fs.existsSync(path.join(c,'missing')))console.log('asset-instance-one');process.exit(0);}
 if(a[0]==='inspect'){console.log(JSON.stringify([{Id:'asset-instance-one',State:{Running:!fs.existsSync(path.join(c,'exited'))},Config:{Labels:{'com.docker.compose.project': process.env.COMPOSE_PROJECT_NAME,'com.docker.compose.service':'asset'}}}]));process.exit(0);}
 if(a[0]!=='exec'||!a.includes('asset-instance-one'))throw Error('unexpected docker '+a);
@@ -1611,9 +1614,23 @@ for (const selectors of [
 		"COMPOSE_PROJECT_NAME=owned-control",
 		"APPS_COMPOSE=docker compose -p owned-control -f infra/docker-compose.apps.yml --ansi never",
 	],
+	[
+		"PACKAGE=asset",
+		"APPS_COMPOSE=docker compose -f infra/docker-compose.apps.yml",
+	],
+	[
+		"PACKAGE=asset",
+		"APPS_COMPOSE=docker compose --project-name wallpaperdb -f infra/docker-compose.apps.yml",
+	],
+	[
+		"PACKAGE=asset",
+		"APPS_COMPOSE=docker --context controlled compose -p wallpaperdb -f infra/docker-compose.apps.yml",
+	],
 ])
 	test(`Asset migration preserves Make expansion for ${selectors.join(" ")}`, async (t) => {
 		const f = await assetExecutionCheckout(t);
+		if (selectors.some((value) => value.includes("--context controlled")))
+			f.env.FAKE_DOCKER_CONTEXT = "controlled";
 		const result = await f.run("migrate", ...selectors).done;
 		assert.equal(result.status, 0, result.output);
 		assert.equal(f.effects().length, 2);
@@ -1887,6 +1904,39 @@ test("Asset migration preserves awake foreground and partial development identit
 	assert.deepEqual(f.json(".boat/state.json").watcher, watcher);
 	const transport = fs.readFileSync(path.join(f.control, "transport"), "utf8");
 	assert.doesNotMatch(transport, /make apps-start|make stop|boat:stop-watch/);
+});
+
+test("Asset migration command expiry terminates its owned package process and skips backfill", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const controller = "scripts/boat.mjs";
+	const source = fs.readFileSync(path.join(f.root, controller), "utf8");
+	f.local(
+		controller,
+		source.replace(
+			"const entered = Date.now();",
+			"const entered = Date.now() - 176_000;",
+		),
+	);
+	fs.writeFileSync(path.join(f.control, "hold-sql"), "yes");
+	const running = f.run("migrate", "PACKAGE=asset");
+	await migrationObserved(f, "asset-migration launch");
+	const result = await running.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /command deadline exhausted/);
+	assert.deepEqual(
+		f.effects().map((e) => e.phase),
+		["sql"],
+	);
+	const pid = Number(fs.readFileSync(path.join(f.control, "sql-pid"), "utf8"));
+	await observed(() => {
+		try {
+			process.kill(pid, 0);
+			return false;
+		} catch (error) {
+			return error.code === "ESRCH";
+		}
+	});
+	assert.match(result.output, /asset-migration completed [a-f0-9]+ 1/);
 });
 
 test("public lock generation repairs stale dependency inputs before frozen preparation and returns only the lock", async (t) => {

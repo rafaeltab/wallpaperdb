@@ -17,6 +17,7 @@
 		"boat:cache-login": "cd .. && turbo login",
 		"test:boat": "node --test boat.test.mjs",
 		"test:asset-migration": "node --test --test-name-pattern='Asset migration' boat.test.mjs",
+		"test:boat-focused": "node --test",
 		"test:boat-sample": "node --test boat-sample.test.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",

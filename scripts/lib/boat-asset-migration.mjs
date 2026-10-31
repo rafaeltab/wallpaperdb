@@ -268,7 +268,11 @@ async function worker(requestFile, compose) {
 	const id = output(compose[0], [...compose.slice(1), "ps", "-q", "asset"]);
 	if (!id || /\s/.test(id))
 		throw Error("Asset migration requires one existing running container");
-	const [info] = JSON.parse(output("docker", ["inspect", id]));
+	const composeAt = compose.indexOf("compose");
+	const docker = composeAt >= 0 ? compose.slice(0, composeAt) : ["docker"];
+	const [info] = JSON.parse(
+		output(docker[0], [...docker.slice(1), "inspect", id]),
+	);
 	if (
 		!info?.State?.Running ||
 		info.Config?.Labels?.["com.docker.compose.service"] !== "asset"
@@ -276,22 +280,24 @@ async function worker(requestFile, compose) {
 		throw Error(
 			"Asset migration requires existing running owned Asset instance",
 		);
-	const projectAt = compose.indexOf("-p");
-	if (
-		projectAt < 0 ||
-		info.Config.Labels["com.docker.compose.project"] !== compose[projectAt + 1]
-	)
+	const projectAt = compose.findIndex(
+		(value) => value === "-p" || value === "--project-name",
+	);
+	const project =
+		projectAt >= 0 ? compose[projectAt + 1] : process.env.COMPOSE_PROJECT_NAME;
+	if (!project || info.Config.Labels["com.docker.compose.project"] !== project)
 		throw Error("Asset migration container project mismatch");
 	console.log(
-		`asset-migration instance ${JSON.stringify({ id, project: compose[projectAt + 1], service: "asset", cwd: "/app/apps/asset", deliveryDeadline: deadline, commandDeadline: request.deadline })}`,
+		`asset-migration instance ${JSON.stringify({ id, project, service: "asset", cwd: "/app/apps/asset", deliveryDeadline: deadline, commandDeadline: request.deadline })}`,
 	);
 	const code = `import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';import {spawn} from 'node:child_process';const hash=${hash};const regular=${regular};const members=${members};await (${runtime})(${JSON.stringify(request.expected)},${deadline},${request.deadline},{fs,path,hash,regular,members,spawn}).catch(error=>{console.error(error.message);process.exitCode=1;process.stdin.destroy();});`;
 	let waiting = true,
 		sent = false;
 	const status = await new Promise((resolve, reject) => {
 		const child = spawn(
-			"docker",
+			docker[0],
 			[
+				...docker.slice(1),
 				"exec",
 				"-i",
 				"-w",

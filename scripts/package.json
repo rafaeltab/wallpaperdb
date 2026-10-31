@@ -19,6 +19,7 @@
 		"test:asset-migration": "node --test --test-name-pattern='Asset migration' boat.test.mjs",
 		"test:boat-focused": "node --test",
 		"test:boat-pending-cleanup": "node --test --test-name-pattern='^pending-upgrade fixture' boat.test.mjs",
+		"test:boat-pending-diagnostic": "node --test --test-name-pattern='^(pending-upgrade|preview forwards downstream|preview retains)' boat.test.mjs",
 		"test:boat-sample": "node --test boat-sample.test.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",

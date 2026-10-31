@@ -6966,3 +6966,513 @@ const child=spawn(process.execPath,['-e',"require('fs').writeFileSync(process.ar
 	);
 });
 
+async function pendingUpgradePreview(t, mode) {
+	const evidence = process.env.BOAT_PENDING_UPGRADE_EVIDENCE;
+	assert.ok(evidence, "diagnostic evidence directory is required");
+	const report = path.join(evidence, mode);
+	const cleanups = [];
+	const owner = t;
+	let baseCleanup;
+	t = {
+		after: (fn) => {
+			baseCleanup ??= fn;
+			cleanups.push(fn);
+		},
+	};
+	let f;
+	const receipts = { mode, phases: [], processes: [] };
+	owner.after(() =>
+		cleanupPendingPreview({ f, cleanups, baseCleanup, receipts, report }),
+	);
+	f = await lockGenerationCheckout(t);
+	receipts.directory = f.directory;
+	delete f.env.MAKEFILES;
+	delete f.env.GNUMAKEFLAGS;
+	const phase = (name) => {
+		receipts.phases.push({ name, at: Date.now() });
+		fs.writeFileSync(`${report}.json`, JSON.stringify(receipts, null, 2));
+	};
+	const production = [
+		"scripts/boat.mjs",
+		"scripts/lib/boat.mjs",
+		"Makefile",
+		"scripts/boat-route.mk",
+	];
+	receipts.productionHashes = Object.fromEntries(
+		production.map((name) => {
+			const bytes = fs.readFileSync(path.join(f.root, name));
+			assert.deepEqual(
+				bytes,
+				fs.readFileSync(path.resolve(import.meta.dirname, "..", name)),
+			);
+			return [name, createHash("sha256").update(bytes).digest("hex")];
+		}),
+	);
+	const token = createHash("sha256")
+		.update(`${f.directory}:${process.hrtime.bigint()}`)
+		.digest("hex");
+	const authorization = `Bearer ${token}`;
+	const sockets = new Set();
+	const pending = new Map();
+	const upstream = http.createServer((req, res) => {
+		if (req.headers.authorization !== authorization) {
+			res.writeHead(401);
+			res.end("authentication required");
+			return;
+		}
+		if (req.url === "/http-pending") {
+			req.resume();
+			pending.get(req.url)?.({
+				req,
+				socket: req.socket,
+				closed: once(res, "close"),
+			});
+			return;
+		}
+		res.writeHead(200, { "content-type": "text/plain" });
+		res.end("authenticated fixture control");
+	});
+	upstream.on("connection", (socket) => {
+		sockets.add(socket);
+		socket.on("error", () => {});
+		socket.once("close", () => sockets.delete(socket));
+	});
+	upstream.on("upgrade", (req, socket) => {
+		assert.equal(
+			req.headers.authorization === authorization,
+			true,
+			"upgrade authentication forwarded",
+		);
+		if (req.url === "/ws-pending") {
+			// Drain the upgraded raw socket so a remote FIN is observable while
+			// deliberately withholding the HTTP 101 response.
+			socket.once("end", () => socket.end());
+			socket.resume();
+			pending.get(req.url)?.({
+				req,
+				socket,
+				closed: new Promise((resolve) => socket.once("close", resolve)),
+			});
+			return;
+		}
+		const accept = createHash("sha1")
+			.update(
+				req.headers["sec-websocket-key"] +
+					"258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
+			)
+			.digest("base64");
+		socket.write(
+			`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\nSec-WebSocket-Protocol: boat-diagnostic\r\n\r\n`,
+		);
+		let buffered = Buffer.alloc(0);
+		socket.on("data", (bytes) => {
+			buffered = Buffer.concat([buffered, bytes]);
+			while (buffered.length >= 6) {
+				const length = buffered[1] & 127;
+				if (buffered.length < length + 6) return;
+				assert.equal(buffered[0], 0x81);
+				assert.equal(buffered[1] & 128, 128);
+				const mask = buffered.subarray(2, 6);
+				const payload = Buffer.from(buffered.subarray(6, length + 6));
+				for (let i = 0; i < length; i++) payload[i] ^= mask[i % 4];
+				buffered = buffered.subarray(length + 6);
+				const reply = Buffer.from(`ack:${payload.toString()}`);
+				socket.write(Buffer.concat([Buffer.from([0x81, reply.length]), reply]));
+			}
+		});
+	});
+	t.after(async () => {
+		for (const socket of sockets) socket.destroy();
+		await previewProbe(
+			new Promise((resolve) => upstream.close(resolve)),
+			"upstream cleanup did not complete",
+		);
+	});
+	upstream.listen(0, "127.0.0.1");
+	await previewProbe(
+		once(upstream, "listening"),
+		"controlled upstream did not listen",
+	);
+	const upstreamPort = upstream.address().port;
+	// Reserve an OS-selected private forward port. Its ingress pair is checked
+	// once, without a fallback port or retry if anything else owns it.
+	const net = await import("node:net");
+	const reservation = net.createServer();
+	reservation.listen(0, "127.0.0.1");
+	await previewProbe(
+		once(reservation, "listening"),
+		"private port reservation failed",
+	);
+	const privatePort = reservation.address().port;
+	const port = privatePort - 20000;
+	assert.ok(port > 0 && port < 45536);
+	await previewProbe(
+		new Promise((resolve) => reservation.close(resolve)),
+		"port reservation cleanup failed",
+	);
+	f.local(".worktree", `INGRESS_PORT=${port}\n`);
+	const authority = f.json("apps/asset/.authority.json");
+	authority.identityProviders.clerk.authorizedParties = [
+		`http://localhost:${port}`,
+		`http://127.0.0.1:${port}`,
+	];
+	f.local("apps/asset/.authority.json", JSON.stringify(authority));
+	const transport = path.join(f.root, ".mise/boat/boat");
+	fs.writeFileSync(
+		transport,
+		`#!${process.execPath}
+const fs=require('fs'),path=require('path'),argv=process.argv.slice(2),control=process.env.FAKE_CONTROL;
+fs.appendFileSync(path.join(control,'transport'),JSON.stringify(argv)+'\\n');
+if(!argv.includes('fake-worker'))throw Error('unexpected synthetic worker identity');
+if(argv.includes('info')){console.log(JSON.stringify({state:'ready'}));process.exit(0);}
+if(argv.includes('--status')){console.log(JSON.stringify({running:true,stdout:'Watch enabled'}));process.exit(0);}
+if(argv.includes('--detach')){console.log(JSON.stringify({processId:557}));process.exit(0);}
+if(argv.includes('forward')){
+ if(argv.includes('--reverse'))throw Error('unexpected reverse forward');
+ if(argv[argv.indexOf('--local')+1]!==${JSON.stringify(String(privatePort))}||argv[argv.indexOf('--remote')+1]!==${JSON.stringify(String(port))})throw Error('unexpected forward ports');
+ const net=require('net'),peers=new Set();let sequence=0;
+ const trace=(connection,event,detail={})=>fs.appendFileSync(path.join(control,'forward-events'),JSON.stringify({pid:process.pid,connection,event,at:Date.now(),...detail})+'\\n');
+ const server=net.createServer(socket=>{const connection=++sequence;trace(connection,'downstream-connected',{remotePort:socket.remotePort});const peer=net.connect(${upstreamPort},'127.0.0.1');peer.on('connect',()=>trace(connection,'upstream-connected',{localPort:peer.localPort}));peers.add(socket);peers.add(peer);for(const [role,p] of [['downstream',socket],['upstream',peer]]){p.on('error',()=>{});p.on('end',()=>trace(connection,role+'-end'));p.on('close',()=>{trace(connection,role+'-close');peers.delete(p);socket.destroy();peer.destroy();});}socket.pipe(peer).pipe(socket);});
+ server.listen(${privatePort},'127.0.0.1',()=>fs.writeFileSync(path.join(control,'forward-ready'),String(process.pid)));
+ process.on('SIGTERM',()=>{for(const p of peers)p.destroy();server.close(()=>process.exit(0));});
+}else if(argv.includes('ssh')){
+ const command=argv.at(-1);
+ const allowed=command.startsWith('mkdir -p /home/user/wallpaperdb;') || command.startsWith('cd /home/user/wallpaperdb && tar -xzf -') || command.includes('mise trust && make install BOAT_EXEC=worker') || command.includes('chmod a+rx infra/postgres/init') || command.includes('SCRIPT=boat:ready') || command.includes('--input-type=module -') || command.includes('cat > /home/user/wallpaperdb/.boat/cache.json');
+ if(!allowed)throw Error('unexpected controlled SSH operation');
+ // Consume source/archive bytes but never execute a supplied shell string.
+ process.stdin.resume();
+}else throw Error('unexpected controlled Boat operation');
+`,
+	);
+	receipts.controlledTransportHash = createHash("sha256")
+		.update(fs.readFileSync(transport))
+		.digest("hex");
+	fs.copyFileSync(transport, `${report}.controlled-boat.cjs`);
+	// Block PATH-based external escape even if a later controller path changes.
+	for (const name of ["boat", "ssh", "curl", "wget"])
+		fs.writeFileSync(
+			path.join(f.directory, "home/.local/bin", name),
+			"#!/bin/sh\necho 'forbidden external diagnostic operation' >&2\nexit 96\n",
+			{ mode: 0o755 },
+		);
+	if (mode === "foreground") {
+		const keeper = f.json(".boat/state.json").daemon;
+		f.local(
+			`.boat/command-${keeper.pid}.json`,
+			JSON.stringify({ ...keeper, development: true }),
+		);
+	}
+	const command = f.run(
+		"boat-preview",
+		"BOAT_EXEC=local",
+		"SHELL=/bin/sh",
+		"boat_routed_goals=",
+	);
+	let tunnel;
+	t.after(async () => {
+		const owned = fixtureCensus(f.directory);
+		receipts.processes = owned;
+		receipts.transport = fs
+			.readFileSync(path.join(f.control, "transport"), "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		if (!tunnel && fs.existsSync(path.join(f.control, "forward-ready")))
+			tunnel = fixtureProcess(
+				Number(fs.readFileSync(path.join(f.control, "forward-ready"), "utf8")),
+			);
+		if (tunnel && liveOwnedProcess(f.root, tunnel)) {
+			assert.equal(signalFixtureGroup(tunnel, "SIGTERM", f.directory), true);
+			assert.equal(
+				await fixtureStopped(() => !liveOwnedProcess(f.root, tunnel)),
+				true,
+			);
+		}
+		const cleanup = await stopLockFixtureChildren(f.commands);
+		receipts.commandCleanup = cleanup;
+		receipts.controllerOutput = command.output();
+		receipts.forwardEvents = fs
+			.readFileSync(path.join(f.control, "forward-events"), "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		receipts.survivingCommandGroups = f.commands
+			.filter((p) => processGroupRunning(p.child.pid))
+			.map((p) => p.child.pid);
+		receipts.tunnelTerminated = !tunnel || !liveOwnedProcess(f.root, tunnel);
+		phase("controlled endpoints and preview commands stopped");
+	});
+	await f.readiness.wait(() => {
+		if (command.terminal) assert.fail(command.output());
+		return (
+			command.output().includes("Private preview proxy") &&
+			fs.existsSync(path.join(f.control, "forward-ready"))
+		);
+	}, "production preview and controlled forward readiness");
+	tunnel = fixtureProcess(
+		Number(fs.readFileSync(path.join(f.control, "forward-ready"), "utf8")),
+	);
+	assert.ok(tunnel);
+	assert.equal(path.resolve(tunnel.cwd), f.root);
+	const state = f.json(".boat/state.json");
+	assert.equal(state.id, "fake-worker");
+	assert.equal(state.reconciliationPending, undefined);
+	assert.equal(Boolean(state.watcher), mode === "managed");
+	if (mode === "foreground")
+		assert.equal(
+			liveOwnedProcess(f.root, f.json(".boat/state.json").daemon),
+			true,
+		);
+	phase("production preview ready");
+	const clients = new Set();
+	t.after(() => {
+		for (const client of clients) client.destroy();
+	});
+	const request = (
+		url,
+		authenticated = true,
+		upgrade = false,
+		targetPort = port,
+	) => {
+		const headers = authenticated ? { authorization } : {};
+		if (upgrade)
+			Object.assign(headers, {
+				connection: "Upgrade",
+				upgrade: "websocket",
+				"sec-websocket-version": "13",
+				"sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
+				"sec-websocket-protocol": "boat-diagnostic",
+			});
+		const client = http.request({
+			hostname: "127.0.0.1",
+			port: targetPort,
+			path: url,
+			headers,
+		});
+		clients.add(client);
+		client.on("error", () => {});
+		client.end();
+		return client;
+	};
+	const healthy = async (authenticated) => {
+		const client = request("/healthy", authenticated);
+		const [response] = await previewProbe(
+			once(client, "response"),
+			"healthy response missing",
+		);
+		let text = "";
+		response.on("data", (bytes) => {
+			text += bytes;
+		});
+		await previewProbe(once(response, "end"), "healthy response incomplete");
+		assert.equal(response.statusCode, authenticated ? 200 : 401);
+		assert.equal(
+			text,
+			authenticated
+				? "authenticated fixture control"
+				: "authentication required",
+		);
+	};
+	const arrival = (url) => new Promise((resolve) => pending.set(url, resolve));
+	phase("ready for controlled probes");
+	return {
+		...f,
+		phase,
+		receipts,
+		healthy,
+		request,
+		arrival,
+		clients,
+		privatePort,
+	};
+}
+
+async function previewFrame(socket, text) {
+	const payload = Buffer.from(text);
+	assert.ok(payload.length < 120);
+	const mask = Buffer.from([17, 34, 51, 68]);
+	const bytes = Buffer.from(payload);
+	for (let i = 0; i < bytes.length; i++) bytes[i] ^= mask[i % 4];
+	let buffered = Buffer.alloc(0);
+	let onData;
+	const response = new Promise((resolve, reject) => {
+		onData = (chunk) => {
+			buffered = Buffer.concat([buffered, chunk]);
+			if (buffered.length < 2 || buffered.length < (buffered[1] & 127) + 2)
+				return;
+			try {
+				assert.equal(buffered[0], 0x81);
+				assert.equal(buffered[1] & 128, 0);
+				assert.equal(buffered.subarray(2).toString(), `ack:${text}`);
+				resolve();
+			} catch (error) {
+				reject(error);
+			}
+		};
+		socket.on("data", onData);
+	});
+	socket.write(
+		Buffer.concat([Buffer.from([0x81, 0x80 | payload.length]), mask, bytes]),
+	);
+	try {
+		await previewProbe(response, "WebSocket duplex frame missing");
+	} finally {
+		socket.off("data", onData);
+	}
+}
+
+for (const mode of ["foreground", "managed"])
+	test(`pending-upgrade diagnostic via production ${mode} preview`, async (t) => {
+		const f = await pendingUpgradePreview(t, mode);
+		let sibling;
+		await t.test(
+			"healthy authentication and successful 101 duplex control",
+			{ timeout: 3000 },
+			async () => {
+				await f.healthy(false);
+				await f.healthy(true);
+				const client = f.request("/ws-sibling", true, true);
+				const [response, socket, head] = await previewProbe(
+					once(client, "upgrade"),
+					"successful 101 missing",
+				);
+				assert.equal(response.statusCode, 101);
+				assert.equal(
+					response.headers["sec-websocket-protocol"],
+					"boat-diagnostic",
+				);
+				assert.equal(
+					response.headers["sec-websocket-accept"],
+					"s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
+				);
+				assert.equal(head.length, 0);
+				f.clients.add(socket);
+				sibling = socket;
+				await previewFrame(sibling, "before-disconnect");
+				f.phase("authentication and successful 101 duplex passed");
+			},
+		);
+		await t.test(
+			"ordinary HTTP cancellation remains healthy",
+			{ timeout: 3000 },
+			async () => {
+				const arrived = f.arrival("/http-pending");
+				const client = f.request("/http-pending");
+				const upstream = await previewProbe(
+					arrived,
+					"ordinary HTTP did not reach upstream",
+				);
+				client.destroy();
+				await previewProbe(
+					upstream.closed,
+					"ordinary HTTP survived downstream cancellation",
+				);
+				await f.healthy(true);
+				f.phase("ordinary HTTP cancellation and next request passed");
+			},
+		);
+		await t.test(
+			"same forwarder cancels a pending upgrade with production proxy bypassed",
+			{ timeout: 3000 },
+			async () => {
+				const arrived = f.arrival("/ws-pending");
+				const client = f.request("/ws-pending", true, true, f.privatePort);
+				let received101 = false;
+				client.on("upgrade", () => {
+					received101 = true;
+				});
+				const [socket] = await previewProbe(
+					once(client, "socket"),
+					"bypass client socket missing",
+				);
+				const upstream = await previewProbe(
+					arrived,
+					"bypass handshake did not reach same upstream",
+				);
+				const downstreamPort = socket.localPort;
+				const upstreamPort = upstream.socket.remotePort;
+				const closed = once(socket, "close");
+				socket.destroy();
+				await previewProbe(closed, "bypass client socket did not close");
+				await previewProbe(
+					upstream.closed,
+					"controlled forwarder retained a bypassed pending upgrade",
+				);
+				assert.equal(socket.destroyed, true);
+				assert.equal(upstream.socket.destroyed, true);
+				assert.equal(received101, false);
+				f.receipts.bypassControl = {
+					downstreamPort,
+					upstreamPort,
+					disconnectMethod: "destroy",
+					downstreamSocketDestroyed: socket.destroyed,
+					upstreamSocketDestroyed: upstream.socket.destroyed,
+					received101,
+				};
+				f.phase(
+					"same controlled forwarder cancellation passed with proxy bypassed",
+				);
+			},
+		);
+		await t.test(
+			"pending upstream handshake terminates after actual downstream socket destruction",
+			{ timeout: 3000 },
+			async () => {
+				const arrived = f.arrival("/ws-pending");
+				const client = f.request("/ws-pending", true, true);
+				let received101 = false;
+				client.on("upgrade", () => {
+					received101 = true;
+				});
+				const [socket] = await previewProbe(
+					once(client, "socket"),
+					"downstream socket missing",
+				);
+				const upstream = await previewProbe(
+					arrived,
+					"pending handshake did not reach upstream",
+				);
+				assert.equal(received101, false);
+				const downstreamPort = socket.localPort;
+				const upstreamPort = upstream.socket.remotePort;
+				const closed = once(socket, "close");
+				f.phase("upstream handshake held without 101");
+				socket.destroy();
+				await previewProbe(closed, "actual downstream socket did not close");
+				f.phase("actual downstream socket closed");
+				try {
+					await previewProbe(
+						upstream.closed,
+						"Pending upstream WebSocket handshake survived downstream socket closure for 1000ms",
+					);
+					f.phase("pending upstream handshake cancelled");
+				} catch (error) {
+					f.receipts.pendingAfterDeadline = {
+						downstreamPort,
+						upstreamPort,
+						socketDestroyed: upstream.socket.destroyed,
+						requestDestroyed: upstream.req.destroyed,
+						disconnectMethod: "destroy",
+						downstreamSocketDestroyed: socket.destroyed,
+						received101,
+					};
+					assert.equal(received101, false);
+					f.phase("pending upstream handshake remained open at deadline");
+					throw error;
+				}
+			},
+		);
+		await t.test(
+			"unrelated sibling and next request survive cancellation",
+			{ timeout: 3000 },
+			async () => {
+				assert.ok(sibling);
+				assert.equal(sibling.destroyed, false);
+				await previewFrame(sibling, "after-disconnect");
+				await f.healthy(true);
+				f.phase(
+					"sibling duplex and next request passed after cancellation deadline",
+				);
+			},
+		);
+	});

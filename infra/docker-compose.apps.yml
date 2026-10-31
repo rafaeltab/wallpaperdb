@@ -34,6 +34,12 @@ services:
         - action: sync+restart
           path: ../packages
           target: /app/packages
+          ignore:
+            - "**/node_modules/**"
+            - "**/dist/**"
+            - "**/coverage/**"
+            - "**/.turbo/**"
+            - "**/*.tsbuildinfo"
         - action: sync
           path: ../apps/ingestor/package.json
           target: /app/apps/ingestor/package.json
@@ -66,6 +72,12 @@ services:
         - action: sync+restart
           path: ../packages
           target: /app/packages
+          ignore:
+            - "**/node_modules/**"
+            - "**/dist/**"
+            - "**/coverage/**"
+            - "**/.turbo/**"
+            - "**/*.tsbuildinfo"
         - action: sync
           path: ../apps/asset/package.json
           target: /app/apps/asset/package.json
@@ -93,6 +105,12 @@ services:
         - action: sync+restart
           path: ../packages
           target: /app/packages
+          ignore:
+            - "**/node_modules/**"
+            - "**/dist/**"
+            - "**/coverage/**"
+            - "**/.turbo/**"
+            - "**/*.tsbuildinfo"
         - action: sync
           path: ../apps/gateway/package.json
           target: /app/apps/gateway/package.json
@@ -120,6 +138,12 @@ services:
         - action: sync+restart
           path: ../packages
           target: /app/packages
+          ignore:
+            - "**/node_modules/**"
+            - "**/dist/**"
+            - "**/coverage/**"
+            - "**/.turbo/**"
+            - "**/*.tsbuildinfo"
         - action: sync
           path: ../apps/variant-generator/package.json
           target: /app/apps/variant-generator/package.json
@@ -147,6 +171,12 @@ services:
         - action: sync+restart
           path: ../packages
           target: /app/packages
+          ignore:
+            - "**/node_modules/**"
+            - "**/dist/**"
+            - "**/coverage/**"
+            - "**/.turbo/**"
+            - "**/*.tsbuildinfo"
         - action: sync
           path: ../apps/color-extractor/package.json
           target: /app/apps/color-extractor/package.json
@@ -176,6 +206,12 @@ services:
         - action: sync+restart
           path: ../packages
           target: /app/packages
+          ignore:
+            - "**/node_modules/**"
+            - "**/dist/**"
+            - "**/coverage/**"
+            - "**/.turbo/**"
+            - "**/*.tsbuildinfo"
         - action: sync
           path: ../apps/tags/package.json
           target: /app/apps/tags/package.json
@@ -210,6 +246,12 @@ services:
         - action: sync+restart
           path: ../packages
           target: /app/packages
+          ignore:
+            - "**/node_modules/**"
+            - "**/dist/**"
+            - "**/coverage/**"
+            - "**/.turbo/**"
+            - "**/*.tsbuildinfo"
         - action: sync
           path: ../apps/wallpaper/package.json
           target: /app/apps/wallpaper/package.json
@@ -241,6 +283,12 @@ services:
         - action: sync+restart
           path: ../packages
           target: /app/packages
+          ignore:
+            - "**/node_modules/**"
+            - "**/dist/**"
+            - "**/coverage/**"
+            - "**/.turbo/**"
+            - "**/*.tsbuildinfo"
         - action: sync
           path: ../apps/user/package.json
           target: /app/apps/user/package.json
@@ -268,6 +316,12 @@ services:
         - action: sync+restart
           path: ../packages
           target: /app/packages
+          ignore:
+            - "**/node_modules/**"
+            - "**/dist/**"
+            - "**/coverage/**"
+            - "**/.turbo/**"
+            - "**/*.tsbuildinfo"
         - action: sync
           path: ../apps/web/package.json
           target: /app/apps/web/package.json

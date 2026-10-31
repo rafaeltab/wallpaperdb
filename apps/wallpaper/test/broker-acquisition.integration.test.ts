@@ -19,6 +19,17 @@ for (const ending of ['timeout', 'cancellation', 'disposal'] as const) {
     const layer = assetWorkflowLayer({
       natsUrl: `nats://127.0.0.1:${address.port}`,
       credential: { user: 'test', password: 'test' },
+      ownerNamespace: 'test',
+      identityProviders: [
+        {
+          issuer: 'https://identity.test',
+          jwksUrl: 'https://identity.test/jwks',
+          ownerNamespace: 'test',
+          audience: [],
+          authorizedParties: [],
+          requireAuthorizedParty: false,
+        },
+      ],
       operatorNotification: { url: 'http://127.0.0.1', token: 'test' },
       maxAttempts: 2,
       retryDelayMs: 10,

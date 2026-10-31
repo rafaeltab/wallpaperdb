@@ -167,6 +167,61 @@ for (const mode of ["foreground", "managed"]) {
 	}
 
 	for (const app of apps) {
+		test(`${mode} ${app} scopes its literal package-directory ignore to Vitest compiler output`, () => {
+			const configuration = mode === "managed" ? managed : foreground;
+			const rule = watches(configuration, app).find(
+				(item) => item.path === path.join(root, "packages"),
+			);
+			assert.ok(rule);
+			// This is a configuration contract for literal directory entries, not
+			// Compose trigger execution or a replacement for its glob matcher.
+			// Compose 2.40.3 roots ignores at rule.path and checks parent matches:
+			// https://github.com/docker/compose/blob/v2.40.3/pkg/watch/dockerignore.go
+			// Existing glob entries are preserved exactly in the rule check below.
+			const directories = (rule.ignore ?? [])
+				.filter((pattern) => !pattern.includes("*"))
+				.map((directory) => path.resolve(rule.path, directory));
+			for (const [file, ignored] of [
+				["vitest-config/src/index.ts", false],
+				["vitest-config/src/defaults.ts", false],
+				["vitest-config/package.json", false],
+				["vitest-config/tsconfig.json", false],
+				["vitest-config/dist-next/index.js", false],
+				["vitest-config/dist.js", false],
+				["vitest-config-next/dist/index.js", false],
+				["nested/vitest-config/dist/index.js", false],
+				// profile-markdown actually exports this built JS at runtime.
+				["profile-markdown/dist/index.js", false],
+				["profile-markdown/src/index.ts", false],
+				["profile-markdown/package.json", false],
+				["core/src/index.ts", false],
+				["core/package.json", false],
+				// tsc emits these eight files from src/{index,defaults}.ts with
+				// declaration, declarationMap and sourceMap in this package's tsconfig.
+				["vitest-config/dist/index.js", true],
+				["vitest-config/dist/index.js.map", true],
+				["vitest-config/dist/index.d.ts", true],
+				["vitest-config/dist/index.d.ts.map", true],
+				["vitest-config/dist/defaults.js", true],
+				["vitest-config/dist/defaults.js.map", true],
+				["vitest-config/dist/defaults.d.ts", true],
+				["vitest-config/dist/defaults.d.ts.map", true],
+			]) {
+				const absolute = path.join(root, "packages", file);
+				assert.equal(
+					directories.some((directory) => {
+						const relative = path.relative(directory, absolute);
+						return (
+							relative === "" ||
+							(!relative.startsWith("..") && !path.isAbsolute(relative))
+						);
+					}),
+					ignored,
+					`Literal directory ignore coverage for packages/${file}`,
+				);
+			}
+		});
+
 		test(`${mode} preserves ${app} source, shared package restart, and lock rebuild rules`, () => {
 			const configuration = mode === "managed" ? managed : foreground;
 			const rules = watches(configuration, app);
@@ -186,6 +241,7 @@ for (const mode of ["foreground", "managed"]) {
 						"**/coverage/**",
 						"**/.turbo/**",
 						"**/*.tsbuildinfo",
+						"vitest-config/dist/",
 					],
 					initial_sync,
 				},

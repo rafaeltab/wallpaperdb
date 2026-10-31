@@ -16,6 +16,7 @@ afterEach(() => cleanup());
 it("cancels pending list requests when the session changes and when the UI unmounts", async () => {
 	const signals: AbortSignal[] = [];
 	vi.mocked(recentCreations).mockImplementation((signal) => {
+    if (!signal) throw new Error('The UI must supply its request cancellation signal');
 		signals.push(signal);
 		return new Promise(() => {});
 	});

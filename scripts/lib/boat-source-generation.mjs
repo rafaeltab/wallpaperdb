@@ -91,9 +91,10 @@ function validateMigrations(files) {
 		!Array.isArray(journal.entries)
 	)
 		throw new Error("Invalid migration journal");
+	const origin = "00000000-0000-0000-0000-000000000000";
 	const expected = new Set([journalPath]),
-		ids = new Set();
-	let previous = "00000000-0000-0000-0000-000000000000",
+		ids = new Set([origin]);
+	let previous = origin,
 		when = -1;
 	for (const [idx, entry] of journal.entries.entries()) {
 		const prefix = String(idx).padStart(4, "0");
@@ -143,6 +144,7 @@ function inputState(source, kind, outputs, root) {
 			"scripts/boat.mjs",
 			"scripts/boat-route.mk",
 			"scripts/mise-shell.sh",
+			"scripts/boat-shell.mjs",
 			"scripts/toolchain.mjs",
 			"scripts/lib/boat-source-generation.mjs",
 			"scripts/lib/boat-preparation.mjs",

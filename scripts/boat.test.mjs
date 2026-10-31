@@ -2487,6 +2487,13 @@ test("known-lost reconstruction preserves identity evidence and cost across fail
 async function migrationGenerationCheckout(t) {
 	const f = await lockGenerationCheckout(t);
 	const repository = path.resolve(import.meta.dirname, "..");
+	for (const name of ["scripts/mise-shell.sh", "scripts/boat-shell.mjs"])
+		f.local(name, fs.readFileSync(path.join(repository, name)));
+	fs.mkdirSync(path.join(f.worker, ".boat"), { recursive: true });
+	fs.writeFileSync(
+		path.join(f.worker, ".boat/cache.json"),
+		JSON.stringify({ api: "http://127.0.0.1:12345", token: "fixture" }),
+	);
 	const descriptor = JSON.parse(
 		fs.readFileSync(path.join(repository, "scripts/boat-workloads/548.json")),
 	);
@@ -2565,6 +2572,7 @@ if(mode==='invalid-path')fs.writeFileSync('drizzle/private.env','not source');
 if(mode==='missing-sql')fs.unlinkSync('drizzle/'+tag+'.sql');
 if(mode==='unjournalled'){journal.entries.pop();fs.writeFileSync('drizzle/meta/_journal.json',JSON.stringify(journal));}
 if(mode==='timestamp'){journal.entries.at(-1).when=journal.entries.at(-2).when;fs.writeFileSync('drizzle/meta/_journal.json',JSON.stringify(journal));}
+if(mode==='origin-id'){const value=JSON.parse(fs.readFileSync(snapshot));value.id='00000000-0000-0000-0000-000000000000';fs.writeFileSync(snapshot,JSON.stringify(value));}
 if(mode==='duplicate-id'){const value=JSON.parse(fs.readFileSync(snapshot));value.id=value.prevId;fs.writeFileSync(snapshot,JSON.stringify(value));}
 if(mode==='unsafe-tag'){journal.entries.at(-1).tag='../outside';fs.writeFileSync('drizzle/meta/_journal.json',JSON.stringify(journal));}
 if(mode==='oversized')fs.writeFileSync('drizzle/'+tag+'.sql',Buffer.alloc(8*1024*1024+1,'x'));
@@ -2612,6 +2620,10 @@ test("public migration generation returns native SQL, snapshot and journal as a 
 	const remote = migrationBytes(f.worker);
 	const journal = JSON.parse(remote["apps/asset/drizzle/meta/_journal.json"]);
 	assert.equal(journal.entries.length, 19, result.output);
+	assert.equal(
+		JSON.parse(remote["apps/asset/drizzle/meta/0000_snapshot.json"]).prevId,
+		"00000000-0000-0000-0000-000000000000",
+	);
 	const tag = journal.entries.at(-1).tag;
 	assert.match(
 		remote[`apps/asset/drizzle/${tag}.sql`],
@@ -2809,6 +2821,7 @@ for (const mode of [
 	"unjournalled",
 	"timestamp",
 	"duplicate-id",
+	"origin-id",
 	"unsafe-tag",
 	"oversized",
 	"multiple-appends",
@@ -2825,7 +2838,21 @@ for (const mode of [
 		else if (mode === "transfer-failure") flag(f, "transfer-fail");
 		else fs.writeFileSync(path.join(f.control, "migration-mode"), mode);
 		const result = await f.migrations();
+		if (mode === "origin-id") {
+			const proposed = JSON.parse(
+				fs.readFileSync(
+					path.join(f.worker, "apps/asset/drizzle/meta/0018_snapshot.json"),
+				),
+			);
+			assert.equal(proposed.id, "00000000-0000-0000-0000-000000000000");
+			assert.equal(
+				proposed.prevId,
+				f.json("apps/asset/drizzle/meta/0017_snapshot.json").id,
+			);
+		}
 		assert.notEqual(result.status, 0, result.output);
+		if (mode === "origin-id")
+			assert.match(result.output, /Inconsistent migration snapshot chain/);
 		assert.match(result.output, /proposal retained at|retained evidence at/);
 		assert.deepEqual(migrationBytes(f.root), before);
 		assert.equal(
@@ -3034,14 +3061,12 @@ for (const mode of ["framed", "unsafe-transfer", "duplicate-transfer"])
 				fs.readFileSync(transport, "utf8").replace(
 					"if(command.includes('base64 -w0')||command.includes('collect-migrations')){",
 					`
-if(command.includes('collect-migrations')){console.log(JSON.stringify(${
-						mode === "unsafe-transfer"
-							? JSON.stringify([["../outside", "ZXZpbA=="]])
-							: JSON.stringify([
-									["apps/asset/drizzle/meta/_journal.json", "e30="],
-									["apps/asset/drizzle/meta/_journal.json", "e30="],
-								])
-					}));process.exit(0);}
+if(command.includes('collect-migrations')){
+ const records=JSON.parse(cp.execFileSync('bash',['-c',command],{env:process.env,maxBuffer:48*1024*1024}));
+ if(${JSON.stringify(mode)}==='duplicate-transfer')records.push({...records[0]});
+ else records[0].name='../outside';
+ return process.stdout.write(JSON.stringify(records),()=>process.exit(0));
+}
 if(command.includes('base64 -w0')||command.includes('collect-migrations')){`,
 				),
 			);
@@ -3292,7 +3317,7 @@ for (const mode of [
 				"if(command.includes('base64 -w0')||command.includes('collect-migrations')){",
 				`
 if(command.includes('collect-migrations')){
- const records=JSON.parse(cp.execFileSync('bash',['-c',command],{env:process.env}));
+ const records=JSON.parse(cp.execFileSync('bash',['-c',command],{env:process.env,maxBuffer:48*1024*1024}));
  const mode=${JSON.stringify(mode)},record=records[0];
  if(mode==='hash')record.sha256='0'.repeat(64);
  if(mode==='length')record.size++;
@@ -3300,7 +3325,7 @@ if(command.includes('collect-migrations')){
  if(mode==='nonregular')record.type='hardlink';
  if(mode==='absolute')record.name='/tmp/outside';
  if(mode==='backslash')record.name='apps'+String.fromCharCode(92)+'asset'+String.fromCharCode(92)+'drizzle'+String.fromCharCode(92)+'0018_invalid.sql';
- console.log(JSON.stringify(records));process.exit(0);
+ return process.stdout.write(JSON.stringify(records),()=>process.exit(0));
 }
 if(command.includes('base64 -w0')||command.includes('collect-migrations')){`,
 			),
@@ -3311,22 +3336,51 @@ if(command.includes('base64 -w0')||command.includes('collect-migrations')){`,
 		assert.deepEqual(migrationBytes(f.root), before);
 	});
 
-test("local ignored output and mode changes participate in the final source comparison", async (t) => {
+test("local ignored output participates independently in the final source comparison", async (t) => {
 	const f = await pausedMigrations(t);
 	f.local(
 		".gitignore",
 		fs.readFileSync(path.join(f.root, ".gitignore"), "utf8") +
 			"apps/asset/drizzle/ignored*\n",
 	);
-	f.local("apps/asset/drizzle/ignored.sql", "-- local ignored occupant\n");
-	const file = path.join(f.root, "apps/asset/src/db/schema.ts");
-	fs.chmodSync(file, 0o640);
+	const name = "apps/asset/drizzle/ignored.sql";
+	f.local(name, "-- local ignored occupant\n");
+	assert.equal(
+		execFileSync("git", ["check-ignore", name], { cwd: f.root })
+			.toString()
+			.trim(),
+		name,
+	);
 	const before = migrationBytes(f.root);
 	f.release();
 	const result = await f.pending;
 	assert.notEqual(result.status, 0, result.output);
+	assert.match(
+		result.output,
+		/Invalid migration path: apps\/asset\/drizzle\/ignored.sql/,
+	);
 	assert.deepEqual(migrationBytes(f.root), before);
-	assert.equal(fs.statSync(file).mode & 0o777, 0o640);
+});
+
+test("concurrent schema chmod alone rejects migration source acceptance", async (t) => {
+	const f = await pausedMigrations(t),
+		file = path.join(f.root, "apps/asset/src/db/schema.ts");
+	const before = migrationBytes(f.root),
+		schema = fs.readFileSync(file),
+		oldMode = fs.statSync(file).mode & 0o777;
+	const editedMode = oldMode ^ 0o004;
+	fs.chmodSync(file, editedMode);
+	assert.notEqual(editedMode, oldMode);
+	f.release();
+	const result = await f.pending;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(
+		result.output,
+		/Local generator inputs or old migration set changed: apps\/asset\/src\/db\/schema.ts/,
+	);
+	assert.deepEqual(migrationBytes(f.root), before);
+	assert.deepEqual(fs.readFileSync(file), schema);
+	assert.equal(fs.statSync(file).mode & 0o777, editedMode);
 });
 
 test("remote proposal retention rejects a symlinked evidence ancestor before restoration", async (t) => {
@@ -3435,6 +3489,16 @@ test("transport loss leaves an independently live remote writer owned and blocks
 		() => fs.existsSync(path.join(f.control, "writer-entered")),
 		"independent API writer ready",
 	);
+	const writerIdentity = worktreeProcesses(f.root).find(
+		(record) => record.pid === writer.child.pid,
+	);
+	assert.ok(writerIdentity?.startTicks, "writer has an owned process identity");
+	const assertWriterRunning = () => {
+		assert.equal(writer.child.exitCode, null);
+		assert.equal(writer.child.signalCode, null);
+		assert.equal(writer.closed, false);
+		assert.equal(liveOwnedProcess(f.root, writerIdentity), true);
+	};
 	flag(f, "stream-loss");
 	const lost = await f.migrations();
 	assert.notEqual(lost.status, 0, lost.output);
@@ -3443,7 +3507,7 @@ test("transport loss leaves an independently live remote writer owned and blocks
 		() => fs.existsSync(path.join(f.control, "writer-mutated")),
 		"API writer outlived failed CLI",
 	);
-	assert.equal(writer.child.exitCode, null);
+	assertWriterRunning();
 	const remote = migrationBytes(f.worker),
 		ownership = f.json(".boat/source-writer.json");
 	assert.match(ownership.commandId, /^cmd_/);
@@ -3460,7 +3524,7 @@ test("transport loss leaves an independently live remote writer owned and blocks
 		daemonResult = await daemon.done;
 	assert.notEqual(daemonResult.status, 0, daemonResult.output);
 	assert.match(daemonResult.output, /completion is uncertain/);
-	assert.equal(writer.child.exitCode, null);
+	assertWriterRunning();
 	assert.deepEqual(migrationBytes(f.root), before);
 	assert.deepEqual(migrationBytes(f.worker), remote);
 	assert.equal(
@@ -3468,8 +3532,31 @@ test("transport loss leaves an independently live remote writer owned and blocks
 		ownership.commandId,
 	);
 	flag(f, "writer-release");
-	await writer.done;
+	const finished = await writer.done;
+	assert.equal(finished.status, 0, finished.output);
+	assert.equal(writer.child.signalCode, null);
+	assert.equal(writer.closed, true);
+	assert.equal(liveOwnedProcess(f.root, writerIdentity), false);
 	const stillBlocked = await f.run("build", "PACKAGE=asset").done;
 	assert.notEqual(stillBlocked.status, 0, stillBlocked.output);
 	assert.match(stillBlocked.output, /completion is uncertain/);
+});
+
+test("concurrent maintained execution wrapper edit rejects migration source acceptance", async (t) => {
+	const f = await pausedMigrations(t),
+		name = "scripts/boat-shell.mjs";
+	const before = migrationBytes(f.root),
+		captured = fs.readFileSync(path.join(f.root, name), "utf8"),
+		edited = `${captured}\n// concurrent wrapper edit\n`;
+	f.local(name, edited);
+	f.release();
+	const result = await f.pending;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(
+		result.output,
+		/Local generator inputs or old migration set changed: scripts\/boat-shell.mjs/,
+	);
+	assert.deepEqual(migrationBytes(f.root), before);
+	assert.equal(fs.readFileSync(path.join(f.root, name), "utf8"), edited);
+	assert.equal(fs.readFileSync(path.join(f.worker, name), "utf8"), captured);
 });

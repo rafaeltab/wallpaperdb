@@ -349,12 +349,22 @@ async function worker(requestFile, compose) {
 		throw Error(
 			"Asset migration requires existing running owned Asset instance",
 		);
-	const projectAt = compose.findIndex(
-		(value) => value === "-p" || value === "--project-name",
-	);
-	const project =
-		projectAt >= 0 ? compose[projectAt + 1] : process.env.COMPOSE_PROJECT_NAME;
-	if (!project || info.Config.Labels["com.docker.compose.project"] !== project)
+	// Compose owns option forms, dotenv/config precedence and project selection.
+	// Keep its rendered configuration internal; only the non-secret name is used.
+	const project = JSON.parse(
+		output(compose[0], [
+			...compose.slice(1),
+			"config",
+			"--format",
+			"json",
+			"--no-env-resolution",
+		]),
+	).name;
+	if (
+		typeof project !== "string" ||
+		!project ||
+		info.Config.Labels["com.docker.compose.project"] !== project
+	)
 		throw Error("Asset migration container project mismatch");
 	console.log(
 		`asset-migration instance ${JSON.stringify({ id, project, service: "asset", cwd: "/app/apps/asset", deliveryDeadline: deadline, commandDeadline: request.deadline })}`,

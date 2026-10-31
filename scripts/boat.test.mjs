@@ -1175,6 +1175,22 @@ child.on('close',code=>{
 async function assetExecutionCheckout(t) {
 	const f = await lockGenerationCheckout(t);
 	f.env.COMPOSE_PROJECT_NAME = "wallpaperdb";
+	f.env.FAKE_CONTAINER_PROJECT = "wallpaperdb";
+	f.env.FAKE_CONTAINER_SERVICE = "asset";
+	f.env.FAKE_NATIVE_COMPOSE = execFileSync(
+		"mise",
+		["which", "docker-compose"],
+		{ encoding: "utf8" },
+	).trim();
+	f.env.DOCKER_HOST = `unix://${f.directory}/no-daemon.sock`;
+	f.env.DOCKER_CONFIG = path.join(f.directory, "empty-docker-config");
+	fs.mkdirSync(f.env.DOCKER_CONFIG);
+	f.local(
+		"infra/docker-compose.apps.yml",
+		fs.readFileSync(
+			path.resolve(import.meta.dirname, "../infra/docker-compose.apps.yml"),
+		),
+	);
 	f.local(
 		".gitignore",
 		fs.readFileSync(path.join(f.root, ".gitignore"), "utf8") +
@@ -1272,8 +1288,9 @@ const fs=require('fs'),path=require('path'),cp=require('child_process'),a=proces
 fs.appendFileSync(path.join(c,'docker'),JSON.stringify(a)+'\\n');
 const context=a[0]==='--context'?a.splice(0,2)[1]:undefined;
 if(process.env.FAKE_DOCKER_CONTEXT&&context!==process.env.FAKE_DOCKER_CONTEXT)throw Error('Docker context lost');
+if(a[0]==='compose'&&a.includes('config')){const r=cp.spawnSync(process.env.FAKE_NATIVE_COMPOSE,a.slice(1),{encoding:'utf8',env:process.env});process.stdout.write(r.stdout??'');process.stderr.write(r.stderr??'');process.exit(r.status??1);}
 if(a[0]==='compose'&&a.includes('ps')){if(!fs.existsSync(path.join(c,'missing')))console.log('asset-instance-one');process.exit(0);}
-if(a[0]==='inspect'){console.log(JSON.stringify([{Id:'asset-instance-one',State:{Running:!fs.existsSync(path.join(c,'exited'))},Config:{Labels:{'com.docker.compose.project': process.env.COMPOSE_PROJECT_NAME,'com.docker.compose.service':'asset'}}}]));process.exit(0);}
+if(a[0]==='inspect'){console.log(JSON.stringify([{Id:'asset-instance-one',State:{Running:!fs.existsSync(path.join(c,'exited'))},Config:{Labels:{'com.docker.compose.project': process.env.FAKE_CONTAINER_PROJECT,'com.docker.compose.service':process.env.FAKE_CONTAINER_SERVICE}}}]));process.exit(0);}
 if(a[0]!=='exec'||!a.includes('asset-instance-one'))throw Error('unexpected docker '+a);
 if(fs.existsSync(path.join(c,'replaced'))){console.error('container asset-instance-one no longer running');process.exit(1);}
 const n=a.indexOf('node');const child=cp.spawn(process.execPath,['--import',${JSON.stringify(clock)},...a.slice(n+1)],{cwd:${JSON.stringify(path.join(runtime, "apps/asset"))},env:{...process.env,DATABASE_URL:'runtime-inherited'},stdio:['pipe','pipe','inherit']});process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});child.stdout.on('data',b=>{fs.appendFileSync(path.join(c,'runtime-output'),b);if(b.toString().includes('asset-migration ready')&&fs.existsSync(path.join(c,'replace-on-ready'))){fs.writeFileSync(path.join(c,'replaced'),'yes');child.kill('SIGTERM');}process.stdout.write(b);});child.on('close',code=>process.exit(code??1));
@@ -1557,7 +1574,10 @@ test("Asset migration cannot use a verified receipt after that running instance 
 		.split("\n")
 		.map(JSON.parse);
 	assert.equal(calls.filter((a) => a[0] === "exec").length, 1);
-	assert.equal(calls.filter((a) => a[0] === "compose").length, 1);
+	assert.equal(
+		calls.filter((a) => a[0] === "compose" && a.includes("ps")).length,
+		1,
+	);
 });
 
 for (const [name, selectors, mode, unenrolled] of [
@@ -1606,29 +1626,42 @@ for (const [name, selectors, mode, unenrolled] of [
 		}
 	});
 
-for (const selectors of [
-	["PACKAGE=user", "PACKAGE=asset"],
-	["PACKAGE=asset", "BOAT_EXEC=remote"],
+for (const [selectors, ownedProject] of [
+	[["PACKAGE=user", "PACKAGE=asset"], "wallpaperdb"],
+	[["PACKAGE=asset", "BOAT_EXEC=remote"], "wallpaperdb"],
 	[
-		"PACKAGE=asset",
-		"COMPOSE_PROJECT_NAME=owned-control",
-		"APPS_COMPOSE=docker compose -p owned-control -f infra/docker-compose.apps.yml --ansi never",
+		[
+			"PACKAGE=asset",
+			"COMPOSE_PROJECT_NAME=owned-control",
+			"APPS_COMPOSE=docker compose -p owned-control -f infra/docker-compose.apps.yml --ansi never",
+		],
+		"owned-control",
 	],
 	[
-		"PACKAGE=asset",
-		"APPS_COMPOSE=docker compose -f infra/docker-compose.apps.yml",
+		[
+			"PACKAGE=asset",
+			"APPS_COMPOSE=docker compose -f infra/docker-compose.apps.yml",
+		],
+		"wallpaperdb",
 	],
 	[
-		"PACKAGE=asset",
-		"APPS_COMPOSE=docker compose --project-name wallpaperdb -f infra/docker-compose.apps.yml",
+		[
+			"PACKAGE=asset",
+			"APPS_COMPOSE=docker compose --project-name wallpaperdb -f infra/docker-compose.apps.yml",
+		],
+		"wallpaperdb",
 	],
 	[
-		"PACKAGE=asset",
-		"APPS_COMPOSE=docker --context controlled compose -p wallpaperdb -f infra/docker-compose.apps.yml",
+		[
+			"PACKAGE=asset",
+			"APPS_COMPOSE=docker --context controlled compose -p wallpaperdb -f infra/docker-compose.apps.yml",
+		],
+		"wallpaperdb",
 	],
 ])
 	test(`Asset migration preserves Make expansion for ${selectors.join(" ")}`, async (t) => {
 		const f = await assetExecutionCheckout(t);
+		f.env.FAKE_CONTAINER_PROJECT = ownedProject;
 		if (selectors.some((value) => value.includes("--context controlled")))
 			f.env.FAKE_DOCKER_CONTEXT = "controlled";
 		const result = await f.run("migrate", ...selectors).done;
@@ -1938,6 +1971,92 @@ test("Asset migration command expiry terminates its owned package process and sk
 	});
 	assert.match(result.output, /asset-migration completed [a-f0-9]+ 1/);
 });
+
+for (const flags of [
+	"--project-name=owned",
+	"-powned",
+	"--project-name owned",
+	"-p owned",
+])
+	test(`Asset migration independent ownership accepts explicit project ${flags} over ambient`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		f.env.COMPOSE_PROJECT_NAME = "ambient";
+		f.env.FAKE_CONTAINER_PROJECT = "owned";
+		const result = await f.run(
+			"migrate",
+			"PACKAGE=asset",
+			`APPS_COMPOSE=docker compose ${flags} -f infra/docker-compose.apps.yml`,
+		).done;
+		assert.equal(result.status, 0, result.output);
+		assert.match(result.output, /"project":"owned"/);
+		assert.equal(f.effects().length, 2);
+		assert.equal(f.env.COMPOSE_PROJECT_NAME, "ambient");
+	});
+
+for (const [project, service, guard] of [
+	["foreign", "asset", /container project mismatch/],
+	["owned", "foreign", /running owned Asset instance/],
+])
+	test(`Asset migration independent ownership rejects project=${project}, service=${service}`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		f.env.COMPOSE_PROJECT_NAME = "ambient";
+		f.env.FAKE_CONTAINER_PROJECT = project;
+		f.env.FAKE_CONTAINER_SERVICE = service;
+		const result = await f.run(
+			"migrate",
+			"PACKAGE=asset",
+			"APPS_COMPOSE=docker compose -p owned -f infra/docker-compose.apps.yml",
+		).done;
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, guard);
+		assert.deepEqual(f.effects(), []);
+	});
+
+test("Asset migration independent ownership sensitivity detects ignoring the explicit project", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	f.env.COMPOSE_PROJECT_NAME = "ambient";
+	f.env.FAKE_CONTAINER_PROJECT = "owned";
+	const helper = "scripts/lib/boat-asset-migration.mjs";
+	const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+	assert.equal(source.split("const project = JSON.parse(").length, 2);
+	f.local(
+		helper,
+		source.replace(
+			"const project = JSON.parse(",
+			"const project = process.env.COMPOSE_PROJECT_NAME; const ignored = JSON.parse(",
+		),
+	);
+	const result = await f.run(
+		"migrate",
+		"PACKAGE=asset",
+		"APPS_COMPOSE=docker compose --project-name=owned -f infra/docker-compose.apps.yml",
+	).done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /container project mismatch/);
+	assert.deepEqual(f.effects(), []);
+});
+
+for (const field of ["project", "service"])
+	test(`Asset migration independent ownership ${field} guard sensitivity has no earlier rejection`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		f.env.FAKE_CONTAINER_PROJECT = field === "project" ? "foreign" : "owned";
+		f.env.FAKE_CONTAINER_SERVICE = field === "service" ? "foreign" : "asset";
+		const helper = "scripts/lib/boat-asset-migration.mjs";
+		const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+		const guard =
+			field === "project"
+				? 'info.Config.Labels["com.docker.compose.project"] !== project'
+				: 'info.Config?.Labels?.["com.docker.compose.service"] !== "asset"';
+		assert.equal(source.split(guard).length, 2);
+		f.local(helper, source.replace(guard, "false"));
+		const mutant = await f.run(
+			"migrate",
+			"PACKAGE=asset",
+			"APPS_COMPOSE=docker compose --project-name=owned -f infra/docker-compose.apps.yml",
+		).done;
+		assert.equal(mutant.status, 0, mutant.output);
+		assert.equal(f.effects().length, 2);
+	});
 
 function finalInspectionClock(f, mode) {
 	fs.appendFileSync(

@@ -1517,7 +1517,26 @@ async function preview() {
 			path: req.url,
 			headers: req.headers,
 		});
-		upstream.on("upgrade", (response, peer, bytes) => {
+		let peer;
+		// This downstream owns both the pending request and any upgraded peer.
+		// An upgraded server socket can receive EOF without emitting close, so
+		// retire it on end as well. No handshake deadline substitutes for EOF.
+		const disconnect = () => {
+			upstream.destroy();
+			peer?.destroy();
+			socket.destroy();
+		};
+		socket.once("end", disconnect);
+		socket.once("close", disconnect);
+		socket.once("error", disconnect);
+		upstream.once("upgrade", (response, upgraded, bytes) => {
+			peer = upgraded;
+			peer.once("error", disconnect);
+			peer.once("close", () => socket.end());
+			if (socket.destroyed) {
+				disconnect();
+				return;
+			}
 			socket.write(
 				`HTTP/1.1 101 Switching Protocols\r\n${Object.entries(response.headers)
 					.map(([k, v]) => `${k}: ${v}`)
@@ -1527,7 +1546,7 @@ async function preview() {
 			socket.write(bytes);
 			socket.pipe(peer).pipe(socket);
 		});
-		upstream.on("error", () => socket.destroy());
+		upstream.once("error", disconnect);
 		upstream.end();
 	});
 	await new Promise((resolve, reject) =>

@@ -7077,43 +7077,56 @@ async function pendingUpgradePreview(t, mode) {
 			true,
 			"upgrade authentication forwarded",
 		);
-		if (req.url === "/ws-pending") {
-			// Drain the upgraded raw socket so a remote FIN is observable while
-			// deliberately withholding the HTTP 101 response.
+		const establish = () => {
+			const accept = createHash("sha1")
+				.update(
+					req.headers["sec-websocket-key"] +
+						"258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
+				)
+				.digest("base64");
+			socket.write(
+				`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\nSec-WebSocket-Protocol: boat-diagnostic\r\n\r\n`,
+			);
+			let buffered = Buffer.alloc(0);
+			socket.on("data", (bytes) => {
+				buffered = Buffer.concat([buffered, bytes]);
+				while (buffered.length >= 6) {
+					const length = buffered[1] & 127;
+					if (buffered.length < length + 6) return;
+					assert.equal(buffered[0], 0x81);
+					assert.equal(buffered[1] & 128, 128);
+					const mask = buffered.subarray(2, 6);
+					const payload = Buffer.from(buffered.subarray(6, length + 6));
+					for (let i = 0; i < length; i++) payload[i] ^= mask[i % 4];
+					buffered = buffered.subarray(length + 6);
+					const reply = Buffer.from(`ack:${payload.toString()}`);
+					const frame = Buffer.concat([
+						Buffer.from([0x81, reply.length]),
+						reply,
+					]);
+					if (payload.toString() === "healthy-completion") socket.end(frame);
+					else socket.write(frame);
+				}
+			});
+		};
+		if (req.url.startsWith("/ws-pending") || req.url === "/ws-late") {
+			// Consume raw upgraded bytes and acknowledge EOF, as qualified by the
+			// retained SAME-forwarder bypass. Never manufacture closure in cleanup.
 			socket.once("end", () => socket.end());
 			socket.resume();
 			pending.get(req.url)?.({
 				req,
 				socket,
+				establish,
 				closed: new Promise((resolve) => socket.once("close", resolve)),
 			});
 			return;
 		}
-		const accept = createHash("sha1")
-			.update(
-				req.headers["sec-websocket-key"] +
-					"258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
-			)
-			.digest("base64");
-		socket.write(
-			`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\nSec-WebSocket-Protocol: boat-diagnostic\r\n\r\n`,
-		);
-		let buffered = Buffer.alloc(0);
-		socket.on("data", (bytes) => {
-			buffered = Buffer.concat([buffered, bytes]);
-			while (buffered.length >= 6) {
-				const length = buffered[1] & 127;
-				if (buffered.length < length + 6) return;
-				assert.equal(buffered[0], 0x81);
-				assert.equal(buffered[1] & 128, 128);
-				const mask = buffered.subarray(2, 6);
-				const payload = Buffer.from(buffered.subarray(6, length + 6));
-				for (let i = 0; i < length; i++) payload[i] ^= mask[i % 4];
-				buffered = buffered.subarray(length + 6);
-				const reply = Buffer.from(`ack:${payload.toString()}`);
-				socket.write(Buffer.concat([Buffer.from([0x81, reply.length]), reply]));
-			}
-		});
+		if (req.url === "/ws-upstream-error") {
+			socket.resetAndDestroy();
+			return;
+		}
+		establish();
 	});
 	t.after(async () => {
 		for (const socket of sockets) socket.destroy();
@@ -7479,6 +7492,14 @@ for (const mode of ["foreground", "managed"])
 						upstream.closed,
 						"Pending upstream WebSocket handshake survived downstream socket closure for 1000ms",
 					);
+					assert.equal(upstream.socket.destroyed, true);
+					f.receipts.pendingCancelled = {
+						downstreamPort,
+						upstreamPort,
+						downstreamSocketDestroyed: socket.destroyed,
+						upstreamSocketDestroyed: upstream.socket.destroyed,
+						received101,
+					};
 					f.phase("pending upstream handshake cancelled");
 				} catch (error) {
 					f.receipts.pendingAfterDeadline = {
@@ -7494,6 +7515,149 @@ for (const mode of ["foreground", "managed"])
 					f.phase("pending upstream handshake remained open at deadline");
 					throw error;
 				}
+			},
+		);
+		await t.test(
+			"late 101 transition retains duplex and cancels its established peer",
+			{ timeout: 3000 },
+			async () => {
+				const arrived = f.arrival("/ws-late");
+				const client = f.request("/ws-late", true, true);
+				const upgraded = once(client, "upgrade");
+				const upstream = await previewProbe(arrived, "late handshake missing");
+				upstream.establish();
+				const [response, socket] = await previewProbe(
+					upgraded,
+					"late 101 missing",
+				);
+				assert.equal(response.statusCode, 101);
+				f.clients.add(socket);
+				await previewFrame(socket, "late-transition");
+				const closed = once(socket, "close");
+				socket.destroy();
+				await previewProbe(closed, "late downstream did not close");
+				await previewProbe(
+					upstream.closed,
+					"late upgraded peer survived downstream close",
+				);
+				assert.equal(upstream.socket.destroyed, true);
+				f.phase("late 101 duplex and established peer retirement passed");
+			},
+		);
+		await t.test(
+			"upstream handshake error closes downstream and preserves sibling",
+			{ timeout: 3000 },
+			async () => {
+				const client = f.request("/ws-upstream-error", true, true);
+				const [socket] = await previewProbe(
+					once(client, "socket"),
+					"error downstream missing",
+				);
+				await previewProbe(
+					once(socket, "close"),
+					"upstream error did not close downstream",
+				);
+				assert.equal(socket.destroyed, true);
+				await previewFrame(sibling, "after-upstream-error");
+				await f.healthy(true);
+				f.phase(
+					"upstream error closes affected downstream and preserves sibling",
+				);
+			},
+		);
+		await t.test(
+			"healthy upstream completion flushes its final frame and closes downstream",
+			{ timeout: 3000 },
+			async () => {
+				const arrived = f.arrival("/ws-late");
+				const client = f.request("/ws-late", true, true);
+				const upgraded = once(client, "upgrade");
+				const upstream = await previewProbe(
+					arrived,
+					"completion upstream missing",
+				);
+				upstream.establish();
+				const [, socket] = await previewProbe(
+					upgraded,
+					"completion 101 missing",
+				);
+				f.clients.add(socket);
+				const closed = once(socket, "close");
+				await previewFrame(socket, "healthy-completion");
+				await previewProbe(
+					closed,
+					"healthy completion did not close downstream",
+				);
+				await previewProbe(
+					upstream.closed,
+					"healthy completion retained upstream",
+				);
+				await f.healthy(true);
+				f.phase(
+					"healthy upstream completion flushed final frame and retired sockets",
+				);
+			},
+		);
+		await t.test(
+			"pending downstream ECONNRESET retires only its own lifetime",
+			{ timeout: 3000 },
+			async () => {
+				const arrived = f.arrival("/ws-pending-reset");
+				const client = f.request("/ws-pending-reset", true, true);
+				const [socket] = await previewProbe(
+					once(client, "socket"),
+					"reset downstream missing",
+				);
+				const upstream = await previewProbe(arrived, "reset upstream missing");
+				const closed = once(socket, "close");
+				socket.resetAndDestroy();
+				await previewProbe(closed, "reset downstream did not close");
+				await previewProbe(
+					upstream.closed,
+					"reset pending upstream survived downstream close",
+				);
+				await previewFrame(sibling, "after-reset");
+				await f.healthy(true);
+				f.receipts.resetControl = {
+					disconnectMethod: "resetAndDestroy",
+					downstreamSocketDestroyed: socket.destroyed,
+					upstreamSocketDestroyed: upstream.socket.destroyed,
+					siblingDestroyed: sibling.destroyed,
+				};
+				f.phase("pending reset retirement, sibling and next request passed");
+			},
+		);
+		await t.test(
+			"101 racing actual downstream closure cannot retain a peer",
+			{ timeout: 3000 },
+			async () => {
+				const arrived = f.arrival("/ws-late");
+				const client = f.request("/ws-late", true, true);
+				let received101 = false;
+				client.on("upgrade", (_response, peer) => {
+					received101 = true;
+					f.clients.add(peer);
+				});
+				const [socket] = await previewProbe(
+					once(client, "socket"),
+					"racing downstream missing",
+				);
+				const upstream = await previewProbe(arrived, "racing upstream missing");
+				const closed = once(socket, "close");
+				socket.destroy();
+				await previewProbe(closed, "racing downstream did not close");
+				const upstreamOpenAt101 = !upstream.socket.destroyed;
+				upstream.establish();
+				await previewProbe(upstream.closed, "101 race retained upstream peer");
+				assert.equal(received101, false);
+				assert.equal(upstream.socket.destroyed, true);
+				f.receipts.late101Race = {
+					downstreamClosedBefore101: true,
+					upstreamOpenAt101,
+					received101,
+					upstreamSocketDestroyed: upstream.socket.destroyed,
+				};
+				f.phase("101 racing downstream closure retired upstream peer");
 			},
 		);
 		await t.test(

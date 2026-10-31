@@ -103,11 +103,18 @@ function signalOwned(members, signal) {
 // daemon/session escapes are NOT contained by procfs polling or this receipt.
 export function finiteShutdownProcess(child, phase) {
 	return new Promise((resolve, reject) => {
-		const leader = identity(child.pid);
+		let leader, ownershipFailure;
+		try {
+			leader = identity(child.pid);
+		} catch {
+			ownershipFailure = "local process identity unavailable";
+		}
 		const observed = new Map();
+		if (leader && leader.pid === leader.group && leader.pid === leader.session)
+			observed.set(`${leader.pid}:${leader.birth}`, leader);
 		let closed = false,
 			terminal,
-			failure,
+			failure = ownershipFailure,
 			cancelling = false,
 			killed = false,
 			finished = false;
@@ -145,9 +152,12 @@ export function finiteShutdownProcess(child, phase) {
 			child.stderr?.destroy();
 			const receipt = {
 				phase: phase.phase,
+				spawnedPid: child.pid,
 				leader,
 				observed: [...observed.values()],
-				unresolved: members,
+				unresolved: leader
+					? members
+					: [{ pid: child.pid, reason: "identity-unavailable" }],
 				pipesClosed: closed,
 				terminal,
 				failure,

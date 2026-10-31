@@ -6,6 +6,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  uniqueIndex,
   text,
   timestamp,
   uuid,
@@ -206,8 +207,33 @@ export const assetResultOutbox = pgTable(
 /** One serialization boundary per owned Asset, independent of legacy catalogue rows. */
 export const assetSourceState = pgTable('asset_source_state', {
   assetId: text('asset_id').primaryKey(),
+  nextCandidateOrdinal: integer('next_candidate_ordinal').notNull().default(0),
   state: jsonb('state').notNull().$type<import('../capabilities/sources/index.js').SourceState>(),
 });
+/** Replay responsibility is retained separately from bounded active membership. */
+export const sourceCandidates = pgTable(
+  'source_candidates',
+  {
+    id: text('id').primaryKey(),
+    assetId: text('asset_id').notNull(),
+    ordinal: integer('ordinal').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    sourceId: text('source_id').notNull(),
+    status: text('status').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    candidate: jsonb('candidate')
+      .notNull()
+      .$type<import('../capabilities/sources/index.js').Candidate>(),
+  },
+  (table) => [
+    uniqueIndex('source_candidate_replay').on(table.assetId, table.idempotencyKey),
+    uniqueIndex('source_candidate_page').on(table.assetId, table.ordinal),
+    uniqueIndex('source_candidate_source').on(table.assetId, table.sourceId),
+    index('source_candidate_pending')
+      .on(table.assetId, table.expiresAt)
+      .where(sql`${table.status} NOT IN ('accepted', 'rejected', 'cancelled')`),
+  ]
+);
 /** Accepted identities can only be inserted. Conflicting replay never updates facts. */
 export const immutableSources = pgTable(
   'immutable_sources',

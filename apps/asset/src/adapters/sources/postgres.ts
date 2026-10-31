@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { and, asc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, lt, gt, count, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
 import { Pool } from 'pg';
@@ -19,6 +19,7 @@ import {
   assetConfiguration,
   ownedAssets,
   assetSourceState,
+  sourceCandidates,
   immutableSources,
   sourceAcceptanceOutbox,
   sourceCleanup,
@@ -112,7 +113,7 @@ export function sourcePostgresLayer(options: Options) {
           run('release-read', async (db) => {
             await db.delete(sourceReads).where(eq(sourceReads.id, id));
           }),
-        transact: (assetId, revision, change) =>
+        transact: (assetId, revision, change, selection) =>
           run('transact', (db) =>
             db.transaction(async (tx) => {
               if (revision !== null) {
@@ -132,6 +133,8 @@ export function sourcePostgresLayer(options: Options) {
                 .select()
                 .from(assetSourceState)
                 .where(eq(assetSourceState.assetId, assetId));
+              if (record?.state.candidates.length)
+                throw new Error('Source history migration must complete before serving requests');
               const initial: SourceState | null =
                 asset && asset.deletedAt === null
                   ? (record?.state ?? {
@@ -150,9 +153,77 @@ export function sourcePostgresLayer(options: Options) {
                       nonterminalCandidateCount: 0,
                     })
                   : null;
+              let nextOrdinal = record?.nextCandidateOrdinal ?? 0;
+              if (initial) {
+                const assetMatch = eq(sourceCandidates.assetId, assetId);
+                const selected = selection ?? { kind: 'page' as const };
+                let condition = assetMatch;
+                if (selected.kind === 'candidate')
+                  condition = and(assetMatch, eq(sourceCandidates.id, selected.candidateId))!;
+                if (selected.kind === 'replay') {
+                  condition = and(assetMatch, eq(sourceCandidates.idempotencyKey, selected.key))!;
+                  const [active] = await tx
+                    .select({ count: count() })
+                    .from(sourceCandidates)
+                    .where(
+                      and(
+                        assetMatch,
+                        sql`${sourceCandidates.status} NOT IN ('accepted', 'rejected', 'cancelled')`,
+                        gt(sourceCandidates.expiresAt, new Date(selected.now))
+                      )
+                    );
+                  initial.activeCandidateCount = active?.count ?? 0;
+                }
+                if (selected.kind === 'page') {
+                  let valid = true;
+                  if (selected.cursor !== undefined) {
+                    const match = /^(0|[1-9][0-9]*):(.+)$/.exec(selected.cursor);
+                    const ordinal = Number(match?.[1]);
+                    const [cursor] =
+                      match && Number.isSafeInteger(ordinal) && selected.cursor.length <= 256
+                        ? await tx
+                            .select({ id: sourceCandidates.id })
+                            .from(sourceCandidates)
+                            .where(
+                              and(
+                                assetMatch,
+                                eq(sourceCandidates.ordinal, ordinal),
+                                eq(sourceCandidates.id, match[2]!)
+                              )
+                            )
+                        : [];
+                    valid = cursor !== undefined;
+                    condition = and(assetMatch, lt(sourceCandidates.ordinal, valid ? ordinal : 0))!;
+                  }
+                  const rows = await tx
+                    .select()
+                    .from(sourceCandidates)
+                    .where(condition)
+                    .orderBy(desc(sourceCandidates.ordinal))
+                    .limit(33);
+                  const page = rows.slice(0, 32);
+                  const last = page.at(-1);
+                  initial.candidates = page.map((row) => row.candidate).reverse();
+                  initial.candidatePage = {
+                    valid,
+                    ...(rows.length > 32 && last
+                      ? { nextCursor: `${last.ordinal}:${last.id}` }
+                      : {}),
+                  };
+                } else
+                  initial.candidates =
+                    selected.kind === 'membership'
+                      ? []
+                      : (await tx.select().from(sourceCandidates).where(condition).limit(1)).map(
+                          (row) => row.candidate
+                        );
+              }
               const priorSources = initial?.sources.map((source) => source.sourceId) ?? [];
               const priorCandidates = new Map(
-                initial?.candidates.map((candidate) => [candidate.candidateId, candidate.status])
+                initial?.candidates.map((candidate) => [
+                  candidate.candidateId,
+                  structuredClone(candidate),
+                ])
               );
               const changed = decide(() => {
                 const changed = change(initial);
@@ -177,7 +248,33 @@ export function sourcePostgresLayer(options: Options) {
               }
               if (changed.state && asset) {
                 for (const candidate of changed.state.candidates) {
-                  if (priorCandidates.get(candidate.candidateId) === candidate.status) continue;
+                  const prior = priorCandidates.get(candidate.candidateId);
+                  if (isDeepStrictEqual(prior, candidate)) continue;
+                  const values = {
+                    id: candidate.candidateId,
+                    assetId,
+                    ordinal: nextOrdinal,
+                    idempotencyKey: candidate.idempotencyKey,
+                    sourceId: candidate.sourceId,
+                    status: candidate.status,
+                    expiresAt: new Date(candidate.expiresAt),
+                    candidate,
+                  };
+                  if (prior)
+                    await tx
+                      .update(sourceCandidates)
+                      .set({ candidate, status: candidate.status })
+                      .where(
+                        and(
+                          eq(sourceCandidates.assetId, assetId),
+                          eq(sourceCandidates.id, candidate.candidateId)
+                        )
+                      );
+                  else {
+                    await tx.insert(sourceCandidates).values(values);
+                    nextOrdinal++;
+                  }
+                  if (prior?.status === candidate.status) continue;
                   const terminal = ['accepted', 'rejected', 'cancelled'].includes(candidate.status);
                   const context = changed.cleanupContext ?? candidate.context;
                   const inputExpiry = Math.min(
@@ -300,12 +397,18 @@ export function sourcePostgresLayer(options: Options) {
                       set: { dueAt: new Date(evidenceExpiresAt), context: changed.cleanupContext },
                     });
                 }
+                const {
+                  candidatePage: _page,
+                  activeCandidateCount: _active,
+                  ...membership
+                } = changed.state;
+                const persisted = { ...membership, candidates: [] };
                 await tx
                   .insert(assetSourceState)
-                  .values({ assetId, state: changed.state })
+                  .values({ assetId, nextCandidateOrdinal: nextOrdinal, state: persisted })
                   .onConflictDoUpdate({
                     target: assetSourceState.assetId,
-                    set: { state: changed.state },
+                    set: { state: persisted, nextCandidateOrdinal: nextOrdinal },
                   });
               }
               if (changed.confirmation) {

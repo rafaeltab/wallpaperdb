@@ -1,4 +1,6 @@
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Cause, Effect, Exit, ManagedRuntime } from 'effect';
@@ -14,6 +16,171 @@ import {
 } from '../src/capabilities/sources/index.js';
 let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
 let pool: Pool;
+it.each([32, 2048])(
+  'migrates %i existing candidates without losing replay history',
+  async (size) => {
+    const assetId = `asset_legacy_${size}`;
+    const candidates = Array.from({ length: size }, (_, index) => ({
+      candidateId: `${assetId}_${index}`,
+      sourceId: `${assetId}_source_${index}`,
+      idempotencyKey: `legacy-${index}`,
+      operation: 'add',
+      expectedSourceSetRevision: '0',
+      status: 'cancelled',
+      expiresAt: '2099-01-01T00:00:00Z',
+      orphanExpiresAt: '2099-01-01T00:00:00Z',
+      layout: 'asset-layout-1',
+    }));
+    await pool.query(
+      `INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+    VALUES ($1, 'wallpaper', 'wallpaper', 'clerk', 'owner')`,
+      [assetId]
+    );
+    const state = {
+      asset: {
+        id: assetId,
+        applicationId: 'wallpaper',
+        assetType: 'wallpaper',
+        owner: { namespace: 'clerk', subject: 'owner' },
+      },
+      candidates,
+      sources: [],
+      sourceSetRevision: '0',
+      deliveryRevision: '0',
+      nonterminalCandidateCount: 0,
+      defaultSourceId: null,
+      initialAnalysisSourceId: null,
+    };
+    await pool.query('INSERT INTO asset_source_state (asset_id, state) VALUES ($1, $2)', [
+      assetId,
+      state,
+    ]);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await promisify(execFile)(
+        process.execPath,
+        ['--import', 'tsx', 'scripts/migrate-source-history.ts'],
+        {
+          env: { ...process.env, DATABASE_URL: container.getConnectionUri() },
+          timeout: 10000,
+        }
+      );
+      const saved = await pool.query(
+        'SELECT candidate FROM source_candidates WHERE asset_id=$1 ORDER BY ordinal',
+        [assetId]
+      );
+      expect(saved.rows.map((row) => row.candidate)).toEqual(candidates);
+      expect(
+        (
+          await pool.query(
+            'SELECT state, next_candidate_ordinal FROM asset_source_state WHERE asset_id=$1',
+            [assetId]
+          )
+        ).rows
+      ).toEqual([{ state: { ...state, candidates: [] }, next_candidate_ordinal: size }]);
+    }
+  }
+);
+it.each([32, 2048])(
+  'keeps the mutable Source row bounded with %i retained candidates',
+  async (size) => {
+    const assetId = `asset_history_${size}`;
+    await pool.query(
+      `INSERT INTO owned_assets (id, application_id, asset_type, owner_namespace, owner_subject)
+    VALUES ($1, 'wallpaper', 'wallpaper', 'clerk', 'owner')`,
+      [assetId]
+    );
+    const runtime = ManagedRuntime.make(
+      sourcePostgresLayer({
+        databaseUrl: container.getConnectionUri(),
+        maxAttempts: 3,
+        retryDelayMs: 1,
+        leaseMs: 1000,
+      })
+    );
+    try {
+      await runtime.runPromise(
+        SourceStore.use((store) =>
+          store.transact(assetId, null, (state) => {
+            if (!state) throw new Error('Missing Asset');
+            return { state, result: undefined };
+          })
+        )
+      );
+      // Fixed retained history is fixture setup, not one supported intake mutation.
+      await pool.query(
+        `INSERT INTO source_candidates (id, asset_id, ordinal, idempotency_key, source_id, status, expires_at, candidate)
+        SELECT $1 || '_' || n, $1, n, 'history-' || n, $1 || '_source_' || n, 'cancelled', '2099-01-01T00:00:00Z',
+          jsonb_build_object('candidateId', $1 || '_' || n, 'sourceId', $1 || '_source_' || n,
+            'idempotencyKey', 'history-' || n, 'operation', 'add', 'expectedSourceSetRevision', '0',
+            'status', 'cancelled', 'expiresAt', '2099-01-01T00:00:00Z', 'orphanExpiresAt', '2099-01-01T00:00:00Z', 'layout', 'asset-layout-1')
+        FROM generate_series(0, $2::integer - 1) AS n`,
+        [assetId, size]
+      );
+      await pool.query(
+        'UPDATE asset_source_state SET next_candidate_ordinal=$2 WHERE asset_id=$1',
+        [assetId, size]
+      );
+      const { rows } = await pool.query(
+        `SELECT octet_length(state::text) AS bytes,
+      jsonb_array_length(state->'candidates') AS candidates FROM asset_source_state WHERE asset_id=$1`,
+        [assetId]
+      );
+      console.info('retained-history mutable-row evidence', { size, ...rows[0] });
+      expect(rows[0].candidates).toBe(0);
+      expect(rows[0].bytes).toBeLessThan(2048);
+      const inspect = (
+        selection: Parameters<
+          import('../src/capabilities/sources/index.js').SourceStorePort['transact']
+        >[3]
+      ) =>
+        runtime.runPromise(
+          SourceStore.use((store) =>
+            store.transact(assetId, null, (state) => ({ state, result: state }), selection)
+          )
+        );
+      const keyed = await inspect({ kind: 'candidate', candidateId: `${assetId}_0` });
+      expect(keyed?.candidates.map((entry) => entry.candidateId)).toEqual([`${assetId}_0`]);
+      const replay = await inspect({
+        kind: 'replay',
+        key: 'history-0',
+        now: new Date().toISOString(),
+      });
+      expect(replay?.candidates).toEqual(keyed?.candidates);
+      expect(replay?.activeCandidateCount).toBe(0);
+      const first = await inspect({ kind: 'page' });
+      expect(first?.candidates).toHaveLength(32);
+      if (size === 2048) {
+        expect(first?.candidatePage?.nextCursor).toBe(`${size - 32}:${assetId}_${size - 32}`);
+        const second = await inspect({ kind: 'page', cursor: first?.candidatePage?.nextCursor });
+        expect(second?.candidates).toHaveLength(32);
+        expect(second?.candidates.at(-1)?.candidateId).toBe(`${assetId}_${size - 33}`);
+        expect(await inspect({ kind: 'page', cursor: `2016:${assetId}_0` })).toMatchObject({
+          candidatePage: { valid: false },
+        });
+      } else expect(first?.candidatePage?.nextCursor).toBeUndefined();
+      const failed = await runtime.runPromiseExit(
+        SourceStore.use((store) =>
+          store.transact(
+            assetId,
+            null,
+            (state) => {
+              if (!state?.candidates[0]) throw new Error('Missing candidate');
+              state.candidates[0].reason = 'must-roll-back';
+              throw new Error('deliberate rollback');
+            },
+            { kind: 'candidate', candidateId: `${assetId}_0` }
+          )
+        )
+      );
+      expect(Exit.isFailure(failed)).toBe(true);
+      expect(
+        (await inspect({ kind: 'candidate', candidateId: `${assetId}_0` }))?.candidates
+      ).toEqual(keyed?.candidates);
+    } finally {
+      await runtime.dispose();
+    }
+  }
+);
 beforeAll(async () => {
   container = await new PostgreSqlContainer('postgres:16-alpine').start();
   pool = new Pool({ connectionString: container.getConnectionUri() });

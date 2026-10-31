@@ -21,6 +21,7 @@ import {
   assetResultOutbox,
   ownedAssets,
   assetSourceState,
+  sourceCandidates,
   immutableSources,
   assetDeletions,
   sourceCleanup,
@@ -177,6 +178,17 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
           await tx.update(ownedAssets).set({ deletedAt }).where(eq(ownedAssets.id, asset.id));
           if (record) {
             const state = record.state;
+            const pending = await tx
+              .select()
+              .from(sourceCandidates)
+              .where(
+                and(
+                  eq(sourceCandidates.assetId, asset.id),
+                  sql`${sourceCandidates.status} NOT IN ('accepted', 'rejected', 'cancelled')`
+                )
+              );
+            const legacy = state.candidates;
+            state.candidates = [...legacy, ...pending.map((row) => row.candidate)];
             state.sources = [];
             state.defaultSourceId = null;
             state.sourceSetRevision = sourceSetRevision;
@@ -231,6 +243,15 @@ async function accept(db: ReturnType<typeof drizzle>, input: Acceptance) {
                   });
             }
             state.nonterminalCandidateCount = 0;
+            for (const row of pending) {
+              const candidate = state.candidates.find((entry) => entry.candidateId === row.id);
+              if (candidate)
+                await tx
+                  .update(sourceCandidates)
+                  .set({ status: candidate.status, candidate })
+                  .where(eq(sourceCandidates.id, row.id));
+            }
+            state.candidates = legacy;
             await tx
               .update(assetSourceState)
               .set({ state })

@@ -61,6 +61,9 @@ export interface SourceState {
   initialAnalysisSourceId: string | null;
   sources: AcceptedSource[];
   candidates: Candidate[];
+  /** Present on a selected persistence window, rather than a complete history. */
+  candidatePage?: { readonly nextCursor?: string; readonly valid: boolean };
+  activeCandidateCount?: number;
   /** Includes expired records until their durable status becomes terminal. */
   nonterminalCandidateCount: number;
 }
@@ -90,12 +93,17 @@ export type SourceChangeOutcome =
     }
   | { readonly kind: 'unavailable' }
   | { readonly kind: 'rejected'; readonly reason: string };
-/** Serializes one Asset. The callback is pure, receives a detached state, and cannot
+/** Serializes one Asset. The callback is pure, receives detached active membership
+ * and only the selected candidates, and cannot
  * escape transaction resources. State, immutable Source metadata, cleanup deadlines,
  * initial analysis provenance and confirmation outbox commit together. Retirement records
  * evidence expiry once on the immutable Source row, without hydrating retirement history.
  * Active membership gates all Source and descendant eligibility; retained bytes confer none. A non-null
- * revision locks/compares the active configuration in that same transaction. */
+ * revision locks/compares the active configuration in that same transaction.
+ * Candidate mutations affect only selected or newly appended identities. History is
+ * retained for keyed replay and status. The default window contains the newest 32
+ * candidates; page cursors are stable ordinal/identity pairs. A replay selection also
+ * supplies the current unexpired pending count, independent of retained history. */
 export interface SourceStorePort {
   readonly transact: <A>(
     assetId: string,
@@ -118,7 +126,12 @@ export interface SourceStorePort {
         readonly expiresAt: string;
       };
       readonly cleanupContext?: CommandContext;
-    }
+    },
+    selection?:
+      | { readonly kind: 'candidate'; readonly candidateId: string }
+      | { readonly kind: 'replay'; readonly key: string; readonly now: string }
+      | { readonly kind: 'page'; readonly cursor?: string }
+      | { readonly kind: 'membership' }
   ) => Effect.Effect<A, SourceFailure>;
   readonly releaseRead: (readId: string) => Effect.Effect<void, SourceFailure>;
 }

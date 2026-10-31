@@ -3,6 +3,7 @@ export type { Intent, Observation, Start, Status, StartResult } from './contract
 export { JobLive } from './implementation.js';
 
 export type {
+  Control,
   WaitState,
   Stage,
   StageRequest,

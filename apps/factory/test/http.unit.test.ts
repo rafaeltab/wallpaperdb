@@ -10,6 +10,8 @@ import {
   type StartResult,
 } from '../src/capabilities/job/index.js';
 const idle: Job = {
+  resume: () => Effect.succeed({ kind: 'rejected' }),
+  cancel: () => Effect.succeed({ kind: 'rejected' }),
   start: () => Effect.succeed({ kind: 'empty' }),
   status: () => Effect.succeed({ kind: 'empty' }),
 };
@@ -208,3 +210,135 @@ it('shows current commit PR readiness separately from default branch landing', (
         }),
     }
   ));
+it('translates explicit resume with its job and parked-stage identity', async () => {
+  const commands: unknown[] = [];
+  const command = { jobId: '1', index: 0, questionId: 'q' };
+  await contract(
+    async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/job/resume',
+        payload: command,
+      });
+      expect(response.statusCode).toBe(202);
+      expect(commands).toEqual([command]);
+    },
+    {
+      ...idle,
+      resume: (value) => {
+        commands.push(value);
+        return Effect.succeed({ kind: 'empty' });
+      },
+    }
+  );
+});
+it('translates explicit cancellation and rejected commands without changing admission', async () => {
+  const received: string[] = [];
+  await contract(
+    async (app) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/job/cancel',
+        payload: { jobId: '1' },
+      });
+      expect(response.statusCode).toBe(202);
+      expect(received).toEqual(['1']);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: '/api/job/resume',
+            payload: { jobId: '1', index: 0, questionId: 'q' },
+          })
+        ).statusCode
+      ).toBe(409);
+    },
+    {
+      ...idle,
+      cancel: (id) => {
+        received.push(id);
+        return Effect.succeed({ kind: 'empty' });
+      },
+    }
+  );
+});
+it.each(['/api/job/resume', '/api/job/cancel'])(
+  'rejects invalid and foreign-origin commands at %s',
+  async (url) => {
+    await contract(async (app) => {
+      expect((await app.inject({ method: 'POST', url, payload: {} })).statusCode).toBe(400);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url,
+            headers: { origin: 'https://evil.test' },
+            payload: {},
+          })
+        ).statusCode
+      ).toBe(403);
+    });
+  }
+);
+it('renders the parked question safely with the owning thread and resume command', async () => {
+  await contract(
+    async (app) => {
+      const rendered = (await app.inject('/')).body;
+      expect(rendered).toContain('Active capacity released');
+      expect(rendered).toContain('&lt;question&gt;');
+      expect(rendered).toContain('t3-thread://v1/owning-thread');
+      expect(rendered).toContain('disabled>Resume existing job');
+    },
+    {
+      ...idle,
+      status: () =>
+        Effect.succeed({
+          kind: 'job',
+          intent,
+          elapsedMs: 0,
+          execution: {
+            kind: 'found',
+            threadId: 'owning-thread',
+            status: 'waiting-for-input',
+            worktree: '/worker',
+            branch: intent.branch,
+            model: 'gpt-6.1-sol',
+            question: { id: 'q', text: '<question>' },
+          },
+          resume: { index: 0, questionId: 'q' },
+          delivery: {
+            stage: 'implementation',
+            commit: intent.base,
+            ready: false,
+            landed: false,
+            active: false,
+            activity: 'awaiting-answer',
+            question: { id: 'q', text: '<question>' },
+          },
+        }),
+    }
+  );
+});
+it('hides cancellation after its durable command is accepted', async () => {
+  await contract(
+    async (app) => expect((await app.inject('/')).body).not.toContain('>Cancel job<'),
+    {
+      ...idle,
+      status: () =>
+        Effect.succeed({
+          kind: 'job',
+          intent,
+          execution: { kind: 'absent' },
+          elapsedMs: 0,
+          delivery: {
+            stage: 'implementation',
+            commit: intent.base,
+            ready: false,
+            landed: false,
+            active: false,
+            activity: 'cancelled',
+          },
+        }),
+    }
+  );
+});

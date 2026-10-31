@@ -21,6 +21,7 @@ it('persists stage intent before launch, keeps uncertainty reserved, and reconci
         }),
     }),
     Layer.succeed(Execution, {
+      interrupt: () => Effect.void,
       inspectStage: () => Effect.succeed(null),
       sendStage: () => Effect.void,
       launch: () =>

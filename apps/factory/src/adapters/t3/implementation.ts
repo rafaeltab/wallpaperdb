@@ -1,3 +1,4 @@
+import { mcpCall, pendingQuestion } from './questions.js';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import {
@@ -32,6 +33,8 @@ const detail = z.object({
       'rolled_back',
     ]),
     pendingRequestCount: z.number().int().nonnegative(),
+    latestRunId: z.string().nullable(),
+    runCount: z.number().int().nonnegative(),
   }),
 });
 const title = (intent: Intent) => `Factory ${intent.id}`;
@@ -40,6 +43,8 @@ export function t3Execution(config: {
   project: string;
   projectId: string;
   prBase?: string;
+  mcpEndpoint?: string;
+  mcpAuthorizationFile?: string;
 }): Execution {
   const call = (args: string[], signal?: AbortSignal) =>
     command(config.binary, ['thread', ...args, '--json'], config.project, signal).then((text) =>
@@ -123,7 +128,9 @@ ${receiptInstructions(intent, 'implementation')}`,
             signal
           );
           if (branch !== intent.branch) return { kind: 'ambiguous' };
+          const questions = await questionObservation(config, thread, signal);
           return {
+            ...questions,
             kind: 'found',
             threadId: thread.threadId,
             status: thread.pendingRequestCount > 0 ? 'waiting-for-input' : thread.status,
@@ -140,8 +147,62 @@ ${receiptInstructions(intent, 'implementation')}`,
   };
   return {
     ...execution,
-    ...stageExecution(call, execution.observe, config.prBase ?? 'main', (signal) =>
-      command(config.binary, ['thread', 'send', '--help'], config.project, signal)
+    interrupt: (intent, threadId) =>
+      Effect.tryPromise({
+        try: async (signal) => {
+          await mcpCall(
+            config,
+            't3_thread_interrupt',
+            {
+              threadId,
+              clientRequestId: `${intent.id}:cancel`,
+              reason: 'Explicit factory cancellation',
+            },
+            signal
+          );
+        },
+        catch: (cause) => new Unavailable({ operation: 'interrupt', cause }),
+      }).pipe(
+        Effect.tapError((error) => Effect.logError(error)),
+        Effect.withSpan('factory.t3.interrupt')
+      ),
+    ...stageExecution(
+      call,
+      execution.observe,
+      config.prBase ?? 'main',
+      (signal) => command(config.binary, ['thread', 'send', '--help'], config.project, signal),
+      config.mcpEndpoint && config.mcpAuthorizationFile
+        ? (intent, request, prompt, signal) =>
+            mcpCall(
+              config,
+              't3_thread_send',
+              {
+                threadId: request.threadId,
+                message: prompt,
+                mode: 'queue',
+                clientRequestId: `${intent.id}:stage:${request.index}`,
+              },
+              signal
+            )
+        : undefined
     ),
   };
+}
+
+async function questionObservation(
+  config: Parameters<typeof t3Execution>[0],
+  thread: z.infer<typeof detail>['thread'],
+  signal?: AbortSignal
+) {
+  if (config.mcpEndpoint && config.mcpAuthorizationFile)
+    return {
+      ...(await pendingQuestion(config, thread.threadId, thread.latestRunId, signal)),
+      run: currentRun(thread),
+    };
+  if (thread.pendingRequestCount > 0)
+    throw new Error('Structured T3 MCP observation requires endpoint and authorization file');
+  return { question: undefined, run: currentRun(thread) };
+}
+function currentRun(thread: z.infer<typeof detail>['thread']) {
+  return thread.latestRunId ? { id: thread.latestRunId, ordinal: thread.runCount } : undefined;
 }

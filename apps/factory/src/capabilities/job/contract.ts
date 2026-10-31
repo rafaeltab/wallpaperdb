@@ -24,6 +24,9 @@ export type Observation =
       readonly kind: 'found';
       readonly threadId: string;
       readonly status: string;
+      readonly answeredQuestions?: readonly string[];
+      readonly run?: { readonly id: string; readonly ordinal: number };
+      readonly question?: { readonly id: string; readonly text: string };
       readonly worktree: string;
       readonly branch: string;
       readonly model: string;
@@ -33,6 +36,9 @@ export type Observation =
  * This slice admits one job total. No implicit reset or retry of a launch. */
 export interface JobStore {
   read(): Effect.Effect<Intent | null, Unavailable>;
+  readControl(): Effect.Effect<Control, Unavailable>;
+  /** Atomic revision compare-and-set. Commands and delivery claims share this journal. */
+  saveControl(state: Control): Effect.Effect<boolean, Unavailable>;
   readWait(): Effect.Effect<WaitState | null, Unavailable>;
   /** Append atomically at revision; competing writers cannot overwrite a deadline or delivery identity. */
   saveWait(state: WaitState): Effect.Effect<boolean, Unavailable>;
@@ -53,6 +59,16 @@ export interface JobStore {
   claimStage(index: number): Effect.Effect<boolean, Unavailable>;
   claimLaunch(): Effect.Effect<boolean, Unavailable>;
 }
+export interface Control {
+  readonly revision: number;
+  readonly cancelled: boolean;
+  readonly claimed: readonly number[];
+  readonly parked?: {
+    readonly run?: { readonly id: string; readonly ordinal: number };
+    readonly index: number;
+    readonly question: { readonly id: string; readonly text: string };
+  };
+}
 export const JobStore = Context.Service<JobStore>('wallpaperdb.factory.JobStore');
 export interface Issues {
   pullRequest(intent: Intent): Effect.Effect<PullRequestObservation, Unavailable>;
@@ -71,6 +87,8 @@ export const Issues = Context.Service<Issues>('wallpaperdb.factory.Issues');
 /** Launch may have succeeded on every failure. Observe must identify the exact title,
  * branch, model and isolated worktree; absence never authorizes a second launch. */
 export interface Execution {
+  /** Idempotent cancellation of this owning job, without cancelling unrelated threads. */
+  interrupt(intent: Intent, threadId: string): Effect.Effect<void, Unavailable>;
   inspectStage(
     intent: Intent,
     request: StageRequest
@@ -87,11 +105,24 @@ export interface Start {
 }
 export type Status =
   | { kind: 'empty' }
-  | { kind: 'job'; intent: Intent; execution: Observation; elapsedMs: number; delivery?: Delivery };
+  | {
+      kind: 'job';
+      intent: Intent;
+      execution: Observation;
+      elapsedMs: number;
+      resume?: { index: number; questionId: string };
+      delivery?: Delivery;
+    };
 export type StartResult = Status | { kind: 'occupied' } | { kind: 'rejected' };
 export interface Job {
   start(command: Start): Effect.Effect<StartResult, Unavailable>;
   status(): Effect.Effect<Status, Unavailable>;
+  resume(command: {
+    jobId: string;
+    index: number;
+    questionId: string;
+  }): Effect.Effect<StartResult, Unavailable>;
+  cancel(jobId: string): Effect.Effect<StartResult, Unavailable>;
 }
 export const Job = Context.Service<Job>('wallpaperdb.factory.Job');
 
@@ -102,6 +133,11 @@ export interface StageRequest {
   readonly index: number;
   readonly ordinal?: number;
   readonly continuation?: boolean;
+  readonly resume?: boolean;
+  readonly observedRunId?: string;
+  /** Question already observed on this adopted run, retained atomically with its association. */
+  readonly question?: { readonly id: string; readonly text: string };
+  readonly deliveryIndex?: number;
   readonly stage: Stage;
   readonly threadId: string;
   readonly commit: string;
@@ -129,7 +165,15 @@ export type PullRequestObservation =
     };
 export interface Delivery {
   readonly stage: Stage | 'ci';
-  readonly activity?: 'repairing' | 'waiting-for-github' | 'continuation-pending';
+  readonly activity?:
+    | 'repairing'
+    | 'waiting-for-github'
+    | 'continuation-pending'
+    | 'awaiting-answer'
+    | 'cancelled'
+    | 'resume-pending';
+  readonly active?: boolean;
+  readonly question?: { readonly id: string; readonly text: string };
   readonly deadline?: number;
   readonly commit: string;
   readonly ready: boolean;

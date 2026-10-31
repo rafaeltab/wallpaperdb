@@ -30,6 +30,7 @@ it('requires fresh accepted stages and matching current CI before reporting read
         }),
     }),
     Layer.succeed(Execution, {
+      interrupt: () => Effect.void,
       launch: () => Effect.succeed({ kind: 'submitted' as const }),
       observe: (intent) =>
         Effect.succeed({
@@ -93,12 +94,15 @@ async function stagesFixture() {
   let prCommit = commit;
   let prKind: 'found' | 'absent' | 'ambiguous' = 'found';
   let sends = 0;
+  let interrupts = 0;
+  let answeredQuestions: readonly string[] = [];
   let failed = false;
   let now = 100;
   let progress = 'run-1:failed';
   let waiting = false;
   let status = 'completed';
   let stageIndex: number | undefined;
+  let question: { id: string; text: string } | undefined;
   const deps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
     Layer.succeed(Time, { now: () => Effect.succeed(now) }),
@@ -126,12 +130,19 @@ async function stagesFixture() {
         ),
     }),
     Layer.succeed(Execution, {
+      interrupt: () =>
+        Effect.sync(() => {
+          interrupts++;
+        }),
       launch: () => Effect.succeed({ kind: 'submitted' as const }),
       observe: (intent) =>
         Effect.succeed({
           kind: 'found' as const,
           threadId: 'thread',
           status,
+          question,
+          answeredQuestions,
+          run: { id: runId, ordinal },
           worktree: '/worker',
           branch: intent.branch,
           model: 'gpt-6.1-sol',
@@ -168,6 +179,9 @@ async function stagesFixture() {
   return {
     start: () => run((job) => job.start({ issue: 577, base: 'a'.repeat(40), context: '' })),
     status: () => run((job) => job.status()),
+    cancel: (id: string) => run((job) => job.cancel(id)),
+    resume: (command: { jobId: string; index: number; questionId: string }) =>
+      run((job) => job.resume(command)),
     change: (value: {
       ordinal?: number;
       runId?: string;
@@ -182,6 +196,8 @@ async function stagesFixture() {
       waiting?: boolean;
       status?: string;
       stageIndex?: number;
+      question?: { id: string; text: string };
+      answeredQuestions?: readonly string[];
     }) => {
       ordinal = value.ordinal ?? ordinal;
       runId = value.runId ?? runId;
@@ -196,8 +212,11 @@ async function stagesFixture() {
       waiting = value.waiting ?? waiting;
       status = value.status ?? status;
       stageIndex = value.stageIndex ?? stageIndex;
+      question = value.question;
+      answeredQuestions = value.answeredQuestions ?? answeredQuestions;
     },
     sends: () => sends,
+    interrupts: () => interrupts,
     store,
   };
 }
@@ -439,4 +458,261 @@ it('does not count a human-question interruption as continued GitHub waiting', a
   job.change({ now: 3600101 });
   await job.status();
   expect(job.sends()).toBe(3);
+});
+
+it('parks an actual question without accepting its completed-looking receipt or advancing the stage', async () => {
+  const job = await stagesFixture();
+  job.change({
+    status: 'waiting-for-input',
+    question: { id: 'q-1', text: 'Which approved option?' },
+  });
+  expect(await job.start()).toMatchObject({
+    delivery: {
+      stage: 'implementation',
+      activity: 'awaiting-answer',
+      active: false,
+      ready: false,
+      question: { id: 'q-1', text: 'Which approved option?' },
+    },
+  });
+  expect(await job.status()).toMatchObject({
+    delivery: {
+      stage: 'implementation',
+      activity: 'awaiting-answer',
+      active: false,
+      question: { id: 'q-1' },
+    },
+  });
+  expect(job.sends()).toBe(0);
+});
+it('requires explicit resumption after a cleared question and never sends twice for competing commands', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q', text: 'Choose?' },
+  });
+  const started = await job.start();
+  if (started.kind !== 'job') throw new Error('Expected reserved job');
+  job.change({ status: 'completed', accepted: false });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'awaiting-answer', active: false },
+  });
+  const command = { jobId: started.intent.id, index: 0, questionId: 'q' };
+  await Promise.all([job.resume(command), job.resume(command)]);
+  expect(job.sends()).toBe(1);
+  expect(await Effect.runPromise(job.store.readStage(1))).toMatchObject({
+    stage: 'implementation',
+    resume: true,
+    ordinal: 2,
+  });
+  expect(await job.start()).toEqual({ kind: 'occupied' });
+});
+it('cancels explicitly without reopening admission or delivering a later stage', async () => {
+  const job = await stagesFixture();
+  job.change({ accepted: false });
+  const started = await job.start();
+  if (started.kind !== 'job') throw new Error('Expected job');
+  expect(await job.cancel(started.intent.id)).toMatchObject({
+    delivery: { activity: 'cancelled', active: false },
+  });
+  expect(job.interrupts()).toBe(1);
+  job.change({ accepted: true });
+  await job.status();
+  expect(job.sends()).toBe(0);
+  expect(await job.start()).toEqual({ kind: 'occupied' });
+});
+it.each(['interrupted', 'running', 'waiting-for-input'])(
+  'does not accept a receipt while its structured run is %s',
+  async (status) => {
+    const job = await stagesFixture();
+    job.change({ status });
+    expect(await job.start()).toMatchObject({
+      delivery: { stage: 'implementation', ready: false },
+    });
+    expect(job.sends()).toBe(0);
+  }
+);
+it('rejects resumption while unanswered and rejects stale question commands after replacement', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q1', text: 'First?' },
+  });
+  const started = await job.start();
+  if (started.kind !== 'job') throw new Error('Expected job');
+  const command = { jobId: started.intent.id, index: 0, questionId: 'q1' };
+  expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+  job.change({ question: { id: 'q2', text: 'Replacement?' } });
+  await job.status();
+  job.change({ status: 'completed', accepted: true });
+  expect(await job.resume(command)).toEqual({ kind: 'rejected' });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'awaiting-answer', ready: false },
+  });
+  expect(job.sends()).toBe(0);
+});
+it('observes an answered live run without starting its stage again', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q', text: 'Choose?' },
+  });
+  await job.start();
+  job.change({ status: 'running', answeredQuestions: ['q'] });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'implementation', active: true } });
+  expect(job.sends()).toBe(0);
+  job.change({ status: 'completed', accepted: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review' } });
+  expect(job.sends()).toBe(1);
+});
+it('adopts the owning answered thread run and never issues a duplicate explicit resume', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q', text: 'Choose?' },
+  });
+  const initial = await job.start();
+  if (initial.kind !== 'job') throw new Error('Expected job');
+  job.change({ status: 'running', answeredQuestions: ['q'], runId: 'answer-run', ordinal: 2 });
+  await job.resume({ jobId: initial.intent.id, index: 0, questionId: 'q' });
+  await job.status();
+  expect(job.sends()).toBe(0);
+  expect(await Effect.runPromise(job.store.readStage(1))).toMatchObject({
+    stage: 'implementation',
+    observedRunId: 'answer-run',
+    ordinal: 2,
+  });
+});
+it('does not adopt a replacement run at the parked ordinal as an answer continuation', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q', text: 'Choose?' },
+  });
+  await job.start();
+  job.change({
+    status: 'completed',
+    answeredQuestions: ['q'],
+    runId: 'replacement',
+    ordinal: 1,
+    accepted: true,
+  });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'awaiting-answer', ready: false },
+  });
+  expect(job.sends()).toBe(0);
+});
+it('retains the question association while an answered async continuation is not visible yet', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q', text: 'Choose?' },
+  });
+  await job.start();
+  job.change({ status: 'completed', answeredQuestions: ['q'], accepted: false });
+  await job.status();
+  job.change({ status: 'running', runId: 'answer-run', ordinal: 2 });
+  await job.status();
+  expect(await Effect.runPromise(job.store.readStage(1))).toMatchObject({
+    observedRunId: 'answer-run',
+    ordinal: 2,
+  });
+  expect(job.sends()).toBe(0);
+});
+async function answeredBabysitting() {
+  const job = await waitingJob();
+  job.change({
+    status: 'waiting-for-input',
+    waiting: false,
+    question: { id: 'repair-q', text: 'Which repair?' },
+  });
+  await job.status();
+  job.change({ status: 'running', runId: 'answer-5', ordinal: 5, answeredQuestions: ['repair-q'] });
+  await job.status();
+  job.change({ status: 'completed', waiting: true, stageIndex: 5 });
+  await job.status();
+  return job;
+}
+it('sends the watchdog continuation once after adopting an answered babysitting run', async () => {
+  const job = await answeredBabysitting();
+  job.change({ now: 3600101 });
+  await job.status();
+  await job.status();
+  expect(job.sends()).toBe(4);
+  expect(await Effect.runPromise(job.store.readStage(6))).toMatchObject({
+    stage: 'babysitting',
+    continuation: true,
+    ordinal: 6,
+    previousRunId: 'answer-5',
+  });
+});
+it('accepts an associated watcher completion after adopting a babysitting answer', async () => {
+  const job = await answeredBabysitting();
+  job.change({
+    status: 'completed',
+    waiting: false,
+    accepted: true,
+    runId: 'watcher-6',
+    ordinal: 6,
+    stageIndex: 5,
+  });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review' } });
+  expect(job.sends()).toBe(4);
+});
+it('retains the answer continuation when it asks another question before observation', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q1', text: 'First?' },
+  });
+  await job.start();
+  job.change({
+    answeredQuestions: ['q1'],
+    runId: 'answer-2',
+    ordinal: 2,
+    question: { id: 'q2', text: 'Second?' },
+  });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'awaiting-answer', active: false, question: { id: 'q2' } },
+  });
+  job.change({ answeredQuestions: ['q1', 'q2'], status: 'completed', accepted: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review' } });
+  expect(job.sends()).toBe(1);
+});
+it('recovers the question recorded with an adopted run before control publication', async () => {
+  const job = await stagesFixture();
+  job.change({
+    accepted: false,
+    status: 'waiting-for-input',
+    question: { id: 'q1', text: 'First?' },
+  });
+  await job.start();
+  const original = await Effect.runPromise(job.store.readStage(0));
+  if (!original) throw new Error('Expected original stage');
+  await Effect.runPromise(
+    job.store.saveStage({
+      ...original,
+      index: 1,
+      ordinal: 2,
+      previousRunId: 'run-1',
+      observedRunId: 'answer-2',
+      deliveryIndex: 0,
+      question: { id: 'q2', text: 'Second?' },
+    })
+  );
+  job.change({ status: 'running', answeredQuestions: ['q1', 'q2'], runId: 'answer-3', ordinal: 3 });
+  await job.status();
+  expect(await Effect.runPromise(job.store.readStage(2))).toMatchObject({
+    stage: 'implementation',
+    observedRunId: 'answer-3',
+    ordinal: 3,
+  });
+  expect(job.sends()).toBe(0);
 });

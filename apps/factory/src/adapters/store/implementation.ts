@@ -20,6 +20,10 @@ const stageSchema = z
   .object({
     ordinal: z.number().int().positive().optional(),
     continuation: z.boolean().optional(),
+    resume: z.boolean().optional(),
+    observedRunId: z.string().optional(),
+    question: z.object({ id: z.string(), text: z.string() }).optional(),
+    deliveryIndex: z.number().int().nonnegative().optional(),
     index: z.number().int().min(0),
     stage: z.enum(['implementation', 'review', 'publication', 'babysitting', 'ci']),
     threadId: z.string().min(1),
@@ -93,7 +97,44 @@ export function fileStore(directory: string): JobStore {
       }
     }
   };
+  const controlSchema = z
+    .object({
+      revision: z.number().int().nonnegative(),
+      cancelled: z.boolean(),
+      claimed: z.array(z.number().int().nonnegative()),
+      parked: z
+        .object({
+          index: z.number().int().nonnegative(),
+          run: z.object({ id: z.string(), ordinal: z.number().int().positive() }).optional(),
+          question: z.object({ id: z.string(), text: z.string() }),
+        })
+        .optional(),
+    })
+    .strict();
+  const readControl = async () => {
+    let latest: import('../../capabilities/job/index.js').Control = {
+      revision: -1,
+      cancelled: false,
+      claimed: [],
+    };
+    for (let revision = 0; ; revision++) {
+      try {
+        latest = controlSchema.parse(
+          JSON.parse(await readFile(join(directory, `control-${revision}.json`), 'utf8'))
+        );
+      } catch (cause) {
+        if (code(cause, 'ENOENT')) return latest;
+        throw cause;
+      }
+    }
+  };
+  const saveControl = async (state: import('../../capabilities/job/index.js').Control) => {
+    if (state.revision !== (await readControl()).revision + 1) return false;
+    return publish(`control-${state.revision}.json`, controlSchema.parse(state));
+  };
   return {
+    readControl: () => effect('read-control', readControl),
+    saveControl: (state) => effect('save-control', () => saveControl(state)),
     readWait: () => effect('read-wait', readWait),
     saveWait: (state) =>
       effect('save-wait', async () => {
@@ -130,7 +171,27 @@ export function fileStore(directory: string): JobStore {
         publish(`stage-${request.index}.json`, stageSchema.parse(request))
       ),
     claimStage: (index) =>
-      effect('claim-stage', () => publish(`stage-${index}-claimed.json`, { version: 1 })),
+      effect('claim-stage', async () => {
+        // Existing pre-question delivery claims remain authoritative.
+        try {
+          await readFile(join(directory, `stage-${index}-claimed.json`));
+          return false;
+        } catch (cause) {
+          if (!code(cause, 'ENOENT')) throw cause;
+        }
+        for (;;) {
+          const state = await readControl();
+          if (state.cancelled || state.claimed.includes(index)) return false;
+          if (
+            await saveControl({
+              ...state,
+              revision: state.revision + 1,
+              claimed: [...state.claimed, index],
+            })
+          )
+            return true;
+        }
+      }),
     read: () =>
       effect('read', async () => {
         try {

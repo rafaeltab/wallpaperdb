@@ -32,6 +32,7 @@ function setup(issue: Effect.Success<ReturnType<IssuePort['inspect']>> = facts) 
             inspect: () => Effect.succeed(issue),
           }),
           Layer.succeed(Execution, {
+            interrupt: () => Effect.void,
             inspectStage: () => Effect.succeed(null),
             sendStage: () => Effect.void,
             launch: () =>

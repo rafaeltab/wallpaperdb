@@ -151,7 +151,7 @@
 		"expected": [
 			"Exit zero and return the newly generated lock to local source authority without coordinator file transfer.",
 			"Lock differs from initialLock and contains nats 2.29.3 patch hash 6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe in patchedDependencies and relevant consumer resolutions.",
-			"Preserve existing infrastructure esbuild importer entry and all unrelated dependency and peer bindings. Final reference lock is diagnostic, never an input.",
+			"Preserve the infrastructure esbuild importer entry and inspect all native lock changes. The maintainer approved the documented three Vitest peer-context links and seventeen registry deprecation fields produced by pinned native resolution in this disposable workload. Retain complete before/after evidence without trimming. Final reference lock is diagnostic, never an input.",
 			"Routed forced build automatically performs frozen preparation and exits zero. Assert remote installed NATS patch resolutions and loadedRuntime protocol/transport hashes after preparation. make install is intentionally local and is not this preparation command."
 		],
 		"scriptCommit": "21a7f8c42bb5b737348c316bdd8a38995be2403c"
@@ -291,7 +291,7 @@
 			"No dependency, version pin, resolution policy or metadata-trimming change is authorized by a diagnostic control.",
 			"The explicit --resolution-only mutation is test input in a disposable checkout; it is not a production generator default or an extra controller ARGS override.",
 			"Retain the original and generated lockfiles separately, command statuses, full timings, script and source hashes, and all failures.",
-			"If native resolution changes unrelated peers, exact preservation remains unmet. Acceptance of that explicit graph delta requires a scope decision; structural validity or an unchanged fast-path repeat does not establish equivalence."
+			"The completed controls establish native-resolution attribution, not semantic equivalence. The maintainer explicitly approved this documented native output and delegated routine necessary package/lockfile churn to engineering judgment with tests and evidence. Do not reopen incidental version questions or silently trim output. Material scope, compatibility/security/billing commitments or new capabilities still require decisions."
 		]
 	},
 	"promotion": "Two consecutive clean observed runs of this subset, cold/warm conditions recorded, no unplanned infrastructure intervention or unrelated steady-state churn. Product outcomes and infrastructure failures remain separate. Diagnostic resolver controls cannot promote a baseline or waive preservation."

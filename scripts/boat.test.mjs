@@ -904,11 +904,14 @@ async function lockGenerationCheckout(
 		"scripts/boat-route.mk",
 		"scripts/boat.mjs",
 		"scripts/boat-stop-watch.mjs",
+		"scripts/docker-validation.mjs",
+		"scripts/lib/docker-queue.mjs",
 		"scripts/lib/boat.mjs",
 		"scripts/lib/boat-cache.mjs",
 		"scripts/lib/boat-preparation.mjs",
 		"scripts/lib/boat-snapshot.mjs",
 		"scripts/lib/boat-source-generation.mjs",
+		"scripts/lib/boat-asset-migration.mjs",
 		"scripts/package.json",
 	]) {
 		local(name, fs.readFileSync(path.join(repository, name)));
@@ -1168,6 +1171,723 @@ child.on('close',code=>{
 			run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock").done,
 	};
 }
+
+async function assetExecutionCheckout(t) {
+	const f = await lockGenerationCheckout(t);
+	f.env.COMPOSE_PROJECT_NAME = "wallpaperdb";
+	f.local(
+		".gitignore",
+		fs.readFileSync(path.join(f.root, ".gitignore"), "utf8") +
+			"node_modules/\n",
+	);
+	fs.mkdirSync(path.join(f.root, "scripts/node_modules"), { recursive: true });
+	fs.symlinkSync(
+		path.resolve(import.meta.dirname, "node_modules/typescript"),
+		path.join(f.root, "scripts/node_modules/typescript"),
+	);
+	f.local(
+		"apps/asset/package.json",
+		JSON.stringify({
+			scripts: {
+				"dev:configure": "true",
+				"db:migrate": "fixture-sql && tsx scripts/backfill.ts",
+			},
+		}),
+	);
+	f.local(
+		"apps/asset/drizzle.config.ts",
+		"export default { dialect: 'postgresql' };\n",
+	);
+	f.local(
+		"apps/asset/scripts/backfill.ts",
+		"import { value } from '../src/backfill-input.ts';\n// intended backfill\n",
+	);
+	f.local(
+		"apps/asset/src/backfill-input.ts",
+		"export const value = 'current';\n",
+	);
+	f.local(
+		"apps/asset/drizzle/0000_first.sql",
+		"CREATE TABLE fixture(id int);\n",
+	);
+	f.local("apps/asset/drizzle/meta/0000_snapshot.json", '{"id":"first"}\n');
+	f.local(
+		"apps/asset/drizzle/meta/_journal.json",
+		JSON.stringify({ entries: [{ idx: 0, tag: "0000_first" }] }),
+	);
+	const prepared = await f.generate();
+	assert.equal(prepared.status, 0, prepared.output);
+	const runtime = path.join(f.directory, "runtime");
+	fs.cpSync(f.worker, runtime, { recursive: true });
+	fs.writeFileSync(
+		path.join(runtime, ".pnpm-lockfile-hash"),
+		createHash("sha256")
+			.update(fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")))
+			.digest("hex") + "\n",
+	);
+	const bin = path.join(f.directory, "home/.local/bin");
+	const put = (name, code) => {
+		fs.mkdirSync(path.dirname(name), { recursive: true });
+		fs.writeFileSync(name, code, { mode: 0o755 });
+	};
+	const clock = path.join(f.directory, "clock.mjs");
+	put(
+		clock,
+		`import fs from 'node:fs';import path from 'node:path';const now=Date.now;Date.now=()=>now()+(fs.existsSync(path.join(process.env.FAKE_CONTROL,'expire'))?20001:0);`,
+	);
+	const pnpm = path.join(bin, "pnpm");
+	put(path.join(bin, "tsx"), '#!/bin/sh\nexec fixture-backfill "$@"\n');
+	fs.renameSync(pnpm, pnpm + "-install");
+	put(
+		pnpm,
+		`#!${process.execPath}
+const cp=require('child_process'),fs=require('fs');
+if(process.argv[2]!=='run')process.exit(cp.spawnSync(${JSON.stringify(pnpm + "-install")},process.argv.slice(2),{stdio:'inherit',env:process.env}).status??1);
+const script=JSON.parse(fs.readFileSync('package.json')).scripts[process.argv[3]];
+process.exit(cp.spawnSync(script,{shell:true,stdio:'inherit',env:process.env}).status??1);
+`,
+	);
+	for (const phase of ["sql", "backfill"])
+		put(
+			path.join(bin, "fixture-" + phase),
+			`#!${process.execPath}
+const fs=require('fs'),path=require('path'),c=process.env.FAKE_CONTROL;
+fs.appendFileSync(path.join(c,'effects'),JSON.stringify({phase:${JSON.stringify(phase)},cwd:process.cwd(),url:process.env.DATABASE_URL})+'\\n');
+if(process.env.DATABASE_URL==='docker-only'&&process.cwd()!==${JSON.stringify(path.join(runtime, "apps/asset"))}){console.error('getaddrinfo ENOTFOUND postgres');process.exit(19);}
+process.exit(fs.existsSync(path.join(c,${JSON.stringify("fail-" + phase)}))?23:0);
+`,
+		);
+	const turbo = `#!${process.execPath}
+const cp=require('child_process'),path=require('path'),fs=require('fs');
+fs.appendFileSync(path.join(process.env.FAKE_CONTROL,'host-invocations'),JSON.stringify({args:process.argv.slice(2),cwd:process.cwd()})+'\\n');
+process.exit(cp.spawnSync('pnpm',['run','db:migrate'],{cwd:path.join(process.cwd(),'apps/asset'),env:process.env,stdio:'inherit'}).status??1);
+`;
+	for (const root of [f.root, f.worker])
+		put(path.join(root, "node_modules/.bin/turbo"), turbo);
+	put(
+		path.join(bin, "docker"),
+		`#!${process.execPath}
+const fs=require('fs'),path=require('path'),cp=require('child_process'),a=process.argv.slice(2),c=process.env.FAKE_CONTROL;
+fs.appendFileSync(path.join(c,'docker'),JSON.stringify(a)+'\\n');
+if(a[0]==='compose'&&a.includes('ps')){if(!fs.existsSync(path.join(c,'missing')))console.log('asset-instance-one');process.exit(0);}
+if(a[0]==='inspect'){console.log(JSON.stringify([{Id:'asset-instance-one',State:{Running:!fs.existsSync(path.join(c,'exited'))},Config:{Labels:{'com.docker.compose.project': process.env.COMPOSE_PROJECT_NAME,'com.docker.compose.service':'asset'}}}]));process.exit(0);}
+if(a[0]!=='exec'||!a.includes('asset-instance-one'))throw Error('unexpected docker '+a);
+if(fs.existsSync(path.join(c,'replaced'))){console.error('container asset-instance-one no longer running');process.exit(1);}
+const n=a.indexOf('node');const child=cp.spawn(process.execPath,['--import',${JSON.stringify(clock)},...a.slice(n+1)],{cwd:${JSON.stringify(path.join(runtime, "apps/asset"))},env:{...process.env,DATABASE_URL:'runtime-inherited'},stdio:['pipe','pipe','inherit']});process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});child.stdout.on('data',b=>{fs.appendFileSync(path.join(c,'runtime-output'),b);if(b.toString().includes('asset-migration ready')&&fs.existsSync(path.join(c,'replace-on-ready'))){fs.writeFileSync(path.join(c,'replaced'),'yes');child.kill('SIGTERM');}process.stdout.write(b);});child.on('close',code=>process.exit(code??1));
+`,
+	);
+	f.env.DATABASE_URL = "docker-only";
+	return {
+		...f,
+		runtime,
+		effects: () =>
+			fs.existsSync(path.join(f.control, "effects"))
+				? fs
+						.readFileSync(path.join(f.control, "effects"), "utf8")
+						.trim()
+						.split("\n")
+						.map(JSON.parse)
+				: [],
+	};
+}
+
+test("canonical Asset migration uses its running container while the original valid host caller still works", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	f.env.DATABASE_URL = "valid-host";
+	const host = await f.run("migrate", "PACKAGE=asset", "BOAT_EXEC=local").done;
+	assert.equal(host.status, 0, host.output);
+	assert.equal(f.effects()[0].cwd, path.join(f.root, "apps/asset"));
+	f.env.DATABASE_URL = "docker-only";
+	const remote = await f.run("migrate", "PACKAGE=asset").done;
+	assert.equal(remote.status, 0, remote.output);
+	assert.deepEqual(
+		f
+			.effects()
+			.slice(2)
+			.map((e) => [e.phase, e.cwd, e.url]),
+		["sql", "backfill"].map((phase) => [
+			phase,
+			path.join(f.runtime, "apps/asset"),
+			"runtime-inherited",
+		]),
+	);
+});
+
+async function migrationObserved(f, text) {
+	const file = path.join(f.control, "runtime-output");
+	const deadline = Date.now() + 4000;
+	while (Date.now() < deadline) {
+		if (fs.existsSync(file) && fs.readFileSync(file, "utf8").includes(text))
+			return;
+		await new Promise((resolve) => setTimeout(resolve, 10));
+	}
+	assert.fail(`Runtime did not report ${text}`);
+}
+
+test("Asset migration awaits complete runtime delivery without database effects, then runs once and can repeat unchanged", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const names = [
+		"drizzle/0000_first.sql",
+		"drizzle/meta/0000_snapshot.json",
+		"drizzle/meta/_journal.json",
+		"scripts/backfill.ts",
+		"package.json",
+	];
+	for (const name of names)
+		fs.writeFileSync(path.join(f.runtime, "apps/asset", name), "old delivery");
+	const running = f.run("migrate", "PACKAGE=asset");
+	await migrationObserved(f, "asset-migration waiting");
+	assert.deepEqual(f.effects(), []);
+	for (const name of names)
+		fs.copyFileSync(
+			path.join(f.root, "apps/asset", name),
+			path.join(f.runtime, "apps/asset", name),
+		);
+	const result = await running.done;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(f.effects().length, 2);
+	const repeat = await f.run("migrate", "PACKAGE=asset").done;
+	assert.equal(repeat.status, 0, repeat.output);
+	assert.deepEqual(
+		f.effects().map((e) => e.phase),
+		["sql", "backfill", "sql", "backfill"],
+	);
+	const docker = fs
+		.readFileSync(path.join(f.control, "docker"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.equal(docker.filter((a) => a[0] === "exec").length, 2);
+	assert(
+		docker.every(
+			(a) => !a.some((v) => ["up", "restart", "start", "cp"].includes(v)),
+		),
+	);
+});
+
+for (const [name, relative, value, guard] of [
+	[
+		"journal",
+		"apps/asset/drizzle/meta/_journal.json",
+		"old journal",
+		"hash:apps/asset/drizzle/meta/_journal.json",
+	],
+	[
+		"SQL",
+		"apps/asset/drizzle/0000_first.sql",
+		"old SQL",
+		"hash:apps/asset/drizzle/0000_first.sql",
+	],
+	[
+		"snapshot",
+		"apps/asset/drizzle/meta/0000_snapshot.json",
+		"old snapshot",
+		"hash:apps/asset/drizzle/meta/0000_snapshot.json",
+	],
+	[
+		"backfill",
+		"apps/asset/scripts/backfill.ts",
+		"old backfill",
+		"hash:apps/asset/scripts/backfill.ts",
+	],
+	[
+		"backfill dependency",
+		"apps/asset/src/backfill-input.ts",
+		"old dependency",
+		"hash:apps/asset/src/backfill-input.ts",
+	],
+	[
+		"package command",
+		"apps/asset/package.json",
+		'{"scripts":{"db:migrate":"fixture-sql"}}',
+		"hash:apps/asset/package.json",
+	],
+	[
+		"config",
+		"apps/asset/drizzle.config.ts",
+		"old config",
+		"hash:apps/asset/drizzle.config.ts",
+	],
+	["lock bytes", "pnpm-lock.yaml", "old lock", "hash:pnpm-lock.yaml"],
+	[
+		"installed lock",
+		".pnpm-lockfile-hash",
+		"old installed lock",
+		"installed-lock",
+	],
+	[
+		"extra migration member",
+		"apps/asset/drizzle/9999_extra.sql",
+		"extra",
+		"membership:apps/asset/drizzle",
+	],
+	[
+		"missing SQL",
+		"apps/asset/drizzle/0000_first.sql",
+		null,
+		"membership:apps/asset/drizzle",
+	],
+	[
+		"missing snapshot",
+		"apps/asset/drizzle/meta/0000_snapshot.json",
+		null,
+		"membership:apps/asset/drizzle",
+	],
+	[
+		"missing backfill",
+		"apps/asset/scripts/backfill.ts",
+		null,
+		"membership:apps/asset/scripts",
+	],
+])
+	test(`Asset migration independently rejects stale ${name} and accepts its matching neighbor`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		const file = path.join(f.runtime, relative),
+			original = fs.existsSync(file) ? fs.readFileSync(file) : null;
+		if (value === null) fs.unlinkSync(file);
+		else fs.writeFileSync(file, value);
+		const running = f.run("migrate", "PACKAGE=asset");
+		await migrationObserved(f, guard);
+		assert.deepEqual(f.effects(), []);
+		fs.writeFileSync(path.join(f.control, "expire"), "yes");
+		const rejected = await running.done;
+		assert.notEqual(rejected.status, 0, rejected.output);
+		assert.match(rejected.output, /deadline exhausted/);
+		assert.deepEqual(f.effects(), []);
+		fs.unlinkSync(path.join(f.control, "expire"));
+		if (original) fs.writeFileSync(file, original);
+		else fs.unlinkSync(file);
+		const valid = await f.run("migrate", "PACKAGE=asset").done;
+		assert.equal(valid.status, 0, valid.output);
+		assert.equal(f.effects().length, 2);
+	});
+
+for (const state of ["missing", "exited", "replaced"])
+	test(`Asset migration rejects ${state} instance without fallback`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		fs.writeFileSync(path.join(f.control, state), "yes");
+		const result = await f.run("migrate", "PACKAGE=asset").done;
+		assert.notEqual(result.status, 0, result.output);
+		assert.deepEqual(f.effects(), []);
+		const calls = fs
+			.readFileSync(path.join(f.control, "docker"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
+		assert(calls.every((a) => ["compose", "inspect", "exec"].includes(a[0])));
+		assert.equal(
+			calls.filter((a) => a[0] === "exec").length,
+			state === "replaced" ? 1 : 0,
+		);
+	});
+
+for (const phase of ["sql", "backfill"])
+	test(`Asset migration retains ${phase} failure and does not rerun`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		fs.writeFileSync(path.join(f.control, "fail-" + phase), "yes");
+		const result = await f.run("migrate", "PACKAGE=asset").done;
+		assert.notEqual(result.status, 0, result.output);
+		assert.deepEqual(
+			f.effects().map((e) => e.phase),
+			phase === "sql" ? ["sql"] : ["sql", "backfill"],
+		);
+		assert.match(result.output, /exit 23/);
+		assert(
+			fs
+				.readdirSync(path.join(f.root, ".boat"))
+				.some((name) => /^command-.*\.log$/.test(name)),
+		);
+	});
+
+test("Asset migration unknown terminal status blocks another side-effecting submission", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	fs.writeFileSync(path.join(f.control, "missing-terminal"), "yes");
+	const first = await f.run("migrate", "PACKAGE=asset").done;
+	assert.notEqual(first.status, 0, first.output);
+	assert.match(first.output, /terminal status uncertain/);
+	assert.equal(f.effects().length, 2);
+	fs.unlinkSync(path.join(f.control, "missing-terminal"));
+	const second = await f.run("migrate", "PACKAGE=asset").done;
+	assert.notEqual(second.status, 0, second.output);
+	assert.match(
+		second.output,
+		/Previous Asset migration terminal status uncertain/,
+	);
+	assert.equal(f.effects().length, 2);
+});
+
+test("Asset migration preserves a superseding source edit and a new coherent invocation succeeds", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const name = "apps/asset/scripts/backfill.ts";
+	fs.writeFileSync(path.join(f.runtime, name), "old delivery");
+	const running = f.run("migrate", "PACKAGE=asset");
+	await migrationObserved(f, "hash:" + name);
+	const accepted = fs.readFileSync(path.join(f.root, name));
+	f.local(name, "// newer edit retained\n");
+	fs.writeFileSync(path.join(f.runtime, name), accepted);
+	await migrationObserved(f, "asset-migration ready");
+	fs.writeFileSync(path.join(f.control, "expire"), "yes");
+	const result = await running.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /source superseded/);
+	assert.deepEqual(f.effects(), []);
+	assert.equal(
+		fs.readFileSync(path.join(f.root, name), "utf8"),
+		"// newer edit retained\n",
+	);
+	fs.unlinkSync(path.join(f.control, "expire"));
+	fs.copyFileSync(path.join(f.root, name), path.join(f.runtime, name));
+	const next = await f.run("migrate", "PACKAGE=asset").done;
+	assert.equal(next.status, 0, next.output);
+});
+
+test("Asset migration cannot use a verified receipt after that running instance is replaced", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	fs.writeFileSync(path.join(f.control, "replace-on-ready"), "yes");
+	const result = await f.run("migrate", "PACKAGE=asset").done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /asset-migration verified/);
+	assert.deepEqual(f.effects(), []);
+	const calls = fs
+		.readFileSync(path.join(f.control, "docker"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	assert.equal(calls.filter((a) => a[0] === "exec").length, 1);
+	assert.equal(calls.filter((a) => a[0] === "compose").length, 1);
+});
+
+for (const [name, selectors, mode, unenrolled] of [
+	["local", ["migrate", "PACKAGE=asset", "BOAT_EXEC=local"]],
+	["worker", ["migrate", "PACKAGE=asset", "BOAT_EXEC=worker"]],
+	["unenrolled", ["migrate", "PACKAGE=asset"], "development", true],
+	[
+		"validation forced remote",
+		["migrate", "PACKAGE=asset", "BOAT_EXEC=remote"],
+		"validation",
+	],
+	["validation default", ["migrate", "PACKAGE=asset"], "validation"],
+	["direct run", ["run", "PACKAGE=asset", "SCRIPT=db:migrate"]],
+	["other package", ["migrate", "PACKAGE=user"]],
+	["all packages", ["migrate"]],
+	["duplicate selects other", ["migrate", "PACKAGE=asset", "PACKAGE=user"]],
+])
+	test(`Asset migration retains the original ${name} caller`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		f.env.DATABASE_URL = "valid-host";
+		if (mode)
+			f.local(
+				".boat/enrollment.json",
+				JSON.stringify({ ...f.json(".boat/enrollment.json"), mode }),
+			);
+		if (unenrolled) fs.unlinkSync(path.join(f.root, ".boat/enrollment.json"));
+		const result = await f.run(...selectors).done;
+		assert.equal(result.status, 0, result.output);
+		assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
+		assert.equal(f.effects().length, 2);
+		assert(
+			f
+				.effects()
+				.every(
+					(e) =>
+						e.url === "valid-host" &&
+						e.cwd !== path.join(f.runtime, "apps/asset"),
+				),
+		);
+		if (selectors.includes("PACKAGE=user")) {
+			const host = fs.readFileSync(
+				path.join(f.control, "host-invocations"),
+				"utf8",
+			);
+			assert.match(host, /--filter=@wallpaperdb\/user/);
+		}
+	});
+
+for (const selectors of [
+	["PACKAGE=user", "PACKAGE=asset"],
+	["PACKAGE=asset", "BOAT_EXEC=remote"],
+	[
+		"PACKAGE=asset",
+		"COMPOSE_PROJECT_NAME=owned-control",
+		"APPS_COMPOSE=docker compose -p owned-control -f infra/docker-compose.apps.yml --ansi never",
+	],
+])
+	test(`Asset migration preserves Make expansion for ${selectors.join(" ")}`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		const result = await f.run("migrate", ...selectors).done;
+		assert.equal(result.status, 0, result.output);
+		assert.equal(f.effects().length, 2);
+		assert(
+			f.effects().every((e) => e.cwd === path.join(f.runtime, "apps/asset")),
+		);
+	});
+
+test("Asset migration honors a Make override assignment and original invalid-selector rejection", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	f.env.DATABASE_URL = "valid-host";
+	f.local(".worktree", "INGRESS_PORT=9120\noverride PACKAGE := asset\n");
+	const original = await f.run("migrate", "PACKAGE=user").done;
+	assert.equal(original.status, 0, original.output);
+	assert.equal(f.effects()[0].cwd, path.join(f.runtime, "apps/asset"));
+	f.local(".worktree", "INGRESS_PORT=9120\n");
+	const invalid = await f.run("migrate", "PACKAGE=unknown").done;
+	assert.notEqual(invalid.status, 0, invalid.output);
+	assert.match(invalid.output, /Unknown PACKAGE/);
+	assert.equal(f.effects().length, 2);
+});
+
+for (const shape of ["file symlink", "directory symlink", "nonregular file"])
+	test(`Asset migration rejects runtime ${shape} even when target bytes match`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		const file = path.join(f.runtime, "apps/asset/drizzle/0000_first.sql");
+		if (shape === "file symlink") {
+			const outside = path.join(f.directory, "outside.sql");
+			fs.copyFileSync(file, outside);
+			fs.unlinkSync(file);
+			fs.symlinkSync(outside, file);
+		} else if (shape === "directory symlink") {
+			const directory = path.join(f.runtime, "apps/asset/drizzle/meta"),
+				outside = path.join(f.directory, "outside-meta");
+			fs.renameSync(directory, outside);
+			fs.symlinkSync(outside, directory);
+		} else {
+			fs.unlinkSync(file);
+			fs.mkdirSync(file);
+		}
+		const running = f.run("migrate", "PACKAGE=asset");
+		await migrationObserved(f, "asset-migration waiting");
+		assert.deepEqual(f.effects(), []);
+		fs.writeFileSync(path.join(f.control, "expire"), "yes");
+		const rejected = await running.done;
+		assert.notEqual(rejected.status, 0, rejected.output);
+		assert.deepEqual(f.effects(), []);
+	});
+
+for (const [artifact, stale, expectedPhases] of [
+	[
+		"apps/asset/package.json",
+		'{"scripts":{"db:migrate":"fixture-sql"}}',
+		["sql"],
+	],
+	[
+		"apps/asset/scripts/backfill.ts",
+		"// stale backfill\n",
+		["sql", "backfill"],
+	],
+])
+	test(`Asset migration guard sensitivity for ${artifact} excludes an earlier rejection`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		const helper = "scripts/lib/boat-asset-migration.mjs";
+		const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+		const guard = "if (hash(regular(root, name)) !== digest)";
+		assert.equal(source.split(guard).length, 2);
+		f.local(
+			helper,
+			source.replace(
+				guard,
+				`if (name !== ${JSON.stringify(artifact)} && hash(regular(root, name)) !== digest)`,
+			),
+		);
+		fs.writeFileSync(path.join(f.runtime, artifact), stale);
+		const mutant = await f.run("migrate", "PACKAGE=asset").done;
+		assert.equal(mutant.status, 0, mutant.output);
+		assert.deepEqual(
+			f.effects().map((e) => e.phase),
+			expectedPhases,
+		);
+		assert.doesNotMatch(mutant.output, /asset-migration waiting/);
+	});
+
+test("Asset migration failure-propagation sensitivity exposes a false success", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const helper = "scripts/lib/boat-asset-migration.mjs";
+	const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+	const verdict = "resolve(expired ? 1 : (code ?? 1));";
+	assert.equal(source.split(verdict).length, 2);
+	f.local(helper, source.replace(verdict, "resolve(0);"));
+	fs.writeFileSync(path.join(f.control, "fail-sql"), "yes");
+	const mutant = await f.run("migrate", "PACKAGE=asset").done;
+	assert.equal(mutant.status, 0, mutant.output);
+	assert.deepEqual(
+		f.effects().map((e) => e.phase),
+		["sql"],
+	);
+});
+
+test("Asset migration detects source drift during authoritative flush without changing the edit", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	f.local("notes.txt", "force a source flush\n");
+	fs.writeFileSync(path.join(f.control, "pause-sync"), "yes");
+	const running = f.run("migrate", "PACKAGE=asset");
+	await observed(() => fs.existsSync(path.join(f.control, "entered-sync")));
+	f.local("apps/asset/scripts/backfill.ts", "// edit made during flush\n");
+	fs.writeFileSync(path.join(f.control, "release-sync"), "yes");
+	const rejected = await running.done;
+	assert.notEqual(rejected.status, 0, rejected.output);
+	assert.match(rejected.output, /source changed during authoritative flush/);
+	assert.equal(
+		fs.readFileSync(
+			path.join(f.root, "apps/asset/scripts/backfill.ts"),
+			"utf8",
+		),
+		"// edit made during flush\n",
+	);
+	assert.deepEqual(f.effects(), []);
+	assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
+});
+
+for (const state of ["ready", "stopped"])
+	test(`Asset migration retains available DIRTY ${state} refusal before work`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		const prior = f.json(".boat/state.json");
+		f.local(
+			".boat/state.json",
+			JSON.stringify({
+				...prior,
+				snapshotRecovery: { status: "DIRTY", workerId: "fake-worker" },
+			}),
+		);
+		if (state === "stopped")
+			fs.writeFileSync(path.join(f.control, "sleep"), "yes");
+		const result = await f.run("migrate", "PACKAGE=asset").done;
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /DIRTY.*snapshot/i);
+		assert.deepEqual(f.effects(), []);
+		assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
+		const calls = fs
+			.readFileSync(path.join(f.control, "transport"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
+		assert(
+			calls.every(
+				(a) => !a.some((value) => ["new", "resume", "delete"].includes(value)),
+			),
+		);
+	});
+
+for (const [mode, effects] of [
+	["missing-started", 2],
+	["launcher-failed", 2],
+	["stream-loss", 0],
+])
+	test(`Asset migration preserves uncertainty on ${mode} without retry`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		fs.writeFileSync(path.join(f.control, mode), "yes");
+		const first = await f.run("migrate", "PACKAGE=asset").done;
+		assert.notEqual(first.status, 0, first.output);
+		assert.match(first.output, /terminal status uncertain/);
+		assert.equal(f.effects().length, effects);
+		fs.unlinkSync(path.join(f.control, mode));
+		const second = await f.run("migrate", "PACKAGE=asset").done;
+		assert.notEqual(second.status, 0, second.output);
+		assert.match(
+			second.output,
+			/Previous Asset migration terminal status uncertain/,
+		);
+		assert.equal(f.effects().length, effects);
+	});
+
+test("Asset migration delivery consumes the remaining enclosing command allowance", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const controller = "scripts/boat.mjs";
+	const source = fs.readFileSync(path.join(f.root, controller), "utf8");
+	assert.equal(source.split("const entered = Date.now();").length, 2);
+	f.local(
+		controller,
+		source.replace(
+			"const entered = Date.now();",
+			"const entered = Date.now() - 178_000;",
+		),
+	);
+	fs.writeFileSync(
+		path.join(f.runtime, "apps/asset/drizzle/0000_first.sql"),
+		"old SQL",
+	);
+	const running = f.run("migrate", "PACKAGE=asset");
+	await migrationObserved(f, "hash:apps/asset/drizzle/0000_first.sql");
+	assert.deepEqual(f.effects(), []);
+	const result = await running.done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /deadline exhausted/);
+	assert.deepEqual(f.effects(), []);
+});
+
+test("Asset migration refuses launch after preparation consumes its command allowance", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const controller = "scripts/boat.mjs";
+	const source = fs.readFileSync(path.join(f.root, controller), "utf8");
+	f.local(
+		controller,
+		source.replace(
+			"const entered = Date.now();",
+			"const entered = Date.now() - 180_001;",
+		),
+	);
+	const result = await f.run("migrate", "PACKAGE=asset").done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /command allowance exhausted/);
+	assert.deepEqual(f.effects(), []);
+	assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
+});
+
+test("Asset migration await sensitivity cannot substitute immediate rejection for delivery", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const helper = "scripts/lib/boat-asset-migration.mjs";
+	const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+	assert.equal(source.split("if (!last) break;").length, 2);
+	f.local(helper, source.replace("if (!last) break;", "break;"));
+	fs.writeFileSync(
+		path.join(f.runtime, "apps/asset/drizzle/0000_first.sql"),
+		"old SQL",
+	);
+	const mutant = await f.run("migrate", "PACKAGE=asset").done;
+	assert.notEqual(mutant.status, 0, mutant.output);
+	assert.match(mutant.output, /changed before launch/);
+	assert.doesNotMatch(mutant.output, /asset-migration waiting/);
+	assert.deepEqual(f.effects(), []);
+});
+
+test("Asset migration blocks a new submission when worker termination lacks runtime completion", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const docker = path.join(f.directory, "home/.local/bin/docker");
+	const source = fs.readFileSync(docker, "utf8");
+	assert.equal(source.split("process.stdout.write(b);").length, 2);
+	fs.writeFileSync(
+		docker,
+		source.replace(
+			"process.stdout.write(b);",
+			"if(!b.toString().includes('asset-migration completed'))process.stdout.write(b);",
+		),
+	);
+	const result = await f.run("migrate", "PACKAGE=asset").done;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /terminal status uncertain/);
+	assert.equal(f.effects().length, 2);
+	const active = f.json(".boat/asset-migration-active.json");
+	assert.equal(active.terminal.exitCode, 0);
+	assert.equal(active.authorizationSent, true);
+	assert.equal(active.runtimeExit, undefined);
+	const retry = await f.run("migrate", "PACKAGE=asset").done;
+	assert.notEqual(retry.status, 0, retry.output);
+	assert.equal(f.effects().length, 2);
+});
+
+test("Asset migration preserves awake foreground and partial development identities", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const state = f.json(".boat/state.json");
+	const watcher = { pid: 557, commandId: "foreground-watch" };
+	f.local(
+		".boat/state.json",
+		JSON.stringify({ ...state, developmentWanted: true, watcher }),
+	);
+	const result = await f.run("migrate", "PACKAGE=asset").done;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(f.json(".boat/state.json").id, "fake-worker");
+	assert.deepEqual(f.json(".boat/state.json").watcher, watcher);
+	const transport = fs.readFileSync(path.join(f.control, "transport"), "utf8");
+	assert.doesNotMatch(transport, /make apps-start|make stop|boat:stop-watch/);
+});
 
 test("public lock generation repairs stale dependency inputs before frozen preparation and returns only the lock", async (t) => {
 	const f = await lockGenerationCheckout(t);

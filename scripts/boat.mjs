@@ -32,6 +32,10 @@ import {
 	generateSource,
 	recoverPublication,
 } from "./lib/boat-source-generation.mjs";
+import {
+	assetMigrationSelected,
+	captureAssetMigration,
+} from "./lib/boat-asset-migration.mjs";
 
 const root = process.cwd();
 const dir = path.join(root, ".boat");
@@ -204,9 +208,13 @@ function owned() {
 	if (!config || config.root !== root)
 		throw new Error("This worktree is not enrolled");
 }
-async function lock(fn, name = "lifecycle") {
+async function lock(fn, name = "lifecycle", deadline = Infinity) {
 	const lockDir = path.join(dir, `${name}.lock`);
 	for (let attempt = 0; ; attempt++) {
+		if (Date.now() >= deadline)
+			throw new Error(
+				"Asset migration command allowance exhausted while awaiting source ownership; no launch",
+			);
 		try {
 			fs.mkdirSync(lockDir);
 			fs.writeFileSync(path.join(lockDir, "pid"), String(process.pid));
@@ -221,7 +229,7 @@ async function lock(fn, name = "lifecycle") {
 				continue;
 			}
 			if (attempt > 600) throw new Error("Lifecycle lock timed out");
-			await wait(500);
+			await wait(Math.min(500, deadline - Date.now()));
 		}
 	}
 	try {
@@ -398,12 +406,22 @@ function manifest() {
 	}
 	return result;
 }
-async function sync(id) {
-	return lock(() => {
+async function sync(id, capture) {
+	return lock(async () => {
 		snapshots.startup();
 		assertSourceWriterStopped();
 		recoverPublication(root, acceptSource);
-		return syncSource(id, manifest());
+		const source = manifest();
+		const intended = capture?.(source);
+		await syncSource(id, source);
+		if (
+			capture &&
+			JSON.stringify(capture(manifest())) !== JSON.stringify(intended)
+		)
+			throw new Error(
+				"Migration source changed during authoritative flush; no launch",
+			);
+		return intended;
 	}, "source");
 }
 // Caller holds source.lock, including while accepting generated source.
@@ -876,7 +894,156 @@ async function stop(remove = false, targets) {
 		}
 	});
 }
+async function runAssetMigration(id, started, targets, expected, deadline) {
+	if (Date.now() >= deadline)
+		throw new Error("Asset migration command allowance exhausted; no launch");
+	const token = randomBytes(16).toString("hex");
+	const requestFile = `.boat/asset-migration-${token}.json`;
+	const permit = `.boat/asset-migration-${token}.permit`;
+	await ssh(id, `cd ${remote} && cat > ${quote(requestFile)}`, {
+		input: JSON.stringify({ expected, deadline, permit, token }),
+	});
+	const file = path.join(dir, "asset-migration-active.json");
+	const evidence = path.join(
+		dir,
+		`asset-migration-${started}-${process.pid}.json`,
+	);
+	const record = {
+		workerId: id,
+		targets,
+		expected,
+		started,
+		deadline,
+		deliveryBudgetMs: 20_000,
+		commandId: null,
+		terminal: null,
+	};
+	const persist = () => {
+		write(file, record);
+		write(evidence, record);
+	};
+	await lock(
+		() => {
+			if (fs.existsSync(file))
+				throw new Error(
+					"Previous Asset migration terminal status uncertain; inspect ownership before another run",
+				);
+			persist();
+		},
+		"asset-migration",
+		deadline,
+	);
+	let pending = "",
+		authorization;
+	const result = await boat(
+		[
+			"--json",
+			"exec",
+			id,
+			"--timeout",
+			String(Math.max(1, Math.floor((deadline - Date.now()) / 1000))),
+			"--stream",
+			"--",
+			"bash",
+			"-lc",
+			`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker docker-run ${targets
+				.slice(1)
+				.filter((v) => !v.startsWith("ARGS="))
+				.map(quote)
+				.join(
+					" ",
+				)} ${quote(`ARGS=node scripts/lib/boat-asset-migration.mjs ${requestFile} $(APPS_COMPOSE)`)}`,
+		],
+		{
+			allowFailure: true,
+			streamFrames: true,
+			logPath: path.join(dir, `command-${started}.log`),
+			onOutput: (data) => {
+				pending = (pending + data).slice(-8192);
+				const completion = pending.match(
+					new RegExp(
+						`asset-migration completed ${hash(JSON.stringify(expected))} (\\d+)\\n`,
+					),
+				);
+				if (completion && Number(completion[1]) <= 255) {
+					record.runtimeExit = Number(completion[1]);
+					persist();
+				}
+				if (!authorization && pending.includes("asset-migration ready\n")) {
+					authorization = lock(
+						() => {
+							const current = captureAssetMigration(root, manifest());
+							if (JSON.stringify(current) !== JSON.stringify(expected))
+								throw new Error(
+									"Asset migration source superseded before launch",
+								);
+						},
+						"source",
+						deadline,
+					)
+						.then(() => {
+							record.authorizationSent = true;
+							persist();
+							return ssh(
+								id,
+								`cd ${remote} && printf '%s' ${quote(token)} > ${quote(permit)}`,
+							);
+						})
+						.catch(async (error) => {
+							await ssh(
+								id,
+								`cd ${remote} && printf '%s' reject > ${quote(permit)}`,
+							);
+							throw error;
+						});
+					// Keep a rejection observed while the exec reports its bounded no-launch result.
+					authorization.catch((error) => {
+						record.authorizationError = error.message;
+						persist();
+					});
+				}
+			},
+			onFrame: (frame) => {
+				if (frame.type === "started") {
+					if (record.commandId || record.terminal) record.protocolError = true;
+					record.commandId = frame.commandId;
+				}
+				if (frame.type === "exit") {
+					if (!record.commandId || record.terminal) record.protocolError = true;
+					record.terminal = frame;
+				}
+				persist();
+			},
+		},
+	);
+	let authorizationError;
+	try {
+		await authorization;
+	} catch (error) {
+		authorizationError = error;
+	}
+	if (
+		!provenSourceExit(record) ||
+		((record.authorizationSent || record.terminal?.exitCode === 0) &&
+			!Number.isInteger(record.runtimeExit))
+	)
+		throw new Error(
+			`Asset migration terminal status uncertain; no automatic rerun. Ownership: ${file}`,
+		);
+	fs.rmSync(file);
+	await ssh(
+		id,
+		`cd ${remote} && rm -f -- ${quote(requestFile)} ${quote(permit)}`,
+	);
+	if (authorizationError) throw authorizationError;
+	return {
+		status:
+			result.status || record.terminal.exitCode || record.runtimeExit || 0,
+	};
+}
+
 async function command() {
+	const entered = Date.now();
 	owned();
 	const targets = args
 		.slice(args.indexOf("--") + 1)
@@ -899,6 +1066,14 @@ async function command() {
 	daemon();
 	const started = Date.now();
 	try {
+		const migration = assetMigrationSelected(root, config.mode, targets);
+		if (
+			migration &&
+			fs.existsSync(path.join(dir, "asset-migration-active.json"))
+		)
+			throw new Error(
+				"Previous Asset migration terminal status uncertain; inspect ownership before another run",
+			);
 		const kind = sourceGeneration(targets);
 		if (kind) {
 			const result = await generate(id, started, kind);
@@ -911,12 +1086,32 @@ async function command() {
 			process.exitCode = result.status;
 			return;
 		}
-		await sync(id);
+		const expected = await sync(
+			id,
+			migration ? (source) => captureAssetMigration(root, source) : undefined,
+		);
 		const dependencies = await prepare(id);
 		await cache(id);
 		await reconcileDevelopment(id, dependencies, {
 			foreground: targets[0] === "dev",
 		});
+		if (migration) {
+			const result = await runAssetMigration(
+				id,
+				started,
+				targets,
+				expected,
+				entered + 180_000,
+			);
+			event("command", {
+				targets,
+				status: result.status,
+				ms: Date.now() - started,
+				resumed,
+			});
+			process.exitCode = result.status;
+			return;
+		}
 		if (["dev", "apps-start"].includes(targets[0])) {
 			const s = read(stateFile);
 			s.developmentWanted = true;

@@ -8,8 +8,10 @@ export function installationInputs(tracked) {
 		"mise.lock",
 		"mise.toml",
 		"pnpm-workspace.yaml",
-		...tracked.filter((name) =>
-			/(^|\/)(package.json|\.npmrc|\.env.example)$/.test(name),
+		...tracked.filter(
+			(name) =>
+				/(^|\/)(package.json|\.npmrc|\.env.example)$/.test(name) ||
+				name.startsWith("patches/"),
 		),
 		"scripts/setup-worktree.mjs",
 		"scripts/lib/env-pipeline.mjs",

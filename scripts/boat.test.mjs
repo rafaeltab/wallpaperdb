@@ -20,6 +20,10 @@ test("successful full app cleanup clears restoration intent while partial and fa
 	assert.equal(developmentWantedAfterCommand(true, ["apps-stop"], 0), false);
 	assert.equal(developmentWantedAfterCommand(true, ["stop"], 0), false);
 	assert.equal(
+		developmentWantedAfterCommand(true, ["stop", "SERVICE=web"], 0),
+		true,
+	);
+	assert.equal(
 		developmentWantedAfterCommand(true, ["apps-stop", "SERVICE="], 0),
 		false,
 	);
@@ -324,13 +328,16 @@ test("setup helper, workspace and template edits invalidate actual preparation s
 		"package.json",
 		"apps/user/package.json",
 		"apps/user/.env.example",
+		"patches/nats-2.29.3.patch",
 	]);
+	assert.ok(files.includes("patches/nats-2.29.3.patch"));
 	for (const file of files) {
 		fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
 		fs.writeFileSync(path.join(root, file), "initial");
 	}
 	let previous = fingerprint(root, files);
 	for (const file of [
+		"patches/nats-2.29.3.patch",
 		"scripts/lib/worktree-project.mjs",
 		"apps/user/.env.example",
 		"apps/user/package.json",

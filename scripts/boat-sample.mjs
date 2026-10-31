@@ -5,6 +5,7 @@ import os from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { worktreeProcesses } from "./lib/boat.mjs";
+import { allStacksHealthy } from "./lib/boat-sample.mjs";
 
 const execute = promisify(execFile);
 const [taskFile, output, ...options] = process.argv.slice(2);
@@ -112,7 +113,7 @@ do {
 		hostBefore: before,
 		hostAfter: host(),
 		stacks,
-		allHealthy: stacks.length === 5 && stacks.every((stack) => stack.healthy),
+		allHealthy: allStacksHealthy(tasks, stacks),
 	};
 	fs.appendFileSync(
 		path.join(output, "aligned-samples.jsonl"),

@@ -16,6 +16,7 @@
 		"boat:lint": "biome lint boat.mjs boat.test.mjs boat-shell.mjs boat-ready.mjs boat-probe.mjs boat-watch.mjs lib/boat.mjs lib/boat-cache.mjs",
 		"boat:cache-login": "cd .. && turbo login",
 		"test:boat": "node --test boat.test.mjs",
+		"test:boat-sample": "node --test boat-sample.test.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:docker-queue": "cd .. && node --test scripts/docker-validation.test.mjs",

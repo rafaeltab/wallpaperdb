@@ -793,6 +793,19 @@ async function stopLockFixtureChildren(children, drain = false) {
 	assert.fail("Owned lock fixture process groups did not exit");
 }
 
+// Keep raw chunks until observation so split terminal sequences remain contiguous.
+function lockFixtureOutput() {
+	let tail = "";
+	return {
+		capture(bytes) {
+			tail = (tail + String(bytes)).slice(-16384);
+		},
+		read() {
+			return stripVTControlCharacters(tail).replaceAll("\u001b", "");
+		},
+	};
+}
+
 // hrtime uses the same monotonic clock in the parent and its local child.
 const fixtureNow = () => Number(process.hrtime.bigint() / 1_000_000n);
 function lockFixtureReadiness({
@@ -1067,10 +1080,8 @@ child.on('close',code=>{
 			detached: true,
 			stdio: ["ignore", "pipe", "pipe"],
 		});
-		let output = "";
-		const capture = (bytes) => {
-			output = (output + stripVTControlCharacters(String(bytes))).slice(-16384);
-		};
+		const output = lockFixtureOutput();
+		const capture = output.capture;
 		child.stdout.on("data", capture);
 		child.stderr.on("data", capture);
 		child.on("error", (error) => capture(error.message));
@@ -1079,7 +1090,7 @@ child.on('close',code=>{
 			child,
 			closed: false,
 			terminal: null,
-			output: () => output,
+			output: output.read,
 		};
 		child.on("exit", (status, signal) => {
 			record.terminal = { status, signal };
@@ -1090,7 +1101,7 @@ child.on('close',code=>{
 		record.done = new Promise((resolve) => {
 			child.on("close", (status, signal) => {
 				record.closed = true;
-				resolve({ status, signal, output });
+				resolve({ status, signal, output: output.read() });
 			});
 		});
 		owned.push(record);
@@ -1263,6 +1274,71 @@ test("paused lock fixture reports Make failure before the sync barrier", async (
 	assert.equal(command.child.exitCode, 2);
 	assert.equal(command.child.signalCode, null);
 	assert.equal(processGroupRunning(command.child.pid), false);
+});
+
+test("lock fixture output retains a bounded sanitized tail across split controls", () => {
+	const output = lockFixtureOutput();
+	output.capture("\u001b[");
+	assert.equal(output.read(), "[");
+	output.capture("31mfixture failure\u001b[0m");
+	assert.equal(output.read(), "fixture failure");
+	output.capture("x".repeat(20000));
+	output.capture("\u001b[");
+	output.capture("31mbounded failure\u001b[0m");
+	assert.ok(output.read().length <= 16384);
+	assert.ok(output.read().endsWith("bounded failure"));
+	assert.equal(output.read().includes(String.fromCharCode(27)), false);
+});
+
+test("paused lock fixture sanitizes split terminal controls in bounded Make diagnostics", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	f.local(
+		"scripts/boat.mjs",
+		`import fs from 'node:fs';import path from 'node:path';
+const control=process.env.FAKE_CONTROL;
+const wait=(name)=>{while(!fs.existsSync(path.join(control,name)))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);};
+fs.writeSync(1,'x'.repeat(20000)+'\u001b[');wait('complete-diagnostic');
+fs.writeSync(1,'31mfixture split failure\u001b[0m');wait('exit-diagnostic');process.exit(37);`,
+	);
+	const rejected = assert.rejects(pausedGeneration(t, "sync", f), (error) => {
+		assert.match(
+			error.message,
+			/Make exited before paused sync: status=2, signal=none/,
+		);
+		assert.match(error.message, /fixture split failure/);
+		assert.equal(
+			error.message.includes(String.fromCharCode(27)),
+			false,
+			"split ANSI control must not escape into diagnostic",
+		);
+		assert.ok(
+			error.message.length <= 16500,
+			"terminal diagnostic retains its bounded output tail",
+		);
+		return true;
+	});
+	const command = f.commands[0];
+	await f.readiness.wait(
+		() => command.output().endsWith("["),
+		"first split diagnostic chunk captured",
+	);
+	flag(f, "complete-diagnostic");
+	await f.readiness.wait(
+		() => command.output().includes("fixture split failure"),
+		"second split diagnostic chunk captured",
+	);
+	flag(f, "exit-diagnostic");
+	await rejected;
+	assert.deepEqual(await stopLockFixtureChildren(f.commands, true), {
+		drained: true,
+		signal: null,
+	});
+	const result = await command.done;
+	assert.equal(command.closed, true);
+	assert.equal(result.status, 2);
+	assert.equal(result.signal, null);
+	assert.equal(result.output.includes(String.fromCharCode(27)), false);
+	assert.ok(result.output.length <= 16384);
 });
 
 for (const status of [0, 37])
@@ -2017,10 +2093,8 @@ for (const phase of ["sync", "generate", "collect", "unresponsive"])
 				stdio: ["ignore", "pipe", "pipe"],
 			},
 		);
-		let output = "";
-		const capture = (bytes) => {
-			output = (output + stripVTControlCharacters(String(bytes))).slice(-16384);
-		};
+		const output = lockFixtureOutput();
+		const capture = output.capture;
 		runner.stdout.on("data", capture);
 		runner.stderr.on("data", capture);
 		runnerIdentity = fixtureProcess(runner.pid);
@@ -2040,15 +2114,18 @@ for (const phase of ["sync", "generate", "collect", "unresponsive"])
 			const phases = fs.existsSync(`${report}.phases`)
 				? fs.readFileSync(`${report}.phases`, "utf8").slice(-8192)
 				: "no child phase recorded";
-			error.message += `\nChild phases: ${phases}\nChild output: ${output}`;
+			error.message += `\nChild phases: ${phases}\nChild output: ${output.read()}`;
 			throw error;
 		}
-		assert.equal(fs.existsSync(report), true, output);
+		assert.equal(fs.existsSync(report), true, output.read());
 		await observed(() => closed, `failed ${phase} test exits after cleanup`);
-		assert.equal(await done, 1, output);
-		assert.equal(runner.exitCode, 1, output);
-		assert.equal(runner.signalCode, null, output);
-		assert.match(output, /intentional failure before normal barrier release/);
+		assert.equal(await done, 1, output.read());
+		assert.equal(runner.exitCode, 1, output.read());
+		assert.equal(runner.signalCode, null, output.read());
+		assert.match(
+			output.read(),
+			/intentional failure before normal barrier release/,
+		);
 		const snapshot = JSON.parse(fs.readFileSync(report, "utf8"));
 		const result = JSON.parse(fs.readFileSync(`${report}.result`, "utf8"));
 		const cleanup = JSON.parse(fs.readFileSync(`${report}.cleanup`, "utf8"));

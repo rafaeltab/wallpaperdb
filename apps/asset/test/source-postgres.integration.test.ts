@@ -1,3 +1,5 @@
+import { sourceWindowContract } from './fixtures/source-window-contract.js';
+import { sourceQueryWork } from './fixtures/source-query-work.js';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -109,10 +111,10 @@ it.each([32, 2048])(
       // Fixed retained history is fixture setup, not one supported intake mutation.
       await pool.query(
         `INSERT INTO source_candidates (id, asset_id, ordinal, idempotency_key, source_id, status, expires_at, candidate)
-        SELECT $1 || '_' || n, $1, n, 'history-' || n, $1 || '_source_' || n, 'cancelled', '2099-01-01T00:00:00Z',
+        SELECT $1 || '_' || n, $1, n, 'history-' || n, $1 || '_source_' || n, 'cancelled', CASE WHEN n=2 THEN '2020-01-01T00:00:00Z'::timestamptz ELSE '2099-01-01T00:00:00Z'::timestamptz END,
           jsonb_build_object('candidateId', $1 || '_' || n, 'sourceId', $1 || '_source_' || n,
             'idempotencyKey', 'history-' || n, 'operation', 'add', 'expectedSourceSetRevision', '0',
-            'status', 'cancelled', 'expiresAt', '2099-01-01T00:00:00Z', 'orphanExpiresAt', '2099-01-01T00:00:00Z', 'layout', 'asset-layout-1')
+            'status', 'cancelled', 'expiresAt', CASE WHEN n=2 THEN '2020-01-01T00:00:00Z' ELSE '2099-01-01T00:00:00Z' END, 'orphanExpiresAt', '2099-01-01T00:00:00Z', 'layout', 'asset-layout-1')
         FROM generate_series(0, $2::integer - 1) AS n`,
         [assetId, size]
       );
@@ -128,54 +130,27 @@ it.each([32, 2048])(
       console.info('retained-history mutable-row evidence', { size, ...rows[0] });
       expect(rows[0].candidates).toBe(0);
       expect(rows[0].bytes).toBeLessThan(2048);
-      const inspect = (
-        selection: Parameters<
-          import('../src/capabilities/sources/index.js').SourceStorePort['transact']
-        >[3]
-      ) =>
-        runtime.runPromise(
-          SourceStore.use((store) =>
-            store.transact(assetId, null, (state) => ({ state, result: state }), selection)
-          )
-        );
-      const keyed = await inspect({ kind: 'candidate', candidateId: `${assetId}_0` });
-      expect(keyed?.candidates.map((entry) => entry.candidateId)).toEqual([`${assetId}_0`]);
-      const replay = await inspect({
-        kind: 'replay',
-        key: 'history-0',
-        now: new Date().toISOString(),
-      });
-      expect(replay?.candidates).toEqual(keyed?.candidates);
-      expect(replay?.activeCandidateCount).toBe(0);
-      const first = await inspect({ kind: 'page' });
-      expect(first?.candidates).toHaveLength(32);
-      if (size === 2048) {
-        expect(first?.candidatePage?.nextCursor).toBe(`${size - 32}:${assetId}_${size - 32}`);
-        const second = await inspect({ kind: 'page', cursor: first?.candidatePage?.nextCursor });
-        expect(second?.candidates).toHaveLength(32);
-        expect(second?.candidates.at(-1)?.candidateId).toBe(`${assetId}_${size - 33}`);
-        expect(await inspect({ kind: 'page', cursor: `2016:${assetId}_0` })).toMatchObject({
-          candidatePage: { valid: false },
-        });
-      } else expect(first?.candidatePage?.nextCursor).toBeUndefined();
-      const failed = await runtime.runPromiseExit(
-        SourceStore.use((store) =>
-          store.transact(
-            assetId,
-            null,
-            (state) => {
-              if (!state?.candidates[0]) throw new Error('Missing candidate');
-              state.candidates[0].reason = 'must-roll-back';
-              throw new Error('deliberate rollback');
-            },
-            { kind: 'candidate', candidateId: `${assetId}_0` }
-          )
-        )
+      await pool.query('ANALYZE source_candidates');
+      await sourceWindowContract(
+        (selection, change) =>
+          sourceQueryWork(pool, size, () =>
+            runtime.runPromise(
+              SourceStore.use((store) =>
+                store.transact(
+                  assetId,
+                  null,
+                  (state) => {
+                    if (state) change?.(state);
+                    return { state, result: state };
+                  },
+                  selection
+                )
+              )
+            )
+          ),
+        assetId,
+        size
       );
-      expect(Exit.isFailure(failed)).toBe(true);
-      expect(
-        (await inspect({ kind: 'candidate', candidateId: `${assetId}_0` }))?.candidates
-      ).toEqual(keyed?.candidates);
     } finally {
       await runtime.dispose();
     }

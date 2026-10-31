@@ -925,7 +925,17 @@ if(argv.includes('--lockfile-only')){
 		MAKEOVERRIDES: "",
 		BOAT_EXEC: "",
 	};
-	delete env.MAKEOVERRIDES;
+	// Fixture callers choose their own Make selectors, independent of the
+	// outer `make run PACKAGE=scripts SCRIPT=test:boat` invocation.
+	for (const name of [
+		"MAKEOVERRIDES",
+		"PACKAGE",
+		"SERVICE",
+		"SCRIPT",
+		"ARGS",
+		"APPS_COMPOSE",
+	])
+		delete env[name];
 	put(
 		path.join(root, ".mise/boat/boat"),
 		`#!${process.execPath}
@@ -1427,7 +1437,7 @@ test("tracked and previously synchronized untracked patch deletions reach genera
 	assert.equal(frozen.status, 0, frozen.output);
 });
 
-async function sleepingDevelopmentCheckout(t) {
+async function developmentCheckout(t) {
 	const f = await lockGenerationCheckout(t);
 	// Keep the real Make/controller path; control only remote process responses
 	// and Docker so restoration cannot touch a worker or the host's containers.
@@ -1438,18 +1448,28 @@ async function sleepingDevelopmentCheckout(t) {
 			"const command=argv.at(-1)",
 			`if(argv.includes('--status')){console.log(JSON.stringify({running:!fs.existsSync(path.join(control,'fail-watch')),stdout:'Watch enabled'}));process.exit(0);}
 if(argv.includes('--detach')){console.log(JSON.stringify({processId:557}));process.exit(0);}
-if(argv.includes('ssh')&&argv.at(-1).includes('SCRIPT=boat:ready')){if(argv.at(-1).includes('ARGS=--once'))process.exit(0);console.error('fixture ends preview at readiness');process.exit(37);}
+if(argv.includes('ssh')&&argv.at(-1).includes('SCRIPT=boat:ready')){
+ if(argv.at(-1).includes('ARGS=--once'))process.exit(fs.existsSync(path.join(control,'not-ready'))?1:0);
+ if(argv.at(-1).includes('make apps-start')){
+  const startup=argv.at(-1).split('make run PACKAGE=scripts SCRIPT=boat:ready')[0].replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER);
+  const result=cp.spawnSync('bash',['-c',startup+'true'],{env:process.env,stdio:'inherit'});
+  if(result.status!==0)process.exit(result.status??1);
+ }
+ console.error('fixture ends preview at readiness');process.exit(37);
+}
 const command=argv.at(-1)`,
 		),
 	);
 	fs.writeFileSync(
 		path.join(f.directory, "home/.local/bin/docker"),
-		`#!${process.execPath}
+		`#!/bin/bash
+exec -a docker-compose '${process.execPath}' - "$@" <<'NODE'
 const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL,argv=process.argv.slice(2);
+const apps=argv.includes('infra/docker-compose.apps.yml')||argv.includes('.boat/development-compose.json');
 fs.appendFileSync(path.join(control,'docker'),JSON.stringify(argv)+'\\n');
-if(argv.includes('up')&&argv.includes('infra/docker-compose.apps.yml')&&fs.existsSync(path.join(control,'fail-apps')))process.exit(29);
+if(argv.includes('up')&&apps&&fs.existsSync(path.join(control,'fail-apps')))process.exit(29);
 if(argv.includes('down')&&fs.existsSync(path.join(control,'fail-cleanup')))process.exit(30);
-if(argv.includes('infra/docker-compose.apps.yml')){
+if(apps){
  const image=path.join(control,'image-dependencies');
  if(argv.includes('build')||argv.includes('--build')){
   if(fs.existsSync(path.join(control,'fail-build')))process.exit(32);
@@ -1459,10 +1479,25 @@ if(argv.includes('infra/docker-compose.apps.yml')){
   if(!fs.existsSync(image))throw Error('No application image');
   fs.writeFileSync(path.join(control,'running-dependencies'),fs.readFileSync(image));
  }
+ if(argv.includes('watch')){
+  fs.writeFileSync(path.join(control,'watch-pid'),String(process.pid));
+  console.log('Watch enabled');
+  setInterval(()=>fs.writeFileSync(path.join(control,'watched-source'),fs.readFileSync(path.join(process.env.FAKE_WORKER,'notes.txt'))),10);
+ }
 }
+NODE
 `,
 		{ mode: 0o755 },
 	);
+	f.local("scripts/check-infra.sh", "#!/bin/sh\nexit 0\n");
+	fs.chmodSync(path.join(f.root, "scripts/check-infra.sh"), 0o755);
+	f.local(
+		"node_modules/.bin/turbo",
+		`#!${process.execPath}
+require('fs').appendFileSync(require('path').join(process.env.FAKE_CONTROL,'validation'),JSON.stringify(process.argv.slice(2))+'\\n');
+`,
+	);
+	fs.chmodSync(path.join(f.root, "node_modules/.bin/turbo"), 0o755);
 	const normal = () =>
 		f.run("run", "PACKAGE=asset", "SCRIPT=dev:configure", "BOAT_EXEC=remote")
 			.done;
@@ -1470,11 +1505,6 @@ if(argv.includes('infra/docker-compose.apps.yml')){
 	assert.equal(generated.status, 0, generated.output);
 	const prepared = await normal();
 	assert.equal(prepared.status, 0, prepared.output);
-	const built = await f.run("apps-start").done;
-	assert.equal(built.status, 0, built.output);
-	for (const name of ["calls", "transport", "docker"])
-		fs.rmSync(path.join(f.control, name), { force: true });
-	flag(f, "sleep");
 	return {
 		...f,
 		normal,
@@ -1488,6 +1518,142 @@ if(argv.includes('infra/docker-compose.apps.yml')){
 				.map((line) => JSON.parse(line)),
 	};
 }
+
+async function sleepingDevelopmentCheckout(t) {
+	const f = await developmentCheckout(t);
+	const built = await f.run("apps-start").done;
+	assert.equal(built.status, 0, built.output);
+	for (const name of ["calls", "transport", "docker"])
+		fs.rmSync(path.join(f.control, name), { force: true });
+	flag(f, "sleep");
+	return f;
+}
+
+for (const targets of [
+	["dev"],
+	["dev", "ARGS=--no-up"],
+	[
+		"dev",
+		"ARGS=--no-up",
+		"APPS_COMPOSE=docker compose -p wallpaperdb -f .boat/development-compose.json",
+	],
+])
+	for (const entry of ["validation", "preview"])
+		test(`awake ${targets.join(" ")} keeps its foreground watcher through ${entry}`, async (t) => {
+			const f = await developmentCheckout(t);
+			// An existing image lets --no-up watch without proving its freshness.
+			fs.copyFileSync(
+				path.join(f.worker, "pnpm-lock.yaml"),
+				path.join(f.control, "image-dependencies"),
+			);
+			const foreground = f.run(...targets);
+			await observed(
+				() =>
+					fs.existsSync(path.join(f.control, "watch-pid")) &&
+					fs
+						.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+						.includes('"kind":"foreground-watching"'),
+				"foreground Make development watcher",
+			);
+			const watcher = Number(
+				fs.readFileSync(path.join(f.control, "watch-pid")),
+			);
+			const before = fs.readFileSync(path.join(f.control, "docker"), "utf8");
+			const result = await (entry === "validation"
+				? f.run("check", "PACKAGE=user").done
+				: f.run("boat-preview").done);
+			if (entry === "validation") {
+				assert.equal(result.status, 0, result.output);
+				assert.match(
+					fs.readFileSync(path.join(f.control, "validation"), "utf8"),
+					/check-types/,
+				);
+			} else assert.match(result.output, /fixture ends preview at readiness/);
+			assert.equal(
+				foreground.closed,
+				false,
+				"foreground make must keep running",
+			);
+			process.kill(watcher, 0);
+			assert.equal(
+				fs.readFileSync(path.join(f.control, "docker"), "utf8"),
+				before,
+			);
+			assert.equal(
+				f.json(".boat/state.json").developmentDependencies,
+				undefined,
+			);
+			assert.equal(
+				f.transport().some((argv) => argv.includes("--detach")),
+				false,
+			);
+			f.local("notes.txt", "source changed while development stays awake\n");
+			const synced = await f.normal();
+			assert.equal(synced.status, 0, synced.output);
+			await observed(
+				() =>
+					fs.existsSync(path.join(f.control, "watched-source")) &&
+					fs.readFileSync(path.join(f.control, "watched-source"), "utf8") ===
+						"source changed while development stays awake\n",
+				"surviving watcher receives synchronized source",
+			);
+			assert.equal(foreground.closed, false);
+			assert.equal(
+				fs.readFileSync(path.join(f.control, "docker"), "utf8"),
+				before,
+			);
+		});
+
+for (const targets of [
+	["apps-start"],
+	["apps-start", "SERVICE=web"],
+	["apps-start", "ARGS=--build"],
+])
+	for (const entry of ["validation", "preview"])
+		test(`awake ${targets.join(" ")} avoids unrelated app mutations during ${entry}`, async (t) => {
+			const f = await developmentCheckout(t);
+			const started = await f.run(...targets).done;
+			assert.equal(started.status, 0, started.output);
+			const before = fs.readFileSync(path.join(f.control, "docker"), "utf8");
+			const result = await (entry === "validation"
+				? f.run("check", "PACKAGE=user").done
+				: f.run("boat-preview").done);
+			if (entry === "validation") assert.equal(result.status, 0, result.output);
+			else assert.match(result.output, /fixture ends preview at readiness/);
+			assert.equal(
+				fs.readFileSync(path.join(f.control, "docker"), "utf8"),
+				before,
+			);
+			assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+		});
+
+test("awake healthy preview leaves unknown images alone without saved development intent", async (t) => {
+	const f = await developmentCheckout(t);
+	const preview = await f.run("boat-preview").done;
+	assert.match(preview.output, /fixture ends preview at readiness/);
+	assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
+	assert.equal(f.json(".boat/state.json").developmentDependencies, undefined);
+});
+
+test("initial preview uses ordinary startup when readiness fails without a recovery obligation", async (t) => {
+	const f = await developmentCheckout(t);
+	flag(f, "not-ready");
+	const preview = await f.run("boat-preview").done;
+	assert.match(preview.output, /fixture ends preview at readiness/);
+	const docker = fs
+		.readFileSync(path.join(f.control, "docker"), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line));
+	assert.deepEqual(
+		docker.map((argv) => argv.slice(4)),
+		[
+			["infra/docker-compose.yml", "up", "-d"],
+			["infra/docker-compose.apps.yml", "up", "-d", "--build"],
+		],
+	);
+	assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+});
 
 test("ordinary commands reconcile development after generator resume and frozen preparation", async (t) => {
 	const f = await sleepingDevelopmentCheckout(t);
@@ -1599,6 +1765,34 @@ test("a healthy preview with no saved development intent rebuilds images of unkn
 	assert.equal(
 		f.dependencies("running").inputs["patches/dependency.patch"],
 		"original patch\n",
+	);
+});
+
+test("preview recovery without saved intent stays pending across preparation and rebuild failures", async (t) => {
+	const f = await sleepingDevelopmentCheckout(t);
+	const state = f.json(".boat/state.json");
+	state.developmentWanted = false;
+	delete state.developmentDependencies;
+	f.local(".boat/state.json", JSON.stringify(state));
+	f.local("patches/dependency.patch", "changed dependency B\n");
+	const invalid = await f.run("boat-preview").done;
+	assert.match(invalid.output, /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/);
+	assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+	assert.equal(fs.existsSync(path.join(f.control, "docker")), false);
+	const generated = await f.generate();
+	assert.equal(generated.status, 0, generated.output);
+	flag(f, "fail-build");
+	const incomplete = await f.run("boat-preview").done;
+	assert.notEqual(incomplete.status, 0);
+	assert.equal(f.json(".boat/state.json").reconciliationPending, true);
+	assert.equal(f.json(".boat/state.json").developmentDependencies, undefined);
+	fs.unlinkSync(path.join(f.control, "fail-build"));
+	const retried = await f.run("boat-preview").done;
+	assert.match(retried.output, /fixture ends preview at readiness/);
+	assert.equal(f.json(".boat/state.json").reconciliationPending, undefined);
+	assert.equal(
+		f.dependencies("running").inputs["patches/dependency.patch"],
+		"changed dependency B\n",
 	);
 });
 

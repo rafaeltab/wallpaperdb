@@ -216,7 +216,7 @@ function admit() {
 			"Protective $10 usage cutoff: no new work admitted; stop experiment workers.",
 		);
 }
-async function ensure() {
+async function ensure({ developmentRequested = false } = {}) {
 	return lock(async () => {
 		admit();
 		let s = read(stateFile);
@@ -274,7 +274,10 @@ async function ensure() {
 					);
 					s.runningSince = Date.now();
 					delete s.watcher;
-					if (config.mode === "development" && s.developmentWanted)
+					if (
+						config.mode === "development" &&
+						(s.developmentWanted || developmentRequested)
+					)
 						s.reconciliationPending = true;
 					resumed = true;
 				} catch (error) {
@@ -599,18 +602,18 @@ async function reconcileDevelopment(
 		const state = read(stateFile);
 		if (
 			config.mode !== "development" ||
-			(!state.developmentWanted && !requested)
+			(!state.developmentWanted && !requested) ||
+			!state.reconciliationPending
 		)
 			return;
 		if (!dependencies)
 			throw new Error("Development requires prepared dependencies");
 		// Host installation does not establish what is baked into app images.
-		// Unknown or changed image inputs require a build, including on retry.
+		// Unknown or changed image inputs require a build during recovery.
+		// Awake foreground and partial starts do not authorize full restoration.
 		const rebuild =
 			state.developmentDependencies?.id !== id ||
 			state.developmentDependencies?.dependencies !== dependencies;
-		if (!state.reconciliationPending && !rebuild) return;
-		state.reconciliationPending = true;
 		delete state.watcher;
 		save(state);
 		await ssh(
@@ -998,7 +1001,7 @@ async function preview() {
 	owned();
 	if (config.mode !== "development")
 		throw new Error("Validation mode uses its local development stack");
-	const { id } = await ensure();
+	const { id } = await ensure({ developmentRequested: true });
 	const startupLease = path.join(dir, `command-${process.pid}.json`);
 	write(startupLease, {
 		...worktreeProcesses(root).find((p) => p.pid === process.pid),

@@ -39,7 +39,8 @@ function decide<A>(transition: () => A): A {
 export function workflowPostgresLayer(options: Options) {
   return Layer.effectContext(
     Effect.gen(function* () {
-      const poolFor = (max: number) =>
+      const cancelling = new Set<Promise<unknown>>();
+      const poolFor = (max: number, drain = false) =>
         Effect.acquireRelease(
           Effect.sync(() => {
             const p = new Pool({
@@ -56,11 +57,17 @@ export function workflowPostgresLayer(options: Options) {
             });
             return p;
           }),
-          (p) => Effect.promise(() => p.end())
+          (p) =>
+            Effect.promise(async () => {
+              if (drain) {
+                while (cancelling.size) await Promise.allSettled(cancelling);
+              }
+              await p.end();
+            })
         );
       const pool = yield* poolFor(10);
       // A blocked work pool must not prevent cancellation from reaching PostgreSQL.
-      const cancellations = yield* poolFor(1);
+      const cancellations = yield* poolFor(1, true);
       type Database = ReturnType<typeof drizzle>;
       const query = <A>(operation: string, run: (db: Database) => Promise<A>) =>
         Effect.tryPromise({
@@ -81,14 +88,18 @@ export function workflowPostgresLayer(options: Options) {
                 else {
                   // Retain this checkout until cancellation finishes so the PID cannot
                   // be reused by another operation on the same pooled connection.
-                  void cancellations
+                  const cancellation = cancellations
                     .query('SELECT pg_cancel_backend($1)', [backendPid])
                     .catch((cause) =>
                       Effect.runPromise(
                         Effect.logError('Wallpaper database cancellation failed', { cause })
                       )
                     )
-                    .finally(() => client.release(true));
+                    .finally(() => {
+                      client.release(true);
+                      cancelling.delete(cancellation);
+                    });
+                  cancelling.add(cancellation);
                 }
               }
             };

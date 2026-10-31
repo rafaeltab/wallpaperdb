@@ -37,9 +37,13 @@ beforeEach(async () => {
     'TRUNCATE wallpaper_workflow_quarantine, wallpaper_workflow_outbox, wallpaper_source_intents, wallpaper_intents'
   );
 });
-it.each([1, 10])(
-  'cancels %i locked lists and releases their backends before the lock owner resumes',
-  async (count) => {
+it.each([
+  { count: 1, dispose: false },
+  { count: 10, dispose: false },
+  { count: 10, dispose: true },
+])(
+  'cancels $count locked lists before unlocking with disposal=$dispose',
+  async ({ count, dispose }) => {
     const url = new URL(databaseUrl());
     url.searchParams.set('application_name', 'wallpaper-list-cancellation');
     const runtime = ManagedRuntime.make(
@@ -54,6 +58,7 @@ it.each([1, 10])(
     const controller = new AbortController();
     const owner = { namespace: 'authors', subject: 'list-owner' };
     let pending: ReturnType<typeof runtime.runPromiseExit>[] = [];
+    let closing: Promise<void> | undefined;
     try {
       await runtime.runPromise(WorkflowStore);
       await blocker.query('BEGIN');
@@ -76,6 +81,7 @@ it.each([1, 10])(
         })
         .toBe(count);
       controller.abort();
+      if (dispose) closing = runtime.dispose();
       const results = await Promise.all(pending);
       expect(results.every(Exit.isFailure)).toBe(true);
       await expect
@@ -87,13 +93,14 @@ it.each([1, 10])(
         )
         .toEqual([]);
       await blocker.query('ROLLBACK');
-      expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([]);
+      if (closing) await closing;
+      else expect(await runtime.runPromise(WorkflowStore.use((s) => s.list(owner)))).toEqual([]);
     } finally {
       controller.abort();
       await blocker.query('ROLLBACK');
       await Promise.all(pending);
       blocker.release();
-      await runtime.dispose();
+      await (closing ?? runtime.dispose());
     }
   }
 );

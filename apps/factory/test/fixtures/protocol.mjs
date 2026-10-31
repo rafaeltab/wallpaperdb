@@ -12,7 +12,8 @@ const flag = (name) => args[args.indexOf(name) + 1];
 const reply = (value) => console.log(JSON.stringify(value));
 if (basename(process.argv[1]) === 'gh') {
   if (config.githubMalformed) console.log('{}');
-  else if (args[0] === 'api') reply([config.blockers ?? []]);
+  else if (args[0] === 'api')
+    reply(args[1]?.includes('/actions/runs/') ? config.jobs : [config.blockers ?? []]);
   else if (args[0] === 'pr' && args[1] === 'list')
     reply(
       config.prs ??
@@ -30,7 +31,8 @@ if (basename(process.argv[1]) === 'gh') {
       body: config.body ?? '',
       labels: [{ name: 'ready-for-agent' }],
     });
-} else if (args.includes('--help')) console.log('--worktree --model');
+} else if (args.includes('--help'))
+  console.log('--worktree --model' + (config.idempotency ? ' --client-request-id' : ''));
 else if (args[1] === 'start') {
   if (
     flag('--model') !== 'gpt-6.1-sol' ||
@@ -65,7 +67,13 @@ else if (args[1] === 'start') {
   const path = join(config.directory, 'resource.json');
   const resource = JSON.parse(readFileSync(path, 'utf8'));
   const index = Number(args[3].match(/Stage (\d) of factory/)[1]);
-  resource.runCount = index + 1;
+  resource.runCount = Number(args[3].match(/expected run ordinal (\d+)/)?.[1] ?? index + 1);
+  resource.stageIndex = index;
+  resource.stage = args[3].includes('$babysit-pr')
+    ? 'babysitting'
+    : args[3].includes('$review-loop')
+      ? 'review'
+      : 'publication';
   resource.latestRunId = `run-${index + 1}`;
   if (index === 2) {
     const pr = {
@@ -95,35 +103,59 @@ else if (args[1] === 'start') {
   const resource = existsSync(join(config.directory, 'resource.json'))
     ? JSON.parse(readFileSync(join(config.directory, 'resource.json'), 'utf8'))
     : null;
+  if (resource && args[1] === 'show') Object.assign(resource, config.overrides);
   if (config.malformed) console.log('{broken');
   else if (args[1] === 'list')
     reply(resource ? (config.duplicate ? [resource, resource] : [resource]) : []);
   else if (args[1] === 'show')
     reply({
       thread: resource ? { ...resource, ...config.overrides } : null,
-      messages: (config.holdPublication && resource?.runCount === 3 ? [] : config.messages) ??
-        (config.complete && resource
+      messages:
+        config.waitingForGithub && resource?.stage === 'babysitting'
           ? [
               {
                 role: 'assistant',
                 runId: resource.latestRunId,
                 text: JSON.stringify({
+                  ...(resource.stage === 'babysitting'
+                    ? { delivery: `${resource.title.slice(8)}:${resource.stageIndex}` }
+                    : {}),
                   jobId: resource.title.slice(8),
-                  stage: ['implementation', 'review', 'publication'][resource.runCount - 1],
+                  stage: 'babysitting',
                   base: config.base,
-                  commit: config.base,
-                  outcome: [
-                    '<TASK>COMPLETE</TASK>',
-                    '<REVIEW>COMPLETE</REVIEW>',
-                    '<PR>CREATED</PR>',
-                  ][resource.runCount - 1],
-                  tests: true,
-                  coverage: true,
-                  crap: true,
-                  reviews: resource.runCount > 1,
+                  outcome: 'WAITING_FOR_GITHUB',
                 }),
               },
             ]
-          : null) ?? [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }],
+          : ((config.holdPublication && resource?.runCount === 3 ? [] : config.messages) ??
+            (config.complete && resource
+              ? [
+                  {
+                    role: 'assistant',
+                    runId: resource.latestRunId,
+                    text: JSON.stringify({
+                      ...(resource.stage === 'babysitting'
+                        ? { delivery: `${resource.title.slice(8)}:${resource.stageIndex}` }
+                        : {}),
+                      jobId: resource.title.slice(8),
+                      stage:
+                        resource.stage ??
+                        ['implementation', 'review', 'publication'][resource.runCount - 1],
+                      base: config.base,
+                      commit: config.base,
+                      outcome: {
+                        implementation: '<TASK>COMPLETE</TASK>',
+                        review: '<REVIEW>COMPLETE</REVIEW>',
+                        publication: '<PR>CREATED</PR>',
+                        babysitting: '<PR>READY</PR>',
+                      }[resource.stage ?? 'implementation'],
+                      tests: true,
+                      coverage: true,
+                      crap: true,
+                      reviews: resource.runCount > 1,
+                    }),
+                  },
+                ]
+              : null) ?? [{ text: '<TASK>COMPLETE</TASK>', role: 'user' }]),
     });
 }

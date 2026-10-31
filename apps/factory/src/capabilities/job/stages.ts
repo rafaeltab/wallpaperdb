@@ -1,7 +1,9 @@
 import { Effect } from 'effect';
+import { watchdog } from './watchdog.js';
 import {
   Unavailable,
   type Delivery,
+  type Time,
   type Execution,
   type Intent,
   type Issues,
@@ -17,7 +19,8 @@ export function reconcileStages(
   execution: Execution,
   issues: Issues,
   intent: Intent,
-  observation: Observation
+  observation: Observation,
+  time: Time
 ) {
   return Effect.gen(function* () {
     if (observation.kind !== 'found') return undefined;
@@ -30,18 +33,7 @@ export function reconcileStages(
     });
     const waiting = yield* currentStage(store);
     if (!waiting || waiting.threadId !== observation.threadId) return undefined;
-    if (waiting.index === 3) return yield* readiness(execution, issues, intent, waiting);
-    yield* deliver(store, execution, intent, waiting);
-    const evidence = yield* execution.inspectStage(intent, waiting);
-    const delivery: Delivery = {
-      stage: waiting.stage,
-      commit: waiting.commit,
-      ready: false,
-      landed: false,
-    };
-    const verified = yield* acceptStage(store, evidence, waiting);
-    if (!verified) return delivery;
-    return yield* advance(store, execution, issues, intent, waiting, verified);
+    return yield* reconcileStage(store, execution, issues, intent, waiting, observation, time);
   }).pipe(Effect.withSpan('factory.job.stages'));
 }
 function accepted(
@@ -49,8 +41,6 @@ function accepted(
   request: StageRequest
 ): evidence is StageEvidence {
   if (!evidence?.accepted) return false;
-  if (evidence.ordinal !== request.index + 1 || evidence.runId === request.previousRunId)
-    return false;
   return request.stage !== 'publication' || evidence.commit === request.commit;
 }
 function deliver(store: JobStore, execution: Execution, intent: Intent, request: StageRequest) {
@@ -70,7 +60,13 @@ function advance(
   return Effect.gen(function* () {
     const proposed: StageRequest = {
       index: waiting.index + 1,
-      stage: waiting.index === 0 ? 'review' : 'publication',
+      stage:
+        waiting.stage === 'publication'
+          ? 'ci'
+          : waiting.stage === 'review'
+            ? 'publication'
+            : 'review',
+      ordinal: evidence.ordinal + (waiting.stage === 'publication' ? 0 : 1),
       threadId: waiting.threadId,
       commit: evidence.commit,
       previousRunId: evidence.runId,
@@ -81,18 +77,19 @@ function advance(
       return yield* Effect.fail(
         new Unavailable({ operation: 'stage-record-missing', cause: null })
       );
-    if (next.index === 3) return yield* readiness(execution, issues, intent, next);
+    if (next.stage === 'ci') return yield* readiness(store, execution, issues, intent, next);
     yield* deliver(store, execution, intent, next);
     return { stage: next.stage, commit: next.commit, ready: false, landed: false };
   });
 }
 function currentStage(store: JobStore) {
   return Effect.gen(function* () {
-    for (const index of [3, 2, 1, 0]) {
+    let latest: StageRequest | null = null;
+    for (let index = 0; ; index++) {
       const saved = yield* store.readStage(index);
-      if (saved) return saved;
+      if (!saved) return latest;
+      latest = saved;
     }
-    return null;
   });
 }
 function publicationMatches(
@@ -108,25 +105,122 @@ function publicationMatches(
     Boolean(evidence.linked?.includes(pr.url))
   );
 }
-function readiness(execution: Execution, issues: Issues, intent: Intent, accepted: StageRequest) {
+function readiness(
+  store: JobStore,
+  execution: Execution,
+  issues: Issues,
+  intent: Intent,
+  accepted: StageRequest
+) {
   return Effect.gen(function* () {
-    const evidence = yield* execution.inspectStage(intent, { ...accepted, index: 2 });
+    const publication = yield* store.readStage(accepted.index - 1);
+    const evidence = publication ? yield* execution.inspectStage(intent, publication) : null;
     const pr = yield* issues.pullRequest(intent);
     const matches = publicationMatches(evidence, accepted, pr);
+    if (matches && pr.kind === 'found' && pr.ci?.failed) {
+      yield* dispatchRepair(store, execution, intent, accepted, evidence);
+      return {
+        stage: 'babysitting' as const,
+        commit: accepted.commit,
+        ready: false,
+        landed: false,
+        pr,
+      };
+    }
     return {
       stage: 'ci' as const,
       commit: accepted.commit,
       pr,
-      ready: matches && pr.kind === 'found' && pr.ready,
-      landed: matches && pr.kind === 'found' && pr.landed,
+      ready: matches && isReady(pr),
+      landed: false,
     };
   });
 }
 
-function acceptStage(store: JobStore, evidence: StageEvidence | null, request: StageRequest) {
+function associateStage(store: JobStore, evidence: StageEvidence | null, request: StageRequest) {
   return Effect.gen(function* () {
-    if (!evidence || evidence.ordinal !== request.index + 1) return null;
-    if (!(yield* store.bindRun(request, evidence.runId))) return null;
-    return accepted(evidence, request) ? evidence : null;
+    if (!associatedRun(evidence, request)) return null;
+    if (!(yield* store.bindRun(request, evidence.runId, evidence.ordinal))) return null;
+    return evidence;
   });
+}
+
+function dispatchRepair(
+  store: JobStore,
+  execution: Execution,
+  intent: Intent,
+  accepted: StageRequest,
+  evidence: StageEvidence | null
+) {
+  return Effect.gen(function* () {
+    const request: StageRequest = {
+      index: accepted.index + 1,
+      stage: 'babysitting',
+      threadId: accepted.threadId,
+      commit: accepted.commit,
+      previousRunId: accepted.previousRunId,
+      ordinal: (evidence?.ordinal ?? 3) + 1,
+    };
+    yield* store.saveStage(request);
+    const saved = yield* store.readStage(request.index);
+    if (saved) yield* deliver(store, execution, intent, saved);
+  });
+}
+
+function isReady(pr: PullRequestObservation) {
+  return pr.kind === 'found' && pr.ready;
+}
+
+function reconcileStage(
+  store: JobStore,
+  execution: Execution,
+  issues: Issues,
+  intent: Intent,
+  waiting: StageRequest,
+  observation: Extract<Observation, { kind: 'found' }>,
+  time: Time
+) {
+  return Effect.gen(function* () {
+    if (waiting.stage === 'ci' || waiting.index === 3)
+      return yield* readiness(store, execution, issues, intent, waiting);
+    yield* deliver(store, execution, intent, waiting);
+    const observed = yield* execution.inspectStage(intent, waiting);
+    const evidence = yield* associateStage(store, observed, waiting);
+    const delivery: Delivery = {
+      stage: waiting.stage,
+      commit: waiting.commit,
+      ready: false,
+      landed: false,
+    };
+    const verified = evidence && accepted(evidence, waiting) ? evidence : null;
+    if (!verified) {
+      if (waiting.stage === 'babysitting')
+        return yield* watchdog(
+          store,
+          issues,
+          intent,
+          waiting,
+          observation,
+          time,
+          evidence,
+          (request) => deliver(store, execution, intent, request)
+        );
+      return delivery;
+    }
+    return yield* advance(store, execution, issues, intent, waiting, verified);
+  });
+}
+
+function associatedRun(
+  evidence: StageEvidence | null,
+  request: StageRequest
+): evidence is StageEvidence {
+  if (!evidence || evidence.runId === request.previousRunId) return false;
+  const expected = request.ordinal ?? request.index + 1;
+  if (evidence.ordinal === expected) return true;
+  return (
+    request.stage === 'babysitting' &&
+    evidence.ordinal > expected &&
+    evidence.stageIndex === request.index
+  );
 }

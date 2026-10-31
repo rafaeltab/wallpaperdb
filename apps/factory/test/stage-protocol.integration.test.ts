@@ -127,7 +127,11 @@ it('refuses stage delivery and acceptance while the worktree has unreviewed chan
     await expect(Effect.runPromise(adapter.sendStage(intent, review))).rejects.toMatchObject({
       _tag: 'Unavailable',
     });
-    expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(0);
+    expect(
+      (await host.calls()).filter(
+        (call) => call.args[1] === 'send' && !call.args.includes('--help')
+      )
+    ).toHaveLength(0);
   }));
 it('reconciles the fresh stage outcome after a send response is lost', () =>
   stageFixture(async ({ host, adapter, intent, review }) => {
@@ -140,9 +144,121 @@ it('reconciles the fresh stage outcome after a send response is lost', () =>
     await expect(Effect.runPromise(adapter.sendStage(intent, review))).rejects.toMatchObject({
       _tag: 'Unavailable',
     });
-    expect((await host.calls()).filter((call) => call.args[1] === 'send')).toHaveLength(1);
+    expect(
+      (await host.calls()).filter(
+        (call) => call.args[1] === 'send' && !call.args.includes('--help')
+      )
+    ).toHaveLength(1);
     expect(await Effect.runPromise(adapter.inspectStage(intent, review))).toMatchObject({
       accepted: true,
       runId: 'run-2',
     });
+  }));
+
+it.each([false, true])(
+  'preserves continuation delivery identity with advertised idempotency=%s',
+  (supported) =>
+    stageFixture(async ({ host, adapter, intent, request }) => {
+      await host.save({
+        idempotency: supported,
+        lostSend: true,
+        overrides: { status: 'completed' },
+      });
+      const continuation = {
+        ...request,
+        stage: 'babysitting' as const,
+        index: 4,
+        ordinal: 4,
+        continuation: true,
+      };
+      await expect(
+        Effect.runPromise(adapter.sendStage(intent, continuation))
+      ).rejects.toMatchObject({ _tag: 'Unavailable' });
+      const sends = (await host.calls()).filter(
+        (call) => call.args[1] === 'send' && !call.args.includes('--help')
+      );
+      expect(sends).toHaveLength(1);
+      expect(sends[0].args[3]).toContain('continue. Use $babysit-pr');
+      expect(sends[0].args[3]).toContain('delivery 1:4');
+      expect(sends[0].args.includes('--client-request-id')).toBe(supported);
+      if (supported) expect(sends[0].args).toContain('1:stage:4');
+    })
+);
+it('recognizes only the current expected assistant waiting receipt, without accepting it as readiness', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const babysit = { ...request, stage: 'babysitting' as const, index: 4, ordinal: 4 };
+    const overrides = { status: 'completed', runCount: 4, latestRunId: 'repair-4' };
+    const message = {
+      role: 'assistant',
+      runId: 'repair-4',
+      text: JSON.stringify({
+        delivery: `${intent.id}:4`,
+        jobId: intent.id,
+        stage: 'babysitting',
+        base: host.base,
+        outcome: 'WAITING_FOR_GITHUB',
+      }),
+    };
+    await host.save({ overrides, messages: [message] });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).toMatchObject({
+      accepted: false,
+      waitingForGitHub: true,
+      commit: host.base,
+    });
+    for (const invalid of [
+      { ...message, role: 'user' },
+      { ...message, runId: 'old' },
+      { ...message, text: '> ' + message.text },
+      { ...message, text: '<PR>READY</PR>' },
+    ]) {
+      await host.save({ overrides, messages: [invalid] });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).not.toMatchObject({
+        waitingForGitHub: true,
+      });
+    }
+  }));
+it('accepts a latest watcher receipt only with the owning delivery identity and current commit', () =>
+  stageFixture(async ({ host, adapter, intent, request }) => {
+    const babysit = { ...request, stage: 'babysitting' as const, index: 4, ordinal: 4 };
+    const overrides = { status: 'completed', runCount: 5, latestRunId: 'watcher-5' };
+    const waiting = {
+      delivery: `${intent.id}:4`,
+      jobId: intent.id,
+      stage: 'babysitting',
+      base: host.base,
+      outcome: 'WAITING_FOR_GITHUB',
+    };
+    const message = { role: 'assistant', runId: 'watcher-5', text: JSON.stringify(waiting) };
+    await host.save({ overrides, messages: [message] });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).toMatchObject({
+      accepted: false,
+      waitingForGitHub: true,
+      ordinal: 5,
+      stageIndex: 4,
+    });
+    const success = {
+      ...waiting,
+      outcome: '<PR>READY</PR>',
+      commit: host.base,
+      tests: true,
+      coverage: true,
+      crap: true,
+      reviews: true,
+    };
+    await host.save({ overrides, messages: [{ ...message, text: JSON.stringify(success) }] });
+    expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).toMatchObject({
+      accepted: true,
+      ordinal: 5,
+      stageIndex: 4,
+      runId: 'watcher-5',
+    });
+    for (const invalid of [
+      { ...success, delivery: `${intent.id}:3` },
+      { ...success, commit: 'f'.repeat(40) },
+    ]) {
+      await host.save({ overrides, messages: [{ ...message, text: JSON.stringify(invalid) }] });
+      expect(await Effect.runPromise(adapter.inspectStage(intent, babysit))).not.toMatchObject({
+        accepted: true,
+      });
+    }
   }));

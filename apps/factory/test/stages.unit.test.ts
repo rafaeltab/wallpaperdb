@@ -93,9 +93,15 @@ async function stagesFixture() {
   let prCommit = commit;
   let prKind: 'found' | 'absent' | 'ambiguous' = 'found';
   let sends = 0;
+  let failed = false;
+  let now = 100;
+  let progress = 'run-1:failed';
+  let waiting = false;
+  let status = 'completed';
+  let stageIndex: number | undefined;
   const deps = Layer.mergeAll(
     Layer.succeed(JobStore, store),
-    Layer.succeed(Time, { now: () => Effect.succeed(100) }),
+    Layer.succeed(Time, { now: () => Effect.succeed(now) }),
     Layer.succeed(Issues, {
       inspect: () =>
         Effect.succeed({
@@ -112,7 +118,8 @@ async function stagesFixture() {
                 kind: 'found' as const,
                 url: 'https://github.com/rafaeltab/wallpaperdb/pull/999',
                 commit: prCommit,
-                ready: true,
+                ready: !failed,
+                ci: { failed, progress },
                 landed: false,
               }
             : { kind: prKind }
@@ -124,15 +131,24 @@ async function stagesFixture() {
         Effect.succeed({
           kind: 'found' as const,
           threadId: 'thread',
-          status: 'completed',
+          status,
           worktree: '/worker',
           branch: intent.branch,
           model: 'gpt-6.1-sol',
         }),
-      inspectStage: () => Effect.succeed({ runId, ordinal, commit, accepted, linked: links }),
+      inspectStage: () =>
+        Effect.succeed({
+          runId,
+          ordinal,
+          commit,
+          accepted,
+          linked: links,
+          waitingForGitHub: waiting,
+          stageIndex,
+        }),
       sendStage: (_intent, request) =>
         Effect.sync(() => {
-          ordinal = request.index + 1;
+          ordinal = request.ordinal ?? request.index + 1;
           runId = `run-${ordinal}`;
           sends++;
         }),
@@ -160,6 +176,12 @@ async function stagesFixture() {
       links?: string[];
       prCommit?: string;
       prKind?: typeof prKind;
+      failed?: boolean;
+      now?: number;
+      progress?: string;
+      waiting?: boolean;
+      status?: string;
+      stageIndex?: number;
     }) => {
       ordinal = value.ordinal ?? ordinal;
       runId = value.runId ?? runId;
@@ -168,8 +190,15 @@ async function stagesFixture() {
       links = value.links ?? links;
       prCommit = value.prCommit ?? prCommit;
       prKind = value.prKind ?? prKind;
+      failed = value.failed ?? failed;
+      now = value.now ?? now;
+      progress = value.progress ?? progress;
+      waiting = value.waiting ?? waiting;
+      status = value.status ?? status;
+      stageIndex = value.stageIndex ?? stageIndex;
     },
     sends: () => sends,
+    store,
   };
 }
 it.each([{ accepted: false }, { ordinal: 2 }])(
@@ -227,4 +256,187 @@ it('does not replace a durably associated run with another run at the same ordin
   job.change({ runId: 'replacement-run', accepted: true });
   expect(await job.status()).toMatchObject({ delivery: { stage: 'implementation', ready: false } });
   expect(job.sends()).toBe(0);
+});
+
+it('sends a failed current check to the same issue agent and requires review of repaired code', async () => {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ failed: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  expect(job.sends()).toBe(3);
+  job.change({ commit: 'c'.repeat(40), prCommit: 'c'.repeat(40), failed: false });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'publication', ready: false } });
+  expect(await job.status()).toMatchObject({
+    delivery: { stage: 'ci', commit: 'c'.repeat(40), ready: true },
+  });
+});
+
+async function waitingJob() {
+  const job = await stagesFixture();
+  await job.start();
+  await job.status();
+  job.change({ failed: true });
+  await job.status();
+  job.change({ accepted: false, waiting: true });
+  return job;
+}
+it('sends one continuation at an hour of unchanged explicit GitHub waiting, retaining it across fresh runtimes', async () => {
+  const job = await waitingJob();
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', deadline: 3600100 },
+  });
+  job.change({ now: 3600099 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 3600100 });
+  await job.status();
+  expect(job.sends()).toBe(4);
+  job.change({ now: 7200101 });
+  await job.status();
+  await job.status();
+  expect(job.sends()).toBe(4);
+});
+it('restarts the hour on actual CI progress and does not nudge ongoing work or human questions', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3600099, progress: 'run-2:step-3-completed' });
+  await job.status();
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 7200099, status: 'running' });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ status: 'waiting-for-input' });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ status: 'completed', waiting: false });
+  await job.status();
+  expect(job.sends()).toBe(3);
+});
+it('does not nudge from a stale or wrong-ordinal waiting observation', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3600101, ordinal: 3 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+});
+
+it('recovers a persisted continuation decision interrupted before its stage record without a second send', async () => {
+  const job = await waitingJob();
+  await job.status();
+  const saved = await Effect.runPromise(job.store.readWait());
+  const request = await Effect.runPromise(job.store.readStage(4));
+  if (!saved || !request) throw new Error('Expected existing wait and repair stage');
+  const continuation = {
+    ...request,
+    index: 5,
+    ordinal: 5,
+    previousRunId: 'run-4',
+    continuation: true,
+  };
+  await Effect.runPromise(
+    job.store.saveWait({ ...saved, revision: saved.revision + 1, nudged: true, continuation })
+  );
+  await job.status();
+  await job.status();
+  expect(job.sends()).toBe(4);
+  expect(await Effect.runPromise(job.store.readStage(5))).toEqual(continuation);
+});
+it('does not nudge an unbound replacement run at the expected ordinal', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3600101, runId: 'replacement' });
+  await job.status();
+  expect(job.sends()).toBe(3);
+});
+it('allows a full new hour after meaningful CI progress before one continuation', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3500000, progress: 'run-2:job-3-completed' });
+  await job.status();
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 7099999 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 7100001 });
+  await job.status();
+  expect(job.sends()).toBe(4);
+});
+it('keeps babysitting pending when GitHub cannot identify its PR', async () => {
+  const job = await waitingJob();
+  job.change({ prKind: 'ambiguous', now: 3600101 });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  expect(job.sends()).toBe(3);
+});
+it('does not continue waiting against a PR head that differs from the expected agent commit', async () => {
+  const job = await waitingJob();
+  job.change({ prCommit: 'c'.repeat(40) });
+  await job.status();
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(3);
+});
+it('continues an explicitly associated watcher run and uses its ordinal for the next stage', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ ordinal: 5, runId: 'watcher-5', stageIndex: 4 });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', deadline: 3600100 },
+  });
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(4);
+  expect(await Effect.runPromise(job.store.readStage(5))).toMatchObject({
+    ordinal: 6,
+    previousRunId: 'watcher-5',
+  });
+});
+it('accepts successful current watcher completion only for the owning repair stage', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ ordinal: 5, runId: 'watcher-5', stageIndex: 99, accepted: true });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'babysitting', ready: false } });
+  job.change({ stageIndex: 4 });
+  expect(await job.status()).toMatchObject({ delivery: { stage: 'review', ready: false } });
+  expect(await Effect.runPromise(job.store.readStage(5))).toMatchObject({
+    ordinal: 6,
+    previousRunId: 'watcher-5',
+  });
+});
+it('retains the original GitHub deadline across an active watcher turn without sending while active', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3500000, ordinal: 5, runId: 'watcher-5', status: 'running', waiting: false });
+  expect(await job.status()).toMatchObject({ delivery: { activity: 'repairing' } });
+  expect(await Effect.runPromise(job.store.readWait())).toMatchObject({
+    progress: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:run-1:failed',
+    deadline: 3600100,
+  });
+  expect(job.sends()).toBe(3);
+  job.change({ now: 3500100, status: 'completed', waiting: true, stageIndex: 4 });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', deadline: 3600100 },
+  });
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(4);
+});
+it('does not count a human-question interruption as continued GitHub waiting', async () => {
+  const job = await waitingJob();
+  await job.status();
+  job.change({ now: 3500000, status: 'waiting-for-input', waiting: false });
+  await job.status();
+  expect(job.sends()).toBe(3);
+  job.change({ now: 3500100, status: 'completed', waiting: true });
+  expect(await job.status()).toMatchObject({
+    delivery: { activity: 'waiting-for-github', deadline: 7100100 },
+  });
+  job.change({ now: 3600101 });
+  await job.status();
+  expect(job.sends()).toBe(3);
 });

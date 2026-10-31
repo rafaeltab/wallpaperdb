@@ -300,7 +300,7 @@ it('uses protected application credentials, persists publication acknowledgement
       recoveryScope: 'outbox',
       reason: 'exhausted',
     });
-    expect(alerted).toBe(true);
+    await expect.poll(() => alerted).toBe(true);
     expect(
       JSON.parse((await manager.streams.getMessage('ASSET_COMMANDS', { seq: 1 })).string())
     ).toEqual(event);

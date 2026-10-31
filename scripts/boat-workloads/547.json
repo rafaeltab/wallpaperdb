@@ -9,8 +9,7 @@
 	"constraints": [
 		"No product commits in #614; stage product inputs only as disposable worktree edits.",
 		"Copy only listed source paths, never cherry-pick reference commits or infrastructure history.",
-		"Keep all disposable result PRs closed, no new PR, push, issue mutation, or provider operation.",
-		"Live execution requires separate coordinator enrollment and authorization. Preparation does not authorize compute."
+		"Keep all disposable result PRs closed, no new PR, push, issue mutation, or provider operation."
 	],
 	"inputs": {
 		"tests": [
@@ -115,7 +114,9 @@
 		"initialLock": {
 			"path": "pnpm-lock.yaml",
 			"gitBlob": "801b80af115c2e255a9129fc7b0df42f2bbb667f",
-			"sha256": "21d2c8f020733411d01b9e61466af7a110004b60e4d326d908b57a69c12a9e3d"
+			"sha256": "21d2c8f020733411d01b9e61466af7a110004b60e4d326d908b57a69c12a9e3d",
+			"revision": "89b68d5307933704ee70e23e5658829746bd347e",
+			"selection": "Confirmed by git hash-object pnpm-lock.yaml: 801b80af115c2e255a9129fc7b0df42f2bbb667f. This current 89b68d53 lock already contains the scripts esbuild importer entry; older productBase lock 7cadca99 lacks it. Preserve the current lock until generation."
 		},
 		"unchangedProtectedControl": {
 			"path": "apps/asset/test/protected-broker.integration.test.ts",
@@ -139,22 +140,21 @@
 			"Confirm clean infrastructure worktree. Owning apps product paths match productBase; preserve infrastructure-owned scripts manifest and its existing esbuild lock entry. initialLock is the infrastructure baseline lock, not the older productBase lock.",
 			"Stage tests only. Run native reproduction commands against unpatched productBase sources and baseline lock; retain product failures.",
 			"Stage repair inputs. Leave pnpm-lock.yaml at initialLock. Assert it is still byte-identical before the generator.",
-			"Invoke the actual lock generator through public Make, then install through ordinary Make routing. Never copy the final reference lock.",
+			"Run dependencies:lock through public Make with stale initialLock, then the routed forced build to require automatic frozen preparation. Never copy the reference final lock or invoke a remote install script.",
 			"Record local returned lock and remote installed dependency fingerprints; run focused controls, owning checks, and live probes.",
 			"Remove only workload-owned disposable paths/edits, restore baseline product bytes, and verify source/HMR restoration."
 		]
 	},
 	"generator": {
-		"command": "make docker-run ARGS='pnpm install --lockfile-only --ignore-scripts'",
-		"installCommand": "make install",
-		"existingHeadFailure": "89b68d53 routes docker-run through preparation, whose frozen install runs before the requested generator and rejects the deliberately stale patch lock. Root owns the generator routing/artifact-return repair. Do not bypass by installing a precomputed lock.",
-		"gate": "Root must verify this public command is supported after its fix, or replace this command with the new public Make generator entry point before a trial. No successful replay is claimed at preparation time.",
+		"command": "make run PACKAGE=scripts SCRIPT=dependencies:lock",
+		"installCommand": "make build PACKAGE=vitest-config FORCE=1",
 		"expected": [
 			"Exit zero and return the newly generated lock to local source authority without coordinator file transfer.",
 			"Lock differs from initialLock and contains nats 2.29.3 patch hash 6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe in patchedDependencies and relevant consumer resolutions.",
 			"Preserve existing infrastructure esbuild importer entry and all unrelated dependency and peer bindings. Final reference lock is diagnostic, never an input.",
-			"Frozen installation succeeds; loaded processes resolve corrected patch rather than stale e42e0267 or measured 608d9dd0 patch."
-		]
+			"Routed forced build automatically performs frozen preparation and exits zero. Assert remote installed NATS patch resolutions and loadedRuntime protocol/transport hashes after preparation. make install is intentionally local and is not this preparation command."
+		],
+		"scriptCommit": "21a7f8c42bb5b737348c316bdd8a38995be2403c"
 	},
 	"validation": {
 		"nativeCommands": [
@@ -188,35 +188,55 @@
 		"proof": "Log real resolved NATS path, source patch SHA256, root and installed lock hashes, and loaded protocol/transport hashes inside the process exercising NATS. Root and installed lock YAML need not be byte-identical. Compare their patched resolutions. Do not infer loaded SDK identity from source lock alone."
 	},
 	"live": {
-		"sourceAvailability": "Historical untracked probe sources are pinned below and retained outside Git on this host. Fresh clones require this archive; absence is a preparation failure. They are disposable workload inputs, not infrastructure product code.",
+		"sourceAvailability": "Historical untracked originals and exact staged corrections are retained in the pinned external archive on this host. Historical paths below recover provenance; fresh clones need this archive. Retain this one archive and correction patch without parallel shadow implementations.",
 		"fixtures": [
 			{
 				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/user.ts",
 				"destination": "apps/user/src/boat-live-547.ts",
-				"sha256": "2f273a02bed8f913cf278f1ff62cb4387046d3ce58e31d62bf3bf721e7a18e36"
+				"sha256": "2f273a02bed8f913cf278f1ff62cb4387046d3ce58e31d62bf3bf721e7a18e36",
+				"historicalSource": "/tmp/547-live-probes/user.ts",
+				"provenance": "PR #623 original measured application probes at 924ff953",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/user.ts",
+				"stagedSha256": "0b3163257ffa0f393227470c98cf157d2dc0d394c2c9f6fe9b49651172b0f877"
 			},
 			{
 				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/wallpaper.ts",
 				"destination": "apps/wallpaper/src/boat-live-547.ts",
-				"sha256": "eb25eb27619d721c22ce1be60a8a4e04111050a17db4fe1376f8d1794446b52a"
+				"sha256": "eb25eb27619d721c22ce1be60a8a4e04111050a17db4fe1376f8d1794446b52a",
+				"historicalSource": "/tmp/547-live-probes/wallpaper.ts",
+				"provenance": "PR #623 original measured application probes at 924ff953",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/wallpaper.ts",
+				"stagedSha256": "0329aa9616c5b2f0cc690661a5ceb8609939f02317362bc871c90f2f594d2d45"
 			},
 			{
 				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/asset.ts",
 				"destination": "apps/asset/src/boat-live-547.ts",
-				"sha256": "ebb9d55feb87fa7e1152b1c3e8ea62f2d2b40954030b35df89d20d730c28c454"
+				"sha256": "ebb9d55feb87fa7e1152b1c3e8ea62f2d2b40954030b35df89d20d730c28c454",
+				"historicalSource": "/tmp/547-live-probes/asset.ts",
+				"provenance": "PR #623 original measured application probes at 924ff953",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/asset.ts",
+				"stagedSha256": "aa6eb023541d9aa06acf3855c9461c6df55cbaae5806360f8d77ec8c55348906"
 			},
 			{
 				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/remediation-live.mjs",
 				"destination": "apps/asset/test/fixtures/remediation-live.mjs",
-				"sha256": "9ac9113325ea854434df5f5bd7a2623e042d78efc0772c00be27e3904c147f6e"
+				"sha256": "9ac9113325ea854434df5f5bd7a2623e042d78efc0772c00be27e3904c147f6e",
+				"historicalSource": "/tmp/547-remediation-live-source/remediation-live.mjs",
+				"provenance": "PR #623 corrective SDK live verification at a4ced824",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/remediation-live.mjs",
+				"stagedSha256": "9ac9113325ea854434df5f5bd7a2623e042d78efc0772c00be27e3904c147f6e"
 			},
 			{
 				"source": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/remediation-sdk-proof.ts",
 				"destination": "apps/asset/test/fixtures/remediation-sdk-proof.ts",
-				"sha256": "d7e434e4ee1fe447bbc42c83666f880627f13f6415c35acb9e0b467a90d9df70"
+				"sha256": "d7e434e4ee1fe447bbc42c83666f880627f13f6415c35acb9e0b467a90d9df70",
+				"historicalSource": "/tmp/547-remediation-live-source/remediation-sdk-proof.ts",
+				"provenance": "PR #623 corrective SDK live verification at a4ced824",
+				"stagedSource": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/corrected-v1/remediation-sdk-proof.ts",
+				"stagedSha256": "d7e434e4ee1fe447bbc42c83666f880627f13f6415c35acb9e0b467a90d9df70"
 			}
 		],
-		"stage": "Copy hash-verified fixtures to destinations locally. Ordinary Make source projection carries them to the worker; no SSH/scp/manual coordinator transfer. For container probes prepend an import of ./boat-sdk-proof-547.js and copy the pinned remediation-sdk-proof.ts next to each as boat-sdk-proof-547.ts, so each actual production-layer process prints loaded SDK fingerprints. Retain original and staged hashes separately.",
+		"stage": "Copy hash-verified stagedSource bytes to each destination locally. Copy unchanged remediation-sdk-proof.ts next to each container probe as boat-sdk-proof-547.ts. Corrected probes already import it. Ordinary Make projection carries staged sources to the worker without manual remote transfer.",
 		"startupCommands": [
 			"make infra-start",
 			"make dev"
@@ -226,7 +246,7 @@
 		"authorizationCommand": "make docker-run ARGS='pnpm --filter @wallpaperdb/asset exec tsx test/fixtures/remediation-live.mjs'",
 		"expected": [
 			"Production acquisition paths use real PostgreSQL, NATS account configuration and dependencies; silent peer sees native close for timeout, cancellation and disposal for all seven acquisition paths.",
-			"Require every cancellationInterrupted log to be true. Historical scripts throw for either interruption outcome and catch acquisition failures, so zero exit alone is insufficient.",
+			"Every cancellation acquisition must have an Effect Failure with Cause.hasInterrupts true. Corrected callback rejects other exits and returns true only for interruption. Enclosing exercise requires successful true cancellation outcome; generic rejected acquisitions cannot satisfy it. Require cancellationInterrupted true logs too.",
 			"Every silent-peer scenario ends with zero accepted sockets remaining before fixture cleanup.",
 			"Each healthy control opens real broker connection IDs, uses the connection, then leaves zero added connections.",
 			"Corrective SDK probe observes AUTHORIZATION_VIOLATION with no signal and two address candidates; valid credential remains usable and closes; explicit abort observes CANCELLED, exactly one accepted connection and zero sockets before cleanup.",
@@ -241,7 +261,19 @@
 			"make apps-stop",
 			"make infra-stop"
 		],
-		"cleanup": "Verify only owned containers/peers/clients are gone, local product bytes restored, foreground watcher stopped, developmentWanted=false and coordinator stopped-worker receipt. Worker provider operations remain coordinator-owned."
+		"cleanup": "Verify only owned containers/peers/clients are gone, local product bytes restored, foreground watcher stopped, developmentWanted=false and coordinator stopped-worker receipt. Worker provider operations remain coordinator-owned.",
+		"correction": {
+			"patch": "/home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/547-live-fixtures.patch",
+			"sha256": "c251d3dcdd10faad07a3bd619706da2b36be3ba563fd46e1f0540d196fac46d5",
+			"format": "Unified diff from original archived basenames to corrected-v1. Adds fingerprint imports and explicit interrupted-outcome assertions. These are probe corrections, not product fixes.",
+			"portRegex": "Original remediation-live.mjs contains one literal backslash before d, byte sequence 92,100. It is already the numeric digit regex; JSON/cat capture escaping is not source drift. Preserve its bytes and verify using synthetic nonsecret input.",
+			"recovery": "Apply exact patch to a scratch copy of original archived basenames or use corrected-v1. Verify stagedSha256 before copying to destination. Use unchanged remediation-sdk-proof.ts for each apps/<workspace>/src/boat-sdk-proof-547.ts.",
+			"verification": {
+				"command": "mise exec -- node /home/rafaeltab/.local/state/wallpaperdb-boat/557/workloads/547-live-source/verify-fixture-corrections.mjs",
+				"sha256": "5c3c8a174ad9db5e059578847a89377bb35781a3532a0acafc0277bb7e049c57",
+				"observed": "Passed without dependencies, applications or compute. Original port regex accepts synthetic 9703 and rejects malformed input; double-backslash mutation rejects digits. All seven corrected interruption callbacks reject ordinary failure and success exits; all three enclosing outcome checks reject false success and swallowed rejection."
+			}
+		}
 	},
 	"promotion": "Two consecutive clean observed runs of this subset, cold/warm conditions recorded, no unplanned infrastructure intervention or unrelated steady-state churn. Product outcomes and infrastructure failures remain separate. No live trial has run for this preparation."
 }

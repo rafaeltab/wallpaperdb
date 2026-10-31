@@ -5550,6 +5550,7 @@ test("shutdown wall clock incomplete live lock publication waits without bypassi
 
 test("shutdown wall clock captured tunnel session escape remains unresolved before safety cleanup", async (t) => {
 	const f = await shutdownCheckout(t);
+	const sibling = fixtureProcess(f.json(".boat/state.json").daemon.pid);
 	f.local(
 		"scripts/shutdown-tunnel.py",
 		`import os,sys,time,signal,json
@@ -5562,7 +5563,8 @@ if os.fork()==0:
   (control/'shutdown-entered-tunnel-escape').write_text(json.dumps({'pid':os.getpid(),'startTicks':fields[19],'group':int(fields[2]),'session':int(fields[3])}))
  signal.signal(signal.SIGTERM,escaped)
  (control/'shutdown-tunnel-child').write_text(str(os.getpid()))
- while True: time.sleep(0.01)
+ while not (control/'shutdown-tunnel-retire').exists(): time.sleep(0.01)
+ os._exit(0)
 while not (control/'shutdown-tunnel-child').exists(): time.sleep(0.01)
 print('ready',flush=True)
 while True: time.sleep(0.01)
@@ -5600,8 +5602,31 @@ while True: time.sleep(0.01)
 				r.unresolved.some((p) => p.pid === child.pid),
 		),
 	);
-	assert.equal(shutdownLedger(f).runningSince, null);
-	// The controller reports the captured escape; independent test safety owns
+ const second = await shutdownResult(t,f,f.run("boat-stop"));
+ assert.notEqual(second.status,0,"second Make must retain the captured live escape: "+second.output);
+ assert.match(second.output,/tunnel .*record retained/);
+ assert.equal(fixtureProcess(child.pid)?.startTicks,child.startTicks,"assert before independent safety");
+ const retained = f.json(".boat/cache-tunnel.json");
+ assert.ok(retained.shutdownOwnership.captured.some(p=>p.pid===child.pid&&p.birth===child.startTicks));
+ assert.ok(retained.shutdownOwnership.unresolved.some(p=>p.pid===child.pid&&p.birth===child.startTicks));
+ assert.deepEqual(fixtureProcess(sibling.pid),sibling);
+ // Release the controlled process normally as the neighboring retirement case.
+ flag(f,"shutdown-tunnel-retire");
+ await observed(()=>fixtureProcess(child.pid)?.startTicks!==child.startTicks,"controlled tunnel self-retirement");
+ const third = await shutdownResult(t,f,f.run("boat-stop"));
+ assert.equal(third.status,0,third.output);
+ assert.equal(fs.existsSync(path.join(f.root,".boat/cache-tunnel.json")),false);
+ // Model PID reuse with an existing sibling and a deliberately stale birth.
+ // A birth mismatch is never signalling authority, even if PID still exists.
+ retained.shutdownOwnership.captured.push({...retained.shutdownOwnership.captured[0],pid:sibling.pid,birth:String(BigInt(sibling.startTicks)-1n)});
+ f.local(".boat/cache-tunnel.json",JSON.stringify(retained));
+ const reused = await shutdownResult(t,f,f.run("boat-stop"));
+ assert.equal(reused.status,0,reused.output);
+ assert.equal(fs.existsSync(path.join(f.root,".boat/cache-tunnel.json")),false);
+ assert.deepEqual(fixtureProcess(sibling.pid),sibling);
+ assert.equal(shutdownCalls(f).filter(a=>a.includes("stop")).length,1);
+ assert.equal(shutdownLedger(f).runningSince, null);
+ // The controller reports the captured escape; independent test safety owns
 	// its termination. This deliberately is not a successful cleanup assertion.
 });
 

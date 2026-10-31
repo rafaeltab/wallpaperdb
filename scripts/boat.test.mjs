@@ -15,7 +15,9 @@ import {
 import http from "node:http";
 import { once } from "node:events";
 
-test("preview forwards downstream cancellation after the request body completes", async (t) => {
+test("preview forwards downstream cancellation after the request body completes", {
+	timeout: 3000,
+}, async (t) => {
 	let disconnected;
 	const closed = new Promise((resolve) => {
 		disconnected = resolve;
@@ -23,6 +25,10 @@ test("preview forwards downstream cancellation after the request body completes"
 	const upstream = http.createServer((req, res) => {
 		req.resume();
 		res.on("close", disconnected);
+	});
+	t.after(() => {
+		upstream.closeAllConnections();
+		upstream.close();
 	});
 	upstream.listen(0, "127.0.0.1");
 	await once(upstream, "listening");
@@ -35,20 +41,19 @@ test("preview forwards downstream cancellation after the request body completes"
 		forwardPreviewDisconnect(req, res, request);
 		req.pipe(request);
 	});
-	proxy.listen(0, "127.0.0.1");
-	await once(proxy, "listening");
 	t.after(() => {
 		proxy.closeAllConnections();
 		proxy.close();
-		upstream.closeAllConnections();
-		upstream.close();
 	});
+	proxy.listen(0, "127.0.0.1");
+	await once(proxy, "listening");
 	const arrived = once(upstream, "request");
 	const client = http.get({
 		hostname: "127.0.0.1",
 		port: proxy.address().port,
 	});
 	client.on("error", () => {});
+	t.after(() => client.destroy());
 	await arrived;
 	client.destroy();
 	await Promise.race([
@@ -66,8 +71,14 @@ test("preview forwards downstream cancellation after the request body completes"
 	]);
 });
 
-test("preview retains a normally completed response", async (t) => {
+test("preview retains a normally completed response", {
+	timeout: 3000,
+}, async (t) => {
 	const upstream = http.createServer((req, res) => res.end("healthy control"));
+	t.after(() => {
+		upstream.closeAllConnections();
+		upstream.close();
+	});
 	upstream.listen(0, "127.0.0.1");
 	await once(upstream, "listening");
 	const proxy = http.createServer((req, res) => {
@@ -78,12 +89,12 @@ test("preview retains a normally completed response", async (t) => {
 		forwardPreviewDisconnect(req, res, request);
 		req.pipe(request);
 	});
+	t.after(() => {
+		proxy.closeAllConnections();
+		proxy.close();
+	});
 	proxy.listen(0, "127.0.0.1");
 	await once(proxy, "listening");
-	t.after(() => {
-		proxy.close();
-		upstream.close();
-	});
 	const body = await new Promise((resolve, reject) => {
 		http
 			.get(

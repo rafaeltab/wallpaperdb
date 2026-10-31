@@ -11,9 +11,29 @@ import {
 	worktreeProcesses,
 	liveOwnedProcess,
 	forwardPreviewDisconnect,
+	developmentWantedAfterCommand,
 } from "./lib/boat.mjs";
 import http from "node:http";
 import { once } from "node:events";
+
+test("successful full app cleanup clears restoration intent while partial and failed cleanup preserve it", () => {
+	assert.equal(developmentWantedAfterCommand(true, ["apps-stop"], 0), false);
+	assert.equal(developmentWantedAfterCommand(true, ["stop"], 0), false);
+	assert.equal(
+		developmentWantedAfterCommand(true, ["apps-stop", "SERVICE="], 0),
+		false,
+	);
+	assert.equal(
+		developmentWantedAfterCommand(true, ["apps-stop", "SERVICE=web"], 0),
+		true,
+	);
+	assert.equal(developmentWantedAfterCommand(true, ["apps-stop"], 2), true);
+	assert.equal(
+		developmentWantedAfterCommand(true, ["check", "PACKAGE=web"], 0),
+		true,
+	);
+	assert.equal(developmentWantedAfterCommand(false, ["check"], 0), false);
+});
 
 test("preview forwards downstream cancellation after the request body completes", {
 	timeout: 3000,

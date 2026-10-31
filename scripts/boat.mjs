@@ -557,7 +557,10 @@ async function command() {
 			s.developmentWanted = true;
 			save(s);
 		}
-		if (!developmentWantedAfterCommand(true, targets, 0))
+		if (
+			targets[0] === "stop" ||
+			!developmentWantedAfterCommand(true, targets, 0)
+		)
 			await retireWatchers(id);
 		const result = await boat(
 			[

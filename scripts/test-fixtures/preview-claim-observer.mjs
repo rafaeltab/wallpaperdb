@@ -2,7 +2,17 @@
 // can publish atomic foreign input at that boundary without pausing production.
 import fs from "node:fs";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+
+const write = fs.writeFileSync.bind(fs);
+const rename = fs.renameSync.bind(fs);
+
+export function publishPreviewClaimObservation(file, receipt) {
+	const temporary = `${file}.${process.pid}.${randomUUID()}`;
+	write(temporary, JSON.stringify(receipt), { mode: 0o600, flag: "wx" });
+	// Captured native functions avoid recursively entering the observer hooks.
+	rename(temporary, file);
+}
 
 const root = process.env.FAKE_SOURCE;
 const control = process.env.FAKE_CONTROL;
@@ -15,8 +25,6 @@ if (
 ) {
 	const planFile = path.join(control, "immutable-claim-plan.json");
 	const read = fs.readFileSync.bind(fs);
-	const write = fs.writeFileSync.bind(fs);
-	const rename = fs.renameSync.bind(fs);
 	const plan = JSON.parse(read(planFile, "utf8"));
 	const claimFile = path.join(root, ".boat/preview-acquisition.json");
 	const snapshot = () => {
@@ -32,10 +40,9 @@ if (
 	const counts = { claimCreates: 0, claimWrites: 0, claimRenames: 0 };
 	const report = () => {
 		if (observation)
-			write(
+			publishPreviewClaimObservation(
 				path.join(control, "immutable-claim-observation.json"),
-				JSON.stringify({ ...observation, counts }),
-				{ mode: 0o600 },
+				{ ...observation, counts },
 			);
 	};
 	fs.writeFileSync = (name, bytes, ...args) => {

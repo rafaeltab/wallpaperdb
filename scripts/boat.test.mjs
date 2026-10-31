@@ -10211,6 +10211,71 @@ for (const ignoringTerm of [true, false])
 		});
 	});
 
+test("preview claim observer publishes complete receipts while writes are partial", async (t) => {
+	const archive = pendingPreviewEvidence(t);
+	await archive.scenario(async () => {
+		fs.mkdirSync(archive.directory, { recursive: true });
+		const directory = fs.mkdtempSync(
+			path.join(os.tmpdir(), "boat-claim-reader-"),
+		);
+		t.after(() =>
+			archive.cleanup(() => fs.rmSync(directory, { recursive: true })),
+		);
+		const file = path.join(directory, "immutable-claim-observation.json");
+		const nativeWrite = fs.writeFileSync;
+		const observations = [];
+		const observe = () => {
+			try {
+				observations.push({ value: JSON.parse(fs.readFileSync(file, "utf8")) });
+			} catch (error) {
+				observations.push({ error: error.code ?? error.name });
+			}
+		};
+		let publish;
+		try {
+			// Split the actual publisher's write deterministically. A concurrent
+			// pathname reader must see absence or the prior complete receipt.
+			fs.writeFileSync = (name, bytes, options) => {
+				nativeWrite(name, "", options);
+				observe();
+				const half = Math.floor(bytes.length / 2);
+				fs.appendFileSync(name, bytes.slice(0, half));
+				observe();
+				fs.appendFileSync(name, bytes.slice(half));
+			};
+			({ publishPreviewClaimObservation: publish } = await import(
+				"./test-fixtures/preview-claim-observer.mjs?partial-publication"
+			));
+		} finally {
+			fs.writeFileSync = nativeWrite;
+		}
+		const first = { point: "progress", counts: { claimCreates: 1 } };
+		const final = {
+			point: "exit",
+			counts: { claimCreates: 1, claimWrites: 0 },
+		};
+		publish(file, first);
+		assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), first);
+		publish(file, final);
+		assert.deepEqual(JSON.parse(fs.readFileSync(file, "utf8")), final);
+		fs.writeFileSync(
+			path.join(archive.directory, "claim-publication-reader.json"),
+			JSON.stringify({ first, final, observations }),
+		);
+		assert.deepEqual(
+			observations,
+			[
+				{ error: "ENOENT" },
+				{ error: "ENOENT" },
+				{ value: first },
+				{ value: first },
+			],
+			"pathname readers must never observe an empty or partial observer receipt",
+		);
+		assert.deepEqual(fs.readdirSync(directory), [path.basename(file)]);
+	});
+});
+
 function immutableClaimFixture(f, plan) {
 	const name = "scripts/test-fixtures/preview-claim-observer.mjs";
 	const bytes = fs.readFileSync(

@@ -275,5 +275,24 @@
 			}
 		}
 	},
-	"promotion": "Two consecutive clean observed runs of this subset, cold/warm conditions recorded, no unplanned infrastructure intervention or unrelated steady-state churn. Product outcomes and infrastructure failures remain separate. No live trial has run for this preparation."
+	"resolutionDiagnostic": {
+		"purpose": "Discriminate native pinned pnpm full resolution from a Boat or NATS-specific mutation. These controls do not normalize or promote a new baseline.",
+		"command": "make run PACKAGE=scripts SCRIPT=dependencies:lock",
+		"baselineLockBlob": "801b80af115c2e255a9129fc7b0df42f2bbb667f",
+		"baselineWorkspaceBlob": "1fdec36161cf21da362515a7af7bf8d02443c9aa",
+		"forcedScript": "cd .. && mise exec -- pnpm install --lockfile-only --no-frozen-lockfile --ignore-scripts --resolution-only",
+		"cases": [
+			"B0: restore the exact unpatched baseline lock and workspace, remove the disposable NATS patch, and run the unmodified registered generator. Retain the full returned output.",
+			"B1: restore the same baseline inputs. Change only the disposable scripts manifest's dependencies:lock script to forcedScript. Invoke the same public command and retain raw and semantic diffs.",
+			"B1R: repeat forced resolution with B1's unedited returned lock and otherwise identical inputs. Compare every peer edge and all metadata; do not retry until a favorable output appears.",
+			"P1: only after stable B1/B1R, retain that output as a diagnostic seed, restore the original generator script, add the exact NATS patch and workspace declaration, then invoke the same public command. Compare against the seed without editing either result."
+		],
+		"assertions": [
+			"No dependency, version pin, resolution policy or metadata-trimming change is authorized by a diagnostic control.",
+			"The explicit --resolution-only mutation is test input in a disposable checkout; it is not a production generator default or an extra controller ARGS override.",
+			"Retain the original and generated lockfiles separately, command statuses, full timings, script and source hashes, and all failures.",
+			"If native resolution changes unrelated peers, exact preservation remains unmet. Acceptance of that explicit graph delta requires a scope decision; structural validity or an unchanged fast-path repeat does not establish equivalence."
+		]
+	},
+	"promotion": "Two consecutive clean observed runs of this subset, cold/warm conditions recorded, no unplanned infrastructure intervention or unrelated steady-state churn. Product outcomes and infrastructure failures remain separate. Diagnostic resolver controls cannot promote a baseline or waive preservation."
 }

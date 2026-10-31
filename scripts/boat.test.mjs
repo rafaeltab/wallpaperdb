@@ -1085,6 +1085,17 @@ if(argv.includes('--lockfile-only')){
 const fs=require('fs'),cp=require('child_process'),path=require('path');
 const argv=process.argv.slice(2),control=process.env.FAKE_CONTROL;
 fs.appendFileSync(path.join(control,'transport'),JSON.stringify(argv)+'\\n');
+function shutdownHold(phase){
+ if(!fs.existsSync(path.join(control,'shutdown-hang-'+phase)))return;
+ const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
+ fs.writeFileSync(path.join(control,'shutdown-entered-'+phase),JSON.stringify({pid:process.pid,startTicks:fields[19],group:Number(fields[2]),session:Number(fields[3]),state:JSON.parse(fs.readFileSync('.boat/state.json'))}));
+ process.on('SIGTERM',()=>{});
+ while(!fs.existsSync(path.join(control,'shutdown-release-'+phase)))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+}
+if(argv.includes('info'))shutdownHold(fs.existsSync(path.join(control,'stopping'))?'observation':'initial');
+if(argv.includes('ssh')&&argv.at(-1).includes('sudo -n'))shutdownHold('retirement');
+if(argv.includes('usage'))shutdownHold('usage');
+
 if(argv.includes('info')&&!argv.includes('fake-new-worker')){
  if(fs.existsSync(path.join(control,'info-error'))){console.log(JSON.stringify({code:fs.readFileSync(path.join(control,'info-error'),'utf8')}));process.exit(41);}
  if(fs.existsSync(path.join(control,'stopping'))){
@@ -1097,7 +1108,7 @@ if(argv.includes('info')&&!argv.includes('fake-new-worker')){
  }
  console.log(fs.existsSync(path.join(control,'provider-info'))?fs.readFileSync(path.join(control,'provider-info'),'utf8'):JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);
 }
-if(argv.includes('stop')){fs.writeFileSync(path.join(control,'stopping'),'yes');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
+if(argv.includes('stop')){fs.writeFileSync(path.join(control,'stopping'),'yes');shutdownHold('submission');if(fs.existsSync(path.join(control,'fail-stop')))process.exit(32);console.log(JSON.stringify({stop:{id:'stop-current',status:'pending'}}));process.exit(0);}
 if(argv.includes('info')&&argv.includes('fake-new-worker')){console.log(JSON.stringify({sandbox:{id:'fake-new-worker',state:'ready'}}));process.exit(0);}
 if(argv.includes('list')){console.log(fs.existsSync(path.join(control,'worker-list'))?fs.readFileSync(path.join(control,'worker-list'),'utf8'):JSON.stringify({sandboxes:[]}));process.exit(0);}
 if(argv.includes('limits')){if(fs.existsSync(path.join(control,'fail-limits'))){console.log(JSON.stringify({code:'limits_failed'}));process.exit(43);}console.log(JSON.stringify({canStart:true,nextStartDollars:0}));process.exit(0);}
@@ -4960,6 +4971,61 @@ test("awake startup invalidates a stale receipt before any remote effects and ke
 	assert.equal(f.json(".boat/state.json").reconciliationPending, true);
 });
 
+// Safety cleanup is independent of the controller verdict and never makes a green.
+async function shutdownCheckout(t, development = false) {
+ let f;
+ const identities = [];
+ t.after(async () => {
+  if (!f) return;
+  for (const name of fs.readdirSync(f.control).filter(n => n.startsWith("shutdown-entered-"))) {
+   const record = JSON.parse(fs.readFileSync(path.join(f.control, name)));
+   identities.push(record);
+   const current = fixtureProcess(record.pid);
+   if (current?.startTicks === record.startTicks) process.kill(record.pid, "SIGKILL");
+  }
+  await observed(() => identities.every(p => fixtureProcess(p.pid)?.startTicks !== p.startTicks), "independent shutdown safety disposal");
+ });
+ f = development ? await developmentCheckout(t) : await lockGenerationCheckout(t);
+ f.local(".boat/enrollment.json", JSON.stringify({...f.json(".boat/enrollment.json"), shutdownBudgetMs: 18000}));
+ // A fixture keeper stands in for shared cache/daemon resources, not a tunnel.
+ f.local(".boat/cache-tunnel.json", "{}");
+ fs.rmSync(path.join(f.control, "transport"), {force: true});
+ return f;
+}
+async function shutdownResult(t, f, pending) {
+ const start = fixtureNow();
+ let timer;
+ try {
+  return await Promise.race([pending.done, new Promise((_, reject) => {
+   timer = setTimeout(() => reject(new Error("independent shutdown wall clock watchdog expired")), 25000);
+  })]);
+ } finally {
+  clearTimeout(timer);
+  const processes = fs.readdirSync(f.control).filter(n => n.startsWith("shutdown-entered-")).map(n => {
+   const record = JSON.parse(fs.readFileSync(path.join(f.control,n)));
+   return {phase:n, ...record, surviving:fixtureProcess(record.pid)};
+  });
+  t.diagnostic(JSON.stringify({elapsedMs:fixtureNow()-start, directory:f.directory, processes, closed:pending.closed}));
+ }
+}
+function shutdownDisposed(f, phase) {
+ const record = JSON.parse(fs.readFileSync(path.join(f.control, "shutdown-entered-"+phase)));
+ assert.notEqual(fixtureProcess(record.pid)?.startTicks, record.startTicks, "controller must dispose owned process before test safety cleanup");
+ assert.equal(record.state.snapshotRecovery.status, "DIRTY");
+}
+
+test("shutdown wall clock initial info hang preserves single stop admission", async (t) => {
+ const f = await shutdownCheckout(t);
+ flag(f,"shutdown-hang-initial");
+ const result = await shutdownResult(t,f,f.run("boat-stop"));
+ assert.notEqual(result.status,0,result.output);
+ assert.match(result.output,/initial.*deadline/i);
+ shutdownDisposed(f,"initial");
+ const calls = fs.readFileSync(path.join(f.control,"transport"),"utf8");
+ assert.equal(calls.split("\n").filter(line => line.includes('"stop"')).length,1);
+ assert.equal(f.json(".boat/state.json").runningSince,null);
+});
+
 for (const failure of ["fail-retire", "fail-stop", "none"])
 	test(`DIRTY stop still stops compute despite ${failure} and blocks subsequent commands`, async (t) => {
 		const f = await lockGenerationCheckout(t);
@@ -7503,6 +7569,17 @@ async function pendingUpgradePreview(t, mode, archive) {
 		`#!${process.execPath}
 const fs=require('fs'),path=require('path'),argv=process.argv.slice(2),control=process.env.FAKE_CONTROL;
 fs.appendFileSync(path.join(control,'transport'),JSON.stringify(argv)+'\\n');
+function shutdownHold(phase){
+ if(!fs.existsSync(path.join(control,'shutdown-hang-'+phase)))return;
+ const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
+ fs.writeFileSync(path.join(control,'shutdown-entered-'+phase),JSON.stringify({pid:process.pid,startTicks:fields[19],group:Number(fields[2]),session:Number(fields[3]),state:JSON.parse(fs.readFileSync('.boat/state.json'))}));
+ process.on('SIGTERM',()=>{});
+ while(!fs.existsSync(path.join(control,'shutdown-release-'+phase)))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+}
+if(argv.includes('info'))shutdownHold(fs.existsSync(path.join(control,'stopping'))?'observation':'initial');
+if(argv.includes('ssh')&&argv.at(-1).includes('sudo -n'))shutdownHold('retirement');
+if(argv.includes('usage'))shutdownHold('usage');
+
 if(!argv.includes('fake-worker'))throw Error('unexpected synthetic worker identity');
 if(argv.includes('info')){console.log(JSON.stringify({state:'ready'}));process.exit(0);}
 if(argv.includes('--status')){console.log(JSON.stringify({running:true,stdout:'Watch enabled'}));process.exit(0);}

@@ -6725,8 +6725,8 @@ test("concurrent maintained execution wrapper edit rejects migration source acce
 	assert.equal(fs.readFileSync(path.join(f.worker, name), "utf8"), captured);
 });
 
-// UNINTEGRATED diagnostic for the pending-upgrade experiment. Test-only changes;
-// production preview/controller bytes must remain identical to the supplied head.
+// UNINTEGRATED pending-upgrade repair, awaiting parent review and sequential integration.
+// The fixture copies the actual production controller and Make entry point.
 function previewProbe(promise, description, ms = 1000) {
 	let timer;
 	return Promise.race([
@@ -6813,44 +6813,47 @@ test("pending-upgrade fixture preserves receipts and retires keeper when command
 	const evidence = process.env.BOAT_PENDING_UPGRADE_EVIDENCE;
 	assert.ok(evidence, "diagnostic evidence directory is required");
 	const cleanups = [];
-	const f = await lockGenerationCheckout({ after: (fn) => cleanups.push(fn) });
 	const report = path.join(evidence, "cleanup-rejection");
-	const siblingDirectory = fs.mkdtempSync(
-		path.join(os.tmpdir(), "boat-pending-sibling-"),
-	);
-	const sibling = spawn(
-		process.execPath,
-		["-e", "console.log('ready');setInterval(()=>{},1000)"],
-		{
-			cwd: siblingDirectory,
-			detached: true,
-			stdio: ["ignore", "pipe", "pipe"],
-		},
-	);
-	const siblingClosed = once(sibling, "close");
-	let siblingOutput = "";
-	sibling.stdout.on("data", (bytes) => {
-		siblingOutput += bytes;
-	});
-	const siblingIdentity = fixtureProcess(sibling.pid);
-	const keeper = f.json(".boat/state.json").daemon;
-	let survivor;
-	// Independent safety teardown runs after all failure-path assertions, and
-	// never supplies the verdict of the cleanup under test.
+	let f,
+		siblingDirectory,
+		sibling,
+		siblingClosed,
+		siblingIdentity,
+		keeper,
+		survivor;
+	// Register independent teardown before checkout acquisition can fail.
 	t.after(async () => {
 		const failures = [];
-		try {
+		if (f) {
+			const groups = new Set();
 			for (const identity of fixtureCensus(f.directory)) {
-				assert.equal(
-					signalFixtureGroup(identity, "SIGKILL", f.directory),
-					true,
-				);
-				assert.equal(
-					await fixtureStopped(() => !liveOwnedProcess(f.root, identity)),
-					true,
-				);
+				if (groups.has(identity.group)) continue;
+				try {
+					if (!liveOwnedProcess(f.root, identity)) continue;
+					const signaled = signalFixtureGroup(identity, "SIGKILL", f.directory);
+					assert.ok(
+						signaled || !liveOwnedProcess(f.root, identity),
+						"Live owned group refused safety signal",
+					);
+					if (!signaled) continue;
+					groups.add(identity.group);
+					assert.equal(
+						await fixtureStopped(() => !processGroupRunning(identity.group)),
+						true,
+					);
+				} catch (error) {
+					failures.push(error);
+				}
 			}
-			await cleanups[0]();
+		}
+		try {
+			if (f)
+				assert.deepEqual(
+					fixtureCensus(f.directory),
+					[],
+					"Safety survivors retain ownership files",
+				);
+			for (const cleanup of cleanups) await cleanup();
 		} catch (error) {
 			failures.push(error);
 		}
@@ -6863,8 +6866,13 @@ test("pending-upgrade fixture preserves receipts and retires keeper when command
 					signalFixtureGroup(siblingIdentity, "SIGTERM", siblingDirectory),
 					true,
 				);
-			await previewProbe(siblingClosed, "independent sibling teardown failed");
-			fs.rmSync(siblingDirectory, { recursive: true, force: true });
+			if (siblingClosed)
+				await previewProbe(
+					siblingClosed,
+					"independent sibling teardown failed",
+				);
+			if (siblingDirectory)
+				fs.rmSync(siblingDirectory, { recursive: true, force: true });
 		} catch (error) {
 			failures.push(error);
 		}
@@ -6872,12 +6880,15 @@ test("pending-upgrade fixture preserves receipts and retires keeper when command
 			`${report}.safety.json`,
 			JSON.stringify(
 				{
-					keeperRetired: !liveOwnedProcess(f.root, keeper),
+					keeper,
+					survivor,
+					sibling: siblingIdentity,
+					keeperRetired: !keeper || !liveOwnedProcess(f.root, keeper),
 					survivorRetired: !survivor || !liveOwnedProcess(f.root, survivor),
 					siblingRetired:
 						!siblingIdentity ||
 						!liveOwnedProcess(siblingDirectory, siblingIdentity),
-					fixtureRemoved: !fs.existsSync(f.directory),
+					fixtureRemoved: !f || !fs.existsSync(f.directory),
 					failures: failures.map((error) => error.message),
 				},
 				null,
@@ -6887,6 +6898,29 @@ test("pending-upgrade fixture preserves receipts and retires keeper when command
 		if (failures.length)
 			throw new AggregateError(failures, "Independent safety teardown failed");
 	});
+	f = await lockGenerationCheckout({ after: (fn) => cleanups.push(fn) });
+	siblingDirectory = fs.mkdtempSync(
+		path.join(os.tmpdir(), "boat-pending-sibling-"),
+	);
+	sibling = spawn(
+		process.execPath,
+		["-e", "console.log('ready');setInterval(()=>{},1000)"],
+		{
+			cwd: siblingDirectory,
+			detached: true,
+			stdio: ["ignore", "pipe", "pipe"],
+		},
+	);
+	siblingClosed = once(sibling, "close");
+	let siblingOutput = "";
+	sibling.stdout.on("data", (bytes) => {
+		siblingOutput += bytes;
+	});
+	siblingIdentity = fixtureProcess(sibling.pid);
+	keeper = f.json(".boat/state.json").daemon;
+	// Independent safety teardown runs after all failure-path assertions, and
+	// never supplies the verdict of the cleanup under test.
+
 	await f.readiness.wait(
 		() => siblingOutput.includes("ready"),
 		"unrelated sibling ready",

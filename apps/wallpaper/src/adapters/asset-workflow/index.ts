@@ -19,7 +19,7 @@ export function assetWorkflowLayer(options: Options) {
     Effect.gen(function* () {
       const creation = yield* Creation;
       const delivery = yield* WorkflowDelivery;
-      const attempt = <A>(operation: string, run: () => Promise<A>) =>
+      const attempt = <A>(operation: string, run: (signal: AbortSignal) => Promise<A>) =>
         Effect.tryPromise({
           try: run,
           catch: (cause) => new WorkflowFailure({ operation, cause }),
@@ -34,7 +34,7 @@ export function assetWorkflowLayer(options: Options) {
         );
       const connectTo = (protectedAccount: boolean) =>
         Effect.acquireRelease(
-          attempt('connect', () => {
+          attempt('connect', (signal) => {
             const url = new URL(options.natsUrl);
             const legacyCredentials =
               url.username || url.password
@@ -43,6 +43,7 @@ export function assetWorkflowLayer(options: Options) {
             url.username = '';
             url.password = '';
             return connect({
+              signal,
               servers: url.toString(),
               ...(protectedAccount
                 ? {
@@ -61,7 +62,8 @@ export function assetWorkflowLayer(options: Options) {
               Effect.interruptible,
               Effect.timeout(options.shutdownTimeoutMs),
               Effect.catchCause(() => Effect.promise(() => connection.close()))
-            )
+            ),
+          { interruptible: true }
         );
       const protectedConnection = yield* connectTo(true);
       const publicationConnection = yield* connectTo(false);

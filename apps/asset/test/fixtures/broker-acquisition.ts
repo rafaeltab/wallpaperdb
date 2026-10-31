@@ -8,7 +8,9 @@ interface Acquisition {
 }
 
 /** Each participant must enter its production broker acquisition, without replacing NATS. */
-export function brokerAcquisitionContract(start: (url: string) => Acquisition) {
+export function brokerAcquisitionContract(
+  start: (url: string, ending: 'timeout' | 'cancellation' | 'disposal') => Acquisition
+) {
   for (const ending of ['timeout', 'cancellation', 'disposal'] as const) {
     it(`closes the native silent-peer socket after ${ending}`, async () => {
       const sockets = new Set<Socket>();
@@ -20,7 +22,7 @@ export function brokerAcquisitionContract(start: (url: string) => Acquisition) {
       await once(peer, 'listening');
       const address = peer.address();
       if (!address || typeof address === 'string') throw new Error('Missing peer port');
-      const runtime = start(`nats://127.0.0.1:${address.port}`);
+      const runtime = start(`nats://127.0.0.1:${address.port}`, ending);
       const controller = new AbortController();
       const acquisition = runtime.run(controller.signal);
       try {

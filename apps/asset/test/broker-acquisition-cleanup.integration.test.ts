@@ -3,7 +3,7 @@ import { cleanupWorkerLayer } from '../src/adapters/cleanup/index.js';
 import { Cleanup, CleanupStore } from '../src/capabilities/cleanup/index.js';
 import { brokerAcquisitionContract } from './fixtures/broker-acquisition.js';
 
-brokerAcquisitionContract((url) => {
+brokerAcquisitionContract((url, ending) => {
   const options = {
     url,
     credential: { user: 'test', password: 'test' },
@@ -19,13 +19,15 @@ brokerAcquisitionContract((url) => {
     pollMs: 10,
     shutdownTimeoutMs: 100,
   };
-  const runtime = ManagedRuntime.make(
-    cleanupWorkerLayer(options).pipe(
-      Layer.provide(Layer.mergeAll(Layer.mock(Cleanup, {}), Layer.mock(CleanupStore, {})))
-    )
+  const layer = cleanupWorkerLayer(options).pipe(
+    Layer.provide(Layer.mergeAll(Layer.mock(Cleanup, {}), Layer.mock(CleanupStore, {})))
   );
+  const runtime = ManagedRuntime.make(layer);
   return {
-    run: (signal) => runtime.runPromiseExit(Effect.void, { signal }),
+    run: (signal) =>
+      ending === 'cancellation'
+        ? Effect.runPromiseExit(Effect.scoped(Layer.build(layer)), { signal })
+        : runtime.runPromiseExit(Effect.void, { signal }),
     dispose: () => runtime.dispose(),
   };
 });

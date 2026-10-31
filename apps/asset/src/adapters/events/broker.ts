@@ -23,7 +23,7 @@ export interface NatsBroker {
   readonly manager: JetStreamManager;
 }
 export const NatsBroker = Context.Service<NatsBroker>('wallpaperdb/asset/NatsBroker');
-export function broker<A>(operation: string, run: () => Promise<A>) {
+export function broker<A>(operation: string, run: (signal: AbortSignal) => Promise<A>) {
   return Effect.tryPromise({
     try: run,
     catch: (cause) => new BrokerFailure({ operation, cause }),
@@ -39,8 +39,9 @@ export function natsEventsLayer(
   return Layer.effectContext(
     Effect.gen(function* () {
       const connection = yield* Effect.acquireRelease(
-        broker('connect-events', () =>
+        broker('connect-events', (signal) =>
           connect({
+            signal,
             ...assetBrokerTransport(options.url),
             name: options.serviceName,
             timeout: 5000,
@@ -51,7 +52,8 @@ export function natsEventsLayer(
             Effect.interruptible,
             Effect.timeout(options.shutdownTimeoutMs ?? 5000),
             Effect.catchCause(() => Effect.promise(() => connection.close()))
-          )
+          ),
+        { interruptible: true }
       );
       const manager = yield* broker('create-event-manager', () =>
         connection.jetstreamManager({ timeout: 5000 })

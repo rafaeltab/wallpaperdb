@@ -16,24 +16,25 @@ for (const ending of ['timeout', 'cancellation', 'disposal'] as const) {
     await once(peer, 'listening');
     const address = peer.address();
     if (!address || typeof address === 'string') throw new Error('Missing peer port');
-    const runtime = ManagedRuntime.make(
-      assetWorkflowLayer({
-        natsUrl: `nats://127.0.0.1:${address.port}`,
-        credential: { user: 'test', password: 'test' },
-        operatorNotification: { url: 'http://127.0.0.1', token: 'test' },
-        maxAttempts: 2,
-        retryDelayMs: 10,
-        pollMs: 10,
-        shutdownTimeoutMs: 100,
-      }).pipe(
-        Layer.provide(Layer.mergeAll(Layer.mock(Creation, {}), Layer.mock(WorkflowDelivery, {})))
-      )
+    const layer = assetWorkflowLayer({
+      natsUrl: `nats://127.0.0.1:${address.port}`,
+      credential: { user: 'test', password: 'test' },
+      operatorNotification: { url: 'http://127.0.0.1', token: 'test' },
+      maxAttempts: 2,
+      retryDelayMs: 10,
+      pollMs: 10,
+      shutdownTimeoutMs: 100,
+    }).pipe(
+      Layer.provide(Layer.mergeAll(Layer.mock(Creation, {}), Layer.mock(WorkflowDelivery, {})))
     );
+    const runtime = ManagedRuntime.make(layer);
     const controller = new AbortController();
-    const acquisition = runtime.runPromiseExit(
-      WorkflowHealth.pipe(Effect.flatMap((h) => h.check())),
-      { signal: controller.signal }
-    );
+    const acquisition =
+      ending === 'cancellation'
+        ? Effect.runPromiseExit(Effect.scoped(Layer.build(layer)), { signal: controller.signal })
+        : runtime.runPromiseExit(WorkflowHealth.pipe(Effect.flatMap((h) => h.check())), {
+            signal: controller.signal,
+          });
     try {
       await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(1);
       if (ending === 'cancellation') controller.abort();

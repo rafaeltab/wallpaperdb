@@ -23,7 +23,7 @@ interface Options {
   readonly pollMs: number;
   readonly shutdownTimeoutMs: number;
 }
-const broker = <A>(operation: string, run: () => Promise<A>) =>
+const broker = <A>(operation: string, run: (signal: AbortSignal) => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (cause) => new SourceFailure({ operation, cause }) }).pipe(
     Effect.tapError((error) =>
       Effect.logError('Source confirmation transport failed', { operation, cause: error.cause })
@@ -54,8 +54,9 @@ export function sourceConfirmationsLayer(options: Options) {
       const connections = new Map<string, NatsConnection>();
       for (const app of Object.values(options.applications)) {
         const connection = yield* Effect.acquireRelease(
-          broker('connect', () =>
+          broker('connect', (signal) =>
             connect({
+              signal,
               ...assetBrokerTransport(options.url),
               user: app.serviceUser,
               pass: options.credential.password,
@@ -69,7 +70,8 @@ export function sourceConfirmationsLayer(options: Options) {
               Effect.interruptible,
               Effect.timeout(options.shutdownTimeoutMs),
               Effect.catchCause(() => Effect.promise(() => connection.close()))
-            )
+            ),
+          { interruptible: true }
         );
         connections.set(app.id, connection);
       }

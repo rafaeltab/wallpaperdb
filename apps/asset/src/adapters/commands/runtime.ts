@@ -42,7 +42,7 @@ export interface ProtectedCommandOptions {
   readonly shutdownTimeoutMs: number;
   readonly maxAckPending: number;
 }
-function broker<A>(operation: string, run: () => Promise<A>) {
+function broker<A>(operation: string, run: (signal: AbortSignal) => Promise<A>) {
   return Effect.tryPromise({
     try: run,
     catch: (cause) => new CommandBrokerFailure({ operation, cause }),
@@ -327,8 +327,9 @@ export function protectedCommandsLayer(
       const connections = new Map<string, NatsConnection>();
       for (const application of Object.values(options.applications)) {
         const connection = yield* Effect.acquireRelease(
-          broker('connect', () =>
+          broker('connect', (signal) =>
             connect({
+              signal,
               ...assetBrokerTransport(options.url),
               user: application.serviceUser,
               pass: options.credential.password,
@@ -342,7 +343,8 @@ export function protectedCommandsLayer(
               Effect.interruptible,
               Effect.timeout(options.shutdownTimeoutMs),
               Effect.catchCause(() => Effect.promise(() => connection.close()))
-            )
+            ),
+          { interruptible: true }
         );
         const manager = yield* broker('manager', () =>
           connection.jetstreamManager({ timeout: 5000 })

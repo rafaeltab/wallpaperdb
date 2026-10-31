@@ -42,3 +42,59 @@
              if (this.done)
                  return;
              this.closeError = err;
+--- a/lib/nats-base-client/protocol.js
++++ b/lib/nats-base-client/protocol.js
+@@ -409,6 +409,9 @@
+     }
+     dial(srv) {
+         return __awaiter(this, void 0, void 0, function* () {
++            if (this._closed) {
++                throw core_1.NatsError.errorForCode(core_1.ErrorCode.Cancelled);
++            }
+             const pong = this.prepare();
+             let timer;
+             try {
+@@ -562,8 +565,21 @@
+     static connect(options, publisher) {
+         return __awaiter(this, void 0, void 0, function* () {
+             const h = new ProtocolHandler(options, publisher);
+-            yield h.dialLoop();
+-            return h;
++            const signal = options.signal;
++            const cancelled = core_1.NatsError.errorForCode(core_1.ErrorCode.Cancelled);
++            if (signal && signal.aborted) throw cancelled;
++            const abort = () => { void h._close(cancelled); };
++            if (signal) signal.addEventListener("abort", abort, { once: true });
++            try {
++                yield h.dialLoop();
++                if (signal && signal.aborted) {
++                    yield h._close(cancelled);
++                    throw cancelled;
++                }
++                return h;
++            } finally {
++                if (signal) signal.removeEventListener("abort", abort);
++            }
+         });
+     }
+     static toError(s) {
+@@ -903,7 +919,7 @@
+                 l.stop();
+             });
+             this._closed = true;
+-            yield this.transport.close(err);
++            if (this.transport) yield this.transport.close(err);
+             yield this.closed.resolve(err);
+         });
+     }
+--- a/lib/nats-base-client/core.d.ts
++++ b/lib/nats-base-client/core.d.ts
+@@ -985,6 +985,8 @@
+     (nonce?: string): Auth;
+ }
+ export interface ConnectionOptions {
++    /** Cancels connection acquisition; does not own an established connection. */
++    signal?: AbortSignal;
+     /**
+      * When the server requires authentication, set an {@link Authenticator}.
+      * An authenticator is created automatically for username/password and token

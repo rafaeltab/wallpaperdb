@@ -20,7 +20,7 @@ interface Options {
   readonly pollMs: number;
   readonly shutdownTimeoutMs: number;
 }
-const broker = <A>(operation: string, work: () => Promise<A>) =>
+const broker = <A>(operation: string, work: (signal: AbortSignal) => Promise<A>) =>
   Effect.tryPromise({
     try: work,
     catch: (cause) => new CleanupFailure({ operation, cause }),
@@ -40,8 +40,9 @@ export function cleanupWorkerLayer(options: Options) {
       const connections = new Map<string, Awaited<ReturnType<typeof connect>>>();
       for (const application of Object.values(options.applications)) {
         const connection = yield* Effect.acquireRelease(
-          broker('connect', () =>
+          broker('connect', (signal) =>
             connect({
+              signal,
               ...assetBrokerTransport(options.url),
               user: application.serviceUser,
               pass: options.credential.password,
@@ -55,7 +56,8 @@ export function cleanupWorkerLayer(options: Options) {
               Effect.interruptible,
               Effect.timeout(options.shutdownTimeoutMs),
               Effect.catchCause(() => Effect.promise(() => connection.close()))
-            )
+            ),
+          { interruptible: true }
         );
         connections.set(application.id, connection);
       }

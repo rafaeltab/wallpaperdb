@@ -19,7 +19,7 @@ export function attachmentBrokerLayer(options: Options) {
     Effect.gen(function* () {
       const attachments = yield* PictureAttachments;
       const delivery = yield* AttachmentDelivery;
-      const attempt = <A>(operation: string, run: () => Promise<A>) =>
+      const attempt = <A>(operation: string, run: (signal: AbortSignal) => Promise<A>) =>
         Effect.tryPromise({
           try: run,
           catch: (cause) => new AttachmentFailure({ operation, cause }),
@@ -33,11 +33,12 @@ export function attachmentBrokerLayer(options: Options) {
           Effect.withSpan(`user.workflow.${operation}`)
         );
       const protectedConnection = yield* Effect.acquireRelease(
-        attempt('connect', () => {
+        attempt('connect', (signal) => {
           const url = new URL(options.natsUrl);
           url.username = '';
           url.password = '';
           return connect({
+            signal,
             servers: url.toString(),
             user: options.credential.user,
             pass: options.credential.password,
@@ -52,7 +53,8 @@ export function attachmentBrokerLayer(options: Options) {
             Effect.interruptible,
             Effect.timeout(options.shutdownTimeoutMs),
             Effect.catchCause(() => Effect.promise(() => connection.close()))
-          )
+          ),
+        { interruptible: true }
       );
       const consumer = yield* attempt('bind-results', () =>
         protectedConnection.jetstream().consumers.get('ASSET_RESULTS', 'results_user')

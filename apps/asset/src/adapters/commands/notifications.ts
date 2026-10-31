@@ -184,8 +184,9 @@ export function operatorWebhookLayer(options: NotificationOptions) {
       const workers: Array<Fiber.Fiber<void, unknown>> = [];
       for (const application of Object.values(options.applications)) {
         const connection = yield* Effect.acquireRelease(
-          operation('connect-notifications', () =>
+          operation('connect-notifications', (signal) =>
             connect({
+              signal,
               ...assetBrokerTransport(options.url),
               user: application.serviceUser,
               pass: options.credential.password,
@@ -198,7 +199,8 @@ export function operatorWebhookLayer(options: NotificationOptions) {
               Effect.interruptible,
               Effect.timeout(options.shutdownTimeoutMs),
               Effect.catchCause(() => Effect.promise(() => connection.close()))
-            )
+            ),
+          { interruptible: true }
         );
         connections.push(connection);
         const healthy = yield* Ref.make(true);

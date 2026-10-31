@@ -8497,7 +8497,7 @@ if(argv.includes('forward')){
 			? `server.on('error',error=>{event('forward-error',{code:error.code});throw error;});
  let closing=false;
  const finish=()=>{if(closing)return;closing=true;for(const p of peers)p.destroy();server.close(()=>{event('forward-closed');process.exit(0);});};
- process.on('SIGTERM',()=>{event('forward-term');if(!fs.existsSync(path.join(control,'hold-forward-'+process.pid)))finish();else {const timer=setInterval(()=>{if(fs.existsSync(path.join(control,'release-forward-'+process.pid))){clearInterval(timer);finish();}},10);}});`
+ process.on('SIGTERM',()=>{event('forward-term');if(fs.existsSync(path.join(control,'ignore-forward-term')))return;if(!fs.existsSync(path.join(control,'hold-forward-'+process.pid)))finish();else {const timer=setInterval(()=>{if(fs.existsSync(path.join(control,'release-forward-'+process.pid))){clearInterval(timer);finish();}},10);}});`
 			: "process.on('SIGTERM',()=>{for(const p of peers)p.destroy();server.close(()=>process.exit(0));});"
  }
 }else if(argv.includes('ssh')){
@@ -9924,5 +9924,103 @@ for (const field of ["generation", "startTicks"])
 			assert.equal(liveOwnedProcess(f.root, f.tunnel), false);
 			f.receipts.preservedOwnership = { field, replacement, result };
 			f.phase("retirement preserved replacement ownership file");
+		});
+	});
+
+for (const ignoringTerm of [true, false])
+	test(`preview lifetime late wrapper failure retires ${ignoringTerm ? "TERM-ignoring" : "cooperative"} descendant`, async (t) => {
+		const archive = pendingPreviewEvidence(t);
+		await archive.scenario(async () => {
+			const f = await pendingUpgradePreview(
+				t,
+				"managed",
+				archive,
+				`late-failure-${ignoringTerm}`,
+				{ beforeStart: (fixture) => flag(fixture, "descendant-forward") },
+			);
+			await f.healthy(true);
+			const owner = f.json(".boat/preview-process.json");
+			const descendant = f.tunnel;
+			assert.notEqual(owner.forward.pid, descendant.pid);
+			assert.ok(
+				owner.captured.some(
+					(p) =>
+						p.pid === descendant.pid && p.startTicks === descendant.startTicks,
+				),
+			);
+			const healthyFrom = fixtureNow();
+			await new Promise((resolve) => setTimeout(resolve, 10050));
+			assert.ok(fixtureNow() - healthyFrom >= 10000);
+			await f.healthy(true);
+			assert.equal(liveOwnedProcess(f.root, owner), true);
+			assert.equal(previewListenerOwner(descendant, f.privatePort).length, 1);
+			if (ignoringTerm) flag(f, "ignore-forward-term");
+			// Arm the independent, existing one-second liveness observer before the
+			// trigger, and before awaiting Make's potentially descendant-held pipes.
+			const observedFrom = fixtureNow();
+			const retirement = fixtureStopped(
+				() =>
+					!liveOwnedProcess(f.root, descendant) &&
+					!liveOwnedProcess(f.root, owner),
+			);
+			flag(f, "exit-wrapper-only");
+			const retired = await retirement;
+			f.receipts.lateFailureObservation = {
+				owner,
+				descendant,
+				ignoringTerm,
+				healthyMs: fixtureNow() - healthyFrom,
+				observationMs: fixtureNow() - observedFrom,
+				retired,
+				controllerLive: liveOwnedProcess(f.root, owner),
+				descendantLive: liveOwnedProcess(f.root, descendant),
+				descendantListeners: previewListenerOwner(descendant, f.privatePort),
+				commandTerminal: f.command.terminal,
+				commandClosed: f.command.closed,
+				events: readPreviewRetirementEvents(f),
+			};
+			f.phase(
+				"late failure liveness verdict before fixture cleanup or command-pipe await",
+			);
+			assert.equal(
+				retired,
+				true,
+				"late failure must retire the known descendant inside its selected disposal reserve",
+			);
+			assert.deepEqual(previewListenerOwner(descendant, f.privatePort), []);
+			const result = await previewProbe(
+				f.command.done,
+				"late failure command pipes did not naturally close",
+			);
+			assert.notEqual(result.status, 0);
+			assert.match(result.output, /forward exited after readiness \(48\)/);
+			assert.doesNotMatch(result.output, /local disposal unresolved/);
+			const lifecycle = fs
+				.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line))
+				.filter((event) => event.kind === "preview-lifetime");
+			assert.ok(
+				lifecycle.some(
+					(event) => event.stage === "retired" && event.terminal.code === 48,
+				),
+			);
+			assert.equal(
+				lifecycle.some((event) => event.stage === "unresolved"),
+				false,
+			);
+			assert.equal(
+				fs.existsSync(path.join(f.root, ".boat/preview-process.json")),
+				false,
+			);
+			f.receipts.lateFailureResult = {
+				result,
+				naturalClosure: true,
+				lifecycle,
+			};
+			f.phase(
+				"late failure owned retirement and natural closure passed before fixture cleanup",
+			);
 		});
 	});

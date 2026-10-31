@@ -306,11 +306,14 @@ export async function runPreview({
 			server.close(() => {
 				publicClosed = true;
 			});
-		// Startup failure uses the selected disposal reserve within the same deadline.
-		// Cooperative shutdown of a healthy preview has its own finite local handover.
-		const disposalEnd =
-			published && !failure ? now() + 10000 : Math.min(deadline, now() + 1000);
-		const forceAt = published && !failure ? disposalEnd - 1000 : now();
+		// Startup disposal stays inside acquisition's original total. Once serving,
+		// failure gets the selected 1s disposal reserve measured from that failure,
+		// independent of the expired acquisition clock. Cooperative stop is unchanged.
+		const disposalBegan = now();
+		const disposalEnd = published
+			? disposalBegan + (failure ? 1000 : 10000)
+			: Math.min(deadline, disposalBegan + 1000);
+		const forceAt = published && !failure ? disposalEnd - 1000 : disposalBegan;
 		let unresolved = [];
 		try {
 			if (state.forward) {

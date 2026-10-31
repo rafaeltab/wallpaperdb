@@ -1441,6 +1441,76 @@ test("lock fixture phases consume one monotonic budget even while Make stays liv
 	assert.equal(processGroupRunning(command.child.pid), false);
 });
 
+test("lock fixture live missing marker expires after false observations", async (t) => {
+	let clock = 1000;
+	const readiness = lockFixtureReadiness({
+		deadline: clock + 5000,
+		now: () => clock,
+	});
+	const f = await lockGenerationCheckout(t, { readiness });
+	const paused = await pausedGeneration(t, "sync", f);
+	const command = f.commands[0];
+	let observations = 0;
+	let cancelWait = false;
+	let outcome;
+	assert.ok(clock < readiness.deadline);
+	readiness
+		.wait(() => {
+			if (cancelWait)
+				throw new Error("independent missing-marker safety cancellation");
+			observations++;
+			clock += 1000;
+			return fs.existsSync(path.join(f.control, "entered"));
+		}, "live missing generator marker")
+		.then(
+			() => {
+				outcome = "ready";
+			},
+			(error) => {
+				outcome = error;
+			},
+		);
+	try {
+		assert.ok(
+			await fixtureStopped(() => outcome !== undefined),
+			"live missing marker must settle at the original deadline",
+		);
+		assert.ok(outcome instanceof Error);
+		assert.match(
+			outcome.message,
+			/Readiness deadline exhausted during live missing generator marker/,
+		);
+		assert.ok(
+			observations > 1,
+			"false observations must advance an initially unexpired budget",
+		);
+		assert.ok(clock >= readiness.deadline);
+		assert.equal(fs.existsSync(path.join(f.control, "entered")), false);
+		assert.equal(command.terminal, null);
+		assert.equal(command.child.exitCode, null);
+		assert.equal(command.child.signalCode, null);
+		assert.equal(command.closed, false);
+		assert.equal(processGroupRunning(command.child.pid), true);
+	} finally {
+		// Stop a broken waiter independently before releasing its real command.
+		cancelWait = true;
+		assert.ok(
+			await fixtureStopped(() => outcome !== undefined),
+			"missing-marker waiter canceled for safety",
+		);
+		paused.release();
+		assert.deepEqual(await stopLockFixtureChildren(f.commands, true), {
+			drained: true,
+			signal: null,
+		});
+		const result = await paused.pending;
+		assert.equal(result.status, 0, result.output);
+		assert.equal(result.signal, null);
+		assert.equal(command.closed, true);
+		assert.equal(processGroupRunning(command.child.pid), false);
+	}
+});
+
 test("lock fixture child cannot restart an expired overall readiness budget", async (t) => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "boat-lock-budget-"));
 	const report = path.join(directory, "report.json");

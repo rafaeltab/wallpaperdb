@@ -169,8 +169,8 @@ function owned() {
 	if (!config || config.root !== root)
 		throw new Error("This worktree is not enrolled");
 }
-async function lock(fn) {
-	const lockDir = path.join(dir, "lifecycle.lock");
+async function lock(fn, name = "lifecycle") {
+	const lockDir = path.join(dir, `${name}.lock`);
 	for (let attempt = 0; ; attempt++) {
 		try {
 			fs.mkdirSync(lockDir);
@@ -355,50 +355,182 @@ function manifest() {
 	return result;
 }
 async function sync(id) {
-	return lock(async () => {
-		const baseline = Object.fromEntries(
-			execFileSync("git", ["ls-tree", "-r", "--name-only", "-z", config.base])
-				.toString()
-				.split("\0")
-				.filter(Boolean)
-				.map((p) => [p, "baseline"]),
+	return lock(() => syncSource(id, manifest()), "source");
+}
+// Caller holds source.lock, including while accepting generated source.
+async function syncSource(id, after, sourceRoot = root) {
+	const baseline = Object.fromEntries(
+		execFileSync("git", ["ls-tree", "-r", "--name-only", "-z", config.base])
+			.toString()
+			.split("\0")
+			.filter(Boolean)
+			.map((p) => [p, "baseline"]),
+	);
+	const before = read(path.join(dir, "manifest.json"), baseline);
+	const change = delta(before, after);
+	if (change.deleted.length)
+		await ssh(
+			id,
+			`cd ${remote} && rm -f -- ${change.deleted.map(quote).join(" ")}`,
 		);
-		const after = manifest(),
-			before = read(path.join(dir, "manifest.json"), baseline);
-		const change = delta(before, after);
-		if (change.deleted.length)
+	if (change.changed.length) {
+		const tar = execFileSync("tar", ["--null", "-T", "-", "-czf", "-"], {
+			cwd: sourceRoot,
+			input: `${change.changed.join("\0")}\0`,
+			maxBuffer: 256 * 1024 * 1024,
+		});
+		await ssh(id, `cd ${remote} && tar -xzf -`, { input: tar });
+		event("sync", {
+			changed: change.changed.length,
+			deleted: change.deleted.length,
+			bytes: tar.length,
+		});
+	} else if (change.deleted.length)
+		event("sync", { changed: 0, deleted: change.deleted.length, bytes: 0 });
+	write(path.join(dir, "manifest.json"), after);
+	if (change.changed.length || change.deleted.length) {
+		const s = read(stateFile);
+		s.lastActivity = Date.now();
+		save(s);
+	}
+}
+
+function lockGeneration(targets) {
+	return (
+		targets.length === 3 &&
+		targets[0] === "run" &&
+		targets.includes("PACKAGE=scripts") &&
+		targets.includes("SCRIPT=dependencies:lock")
+	);
+}
+function dependencyState(source) {
+	return Object.fromEntries(
+		[...new Set(installationInputs(Object.keys(source)))]
+			.sort()
+			.map((name) => [name, source[name] ?? null]),
+	);
+}
+async function generateLock(id, started) {
+	return lock(async () => {
+		const staging = fs.mkdtempSync(path.join(runDir, `lock-${config.key}-`));
+		fs.chmodSync(staging, 0o700);
+		const snapshot = path.join(staging, "source");
+		const source = {};
+		// Capture bytes once. Hashing live files and later archiving them can send
+		// a different input than the one used by the acceptance check.
+		for (const name of Object.keys(manifest())) {
+			const from = path.join(root, name),
+				to = path.join(snapshot, name);
+			fs.mkdirSync(path.dirname(to), { recursive: true });
+			const stat = fs.lstatSync(from);
+			if (stat.isSymbolicLink()) {
+				const target = fs.readlinkSync(from);
+				fs.symlinkSync(target, to);
+				source[name] = hash(target);
+			} else if (stat.isFile()) {
+				const bytes = fs.readFileSync(from);
+				fs.writeFileSync(to, bytes, { mode: stat.mode & 0o777 });
+				source[name] = hash(bytes);
+			}
+		}
+		const inputs = dependencyState(source);
+		for (const name of Object.keys(inputs)) {
+			if (
+				inputs[name] !== null &&
+				!fs.lstatSync(path.join(snapshot, name)).isFile()
+			)
+				throw new Error(`Lock generation requires regular input: ${name}`);
+		}
+		let accepted = false;
+		try {
+			await syncSource(id, source, snapshot);
+			// A failed generator may have changed the worker lock. Force the next
+			// sync to restore local authority, including a locally absent output.
+			const sent = read(path.join(dir, "manifest.json"));
+			write(path.join(dir, "manifest.json"), {
+				...sent,
+				"pnpm-lock.yaml": null,
+			});
 			await ssh(
 				id,
-				`cd ${remote} && rm -f -- ${change.deleted.map(quote).join(" ")}`,
+				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && mise install --locked`,
 			);
-		if (change.changed.length) {
-			const tar = execFileSync("tar", ["--null", "-T", "-", "-czf", "-"], {
-				input: `${change.changed.join("\0")}\0`,
-				maxBuffer: 256 * 1024 * 1024,
+			const result = await boat(
+				[
+					"exec",
+					id,
+					"--timeout",
+					"0",
+					"--stream",
+					"--",
+					"bash",
+					"-lc",
+					`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker run PACKAGE=scripts SCRIPT=dependencies:lock`,
+				],
+				{
+					allowFailure: true,
+					streamFrames: true,
+					logPath: path.join(dir, `command-${started}.log`),
+				},
+			);
+			const proposal = path.join(staging, "pnpm-lock.yaml");
+			try {
+				const collected = await ssh(
+					id,
+					`cd ${remote} && test ! -L pnpm-lock.yaml && test -f pnpm-lock.yaml && base64 -w0 -- pnpm-lock.yaml`,
+					{ capture: true },
+				);
+				const encoded = collected.out.trim();
+				const bytes = Buffer.from(encoded, "base64");
+				if (!bytes.length || bytes.toString("base64") !== encoded)
+					throw new Error("Invalid lockfile transfer");
+				fs.writeFileSync(proposal, bytes, { mode: 0o600 });
+			} catch (error) {
+				throw new Error(
+					`Lock generation output collection failed; retained evidence at ${staging}: ${error.message}`,
+				);
+			}
+			if (result.status !== 0)
+				throw new Error(
+					`Lock generator failed (${result.status}); proposal retained at ${proposal}`,
+				);
+			if (
+				JSON.stringify(dependencyState(manifest())) !== JSON.stringify(inputs)
+			)
+				throw new Error(
+					`Local dependency inputs or old lock changed; proposal retained at ${proposal}`,
+				);
+			const output = path.join(root, "pnpm-lock.yaml");
+			if (fs.existsSync(output) && !fs.lstatSync(output).isFile())
+				throw new Error(
+					`Local lock is not regular; proposal retained at ${proposal}`,
+				);
+			const bytes = fs.readFileSync(proposal);
+			// Keep the retained proposal private and replace source atomically on its
+			// own filesystem. No event-loop yield between comparison and rename.
+			const temporary = path.join(root, `.boat/lock-${process.pid}.tmp`);
+			fs.writeFileSync(temporary, bytes, {
+				mode: fs.existsSync(output) ? fs.statSync(output).mode & 0o777 : 0o644,
 			});
-			await ssh(id, `cd ${remote} && tar -xzf -`, { input: tar });
-			event("sync", {
-				changed: change.changed.length,
-				deleted: change.deleted.length,
-				bytes: tar.length,
+			fs.renameSync(temporary, output);
+			const current = read(path.join(dir, "manifest.json"));
+			write(path.join(dir, "manifest.json"), {
+				...current,
+				"pnpm-lock.yaml": hash(bytes),
 			});
-		} else if (change.deleted.length)
-			event("sync", { changed: 0, deleted: change.deleted.length, bytes: 0 });
-		write(path.join(dir, "manifest.json"), after);
-		if (change.changed.length || change.deleted.length) {
-			const s = read(stateFile);
-			s.lastActivity = Date.now();
-			save(s);
+			accepted = true;
+			event("lock-accepted", { hash: hash(bytes) });
+			return result;
+		} finally {
+			fs.rmSync(snapshot, { recursive: true, force: true });
+			if (accepted) fs.rmSync(staging, { recursive: true, force: true });
 		}
-	});
+	}, "source");
 }
 async function prepare(id) {
 	return lock(async () => {
 		const inputs = projectedInputs(root);
-		const tracked = execFileSync("git", ["ls-files", "-z"])
-			.toString()
-			.split("\0")
-			.filter(Boolean);
+		const tracked = Object.keys(manifest());
 		const installation = installationInputs(tracked);
 		const dependencies = fingerprint(root, installation);
 		const configuration = [
@@ -538,6 +670,17 @@ async function command() {
 	daemon();
 	const started = Date.now();
 	try {
+		if (lockGeneration(targets)) {
+			const result = await generateLock(id, started);
+			event("command", {
+				targets,
+				status: result.status,
+				ms: Date.now() - started,
+				resumed,
+			});
+			process.exitCode = result.status;
+			return;
+		}
 		await sync(id);
 		await prepare(id);
 		await cache(id);

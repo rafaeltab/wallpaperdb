@@ -765,6 +765,7 @@ async function lockGenerationCheckout(t) {
 		"Makefile",
 		"scripts/boat-route.mk",
 		"scripts/boat.mjs",
+		"scripts/boat-stop-watch.mjs",
 		"scripts/lib/boat.mjs",
 		"scripts/lib/boat-cache.mjs",
 		"scripts/lib/boat-preparation.mjs",
@@ -822,10 +823,13 @@ if(argv[0]==='--filter') {const pkg=argv[1].split('/')[1],script=argv[3];const c
 if(argv[0]!=='install')throw Error('unexpected pnpm '+argv);
 if(argv.includes('--lockfile-only')){
  if(JSON.stringify(argv)!==JSON.stringify(['install','--lockfile-only','--no-frozen-lockfile','--ignore-scripts']))throw Error('generator flags changed');
+ fs.appendFileSync(path.join(control,'old-locks'),JSON.stringify(fs.readFileSync(path.join(root,'pnpm-lock.yaml'),'utf8'))+'\\n');
  fs.appendFileSync(path.join(control,'calls'),'generate\\n');
  fs.writeFileSync(path.join(control,'entered'),'yes');
  (async()=>{while(fs.existsSync(path.join(control,'pause'))&&!fs.existsSync(path.join(control,'release')))await new Promise(r=>setTimeout(r,10));
  fs.writeFileSync(path.join(root,'pnpm-lock.yaml'),expected());
+ if(fs.existsSync(path.join(control,'missing')))fs.unlinkSync(path.join(root,'pnpm-lock.yaml'));
+ if(fs.existsSync(path.join(control,'directory'))){fs.unlinkSync(path.join(root,'pnpm-lock.yaml'));fs.mkdirSync(path.join(root,'pnpm-lock.yaml'));}
  if(fs.existsSync(path.join(control,'symlink'))){fs.unlinkSync(path.join(root,'pnpm-lock.yaml'));fs.symlinkSync(path.join(control,'outside'),path.join(root,'pnpm-lock.yaml'));}
  process.exit(fs.existsSync(path.join(control,'fail'))?23:0);})();
 }else{if(!argv.includes('--frozen-lockfile'))throw Error('normal install is not frozen');fs.appendFileSync(path.join(control,'calls'),'frozen\\n');if(fs.readFileSync(path.join(root,'pnpm-lock.yaml'),'utf8')!==expected()){console.error('ERR_PNPM_LOCKFILE_CONFIG_MISMATCH');process.exit(17);}}
@@ -866,6 +870,7 @@ if(argv.includes('--lockfile-only')){
 		MAKEOVERRIDES: "",
 		BOAT_EXEC: "",
 	};
+	delete env.MAKEOVERRIDES;
 	put(
 		path.join(root, ".mise/boat/boat"),
 		`#!${process.execPath}
@@ -873,10 +878,18 @@ const fs=require('fs'),cp=require('child_process'),path=require('path');
 const argv=process.argv.slice(2),control=process.env.FAKE_CONTROL;
 fs.appendFileSync(path.join(control,'transport'),JSON.stringify(argv)+'\\n');
 if(argv.includes('info')){console.log(JSON.stringify({state:fs.existsSync(path.join(control,'sleep'))?'stopped':'ready'}));process.exit(0);}
+if(argv.includes('extend')){console.log('{}');process.exit(0);}
 if(argv.includes('resume')){fs.unlinkSync(path.join(control,'sleep'));console.log('{}');process.exit(0);}
 const command=argv.at(-1).replaceAll('/home/user/wallpaperdb',process.env.FAKE_WORKER);
 if(argv.includes('ssh')&&(command.startsWith('mkdir -p '+process.env.FAKE_WORKER+';')||command.includes('sudo -n')||command.includes('--input-type=module -')))process.exit(0);
 if(!argv.includes('ssh')&&!argv.includes('exec'))throw Error('unexpected Boat '+argv);
+if(command.includes('base64 -w0')){
+ fs.writeFileSync(path.join(control,'collecting'),'yes');
+ if(fs.existsSync(path.join(control,'transfer-fail')))process.exit(31);
+ if(fs.existsSync(path.join(control,'framed'))){console.log(JSON.stringify({type:'stdout',data:'invalid framed payload'}));process.exit(0);}
+}
+const pause=command.includes('tar -xzf -')?'sync':command.includes('base64 -w0')?'collect':null;
+if(pause&&fs.existsSync(path.join(control,'pause-'+pause))){fs.writeFileSync(path.join(control,'entered-'+pause),'yes');while(!fs.existsSync(path.join(control,'release-'+pause)))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);}
 const stream=argv.includes('--stream'),child=cp.spawn('bash',['-c',command],{env:process.env,stdio:['pipe',stream?'pipe':'inherit',stream?'pipe':'inherit']});
 process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});
 if(stream)for(const type of ['stdout','stderr'])child[type].on('data',b=>console.log(JSON.stringify({type,data:b.toString()})));
@@ -993,3 +1006,296 @@ test("public lock generation repairs stale dependency inputs before frozen prepa
 		prepared,
 	);
 });
+
+async function observed(predicate, description) {
+	const deadline = Date.now() + 5000;
+	while (!predicate()) {
+		if (Date.now() >= deadline)
+			assert.fail(`Timed out observing ${description}`);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+	}
+}
+function flag(f, name) {
+	fs.writeFileSync(path.join(f.control, name), "yes");
+}
+async function pausedGeneration(t, phase = "") {
+	const f = await lockGenerationCheckout(t);
+	flag(f, phase ? `pause-${phase}` : "pause");
+	const pending = f.generate();
+	t.after(() => {
+		if (fs.existsSync(f.control))
+			flag(f, phase ? `release-${phase}` : "release");
+	});
+	await observed(
+		() =>
+			fs.existsSync(
+				path.join(f.control, phase ? `entered-${phase}` : "entered"),
+			),
+		`paused ${phase || "generator"}`,
+	);
+	return {
+		...f,
+		pending,
+		release: () => flag(f, phase ? `release-${phase}` : "release"),
+	};
+}
+
+for (const [name, edit] of [
+	["old output", (f) => f.local("pnpm-lock.yaml", "concurrent local lock\n")],
+	[
+		"manifest",
+		(f) => f.local("package.json", '{"private":true,"concurrent":true}\n'),
+	],
+	[
+		"tracked patch",
+		(f) => f.local("patches/dependency.patch", "concurrent tracked patch\n"),
+	],
+	[
+		"untracked input addition",
+		(f) => f.local("patches/concurrent.patch", "concurrent new patch\n"),
+	],
+	[
+		"input deletion",
+		(f) => fs.unlinkSync(path.join(f.root, "patches/dependency.patch")),
+	],
+])
+	test(`public lock generation rejects concurrent ${name} edits and retains the proposal`, async (t) => {
+		const f = await pausedGeneration(t);
+		edit(f);
+		const before = execFileSync("git", ["diff", "--binary"], { cwd: f.root });
+		const lock = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
+		f.release();
+		const result = await f.pending;
+		assert.notEqual(result.status, 0);
+		assert.match(result.output, /Local dependency inputs or old lock changed/);
+		assert.deepEqual(
+			fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+			lock,
+		);
+		assert.deepEqual(
+			execFileSync("git", ["diff", "--binary"], { cwd: f.root }),
+			before,
+		);
+		if (name === "untracked input addition")
+			assert.equal(
+				fs.readFileSync(path.join(f.root, "patches/concurrent.patch"), "utf8"),
+				"concurrent new patch\n",
+			);
+		const proposal = result.output.match(
+			/proposal retained at (.+\/pnpm-lock.yaml)/,
+		)?.[1];
+		assert.ok(proposal, result.output);
+		assert.equal(path.relative(f.root, proposal).startsWith(".."), true);
+		assert.equal(fs.statSync(proposal).mode & 0o777, 0o600);
+		assert.equal(
+			JSON.parse(fs.readFileSync(proposal)).inputs["patches/dependency.patch"],
+			"original patch\n",
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+			false,
+		);
+		assert.equal(f.json(".boat/manifest.json")["pnpm-lock.yaml"], null);
+	});
+
+test("captured dependency bytes reach the worker even when local inputs change during upload", async (t) => {
+	const f = await pausedGeneration(t, "sync");
+	f.local("patches/dependency.patch", "edited while transporting\n");
+	f.release();
+	const result = await f.pending;
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Local dependency inputs or old lock changed/);
+	const proposal = result.output.match(
+		/proposal retained at (.+\/pnpm-lock.yaml)/,
+	)[1];
+	assert.equal(
+		JSON.parse(fs.readFileSync(proposal)).inputs["patches/dependency.patch"],
+		"original patch\n",
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.root, "patches/dependency.patch"), "utf8"),
+		"edited while transporting\n",
+	);
+});
+
+test("failed generation preserves local authority and a later transaction restores its old output", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	flag(f, "fail");
+	const result = await f.generate();
+	assert.notEqual(result.status, 0);
+	assert.match(result.output, /Lock generator failed/);
+	assert.equal(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8"),
+		"stale lock\n",
+	);
+	const proposal = result.output.match(
+		/proposal retained at (.+\/pnpm-lock.yaml)/,
+	)[1];
+	assert.equal(
+		JSON.parse(fs.readFileSync(proposal)).resolutions.unrelated,
+		"preserved@1.0.0",
+	);
+	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
+	fs.unlinkSync(path.join(f.control, "fail"));
+	flag(f, "pause");
+	const next = f.generate();
+	await observed(
+		() =>
+			fs.readFileSync(path.join(f.control, "calls"), "utf8").split("generate\n")
+				.length === 3,
+		"second generation",
+	);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml"), "utf8"),
+		"stale lock\n",
+	);
+	flag(f, "release");
+	const accepted = await next;
+	assert.equal(accepted.status, 0, accepted.output);
+});
+
+for (const mode of [
+	"missing",
+	"directory",
+	"symlink",
+	"transfer-fail",
+	"framed",
+])
+	test(`public lock generation rejects ${mode} output without importing source`, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		fs.writeFileSync(path.join(f.control, "outside"), "outside bytes\n");
+		flag(f, mode);
+		const result = await f.generate();
+		assert.notEqual(result.status, 0);
+		assert.match(result.output, /output collection failed/);
+		assert.equal(
+			fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8"),
+			"stale lock\n",
+		);
+		assert.equal(
+			fs.readFileSync(path.join(f.control, "outside"), "utf8"),
+			"outside bytes\n",
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+			false,
+		);
+	});
+
+test("acceptance leaves unrelated concurrent edits pending for the next source sync", async (t) => {
+	const f = await pausedGeneration(t);
+	const before = f.json(".boat/manifest.json")["notes.txt"];
+	f.local("notes.txt", "pending unrelated source\n");
+	f.release();
+	const result = await f.pending;
+	assert.equal(result.status, 0, result.output);
+	assert.equal(f.json(".boat/manifest.json")["notes.txt"], before);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8"),
+		"original unrelated source\n",
+	);
+	const next = await f.generate();
+	assert.equal(next.status, 0, next.output);
+	assert.equal(
+		fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8"),
+		"pending unrelated source\n",
+	);
+});
+
+test("tracked and previously synchronized untracked patch deletions reach generation and frozen preparation", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	f.local("patches/new.patch", "disposable untracked patch\n");
+	assert.equal((await f.generate()).status, 0);
+	fs.unlinkSync(path.join(f.root, "patches/dependency.patch"));
+	fs.unlinkSync(path.join(f.root, "patches/new.patch"));
+	const result = await f.generate();
+	assert.equal(result.status, 0, result.output);
+	const inputs = JSON.parse(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+	).inputs;
+	assert.equal(inputs["patches/dependency.patch"], undefined);
+	assert.equal(inputs["patches/new.patch"], undefined);
+	assert.equal(
+		fs.existsSync(path.join(f.worker, "patches/dependency.patch")),
+		false,
+	);
+	assert.equal(fs.existsSync(path.join(f.worker, "patches/new.patch")), false);
+	const frozen = await f.run(
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		"BOAT_EXEC=remote",
+	).done;
+	assert.equal(frozen.status, 0, frozen.output);
+});
+
+test("ordinary routed commands still require a frozen lock and generator resume does not restore development", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	const normal = await f.run(
+		"run",
+		"PACKAGE=asset",
+		"SCRIPT=dev:configure",
+		"BOAT_EXEC=remote",
+	).done;
+	assert.notEqual(normal.status, 0);
+	assert.match(normal.output, /ERR_PNPM_LOCKFILE_CONFIG_MISMATCH/);
+	f.local(
+		".boat/state.json",
+		JSON.stringify({ ...f.json(".boat/state.json"), developmentWanted: true }),
+	);
+	flag(f, "sleep");
+	const result = await f.generate();
+	assert.equal(result.status, 0, result.output);
+	assert.match(result.output, /Remote environment resumed from sleep/);
+	assert.equal(f.json(".boat/state.json").developmentWanted, true);
+	assert.doesNotMatch(
+		fs.readFileSync(path.join(f.control, "transport"), "utf8"),
+		/make infra-start|make apps-start/,
+	);
+});
+
+for (const phase of ["sync", "", "collect"])
+	test(`source synchronization and a second generator wait through ${phase || "generation"} and acceptance`, async (t) => {
+		const f = await pausedGeneration(t, phase);
+		f.local("notes.txt", "concurrent unrelated edit\n");
+		const daemon = spawn(process.execPath, ["scripts/boat.mjs", "daemon"], {
+			cwd: f.root,
+			env: f.env,
+			stdio: "ignore",
+		});
+		const stopped = once(daemon, "close");
+		t.after(async () => {
+			daemon.kill();
+			await stopped;
+		});
+		const second = f.generate();
+		await observed(
+			() =>
+				fs
+					.readdirSync(path.join(f.root, ".boat"))
+					.filter((name) => /^command-\d+\.json$/.test(name)).length === 2,
+			"overlapping command leases",
+		);
+		f.release();
+		const firstResult = await f.pending;
+		const secondResult = await second;
+		assert.equal(firstResult.status, 0, firstResult.output);
+		assert.equal(secondResult.status, 0, secondResult.output);
+		const starts = fs
+			.readFileSync(path.join(f.control, "old-locks"), "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		assert.equal(starts.length, 2);
+		assert.equal(starts[0], "stale lock\n");
+		assert.equal(
+			starts[1],
+			fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"), "utf8"),
+		);
+		await observed(
+			() =>
+				fs.readFileSync(path.join(f.worker, "notes.txt"), "utf8") ===
+				"concurrent unrelated edit\n",
+			"pending source delivered",
+		);
+	});

@@ -72,6 +72,7 @@ function execute(
 		onOutput = () => {},
 		collectOutput = false,
 		maxCaptureBytes = Infinity,
+		onFrame = () => {},
 	} = {},
 ) {
 	return new Promise((resolve, reject) => {
@@ -131,6 +132,7 @@ function execute(
 			const line = (value) => {
 				try {
 					const frame = JSON.parse(value);
+					onFrame(frame);
 					if (frame.type === "stdout" || frame.type === "stderr")
 						emit(frame.data, frame.type === "stderr");
 					else if (frame.event === "error") emit(`${frame.error}\n`, true);
@@ -399,6 +401,7 @@ function manifest() {
 async function sync(id) {
 	return lock(() => {
 		snapshots.startup();
+		assertSourceWriterStopped();
 		recoverPublication(root, acceptSource);
 		return syncSource(id, manifest());
 	}, "source");
@@ -512,6 +515,104 @@ function acceptSource(outputs) {
 	);
 }
 
+function provenSourceExit(record) {
+	const terminal = record.terminal;
+	return (
+		record.protocolError !== true &&
+		typeof record.commandId === "string" &&
+		/^cmd_[a-z0-9]+$/.test(record.commandId) &&
+		terminal?.type === "exit" &&
+		Number.isInteger(terminal.exitCode) &&
+		terminal.exitCode >= 0 &&
+		terminal.exitCode <= 255 &&
+		terminal.launcherFailed === false &&
+		terminal.timedOut === false &&
+		terminal.oomKilled === false &&
+		terminal.signal === null &&
+		terminal.success === (terminal.exitCode === 0) &&
+		typeof terminal.finishedAt === "string" &&
+		Number.isFinite(Date.parse(terminal.finishedAt))
+	);
+}
+function assertSourceWriterStopped() {
+	const file = path.join(dir, "source-writer.json");
+	if (!fs.existsSync(file)) return;
+	if (!provenSourceExit(read(file)))
+		throw new Error(
+			`Source writer completion is uncertain; source synchronization and generation blocked. Preserve the active worker tree; ownership evidence at ${file}`,
+		);
+	fs.rmSync(file);
+}
+async function runSourceCommand(id, started, kind) {
+	const file = path.join(dir, "source-writer.json");
+	const evidence = path.join(
+		dir,
+		`source-command-${started}-${process.pid}.json`,
+	);
+	const record = {
+		workerId: id,
+		kind,
+		startedAt: new Date().toISOString(),
+		commandId: null,
+		terminal: null,
+	};
+	const persist = () => {
+		write(evidence, record);
+		write(file, record);
+	};
+	// Persist uncertainty BEFORE submission. CLI loss cannot authorize another writer.
+	persist();
+	const result = await boat(
+		[
+			"--json",
+			"exec",
+			id,
+			"--timeout",
+			"0",
+			"--stream",
+			"--",
+			"bash",
+			"-lc",
+			`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker run ${kind === "lock" ? "PACKAGE=scripts SCRIPT=dependencies:lock" : "PACKAGE=asset SCRIPT=db:generate"}`,
+		],
+		{
+			allowFailure: true,
+			collectOutput: kind === "migrations",
+			streamFrames: true,
+			logPath: path.join(dir, `command-${started}.log`),
+			onFrame: (frame) => {
+				if (frame.type === "started" && typeof frame.commandId === "string") {
+					if (
+						(record.commandId && record.commandId !== frame.commandId) ||
+						record.terminal
+					)
+						record.protocolError = true;
+					record.commandId = frame.commandId;
+					persist();
+				}
+				if (frame.type === "exit") {
+					if (!record.commandId) record.protocolError = true;
+					record.terminal = Object.fromEntries(
+						[
+							"type",
+							"exitCode",
+							"finishedAt",
+							"launcherFailed",
+							"timedOut",
+							"oomKilled",
+							"signal",
+							"success",
+						].map((name) => [name, frame[name]]),
+					);
+					persist();
+				}
+			},
+		},
+	);
+	assertSourceWriterStopped();
+	return { ...result, status: result.status || record.terminal.exitCode };
+}
+
 async function generate(id, started, kind) {
 	return lock(
 		() =>
@@ -521,6 +622,7 @@ async function generate(id, started, kind) {
 				stagingRoot: runDir,
 				names: sourceNames,
 				transport: {
+					assertStopped: assertSourceWriterStopped,
 					sync: (source, snapshot) => syncSource(id, source, snapshot),
 					invalidate: (kind, outputs) => {
 						const sent = read(path.join(dir, "manifest.json"));
@@ -538,26 +640,7 @@ async function generate(id, started, kind) {
 							`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise trust && ${kind === "lock" ? "mise install --locked" : "make install BOAT_EXEC=worker"}`,
 						);
 					},
-					generate: (kind) =>
-						boat(
-							[
-								"exec",
-								id,
-								"--timeout",
-								"0",
-								"--stream",
-								"--",
-								"bash",
-								"-lc",
-								`export PATH="$HOME/.local/bin:$PATH" WALLPAPERDB_BOAT_WORKER=1; cd ${remote} && mise exec -- make BOAT_EXEC=worker run ${kind === "lock" ? "PACKAGE=scripts SCRIPT=dependencies:lock" : "PACKAGE=asset SCRIPT=db:generate"}`,
-							],
-							{
-								allowFailure: true,
-								collectOutput: kind === "migrations",
-								streamFrames: true,
-								logPath: path.join(dir, `command-${started}.log`),
-							},
-						),
+					generate: (kind) => runSourceCommand(id, started, kind),
 					collect: async (kind) =>
 						(
 							await ssh(

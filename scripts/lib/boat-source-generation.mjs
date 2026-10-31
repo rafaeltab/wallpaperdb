@@ -418,6 +418,7 @@ export async function generateSource({
 			: path.join(staging, "proposal");
 	let accepted = false;
 	try {
+		transport.assertStopped();
 		recoverPublication(root, transport.accept);
 		const { source, inputs, outputs } = capture(root, snapshot, names(), kind);
 		if (kind === "migrations") validateMigrations(outputs);

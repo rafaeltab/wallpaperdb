@@ -983,10 +983,16 @@ if(command.includes('base64 -w0')||command.includes('collect-migrations')){
 }
 const pause=command.includes('tar -xzf -')?'sync':(command.includes('base64 -w0')||command.includes('collect-migrations'))?'collect':null;
 if(pause&&fs.existsSync(path.join(control,'pause-'+pause))){fs.writeFileSync(path.join(control,'entered-'+pause),'yes');while(!fs.existsSync(path.join(control,'release-'+pause))||fs.existsSync(path.join(control,'ignore-release')))Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);}
-const stream=argv.includes('--stream'),child=cp.spawn('bash',['-c',command],{env:process.env,stdio:['pipe',stream?'pipe':'inherit',stream?'pipe':'inherit']});
+const stream=argv.includes('--stream');
+if(stream&&!fs.existsSync(path.join(control,'missing-started')))console.log(JSON.stringify({type:'started',commandId:'cmd_fixture'+process.pid}));
+if(stream&&fs.existsSync(path.join(control,'stream-loss'))){fs.writeFileSync(path.join(control,'writer-active'),'yes');process.exit(71);}
+const child=cp.spawn('bash',['-c',command],{env:process.env,stdio:['pipe',stream?'pipe':'inherit',stream?'pipe':'inherit']});
 process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});
 if(stream)for(const type of ['stdout','stderr'])child[type].on('data',b=>console.log(JSON.stringify({type,data:b.toString()})));
-child.on('close',code=>process.exit(code??1));
+child.on('close',code=>{
+ if(stream&&!fs.existsSync(path.join(control,'missing-terminal')))console.log(JSON.stringify({type:'exit',exitCode:code??1,finishedAt:new Date().toISOString(),launcherFailed:fs.existsSync(path.join(control,'launcher-failed')),timedOut:false,oomKilled:false,signal:null,success:code===0}));
+ process.exit(code??1);
+});
 `,
 		0o755,
 	);
@@ -1053,6 +1059,11 @@ child.on('close',code=>process.exit(code??1));
 		local,
 		json,
 		run,
+		writer: () =>
+			start(background, process.execPath, [
+				"-e",
+				`const fs=require('fs'),path=require('path'),control=process.env.FAKE_CONTROL;fs.writeFileSync(path.join(control,'writer-entered'),'yes');const tick=()=>{if(fs.existsSync(path.join(control,'writer-active'))){fs.writeFileSync(path.join(process.env.FAKE_WORKER,'apps/asset/drizzle/9999_live_writer.sql'),'remote writer still owns outputs');fs.writeFileSync(path.join(control,'writer-mutated'),'yes');}if(fs.existsSync(path.join(control,'writer-release')))process.exit(0);};tick();setInterval(tick,10);`,
+			]),
 		daemon: () =>
 			start(background, process.execPath, ["scripts/boat.mjs", "daemon"]),
 		generate: () =>
@@ -3387,4 +3398,78 @@ test("generation rejects symlinked inputs without reading the outside target", a
 	assert.notEqual(result.status, 0, result.output);
 	assert.equal(fs.existsSync(readFlag), false);
 	assert.equal(fs.readlinkSync(schema), outside);
+});
+
+for (const mode of ["missing-terminal", "missing-started", "launcher-failed"])
+	test(`source command ownership blocks restoration after ${mode} without terminal proof`, async (t) => {
+		const f = await migrationGenerationCheckout(t),
+			before = migrationBytes(f.root);
+		flag(f, mode);
+		const result = await f.migrations();
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(result.output, /completion is uncertain/);
+		const remote = migrationBytes(f.worker);
+		assert.deepEqual(migrationBytes(f.root), before);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+			true,
+		);
+		fs.unlinkSync(path.join(f.control, mode));
+		for (const pending of [
+			f.run("build", "PACKAGE=asset").done,
+			f.generate(),
+			f.migrations(),
+		]) {
+			const next = await pending;
+			assert.notEqual(next.status, 0, next.output);
+			assert.match(next.output, /completion is uncertain/);
+		}
+		assert.deepEqual(migrationBytes(f.worker), remote);
+	});
+
+test("transport loss leaves an independently live remote writer owned and blocks sync plus both generators", async (t) => {
+	const f = await migrationGenerationCheckout(t),
+		before = migrationBytes(f.root),
+		writer = f.writer();
+	await observed(
+		() => fs.existsSync(path.join(f.control, "writer-entered")),
+		"independent API writer ready",
+	);
+	flag(f, "stream-loss");
+	const lost = await f.migrations();
+	assert.notEqual(lost.status, 0, lost.output);
+	assert.match(lost.output, /completion is uncertain/);
+	await observed(
+		() => fs.existsSync(path.join(f.control, "writer-mutated")),
+		"API writer outlived failed CLI",
+	);
+	assert.equal(writer.child.exitCode, null);
+	const remote = migrationBytes(f.worker),
+		ownership = f.json(".boat/source-writer.json");
+	assert.match(ownership.commandId, /^cmd_/);
+	assert.equal(ownership.terminal, null);
+	for (const next of [
+		await f.run("build", "PACKAGE=asset").done,
+		await f.generate(),
+		await f.migrations(),
+	]) {
+		assert.notEqual(next.status, 0, next.output);
+		assert.match(next.output, /completion is uncertain/);
+	}
+	const daemon = f.daemon(),
+		daemonResult = await daemon.done;
+	assert.notEqual(daemonResult.status, 0, daemonResult.output);
+	assert.match(daemonResult.output, /completion is uncertain/);
+	assert.equal(writer.child.exitCode, null);
+	assert.deepEqual(migrationBytes(f.root), before);
+	assert.deepEqual(migrationBytes(f.worker), remote);
+	assert.equal(
+		f.json(".boat/source-writer.json").commandId,
+		ownership.commandId,
+	);
+	flag(f, "writer-release");
+	await writer.done;
+	const stillBlocked = await f.run("build", "PACKAGE=asset").done;
+	assert.notEqual(stillBlocked.status, 0, stillBlocked.output);
+	assert.match(stillBlocked.output, /completion is uncertain/);
 });

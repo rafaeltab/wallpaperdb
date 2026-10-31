@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -2468,3 +2469,142 @@ test("known-lost reconstruction preserves identity evidence and cost across fail
 		false,
 	);
 });
+
+// Native Drizzle runs without a database, using the descriptor's pinned old
+// migrations and a test-only append. Only transport and installation are controlled.
+async function migrationGenerationCheckout(t) {
+	const f = await lockGenerationCheckout(t);
+	const repository = path.resolve(import.meta.dirname, "..");
+	const descriptor = JSON.parse(
+		fs.readFileSync(path.join(repository, "scripts/boat-workloads/548.json")),
+	);
+	const names = descriptor.before.migrationSet.map((entry) => entry.path);
+	for (const name of [
+		...names,
+		"apps/asset/package.json",
+		"apps/asset/drizzle.config.ts",
+		"apps/asset/src/db/schema.ts",
+	])
+		f.local(name, fs.readFileSync(path.join(repository, name)));
+	// Use checked-in inputs so the regression works in shallow checkouts. A
+	// test-only native append exercises source return without including a Source
+	// capability implementation in the infrastructure change.
+	for (const entry of [
+		...descriptor.before.migrationSet,
+		descriptor.before.schema,
+	])
+		assert.equal(
+			createHash("sha256")
+				.update(fs.readFileSync(path.join(f.root, entry.path)))
+				.digest("hex"),
+			entry.sha256,
+		);
+	const pkg = f.json("apps/asset/package.json");
+	pkg.scripts["dev:configure"] = "true";
+	f.local("apps/asset/package.json", JSON.stringify(pkg));
+	const schema = fs.readFileSync(
+		path.join(f.root, "apps/asset/src/db/schema.ts"),
+		"utf8",
+	);
+	const anchor =
+		"export const assetSourceState = pgTable('asset_source_state', {";
+	assert.equal(schema.split(anchor).length, 2);
+	f.local(
+		"apps/asset/src/db/schema.ts",
+		schema.replace(
+			anchor,
+			`${anchor}\n  nextCandidateOrdinal: bigint('next_candidate_ordinal', {mode:'number'}).notNull().default(0),`,
+		) +
+			"\nexport const sourceCandidates = pgTable('source_candidates', {id: text('id').primaryKey()});\n",
+	);
+	f.local(
+		".gitignore",
+		fs.readFileSync(path.join(f.root, ".gitignore"), "utf8") +
+			"node_modules/\n",
+	);
+	const prepared = await f.generate();
+	assert.equal(prepared.status, 0, prepared.output);
+	fs.symlinkSync(
+		path.join(repository, "apps/asset/node_modules"),
+		path.join(f.worker, "apps/asset/node_modules"),
+	);
+	const wrapper = path.join(f.directory, "home/.local/bin/drizzle-kit");
+	fs.writeFileSync(
+		wrapper,
+		`#!${process.execPath}
+const fs=require('fs'),path=require('path'),cp=require('child_process');
+const control=process.env.FAKE_CONTROL,worker=process.env.FAKE_WORKER;
+if(!fs.existsSync(path.join(control,'installed-dependencies')))throw Error('Drizzle requires installed dependencies');
+fs.appendFileSync(path.join(control,'migration-starts'),JSON.stringify(JSON.parse(fs.readFileSync('drizzle/meta/_journal.json')))+'\\n');
+fs.writeFileSync(path.join(control,'migration-entered'),'yes');
+(async()=>{while(fs.existsSync(path.join(control,'migration-pause'))&&!fs.existsSync(path.join(control,'migration-release')))await new Promise(r=>setTimeout(r,10));
+const result=cp.spawnSync(process.execPath,[${JSON.stringify(path.join(repository, "apps/asset/node_modules/drizzle-kit/bin.cjs"))},...process.argv.slice(2)],{env:{...process.env,DATABASE_URL:'postgres://unused:unused@127.0.0.1/unused'},stdio:'inherit'});
+process.exit(result.status??1);
+})();
+`,
+		{ mode: 0o755 },
+	);
+	fs.mkdirSync(path.join(f.worker, "node_modules/.bin"), { recursive: true });
+	fs.writeFileSync(
+		path.join(f.worker, "node_modules/.bin/turbo"),
+		"#!/bin/sh\nexit 0\n",
+		{ mode: 0o755 },
+	);
+	return {
+		...f,
+		migrations: () => f.run("run", "PACKAGE=asset", "SCRIPT=db:generate").done,
+	};
+}
+
+function migrationBytes(root) {
+	const result = {};
+	function visit(dir) {
+		for (const entry of fs.readdirSync(path.join(root, dir), {
+			withFileTypes: true,
+		})) {
+			const name = path.posix.join(dir, entry.name);
+			if (entry.isDirectory()) visit(name);
+			else
+				result[name] = entry.isSymbolicLink()
+					? `link:${fs.readlinkSync(path.join(root, name))}`
+					: fs.readFileSync(path.join(root, name), "utf8");
+		}
+	}
+	visit("apps/asset/drizzle");
+	return result;
+}
+
+test("public migration generation returns native SQL, snapshot and journal as a complete local source set", async (t) => {
+	const f = await migrationGenerationCheckout(t);
+	const before = migrationBytes(f.root);
+	const result = await f.migrations();
+	assert.equal(result.status, 0, result.output);
+	const remote = migrationBytes(f.worker);
+	const journal = JSON.parse(remote["apps/asset/drizzle/meta/_journal.json"]);
+	assert.equal(journal.entries.length, 19, result.output);
+	const tag = journal.entries.at(-1).tag;
+	assert.match(
+		remote[`apps/asset/drizzle/${tag}.sql`],
+		/CREATE TABLE "source_candidates"/,
+	);
+	assert.match(
+		remote[`apps/asset/drizzle/${tag}.sql`],
+		/next_candidate_ordinal/,
+	);
+	assert.equal(
+		f.json("apps/asset/drizzle/meta/_journal.json").entries.length,
+		19,
+		"public Make completed but generation remained remote-only",
+	);
+	assert.deepEqual(migrationBytes(f.root), remote);
+	for (const [name, bytes] of Object.entries(before))
+		if (!name.endsWith("/_journal.json")) assert.equal(remote[name], bytes);
+	const again = await f.migrations();
+	assert.equal(again.status, 0, again.output);
+	assert.match(again.output, /No schema changes/);
+	assert.deepEqual(migrationBytes(f.root), remote);
+	const next = await f.run("build", "PACKAGE=asset").done;
+	assert.equal(next.status, 0, next.output);
+	assert.deepEqual(migrationBytes(f.worker), remote);
+});
+

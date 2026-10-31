@@ -5550,49 +5550,107 @@ test("shutdown wall clock incomplete live lock publication waits without bypassi
 
 // Ordinary cache has the existing 601 * 500 ms contention allowance. Do not
 // substitute a reduced counter/clock: this one public limit check pays that cost.
-test("ordinary lock unpublished pid retains ownership through its existing contention limit",async t=>{
- const f=await lockGenerationCheckout(t);
- const before=f.json(".boat/state.json"),server=f.json(".boat/cache-server.json"),settings=f.json(".boat/cache.json");
- const keeper=fixtureProcess(server.pid);
- const lock=path.join(f.root,".boat/lifecycle.lock");fs.mkdirSync(lock);
- const start=fixtureNow(),pending=f.run("boat-cache");let timer;
- let result;
- try { result=await Promise.race([pending.done,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error("independent ordinary lock watchdog expired")),310000);})]); }
- finally {clearTimeout(timer);t.diagnostic(JSON.stringify({kind:"ordinary-lock-limit",elapsedMs:fixtureNow()-start,closed:pending.closed,lockRetained:fs.existsSync(lock)}));}
- assert.notEqual(result.status,0,result.output);assert.match(result.output,/Lifecycle lock timed out/);
- assert.ok(fixtureNow()-start>=300000,"preserve the real ordinary allowance");
- assert.ok(fixtureNow()-start<310000,"controller must refuse before independent safety");
- assert.equal(pending.closed,true);assert.equal(fs.existsSync(lock),true);
- assert.equal(fs.existsSync(path.join(lock,"pid")),false);
- assert.deepEqual(f.json(".boat/state.json"),before);assert.deepEqual(f.json(".boat/cache-server.json"),server);assert.deepEqual(f.json(".boat/cache.json"),settings);
- assert.deepEqual(fixtureProcess(keeper.pid),keeper);
- assert.equal(fs.existsSync(path.join(f.control,"transport")),false);
+test("ordinary lock unpublished pid retains ownership through its existing contention limit", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	const before = f.json(".boat/state.json"),
+		server = f.json(".boat/cache-server.json"),
+		settings = f.json(".boat/cache.json");
+	const keeper = fixtureProcess(server.pid);
+	const lock = path.join(f.root, ".boat/lifecycle.lock");
+	fs.mkdirSync(lock);
+	const start = fixtureNow(),
+		pending = f.run("boat-cache");
+	let timer;
+	let result;
+	try {
+		result = await Promise.race([
+			pending.done,
+			new Promise((_, reject) => {
+				timer = setTimeout(
+					() => reject(new Error("independent ordinary lock watchdog expired")),
+					310000,
+				);
+			}),
+		]);
+	} finally {
+		clearTimeout(timer);
+		t.diagnostic(
+			JSON.stringify({
+				kind: "ordinary-lock-limit",
+				elapsedMs: fixtureNow() - start,
+				closed: pending.closed,
+				lockRetained: fs.existsSync(lock),
+			}),
+		);
+	}
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Lifecycle lock timed out/);
+	assert.ok(
+		fixtureNow() - start >= 300000,
+		"preserve the real ordinary allowance",
+	);
+	assert.ok(
+		fixtureNow() - start < 310000,
+		"controller must refuse before independent safety",
+	);
+	assert.equal(pending.closed, true);
+	assert.equal(fs.existsSync(lock), true);
+	assert.equal(fs.existsSync(path.join(lock, "pid")), false);
+	assert.deepEqual(f.json(".boat/state.json"), before);
+	assert.deepEqual(f.json(".boat/cache-server.json"), server);
+	assert.deepEqual(f.json(".boat/cache.json"), settings);
+	assert.deepEqual(fixtureProcess(keeper.pid), keeper);
+	assert.equal(fs.existsSync(path.join(f.control, "transport")), false);
 });
 
-for(const publication of ["delayed-pid","release-without-pid"])
- test(`ordinary lock ${publication} contention preserves cache and progresses after release`,async t=>{
-  const f=await lockGenerationCheckout(t);
-  const before=f.json(".boat/state.json"),server=f.json(".boat/cache-server.json"),settings=f.json(".boat/cache.json");
-  const keeper=fixtureProcess(server.pid),lock=path.join(f.root,".boat/lifecycle.lock");fs.mkdirSync(lock);
-  const pending=f.run("boat-cache");
-  // Observe the actual ordinary controller in its fixture before publishing.
-  await observed(()=>worktreeProcesses(f.root).some(p=>{
-   try {return fs.readFileSync(`/proc/${p.pid}/cmdline`,"utf8").split("\0").some(a=>a==="scripts/boat.mjs");}catch{return false;}
-  }),"ordinary cache controller with unpublished ownership");
-  assert.equal(pending.closed,false);assert.equal(fs.existsSync(lock),true);
-  assert.equal(fs.existsSync(path.join(f.control,"transport")),false);
-  if(publication==="delayed-pid") {
-   const pidFile=path.join(lock,"pid");
-   fs.writeFileSync(pidFile,String(keeper.pid));
-   fs.utimesSync(pidFile,new Date(0),new Date());
-   await observed(()=>fs.statSync(pidFile).atimeMs>0,"actual published lock pid read");
-   assert.equal(pending.closed,false);assert.equal(fs.existsSync(lock),true);
-  }
-  fs.rmSync(lock,{recursive:true});
-  const result=await pending.done;assert.equal(result.status,0,result.output);
-  assert.deepEqual(f.json(".boat/state.json"),before);assert.deepEqual(f.json(".boat/cache-server.json"),server);assert.deepEqual(f.json(".boat/cache.json"),settings);assert.deepEqual(fixtureProcess(keeper.pid),keeper);
-  assert.equal(fs.existsSync(path.join(f.control,"transport")),false);
- });
+for (const publication of ["delayed-pid", "release-without-pid"])
+	test(`ordinary lock ${publication} contention preserves cache and progresses after release`, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		const before = f.json(".boat/state.json"),
+			server = f.json(".boat/cache-server.json"),
+			settings = f.json(".boat/cache.json");
+		const keeper = fixtureProcess(server.pid),
+			lock = path.join(f.root, ".boat/lifecycle.lock");
+		fs.mkdirSync(lock);
+		const pending = f.run("boat-cache");
+		// Observe the actual ordinary controller in its fixture before publishing.
+		await observed(
+			() =>
+				worktreeProcesses(f.root).some((p) => {
+					try {
+						return fs
+							.readFileSync(`/proc/${p.pid}/cmdline`, "utf8")
+							.split("\0")
+							.some((a) => a === "scripts/boat.mjs");
+					} catch {
+						return false;
+					}
+				}),
+			"ordinary cache controller with unpublished ownership",
+		);
+		assert.equal(pending.closed, false);
+		assert.equal(fs.existsSync(lock), true);
+		assert.equal(fs.existsSync(path.join(f.control, "transport")), false);
+		if (publication === "delayed-pid") {
+			const pidFile = path.join(lock, "pid");
+			fs.writeFileSync(pidFile, String(keeper.pid));
+			fs.utimesSync(pidFile, new Date(0), new Date());
+			await observed(
+				() => fs.statSync(pidFile).atimeMs > 0,
+				"actual published lock pid read",
+			);
+			assert.equal(pending.closed, false);
+			assert.equal(fs.existsSync(lock), true);
+		}
+		fs.rmSync(lock, { recursive: true });
+		const result = await pending.done;
+		assert.equal(result.status, 0, result.output);
+		assert.deepEqual(f.json(".boat/state.json"), before);
+		assert.deepEqual(f.json(".boat/cache-server.json"), server);
+		assert.deepEqual(f.json(".boat/cache.json"), settings);
+		assert.deepEqual(fixtureProcess(keeper.pid), keeper);
+		assert.equal(fs.existsSync(path.join(f.control, "transport")), false);
+	});
 
 test("shutdown wall clock captured tunnel session escape remains unresolved before safety cleanup", async (t) => {
 	const f = await shutdownCheckout(t);

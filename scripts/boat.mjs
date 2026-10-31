@@ -271,6 +271,7 @@ async function lock(fn, name = "lifecycle", deadline = Infinity, shutdown) {
 				pid = Number(fs.readFileSync(path.join(lockDir, "pid"), "utf8"));
 			} catch (error) {
 				if (error.code !== "ENOENT") throw error;
+				if (attempt > 600) throw new Error("Lifecycle lock timed out");
 				// mkdir/pid publication and owner release are separate filesystem steps.
 				// Missing publication never authorizes removing another owner's lock.
 				await wait(

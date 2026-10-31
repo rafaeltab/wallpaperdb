@@ -1,5 +1,5 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
-import { cleanupWorkerLayer } from '../src/adapters/cleanup/worker.js';
+import { cleanupWorkerLayer } from '../src/adapters/cleanup/index.js';
 import { Cleanup, CleanupStore } from '../src/capabilities/cleanup/index.js';
 import { brokerAcquisitionContract } from './fixtures/broker-acquisition.js';
 

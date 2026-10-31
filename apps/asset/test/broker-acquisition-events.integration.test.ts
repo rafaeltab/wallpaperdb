@@ -1,5 +1,5 @@
 import { Effect, ManagedRuntime } from 'effect';
-import { natsEventsLayer } from '../src/adapters/events/broker.js';
+import { natsEventsLayer } from '../src/adapters/events/index.js';
 import { brokerAcquisitionContract } from './fixtures/broker-acquisition.js';
 
 brokerAcquisitionContract((url) => {

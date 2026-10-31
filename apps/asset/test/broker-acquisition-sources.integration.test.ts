@@ -1,5 +1,5 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
-import { sourceConfirmationsLayer } from '../src/adapters/sources/publisher.js';
+import { sourceConfirmationsLayer } from '../src/adapters/sources/index.js';
 import { SourceAcceptanceOutbox } from '../src/capabilities/sources/index.js';
 import { brokerAcquisitionContract } from './fixtures/broker-acquisition.js';
 

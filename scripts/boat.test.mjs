@@ -9344,6 +9344,11 @@ for (const delayed of [false, true])
 				"authenticated fixture control",
 			);
 			assert.equal(f.receipts.finalListeners.newForward.length, 1);
+			assertPreviewRetirementOrder(
+				readPreviewRetirementEvents(f),
+				oldForward,
+				newForward,
+			);
 		});
 	});
 
@@ -9439,5 +9444,94 @@ test("preview replacement fixture retains evidence after delayed cleanup rejecti
 		assert.deepEqual(fixtureCensus(f.directory), []);
 		fs.rmSync(f.directory, { recursive: true });
 		assert.equal(fs.existsSync(f.directory), false);
+	});
+});
+
+function assertPreviewRetirementOrder(events, prior, successor) {
+	const retired = events.findIndex(
+		(event) =>
+			event.pid === prior.pid &&
+			event.startTicks === prior.startTicks &&
+			event.event === "forward-exited" &&
+			event.code === 0,
+	);
+	const born = events.findIndex(
+		(event) =>
+			event.pid === successor.pid &&
+			event.startTicks === successor.startTicks &&
+			event.event === "forward-born",
+	);
+	assert.ok(
+		retired >= 0 && born > retired,
+		"predecessor retirement must precede successor birth",
+	);
+}
+
+test("preview replacement ordering oracle rejects a forward started before retirement", async (t) => {
+	const archive = pendingPreviewEvidence(t);
+	await archive.scenario(async () => {
+		const f = await pendingUpgradePreview(
+			t,
+			"managed",
+			archive,
+			"replacement-order-sensitivity",
+		);
+		const prior = f.tunnel;
+		await f.healthy(true);
+		flag(f, `hold-forward-${prior.pid}`);
+		const controller = fixtureProcess(f.json(".boat/preview-process.json").pid);
+		assert.equal(liveOwnedProcess(f.root, controller), true);
+		process.kill(controller.pid, "SIGTERM");
+		assert.equal(
+			await fixtureStopped(() =>
+				readPreviewRetirementEvents(f).some((e) => e.event === "forward-term"),
+			),
+			true,
+		);
+		assert.equal(previewListenerOwner(prior, f.privatePort).length, 1);
+		// Deliberately start the same controlled forward too early through Make. This
+		// negative control qualifies the ordering assertion using a real bind error.
+		fs.appendFileSync(
+			path.join(f.root, "Makefile"),
+			`\npreview-early-forward:\n\t@.mise/boat/boat --no-update forward fake-worker --remote ${f.port} --local ${f.privatePort}\n`,
+		);
+		const early = f.run(
+			"preview-early-forward",
+			"BOAT_EXEC=local",
+			"SHELL=/bin/sh",
+			"boat_routed_goals=",
+		);
+		const result = await previewProbe(
+			early.done,
+			"early forward command did not close",
+		);
+		assert.notEqual(result.status, 0);
+		const successor = readPreviewRetirementEvents(f).find(
+			(e) => e.event === "forward-born" && e.pid !== prior.pid,
+		);
+		assert.ok(successor);
+		assert.equal(
+			readPreviewRetirementEvents(f).find((e) => e.event === "forward-error")
+				.code,
+			"EADDRINUSE",
+		);
+		flag(f, `release-forward-${prior.pid}`);
+		await previewProbe(f.command.done, "original preview did not drain");
+		assert.throws(
+			() =>
+				assertPreviewRetirementOrder(
+					readPreviewRetirementEvents(f),
+					prior,
+					successor,
+				),
+			/predecessor retirement must precede successor birth/,
+		);
+		f.receipts.orderingSensitivity = {
+			prior,
+			successor,
+			result,
+			rejected: true,
+		};
+		f.phase("actual early forward rejected by ordering oracle");
 	});
 });

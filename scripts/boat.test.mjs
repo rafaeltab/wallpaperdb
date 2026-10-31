@@ -1912,6 +1912,107 @@ test("lock fixture canary readiness detects early exit without output", async (t
 	assert.equal(canary.signalCode, null);
 });
 
+test("lock fixture preserves owned files when verified cleanup fails", async (t) => {
+	const directory = fs.mkdtempSync(
+		path.join(os.tmpdir(), "boat-lock-retention-"),
+	);
+	const fixture = path.join(directory, "fixture");
+	const destination = path.join(directory, "escaped-owned-child");
+	fs.mkdirSync(fixture);
+	fs.mkdirSync(destination);
+	const evidence = path.join(fixture, "owned-evidence");
+	fs.writeFileSync(evidence, "retain these fixture bytes");
+	const readiness = lockFixtureReadiness();
+	const children = [];
+	// This direct-child teardown deliberately does not use the cleanup under test.
+	t.after(async () => {
+		for (const record of children) {
+			const current = fixtureProcess(record.child.pid);
+			if (current) {
+				assert.equal(current.startTicks, record.identity.startTicks);
+				assert.equal(current.group, record.identity.group);
+				record.child.kill("SIGTERM");
+			}
+			assert.ok(
+				await fixtureStopped(() => record.closed),
+				"independent owned child closure",
+			);
+			assert.deepEqual(await record.done, [null, "SIGTERM"]);
+		}
+		fs.rmSync(directory, { recursive: true, force: true });
+	});
+	const start = (cwd, code, args = []) => {
+		const child = spawn(process.execPath, ["-e", code, ...args], {
+			cwd,
+			detached: true,
+			stdio: "ignore",
+		});
+		const record = {
+			child,
+			identity: fixtureProcess(child.pid),
+			closed: false,
+		};
+		record.done = once(child, "close").then((result) => {
+			record.closed = true;
+			return result;
+		});
+		children.push(record);
+		return record;
+	};
+	const runner = start(import.meta.dirname, "setInterval(()=>{},1000)");
+	const escaped = start(
+		fixture,
+		`const fs=require('fs'),path=require('path');const [fixture,destination]=process.argv.slice(1);
+fs.writeFileSync(path.join(fixture,'ready'),'yes');
+const timer=setInterval(()=>{if(fs.existsSync(path.join(fixture,'move'))){process.chdir(destination);fs.writeFileSync(path.join(destination,'moved'),'yes');clearInterval(timer);}},10);
+setInterval(()=>{},1000);`,
+		[fixture, destination],
+	);
+	await readiness.wait(() => {
+		assert.equal(escaped.child.exitCode, null);
+		assert.equal(escaped.child.signalCode, null);
+		return fs.existsSync(path.join(fixture, "ready"));
+	}, "owned child ready before retention scenario");
+	assert.ok(fixtureCensus(fixture).some((p) => p.pid === escaped.child.pid));
+	await assert.rejects(
+		emergencyLockFixtureCleanup({
+			runner: runner.child,
+			runnerIdentity: runner.identity,
+			done: runner.done,
+			directory: fixture,
+			beforeRunnerStop: async () => {
+				// Moving after the first census makes the captured cwd identity stale.
+				// Cleanup must reject rather than signal outside verified ownership.
+				fs.writeFileSync(path.join(fixture, "move"), "yes");
+				await readiness.wait(
+					() => fs.existsSync(path.join(destination, "moved")),
+					"owned child moved after initial census",
+				);
+			},
+		}),
+		/Owned fixture groups did not stop; preserving fixture files/,
+	);
+	assert.equal(
+		fs.existsSync(evidence),
+		true,
+		"failed cleanup retains owned files before safety teardown",
+	);
+	assert.equal(fs.readFileSync(evidence, "utf8"), "retain these fixture bytes");
+	assert.ok(
+		await fixtureStopped(() => runner.closed),
+		"terminated runner pipes close",
+	);
+	assert.equal(runner.closed, true);
+	assert.deepEqual(await runner.done, [null, "SIGTERM"]);
+	assert.equal(escaped.closed, false);
+	assert.equal(escaped.child.exitCode, null);
+	assert.equal(escaped.child.signalCode, null);
+	assert.equal(processGroupRunning(escaped.child.pid), true);
+	const survivor = fixtureProcess(escaped.child.pid);
+	assert.equal(survivor.startTicks, escaped.identity.startTicks);
+	assert.equal(survivor.cwd, destination);
+});
+
 for (const scenario of ["missing", "late", "unresponsive"])
 	test(`lock fixture emergency cleanup owns detached Make and keeper before ${scenario} report`, async (t) => {
 		const directory = fs.mkdtempSync(

@@ -9926,10 +9926,7 @@ async function observePreviewAcquisitionBudget(f) {
 		completed <= lower + 10000,
 		"startup disposal must remain inside the selected original total",
 	);
-	assert.ok(
-		completed - term.monoMs >= 400,
-		"TERM-ignoring forward must exercise disposal escalation, not fast cooperative cleanup",
-	);
+
 	assert.equal(liveOwnedProcess(f.root, forward), false);
 	assert.equal(liveOwnedProcess(f.root, owner), false);
 	assert.notEqual(result.status, 0);

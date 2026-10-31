@@ -774,17 +774,21 @@ async function stopLockFixtureChildren(children, drain = false) {
 		await Promise.all(children.map((p) => p.done));
 		return true;
 	};
-	if (drain && (await exited())) return;
+	if (drain && (await exited())) return { drained: true, signal: null };
 	for (const signal of ["SIGTERM", "SIGKILL"]) {
-		for (const { child } of children) {
-			if (!processGroupRunning(child.pid)) continue;
-			try {
-				process.kill(-child.pid, signal);
-			} catch (error) {
-				if (error.code !== "ESRCH") throw error;
+		for (const record of children) {
+			if (!processGroupRunning(record.child.pid)) continue;
+			// Detached fixture groups can outlive their leader. Verify an actual
+			// surviving member's cwd/start/group rather than trusting the old PGID.
+			for (const member of fixtureCensus(record.directory)) {
+				if (
+					member.group === record.child.pid &&
+					signalFixtureGroup(member, signal, record.directory)
+				)
+					break;
 			}
 		}
-		if (await exited()) return;
+		if (await exited()) return { drained: false, signal };
 	}
 	assert.fail("Owned lock fixture process groups did not exit");
 }
@@ -812,7 +816,7 @@ function lockFixtureReadiness({
 			if (report)
 				fs.appendFileSync(
 					`${report}.phases`,
-					JSON.stringify({ phase, at: now(), deadline }) + "\n",
+					`${JSON.stringify({ phase, at: now(), deadline })}\n`,
 				);
 			check();
 		},
@@ -831,12 +835,17 @@ function lockFixtureReadiness({
 
 async function lockGenerationCheckout(
 	t,
-	{ readiness = lockFixtureReadiness() } = {},
+	{
+		readiness = lockFixtureReadiness(),
+		directory: ownedDirectory,
+		cleanupReport,
+	} = {},
 ) {
 	readiness.enter("checkout setup");
-	const directory = fs.mkdtempSync(
-		path.join(os.tmpdir(), "boat-lock-command-"),
-	);
+	const directory =
+		ownedDirectory ??
+		fs.mkdtempSync(path.join(os.tmpdir(), "boat-lock-command-"));
+	fs.mkdirSync(directory, { recursive: true });
 	const root = path.join(directory, "source");
 	const worker = path.join(directory, "worker");
 	const home = path.join(directory, "home");
@@ -853,11 +862,21 @@ async function lockGenerationCheckout(
 				"release-stop-completion",
 			])
 				fs.writeFileSync(path.join(control, name), "yes");
+		let commandCleanup;
+		let backgroundCleanup;
 		try {
-			await stopLockFixtureChildren(commands, true);
+			commandCleanup = await stopLockFixtureChildren(commands, true);
 		} finally {
-			await stopLockFixtureChildren(background);
+			backgroundCleanup = await stopLockFixtureChildren(background);
 		}
+		if (cleanupReport)
+			fs.writeFileSync(
+				`${cleanupReport}.cleanup`,
+				JSON.stringify({
+					commands: commandCleanup,
+					background: backgroundCleanup,
+				}),
+			);
 		fs.rmSync(directory, { recursive: true, force: true });
 	});
 	const repository = path.resolve(import.meta.dirname, "..");
@@ -1056,6 +1075,7 @@ child.on('close',code=>{
 		child.stderr.on("data", capture);
 		child.on("error", (error) => capture(error.message));
 		const record = {
+			directory,
 			child,
 			closed: false,
 			terminal: null,
@@ -1343,8 +1363,20 @@ test("lock fixture phases consume one monotonic budget even while Make stays liv
 test("lock fixture child cannot restart an expired overall readiness budget", async (t) => {
 	const directory = fs.mkdtempSync(path.join(os.tmpdir(), "boat-lock-budget-"));
 	const report = path.join(directory, "report.json");
-	t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-	const runner = spawn(
+	const fixtureDirectory = path.join(directory, "fixture");
+	fs.mkdirSync(fixtureDirectory);
+	let runner, done, runnerIdentity;
+	t.after(async () => {
+		if (runner)
+			await emergencyLockFixtureCleanup({
+				runner,
+				runnerIdentity,
+				done,
+				directory: fixtureDirectory,
+			});
+		fs.rmSync(directory, { recursive: true, force: true });
+	});
+	runner = spawn(
 		process.execPath,
 		[
 			"--test",
@@ -1358,6 +1390,7 @@ test("lock fixture child cannot restart an expired overall readiness budget", as
 				NODE_OPTIONS: "",
 				BOAT_LOCK_CLEANUP_PHASE: "sync",
 				BOAT_LOCK_CLEANUP_REPORT: report,
+				BOAT_LOCK_FIXTURE_DIRECTORY: fixtureDirectory,
 				BOAT_LOCK_READY_DEADLINE: "1",
 			},
 			stdio: ["ignore", "pipe", "pipe"],
@@ -1370,7 +1403,8 @@ test("lock fixture child cannot restart an expired overall readiness budget", as
 	runner.stderr.on("data", (bytes) => {
 		output += bytes;
 	});
-	const done = once(runner, "close");
+	runnerIdentity = fixtureProcess(runner.pid);
+	done = once(runner, "close");
 	await observed(
 		() => runner.exitCode !== null || runner.signalCode !== null,
 		"expired budget runner exit",
@@ -1397,7 +1431,11 @@ if (process.env.BOAT_LOCK_CLEANUP_PHASE) {
 			deadline: Number(process.env.BOAT_LOCK_READY_DEADLINE),
 			report: process.env.BOAT_LOCK_CLEANUP_REPORT,
 		});
-		const checkout = await lockGenerationCheckout(t, { readiness });
+		const checkout = await lockGenerationCheckout(t, {
+			readiness,
+			directory: process.env.BOAT_LOCK_FIXTURE_DIRECTORY,
+			cleanupReport: process.env.BOAT_LOCK_CLEANUP_REPORT,
+		});
 		const f = await pausedGeneration(t, pause, checkout);
 		if (phase === "unresponsive") flag(f, "ignore-release");
 		f.pending.then((result) => {
@@ -1406,25 +1444,34 @@ if (process.env.BOAT_LOCK_CLEANUP_PHASE) {
 				JSON.stringify(result),
 			);
 		});
+		if (process.env.BOAT_LOCK_BEFORE_REPORT) {
+			fs.writeFileSync(`${process.env.BOAT_LOCK_CLEANUP_REPORT}.parked`, "yes");
+			await readiness.wait(
+				() => fs.existsSync(path.join(f.control, "publish-report")),
+				"pre-report barrier",
+			);
+		}
+		if (process.env.BOAT_LOCK_BEFORE_REPORT === "late") {
+			const nested = path.join(f.worker, "scripts");
+			spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], {
+				cwd: nested,
+				detached: true,
+				stdio: "ignore",
+			});
+			fs.writeFileSync(
+				process.env.BOAT_LOCK_CLEANUP_REPORT,
+				JSON.stringify({ directory: f.directory, processes: [] }),
+			);
+			fs.writeFileSync(`${process.env.BOAT_LOCK_CLEANUP_REPORT}.late`, "yes");
+			await readiness.wait(() => false, "late report parked runner");
+		}
 		readiness.enter("daemon startup");
 		const { child: daemon } = f.daemon();
 		await readiness.wait(
 			() => worktreeProcesses(f.root).some((p) => p.pid === daemon.pid),
 			"owned daemon started",
 		);
-		const processes = [
-			...worktreeProcesses(f.root),
-			...worktreeProcesses(f.worker),
-		].flatMap((record) => {
-			try {
-				const stat = fs.readFileSync(`/proc/${record.pid}/stat`, "utf8");
-				const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
-				return [{ ...record, group: Number(fields[2]) }];
-			} catch (error) {
-				if (["ENOENT", "ESRCH"].includes(error.code)) return [];
-				throw error;
-			}
-		});
+		const processes = fixtureCensus(f.directory);
 		readiness.enter("report publication");
 		fs.writeFileSync(
 			process.env.BOAT_LOCK_CLEANUP_REPORT,
@@ -1434,23 +1481,444 @@ if (process.env.BOAT_LOCK_CLEANUP_PHASE) {
 	});
 }
 
+async function fixtureStopped(predicate) {
+	const deadline = fixtureNow() + 1000;
+	while (!predicate()) {
+		if (fixtureNow() >= deadline) return false;
+		await new Promise((resolve) => setTimeout(resolve, 10));
+	}
+	return true;
+}
+function fixtureGroupMembers(group) {
+	const members = [];
+	for (const pid of fs.readdirSync("/proc")) {
+		if (!/^\d+$/.test(pid)) continue;
+		try {
+			const text = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+			const fields = text.slice(text.lastIndexOf(")") + 2).split(" ");
+			if (Number(fields[2]) !== group || fields[0] === "Z") continue;
+			const record = fixtureProcess(pid);
+			if (record) members.push(record);
+		} catch (error) {
+			if (!["ENOENT", "ESRCH"].includes(error.code)) throw error;
+		}
+	}
+	return members;
+}
+function signalFixtureGroup(record, signal, directory) {
+	const current = fixtureProcess(record.pid);
+	if (
+		!current ||
+		current.startTicks !== record.startTicks ||
+		current.group !== record.group ||
+		current.cwd !== record.cwd
+	)
+		return false;
+	const ownGroup = fixtureProcess(process.pid).group;
+	if (
+		!Number.isSafeInteger(record.group) ||
+		record.group <= 1 ||
+		record.group === ownGroup
+	)
+		return false;
+	if (directory) {
+		if (!fixtureContains(directory, current.cwd)) return false;
+		assert.ok(
+			fixtureGroupMembers(record.group).every((p) =>
+				fixtureContains(directory, p.cwd),
+			),
+			"Refusing mixed-ownership fixture group",
+		);
+	}
+	const verified = fixtureProcess(record.pid);
+	if (
+		!verified ||
+		verified.startTicks !== record.startTicks ||
+		verified.group !== record.group ||
+		verified.cwd !== record.cwd
+	)
+		return false;
+	try {
+		process.kill(-record.group, signal);
+	} catch (error) {
+		if (error.code !== "ESRCH") throw error;
+	}
+	return true;
+}
+async function emergencyLockFixtureCleanup({
+	runner,
+	runnerIdentity,
+	done,
+	directory,
+	beforeRunnerStop = async () => {},
+}) {
+	// The parent already owns this directory. A report is never an ownership source.
+	const records = new Map();
+	const census = () => {
+		for (const record of fixtureCensus(directory))
+			records.set(`${record.pid}:${record.startTicks}`, record);
+	};
+	let runnerClosed = false;
+	done.then(() => {
+		runnerClosed = true;
+	});
+	census();
+	const currentRunner = fixtureProcess(runner.pid);
+	const runnerRecords =
+		runnerIdentity && currentRunner?.startTicks === runnerIdentity.startTicks
+			? fixtureGroupMembers(runner.pid)
+			: [];
+	await beforeRunnerStop();
+	const runnerSignals = [];
+	for (const signal of ["SIGTERM", "SIGKILL"]) {
+		for (const record of runnerRecords)
+			if (signalFixtureGroup(record, signal)) {
+				runnerSignals.push(signal);
+				break;
+			}
+		if (
+			await fixtureStopped(
+				() =>
+					!processGroupRunning(runner.pid) &&
+					(runner.exitCode !== null || runner.signalCode !== null),
+			)
+		)
+			break;
+	}
+	assert.equal(
+		processGroupRunning(runner.pid),
+		false,
+		"runner group survived emergency cleanup",
+	);
+	// Capture groups launched after the first census and before runner shutdown.
+	census();
+	const control = path.join(directory, "control");
+	if (fs.existsSync(control))
+		for (const name of [
+			"release",
+			"release-sync",
+			"release-collect",
+			"release-stop-completion",
+		])
+			fs.writeFileSync(path.join(control, name), "yes");
+	const stopped = () => {
+		census();
+		return [...new Set([...records.values()].map((p) => p.group))].every(
+			(group) => !processGroupRunning(group),
+		);
+	};
+	await fixtureStopped(stopped);
+	const drainedGroups = [
+		...new Set([...records.values()].map((p) => p.group)),
+	].filter((group) => !processGroupRunning(group));
+	const signaled = [];
+	for (const signal of ["SIGTERM", "SIGKILL"]) {
+		census();
+		const groups = new Set();
+		for (const record of records.values()) {
+			if (groups.has(record.group)) continue;
+			if (signalFixtureGroup(record, signal, directory)) {
+				groups.add(record.group);
+				signaled.push({ group: record.group, signal });
+			}
+		}
+		if (await fixtureStopped(stopped)) {
+			assert.deepEqual(
+				fixtureCensus(directory),
+				[],
+				"owned processes survived emergency cleanup",
+			);
+			assert.ok(
+				await fixtureStopped(() => runnerClosed),
+				"runner pipes did not close after owned cleanup",
+			);
+			await done;
+			fs.rmSync(directory, { recursive: true, force: true });
+			return {
+				processes: [...records.values()],
+				drainedGroups,
+				signaled,
+				runnerSignals,
+			};
+		}
+	}
+	assert.fail("Owned fixture groups did not stop; preserving fixture files");
+}
+
+function fixtureProcess(pid) {
+	try {
+		const stat = () => {
+			const text = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+			return text.slice(text.lastIndexOf(")") + 2).split(" ");
+		};
+		const before = stat();
+		if (before[0] === "Z") return null;
+		const cwd = fs.readlinkSync(`/proc/${pid}/cwd`);
+		const after = stat();
+		if (before[19] !== after[19] || before[2] !== after[2] || after[0] === "Z")
+			return null;
+		return {
+			name: fs.readFileSync(`/proc/${pid}/comm`, "utf8").trim(),
+			pid: Number(pid),
+			group: Number(after[2]),
+			startTicks: after[19],
+			cwd,
+		};
+	} catch (error) {
+		if (["ENOENT", "ESRCH"].includes(error.code)) return null;
+		throw error;
+	}
+}
+function fixtureContains(directory, cwd) {
+	return cwd === directory || cwd.startsWith(`${directory}/`);
+}
+function fixtureCensus(directory) {
+	return fs
+		.readdirSync("/proc")
+		.filter((pid) => /^\d+$/.test(pid))
+		.flatMap((pid) => {
+			// Read cwd first: other users' proc entries need no identity inspection.
+			let cwd;
+			try {
+				cwd = fs.readlinkSync(`/proc/${pid}/cwd`);
+			} catch (error) {
+				if (["ENOENT", "ESRCH", "EACCES"].includes(error.code)) return [];
+				throw error;
+			}
+			if (!fixtureContains(directory, cwd)) return [];
+			const record = fixtureProcess(pid);
+			return record && fixtureContains(directory, record.cwd) ? [record] : [];
+		});
+}
+
+for (const scenario of ["missing", "late", "unresponsive"])
+	test(`lock fixture emergency cleanup owns detached Make and keeper before ${scenario} report`, async (t) => {
+		const directory = fs.mkdtempSync(
+			path.join(os.tmpdir(), "boat-lock-emergency-"),
+		);
+		const owned = path.join(directory, "fixture");
+		const sibling = `${owned}-sibling`;
+		fs.mkdirSync(owned);
+		fs.mkdirSync(sibling);
+		const report = path.join(directory, "report.json");
+		let canary, canaryClosed, runner, runnerIdentity, done;
+		// Keep mutation/reproduction failures bounded independently of the helper under test.
+		t.after(async () => {
+			for (const record of fixtureCensus(owned))
+				signalFixtureGroup(record, "SIGKILL", owned);
+			if (
+				fixtureProcess(runner.pid)?.startTicks === runnerIdentity?.startTicks
+			) {
+				for (const record of fixtureGroupMembers(runner.pid))
+					if (signalFixtureGroup(record, "SIGKILL")) break;
+			}
+			await observed(
+				() =>
+					(!runner || !processGroupRunning(runner.pid)) &&
+					fixtureCensus(owned).length === 0,
+				"regression safety cleanup",
+			);
+			if (done) await done;
+			if (canary) {
+				canary.kill("SIGTERM");
+				const [status, signal] = await canaryClosed;
+				assert.equal(status, null);
+				assert.equal(signal, "SIGTERM");
+				assert.equal(canary.exitCode, null);
+				assert.equal(canary.signalCode, "SIGTERM");
+			}
+			fs.rmSync(directory, { recursive: true, force: true });
+		});
+		canary = spawn(
+			process.execPath,
+			["-e", "console.log('ready');setInterval(()=>{},1000)"],
+			{ cwd: sibling, detached: true },
+		);
+		canaryClosed = once(canary, "close");
+		const canaryReady = once(canary.stdout, "data");
+		runner = spawn(
+			process.execPath,
+			[
+				"--test",
+				"--test-name-pattern=^lock fixture intentional failure$",
+				fileURLToPath(import.meta.url),
+			],
+			{
+				detached: true,
+				stdio: ["ignore", "pipe", "pipe"],
+				env: {
+					...process.env,
+					NODE_OPTIONS: "",
+					NODE_TEST_CONTEXT: undefined,
+					BOAT_LOCK_CLEANUP_PHASE:
+						scenario === "unresponsive" ? "unresponsive" : "sync",
+					BOAT_LOCK_CLEANUP_REPORT: report,
+					BOAT_LOCK_FIXTURE_DIRECTORY: owned,
+					BOAT_LOCK_READY_DEADLINE: String(fixtureNow() + 5000),
+					BOAT_LOCK_BEFORE_REPORT: scenario === "late" ? "late" : "1",
+				},
+			},
+		);
+		runnerIdentity = fixtureProcess(runner.pid);
+		done = once(runner, "close");
+		runner.stdout.resume();
+		runner.stderr.resume();
+
+		await canaryReady;
+		await observed(
+			() => fs.existsSync(`${report}.parked`),
+			"pre-report detached children barrier",
+		);
+		assert.equal(fs.existsSync(report), false);
+		const before = fixtureCensus(owned);
+		assert.ok(
+			new Set(before.map((p) => p.group)).size >= 2,
+			"detached Make and keeper are active before report",
+		);
+		const makeGroup = before.find(
+			(p) => p.name === "make" && p.pid === p.group,
+		)?.group;
+		assert.ok(makeGroup, "real Make group must be owned before report");
+		if (scenario === "missing") {
+			const make = before.find((p) => p.pid === makeGroup);
+			assert.equal(
+				signalFixtureGroup({ ...make, startTicks: "0" }, "SIGTERM", owned),
+				false,
+				"changed start identity never authorizes a signal",
+			);
+			assert.equal(
+				signalFixtureGroup(
+					{ ...make, group: make.group + 1 },
+					"SIGTERM",
+					owned,
+				),
+				false,
+				"changed group never authorizes a signal",
+			);
+			assert.equal(
+				signalFixtureGroup(fixtureProcess(canary.pid), "SIGTERM", owned),
+				false,
+				"sibling-prefix cwd is unrelated",
+			);
+			assert.equal(
+				signalFixtureGroup(fixtureProcess(process.pid), "SIGTERM"),
+				false,
+				"caller group is forbidden",
+			);
+			assert.equal(processGroupRunning(makeGroup), true);
+		}
+
+		const outcome = await emergencyLockFixtureCleanup({
+			runner,
+			runnerIdentity,
+			done,
+			directory: owned,
+			beforeRunnerStop: async () => {
+				assert.equal(
+					fs.existsSync(report),
+					false,
+					"first census occurs before report",
+				);
+				assert.equal(
+					fs.existsSync(owned),
+					true,
+					"files survive until groups stop",
+				);
+				if (scenario === "late") {
+					fs.writeFileSync(path.join(owned, "control/publish-report"), "yes");
+					await observed(
+						() => fs.existsSync(`${report}.late`),
+						"late report and nested detached child",
+					);
+				}
+			},
+		});
+		const [status, signal] = await done;
+		// Node test runner handles SIGTERM and reports a failing test exit.
+		assert.equal(status, 1);
+		assert.equal(signal, null);
+		assert.equal(runner.exitCode, 1);
+		assert.equal(runner.signalCode, null);
+		assert.deepEqual(outcome.runnerSignals, ["SIGTERM"]);
+		assert.equal(fs.existsSync(owned), false);
+		if (scenario === "unresponsive") {
+			assert.equal(outcome.drainedGroups.includes(makeGroup), false);
+			assert.ok(
+				outcome.signaled.some(
+					(p) => p.group === makeGroup && p.signal === "SIGTERM",
+				),
+			);
+		} else {
+			assert.ok(
+				outcome.drainedGroups.includes(makeGroup),
+				"released Make drains before termination",
+			);
+			assert.equal(
+				outcome.signaled.some((p) => p.group === makeGroup),
+				false,
+			);
+		}
+		if (scenario === "late") {
+			assert.ok(
+				outcome.processes.some(
+					(p) => p.cwd === path.join(owned, "worker/scripts"),
+				),
+				"post-runner census owns child launched after initial census",
+			);
+			assert.equal(fs.existsSync(report), true);
+		}
+
+		assert.deepEqual(
+			fixtureCensus(owned),
+			[],
+			"pre-report owned groups survived runner cleanup",
+		);
+		assert.equal(canary.exitCode, null);
+		assert.equal(canary.signalCode, null);
+		assert.equal(canary.kill(0), true);
+	});
+
 for (const phase of ["sync", "generate", "collect", "unresponsive"])
 	test(`lock fixture cleans up after failure during ${phase} without stopping unrelated processes`, async (t) => {
 		const directory = fs.mkdtempSync(
 			path.join(os.tmpdir(), "boat-lock-cleanup-"),
 		);
 		const report = path.join(directory, "report.json");
-		const unrelated = spawn(process.execPath, [
+		const fixtureDirectory = path.join(directory, "fixture");
+		fs.mkdirSync(fixtureDirectory);
+		let unrelated, unrelatedClosed, runner, runnerIdentity, done;
+		t.after(async () => {
+			try {
+				if (runner)
+					await emergencyLockFixtureCleanup({
+						runner,
+						runnerIdentity,
+						done,
+						directory: fixtureDirectory,
+					});
+			} finally {
+				if (unrelated) {
+					unrelated.kill("SIGKILL");
+					await observed(
+						() => unrelated.exitCode !== null || unrelated.signalCode !== null,
+						"unrelated process shutdown",
+					);
+					await unrelatedClosed;
+				}
+			}
+			fs.rmSync(directory, { recursive: true, force: true });
+		});
+		unrelated = spawn(process.execPath, [
 			"-e",
 			"console.log('ready');setInterval(()=>{},1000)",
 		]);
-		const unrelatedClosed = once(unrelated, "close");
+		unrelatedClosed = once(unrelated, "close");
 		let unrelatedReady = false;
 		unrelated.stdout.once("data", () => {
 			unrelatedReady = true;
 		});
 		const readiness = lockFixtureReadiness({ report });
-		const runner = spawn(
+		runner = spawn(
 			process.execPath,
 			[
 				"--test",
@@ -1465,64 +1933,57 @@ for (const phase of ["sync", "generate", "collect", "unresponsive"])
 					NODE_OPTIONS: "",
 					BOAT_LOCK_CLEANUP_PHASE: phase,
 					BOAT_LOCK_CLEANUP_REPORT: report,
+					BOAT_LOCK_FIXTURE_DIRECTORY: fixtureDirectory,
 					BOAT_LOCK_READY_DEADLINE: String(readiness.deadline),
 				},
 				stdio: ["ignore", "pipe", "pipe"],
 			},
 		);
 		let output = "";
-		runner.stdout.on("data", (b) => (output += b));
-		runner.stderr.on("data", (b) => (output += b));
+		const capture = (bytes) => {
+			output = (output + stripVTControlCharacters(String(bytes))).slice(-16384);
+		};
+		runner.stdout.on("data", capture);
+		runner.stderr.on("data", capture);
+		runnerIdentity = fixtureProcess(runner.pid);
 		let closed = false;
-		const done = once(runner, "close").then(([status]) => {
+		done = once(runner, "close").then(([status]) => {
 			closed = true;
 			return status;
 		});
-		t.after(async () => {
-			const snapshot = fs.existsSync(report)
-				? JSON.parse(fs.readFileSync(report, "utf8"))
-				: null;
-			// Emergency cleanup bounds the regression even against the broken fixture.
-			const groups = new Set([
-				runner.pid,
-				...(snapshot?.processes.map((p) => p.group) ?? []),
-			]);
-			try {
-				for (const group of groups) {
-					try {
-						process.kill(-group, "SIGKILL");
-					} catch (error) {
-						if (error.code !== "ESRCH") throw error;
-					}
-				}
-				await observed(() => closed, "regression runner emergency shutdown");
-				await done;
-			} finally {
-				unrelated.kill("SIGKILL");
-				await observed(
-					() => unrelated.exitCode !== null || unrelated.signalCode !== null,
-					"unrelated process shutdown",
-				);
-				await unrelatedClosed;
-			}
-			if (snapshot)
-				fs.rmSync(snapshot.directory, { recursive: true, force: true });
-			fs.rmSync(directory, { recursive: true, force: true });
-		});
+
 		await observed(() => unrelatedReady, "unrelated process ready");
-		await readiness.wait(
-			() => fs.existsSync(report) || closed,
-			"failure scenario ready",
-		);
+		try {
+			await readiness.wait(
+				() => fs.existsSync(report) || closed,
+				"failure scenario ready",
+			);
+		} catch (error) {
+			const phases = fs.existsSync(`${report}.phases`)
+				? fs.readFileSync(`${report}.phases`, "utf8").slice(-8192)
+				: "no child phase recorded";
+			error.message += `\nChild phases: ${phases}\nChild output: ${output}`;
+			throw error;
+		}
 		assert.equal(fs.existsSync(report), true, output);
 		await observed(() => closed, `failed ${phase} test exits after cleanup`);
 		assert.equal(await done, 1, output);
+		assert.equal(runner.exitCode, 1, output);
+		assert.equal(runner.signalCode, null, output);
 		assert.match(output, /intentional failure before normal barrier release/);
 		const snapshot = JSON.parse(fs.readFileSync(report, "utf8"));
 		const result = JSON.parse(fs.readFileSync(`${report}.result`, "utf8"));
-		if (phase === "unresponsive")
-			assert.notEqual(result.status, 0, result.output);
-		else assert.equal(result.status, 0, result.output);
+		const cleanup = JSON.parse(fs.readFileSync(`${report}.cleanup`, "utf8"));
+		if (phase === "unresponsive") {
+			assert.equal(result.status, null, result.output);
+			assert.equal(result.signal, "SIGTERM", result.output);
+			assert.deepEqual(cleanup.commands, { drained: false, signal: "SIGTERM" });
+		} else {
+			assert.equal(result.status, 0, result.output);
+			assert.equal(result.signal, null, result.output);
+			assert.deepEqual(cleanup.commands, { drained: true, signal: null });
+		}
+		assert.deepEqual(cleanup.background, { drained: false, signal: "SIGTERM" });
 		assert.equal(fs.existsSync(snapshot.directory), false);
 		for (const record of snapshot.processes) {
 			const statPath = `/proc/${record.pid}/stat`;

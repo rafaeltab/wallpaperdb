@@ -1293,7 +1293,9 @@ if(a[0]==='compose'&&a.includes('ps')){if(!fs.existsSync(path.join(c,'missing'))
 if(a[0]==='inspect'){console.log(JSON.stringify([{Id:'asset-instance-one',State:{Running:!fs.existsSync(path.join(c,'exited'))},Config:{Labels:{'com.docker.compose.project': process.env.FAKE_CONTAINER_PROJECT,'com.docker.compose.service':process.env.FAKE_CONTAINER_SERVICE}}}]));process.exit(0);}
 if(a[0]!=='exec'||!a.includes('asset-instance-one'))throw Error('unexpected docker '+a);
 if(fs.existsSync(path.join(c,'replaced'))){console.error('container asset-instance-one no longer running');process.exit(1);}
-const n=a.indexOf('node');const child=cp.spawn(process.execPath,['--import',${JSON.stringify(clock)},...a.slice(n+1)],{cwd:${JSON.stringify(path.join(runtime, "apps/asset"))},env:{...process.env,DATABASE_URL:'runtime-inherited'},stdio:['pipe','pipe','inherit']});process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});child.stdout.on('data',b=>{fs.appendFileSync(path.join(c,'runtime-output'),b);if(b.toString().includes('asset-migration ready')&&fs.existsSync(path.join(c,'replace-on-ready'))){fs.writeFileSync(path.join(c,'replaced'),'yes');child.kill('SIGTERM');}process.stdout.write(b);});child.on('close',code=>process.exit(code??1));
+const runtimeEnv={...process.env,DATABASE_URL:'runtime-inherited'},containerAt=a.indexOf('asset-instance-one');
+for(let i=1;i<containerAt;i++){let value;if(a[i]==='-e'||a[i]==='--env')value=a[++i];else if(a[i].startsWith('--env='))value=a[i].slice(6);else if(a[i].startsWith('-e'))value=a[i].slice(2);else continue;const equal=value.indexOf('='),key=equal<0?value:value.slice(0,equal);if(equal<0){if(Object.hasOwn(process.env,key))runtimeEnv[key]=process.env[key];else delete runtimeEnv[key];}else runtimeEnv[key]=value.slice(equal+1);}
+const n=a.indexOf('node');const child=cp.spawn(process.execPath,['--import',${JSON.stringify(clock)},...a.slice(n+1)],{cwd:${JSON.stringify(path.join(runtime, "apps/asset"))},env:runtimeEnv,stdio:['pipe','pipe','inherit']});process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});child.stdout.on('data',b=>{fs.appendFileSync(path.join(c,'runtime-output'),b);if(b.toString().includes('asset-migration ready')&&fs.existsSync(path.join(c,'replace-on-ready'))){fs.writeFileSync(path.join(c,'replaced'),'yes');child.kill('SIGTERM');}process.stdout.write(b);});child.on('close',code=>process.exit(code??1));
 `,
 	);
 	f.env.DATABASE_URL = "docker-only";
@@ -2057,6 +2059,49 @@ for (const field of ["project", "service"])
 		assert.equal(mutant.status, 0, mutant.output);
 		assert.equal(f.effects().length, 2);
 	});
+
+for (const options of [
+	["-e", "DATABASE_URL=host-controlled"],
+	["--env=DATABASE_URL=host-controlled"],
+	["-eDATABASE_URL=host-controlled"],
+	["--env", "DATABASE_URL"],
+])
+	test(`Asset migration environment-forwarding sensitivity detects ${options[0]}`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		f.env.DATABASE_URL = "host-controlled";
+		const helper = "scripts/lib/boat-asset-migration.mjs";
+		const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+		const anchor = '"exec",\n';
+		assert.equal(source.split(anchor).length, 2);
+		f.local(
+			helper,
+			source.replace(
+				anchor,
+				`${anchor}${options.map((value) => JSON.stringify(value)).join(",")},\n`,
+			),
+		);
+		const mutant = await f.run("migrate", "PACKAGE=asset").done;
+		assert.equal(mutant.status, 0, mutant.output);
+		assert.deepEqual(
+			f.effects().map((e) => e.url),
+			["host-controlled", "host-controlled"],
+			"double must expose forwarded host environment instead of always supplying runtime values",
+		);
+		assert(
+			f.effects().every((e) => e.cwd === path.join(f.runtime, "apps/asset")),
+		);
+	});
+
+test("Asset migration environment control inherits runtime URL instead of the controlled host URL", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	f.env.DATABASE_URL = "host-controlled";
+	const result = await f.run("migrate", "PACKAGE=asset").done;
+	assert.equal(result.status, 0, result.output);
+	assert.deepEqual(
+		f.effects().map((e) => e.url),
+		["runtime-inherited", "runtime-inherited"],
+	);
+});
 
 function finalInspectionClock(f, mode) {
 	fs.appendFileSync(

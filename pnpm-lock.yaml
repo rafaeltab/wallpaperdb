@@ -9,7 +9,7 @@ overrides:
 
 patchedDependencies:
   nats@2.29.3:
-    hash: 608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653
+    hash: 6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe
     path: patches/nats-2.29.3.patch
   '@stryker-mutator/vitest-runner@10.0.0':
     hash: 39ecdbebeb734113082eb3b58b0b82bc047fe79cb47f3b0405ea899876fd345d
@@ -135,7 +135,7 @@ importers:
         version: 6.1.3
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -274,7 +274,7 @@ importers:
         version: 5.6.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
@@ -471,7 +471,7 @@ importers:
         version: 16.6.0(bufferutil@4.1.0)(graphql@16.12.0)(utf-8-validate@6.0.6)
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       ulid:
         specifier: ^2.3.0
         version: 2.4.0
@@ -622,7 +622,7 @@ importers:
         version: 5.8.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -779,7 +779,7 @@ importers:
         version: 5.6.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -921,7 +921,7 @@ importers:
         version: 5.6.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -1063,7 +1063,7 @@ importers:
         version: 5.6.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
@@ -1190,7 +1190,7 @@ importers:
         version: 6.1.3
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -1542,7 +1542,7 @@ importers:
         version: 5.8.2
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       pg:
         specifier: ^8.13.1
         version: 8.16.3
@@ -1616,7 +1616,7 @@ importers:
         version: link:../core
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       ulid:
         specifier: ^2.3.0
         version: 2.4.0
@@ -1794,7 +1794,7 @@ importers:
         version: link:../testcontainers
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       postgres:
         specifier: ^3.4.3
         version: 3.4.7
@@ -1865,7 +1865,7 @@ importers:
         version: link:../vitest-config
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -1886,7 +1886,7 @@ importers:
         version: link:../vitest-config
       nats:
         specifier: ^2.29.1
-        version: 2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653)
+        version: 2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe)
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
@@ -20268,7 +20268,7 @@ snapshots:
 
   nanoid@3.3.11: {}
 
-  nats@2.29.3(patch_hash=608d9dd08e0c7e5fbbeef9170a9d4f814942bba8379e605b8250a9ea38f6b653):
+  nats@2.29.3(patch_hash=6991af2bfc41fcaa937a824a006f1037640a92cc2767e53276acf52b624590fe):
     dependencies:
       nkeys.js: 1.1.0
 

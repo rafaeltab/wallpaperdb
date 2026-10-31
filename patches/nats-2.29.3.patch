@@ -44,17 +44,18 @@
              this.closeError = err;
 --- a/lib/nats-base-client/protocol.js
 +++ b/lib/nats-base-client/protocol.js
-@@ -409,6 +409,9 @@
+@@ -409,6 +409,10 @@
      }
      dial(srv) {
          return __awaiter(this, void 0, void 0, function* () {
 +            if (this._closed) {
-+                throw core_1.NatsError.errorForCode(core_1.ErrorCode.Cancelled);
++                const closeError = yield this.closed;
++                throw closeError || core_1.NatsError.errorForCode(core_1.ErrorCode.ConnectionClosed);
 +            }
              const pong = this.prepare();
              let timer;
              try {
-@@ -562,8 +565,21 @@
+@@ -562,8 +566,21 @@
      static connect(options, publisher) {
          return __awaiter(this, void 0, void 0, function* () {
              const h = new ProtocolHandler(options, publisher);
@@ -78,7 +79,7 @@
          });
      }
      static toError(s) {
-@@ -903,7 +919,7 @@
+@@ -903,7 +920,7 @@
                  l.stop();
              });
              this._closed = true;

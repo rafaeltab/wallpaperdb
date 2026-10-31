@@ -224,10 +224,18 @@ export async function runPreview({
 		controller = identity(process.pid);
 	const directory = path.join(root, ".boat"),
 		file = path.join(directory, "preview-process.json"),
-		acquisition = path.join(directory, "preview-acquisition.json");
+		acquisition = path.join(directory, "preview-acquisition.json"),
+		progress = path.join(directory, `preview-progress-${generation}.json`);
+	const claim = {
+		...controller,
+		generation,
+		progress: path.basename(progress),
+	};
 	const state = {
 		...controller,
 		generation,
+		progress: path.basename(progress),
+		phase: "acquiring",
 		ready: false,
 		forward: null,
 		captured: [],
@@ -262,7 +270,9 @@ export async function runPreview({
 	const capture = new Map();
 	const persist = () => {
 		state.captured = [...capture.values()];
-		if (acquired && ownsFile(read(acquisition))) write(acquisition, state);
+		// The exclusive shared identity claim is never rewritten. Progress belongs
+		// to this generation even if the shared claim becomes foreign/unreadable.
+		if (acquired || published) write(progress, state);
 		if (published && ownsFile(read(file))) write(file, state);
 	};
 	const cancel = () => {
@@ -301,11 +311,12 @@ export async function runPreview({
 	const dispose = async () => {
 		clearInterval(monitor);
 		for (const socket of sockets) socket.destroy();
-		let publicClosed = !server.listening;
-		if (!publicClosed)
-			server.close(() => {
-				publicClosed = true;
-			});
+		// close() also cancels a pending listen. Merely seeing listening=false
+		// does not prove that an acquisition-time bind cannot complete later.
+		let publicClosed = false;
+		server.close((error) => {
+			publicClosed = !error || error.code === "ERR_SERVER_NOT_RUNNING";
+		});
 		// Startup disposal stays inside acquisition's original total. Once serving,
 		// failure gets the selected 1s disposal reserve measured from that failure,
 		// independent of the expired acquisition clock. Cooperative stop is unchanged.
@@ -350,8 +361,16 @@ export async function runPreview({
 				throw Error(
 					"Preview predecessor retirement unresolved; record retained",
 				);
+			state.phase = "retired";
+			state.ready = false;
+			state.terminal = terminal ?? null;
+			state.closed = child ? closed : true;
+			state.failure = failure?.message ?? null;
+			state.unresolved = [];
+			persist();
 			removeOwn(file);
 			removeOwn(acquisition);
+			if (!failure) removeOwn(progress);
 			emit("retired", {
 				forward: state.forward,
 				captured: [...capture.values()],
@@ -362,18 +381,17 @@ export async function runPreview({
 			failure = failure
 				? new Error(`${failure.message}; ${error.message}`)
 				: error;
+			state.phase = "unresolved";
+			state.ready = false;
+			state.terminal = terminal ?? null;
+			state.closed = child ? closed : true;
 			state.unresolved = unresolved.length ? unresolved : [...capture.values()];
 			state.failure = failure.message;
-			// A predecessor must never overwrite its successor's acquisition lease.
 			child?.unref();
 			server.unref();
 			try {
-				if (acquired && ownsFile(read(acquisition))) write(acquisition, state);
-				else if (published || state.spawnedPid || state.predecessor)
-					write(
-						path.join(directory, `preview-unresolved-${generation}.json`),
-						state,
-					);
+				if (acquired || published || state.spawnedPid || state.predecessor)
+					write(progress, state);
 				emit("unresolved", { ownership: state });
 			} catch (evidenceError) {
 				failure = new Error(`${failure.message}; ${evidenceError.message}`);
@@ -387,11 +405,12 @@ export async function runPreview({
 	try {
 		if (!controller || controller.cwd !== root)
 			throw Error("Preview controller ownership unavailable");
-		fs.writeFileSync(acquisition, JSON.stringify(state), {
+		fs.writeFileSync(acquisition, JSON.stringify(claim), {
 			flag: "wx",
 			mode: 0o600,
 		});
 		acquired = true;
+		persist();
 		prior = read(file);
 		if (prior) {
 			if (!valid(prior) || prior.pid === process.pid)
@@ -473,6 +492,8 @@ export async function runPreview({
 		}
 		check();
 		state.ready = true;
+		state.phase = "ready";
+		persist();
 		write(file, state);
 		published = true;
 		emit("ready", { forward: state.forward, captured: state.captured });
@@ -497,6 +518,8 @@ export async function runPreview({
 	} catch (error) {
 		failure = error;
 		state.ready = false;
+		state.phase = "failed";
+		state.failure = error.message;
 		try {
 			persist();
 			emit("failed", { message: error.message });

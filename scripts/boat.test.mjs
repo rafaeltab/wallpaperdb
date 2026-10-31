@@ -8610,6 +8610,10 @@ if(argv.includes('forward')){
 		} finally {
 			if (retirement) {
 				receipts.retirementEvents = readPreviewRetirementEvents(f);
+				receipts.progressRecords = fs
+					.readdirSync(path.join(f.root, ".boat"))
+					.filter((name) => /^preview-progress-[0-9a-f-]+\.json$/.test(name))
+					.map((name) => ({ name, state: f.json(`.boat/${name}`) }));
 				const lifetimeFile = path.join(f.root, ".boat/events.jsonl");
 				receipts.lifetimeEvents = fs.existsSync(lifetimeFile)
 					? fs
@@ -9694,7 +9698,10 @@ for (const kind of [
 						...owner,
 						generation: "replacement-acquisition",
 					});
-					f.local(".boat/preview-acquisition.json", prior);
+					const target = path.join(f.root, ".boat/preview-acquisition.json");
+					const temporary = `${target}.fixture-${process.pid}`;
+					fs.writeFileSync(temporary, prior, { mode: 0o600 });
+					fs.renameSync(temporary, target);
 				}
 			}
 			assert.equal(
@@ -9854,6 +9861,17 @@ test("preview acquisition proves a descendant-owned forward listener", async (t)
 	});
 });
 
+function previewAcquisitionProgress(f) {
+	const claim = f.json(".boat/preview-acquisition.json");
+	assert.equal(claim.progress, `preview-progress-${claim.generation}.json`);
+	const name = path.join(f.root, ".boat", claim.progress);
+	if (!fs.existsSync(name)) return null;
+	const progress = JSON.parse(fs.readFileSync(name, "utf8"));
+	for (const field of ["generation", "pid", "startTicks", "cwd"])
+		assert.equal(progress[field], claim[field]);
+	return progress;
+}
+
 async function observePreviewAcquisitionBudget(f) {
 	// The final synthetic readiness process exits before runPreview starts. The
 	// exclusive lease is created after its monotonic origin. Both observations
@@ -9862,14 +9880,14 @@ async function observePreviewAcquisitionBudget(f) {
 		() =>
 			fs.existsSync(path.join(f.control, "acquisition-origin-lower")) &&
 			fs.existsSync(path.join(f.root, ".boat/preview-acquisition.json")) &&
-			f.json(".boat/preview-acquisition.json").forward,
+			previewAcquisitionProgress(f)?.forward,
 		"independent acquisition origin bracket",
 	);
 	const upper = fixtureNow();
 	const lower = JSON.parse(
 		fs.readFileSync(path.join(f.control, "acquisition-origin-lower"), "utf8"),
 	).at;
-	const owner = f.json(".boat/preview-acquisition.json");
+	const owner = previewAcquisitionProgress(f);
 	const forward = fixtureProcess(owner.forward.pid);
 	assert.equal(forward.startTicks, owner.forward.startTicks);
 	assert.equal(forward.cwd, f.root);
@@ -10189,6 +10207,227 @@ for (const ignoringTerm of [true, false])
 			};
 			f.phase(
 				"late failure owned retirement and natural closure passed before fixture cleanup",
+			);
+		});
+	});
+
+function immutableClaimFixture(f, plan) {
+	const name = "scripts/test-fixtures/preview-claim-observer.mjs";
+	const bytes = fs.readFileSync(
+		path.join(import.meta.dirname, "test-fixtures/preview-claim-observer.mjs"),
+	);
+	f.local(name, bytes);
+	f.local("../control/immutable-claim-plan.json", JSON.stringify(plan));
+	f.env.NODE_OPTIONS =
+		`${f.env.NODE_OPTIONS ?? ""} --import=${path.join(f.root, name)}`.trim();
+	flag(f, "hold-forward-start");
+	f.local(
+		".boat/claim-observer.json",
+		JSON.stringify({
+			sha256: createHash("sha256").update(bytes).digest("hex"),
+			plan,
+		}),
+	);
+}
+
+for (const kind of ["progress", "replacement", "uncertainty"])
+	test(`immutable preview acquisition retains ${kind} at its progress boundary`, async (t) => {
+		const archive = pendingPreviewEvidence(t);
+		await archive.scenario(async () => {
+			const f = await pendingUpgradePreview(
+				t,
+				"managed",
+				archive,
+				`immutable-${kind}`,
+				{
+					startupFailure: true,
+					beforeStart: (fixture) =>
+						immutableClaimFixture(fixture, {
+							replace: kind !== "progress",
+							denyForwardIdentity: kind === "uncertainty",
+						}),
+				},
+			);
+			await f.readiness.wait(
+				() =>
+					fs.existsSync(
+						path.join(f.control, "immutable-claim-observation.json"),
+					),
+				"exact generation progress rename observed",
+			);
+			f.receipts.claimObserver = f.json(".boat/claim-observer.json");
+			const observation = JSON.parse(
+				fs.readFileSync(
+					path.join(f.control, "immutable-claim-observation.json"),
+					"utf8",
+				),
+			);
+			const claim = observation.before.claim;
+			const progressName = `.boat/${claim.progress}`;
+			const keeper = f.json(".boat/state.json").daemon;
+			f.receipts.immutableClaimObservation = observation;
+			assert.equal(claim.pid, observation.progress.pid);
+			for (const field of [
+				"forward",
+				"captured",
+				"ready",
+				"failure",
+				"unresolved",
+			])
+				assert.equal(Object.hasOwn(claim, field), false);
+			assert.equal(
+				observation.progress.forward.pid,
+				observation.progress.captured[0].pid,
+			);
+			assert.equal(liveOwnedProcess(f.root, keeper), true);
+			if (kind === "progress") {
+				assert.equal(
+					observation.before.sha256,
+					observation.after.sha256,
+					"progress publication must leave claim bytes immutable",
+				);
+				assert.equal(
+					observation.before.inode,
+					observation.after.inode,
+					"progress publication must not replace the shared claim",
+				);
+				assert.equal(f.json(progressName).phase, "acquiring");
+				flag(f, "release-forward-start");
+				await f.readiness.wait(
+					() => f.command.output().includes("Private preview proxy"),
+					"valid acquisition reaches readiness",
+				);
+				const ready = f.json(progressName);
+				assert.equal(ready.phase, "ready");
+				assert.equal(ready.ready, true);
+				assert.equal(ready.generation, claim.generation);
+				assert.ok(
+					ready.captured.some(
+						(p) =>
+							p.pid === ready.forward.pid &&
+							p.startTicks === ready.forward.startTicks,
+					),
+				);
+				assert.equal(
+					fs.existsSync(path.join(f.root, ".boat/preview-acquisition.json")),
+					false,
+				);
+				const current = fixtureProcess(ready.pid);
+				assert.equal(current.startTicks, ready.startTicks);
+				process.kill(current.pid, "SIGTERM");
+				const result = await previewProbe(
+					f.command.done,
+					"cooperative immutable-claim command did not drain",
+				);
+				assert.equal(result.status, 0, result.output);
+				assert.equal(
+					fs.existsSync(path.join(f.root, progressName)),
+					false,
+					"successful verified retirement removes own progress",
+				);
+				f.receipts.immutableReady = { ready, result };
+			} else {
+				assert.equal(
+					observation.replacement.claim.generation,
+					"replacement-acquisition",
+				);
+				assert.equal(
+					observation.after.sha256,
+					observation.replacement.sha256,
+					"a stale progress snapshot must not overwrite foreign claim bytes",
+				);
+				assert.equal(
+					observation.after.inode,
+					observation.replacement.inode,
+					"progress rename targets only its generation record",
+				);
+				const terminalObserved = await fixtureStopped(
+					() => f.command.terminal !== null,
+				);
+				f.receipts.claimFailureBeforeCleanup = {
+					terminalObserved,
+					commandTerminal: f.command.terminal,
+					commandClosed: f.command.closed,
+					controller: fixtureProcess(claim.pid),
+					publicListeners: previewListenerOwner(claim, f.port),
+					progress: f.json(progressName),
+				};
+				f.phase(
+					"atomic replacement terminal/listener verdict before fixture cleanup",
+				);
+				assert.equal(
+					terminalObserved,
+					true,
+					"claim replacement must fail within the existing one-second observation",
+				);
+				const retained = f.json(progressName);
+				assert.equal(retained.generation, claim.generation);
+				assert.equal(retained.pid, claim.pid);
+				assert.equal(retained.startTicks, claim.startTicks);
+				assert.equal(retained.cwd, claim.cwd);
+				assert.equal(retained.ready, false);
+				assert.match(retained.failure, /acquisition ownership changed/);
+				assert.deepEqual(
+					f.json(".boat/preview-acquisition.json"),
+					observation.replacement.claim,
+				);
+				if (kind === "uncertainty") {
+					assert.equal(retained.phase, "unresolved");
+					assert.match(
+						retained.failure,
+						/fixture forward identity inspection unavailable/,
+					);
+					assert.ok(
+						retained.unresolved.some(
+							(p) =>
+								p.pid === retained.forward.pid &&
+								p.startTicks === retained.forward.startTicks,
+						),
+					);
+					assert.equal(liveOwnedProcess(f.root, retained.forward), true);
+					assert.equal(
+						f.command.closed,
+						false,
+						"unknown descendant holds pipes; fixture disposal cannot supply production success",
+					);
+					f.receipts.expectedUncertainty = {
+						retained,
+						resourceRetirementQualified: false,
+						fixtureDisposalFollowsVerdict: true,
+					};
+				} else {
+					const result = await previewProbe(
+						f.command.done,
+						"replaced-claim command pipes did not naturally close",
+					);
+					assert.notEqual(result.status, 0);
+					assert.match(result.output, /acquisition ownership changed/);
+					assert.equal(retained.phase, "retired");
+					assert.equal(retained.closed, true);
+					assert.deepEqual(retained.unresolved, []);
+					assert.equal(liveOwnedProcess(f.root, retained.forward), false);
+					f.receipts.immutableRetired = {
+						retained,
+						result,
+						naturalClosure: true,
+					};
+				}
+			}
+			const finalObservation = JSON.parse(
+				fs.readFileSync(
+					path.join(f.control, "immutable-claim-observation.json"),
+					"utf8",
+				),
+			);
+			assert.deepEqual(
+				finalObservation.counts,
+				{ claimCreates: 1, claimWrites: 0, claimRenames: 0 },
+				"the shared claim is created exclusively and never rewritten during progress/disposal",
+			);
+			f.receipts.immutableClaimObservation = finalObservation;
+			assert.equal(liveOwnedProcess(f.root, keeper), true);
+			f.phase(
+				"immutable claim and generation progress verdict before fixture disposal",
 			);
 		});
 	});

@@ -8479,7 +8479,7 @@ if(argv.includes('forward')){
  ${
 		retirement
 			? `const identity=()=>{const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');return {pid:process.pid,startTicks:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()};};
- const event=(event,detail={})=>fs.appendFileSync(path.join(control,'retirement-events'),JSON.stringify({event,at:Date.now(),...identity(),...detail})+'\\n');
+ const event=(event,detail={})=>fs.appendFileSync(path.join(control,'retirement-events'),JSON.stringify({event,at:Date.now(),monoMs:Number(process.hrtime.bigint()/1000000n),...identity(),...detail})+'\\n');
  event('forward-born');process.once('exit',code=>event('forward-exited',{code}));
  const predecessorFile=path.join(control,'predecessor-identity');if(fs.existsSync(predecessorFile)){const prior=JSON.parse(fs.readFileSync(predecessorFile));const observe=record=>{try{const text=fs.readFileSync('/proc/'+record.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');return {pid:record.pid,startTicks:fields[19],live:fields[0]!=='Z'&&fields[19]===record.startTicks};}catch(error){if(!['ENOENT','ESRCH'].includes(error.code))throw error;return {pid:record.pid,startTicks:record.startTicks,live:false};}};event('predecessor-at-birth',{controller:observe(prior.controller),forward:observe(prior.forward)});}
 
@@ -8504,7 +8504,7 @@ if(argv.includes('forward')){
  const command=argv.at(-1);
  const allowed=command.startsWith('mkdir -p /home/user/wallpaperdb;') || command.startsWith('cd /home/user/wallpaperdb && tar -xzf -') || command.includes('mise trust && make install BOAT_EXEC=worker') || command.includes('chmod a+rx infra/postgres/init') || command.includes('SCRIPT=boat:ready') || command.includes('--input-type=module -') || command.includes('cat > /home/user/wallpaperdb/.boat/cache.json');
  if(!allowed)throw Error('unexpected controlled SSH operation');
- ${retirement ? "if(command.includes('SCRIPT=boat:ready')){const counter=path.join(control,'ready-count');const count=Number(fs.existsSync(counter)?fs.readFileSync(counter):0)+1;fs.writeFileSync(counter,String(count));if(count===3&&fs.existsSync(path.join(control,'fail-forward-spawn')))fs.writeFileSync(__filename,'#!/nonexistent-preview-interpreter\\n');}" : ""}
+ ${retirement ? "if(command.includes('SCRIPT=boat:ready')){const counter=path.join(control,'ready-count');const count=Number(fs.existsSync(counter)?fs.readFileSync(counter):0)+1;fs.writeFileSync(counter,String(count));if(count===3&&fs.existsSync(path.join(control,'observe-acquisition-origin')))process.once('exit',()=>fs.writeFileSync(path.join(control,'acquisition-origin-lower'),JSON.stringify({at:Number(process.hrtime.bigint()/1000000n),phase:'final-readiness-exit'})));if(count===3&&fs.existsSync(path.join(control,'fail-forward-spawn')))fs.writeFileSync(__filename,'#!/nonexistent-preview-interpreter\\n');}" : ""}
  // Consume source/archive bytes but never execute a supplied shell string.
  process.stdin.resume();
 }else throw Error('unexpected controlled Boat operation');
@@ -9854,48 +9854,219 @@ test("preview acquisition proves a descendant-owned forward listener", async (t)
 	});
 });
 
-test("preview acquisition exhausts only the selected local allowance before readiness", async (t) => {
-	const archive = pendingPreviewEvidence(t);
-	await archive.scenario(async () => {
-		const f = await pendingUpgradePreview(
-			t,
-			"managed",
-			archive,
-			"acquisition-budget",
-			{
-				startupFailure: true,
-				beforeStart: (fixture) => flag(fixture, "hold-forward-start"),
-			},
-		);
-		await f.readiness.wait(
-			() =>
-				readPreviewRetirementEvents(f).some(
-					(e) => e.event === "forward-start-held",
-				),
-			"forward held before binding",
-		);
-		// This observation uses the selected LOCAL 10s allowance. It does not extend
-		// the fixture's 5s readiness allowance or any application/protocol deadline.
-		const result = await previewProbe(
-			f.command.done,
-			"selected local allowance failed to bound command closure",
-			10000,
-		);
-		assert.notEqual(result.status, 0);
-		assert.match(result.output, /local acquisition allowance exhausted/);
-		assert.doesNotMatch(result.output, /Private preview proxy/);
-		assert.equal(
-			fs.existsSync(path.join(f.root, ".boat/preview-process.json")),
-			false,
-		);
-		assert.equal(
-			fs.existsSync(path.join(f.root, ".boat/preview-acquisition.json")),
-			false,
-		);
-		f.receipts.allowanceFailure = { result, naturalClosure: true };
-		f.phase("local allowance failure disposes forward before final handoff");
-	});
-});
+async function observePreviewAcquisitionBudget(f) {
+	// The final synthetic readiness process exits before runPreview starts. The
+	// exclusive lease is created after its monotonic origin. Both observations
+	// use the host hrtime clock, independently of production elapsedMs/deadlines.
+	await f.readiness.wait(
+		() =>
+			fs.existsSync(path.join(f.control, "acquisition-origin-lower")) &&
+			fs.existsSync(path.join(f.root, ".boat/preview-acquisition.json")) &&
+			f.json(".boat/preview-acquisition.json").forward,
+		"independent acquisition origin bracket",
+	);
+	const upper = fixtureNow();
+	const lower = JSON.parse(
+		fs.readFileSync(path.join(f.control, "acquisition-origin-lower"), "utf8"),
+	).at;
+	const owner = f.json(".boat/preview-acquisition.json");
+	const forward = fixtureProcess(owner.forward.pid);
+	assert.equal(forward.startTicks, owner.forward.startTicks);
+	assert.equal(forward.cwd, f.root);
+	assert.ok(
+		upper >= lower && upper - lower <= 100,
+		"origin bracket is too wide to qualify the 500ms counterexample",
+	);
+	await f.readiness.wait(
+		() =>
+			readPreviewRetirementEvents(f).some(
+				(event) => event.event === "forward-start-held",
+			),
+		"forward held before binding",
+	);
+	// 9250 is the independent discrimination gate between 9000 and 9500. Its
+	// slack covers the <=100ms origin bracket and normal observation scheduling;
+	// it changes no production deadline and is not a new cleanup allowance.
+	await new Promise((resolve) =>
+		setTimeout(resolve, Math.max(0, lower + 9250 - fixtureNow())),
+	);
+	const gate = fixtureNow();
+	const term = readPreviewRetirementEvents(f).find(
+		(event) => event.event === "forward-term",
+	);
+	f.receipts.budgetObservation = {
+		lower,
+		upper,
+		gate,
+		term: term ?? null,
+		owner,
+		forward,
+		forwardLiveAtGate: liveOwnedProcess(f.root, forward),
+		commandTerminalAtGate: f.command.terminal,
+		commandClosedAtGate: f.command.closed,
+		observer: "host hrtime, final readiness exit / first lease observation",
+	};
+	f.phase(
+		"independent cutoff verdict before Make pipe await or fixture cleanup",
+	);
+	assert.ok(
+		term && term.monoMs >= lower + 9000 && term.monoMs <= lower + 9250,
+		"selected 9000 ms acquisition cutoff must precede the 9250 ms discrimination gate",
+	);
+	// TERM cannot finish this deliberately noncooperative forward. Successful
+	// disposal must escalate, observe its exact termination and close inherited
+	// pipes inside the original ten-second total, rather than finish fast at 9.5s.
+	const result = await previewProbe(
+		f.command.done,
+		"selected startup total failed to bound natural pipe closure",
+		Math.max(1, lower + 10000 - fixtureNow()),
+	);
+	const completed = fixtureNow();
+	assert.ok(
+		completed <= lower + 10000,
+		"startup disposal must remain inside the selected original total",
+	);
+	assert.ok(
+		completed - term.monoMs >= 400,
+		"TERM-ignoring forward must exercise disposal escalation, not fast cooperative cleanup",
+	);
+	assert.equal(liveOwnedProcess(f.root, forward), false);
+	assert.equal(liveOwnedProcess(f.root, owner), false);
+	assert.notEqual(result.status, 0);
+	assert.match(result.output, /local acquisition allowance exhausted/);
+	assert.doesNotMatch(
+		result.output,
+		/Private preview proxy|local disposal unresolved/,
+	);
+	const lifecycle = fs
+		.readFileSync(path.join(f.root, ".boat/events.jsonl"), "utf8")
+		.trim()
+		.split("\n")
+		.map((line) => JSON.parse(line))
+		.filter((event) => event.kind === "preview-lifetime");
+	assert.ok(
+		lifecycle.some(
+			(event) =>
+				event.stage === "retired" &&
+				event.closed &&
+				event.terminal.signal === "SIGKILL",
+		),
+	);
+	assert.equal(
+		lifecycle.some((event) => event.stage === "unresolved"),
+		false,
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/preview-acquisition.json")),
+		false,
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/preview-process.json")),
+		false,
+	);
+	f.receipts.allowanceFailure = {
+		result,
+		naturalClosure: true,
+		completed,
+		sinceLower: completed - lower,
+		sinceTerm: completed - term.monoMs,
+		lifecycle,
+	};
+	f.phase(
+		"independently observed cutoff and reserved disposal passed before fixture cleanup",
+	);
+}
+
+for (const mutant of [false, true])
+	test(
+		mutant
+			? "preview acquisition budget oracle rejects a 9500 ms cutoff"
+			: "preview acquisition exhausts only the selected local allowance before readiness",
+		async (t) => {
+			const archive = pendingPreviewEvidence(t);
+			const f = await pendingUpgradePreview(
+				t,
+				"managed",
+				archive,
+				mutant ? "budget-mutant-9500" : "acquisition-budget",
+				{
+					startupFailure: true,
+					beforeStart: (fixture) => {
+						for (const name of [
+							"hold-forward-start",
+							"ignore-forward-term",
+							"observe-acquisition-origin",
+						])
+							flag(fixture, name);
+						const modulePath = path.join(
+							fixture.root,
+							"scripts/lib/boat-preview.mjs",
+						);
+						if (mutant) {
+							const original = fs.readFileSync(modulePath, "utf8");
+							assert.equal(
+								original.split("acquisitionEnd = deadline - 1000;").length,
+								2,
+							);
+							fs.writeFileSync(
+								modulePath,
+								original.replace(
+									"acquisitionEnd = deadline - 1000;",
+									"acquisitionEnd = deadline - 500;",
+								),
+							);
+						}
+						fixture.local(
+							".boat/budget-module.json",
+							JSON.stringify({
+								mutant,
+								sha256: createHash("sha256")
+									.update(fs.readFileSync(modulePath))
+									.digest("hex"),
+							}),
+						);
+						fs.copyFileSync(
+							modulePath,
+							path.join(
+								archive.directory,
+								mutant ? "budget-mutant-9500.mjs" : "budget-valid-9000.mjs",
+							),
+						);
+					},
+				},
+			);
+			f.receipts.budgetModule = f.json(".boat/budget-module.json");
+			if (!mutant)
+				await archive.scenario(() => observePreviewAcquisitionBudget(f));
+			else {
+				await assert.rejects(
+					archive.scenario(async () => {
+						try {
+							return await observePreviewAcquisitionBudget(f);
+						} catch (error) {
+							f.receipts.counterexample = {
+								rejected: true,
+								candidateQualified: false,
+								verdictBeforeFixtureCleanup: true,
+								at: fixtureNow(),
+								name: error.name,
+								message: error.message,
+								stack: error.stack,
+							};
+							f.phase(
+								"owning mutant assertion rejected before independent fixture safety",
+							);
+							throw error;
+						}
+					}),
+					/selected 9000 ms acquisition cutoff/,
+				);
+				f.phase(
+					"9500 ms counterexample rejected before independent fixture disposal",
+				);
+			}
+		},
+	);
 
 for (const field of ["generation", "startTicks"])
 	test(`preview lifetime preserves ownership replaced at ${field} during shutdown`, async (t) => {

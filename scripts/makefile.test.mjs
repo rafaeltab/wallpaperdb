@@ -318,8 +318,8 @@ test("focused tests select one workspace and serialize dependency builds and tes
 test("dev defaults to Compose and scopes workspace dev through Turbo", () => {
 	assert.match(output("dev"), /docker compose .* watch/);
 	assert.match(
-		output("dev", "PACKAGE=docs"),
-		/run dev .*--filter=@wallpaperdb\/docs/,
+		output("dev", "PACKAGE=web"),
+		/run dev .*--filter=@wallpaperdb\/web/,
 	);
 });
 

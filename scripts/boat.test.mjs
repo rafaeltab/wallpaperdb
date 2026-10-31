@@ -1840,6 +1840,28 @@ for (const [mode, effects] of [
 		assert.equal(f.effects().length, effects);
 	});
 
+async function migrationResultWithin(running) {
+	let timer;
+	try {
+		return await Promise.race([
+			running.done,
+			new Promise((_, reject) => {
+				timer = setTimeout(
+					() =>
+						reject(
+							Error(
+								"remaining command allowance did not complete within 4000 ms",
+							),
+						),
+					4000,
+				);
+			}),
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
 test("Asset migration delivery consumes the remaining enclosing command allowance", async (t) => {
 	const f = await assetExecutionCheckout(t);
 	const controller = "scripts/boat.mjs";
@@ -1859,9 +1881,90 @@ test("Asset migration delivery consumes the remaining enclosing command allowanc
 	const running = f.run("migrate", "PACKAGE=asset");
 	await migrationObserved(f, "hash:apps/asset/drizzle/0000_first.sql");
 	assert.deepEqual(f.effects(), []);
-	const result = await running.done;
+	const observedAt = performance.now();
+	const result = await migrationResultWithin(running);
+	assert(
+		performance.now() - observedAt < 5000,
+		"command completion must fit the existing fixture observation bound",
+	);
 	assert.notEqual(result.status, 0, result.output);
 	assert.match(result.output, /deadline exhausted/);
+	assert.deepEqual(f.effects(), []);
+});
+
+test("Asset migration remaining-budget sensitivity detects a fresh full delivery allowance", async (t) => {
+	const f = await assetExecutionCheckout(t);
+	const controller = "scripts/boat.mjs",
+		helper = "scripts/lib/boat-asset-migration.mjs";
+	f.local(
+		controller,
+		fs
+			.readFileSync(path.join(f.root, controller), "utf8")
+			.replace(
+				"const entered = Date.now();",
+				"const entered = Date.now() - 178_000;",
+			),
+	);
+	const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+	assert.equal(
+		source.split("Math.min(request.deadline, Date.now() + 20_000)").length,
+		2,
+	);
+	f.local(
+		helper,
+		source.replace(
+			"Math.min(request.deadline, Date.now() + 20_000)",
+			"Date.now() + 20_000",
+		),
+	);
+	fs.writeFileSync(
+		path.join(f.runtime, "apps/asset/drizzle/0000_first.sql"),
+		"old SQL",
+	);
+	const running = f.run("migrate", "PACKAGE=asset");
+	await migrationObserved(f, "hash:apps/asset/drizzle/0000_first.sql");
+	let bailout, caught;
+	const started = performance.now();
+	try {
+		await Promise.race([
+			migrationResultWithin(running),
+			new Promise((_, reject) => {
+				bailout = setTimeout(
+					() => reject(Error("existing five-second fixture bailout")),
+					5000,
+				);
+			}),
+		]);
+	} catch (error) {
+		caught = error;
+	} finally {
+		clearTimeout(bailout);
+	}
+	const elapsedMs = performance.now() - started;
+	t.diagnostic(
+		JSON.stringify({
+			elapsedMs,
+			boundedResult: caught?.message,
+			beforeSafetyRelease: f.effects(),
+		}),
+	);
+	// Release the deliberately invalid probe only after recording its bound failure.
+	fs.writeFileSync(path.join(f.control, "expire"), "yes");
+	const cleanup = await running.done;
+	t.diagnostic(
+		JSON.stringify({
+			probeCleanupStatus: cleanup.status,
+			output: cleanup.output,
+		}),
+	);
+	assert.match(
+		caught?.message ?? "",
+		/remaining command allowance did not complete within 4000 ms/,
+	);
+	assert(
+		elapsedMs < 5000,
+		"the independent four-second bound must beat the existing five-second fixture bailout",
+	);
 	assert.deepEqual(f.effects(), []);
 });
 

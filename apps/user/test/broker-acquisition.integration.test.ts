@@ -1,6 +1,6 @@
 import { once } from 'node:events';
 import { createServer, type Socket } from 'node:net';
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Cause, Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import { attachmentBrokerLayer } from '../src/adapters/picture-attachments/index.js';
 import {
@@ -44,10 +44,17 @@ for (const ending of ['timeout', 'cancellation', 'disposal'] as const) {
     try {
       await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(1);
       if (ending === 'cancellation') controller.abort();
-      if (ending === 'disposal') await runtime.dispose();
-      const result = await acquisition;
+      const disposal = ending === 'disposal' ? runtime.dispose() : Promise.resolve();
+      if (ending === 'timeout') await acquisition;
+      const [result] = await Promise.all([
+        acquisition,
+        expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0),
+        disposal,
+      ]);
       expect(result._tag).toBe('Failure');
-      await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0);
+      if (ending === 'cancellation') {
+        expect(result._tag === 'Failure' && Cause.hasInterrupts(result.cause)).toBe(true);
+      }
     } finally {
       try {
         await runtime.dispose();

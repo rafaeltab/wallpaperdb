@@ -1,9 +1,10 @@
 import { once } from 'node:events';
 import { createServer, type Socket } from 'node:net';
+import { Cause, type Exit } from 'effect';
 import { expect, it } from 'vitest';
 
 interface Acquisition {
-  readonly run: (signal: AbortSignal) => Promise<{ readonly _tag: string }>;
+  readonly run: (signal: AbortSignal) => Promise<Exit.Exit<unknown, unknown>>;
   readonly dispose: () => Promise<void>;
 }
 
@@ -28,9 +29,17 @@ export function brokerAcquisitionContract(
       try {
         await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(1);
         if (ending === 'cancellation') controller.abort();
-        if (ending === 'disposal') await runtime.dispose();
-        expect((await acquisition)._tag).toBe('Failure');
-        await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0);
+        const disposal = ending === 'disposal' ? runtime.dispose() : Promise.resolve();
+        if (ending === 'timeout') await acquisition;
+        const [result] = await Promise.all([
+          acquisition,
+          expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0),
+          disposal,
+        ]);
+        expect(result._tag).toBe('Failure');
+        if (ending === 'cancellation') {
+          expect(result._tag === 'Failure' && Cause.hasInterrupts(result.cause)).toBe(true);
+        }
       } finally {
         try {
           await runtime.dispose();

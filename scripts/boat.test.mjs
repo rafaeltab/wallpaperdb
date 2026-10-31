@@ -2212,6 +2212,7 @@ for (const caller of ["boat-stop", "stop"])
 					...f.json(".boat/state.json"),
 					runningSince: null,
 					developmentWanted: true,
+					reconciliationPending: true,
 				}),
 			);
 			if (provider === "stopped") flag(f, "sleep");
@@ -2235,8 +2236,18 @@ for (const caller of ["boat-stop", "stop"])
 			assert.equal(f.json(".boat/state.json").snapshotRecovery.status, "DIRTY");
 			assert.equal(
 				f.json(".boat/state.json").developmentWanted,
-				!(caller === "stop" && provider === "ready"),
+				caller !== "stop",
 			);
+			assert.equal(
+				f.json(".boat/state.json").reconciliationPending,
+				caller === "stop" ? undefined : true,
+			);
+			assert.equal(f.json(".boat/state.json").cleanReceipt, undefined);
+			if (caller === "stop" && provider === "stopped")
+				assert.match(
+					result.output,
+					/already stopped.*intent.*physical cleanup.*DIRTY/,
+				);
 			if (provider === "stopped")
 				assert.equal(
 					calls.some((argv) => argv.includes("ssh") || argv.includes("exec")),

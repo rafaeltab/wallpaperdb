@@ -673,6 +673,21 @@ async function stop(remove = false, targets) {
 			save(s);
 			event("stopped", { id: s.id, estimatedCost: s.cost });
 		}
+		if (targets && result.cleanupSkipped) {
+			// Stopped compute cannot run cleanup. Cancel desired development without
+			// claiming physical teardown or qualifying the saved snapshot.
+			s.developmentWanted = developmentWantedAfterCommand(
+				s.developmentWanted,
+				targets,
+				0,
+			);
+			if (!developmentWantedAfterCommand(true, targets, 0))
+				delete s.reconciliationPending;
+			save(s);
+			console.log(
+				`Remote compute already stopped; development intent ${s.developmentWanted ? "preserved" : "cleared"}; physical cleanup was not performed; snapshot remains DIRTY.`,
+			);
+		}
 		const tunnel = read(path.join(dir, "cache-tunnel.json"));
 		if (liveOwnedProcess(root, tunnel)) {
 			try {

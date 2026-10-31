@@ -130,7 +130,11 @@ export function snapshotLifecycle({ load, persist }) {
 			}
 			for (let attempt = 0; attempt < 180; attempt++) {
 				const status = workerState(await inspect());
-				if (stopped(status)) return { error: errors.join("; ") };
+				if (stopped(status))
+					return {
+						error: errors.join("; "),
+						cleanupSkipped: stopped(initial) || stopping(initial),
+					};
 				if (!stopping(status))
 					throw new Error(`Unexpected worker state during stop: ${status}`);
 				await wait(1000);

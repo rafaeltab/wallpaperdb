@@ -31,11 +31,10 @@ export function brokerAcquisitionContract(
         if (ending === 'cancellation') controller.abort();
         const disposal = ending === 'disposal' ? runtime.dispose() : Promise.resolve();
         if (ending === 'timeout') await acquisition;
-        const [result] = await Promise.all([
-          acquisition,
-          expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0),
-          disposal,
-        ]);
+        const closure = (async () => {
+          await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0);
+        })();
+        const [result] = await Promise.all([acquisition, closure, disposal]);
         expect(result._tag).toBe('Failure');
         if (ending === 'cancellation') {
           expect(result._tag === 'Failure' && Cause.hasInterrupts(result.cause)).toBe(true);

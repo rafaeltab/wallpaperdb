@@ -3167,24 +3167,31 @@ test("uncollected remote proposal is retained before restoration and retention f
 		);
 });
 
-for (const phase of ["first-addition", "second-addition", "journal-commit"])
-	test(`next public Make recovers a controller killed after ${phase} before consuming snapshots`, async (t) => {
-		const f = await migrationGenerationCheckout(t),
-			before = migrationBytes(f.root);
-		const hook = path.join(f.directory, "crash.cjs");
-		fs.writeFileSync(
-			hook,
-			`
+async function crashMigrationPublication(f, phase) {
+	const hook = path.join(f.directory, "crash.cjs");
+	fs.writeFileSync(
+		hook,
+		`
 const fs=require('fs'),root=${JSON.stringify(f.root)},flag=${JSON.stringify(path.join(f.control, "crashed"))};
 let count=0;const link=fs.linkSync,rename=fs.renameSync;
 function crash(){if(fs.existsSync(flag))return;fs.writeFileSync(flag,'yes');process.kill(process.pid,'SIGKILL');}
 fs.linkSync=function(from,to){const result=link(from,to);if(to.startsWith(root+'/apps/asset/drizzle/')){count++;if(count===${phase === "first-addition" ? 1 : phase === "second-addition" ? 2 : -1})crash();}return result;};
 fs.renameSync=function(from,to){const result=rename(from,to);if(to===root+'/apps/asset/drizzle/meta/_journal.json'&&${phase === "journal-commit"})crash();return result;};
 `,
-		);
-		f.env.NODE_OPTIONS = `--require=${hook}`;
-		const killed = await f.migrations();
-		assert.notEqual(killed.status, 0, killed.output);
+	);
+	f.env.NODE_OPTIONS = `--require=${hook}`;
+	const killed = await f.migrations();
+	assert.notEqual(killed.status, 0, killed.output);
+	delete f.env.NODE_OPTIONS;
+	assert.equal(fs.existsSync(path.join(f.control, "crashed")), true);
+	return f.json(".boat/migration-publication.json");
+}
+
+for (const phase of ["first-addition", "second-addition", "journal-commit"])
+	test(`next public Make recovers a controller killed after ${phase} before consuming snapshots`, async (t) => {
+		const f = await migrationGenerationCheckout(t),
+			before = migrationBytes(f.root);
+		await crashMigrationPublication(f, phase);
 		assert.equal(
 			fs.existsSync(path.join(f.root, ".boat/migration-publication.json")),
 			true,
@@ -3214,6 +3221,114 @@ fs.renameSync=function(from,to){const result=rename(from,to);if(to===root+'/apps
 			f.json("apps/asset/drizzle/meta/_journal.json").entries.length,
 			19,
 		);
+	});
+
+for (const identity of [
+	"same-worker",
+	"not_found",
+	"expired",
+	"unknown-intent",
+	"unknown-pending",
+])
+	test(`committed publication recovery binds delivery to ${identity} ownership on public build`, async (t) => {
+		const f = await migrationGenerationCheckout(t);
+		const baseline = path.join(f.directory, "fresh-baseline");
+		fs.cpSync(f.worker, baseline, { recursive: true });
+		const intent = await crashMigrationPublication(f, "journal-commit");
+		const accepted = migrationBytes(f.root);
+		assert.equal(
+			f.json("apps/asset/drizzle/meta/_journal.json").entries.length,
+			19,
+		);
+		const marker = f.json(".boat/migration-return-pending.json");
+		if (identity === "unknown-intent") {
+			delete intent.workerId;
+			f.local(".boat/migration-publication.json", JSON.stringify(intent));
+		}
+		if (identity === "unknown-pending") {
+			delete marker.workerId;
+			f.local(".boat/migration-return-pending.json", JSON.stringify(marker));
+		}
+		const fresh = ["not_found", "expired"].includes(identity);
+		const priorWorker = path.join(f.directory, "prior-worker");
+		if (fresh) {
+			fs.renameSync(f.worker, priorWorker);
+			fs.renameSync(baseline, f.worker);
+			assert.equal(
+				JSON.parse(
+					migrationBytes(f.worker)["apps/asset/drizzle/meta/_journal.json"],
+				).entries.length,
+				18,
+			);
+			if (identity === "not_found")
+				fs.writeFileSync(path.join(f.control, "info-error"), "not_found");
+			else
+				fs.writeFileSync(
+					path.join(f.control, "provider-info"),
+					JSON.stringify({
+						sandbox: {
+							id: "fake-worker",
+							state: "archived",
+							snapshotAvailable: false,
+							dataExpiredAt: new Date(Date.now() - 60000).toISOString(),
+						},
+					}),
+				);
+			// Keep the fixture's controlled cache transport connected to the new identity.
+			f.local(
+				".boat/cache-tunnel.json",
+				JSON.stringify({
+					...f.json(".boat/cache-tunnel.json"),
+					id: "fake-new-worker",
+				}),
+			);
+		}
+		const callsBefore = fs
+			.readFileSync(path.join(f.control, "transport"), "utf8")
+			.trim()
+			.split("\n").length;
+		const next = await f.run("build", "PACKAGE=asset").done;
+		assert.equal(next.status, 0, next.output);
+		assert.deepEqual(migrationBytes(f.root), accepted);
+		assert.deepEqual(
+			migrationBytes(f.worker),
+			accepted,
+			"recovery must upload accepted source to a worker that did not generate it",
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/migration-publication.json")),
+			false,
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/migration-return-pending.json")),
+			false,
+		);
+		assert.equal(
+			fs.existsSync(intent.proposal),
+			true,
+			"crash evidence remains inspectable",
+		);
+		const calls = fs
+			.readFileSync(path.join(f.control, "transport"), "utf8")
+			.trim()
+			.split("\n")
+			.slice(callsBefore)
+			.map((line) => JSON.parse(line));
+		const retained = calls.some((argv) =>
+			argv.at(-1).includes("retain-migrations"),
+		);
+		assert.equal(
+			retained,
+			identity !== "same-worker",
+			"only proven same-worker recovery may acknowledge without restoration",
+		);
+		if (fresh) {
+			assert.deepEqual(migrationBytes(priorWorker), accepted);
+			assert.equal(
+				f.json(".boat/state.json").retiredWorkers.at(-1).id,
+				"fake-worker",
+			);
+		}
 	});
 
 test("interrupted publication preserves an edited orphan and blocks further source consumers", async (t) => {

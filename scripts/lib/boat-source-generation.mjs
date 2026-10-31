@@ -284,7 +284,7 @@ export function recoverPublication(root, accept) {
 			)
 		)
 			throw new Error("Committed migration recovery conflict");
-		accept(intent.outputs);
+		accept(intent.outputs, intent.workerId);
 	} else
 		throw new Error(
 			"Local journal recovery conflict; preserve source and intent",
@@ -295,7 +295,7 @@ export function recoverPublication(root, accept) {
 // Publish append-only Drizzle output using the journal as commit point. Existing
 // metadata is immutable. Exclusive links never overwrite a concurrent new path.
 // Readers following either old or new journal always have all referenced files.
-function acceptMigrations(root, files, old, check, proposal, modes) {
+function acceptMigrations(root, files, old, check, proposal, modes, workerId) {
 	const journal = validateMigrations(files),
 		before = validateMigrations(old);
 	if (
@@ -329,6 +329,7 @@ function acceptMigrations(root, files, old, check, proposal, modes) {
 			fs.statSync(path.join(root, journalPath)).mode & 0o777,
 		);
 		const intent = {
+			workerId,
 			modes: Object.fromEntries(
 				Object.keys(files).map((name) => [
 					name,
@@ -570,7 +571,15 @@ export async function generateSource({
 		};
 		check();
 		if (kind === "migrations") {
-			acceptMigrations(root, files, outputs, check, proposal, modes);
+			acceptMigrations(
+				root,
+				files,
+				outputs,
+				check,
+				proposal,
+				modes,
+				transport.workerId,
+			);
 			const committed = migrationFiles(root);
 			validateMigrations(committed);
 			if (
@@ -597,6 +606,7 @@ export async function generateSource({
 			Object.fromEntries(
 				Object.entries(files).map(([name, bytes]) => [name, hash(bytes)]),
 			),
+			transport.workerId,
 		);
 		if (kind === "migrations") finishPublication(root);
 		accepted = true;

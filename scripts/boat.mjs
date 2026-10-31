@@ -433,7 +433,7 @@ async function syncSource(id, after, sourceRoot = root) {
 	if (pending) {
 		const marker = path.join(dir, "migration-return-pending.json"),
 			record = read(marker);
-		if (!record.retained) {
+		if (!record.retained || record.retainedWorkerId !== id) {
 			const result = await ssh(
 				id,
 				`export PATH="$HOME/.local/bin:$PATH"; cd ${remote} && mise exec -- node scripts/lib/boat-source-generation.mjs retain-migrations ${quote(record.id)}`,
@@ -447,7 +447,11 @@ async function syncSource(id, after, sourceRoot = root) {
 				throw new Error(
 					"Remote proposal retention not confirmed; restoration blocked",
 				);
-			write(marker, { ...record, retained: receipt.retained });
+			write(marker, {
+				...record,
+				retained: receipt.retained,
+				retainedWorkerId: id,
+			});
 		}
 		await ssh(
 			id,
@@ -494,15 +498,25 @@ async function syncSource(id, after, sourceRoot = root) {
 	}
 }
 
-function acceptSource(outputs) {
-	write(path.join(dir, "manifest.json"), {
-		...read(path.join(dir, "manifest.json")),
-		...outputs,
-	});
+function acceptSource(outputs, workerId) {
 	const migration = Object.hasOwn(
 		outputs,
 		"apps/asset/drizzle/meta/_journal.json",
 	);
+	// Local publication survives worker loss. Delivery acknowledgement belongs
+	// only to the worker that generated these bytes, with known pending ownership.
+	// Legacy intents/markers without ownership must restore through normal sync.
+	const pending = read(path.join(dir, "migration-return-pending.json"));
+	if (
+		typeof workerId !== "string" ||
+		workerId !== read(stateFile).id ||
+		(migration && pending.workerId !== workerId)
+	)
+		return;
+	write(path.join(dir, "manifest.json"), {
+		...read(path.join(dir, "manifest.json")),
+		...outputs,
+	});
 	if (migration)
 		fs.rmSync(path.join(dir, "migration-return-pending.json"), { force: true });
 	const modes = read(path.join(dir, "source-modes.json"));
@@ -622,6 +636,7 @@ async function generate(id, started, kind) {
 				stagingRoot: runDir,
 				names: sourceNames,
 				transport: {
+					workerId: id,
 					assertStopped: assertSourceWriterStopped,
 					sync: (source, snapshot) => syncSource(id, source, snapshot),
 					invalidate: (kind, outputs) => {
@@ -632,6 +647,7 @@ async function generate(id, started, kind) {
 						if (kind === "migrations")
 							write(path.join(dir, "migration-return-pending.json"), {
 								id: randomBytes(12).toString("hex"),
+								workerId: id,
 							});
 					},
 					prepare: async (kind) => {

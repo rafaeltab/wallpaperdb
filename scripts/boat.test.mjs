@@ -1719,7 +1719,7 @@ test("Asset migration failure-propagation sensitivity exposes a false success", 
 	const f = await assetExecutionCheckout(t);
 	const helper = "scripts/lib/boat-asset-migration.mjs";
 	const source = fs.readFileSync(path.join(f.root, helper), "utf8");
-	const verdict = "resolve(expired ? 1 : (code ?? 1));";
+	const verdict = "resolve(expired ? 1 : (exitCode ?? 1));";
 	assert.equal(source.split(verdict).length, 2);
 	f.local(helper, source.replace(verdict, "resolve(0);"));
 	fs.writeFileSync(path.join(f.control, "fail-sql"), "yes");
@@ -1938,6 +1938,125 @@ test("Asset migration command expiry terminates its owned package process and sk
 	});
 	assert.match(result.output, /asset-migration completed [a-f0-9]+ 1/);
 });
+
+function migrationProcess(pid) {
+	try {
+		const fields = fs
+			.readFileSync(`/proc/${pid}/stat`, "utf8")
+			.split(") ")
+			.at(-1)
+			.split(" ");
+		return {
+			pid,
+			state: fields[0],
+			group: Number(fields[2]),
+			session: Number(fields[3]),
+			startTicks: fields[19],
+		};
+	} catch (error) {
+		if (error.code === "ENOENT") return null;
+		throw error;
+	}
+}
+
+for (const [leaderExit, release] of [
+	[7, false],
+	[0, false],
+	[7, true],
+	[0, true],
+])
+	test(`Asset migration group ownership survives leader exit ${leaderExit}, released=${release}`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		const controller = "scripts/boat.mjs";
+		f.local(
+			controller,
+			fs
+				.readFileSync(path.join(f.root, controller), "utf8")
+				.replace(
+					"const entered = Date.now();",
+					"const entered = Date.now() - 176_000;",
+				),
+		);
+		const pnpm = path.join(f.directory, "home/.local/bin/pnpm");
+		fs.writeFileSync(
+			pnpm,
+			`#!${process.execPath}
+const cp=require('child_process'),fs=require('fs'),path=require('path');
+if(process.argv[2]!=='run')process.exit(cp.spawnSync(${JSON.stringify(`${pnpm}-install`)},process.argv.slice(2),{stdio:'inherit',env:process.env}).status??1);
+const control=process.env.FAKE_CONTROL;
+const child=cp.spawn(process.execPath,['-e',"const fs=require('fs'),path=require('path'),c=process.env.FAKE_CONTROL;process.on('SIGTERM',()=>{});fs.writeFileSync(path.join(c,'descendant-pid'),String(process.pid));setInterval(()=>{if(fs.existsSync(path.join(c,'release-descendant')))process.exit(0);},10);"],{stdio:'ignore',env:process.env});child.unref();
+console.log('package leader exited ${leaderExit}');process.exit(${leaderExit});
+`,
+		);
+		let owned;
+		t.after(() => {
+			const current = owned && migrationProcess(owned.pid);
+			const needed = current && !["Z", "X"].includes(current.state);
+			t.diagnostic(
+				JSON.stringify({
+					safetyTeardown: { owned, current, needed: !!needed },
+				}),
+			);
+			if (needed && current.startTicks === owned.startTicks)
+				process.kill(owned.pid, "SIGKILL");
+		});
+		const running = f.run("migrate", "PACKAGE=asset");
+		await migrationObserved(f, `package leader exited ${leaderExit}`);
+		await observed(
+			() => fs.existsSync(path.join(f.control, "descendant-pid")),
+			"owned descendant startup",
+		);
+		owned = migrationProcess(
+			Number(fs.readFileSync(path.join(f.control, "descendant-pid"), "utf8")),
+		);
+		assert(owned && owned.group === owned.session && owned.group !== owned.pid);
+		if (release) {
+			assert.doesNotMatch(
+				fs.readFileSync(path.join(f.control, "runtime-output"), "utf8"),
+				/asset-migration completed/,
+			);
+			fs.writeFileSync(path.join(f.control, "release-descendant"), "yes");
+		}
+		const result = await running.done;
+		const atCompletion = migrationProcess(owned.pid);
+		const instance = JSON.parse(
+			result.output.match(/asset-migration instance (\{[^\n]+\})/)[1],
+		);
+		if (!release)
+			await observed(
+				() => Date.now() >= instance.commandDeadline + 20,
+				"command deadline passage",
+			);
+		const afterDeadline = migrationProcess(owned.pid);
+		t.diagnostic(
+			JSON.stringify({
+				leaderExit,
+				release,
+				commandDeadline: instance.commandDeadline,
+				atCompletion,
+				afterDeadline,
+				output: result.output,
+			}),
+		);
+		assert(
+			!atCompletion || ["Z", "X"].includes(atCompletion.state),
+			"completion must follow termination of live owned descendants, before safety teardown",
+		);
+		assert(
+			!afterDeadline || ["Z", "X"].includes(afterDeadline.state),
+			"owned descendant must not survive its command allowance",
+		);
+		if (release) {
+			assert.equal(result.status === 0, leaderExit === 0, result.output);
+			assert.match(
+				result.output,
+				new RegExp(`asset-migration completed [a-f0-9]+ ${leaderExit}`),
+			);
+		} else {
+			assert.notEqual(result.status, 0, result.output);
+			assert.match(result.output, /command deadline exhausted/);
+		}
+	});
 
 test("public lock generation repairs stale dependency inputs before frozen preparation and returns only the lock", async (t) => {
 	const f = await lockGenerationCheckout(t);

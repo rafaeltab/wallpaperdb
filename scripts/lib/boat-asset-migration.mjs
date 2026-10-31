@@ -147,7 +147,7 @@ export function captureAssetMigration(root, source) {
 
 // Serialized into one pinned Docker exec. stdin carries only the final authorization.
 async function runtime(expected, deadline, commandDeadline, support) {
-	const { path, hash, regular, members, spawn } = support;
+	const { fs, path, hash, regular, members, spawn } = support;
 	const root = path.resolve(process.cwd(), "../..");
 	const inspect = () => {
 		for (const [directory, names] of [
@@ -211,36 +211,101 @@ async function runtime(expected, deadline, commandDeadline, support) {
 			env: process.env,
 			detached: true,
 		});
-		let expired = false;
-		const stop = (signal) => {
+		let expired = false,
+			exited = false,
+			exitCode,
+			settled = false;
+		const sample = (pid) => {
 			try {
-				process.kill(-child.pid, signal);
-			} catch {}
+				const fields = fs
+					.readFileSync(`/proc/${pid}/stat`, "utf8")
+					.split(") ")
+					.at(-1)
+					.split(" ");
+				return {
+					pid,
+					state: fields[0],
+					group: Number(fields[2]),
+					session: Number(fields[3]),
+					start: fields[19],
+				};
+			} catch (error) {
+				if (["ENOENT", "ESRCH"].includes(error.code)) return null;
+				throw error;
+			}
 		};
-		const terminate = setTimeout(
-			() => {
-				expired = true;
-				console.error(
-					"Asset migration command deadline exhausted; termination requested, no automatic rerun",
+		const liveGroup = () =>
+			fs
+				.readdirSync("/proc")
+				.filter((name) => /^\d+$/.test(name))
+				.map((name) => sample(Number(name)))
+				.filter(
+					(p) =>
+						p &&
+						p.group === child.pid &&
+						p.session === child.pid &&
+						!["Z", "X"].includes(p.state),
 				);
-				stop("SIGTERM");
-			},
-			Math.max(0, commandDeadline - Date.now() - 1000),
-		);
-		const kill = setTimeout(
-			() => stop("SIGKILL"),
-			Math.max(0, commandDeadline - Date.now()),
-		);
+		const stop = (signal) => {
+			for (const owned of liveGroup()) {
+				const current = sample(owned.pid);
+				if (
+					current?.start === owned.start &&
+					current.group === child.pid &&
+					current.session === child.pid
+				)
+					try {
+						process.kill(owned.pid, signal);
+					} catch (error) {
+						if (error.code !== "ESRCH") throw error;
+					}
+			}
+		};
+		// The detached session/group is ours until all live members are gone.
+		// Leader exit is a verdict, not evidence of descendant or pipe termination.
+		const finish = (error) => {
+			if (settled) return;
+			settled = true;
+			clearInterval(observe);
+			if (error) reject(error);
+			else resolve(expired ? 1 : (exitCode ?? 1));
+		};
+		const observe = setInterval(() => {
+			try {
+				if (exited && liveGroup().length === 0) {
+					if (Date.now() >= commandDeadline) expired = true;
+					finish();
+					return;
+				}
+				if (Date.now() >= commandDeadline - 1000 && !expired) {
+					expired = true;
+					console.error(
+						"Asset migration command deadline exhausted; termination requested, no automatic rerun",
+					);
+					stop("SIGTERM");
+				}
+				// Reserve the latter half of the existing cleanup second for observing
+				// forced termination. Never extend the enclosing command allowance.
+				if (Date.now() >= commandDeadline - 500) stop("SIGKILL");
+				if (Date.now() >= commandDeadline) {
+					if (exited && liveGroup().length === 0) finish();
+					else
+						finish(
+							Error(
+								"Asset migration package-group termination uncertain; no completion receipt",
+							),
+						);
+				}
+			} catch (error) {
+				finish(error);
+			}
+		}, 10);
 		child.on("error", (error) => {
-			clearTimeout(terminate);
-			clearTimeout(kill);
-			reject(error);
+			finish(error);
 		});
-		child.on("close", (code) => {
-			if (expired) stop("SIGKILL");
-			clearTimeout(terminate);
-			clearTimeout(kill);
-			resolve(expired ? 1 : (code ?? 1));
+		child.on("exit", (code) => {
+			exited = true;
+			exitCode = code;
 		});
 	});
 	console.log(

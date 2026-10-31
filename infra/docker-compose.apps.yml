@@ -68,6 +68,12 @@ services:
         - action: sync
           path: ../apps/asset/src
           target: /app/apps/asset/src
+        - action: sync
+          path: ../apps/asset/drizzle
+          target: /app/apps/asset/drizzle
+        - action: sync
+          path: ../apps/asset/scripts
+          target: /app/apps/asset/scripts
         - action: sync+restart
           path: ../packages
           target: /app/packages

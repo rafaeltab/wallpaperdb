@@ -23,6 +23,7 @@ import {
 	finiteShutdownProcess,
 	retireShutdownTunnel,
 } from "./lib/boat-shutdown.mjs";
+import { runPreview } from "./lib/boat-preview.mjs";
 import { snapshotLifecycle, snapshotExpired } from "./lib/boat-snapshot.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 import {
@@ -1561,27 +1562,7 @@ async function preview() {
 	const port = Number(text.match(/^INGRESS_PORT\s*[:?]?=\s*(\d+)/m)?.[1]);
 	if (!port) throw new Error("No generated ingress port");
 	const privatePort = port + 20000;
-	const prior = read(path.join(dir, "preview-process.json"));
-	if (liveOwnedProcess(root, prior) && prior.pid !== process.pid) {
-		try {
-			if (fs.readlinkSync(`/proc/${prior.pid}/cwd`) === root)
-				process.kill(prior.pid, "SIGTERM");
-		} catch {}
-		await wait(500);
-	}
-	const tunnel = spawn(
-		cli,
-		[
-			"--no-update",
-			"forward",
-			id,
-			"--remote",
-			String(port),
-			"--local",
-			String(privatePort),
-		],
-		{ stdio: "inherit", detached: true },
-	);
+
 	const server = http.createServer((req, res) => {
 		if (meaningfulPreviewRequest(req.url, req.headers)) {
 			const s = read(stateFile);
@@ -1683,39 +1664,27 @@ async function preview() {
 		upstream.once("error", disconnect);
 		upstream.end();
 	});
-	await new Promise((resolve, reject) =>
-		server.listen(port, "127.0.0.1", resolve).once("error", reject),
-	);
-	write(
-		path.join(dir, "preview-process.json"),
-		worktreeProcesses(root).find((p) => p.pid === process.pid),
-	);
-	process.once("exit", () => {
-		if (read(path.join(dir, "preview-process.json")).pid === process.pid)
-			fs.rmSync(path.join(dir, "preview-process.json"), { force: true });
+	await runPreview({
+		root,
+		cli,
+		argv: [
+			"--no-update",
+			"forward",
+			id,
+			"--remote",
+			String(port),
+			"--local",
+			String(privatePort),
+		],
+		privatePort,
+		port,
+		server,
+		record: event,
+		ready: () =>
+			console.log(
+				`Private preview proxy http://localhost:${port}/web; application health passed. Authentication must still be verified in the browser.`,
+			),
 	});
-	console.log(
-		`Private preview proxy http://localhost:${port}/web; application health passed. Authentication must still be verified in the browser.`,
-	);
-	const sockets = new Set();
-	server.on("connection", (socket) => {
-		sockets.add(socket);
-		socket.once("close", () => sockets.delete(socket));
-	});
-	const close = () => {
-		try {
-			process.kill(-tunnel.pid, "SIGTERM");
-		} catch {}
-		for (const socket of sockets) socket.destroy();
-		server.close();
-	};
-	process.once("exit", () => {
-		try {
-			process.kill(-tunnel.pid, "SIGTERM");
-		} catch {}
-	});
-	process.on("SIGINT", close);
-	process.on("SIGTERM", close);
 }
 async function watchDevelopment(id) {
 	const state = read(stateFile);

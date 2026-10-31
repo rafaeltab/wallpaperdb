@@ -967,6 +967,7 @@ async function lockGenerationCheckout(
 		"scripts/lib/boat-preparation.mjs",
 		"scripts/lib/boat-snapshot.mjs",
 		"scripts/lib/boat-shutdown.mjs",
+		"scripts/lib/boat-preview.mjs",
 		"scripts/lib/boat-source-generation.mjs",
 		"scripts/lib/boat-asset-migration.mjs",
 		"scripts/package.json",
@@ -8279,7 +8280,13 @@ const child=spawn(process.execPath,['-e',"require('fs').writeFileSync(process.ar
 	});
 });
 
-async function pendingUpgradePreview(t, mode, archive, retirement = false) {
+async function pendingUpgradePreview(
+	t,
+	mode,
+	archive,
+	retirement = false,
+	options = {},
+) {
 	const evidence = archive.directory;
 	const report = path.join(evidence, retirement || mode);
 	const cleanups = [];
@@ -8309,6 +8316,7 @@ async function pendingUpgradePreview(t, mode, archive, retirement = false) {
 	const production = [
 		"scripts/boat.mjs",
 		"scripts/lib/boat.mjs",
+		"scripts/lib/boat-preview.mjs",
 		"Makefile",
 		"scripts/boat-route.mk",
 	];
@@ -8472,13 +8480,18 @@ if(argv.includes('forward')){
 		retirement
 			? `const identity=()=>{const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');return {pid:process.pid,startTicks:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()};};
  const event=(event,detail={})=>fs.appendFileSync(path.join(control,'retirement-events'),JSON.stringify({event,at:Date.now(),...identity(),...detail})+'\\n');
- event('forward-born');process.once('exit',code=>event('forward-exited',{code}));`
+ event('forward-born');process.once('exit',code=>event('forward-exited',{code}));
+ const predecessorFile=path.join(control,'predecessor-identity');if(fs.existsSync(predecessorFile)){const prior=JSON.parse(fs.readFileSync(predecessorFile));const observe=record=>{try{const text=fs.readFileSync('/proc/'+record.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');return {pid:record.pid,startTicks:fields[19],live:fields[0]!=='Z'&&fields[19]===record.startTicks};}catch(error){if(!['ENOENT','ESRCH'].includes(error.code))throw error;return {pid:record.pid,startTicks:record.startTicks,live:false};}};event('predecessor-at-birth',{controller:observe(prior.controller),forward:observe(prior.forward)});}
+
+ if(fs.existsSync(path.join(control,'fail-forward-start'))){event('forward-rejected');process.exit(43);}
+ if(fs.existsSync(path.join(control,'descendant-forward'))&&!argv.includes('--fixture-forward-child')){const child=require('child_process').spawn(process.execPath,[__filename,...argv,'--fixture-forward-child'],{stdio:'inherit'});process.on('SIGTERM',()=>child.kill('SIGTERM'));child.on('exit',code=>process.exit(code??1));setInterval(()=>{if(fs.existsSync(path.join(control,'exit-wrapper-only'))){event('forward-wrapper-exit-requested');process.exit(48);}},10);return;}`
 			: ""
  }
  const net=require('net'),peers=new Set();let sequence=0;
  const trace=(connection,event,detail={})=>fs.appendFileSync(path.join(control,'forward-events'),JSON.stringify({pid:process.pid,connection,event,at:Date.now(),...detail})+'\\n');
  const server=net.createServer(socket=>{const connection=++sequence;trace(connection,'downstream-connected',{remotePort:socket.remotePort});const peer=net.connect(${upstreamPort},'127.0.0.1');peer.on('connect',()=>trace(connection,'upstream-connected',{localPort:peer.localPort}));peers.add(socket);peers.add(peer);for(const [role,p] of [['downstream',socket],['upstream',peer]]){p.on('error',()=>{});p.on('end',()=>trace(connection,role+'-end'));p.on('close',()=>{trace(connection,role+'-close');peers.delete(p);socket.destroy();peer.destroy();});}socket.pipe(peer).pipe(socket);});
- server.listen(${privatePort},'127.0.0.1',()=>{fs.writeFileSync(path.join(control,'forward-ready'),String(process.pid));${retirement ? "event('forward-listening');" : ""}});
+ const listen=()=>server.listen(${privatePort},'127.0.0.1',()=>{fs.writeFileSync(path.join(control,'forward-ready'),String(process.pid));${retirement ? "event('forward-listening');" : ""}});
+ ${retirement ? "if(fs.existsSync(path.join(control,'hold-forward-start'))){event('forward-start-held');const timer=setInterval(()=>{if(fs.existsSync(path.join(control,'release-forward-start'))){clearInterval(timer);listen();}},10);}else listen();setInterval(()=>{if(fs.existsSync(path.join(control,'exit-forward'))){event('forward-exit-requested');for(const p of peers)p.destroy();server.close(()=>process.exit(Number(fs.existsSync(path.join(control,'exit-forward-code'))?fs.readFileSync(path.join(control,'exit-forward-code')):47)));}},10);" : "listen();"}
  ${
 		retirement
 			? `server.on('error',error=>{event('forward-error',{code:error.code});throw error;});
@@ -8491,6 +8504,7 @@ if(argv.includes('forward')){
  const command=argv.at(-1);
  const allowed=command.startsWith('mkdir -p /home/user/wallpaperdb;') || command.startsWith('cd /home/user/wallpaperdb && tar -xzf -') || command.includes('mise trust && make install BOAT_EXEC=worker') || command.includes('chmod a+rx infra/postgres/init') || command.includes('SCRIPT=boat:ready') || command.includes('--input-type=module -') || command.includes('cat > /home/user/wallpaperdb/.boat/cache.json');
  if(!allowed)throw Error('unexpected controlled SSH operation');
+ ${retirement ? "if(command.includes('SCRIPT=boat:ready')){const counter=path.join(control,'ready-count');const count=Number(fs.existsSync(counter)?fs.readFileSync(counter):0)+1;fs.writeFileSync(counter,String(count));if(count===3&&fs.existsSync(path.join(control,'fail-forward-spawn')))fs.writeFileSync(__filename,'#!/nonexistent-preview-interpreter\\n');}" : ""}
  // Consume source/archive bytes but never execute a supplied shell string.
  process.stdin.resume();
 }else throw Error('unexpected controlled Boat operation');
@@ -8514,12 +8528,14 @@ if(argv.includes('forward')){
 			JSON.stringify({ ...keeper, development: true }),
 		);
 	}
+	await options.beforeStart?.(f, { port, privatePort }, t);
 	const command = f.run(
 		"boat-preview",
 		"BOAT_EXEC=local",
 		"SHELL=/bin/sh",
 		"boat_routed_goals=",
 	);
+	if (retirement) receipts.processes.push(...fixtureCensus(f.directory));
 	let tunnel;
 	t.after(async () => {
 		const owned = fixtureCensus(f.directory);
@@ -8573,11 +8589,16 @@ if(argv.includes('forward')){
 				receipts.commandResults = await Promise.all(
 					f.commands.map((p) => p.done),
 				);
-			receipts.forwardEvents = fs
-				.readFileSync(path.join(f.control, "forward-events"), "utf8")
-				.trim()
-				.split("\n")
-				.map((line) => JSON.parse(line));
+			receipts.forwardEventsRecorded = fs.existsSync(
+				path.join(f.control, "forward-events"),
+			);
+			receipts.forwardEvents = receipts.forwardEventsRecorded
+				? fs
+						.readFileSync(path.join(f.control, "forward-events"), "utf8")
+						.trim()
+						.split("\n")
+						.map((line) => JSON.parse(line))
+				: [];
 			receipts.survivingCommandGroups = f.commands
 				.filter((p) => processGroupRunning(p.child.pid))
 				.map((p) => p.child.pid);
@@ -8589,6 +8610,23 @@ if(argv.includes('forward')){
 		} finally {
 			if (retirement) {
 				receipts.retirementEvents = readPreviewRetirementEvents(f);
+				const lifetimeFile = path.join(f.root, ".boat/events.jsonl");
+				receipts.lifetimeEvents = fs.existsSync(lifetimeFile)
+					? fs
+							.readFileSync(lifetimeFile, "utf8")
+							.trim()
+							.split("\n")
+							.map((line) => JSON.parse(line))
+							.filter((event) => event.kind === "preview-lifetime")
+					: [];
+				for (const event of receipts.lifetimeEvents)
+					receipts.processes.push(
+						...[
+							event.controller,
+							event.forward,
+							...(event.captured ?? []),
+						].filter(Boolean),
+					);
 				receipts.retirementCommandDiagnostics = f.commands.map((record) => ({
 					pid: record.child.pid,
 					terminal: record.terminal,
@@ -8600,6 +8638,8 @@ if(argv.includes('forward')){
 			}
 		}
 	});
+	if (options.startupFailure)
+		return { ...f, command, receipts, phase, port, privatePort };
 	await f.readiness.wait(() => {
 		if (retirement) receipts.processes.push(...fixtureCensus(f.directory));
 		if (command.terminal) assert.fail(command.output());
@@ -9208,9 +9248,24 @@ for (const delayed of [false, true])
 			assert.equal(siblingResponse.statusCode, 101);
 			sibling.clients.add(siblingSocket);
 			await previewFrame(siblingSocket, "before-replacement");
+			if (!delayed) {
+				const owner = f.json(".boat/preview-process.json");
+				const legacy = {
+					pid: owner.pid,
+					startTicks: owner.startTicks,
+					parentPid: owner.parentPid,
+					name: "node",
+				};
+				f.local(".boat/preview-process.json", JSON.stringify(legacy));
+				f.receipts.legacyPredecessor = legacy;
+			}
 			if (delayed) flag(f, `hold-forward-${oldForward.pid}`);
 			f.phase(
 				"old listener and forward identities verified; replacement invoked",
+			);
+			fs.writeFileSync(
+				path.join(f.control, "predecessor-identity"),
+				JSON.stringify({ controller: old, forward: oldForward }),
 			);
 			const replacement = f.run(
 				"boat-preview",
@@ -9465,6 +9520,23 @@ function assertPreviewRetirementOrder(events, prior, successor) {
 		retired >= 0 && born > retired,
 		"predecessor retirement must precede successor birth",
 	);
+	const observed = events.find(
+		(event) =>
+			event.pid === successor.pid &&
+			event.startTicks === successor.startTicks &&
+			event.event === "predecessor-at-birth",
+	);
+	assert.ok(observed, "successor must observe predecessor identities at birth");
+	assert.equal(
+		observed.controller.live,
+		false,
+		"predecessor controller must already be retired at successor birth",
+	);
+	assert.equal(
+		observed.forward.live,
+		false,
+		"predecessor forward must already be retired at successor birth",
+	);
 }
 
 test("preview replacement ordering oracle rejects a forward started before retirement", async (t) => {
@@ -9481,6 +9553,10 @@ test("preview replacement ordering oracle rejects a forward started before retir
 		flag(f, `hold-forward-${prior.pid}`);
 		const controller = fixtureProcess(f.json(".boat/preview-process.json").pid);
 		assert.equal(liveOwnedProcess(f.root, controller), true);
+		fs.writeFileSync(
+			path.join(f.control, "predecessor-identity"),
+			JSON.stringify({ controller, forward: prior }),
+		);
 		process.kill(controller.pid, "SIGTERM");
 		assert.equal(
 			await fixtureStopped(() =>
@@ -9515,6 +9591,14 @@ test("preview replacement ordering oracle rejects a forward started before retir
 				.code,
 			"EADDRINUSE",
 		);
+		assert.equal(
+			readPreviewRetirementEvents(f).find(
+				(event) =>
+					event.pid === successor.pid && event.event === "predecessor-at-birth",
+			).forward.live,
+			true,
+			"sensitivity observes the still-live predecessor",
+		);
 		flag(f, `release-forward-${prior.pid}`);
 		await previewProbe(f.command.done, "original preview did not drain");
 		assert.throws(
@@ -9535,3 +9619,310 @@ test("preview replacement ordering oracle rejects a forward started before retir
 		f.phase("actual early forward rejected by ordering oracle");
 	});
 });
+
+for (const kind of [
+	"start",
+	"spawn",
+	"listen",
+	"signal",
+	"unknown",
+	"contention",
+	"lease-changed",
+])
+	test(`preview acquisition ${kind} failure closes owned resources without readiness`, async (t) => {
+		const archive = pendingPreviewEvidence(t);
+		await archive.scenario(async () => {
+			let keeper, prior;
+			const f = await pendingUpgradePreview(
+				t,
+				"managed",
+				archive,
+				`acquisition-${kind}`,
+				{
+					startupFailure: true,
+					beforeStart: async (fixture, { port }, cleanup) => {
+						if (kind === "start") flag(fixture, "fail-forward-start");
+						if (kind === "spawn") flag(fixture, "fail-forward-spawn");
+						if (kind === "signal" || kind === "lease-changed")
+							flag(fixture, "hold-forward-start");
+						if (kind === "contention") {
+							keeper = fixture.json(".boat/state.json").daemon;
+							prior = JSON.stringify({
+								...keeper,
+								generation: "existing-acquisition",
+							});
+							fixture.local(".boat/preview-acquisition.json", prior);
+						}
+						if (kind === "unknown") {
+							keeper = fixture.json(".boat/state.json").daemon;
+							prior = JSON.stringify(keeper);
+							fixture.local(".boat/preview-process.json", prior);
+						}
+						if (kind === "listen") {
+							const net = await import("node:net");
+							const blocker = net.createServer();
+							cleanup.after(async () => {
+								await previewProbe(
+									new Promise((resolve) => blocker.close(resolve)),
+									"ingress blocker did not close",
+								);
+							});
+							blocker.listen(port, "127.0.0.1");
+							await previewProbe(
+								once(blocker, "listening"),
+								"ingress blocker failed to listen",
+							);
+						}
+					},
+				},
+			);
+			if (kind === "signal" || kind === "lease-changed") {
+				await f.readiness.wait(
+					() =>
+						readPreviewRetirementEvents(f).some(
+							(e) => e.event === "forward-start-held",
+						),
+					"forward held before bind",
+				);
+				const owner = f.json(".boat/preview-acquisition.json");
+				const controller = fixtureProcess(owner.pid);
+				assert.equal(controller.startTicks, owner.startTicks);
+				assert.equal(controller.cwd, f.root);
+				if (kind === "signal") process.kill(controller.pid, "SIGTERM");
+				else {
+					prior = JSON.stringify({
+						...owner,
+						generation: "replacement-acquisition",
+					});
+					f.local(".boat/preview-acquisition.json", prior);
+				}
+			}
+			assert.equal(
+				await fixtureStopped(() => f.command.terminal !== null),
+				true,
+				"failure reaches a prompt terminal status",
+			);
+			const result = await previewProbe(
+				f.command.done,
+				"failed preview command pipes did not naturally close",
+			);
+			assert.notEqual(result.status, 0);
+			assert.doesNotMatch(result.output, /Private preview proxy/);
+			if (kind === "start")
+				assert.match(result.output, /forward exited before readiness/);
+			if (kind === "spawn") assert.match(result.output, /ENOENT/);
+			if (kind === "listen") assert.match(result.output, /EADDRINUSE/);
+			if (kind === "signal")
+				assert.match(result.output, /acquisition cancelled/);
+			if (kind === "unknown") {
+				assert.match(
+					result.output,
+					/Legacy preview forward ownership unavailable/,
+				);
+				assert.equal(liveOwnedProcess(f.root, keeper), true);
+				assert.equal(
+					fs.readFileSync(
+						path.join(f.root, ".boat/preview-process.json"),
+						"utf8",
+					),
+					prior,
+				);
+			} else
+				assert.equal(
+					fs.existsSync(path.join(f.root, ".boat/preview-process.json")),
+					false,
+				);
+			if (kind === "contention" || kind === "lease-changed") {
+				assert.match(
+					result.output,
+					kind === "contention" ? /EEXIST/ : /acquisition ownership changed/,
+				);
+				if (kind === "contention")
+					assert.equal(liveOwnedProcess(f.root, keeper), true);
+				assert.equal(
+					fs.readFileSync(
+						path.join(f.root, ".boat/preview-acquisition.json"),
+						"utf8",
+					),
+					prior,
+				);
+			} else
+				assert.equal(
+					fs.existsSync(path.join(f.root, ".boat/preview-acquisition.json")),
+					false,
+				);
+			const groups = new Set(f.commands.map((record) => record.child.pid));
+			const keeperRecord = f.json(".boat/state.json").daemon;
+			const cacheRecord = f.json(".boat/cache-tunnel.json");
+			assert.equal(liveOwnedProcess(f.root, keeperRecord), true);
+			assert.deepEqual(
+				fixtureCensus(f.directory).filter(
+					(p) => ![keeperRecord.pid, cacheRecord.pid].includes(p.group),
+				),
+				[],
+			);
+			assert.equal(
+				[...groups].every((group) => !processGroupRunning(group)),
+				true,
+			);
+			f.receipts.failure = { kind, result, naturalClosure: true };
+			f.phase(
+				"failure observed and owned resources naturally closed before fixture cleanup",
+			);
+		});
+	});
+
+for (const exitCode of [0, 47, 48])
+	test(`preview lifetime reports post-ready forward exit ${exitCode} and retires ingress`, async (t) => {
+		const archive = pendingPreviewEvidence(t);
+		await archive.scenario(async () => {
+			const f = await pendingUpgradePreview(
+				t,
+				"managed",
+				archive,
+				`post-ready-${exitCode}`,
+				{
+					beforeStart: (fixture) => {
+						if (exitCode === 48) flag(fixture, "descendant-forward");
+					},
+				},
+			);
+			await f.healthy(true);
+			const owner = f.json(".boat/preview-process.json");
+			f.local("../control/exit-forward-code", String(exitCode));
+			flag(f, exitCode === 48 ? "exit-wrapper-only" : "exit-forward");
+			assert.equal(
+				await fixtureStopped(() => f.command.terminal !== null),
+				true,
+				"dead forward produces prompt terminal failure",
+			);
+			const result = await previewProbe(
+				f.command.done,
+				"post-ready failure did not naturally close command pipes",
+			);
+			assert.notEqual(result.status, 0);
+			assert.match(
+				result.output,
+				new RegExp(`forward exited after readiness \\(${exitCode}\\)`),
+			);
+			assert.equal(liveOwnedProcess(f.root, owner), false);
+			assert.equal(liveOwnedProcess(f.root, f.tunnel), false);
+			assert.equal(
+				fs.existsSync(path.join(f.root, ".boat/preview-process.json")),
+				false,
+			);
+			assert.equal(
+				fs.existsSync(path.join(f.root, ".boat/preview-acquisition.json")),
+				false,
+			);
+			f.receipts.postReadyFailure = {
+				owner,
+				result,
+				exitCode,
+				naturalClosure: true,
+			};
+			f.phase(
+				"post-ready exit closes ingress and command pipes before fixture cleanup",
+			);
+		});
+	});
+
+test("preview acquisition proves a descendant-owned forward listener", async (t) => {
+	const archive = pendingPreviewEvidence(t);
+	await archive.scenario(async () => {
+		const f = await pendingUpgradePreview(
+			t,
+			"managed",
+			archive,
+			"descendant-listener",
+			{ beforeStart: (fixture) => flag(fixture, "descendant-forward") },
+		);
+		await f.healthy(true);
+		await f.healthy(false);
+		const owner = f.json(".boat/preview-process.json");
+		assert.notEqual(owner.forward.pid, f.tunnel.pid);
+		assert.deepEqual(previewListenerOwner(owner.forward, f.privatePort), []);
+		assert.equal(previewListenerOwner(f.tunnel, f.privatePort).length, 1);
+		assert.ok(
+			owner.captured.some(
+				(p) => p.pid === f.tunnel.pid && p.startTicks === f.tunnel.startTicks,
+			),
+		);
+		assert.equal(owner.ready, true);
+		f.receipts.descendantProof = { owner, listener: f.tunnel };
+		f.phase("owned descendant supplies listener proof");
+	});
+});
+
+test("preview acquisition exhausts only the selected local allowance before readiness", async (t) => {
+	const archive = pendingPreviewEvidence(t);
+	await archive.scenario(async () => {
+		const f = await pendingUpgradePreview(
+			t,
+			"managed",
+			archive,
+			"acquisition-budget",
+			{
+				startupFailure: true,
+				beforeStart: (fixture) => flag(fixture, "hold-forward-start"),
+			},
+		);
+		await f.readiness.wait(
+			() =>
+				readPreviewRetirementEvents(f).some(
+					(e) => e.event === "forward-start-held",
+				),
+			"forward held before binding",
+		);
+		// This observation uses the selected LOCAL 10s allowance. It does not extend
+		// the fixture's 5s readiness allowance or any application/protocol deadline.
+		const result = await previewProbe(
+			f.command.done,
+			"selected local allowance failed to bound command closure",
+			10000,
+		);
+		assert.notEqual(result.status, 0);
+		assert.match(result.output, /local acquisition allowance exhausted/);
+		assert.doesNotMatch(result.output, /Private preview proxy/);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/preview-process.json")),
+			false,
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/preview-acquisition.json")),
+			false,
+		);
+		f.receipts.allowanceFailure = { result, naturalClosure: true };
+		f.phase("local allowance failure disposes forward before final handoff");
+	});
+});
+
+for (const field of ["generation", "startTicks"])
+	test(`preview lifetime preserves ownership replaced at ${field} during shutdown`, async (t) => {
+		const archive = pendingPreviewEvidence(t);
+		await archive.scenario(async () => {
+			const f = await pendingUpgradePreview(
+				t,
+				"managed",
+				archive,
+				`ownership-${field}`,
+			);
+			await f.healthy(true);
+			const owner = f.json(".boat/preview-process.json");
+			const replacement = { ...owner, [field]: `${owner[field]}-replacement` };
+			f.local(".boat/preview-process.json", JSON.stringify(replacement));
+			const current = fixtureProcess(owner.pid);
+			assert.equal(current.startTicks, owner.startTicks);
+			process.kill(current.pid, "SIGTERM");
+			const result = await previewProbe(
+				f.command.done,
+				"original preview shutdown did not naturally close",
+			);
+			assert.equal(result.status, 0, result.output);
+			assert.deepEqual(f.json(".boat/preview-process.json"), replacement);
+			assert.equal(liveOwnedProcess(f.root, owner), false);
+			assert.equal(liveOwnedProcess(f.root, f.tunnel), false);
+			f.receipts.preservedOwnership = { field, replacement, result };
+			f.phase("retirement preserved replacement ownership file");
+		});
+	});

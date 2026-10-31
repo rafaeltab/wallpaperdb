@@ -150,6 +150,7 @@ function inputState(source, kind, outputs, root) {
 			"scripts/lib/boat-preparation.mjs",
 			"scripts/lib/boat-snapshot.mjs",
 			"scripts/lib/boat-shutdown.mjs",
+			"scripts/lib/boat-preview.mjs",
 			"scripts/lib/boat.mjs",
 			"scripts/lib/boat-cache.mjs",
 			"scripts/lib/boat-asset-migration.mjs",

@@ -1691,6 +1691,76 @@ function fixtureCensus(directory) {
 		});
 }
 
+async function lockCanaryReady(canary, readiness) {
+	let output = "";
+	let failure;
+	const capture = (bytes) => {
+		output = (output + stripVTControlCharacters(String(bytes))).slice(-1024);
+	};
+	const failed = (error) => {
+		failure = error;
+	};
+	canary.stdout.on("data", capture);
+	canary.on("error", failed);
+	try {
+		await readiness.wait(() => {
+			if (failure)
+				throw new Error(`Canary failed before readiness: ${failure.code}`);
+			if (canary.exitCode !== null || canary.signalCode !== null)
+				throw new Error(
+					`Canary exited before readiness: status=${canary.exitCode}, signal=${canary.signalCode ?? "none"}`,
+				);
+			return output.includes("ready");
+		}, "unrelated canary ready");
+	} finally {
+		canary.stdout.off("data", capture);
+		canary.off("error", failed);
+	}
+}
+
+test("lock fixture canary readiness detects early exit without output", async (t) => {
+	const readiness = lockFixtureReadiness();
+	const canary = spawn(process.execPath, ["-e", "process.exit(37)"], {
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+	let closed = false;
+	const done = once(canary, "close").then((result) => {
+		closed = true;
+		return result;
+	});
+	t.after(async () => {
+		if (canary.exitCode === null && canary.signalCode === null)
+			canary.kill("SIGKILL");
+		assert.ok(await fixtureStopped(() => closed), "early-exit canary closes");
+		await done;
+	});
+	let outcome;
+	lockCanaryReady(canary, readiness).then(
+		() => {
+			outcome = "ready";
+		},
+		(error) => {
+			outcome = error;
+		},
+	);
+	assert.ok(
+		await fixtureStopped(() => closed),
+		"real canary exits without a readiness marker",
+	);
+	assert.deepEqual(await done, [37, null]);
+	assert.ok(
+		await fixtureStopped(() => outcome !== undefined),
+		"canary readiness must settle after premature exit",
+	);
+	assert.ok(outcome instanceof Error);
+	assert.match(
+		outcome.message,
+		/Canary exited before readiness: status=37, signal=none/,
+	);
+	assert.equal(canary.exitCode, 37);
+	assert.equal(canary.signalCode, null);
+});
+
 for (const scenario of ["missing", "late", "unresponsive"])
 	test(`lock fixture emergency cleanup owns detached Make and keeper before ${scenario} report`, async (t) => {
 		const directory = fs.mkdtempSync(
@@ -1701,13 +1771,16 @@ for (const scenario of ["missing", "late", "unresponsive"])
 		fs.mkdirSync(owned);
 		fs.mkdirSync(sibling);
 		const report = path.join(directory, "report.json");
+		const readiness = lockFixtureReadiness({ report });
 		let canary, canaryClosed, runner, runnerIdentity, done;
 		// Keep mutation/reproduction failures bounded independently of the helper under test.
 		t.after(async () => {
 			for (const record of fixtureCensus(owned))
 				signalFixtureGroup(record, "SIGKILL", owned);
 			if (
-				fixtureProcess(runner.pid)?.startTicks === runnerIdentity?.startTicks
+				runner &&
+				runnerIdentity &&
+				fixtureProcess(runner.pid)?.startTicks === runnerIdentity.startTicks
 			) {
 				for (const record of fixtureGroupMembers(runner.pid))
 					if (signalFixtureGroup(record, "SIGKILL")) break;
@@ -1735,7 +1808,7 @@ for (const scenario of ["missing", "late", "unresponsive"])
 			{ cwd: sibling, detached: true },
 		);
 		canaryClosed = once(canary, "close");
-		const canaryReady = once(canary.stdout, "data");
+		const canaryReady = lockCanaryReady(canary, readiness);
 		runner = spawn(
 			process.execPath,
 			[
@@ -1754,7 +1827,7 @@ for (const scenario of ["missing", "late", "unresponsive"])
 						scenario === "unresponsive" ? "unresponsive" : "sync",
 					BOAT_LOCK_CLEANUP_REPORT: report,
 					BOAT_LOCK_FIXTURE_DIRECTORY: owned,
-					BOAT_LOCK_READY_DEADLINE: String(fixtureNow() + 5000),
+					BOAT_LOCK_READY_DEADLINE: String(readiness.deadline),
 					BOAT_LOCK_BEFORE_REPORT: scenario === "late" ? "late" : "1",
 				},
 			},
@@ -1765,7 +1838,7 @@ for (const scenario of ["missing", "late", "unresponsive"])
 		runner.stderr.resume();
 
 		await canaryReady;
-		await observed(
+		await readiness.wait(
 			() => fs.existsSync(`${report}.parked`),
 			"pre-report detached children barrier",
 		);
@@ -1826,7 +1899,7 @@ for (const scenario of ["missing", "late", "unresponsive"])
 				);
 				if (scenario === "late") {
 					fs.writeFileSync(path.join(owned, "control/publish-report"), "yes");
-					await observed(
+					await readiness.wait(
 						() => fs.existsSync(`${report}.late`),
 						"late report and nested detached child",
 					);

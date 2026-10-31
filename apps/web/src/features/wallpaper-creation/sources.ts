@@ -96,7 +96,11 @@ export function createWallpaperSourceBatch<TFile>(
   // Outcomes remain available for feedback and retry. Only unresolved work
   // reserves intake slots; the server separately owns active membership limits.
   const remainingCapacity = () =>
-    16 - rows.filter((row) => ['pending', 'uploading', 'confirming'].includes(row.status)).length;
+    16 -
+    rows.filter(
+      (row) =>
+        row.id === blockedInitial || ['pending', 'uploading', 'confirming'].includes(row.status)
+    ).length;
   let current: {
     readonly rows: typeof rows;
     readonly busy: boolean;
@@ -181,10 +185,18 @@ export function createWallpaperSourceBatch<TFile>(
       publish();
       return true;
     },
-    retry(id: string) {
-      if (busy) return;
+    canRetry(id: string) {
       const row = rows.find((row) => row.id === id);
-      if (row?.status === 'failed' && remainingCapacity() === 0) return;
+      return (
+        !busy &&
+        !!row &&
+        (row.status === 'confirming' ||
+          (row.status === 'failed' && (row.id === blockedInitial || remainingCapacity() > 0)))
+      );
+    },
+    retry(id: string) {
+      if (!batch.canRetry(id)) return;
+      const row = rows.find((row) => row.id === id);
       if (row && (row.status === 'failed' || row.status === 'confirming'))
         update(id, { status: 'pending', message: undefined });
     },

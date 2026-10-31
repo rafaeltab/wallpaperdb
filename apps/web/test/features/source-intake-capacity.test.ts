@@ -5,6 +5,73 @@ import {
   type SourceBatchApi,
 } from '@/features/wallpaper-creation';
 
+it('reserves recovery capacity for an ambiguous initial acceptance with fifteen files waiting', async () => {
+  const wallpaper = {
+    wallpaperId: 'saved',
+    assetId: 'asset',
+    sourceId: null,
+    state: 'awaiting-source' as const,
+    createdAt: 'now',
+  };
+  let accepted = false;
+  const uploads: string[] = [];
+  const api: SourceBatchApi<string> = {
+    identifier: () => crypto.randomUUID(),
+    begin: async () => wallpaper,
+    wallpaper: async () => ({ ...wallpaper, state: 'published', sourceId: 'first' }),
+    list: async () => ({
+      sourceSetRevision: accepted ? '1' : '0',
+      sources: accepted ? [{ sourceId: 'first' }] : [],
+      candidates: [],
+      hasPendingCandidates: false,
+    }),
+    create: async (_asset, id, revision) => ({
+      candidateId: id,
+      status: 'awaiting-bytes',
+      expectedSourceSetRevision: revision,
+    }),
+    status: async (_asset, id) => ({
+      candidateId: id,
+      status: 'accepted',
+      sourceId: 'first',
+      expectedSourceSetRevision: '0',
+    }),
+    upload: async (_asset, id, file) => {
+      uploads.push(file);
+      return { candidateId: id, status: 'ready', expectedSourceSetRevision: accepted ? '1' : '0' };
+    },
+    accept: async (_asset, id, revision) => {
+      if (!accepted) {
+        accepted = true;
+        throw new Error('Lost acceptance response');
+      }
+      return {
+        candidateId: id,
+        status: 'accepted',
+        sourceId: id,
+        expectedSourceSetRevision: revision,
+      };
+    },
+    expectSource: async () => {},
+    cancel: async () => {
+      throw new Error('Do not cancel ambiguous work');
+    },
+    wait: async () => {},
+  };
+  const batch = createWallpaperSourceBatch(api, { creationKey: 'same-request' });
+  batch.addFiles(Array.from({ length: 16 }, (_, i) => ({ value: String(i), name: `${i}.png` })));
+  await batch.run(new AbortController().signal);
+  expect(uploads).toEqual(['0']);
+  expect(batch.addFiles([{ value: 'extra', name: 'extra.png' }])).toBe(false);
+  const first = batch.getSnapshot().rows[0];
+  if (!first) throw new Error('Missing initial row');
+  batch.retry(first.id);
+  await batch.run(new AbortController().signal);
+  expect(uploads).toHaveLength(16);
+  expect(uploads.filter((value) => value === '0')).toHaveLength(1);
+  expect(batch.getSnapshot().rows.every((row) => row.status === 'accepted')).toBe(true);
+});
+
 it('reuses intake capacity after sixteen outcomes while retaining independent retries and saved recovery', async () => {
   const wallpaper = {
     wallpaperId: 'wallpaper',

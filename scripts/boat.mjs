@@ -16,6 +16,7 @@ import {
 	worktreeProcesses,
 	liveOwnedProcess,
 	forwardPreviewDisconnect,
+	developmentWantedAfterCommand,
 } from "./lib/boat.mjs";
 import { cacheServer } from "./lib/boat-cache.mjs";
 import {
@@ -556,7 +557,8 @@ async function command() {
 			s.developmentWanted = true;
 			save(s);
 		}
-		if (targets[0] === "stop") await retireWatchers(id);
+		if (!developmentWantedAfterCommand(true, targets, 0))
+			await retireWatchers(id);
 		const result = await boat(
 			[
 				"exec",
@@ -590,6 +592,13 @@ async function command() {
 			local: resourceSample(),
 		});
 		process.exitCode = result.status;
+		const s = read(stateFile);
+		s.developmentWanted = developmentWantedAfterCommand(
+			s.developmentWanted,
+			targets,
+			result.status,
+		);
+		save(s);
 		if (targets[0] === "stop" && result.status === 0) await stop();
 	} finally {
 		if (resumed) console.log("Remote environment resumed from sleep");

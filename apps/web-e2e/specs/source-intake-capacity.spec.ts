@@ -16,6 +16,11 @@ test("retained outcomes allow withdrawal, another Source and replacement without
   );
   await input.setInputFiles(Array(16).fill(fixture));
   const outcomes = sources.getByTestId("source-upload-outcome");
+  // Intake is serial. Observe each file's completion with the normal assertion
+  // deadline instead of assigning one file's deadline to the entire batch.
+  for (let i = 0; i < 16; i++) {
+    await expect(outcomes.nth(i)).toContainText("Source accepted");
+  }
   await expect(outcomes.filter({ hasText: "Source accepted" })).toHaveCount(16);
   await expect(sources).toContainText("16 accepted Sources.");
   await sources

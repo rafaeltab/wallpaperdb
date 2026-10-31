@@ -3064,7 +3064,7 @@ for (const mode of ["framed", "unsafe-transfer", "duplicate-transfer"])
 if(command.includes('collect-migrations')){
  const records=JSON.parse(cp.execFileSync('bash',['-c',command],{env:process.env,maxBuffer:48*1024*1024}));
  if(${JSON.stringify(mode)}==='duplicate-transfer')records.push({...records[0]});
- else records[0].name='../outside';
+ else records.push({...records[0],name:'../outside'});
  return process.stdout.write(JSON.stringify(records),()=>process.exit(0));
 }
 if(command.includes('base64 -w0')||command.includes('collect-migrations')){`,
@@ -3074,7 +3074,25 @@ if(command.includes('base64 -w0')||command.includes('collect-migrations')){`,
 		assert.notEqual(result.status, 0, result.output);
 		assert.match(result.output, /output collection failed/);
 		assert.deepEqual(migrationBytes(f.root), before);
-		assert.equal(fs.existsSync(path.join(f.directory, "outside")), false);
+		if (mode === "unsafe-transfer") {
+			const failure = result.output.match(
+				/Migration generation output collection failed; retained evidence at ([^:\n]+): ([^;\n]+)/,
+			);
+			assert.ok(failure, result.output);
+			// The receiver stages records below <transaction>/proposal. ../outside
+			// escapes that proposal directory, not the fixture's outer directory.
+			const escapedDestination = path.join(failure[1], "outside");
+			assert.deepEqual(
+				{
+					reason: failure[2],
+					escapedDestinationExists: fs.existsSync(escapedDestination),
+				},
+				{
+					reason: "Invalid migration transfer path",
+					escapedDestinationExists: false,
+				},
+			);
+		}
 	});
 
 test("native Drizzle zero-exit schema exception fails without accepting an unchanged tree", async (t) => {

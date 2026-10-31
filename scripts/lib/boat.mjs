@@ -1,4 +1,14 @@
 import fs from "node:fs";
+export function developmentWantedAfterCommand(wanted, targets, status) {
+	if (status !== 0) return wanted;
+	const service = targets.find((value) => value.startsWith("SERVICE="));
+	if (
+		targets[0] === "stop" ||
+		(targets[0] === "apps-stop" && !service?.slice(8).trim())
+	)
+		return false;
+	return wanted;
+}
 export function forwardPreviewDisconnect(req, res, upstream) {
 	const cancel = () => upstream.destroy();
 	req.once("aborted", cancel);

@@ -3223,6 +3223,110 @@ for (const phase of ["first-addition", "second-addition", "journal-commit"])
 		);
 	});
 
+for (const phase of ["first-addition", "second-addition", "journal-commit"])
+	test(`first public generation after ${phase} crash recovers before capture and retains subsequent edits`, async (t) => {
+		const f = await migrationGenerationCheckout(t);
+		const before = migrationBytes(f.root);
+		const intent = await crashMigrationPublication(f, phase);
+		const remoteProposal = migrationBytes(f.worker);
+		const marker = f.json(".boat/migration-return-pending.json");
+		const committed = phase === "journal-commit";
+		assert.equal(
+			f.json("apps/asset/drizzle/meta/_journal.json").entries.length,
+			committed ? 19 : 18,
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, intent.additions[0].name)),
+			true,
+			"pre-commit cases must contain an owned orphan before recovery",
+		);
+		const schema =
+			fs.readFileSync(
+				path.join(f.root, "apps/asset/src/db/schema.ts"),
+				"utf8",
+			) +
+			"\nexport const postCrashRecords = pgTable('post_crash_records', {id: text('id').primaryKey()});\n";
+		f.local("apps/asset/src/db/schema.ts", schema);
+		f.local("notes.txt", "post-crash unrelated local edit\n");
+		// Generation is the FIRST command after controller death. No normal sync
+		// is allowed to repair the output set before this captures its baseline.
+		const result = await f.migrations();
+		assert.equal(result.status, 0, result.output);
+		assert.match(result.output, /Your SQL migration file/);
+		const accepted = migrationBytes(f.root);
+		assert.deepEqual(migrationBytes(f.worker), accepted);
+		const journal = f.json("apps/asset/drizzle/meta/_journal.json");
+		assert.equal(journal.entries.length, committed ? 20 : 19);
+		assert.match(
+			accepted[`apps/asset/drizzle/${journal.entries.at(-1).tag}.sql`],
+			/CREATE TABLE "post_crash_records"/,
+		);
+		for (const [name, bytes] of Object.entries(
+			committed ? remoteProposal : before,
+		))
+			if (!name.endsWith("/_journal.json"))
+				assert.equal(
+					accepted[name],
+					bytes,
+					`preserve previously committed output ${name}`,
+				);
+		const manifest = f.json(".boat/manifest.json"),
+			modes = f.json(".boat/source-modes.json");
+		for (const [name, bytes] of Object.entries(accepted)) {
+			assert.equal(
+				manifest[name],
+				createHash("sha256").update(bytes).digest("hex"),
+			);
+			assert.equal(
+				modes[name],
+				fs.statSync(path.join(f.root, name)).mode & 0o777,
+			);
+		}
+		for (const root of [f.root, f.worker]) {
+			assert.equal(
+				fs.readFileSync(path.join(root, "apps/asset/src/db/schema.ts"), "utf8"),
+				schema,
+			);
+			assert.equal(
+				fs.readFileSync(path.join(root, "notes.txt"), "utf8"),
+				"post-crash unrelated local edit\n",
+			);
+		}
+		for (const name of [
+			"migration-publication.json",
+			"migration-return-pending.json",
+			"source-writer.json",
+		])
+			assert.equal(fs.existsSync(path.join(f.root, ".boat", name)), false);
+		assert.equal(fs.existsSync(intent.staging), false);
+		assert.equal(
+			fs.existsSync(intent.proposal),
+			true,
+			"retain original crash proposal evidence",
+		);
+		const retained = path.join(
+			f.worker,
+			".boat/source-proposals",
+			marker.id,
+			"drizzle",
+		);
+		if (!committed)
+			for (const [name, bytes] of Object.entries(remoteProposal))
+				assert.equal(
+					fs.readFileSync(
+						path.join(retained, name.slice("apps/asset/drizzle/".length)),
+						"utf8",
+					),
+					bytes,
+				);
+		else
+			assert.equal(
+				fs.existsSync(retained),
+				false,
+				"same-worker committed recovery already owns the accepted set",
+			);
+	});
+
 for (const kind of ["lock", "migrations"])
 	for (const stop of [true, false])
 		test(`queued ${kind} generation rechecks ${stop ? "DIRTY stop" : "awake admission"} after taking source ownership`, async (t) => {

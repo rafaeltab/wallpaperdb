@@ -637,7 +637,10 @@ async function generate(id, started, kind) {
 				names: sourceNames,
 				transport: {
 					workerId: id,
-					assertStopped: assertSourceWriterStopped,
+					assertStopped: () => {
+						snapshots.startup();
+						assertSourceWriterStopped();
+					},
 					sync: (source, snapshot) => syncSource(id, source, snapshot),
 					invalidate: (kind, outputs) => {
 						const sent = read(path.join(dir, "manifest.json"));

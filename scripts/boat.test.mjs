@@ -3223,6 +3223,114 @@ for (const phase of ["first-addition", "second-addition", "journal-commit"])
 		);
 	});
 
+for (const kind of ["lock", "migrations"])
+	for (const stop of [true, false])
+		test(`queued ${kind} generation rechecks ${stop ? "DIRTY stop" : "awake admission"} after taking source ownership`, async (t) => {
+			const f = await migrationGenerationCheckout(t);
+			await crashMigrationPublication(f, "first-addition");
+			f.local("notes.txt", "queued local edit remains authoritative\n");
+			f.local(
+				".boat/state.json",
+				JSON.stringify({
+					...f.json(".boat/state.json"),
+					developmentWanted: true,
+					reconciliationPending: true,
+				}),
+			);
+			const before = migrationBytes(f.root);
+			const intent = fs.readFileSync(
+				path.join(f.root, ".boat/migration-publication.json"),
+			);
+			const marker = fs.readFileSync(
+				path.join(f.root, ".boat/migration-return-pending.json"),
+			);
+			const lock = path.join(f.root, ".boat/source.lock");
+			fs.rmSync(lock, { recursive: true, force: true });
+			fs.mkdirSync(lock);
+			fs.writeFileSync(path.join(lock, "pid"), String(process.pid));
+			t.after(() => fs.rmSync(lock, { recursive: true, force: true }));
+			const leases = new Set(fs.readdirSync(path.join(f.root, ".boat")));
+			const pending = kind === "lock" ? f.generate() : f.migrations();
+			// A command lease is persisted after ensure completes, before source.lock.
+			await observed(
+				() =>
+					fs
+						.readdirSync(path.join(f.root, ".boat"))
+						.some(
+							(name) => /^command-\d+\.json$/.test(name) && !leases.has(name),
+						),
+				"queued generation lease after ensure",
+			);
+			if (stop) {
+				const stopped = await f.run("boat-stop").done;
+				assert.equal(stopped.status, 0, stopped.output);
+				assert.equal(
+					f.json(".boat/state.json").snapshotRecovery.status,
+					"DIRTY",
+				);
+			}
+			const state = f.json(".boat/state.json");
+			const transport = fs.readFileSync(
+				path.join(f.control, "transport"),
+				"utf8",
+			);
+			const calls = fs.readFileSync(path.join(f.control, "calls"), "utf8");
+			fs.rmSync(lock, { recursive: true });
+			const result = await pending;
+			assert.equal(result.status === 0, !stop, result.output);
+			if (stop) {
+				assert.match(result.output, /DIRTY.*snapshot/i);
+				assert.equal(
+					fs.readFileSync(path.join(f.control, "transport"), "utf8"),
+					transport,
+					"no upload, preparation or execution after queued admission becomes DIRTY",
+				);
+				assert.equal(
+					fs.readFileSync(path.join(f.control, "calls"), "utf8"),
+					calls,
+				);
+				assert.deepEqual(migrationBytes(f.root), before);
+				assert.deepEqual(
+					fs.readFileSync(
+						path.join(f.root, ".boat/migration-publication.json"),
+					),
+					intent,
+				);
+				assert.deepEqual(
+					fs.readFileSync(
+						path.join(f.root, ".boat/migration-return-pending.json"),
+					),
+					marker,
+				);
+				const after = f.json(".boat/state.json");
+				assert.equal(after.cost, state.cost);
+				assert.equal(after.runningSince, null);
+				assert.equal(after.developmentWanted, true);
+				assert.equal(after.reconciliationPending, true);
+				assert.equal(after.snapshotRecovery.status, "DIRTY");
+			} else {
+				assert.deepEqual(migrationBytes(f.worker), migrationBytes(f.root));
+				assert.equal(
+					fs.existsSync(path.join(f.root, ".boat/migration-publication.json")),
+					false,
+				);
+				assert.equal(
+					fs.existsSync(
+						path.join(f.root, ".boat/migration-return-pending.json"),
+					),
+					false,
+				);
+				assert.equal(
+					f.json(".boat/state.json").snapshotRecovery.status,
+					"ACTIVE",
+				);
+			}
+			assert.equal(
+				fs.readFileSync(path.join(f.root, "notes.txt"), "utf8"),
+				"queued local edit remains authoritative\n",
+			);
+		});
+
 for (const identity of [
 	"same-worker",
 	"not_found",

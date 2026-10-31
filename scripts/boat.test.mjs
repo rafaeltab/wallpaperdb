@@ -16,6 +16,7 @@ import {
 } from "./lib/boat.mjs";
 import http from "node:http";
 import { once } from "node:events";
+import { stripVTControlCharacters } from "node:util";
 
 test("successful full app cleanup clears restoration intent while partial and failed cleanup preserve it", () => {
 	assert.equal(developmentWantedAfterCommand(true, ["apps-stop"], 0), false);
@@ -1004,14 +1005,28 @@ child.on('close',code=>{
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		let output = "";
-		child.stdout.on("data", (b) => (output += b));
-		child.stderr.on("data", (b) => (output += b));
-		child.on("error", (error) => (output += error.message));
-		const record = { child, closed: false };
+		const capture = (bytes) => {
+			output = (output + stripVTControlCharacters(String(bytes))).slice(-16384);
+		};
+		child.stdout.on("data", capture);
+		child.stderr.on("data", capture);
+		child.on("error", (error) => capture(error.message));
+		const record = {
+			child,
+			closed: false,
+			terminal: null,
+			output: () => output,
+		};
+		child.on("exit", (status, signal) => {
+			record.terminal = { status, signal };
+		});
+		child.on("error", () => {
+			record.terminal = { status: null, signal: null };
+		});
 		record.done = new Promise((resolve) => {
-			child.on("close", (status) => {
+			child.on("close", (status, signal) => {
 				record.closed = true;
-				resolve({ status, output });
+				resolve({ status, signal, output });
 			});
 		});
 		owned.push(record);
@@ -1058,6 +1073,7 @@ child.on('close',code=>{
 		env,
 		local,
 		json,
+		commands,
 		run,
 		writer: () =>
 			start(background, process.execPath, [
@@ -1125,15 +1141,22 @@ async function observed(predicate, description) {
 function flag(f, name) {
 	fs.writeFileSync(path.join(f.control, name), "yes");
 }
-async function pausedGeneration(t, phase = "") {
-	const f = await lockGenerationCheckout(t);
+async function pausedGeneration(t, phase = "", checkout) {
+	const f = checkout ?? (await lockGenerationCheckout(t));
 	flag(f, phase ? `pause-${phase}` : "pause");
-	const pending = f.generate();
+	const command = f.run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock");
+	const pending = command.done;
 	await observed(
-		() =>
-			fs.existsSync(
+		() => {
+			if (command.terminal) {
+				throw new Error(
+					`Make exited before paused ${phase || "generator"}: status=${command.terminal.status}, signal=${command.terminal.signal ?? "none"}\n${command.output()}`,
+				);
+			}
+			return fs.existsSync(
 				path.join(f.control, phase ? `entered-${phase}` : "entered"),
-			),
+			);
+		},
 		`paused ${phase || "generator"}`,
 	);
 	return {
@@ -1142,6 +1165,84 @@ async function pausedGeneration(t, phase = "") {
 		release: () => flag(f, phase ? `release-${phase}` : "release"),
 	};
 }
+
+test("paused lock fixture reports Make failure before the sync barrier", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	fs.writeFileSync(
+		path.join(f.control, "info-error"),
+		"fixture_early_info_failure",
+	);
+	await assert.rejects(pausedGeneration(t, "sync", f), (error) => {
+		assert.match(error.message, /Make exited before paused sync/);
+		assert.match(error.message, /status=2, signal=none/);
+		assert.match(error.message, /fixture_early_info_failure/);
+		assert.doesNotMatch(error.message, /Timed out/);
+		assert.equal(fs.existsSync(path.join(f.control, "entered-sync")), false);
+		return true;
+	});
+	assert.equal(f.commands.length, 1);
+	const command = f.commands[0];
+	assert.equal(command.closed, true);
+	assert.equal(command.child.exitCode, 2);
+	assert.equal(command.child.signalCode, null);
+	assert.equal(processGroupRunning(command.child.pid), false);
+});
+
+for (const status of [0, 37])
+	test(`paused lock fixture observes Make exit ${status} while descendant pipes remain open`, async (t) => {
+		const f = await lockGenerationCheckout(t);
+		f.local(
+			"scripts/boat.mjs",
+			`import {spawn} from 'node:child_process';
+spawn(process.execPath,['-e',"console.log('pipe holder ready');setInterval(()=>{},1000)"],{stdio:'inherit'});
+console.error('fixture early controller exit');process.exit(${status});`,
+		);
+		await assert.rejects(pausedGeneration(t, "sync", f), (error) => {
+			assert.match(error.message, /Make exited before paused sync/);
+			assert.match(
+				error.message,
+				new RegExp(`status=${status === 0 ? 0 : 2}, signal=none`),
+			);
+			assert.match(error.message, /fixture early controller exit/);
+			return true;
+		});
+		const command = f.commands[0];
+		assert.equal(command.closed, false);
+		assert.equal(command.child.exitCode, status === 0 ? 0 : 2);
+		assert.equal(command.child.signalCode, null);
+		await stopLockFixtureChildren(f.commands);
+		assert.equal(command.closed, true);
+		assert.deepEqual(await command.done, {
+			status: status === 0 ? 0 : 2,
+			signal: null,
+			output: command.output(),
+		});
+		assert.equal(processGroupRunning(command.child.pid), false);
+	});
+
+test("paused lock fixture observes Make signal before generator barrier", async (t) => {
+	const f = await lockGenerationCheckout(t);
+	flag(f, "pause-sync");
+	const waiting = pausedGeneration(t, "", f);
+	// Observe the rejection immediately, while arranging the earlier sync barrier.
+	const rejected = assert.rejects(
+		waiting,
+		/Make exited before paused generator: status=null, signal=SIGTERM/,
+	);
+	await observed(
+		() => fs.existsSync(path.join(f.control, "entered-sync")),
+		"earlier sync barrier",
+	);
+	const command = f.commands[0];
+	command.child.kill("SIGTERM");
+	await rejected;
+	assert.equal(command.child.exitCode, null);
+	assert.equal(command.child.signalCode, "SIGTERM");
+	await stopLockFixtureChildren(f.commands);
+	assert.equal(command.closed, true);
+	assert.equal((await command.done).signal, "SIGTERM");
+	assert.equal(processGroupRunning(command.child.pid), false);
+});
 
 // Run an actual failing test in a child so its after hooks and open handles are
 // exercised without failing (or hanging) the surrounding regression suite.

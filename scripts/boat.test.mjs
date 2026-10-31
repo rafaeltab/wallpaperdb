@@ -1939,6 +1939,87 @@ test("Asset migration command expiry terminates its owned package process and sk
 	assert.match(result.output, /asset-migration completed [a-f0-9]+ 1/);
 });
 
+function finalInspectionClock(f, mode) {
+	fs.appendFileSync(
+		path.join(f.directory, "clock.mjs"),
+		`
+import cp from 'node:child_process';import {syncBuiltinESMExports} from 'node:module';
+const originalNow=Date.now,originalRead=fs.readFileSync,originalSpawn=cp.spawn;
+let inspected=0,armed=false,timeReads=0;
+Date.now=()=>{const value=originalNow();if(!armed)return value;timeReads++;return value+(${JSON.stringify(mode)}==='delivery'?20001:${JSON.stringify(mode)}==='enclosing'&&timeReads>=2?180001:0);};
+fs.readFileSync=function(file,...args){const bytes=originalRead.call(this,file,...args);if(String(file).endsWith('/.pnpm-lockfile-hash')&&++inspected===2){armed=true;fs.writeFileSync(path.join(process.env.FAKE_CONTROL,'final-inspection'),JSON.stringify({inspected,mode:${JSON.stringify(mode)}}));}return bytes;};
+cp.spawn=function(command,args,options){if(command==='pnpm')fs.appendFileSync(path.join(process.env.FAKE_CONTROL,'actual-script-launches'),JSON.stringify({at:Date.now(),inspected,args})+'\\n');return originalSpawn.call(this,command,args,options);};syncBuiltinESMExports();
+`,
+	);
+}
+
+for (const mode of ["delivery", "enclosing", "unexpired"])
+	test(`Asset migration final inspection rechecks ${mode} launch budget`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		finalInspectionClock(f, mode);
+		const result = await f.run("migrate", "PACKAGE=asset").done;
+		assert.deepEqual(
+			JSON.parse(
+				fs.readFileSync(path.join(f.control, "final-inspection"), "utf8"),
+			),
+			{ inspected: 2, mode },
+		);
+		const launches = fs.existsSync(
+			path.join(f.control, "actual-script-launches"),
+		)
+			? fs
+					.readFileSync(path.join(f.control, "actual-script-launches"), "utf8")
+					.trim()
+					.split("\n")
+					.map(JSON.parse)
+			: [];
+		t.diagnostic(JSON.stringify({ mode, launches, output: result.output }));
+		if (mode === "unexpired") {
+			assert.equal(result.status, 0, result.output);
+			assert.equal(launches.length, 1);
+			assert.equal(f.effects().length, 2);
+		} else {
+			assert.notEqual(result.status, 0, result.output);
+			assert.equal(
+				launches.length,
+				0,
+				"no package spawn may follow the expiring final inspection",
+			);
+			assert.deepEqual(f.effects(), []);
+		}
+	});
+
+for (const mode of ["delivery", "enclosing"])
+	test(`Asset migration final inspection ${mode} guard sensitivity observes actual spawn`, async (t) => {
+		const f = await assetExecutionCheckout(t);
+		finalInspectionClock(f, mode);
+		const helper = "scripts/lib/boat-asset-migration.mjs";
+		const source = fs.readFileSync(path.join(f.root, helper), "utf8");
+		const condition = "Date.now() >= deadline || Date.now() >= commandDeadline";
+		assert.equal(source.split(condition).length, 2);
+		f.local(
+			helper,
+			source.replace(
+				condition,
+				mode === "delivery"
+					? "Date.now() >= commandDeadline"
+					: "Date.now() >= deadline",
+			),
+		);
+		const result = await f.run("migrate", "PACKAGE=asset").done;
+		const launches = fs
+			.readFileSync(path.join(f.control, "actual-script-launches"), "utf8")
+			.trim()
+			.split("\n")
+			.map(JSON.parse);
+		assert.equal(launches.length, 1, result.output);
+		assert.equal(launches[0].inspected, 2);
+		assert.doesNotMatch(
+			result.output,
+			/source superseded|changed before launch/,
+		);
+	});
+
 function migrationProcess(pid) {
 	try {
 		const fields = fs

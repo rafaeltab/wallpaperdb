@@ -202,6 +202,10 @@ async function runtime(expected, deadline, commandDeadline, support) {
 		);
 	const changed = inspect();
 	if (changed) throw Error(`Asset migration changed before launch: ${changed}`);
+	if (Date.now() >= deadline || Date.now() >= commandDeadline)
+		throw Error(
+			"Asset migration launch budget exhausted after final inspection; no launch",
+		);
 	console.log(`asset-migration launch ${hash(JSON.stringify(expected))}`);
 	process.stdin.pause();
 	// Receipt is point in time. Source remains editable while the package owns SQL/backfill.

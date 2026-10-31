@@ -36,7 +36,6 @@ services:
           target: /app/packages
           ignore:
             - "**/node_modules/**"
-            - "**/dist/**"
             - "**/coverage/**"
             - "**/.turbo/**"
             - "**/*.tsbuildinfo"
@@ -74,7 +73,6 @@ services:
           target: /app/packages
           ignore:
             - "**/node_modules/**"
-            - "**/dist/**"
             - "**/coverage/**"
             - "**/.turbo/**"
             - "**/*.tsbuildinfo"
@@ -107,7 +105,6 @@ services:
           target: /app/packages
           ignore:
             - "**/node_modules/**"
-            - "**/dist/**"
             - "**/coverage/**"
             - "**/.turbo/**"
             - "**/*.tsbuildinfo"
@@ -140,7 +137,6 @@ services:
           target: /app/packages
           ignore:
             - "**/node_modules/**"
-            - "**/dist/**"
             - "**/coverage/**"
             - "**/.turbo/**"
             - "**/*.tsbuildinfo"
@@ -173,7 +169,6 @@ services:
           target: /app/packages
           ignore:
             - "**/node_modules/**"
-            - "**/dist/**"
             - "**/coverage/**"
             - "**/.turbo/**"
             - "**/*.tsbuildinfo"
@@ -208,7 +203,6 @@ services:
           target: /app/packages
           ignore:
             - "**/node_modules/**"
-            - "**/dist/**"
             - "**/coverage/**"
             - "**/.turbo/**"
             - "**/*.tsbuildinfo"
@@ -248,7 +242,6 @@ services:
           target: /app/packages
           ignore:
             - "**/node_modules/**"
-            - "**/dist/**"
             - "**/coverage/**"
             - "**/.turbo/**"
             - "**/*.tsbuildinfo"
@@ -285,7 +278,6 @@ services:
           target: /app/packages
           ignore:
             - "**/node_modules/**"
-            - "**/dist/**"
             - "**/coverage/**"
             - "**/.turbo/**"
             - "**/*.tsbuildinfo"
@@ -318,7 +310,6 @@ services:
           target: /app/packages
           ignore:
             - "**/node_modules/**"
-            - "**/dist/**"
             - "**/coverage/**"
             - "**/.turbo/**"
             - "**/*.tsbuildinfo"

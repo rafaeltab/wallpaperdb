@@ -654,66 +654,67 @@ it('accepts exact original bytes through HTTP and publishes sufficient committed
   }
 });
 
-it('fences late upload and immutable preparation completion after terminal deletion', async () => {
-  const lifecycle = ManagedRuntime.make(
-    lifecyclePostgresLayer({
+it.each(['upload', 'prepare'] as const)(
+  'fences late upload and immutable preparation completion after terminal deletion (%s)',
+  async (phase) => {
+    const lifecycle = ManagedRuntime.make(
+      lifecyclePostgresLayer({
+        databaseUrl: postgres.getConnectionUri(),
+        revision: authority.identity,
+        ...authority.delivery,
+        leaseMs: 1000,
+      })
+    );
+    const persistence = sourcePostgresLayer({
       databaseUrl: postgres.getConnectionUri(),
-      revision: authority.identity,
       ...authority.delivery,
       leaseMs: 1000,
-    })
-  );
-  const persistence = sourcePostgresLayer({
-    databaseUrl: postgres.getConnectionUri(),
-    ...authority.delivery,
-    leaseMs: 1000,
-  });
-  const s3 = tester.getS3();
-  const storage = sourceStorageLayer({
-    endpoint: s3.endpoints.fromHost,
-    region: 'us-east-1',
-    accessKeyId: s3.options.accessKey,
-    secretAccessKey: s3.options.secretKey,
-    bucket: 'composition-private',
-  });
-  let suspend: 'upload' | 'prepare' | null = null;
-  let entered = () => {};
-  let release = () => {};
-  let resume: Promise<void> = Promise.resolve();
-  const delayed = Layer.effect(
-    SourceBytes,
-    Effect.gen(function* () {
-      const real = yield* SourceBytes;
-      const pause = (phase: 'upload' | 'prepare') =>
-        Effect.gen(function* () {
-          if (suspend !== phase) return;
-          entered();
-          yield* Effect.promise(() => resume);
+    });
+    const s3 = tester.getS3();
+    const storage = sourceStorageLayer({
+      endpoint: s3.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey,
+      bucket: 'composition-private',
+    });
+    let suspend: 'upload' | 'prepare' | null = null;
+    let entered = () => {};
+    let release = () => {};
+    let resume: Promise<void> = Promise.resolve();
+    const delayed = Layer.effect(
+      SourceBytes,
+      Effect.gen(function* () {
+        const real = yield* SourceBytes;
+        const pause = (phase: 'upload' | 'prepare') =>
+          Effect.gen(function* () {
+            if (suspend !== phase) return;
+            entered();
+            yield* Effect.promise(() => resume);
+          });
+        return SourceBytes.of({
+          ...real,
+          put: (...args) => real.put(...args).pipe(Effect.andThen(pause('upload'))),
+          prepare: (...args) => real.prepare(...args).pipe(Effect.andThen(pause('prepare'))),
         });
-      return SourceBytes.of({
-        ...real,
-        put: (...args) => real.put(...args).pipe(Effect.andThen(pause('upload'))),
-        prepare: (...args) => real.prepare(...args).pipe(Effect.andThen(pause('prepare'))),
-      });
-    })
-  ).pipe(Layer.provide(storage));
-  const sources = ManagedRuntime.make(
-    sourcesLayer({ revision: authority.identity, types: authority.assetTypes }).pipe(
-      Layer.provide(Layer.mergeAll(persistence, storage, delayed))
-    )
-  );
-  const owner = { namespace: 'clerk-test', subject: 'late-work-owner' };
-  const png = await sharp({ create: { width: 8, height: 6, channels: 3, background: 'green' } })
-    .png()
-    .toBuffer();
-  const stream = () => ({
-    async *[Symbol.asyncIterator]() {
-      yield png;
-    },
-    cancel() {},
-  });
-  try {
-    for (const phase of ['upload', 'prepare'] as const) {
+      })
+    ).pipe(Layer.provide(storage));
+    const sources = ManagedRuntime.make(
+      sourcesLayer({ revision: authority.identity, types: authority.assetTypes }).pipe(
+        Layer.provide(Layer.mergeAll(persistence, storage, delayed))
+      )
+    );
+    const owner = { namespace: 'clerk-test', subject: 'late-work-owner' };
+    const png = await sharp({ create: { width: 8, height: 6, channels: 3, background: 'green' } })
+      .png()
+      .toBuffer();
+    const stream = () => ({
+      async *[Symbol.asyncIterator]() {
+        yield png;
+      },
+      cancel() {},
+    });
+    try {
       suspend = null;
       const created = await lifecycle.runPromise(
         LifecycleStore.use((s) =>
@@ -793,8 +794,35 @@ it('fences late upload and immutable preparation completion after terminal delet
       ).toMatchObject({
         sources: [],
         nonterminalCandidateCount: 0,
-        candidates: [{ candidateId: id, status: 'cancelled', reason: 'asset-deleted' }],
+        candidates: [],
       });
+      expect(
+        (
+          await pool.query(
+            `SELECT id, asset_id, source_id, idempotency_key, status,
+            candidate->>'candidateId' AS json_candidate_id,
+            candidate->>'sourceId' AS json_source_id,
+            candidate->>'idempotencyKey' AS json_idempotency_key,
+            candidate->>'status' AS json_status,
+            candidate->>'reason' AS json_reason
+           FROM source_candidates WHERE asset_id=$1`,
+            [assetId]
+          )
+        ).rows
+      ).toEqual([
+        {
+          id,
+          asset_id: assetId,
+          source_id: candidate.candidate.sourceId,
+          idempotency_key: `late-${phase}`,
+          status: 'cancelled',
+          json_candidate_id: id,
+          json_source_id: candidate.candidate.sourceId,
+          json_idempotency_key: `late-${phase}`,
+          json_status: 'cancelled',
+          json_reason: 'asset-deleted',
+        },
+      ]);
       expect(
         (
           await pool.query(
@@ -812,10 +840,23 @@ it('fences late upload and immutable preparation completion after terminal delet
           )
         ).rows
       ).toEqual([{ count: 1 }]);
+      expect(
+        (
+          await pool.query('SELECT id, target FROM source_cleanup WHERE asset_id=$1 ORDER BY id', [
+            assetId,
+          ])
+        ).rows
+      ).toEqual([
+        { id: `candidate:${id}`, target: { kind: 'candidate', candidateId: id } },
+        {
+          id: `source:${candidate.candidate.sourceId}`,
+          target: { kind: 'source', assetId, sourceId: candidate.candidate.sourceId },
+        },
+      ]);
+    } finally {
+      release();
+      await sources.dispose();
+      await lifecycle.dispose();
     }
-  } finally {
-    release();
-    await sources.dispose();
-    await lifecycle.dispose();
   }
-});
+);

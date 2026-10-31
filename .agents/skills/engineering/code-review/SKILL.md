@@ -12,7 +12,7 @@ Each axis requiring fresh review runs in a separate sub-agent. When both are nee
 
 Apply [task scope](../../../../docs/agents/task-scope.md) when preparing both sub-agent briefs and interpreting their findings. Include the agreed scope, relevant user decisions, and pending proposals in each brief, including repeated rounds.
 
-The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, tell the user to run $setup-matt-pocock-skills.
+The issue tracker should have been provided to you. If `docs/agents/issue-tracker.md` is missing, tell the user to run `/setup-matt-pocock-skills`.
 
 ## Process
 

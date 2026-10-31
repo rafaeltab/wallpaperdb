@@ -1254,6 +1254,11 @@ test("paused lock fixture reports Make failure before the sync barrier", async (
 	});
 	assert.equal(f.commands.length, 1);
 	const command = f.commands[0];
+	assert.deepEqual(await stopLockFixtureChildren(f.commands, true), {
+		drained: true,
+		signal: null,
+	});
+	await command.done;
 	assert.equal(command.closed, true);
 	assert.equal(command.child.exitCode, 2);
 	assert.equal(command.child.signalCode, null);

@@ -1,52 +1,28 @@
-import { once } from 'node:events';
-import { createServer, type Socket } from 'node:net';
 import { Effect, ManagedRuntime } from 'effect';
-import { expect, it } from 'vitest';
 import { operatorWebhookLayer } from '../src/adapters/commands/index.js';
+import { brokerAcquisitionContract } from './fixtures/broker-acquisition.js';
 
-for (const ending of ['timeout', 'cancellation', 'disposal'] as const) {
-  it(`closes the native silent-peer socket after ${ending}`, async () => {
-    const sockets = new Set<Socket>();
-    const peer = createServer((socket) => {
-      sockets.add(socket);
-      socket.on('close', () => sockets.delete(socket));
-    });
-    peer.listen(0, '127.0.0.1');
-    await once(peer, 'listening');
-    const address = peer.address();
-    if (!address || typeof address === 'string') throw new Error('Missing peer port');
-    const options = {
-      url: `nats://127.0.0.1:${address.port}`,
-      credential: { user: 'test', password: 'test' },
-      target: { url: 'http://127.0.0.1', token: 'test' },
-      applications: {
-        test: {
-          id: 'test',
-          serviceUser: 'test',
-          createSubject: 'asset.commands.test.create',
-          deleteSubject: 'asset.commands.test.delete',
-          resultSubject: 'asset.results.test',
-        },
+brokerAcquisitionContract((url) => {
+  const options = {
+    url,
+    credential: { user: 'test', password: 'test' },
+    target: { url: 'http://127.0.0.1', token: 'test' },
+    applications: {
+      test: {
+        id: 'test',
+        serviceUser: 'test',
+        createSubject: 'asset.commands.test.create',
+        deleteSubject: 'asset.commands.test.delete',
+        resultSubject: 'asset.results.test',
       },
-      maxAttempts: 2,
-      retryDelayMs: 10,
-      shutdownTimeoutMs: 100,
-    };
-    const runtime = ManagedRuntime.make(operatorWebhookLayer(options));
-    const controller = new AbortController();
-    const acquisition = runtime.runPromiseExit(Effect.void, { signal: controller.signal });
-    try {
-      await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(1);
-      if (ending === 'cancellation') controller.abort();
-      if (ending === 'disposal') await runtime.dispose();
-      const result = await acquisition;
-      expect(result._tag).toBe('Failure');
-      await runtime.dispose();
-      await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0);
-    } finally {
-      await runtime.dispose();
-      for (const socket of sockets) socket.destroy();
-      await new Promise<void>((resolve) => peer.close(() => resolve()));
-    }
-  }, 10000);
-}
+    },
+    maxAttempts: 2,
+    retryDelayMs: 10,
+    shutdownTimeoutMs: 100,
+  };
+  const runtime = ManagedRuntime.make(operatorWebhookLayer(options));
+  return {
+    run: (signal) => runtime.runPromiseExit(Effect.void, { signal }),
+    dispose: () => runtime.dispose(),
+  };
+});

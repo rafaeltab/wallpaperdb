@@ -49,9 +49,12 @@ for (const ending of ['timeout', 'cancellation', 'disposal'] as const) {
       await runtime.dispose();
       await expect.poll(() => sockets.size, { timeout: 1000 }).toBe(0);
     } finally {
-      await runtime.dispose();
-      for (const socket of sockets) socket.destroy();
-      await new Promise<void>((resolve) => peer.close(() => resolve()));
+      try {
+        await runtime.dispose();
+      } finally {
+        for (const socket of sockets) socket.destroy();
+        await new Promise<void>((resolve) => peer.close(() => resolve()));
+      }
     }
   }, 10000);
 }

@@ -1,0 +1,44 @@
+--- a/lib/src/node_transport.js
++++ b/lib/src/node_transport.js
+@@ -119,6 +119,7 @@
+             socket.removeAllListeners();
+             d.reject(dialError);
+         });
++        this.socket = socket;
+         socket.setNoDelay(true);
+         return d;
+     }
+@@ -243,6 +244,9 @@
+             }
+             const d = (0, nats_base_client_1.deferred)();
+             try {
++                if (this.done) {
++                    throw nats_base_client_1.NatsError.errorForCode(nats_base_client_1.ErrorCode.ConnectionClosed);
++                }
+                 const tlsSocket = (0, tls_1.connect)(hp.port, hp.hostname, tlsOpts, () => {
+                     tlsSocket.removeAllListeners();
+                     d.resolve(tlsSocket);
+@@ -263,6 +267,7 @@
+                     d.reject(tlsError);
+                     tlsSocket.removeAllListeners();
+                 });
++                this.socket = tlsSocket;
+                 tlsSocket.setNoDelay(true);
+             }
+             catch (err) {
+@@ -420,9 +425,13 @@
+     }
+     _closed(err_1) {
+         return __awaiter(this, arguments, void 0, function* (err, internal = true) {
+-            // if this connection didn't succeed, then ignore it.
+-            if (!this.connected)
++            // Acquisition timeout must also close a socket still waiting for INFO.
++            // Keep failed acquisition out of the established-connection reconnect path.
++            if (!this.connected) {
++                this.done = true;
++                if (this.socket) this.socket.destroy();
+                 return;
++            }
+             if (this.done)
+                 return;
+             this.closeError = err;

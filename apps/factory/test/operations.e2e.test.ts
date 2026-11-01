@@ -362,6 +362,7 @@ it('shows conflict classification and pending questions with a recovery-thread l
     const page = await context.newPage();
     await page.goto(`http://127.0.0.1:${address.port}`);
     await browserExpect(page.getByRole('heading', { name: 'Conflict recovery #4' })).toBeVisible();
+    await page.getByRole('heading', { name: 'Conflict recovery #4' }).scrollIntoViewIfNeeded();
     await browserExpect(page.getByText('Classification: COMPLEX')).toBeVisible();
     await browserExpect(page.getByText('Awaiting independent review-loop')).toBeVisible();
     await browserExpect(page.getByRole('link', { name: 'Open recovery thread' })).toHaveAttribute(
@@ -379,6 +380,11 @@ it('shows conflict classification and pending questions with a recovery-thread l
     await browserExpect(
       page.getByText('Question: Open recovery thread to answer the pending question')
     ).toBeVisible();
+    if (process.env.FACTORY_DEMO_DIRECTORY)
+      await page.screenshot({
+        path: join(process.env.FACTORY_DEMO_DIRECTORY, 'questions.png'),
+        fullPage: true,
+      });
     expect((await Effect.runPromise(f.issues.inspect(5))).blockersReady).toBe(false);
     await context.close();
   } finally {

@@ -58,7 +58,7 @@ if (
   console.log(JSON.stringify(config.mergedPrerequisites?.[args[1].split('/').at(-1)] ?? null));
   process.exit(0);
 }
-if (config.restack && basename(process.argv[1]) === 't3') {
+if (config.restack && basename(process.argv[1]) === 't3' && !args.includes('--help')) {
   const path = join(config.directory, 'restacker.json');
   const flag = (name) => args[args.indexOf(name) + 1];
   let state = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
@@ -118,6 +118,7 @@ if (config.restack && basename(process.argv[1]) === 't3') {
       ],
     };
     writeFileSync(path, JSON.stringify(state));
+    if (config.restack.loseLaunch) process.exit(1);
     console.log(
       JSON.stringify({ threadId: 'restacker', projectId: 'project-id', runId: 'resolve-run' })
     );

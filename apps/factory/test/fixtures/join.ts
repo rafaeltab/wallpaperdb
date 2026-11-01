@@ -7,6 +7,7 @@ export async function joinFixture(
   options: {
     conflict?: boolean;
     restack?: {
+      loseLaunch?: boolean;
       outcome?: 'SIMPLE' | 'COMPLEX';
       review?: boolean;
       stale?: boolean;

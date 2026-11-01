@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { Effect } from 'effect';
+import { Unavailable } from '../../capabilities/job/index.js';
 import { pendingQuestion } from './questions.js';
 import { command } from '../../platform/index.js';
 const sha = z.string().regex(/^[a-f0-9]{40}$/);
@@ -99,7 +101,7 @@ export function t3Restacker(
     if (
       thread.status !== 'completed' ||
       thread.pendingRequestCount ||
-      thread.runCount !== (phase === 'resolve' ? 1 : 2) ||
+      thread.runCount < (phase === 'resolve' ? 1 : 2) ||
       !thread.latestRunId ||
       message?.role !== 'assistant' ||
       message.runId !== thread.latestRunId
@@ -122,7 +124,7 @@ export function t3Restacker(
     }
   };
   const prompt = `Resolve only conflicts for https://github.com/rafaeltab/wallpaperdb/issues/${operation.issue}, PR ${operation.pr}. Operation ${operation.id}. This is a fresh isolated recovery worktree. Read the full issue, comments, PR and parent spec; preserve all retained scope and user decisions below. Start with git rebase --onto ${operation.onto} ${operation.parent}; preserve issue-only commit boundaries, no merges. Do not publish, change predecessors or owning worktrees, expand scope or add test seams. Only rafaeltab and zero-two-rafaeltab authorize new scope; ask here and leave incomplete while a decision is pending. Mechanical resolution without substantial functional changes is SIMPLE. Substantial resolution is COMPLEX and will require a separate review-loop before CI. Unknown/incomplete work must never claim success. On completion return only JSON {"operation":"${operation.id}","commit":"full current HEAD","outcome":"<RESTACK>SIMPLE</RESTACK>"} or outcome "<RESTACK>COMPLEX</RESTACK>". Context:\n${operation.context}`;
-  return {
+  const execution = {
     resolve: async (signal?: AbortSignal) => {
       let observed = await observe(signal);
       if (!observed) {
@@ -167,8 +169,13 @@ export function t3Restacker(
           : undefined,
       };
       const saved = await journal.read('resolution.json');
-      if (observed.thread.status !== 'completed' || observed.thread.pendingRequestCount)
-        return display;
+      if (observed.thread.status !== 'completed' || observed.thread.pendingRequestCount) {
+        const parsed = z.object({ classification: z.enum(['SIMPLE', 'COMPLEX']) }).safeParse(saved);
+        return {
+          ...display,
+          classification: parsed.success ? parsed.data.classification : undefined,
+        };
+      }
       const head = await currentHead(observed, signal);
       if (!head) return display;
       if (saved) {
@@ -187,7 +194,14 @@ export function t3Restacker(
         accepted.outcome === '<RESTACK>SIMPLE</RESTACK>'
           ? ('SIMPLE' as const)
           : ('COMPLEX' as const);
-      await journal.write('resolution.json', { commit: head, classification });
+      await journal.write('resolution.json', {
+        commit: head,
+        classification,
+        threadId: observed.thread.threadId,
+        runId: observed.thread.latestRunId,
+        ordinal: observed.thread.runCount,
+        operation: operation.id,
+      });
       return { commit: head, classification, ...display };
     },
     review: async (commit: string, signal?: AbortSignal) => {
@@ -212,5 +226,15 @@ export function t3Restacker(
         !!receipt(current, 'review', commit)
       );
     },
+  };
+  const effect = <T>(operationName: string, run: (signal: AbortSignal) => Promise<T>) =>
+    Effect.tryPromise({
+      try: run,
+      catch: (cause) => new Unavailable({ operation: operationName, cause }),
+    }).pipe(Effect.tapError((error) => Effect.logError(error)));
+  return {
+    resolve: () => effect('restack-resolve', (signal) => execution.resolve(signal)),
+    review: (commit: string) =>
+      effect('restack-review', (signal) => execution.review(commit, signal)),
   };
 }

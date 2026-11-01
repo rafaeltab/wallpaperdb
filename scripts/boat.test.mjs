@@ -11275,10 +11275,7 @@ for (const variant of [
 			const interrupted = await f.generate();
 			assert.notEqual(interrupted.status, 0);
 		}
-		if (variant === "failed-main") {
-			flag(f, "candidate-stop-uncertain");
-			fs.rmSync(path.join(f.control, "provider-info"));
-		}
+		if (variant === "failed-main") flag(f, "candidate-stop-uncertain");
 		const before = f.json(".boat/state.json"),
 			calls = freshCalls(f).length;
 		const result = await f.run("boat-settle").done;
@@ -11317,11 +11314,32 @@ for (const variant of [
 					? "submission-uncertain"
 					: "completed-observed",
 			);
-			if (variant === "failed-main")
-				assert.ok(
-					effects.some((a) => a.includes("stop") && a.includes("fake-worker")),
+			if (variant === "failed-main") {
+				const candidateStop = effects.findIndex(
+					(a) => a.includes("stop") && a.includes("fake-new-worker"),
 				);
-			else {
+				const oldInspection = effects.findIndex(
+					(a) => a.includes("info") && a.includes("fake-worker"),
+				);
+				assert.ok(
+					oldInspection > candidateStop,
+					"remaining old ownership must still be inspected after candidate failure",
+				);
+				assert.equal(
+					effects.some((a) => a.includes("stop") && a.includes("fake-worker")),
+					false,
+					"do not resubmit the predecessor's completed stop",
+				);
+				assert.equal(
+					fs.existsSync(path.join(f.root, ".boat/cache-tunnel.json")),
+					false,
+					"old owned tunnel disposal still runs",
+				);
+				assert.deepEqual(
+					after.shutdownAttempt.completion,
+					before.shutdownAttempt.completion,
+				);
+			} else {
 				assert.equal(after.admission.runningSince, null);
 				assert.ok(after.admission.cost > 0);
 			}

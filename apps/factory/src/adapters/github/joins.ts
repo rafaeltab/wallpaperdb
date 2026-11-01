@@ -393,20 +393,18 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
         write: (name, data) => publish(recoveryDir, name, data),
       }
     );
-    const effect = <T>(run: () => Promise<T>) =>
-      Effect.tryPromise({
-        try: run,
-        catch: (cause) => new Unavailable({ operation: 'conflict-recovery', cause }),
-      });
     let reviewed = false;
     const result = await Effect.runPromise(
       recover({
-        resolve: () => effect(() => agent.resolve(signal)),
+        resolve: () => agent.resolve(),
         review: (commit) =>
-          effect(async () => {
-            reviewed = await agent.review(commit, signal);
-            return reviewed;
-          }),
+          agent.review(commit).pipe(
+            Effect.tap((result) =>
+              Effect.sync(() => {
+                reviewed = result;
+              })
+            )
+          ),
         // Publication and hosted CI use the join's durable intent and expected-head lease below.
         verify: () => Effect.succeed(false),
       })
@@ -936,7 +934,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
     }
     return true;
   };
-  const validateOperation = async (operation: Intent, dir: string, signal?: AbortSignal) => {
+  const validateReplays = async (operation: Intent, dir: string, signal?: AbortSignal) => {
     for (const item of operation.replay) {
       const saved = await read(dir, `resolved-${item.issue}.json`);
       if (!saved) {
@@ -995,7 +993,7 @@ export function prerequisiteJoin(project: string, base: string, config: JoinConf
   };
   const validateOperation = async (operation: Intent, dir: string, signal?: AbortSignal) => {
     if (!(await operationFactsValid(operation, signal))) return false;
-    for (const item of operation.replay) if (!(await validate(item, dir, signal))) return false;
+    if (!(await validateReplays(operation, dir, signal))) return false;
     return publicationSafe(operation, dir, signal);
   };
   const publishComparisons = async (operation: Intent, signal?: AbortSignal) => {

@@ -865,3 +865,40 @@ it.each([
     await f.close();
   }
 });
+
+it('reconciles a lost recovery launch response without a second worker', async () => {
+  const f = await fixture({ conflict: true, restack: { outcome: 'SIMPLE', loseLaunch: true } });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await expect(Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void)).rejects.toMatchObject({
+      _tag: 'Unavailable',
+    });
+    await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
+    expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true);
+    expect((await f.host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(1);
+  } finally {
+    await f.close();
+  }
+});
+
+it('keeps a classified SIMPLE resolution incomplete until CI verifies its published head', async () => {
+  const f = await fixture({ conflict: true, ciFails: true, restack: { outcome: 'SIMPLE' } });
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    const pending = await Effect.runPromise(f.reopen().inspect(5));
+    expect(pending.blockersReady).toBe(false);
+    expect(pending.recovery?.classification).toBe('SIMPLE');
+    const current = f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0];
+    expect(current).not.toBe(f.c);
+    const path = join(f.host.directory, 'join-live.json');
+    const live = JSON.parse(await readFile(path, 'utf8'));
+    live.newCI = 'SUCCESS';
+    await writeFile(path, JSON.stringify(live));
+    await Effect.runPromise(f.reopen().reconcile?.() ?? Effect.void);
+    expect((await Effect.runPromise(f.reopen().inspect(5))).prerequisite?.base).toBe(current);
+    expect((await Effect.runPromise(f.reopen().inspect(5))).blockersReady).toBe(true);
+  } finally {
+    await f.close();
+  }
+});

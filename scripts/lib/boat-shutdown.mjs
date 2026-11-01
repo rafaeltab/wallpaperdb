@@ -49,7 +49,7 @@ export function shutdownBudget(milliseconds = 180000, record = () => {}) {
 	};
 }
 
-function identity(pid) {
+function identity(pid, includeCwd = false) {
 	try {
 		const text = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
 		const fields = text.slice(text.lastIndexOf(")") + 2).split(" ");
@@ -60,6 +60,7 @@ function identity(pid) {
 			session: Number(fields[3]),
 			birth: fields[19],
 			zombie: fields[0] === "Z",
+			...(includeCwd ? { cwd: fs.readlinkSync(`/proc/${pid}/cwd`) } : {}),
 		};
 	} catch (error) {
 		if (["ENOENT", "ESRCH"].includes(error.code)) return null;
@@ -72,7 +73,8 @@ const same = (a, b) =>
 	a.pid === b.pid &&
 	a.birth === b.birth &&
 	a.group === b.group &&
-	a.session === b.session;
+	a.session === b.session &&
+	(b.cwd === undefined || a.cwd === b.cwd);
 function groupMembers(leader) {
 	return fs
 		.readdirSync("/proc")
@@ -90,7 +92,7 @@ function groupMembers(leader) {
 }
 function signalOwned(members, signal) {
 	for (const member of members) {
-		if (!same(identity(member.pid), member)) continue;
+		if (!same(identity(member.pid, member.cwd !== undefined), member)) continue;
 		try {
 			process.kill(member.pid, signal);
 		} catch (error) {
@@ -99,17 +101,74 @@ function signalOwned(members, signal) {
 	}
 }
 
+// Source transport discovery follows only previously owned processes' child
+// lists. It never scans the host process table or grants group-signal authority.
+function sourceMembers(leader, observed) {
+	const members = new Map();
+	const queue = [...observed.values()];
+	for (let at = 0; at < queue.length; at++) {
+		const captured = queue[at];
+		const current = identity(captured.pid, true);
+		if (!current || current.zombie || current.birth !== captured.birth)
+			continue;
+		members.set(`${current.pid}:${current.birth}`, current);
+		if (
+			!same(current, captured) ||
+			current.group !== leader.group ||
+			current.session !== leader.session
+		)
+			continue;
+		let tasks;
+		try {
+			tasks = fs.readdirSync(`/proc/${current.pid}/task`);
+		} catch (error) {
+			if (["ENOENT", "ESRCH"].includes(error.code)) continue;
+			throw error;
+		}
+		for (const task of tasks) {
+			let children;
+			try {
+				children = fs.readFileSync(
+					`/proc/${current.pid}/task/${task}/children`,
+					"utf8",
+				);
+			} catch (error) {
+				if (["ENOENT", "ESRCH"].includes(error.code)) continue;
+				throw error;
+			}
+			for (const pid of children.trim().split(/\s+/).filter(Boolean)) {
+				const child = identity(Number(pid), true);
+				if (
+					!child ||
+					child.zombie ||
+					child.parent !== current.pid ||
+					BigInt(child.birth) < BigInt(leader.birth) ||
+					!same(identity(current.pid, true), current)
+				)
+					continue;
+				const key = `${child.pid}:${child.birth}`;
+				if (!observed.has(key)) {
+					observed.set(key, child);
+					queue.push(child);
+				}
+			}
+		}
+	}
+	return [...members.values()];
+}
+
 // Own only this fresh session/group and its observed identities. Arbitrary
 // daemon/session escapes are NOT contained by procfs polling or this receipt.
 export function finiteShutdownProcess(child, phase) {
 	return new Promise((resolve, reject) => {
 		let leader, ownershipFailure;
 		try {
-			leader = identity(child.pid);
+			leader = identity(child.pid, !!phase.sourceScope);
 		} catch {
 			ownershipFailure = "local process identity unavailable";
 		}
 		const observed = new Map();
+		const published = new Map();
 		if (leader && leader.pid === leader.group && leader.pid === leader.session)
 			observed.set(`${leader.pid}:${leader.birth}`, leader);
 		let closed = false,
@@ -125,24 +184,70 @@ export function finiteShutdownProcess(child, phase) {
 				leader.pid !== leader.session
 			)
 				return [];
-			const members = groupMembers(leader);
-			for (const p of members) observed.set(`${p.pid}:${p.birth}`, p);
+			const members = phase.sourceScope
+				? sourceMembers(leader, observed)
+				: groupMembers(leader);
+			for (const p of members) {
+				const key = `${p.pid}:${p.birth}`;
+				if (!phase.sourceScope || !observed.has(key)) observed.set(key, p);
+			}
 			// An observed member that changes session is unresolved, not permission
 			// to kill an unverified group or report complete local disposal.
 			for (const p of observed.values()) {
-				const current = identity(p.pid);
+				const current = identity(p.pid, !!phase.sourceScope);
 				if (
 					current &&
 					!current.zombie &&
 					current.birth === p.birth &&
-					!same(current, p)
+					(!same(current, p) ||
+						(phase.sourceScope &&
+							(current.group !== leader.group ||
+								current.session !== leader.session)))
 				) {
-					failure = "observed local process escaped session ownership";
-					members.push(current);
+					failure = phase.sourceScope
+						? "observed local process changed captured ownership"
+						: "observed local process escaped session ownership";
+					if (
+						!members.some(
+							(p) => p.pid === current.pid && p.birth === current.birth,
+						)
+					)
+						members.push(current);
 				}
+			}
+			if (
+				phase.sourceScope &&
+				[...observed.keys()].some((key) => !published.has(key))
+			) {
+				// Durable acquisition precedes every source signal, including children
+				// discovered after an earlier TERM or after the leader has exited.
+				phase.record({
+					phase: phase.phase,
+					stage: "acquired",
+					spawnedPid: child.pid,
+					leader,
+					observed: [...observed.values()],
+					unresolved: members,
+					pipesClosed: closed,
+					terminal,
+					failure,
+				});
+				for (const [key, value] of observed) published.set(key, value);
 			}
 			return members;
 		};
+		const owned = (members) =>
+			members.filter(
+				(p) =>
+					same(
+						(phase.sourceScope ? published : observed).get(
+							`${p.pid}:${p.birth}`,
+						),
+						p,
+					) &&
+					(!phase.sourceScope ||
+						(p.group === leader?.group && p.session === leader?.session)),
+			);
 		const finish = (members) => {
 			if (finished) return;
 			finished = true;
@@ -152,11 +257,20 @@ export function finiteShutdownProcess(child, phase) {
 			child.stderr?.destroy();
 			const receipt = {
 				phase: phase.phase,
+				...(phase.sourceScope
+					? {
+							stage: "finished",
+							retired:
+								!!leader && members.length === 0 && closed && !ownershipFailure,
+						}
+					: {}),
 				spawnedPid: child.pid,
 				leader,
 				observed: [...observed.values()],
 				unresolved: leader
-					? members
+					? phase.sourceScope && !closed && members.length === 0
+						? [{ reason: "local pipe closure unproven" }]
+						: members
 					: [{ pid: child.pid, reason: "identity-unavailable" }],
 				pipesClosed: closed,
 				terminal,
@@ -185,14 +299,20 @@ export function finiteShutdownProcess(child, phase) {
 				members = remember();
 			} catch {
 				failure = "process ownership inspection failed";
+				if (phase.sourceScope) ownershipFailure = failure;
 				members = [...observed.values()].filter((p) => {
 					try {
-						return same(identity(p.pid), p);
+						const current = identity(p.pid, !!phase.sourceScope);
+						return phase.sourceScope
+							? current && !current.zombie && current.birth === p.birth
+							: same(current, p);
 					} catch {
 						return true;
 					}
 				});
 			}
+			if (phase.sourceScope && failure && !Number.isFinite(phase.deadline))
+				phase.deadline = now() + phase.disposalMs;
 			if (now() >= phase.deadline - phase.disposalMs)
 				failure ??= "deadline exceeded";
 			if (closed && members.length === 0) {
@@ -204,10 +324,7 @@ export function finiteShutdownProcess(child, phase) {
 				failure ??= "deadline exceeded";
 				child.stdin?.destroy();
 				try {
-					signalOwned(
-						members.filter((p) => same(observed.get(`${p.pid}:${p.birth}`), p)),
-						"SIGTERM",
-					);
+					signalOwned(owned(members), "SIGTERM");
 				} catch {
 					failure = "local TERM failed";
 				}
@@ -215,10 +332,7 @@ export function finiteShutdownProcess(child, phase) {
 			if (now() >= phase.deadline - phase.disposalMs / 2 && !killed) {
 				killed = true;
 				try {
-					signalOwned(
-						members.filter((p) => same(observed.get(`${p.pid}:${p.birth}`), p)),
-						"SIGKILL",
-					);
+					signalOwned(owned(members), "SIGKILL");
 				} catch {
 					failure = "local KILL failed";
 				}
@@ -236,12 +350,19 @@ export function finiteShutdownProcess(child, phase) {
 		});
 		child.on("error", () => {
 			failure = "local spawn failed";
+			if (phase.sourceScope && !Number.isFinite(phase.deadline))
+				phase.deadline = now() + phase.disposalMs;
 		});
 		const timer = setInterval(
 			tick,
 			Math.max(1, Math.min(20, phase.disposalMs / 5)),
 		);
-		if (!leader || leader.pid !== leader.group || leader.pid !== leader.session)
+		if (
+			!leader ||
+			leader.pid !== leader.group ||
+			leader.pid !== leader.session ||
+			(phase.sourceScope && leader.cwd !== phase.sourceScope.cwd)
+		)
 			failure = "fresh local session ownership unavailable";
 		tick();
 	});

@@ -140,6 +140,7 @@ function inputState(source, kind, outputs, root) {
 	const names = [
 		...installationInputs(Object.keys(source)),
 		"scripts/lib/boat-source-command.mjs",
+		"scripts/lib/boat-shutdown.mjs",
 	];
 	if (kind === "migrations")
 		names.push(
@@ -153,7 +154,6 @@ function inputState(source, kind, outputs, root) {
 			"scripts/lib/boat-preparation.mjs",
 			"scripts/lib/boat-snapshot.mjs",
 			"scripts/lib/boat-reconstruction.mjs",
-			"scripts/lib/boat-shutdown.mjs",
 			"scripts/lib/boat-preview.mjs",
 			"scripts/lib/boat.mjs",
 			"scripts/lib/boat-cache.mjs",

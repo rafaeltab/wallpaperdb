@@ -883,6 +883,13 @@ function lockFixtureReadiness({
 // https://docs.boat.dev/api/reference/agent/attach-command
 // Ordinary command and Asset database migration streams keep their separate fake.
 const sourceCommandContractFixture = String.raw`
+function sourceLocalPipeHolder(control) {
+ const fs=require('fs'),path=require('path');
+ process.on('SIGTERM',()=>fs.writeFileSync(path.join(control,'source-helper-term'),'yes'));
+ const text=fs.readFileSync('/proc/'+process.pid+'/stat','utf8'),fields=text.slice(text.lastIndexOf(')')+2).split(' ');
+ fs.writeFileSync(path.join(control,'source-local-helper.json'),JSON.stringify({pid:process.pid,parent:process.ppid,birth:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()}));
+ setInterval(()=>{},1000);
+}
 function sourceFixtureWriter(control, command, startedAt) {
  const fs=require('fs'),cp=require('child_process'),path=require('path');
  if(fs.existsSync(path.join(control,'stream-loss')))return;
@@ -961,6 +968,16 @@ async function sourceCommandContract() {
   return true;
  }
  if(!flag('missing-started'))emit('attach',override('attached',{type:'attached',processId:start.processId,stdoutOffset:0,stderrOffset:0}));
+ if(flag('source-local-capture-overflow')){
+  process.on('SIGTERM',()=>{fs.writeFileSync(path.join(control,'source-leader-term'),'yes');process.exit(74);});
+  cp.spawn(process.execPath,['-e','('+sourceLocalPipeHolder.toString()+')('+JSON.stringify(control)+')'],{env:process.env,stdio:['ignore',1,2]});
+  while(!flag('source-fault-release'))await new Promise(resolve=>setTimeout(resolve,5));
+  fs.writeFileSync(path.join(control,'writer-active'),'yes');
+  const data='x'.repeat(8*1024*1024+1);
+  fs.writeFileSync(path.join(control,'source-fault-lower'),String(Number(process.hrtime.bigint()/1000000n)));
+  emit('attach',{type:'stdout',data,nextOffset:Buffer.byteLength(data)});
+  await new Promise(()=>setInterval(()=>{},1000));
+ }
  if(flag('stream-loss')){fs.writeFileSync(path.join(control,'writer-active'),'yes');process.exit(71);}
  let cursor=0,subsequent=false;
  const forwarded={stdout:0,stderr:0};
@@ -4572,42 +4589,48 @@ for (const [name, edit] of [
 		assert.equal(f.json(".boat/manifest.json")["pnpm-lock.yaml"], null);
 	});
 
-test("public lock generation rejects a concurrent source command helper edit and retains the proposal", async (t) => {
-	const f = await pausedGeneration(t);
-	const name = "scripts/lib/boat-source-command.mjs";
-	const captured = fs.readFileSync(path.join(f.root, name), "utf8");
-	const edited = `${captured}\n// concurrent source command helper edit\n`;
-	const before = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
-	f.local(name, edited);
-	f.release();
-	const result = await f.pending;
-	assert.notEqual(result.status, 0, result.output);
-	assert.match(
-		result.output,
-		/Local dependency inputs or old lock changed; proposal retained/,
-	);
-	assert.deepEqual(
-		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
-		before,
-	);
-	assert.equal(fs.readFileSync(path.join(f.root, name), "utf8"), edited);
-	assert.equal(fs.readFileSync(path.join(f.worker, name), "utf8"), captured);
-	const proposal = result.output.match(
-		/proposal retained at (.+\/pnpm-lock.yaml)/,
-	)?.[1];
-	assert.ok(proposal, result.output);
-	assert.equal(path.relative(f.root, proposal).startsWith(".."), true);
-	assert.deepEqual(
-		fs.readFileSync(proposal),
-		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml")),
-	);
-	assert.equal(
-		JSON.parse(fs.readFileSync(proposal)).inputs["patches/dependency.patch"],
-		"original patch\n",
-	);
-	assert.equal(fs.existsSync(path.join(f.root, ".boat/prepared.json")), false);
-	assert.equal(f.json(".boat/manifest.json")["pnpm-lock.yaml"], null);
-});
+for (const name of [
+	"scripts/lib/boat-source-command.mjs",
+	"scripts/lib/boat-shutdown.mjs",
+])
+	test(`public lock generation rejects a concurrent source helper ${name} edit and retains the proposal`, async (t) => {
+		const f = await pausedGeneration(t);
+		const captured = fs.readFileSync(path.join(f.root, name), "utf8");
+		const edited = `${captured}\n// concurrent source command helper edit\n`;
+		const before = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
+		f.local(name, edited);
+		f.release();
+		const result = await f.pending;
+		assert.notEqual(result.status, 0, result.output);
+		assert.match(
+			result.output,
+			/Local dependency inputs or old lock changed; proposal retained/,
+		);
+		assert.deepEqual(
+			fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+			before,
+		);
+		assert.equal(fs.readFileSync(path.join(f.root, name), "utf8"), edited);
+		assert.equal(fs.readFileSync(path.join(f.worker, name), "utf8"), captured);
+		const proposal = result.output.match(
+			/proposal retained at (.+\/pnpm-lock.yaml)/,
+		)?.[1];
+		assert.ok(proposal, result.output);
+		assert.equal(path.relative(f.root, proposal).startsWith(".."), true);
+		assert.deepEqual(
+			fs.readFileSync(proposal),
+			fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml")),
+		);
+		assert.equal(
+			JSON.parse(fs.readFileSync(proposal)).inputs["patches/dependency.patch"],
+			"original patch\n",
+		);
+		assert.equal(
+			fs.existsSync(path.join(f.root, ".boat/prepared.json")),
+			false,
+		);
+		assert.equal(f.json(".boat/manifest.json")["pnpm-lock.yaml"], null);
+	});
 
 test("captured dependency bytes reach the worker even when local inputs change during upload", async (t) => {
 	const f = await pausedGeneration(t, "sync");
@@ -8323,6 +8346,235 @@ test("documented source protocol preserves Unicode diagnostics and byte offsets"
 		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
 		false,
 	);
+});
+
+test("source capture failure retires its captured local pipe descendant and protects independent writers", async (t) => {
+	const f = await lockGenerationCheckout(t, { ownPackageGroups: true });
+	const sibling = fs.mkdtempSync(
+		path.join(os.tmpdir(), "boat-source-sibling-"),
+	);
+	const canary = spawn(
+		process.execPath,
+		["-e", "console.log('ready');setInterval(()=>{},1000)"],
+		{ cwd: sibling, detached: true, stdio: ["ignore", "pipe", "pipe"] },
+	);
+	const siblingIdentity = fixtureProcess(canary.pid);
+	let canaryClosed = false;
+	const canaryDone = once(canary, "close").then((result) => {
+		canaryClosed = true;
+		return result;
+	});
+	t.after(async () => {
+		if (fixtureProcess(canary.pid)) {
+			assert.ok(siblingIdentity, "sibling identity precedes safety cleanup");
+			assert.equal(
+				signalFixtureGroup(siblingIdentity, "SIGTERM", sibling),
+				true,
+			);
+		}
+		assert.ok(
+			await fixtureStopped(() => canaryClosed),
+			"owned sibling cleanup",
+		);
+		await canaryDone;
+		fs.rmSync(sibling, { recursive: true, force: true });
+	});
+	assert.ok(siblingIdentity, "sibling identity acquired before readiness");
+	await lockCanaryReady(canary, f.readiness);
+	// This separate API-writer fixture is not the source start receipt's PID.
+	// stream-loss prevents the CLI's default simulated worker from becoming a
+	// misleading local transport descendant. No real remote service is involved.
+	const writer = f.writer();
+	const writerIdentity = fixtureProcess(writer.child.pid);
+	assert.ok(writerIdentity, "independent writer identity precedes readiness");
+	await f.readiness.wait(
+		() => fs.existsSync(path.join(f.control, "writer-entered")),
+		"independently owned remote writer ready",
+	);
+	const before = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
+	flag(f, "stream-loss");
+	flag(f, "source-local-capture-overflow");
+	const command = f.run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock");
+	const helperFile = path.join(f.control, "source-local-helper.json");
+	await f.readiness.wait(() => {
+		assert.equal(command.terminal, null, command.output());
+		return fs.existsSync(helperFile);
+	}, "local transport pipe holder acquired");
+	const helperRecord = JSON.parse(fs.readFileSync(helperFile));
+	const helper = fixtureProcess(helperRecord.pid);
+	const leader = fixtureProcess(helperRecord.parent);
+	assert.ok(helper, "helper identity acquired before fault readiness");
+	assert.ok(leader, "CLI leader identity acquired before fault readiness");
+	assert.equal(helper.startTicks, helperRecord.birth);
+	assert.equal(helper.cwd, helperRecord.cwd);
+	assert.equal(helper.group, helperRecord.group);
+	assert.equal(helper.session, helperRecord.session);
+	const stat = fs.readFileSync(`/proc/${helper.pid}/stat`, "utf8");
+	assert.equal(
+		Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[1]),
+		leader.pid,
+	);
+	assert.equal(helper.group, leader.group);
+	assert.equal(helper.session, leader.session);
+	assert.equal(
+		new Set([helper.pid, leader.pid, writerIdentity.pid, siblingIdentity.pid])
+			.size,
+		4,
+	);
+	for (const independent of [writerIdentity, siblingIdentity]) {
+		assert.notEqual(independent.group, leader.group);
+		assert.notEqual(independent.session, leader.session);
+	}
+	// Upload has finished before attach readiness. The independent writer can
+	// now mutate its own output without racing source installation.
+	fs.mkdirSync(path.join(f.worker, "apps/asset/drizzle"), { recursive: true });
+	const matches = (value, expected) =>
+		value?.pid === expected.pid &&
+		value.birth === expected.startTicks &&
+		value.group === expected.group &&
+		value.session === expected.session &&
+		value.cwd === expected.cwd;
+	const alive = (expected) =>
+		fixtureProcess(expected.pid)?.startTicks === expected.startTicks;
+	const receipt = () => f.json(".boat/source-writer.json");
+	const destination = process.env.BOAT_SOURCE_FAILURE_EVIDENCE_DIRECTORY;
+	let archive;
+	if (destination) {
+		fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+		archive = fs.mkdtempSync(path.join(destination, "B-local-transport-"));
+	}
+	// Arm the independent cutoff before releasing the offending frame and before
+	// awaiting Make or invoking fixture cleanup. No completion await extends it.
+	const releasedAt = fixtureNow(),
+		cutoff = releasedAt + 2000;
+	const observe = async () => {
+		for (;;) {
+			const source = receipt(),
+				ownership = source.phases.attach.localOwnership;
+			const localResolved =
+				!alive(helper) ||
+				ownership?.unresolved?.some((p) => matches(p, helper));
+			if (
+				(command.closed && command.terminal?.status !== 0 && localResolved) ||
+				fixtureNow() >= cutoff
+			) {
+				const observation = {
+					provenance:
+						"local synthetic CLI and independently owned synthetic API writer; before fixture safety cleanup",
+					releasedAt,
+					cutoff,
+					observedAt: fixtureNow(),
+					faultLower: fs.existsSync(path.join(f.control, "source-fault-lower"))
+						? Number(
+								fs.readFileSync(path.join(f.control, "source-fault-lower")),
+							)
+						: null,
+					identities: {
+						leader,
+						helper,
+						writer: writerIdentity,
+						sibling: siblingIdentity,
+					},
+					current: {
+						leader: fixtureProcess(leader.pid),
+						helper: fixtureProcess(helper.pid),
+						writer: fixtureProcess(writerIdentity.pid),
+						sibling: fixtureProcess(siblingIdentity.pid),
+					},
+					command: { terminal: command.terminal, closed: command.closed },
+					leaderTerm: fs.existsSync(path.join(f.control, "source-leader-term")),
+					helperTerm: fs.existsSync(path.join(f.control, "source-helper-term")),
+					writerMutated: fs.existsSync(path.join(f.control, "writer-mutated")),
+					source,
+				};
+				if (archive)
+					fs.writeFileSync(
+						path.join(archive, "before-safety.json"),
+						JSON.stringify(observation, null, 2),
+						{ mode: 0o600 },
+					);
+				t.diagnostic(JSON.stringify({ archive, ...observation }));
+				return observation;
+			}
+			await new Promise((resolve) =>
+				setTimeout(resolve, Math.min(10, Math.max(1, cutoff - fixtureNow()))),
+			);
+		}
+	};
+	const pendingObservation = observe();
+	flag(f, "source-fault-release");
+	const observation = await pendingObservation;
+	const ownership = observation.source.phases.attach.localOwnership;
+	const unresolved = ownership?.unresolved?.some((p) => matches(p, helper));
+	assert.ok(
+		!observation.current.helper ||
+			observation.current.helper.startTicks !== helper.startTicks ||
+			(unresolved && ownership.failure && command.terminal?.status !== 0),
+		"production must retire the exact local pipe descendant or durably retain its failed unresolved identity before safety cleanup",
+	);
+	assert.ok(
+		!observation.current.leader ||
+			observation.current.leader.startTicks !== leader.startTicks,
+	);
+	assert.deepEqual(
+		observation.current.writer,
+		writerIdentity,
+		"independent remote writer survives production disposal",
+	);
+	assert.deepEqual(
+		observation.current.sibling,
+		siblingIdentity,
+		"unrelated sibling survives production disposal",
+	);
+	assert.equal(
+		observation.writerMutated,
+		true,
+		"remote writer acted after the CLI fault",
+	);
+	assert.equal(writer.closed, false);
+	assert.equal(canaryClosed, false);
+	assert.equal(
+		observation.command.closed,
+		true,
+		"Make pipes complete within the same failure allowance",
+	);
+	assert.notEqual(observation.command.terminal?.status, 0);
+	assert.ok(
+		matches(ownership?.leader, leader),
+		"durable receipt identifies the actual local CLI leader",
+	);
+	assert.ok(
+		ownership.observed.some((p) => matches(p, helper)),
+		"durable receipt captures the actual local helper",
+	);
+	assert.equal(observation.source.phases.attach.overflow, true);
+	assert.equal(observation.source.phases.attach.complete, false);
+	const result = await command.done;
+	assert.match(result.output, /completion is uncertain/);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+		before,
+	);
+	assert.equal(fs.existsSync(path.join(f.control, "collecting")), false);
+	const retained = fs.readFileSync(
+		path.join(f.root, ".boat/source-writer.json"),
+	);
+	const next = await f.run("build", "PACKAGE=asset").done;
+	assert.notEqual(next.status, 0, next.output);
+	assert.match(next.output, /completion is uncertain/);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.root, ".boat/source-writer.json")),
+		retained,
+	);
+	assert.equal(
+		fs
+			.readFileSync(path.join(f.control, "source-submissions"), "utf8")
+			.trim()
+			.split("\n").length,
+		1,
+	);
+	assert.equal(alive(writerIdentity), true);
+	assert.equal(alive(siblingIdentity), true);
 });
 
 test("legacy proven source completion permits the next public lock generation", async (t) => {

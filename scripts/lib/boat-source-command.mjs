@@ -123,7 +123,7 @@ export function provenOwnedSourceExit(record) {
 // and base64 expansion. A retained prefix on overflow is diagnostic, never proof.
 const rawLimits = { stdout: 64 * 1024 * 1024, stderr: 8 * 1024 * 1024 };
 const decodedLimit = 8 * 1024 * 1024;
-function observation(directory, phase, argv, artifact) {
+function observation(directory, phase, argv, artifact, persistOwnership) {
 	const meta = {
 		argv,
 		artifact,
@@ -181,6 +181,11 @@ function observation(directory, phase, argv, artifact) {
 	};
 	let decoded = 0;
 	const hook = {
+		ownership: (receipt) => {
+			meta.localOwnership = receipt;
+			save();
+			persistOwnership();
+		},
 		raw: (stream, bytes) => retain(stream, bytes, rawLimits[stream]),
 		output: (data, stderr) => {
 			const remaining = Math.max(0, decodedLimit - decoded);
@@ -238,7 +243,14 @@ function observation(directory, phase, argv, artifact) {
 				meta.ioError = true;
 			}
 			meta.complete =
-				meta.closed && !meta.overflow && !meta.malformed && !meta.ioError;
+				meta.closed &&
+				!meta.overflow &&
+				!meta.malformed &&
+				!meta.ioError &&
+				(!meta.localOwnership ||
+					(meta.localOwnership.stage === "finished" &&
+						meta.localOwnership.retired === true &&
+						!meta.localOwnership.failure));
 			save();
 			for (const file of [path.join(directory, `${phase}.json`), directory]) {
 				const fd = fs.openSync(file, "r");
@@ -290,7 +302,7 @@ export async function runOwnedSourceCommand({
 	checkpoint();
 	async function phase(name, args, stream = false, onFrame = () => {}) {
 		const argv = ["--no-update", "--json", "exec", workerId, ...args];
-		const observed = observation(directory, name, argv, artifact);
+		const observed = observation(directory, name, argv, artifact, checkpoint);
 		record.phases[name] = observed.meta;
 		checkpoint();
 		try {

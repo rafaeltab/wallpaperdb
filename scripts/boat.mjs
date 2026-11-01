@@ -124,7 +124,7 @@ function execute(
 		}
 		const child = spawn(command, argv, {
 			cwd: root,
-			detached: !!shutdown,
+			detached: !!shutdown || !!sourceObservation,
 			env: { ...process.env, BOAT_NO_UPDATE: "1" },
 			stdio: [
 				shutdown ? "pipe" : input === undefined ? "inherit" : "pipe",
@@ -133,25 +133,24 @@ function execute(
 			],
 		});
 		let sourceAborted = false,
-			sourceError,
-			sourceDisposal,
-			sourcePipeDisposal;
+			sourceError;
+		// The source CLI has unlimited healthy duration. Its already-selected
+		// failure allowance is TERM now, KILL at 1000ms, final disposal at 2000ms.
+		const sourcePhase = sourceObservation && {
+			phase: "source-transport",
+			deadline: Infinity,
+			disposalMs: 2000,
+			sourceScope: { cwd: root },
+			record: (receipt) => sourceObservation.ownership(receipt),
+		};
 		const abortSource = () => {
 			if (sourceAborted) return;
 			sourceAborted = true;
-			sourceError = { code: "source_capture_aborted" };
-			child.kill("SIGTERM");
-			// Failure disposal is finite; the normal owned attach has no deadline.
-			sourceDisposal = setTimeout(() => {
-				child.kill("SIGKILL");
-				sourcePipeDisposal = setTimeout(() => {
-					child.stdout.destroy();
-					child.stderr.destroy();
-					reject(
-						new Error("Source CLI pipes did not close after capture failure"),
-					);
-				}, 1000);
-			}, 1000);
+			sourceError ??= { code: "source_capture_aborted" };
+			sourcePhase.deadline = Math.min(
+				sourcePhase.deadline,
+				performance.now() + 2000,
+			);
 		};
 		if (sourceObservation) {
 			// Observe actual CLI bytes before JSON parsing or decoded projection.
@@ -163,14 +162,21 @@ function execute(
 				});
 			child.on("error", (error) => {
 				sourceError = error;
+				abortSource();
 			});
+			// Only actual close establishes pipe closure, including failed disposal.
+			child.on("close", (code, signal) =>
+				sourceObservation.close({ code, signal, error: sourceError }),
+			);
 		}
 		let out = "",
 			err = "",
 			decoded = "",
 			outputOverflow = false,
 			captureOverflow = false;
-		const finite = shutdown && finiteShutdownProcess(child, shutdown);
+		const finite =
+			(shutdown || sourcePhase) &&
+			finiteShutdownProcess(child, shutdown || sourcePhase);
 		let forwarded = 0,
 			forwardingOverflow = false;
 		if (shutdown && !capture && !streamFrames) {
@@ -294,10 +300,6 @@ function execute(
 		}
 		if (!shutdown && !sourceObservation) child.on("error", reject);
 		const complete = (code, signal) => {
-			clearTimeout(sourceDisposal);
-			clearTimeout(sourcePipeDisposal);
-			if (sourceObservation)
-				sourceObservation.close({ code, signal, error: sourceError });
 			const status = code ?? (signal === "SIGINT" ? 130 : 143);
 			if (captureOverflow || forwardingOverflow) {
 				reject(new Error("Captured transport output limit exceeded"));

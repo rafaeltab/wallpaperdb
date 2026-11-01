@@ -1145,7 +1145,7 @@ if(argv.includes('--lockfile-only')){
  if(fs.existsSync(path.join(control,'missing')))fs.unlinkSync(path.join(root,'pnpm-lock.yaml'));
  if(fs.existsSync(path.join(control,'directory'))){fs.unlinkSync(path.join(root,'pnpm-lock.yaml'));fs.mkdirSync(path.join(root,'pnpm-lock.yaml'));}
  if(fs.existsSync(path.join(control,'symlink'))){fs.unlinkSync(path.join(root,'pnpm-lock.yaml'));fs.symlinkSync(path.join(control,'outside'),path.join(root,'pnpm-lock.yaml'));}
- process.exit(fs.existsSync(path.join(control,'fail'))?23:0);})();
+ process.exitCode=fs.existsSync(path.join(control,'fail'))?23:0;})();
 }else{if(!argv.includes('--frozen-lockfile'))throw Error('normal install is not frozen');fs.appendFileSync(path.join(control,'calls'),'frozen\\n');if(fs.readFileSync(path.join(root,'pnpm-lock.yaml'),'utf8')!==expected()){console.error('ERR_PNPM_LOCKFILE_CONFIG_MISMATCH');process.exit(17);}fs.writeFileSync(path.join(control,'installed-dependencies'),fs.readFileSync(path.join(root,'pnpm-lock.yaml')));}
 `,
 		0o755,
@@ -8126,6 +8126,16 @@ test("documented source protocol accepts absent optional history without losing 
 });
 
 for (const [name, faults] of [
+	[
+		"required raw receipt overflow",
+		{ "source-detach-raw": () => Buffer.alloc(64 * 1024 * 1024 + 1, 32) },
+	],
+	[
+		"required decoded output overflow",
+		{
+			"source-diagnostic-stdout": () => Buffer.alloc(8 * 1024 * 1024 + 1, 120),
+		},
+	],
 	["start acknowledgement loss", { "start-ack-loss": "yes" }],
 	["malformed start JSON", { "source-detach-raw": "not JSON\n" }],
 	["null start receipt", { "source-detach-raw": "null\n" }],
@@ -8258,17 +8268,37 @@ for (const [name, faults] of [
 	test(`documented source protocol rejects ${name} and keeps source ownership`, async (t) => {
 		const f = await lockGenerationCheckout(t);
 		const before = fs.readFileSync(path.join(f.root, "pnpm-lock.yaml"));
-		for (const [file, value] of Object.entries(faults))
+		for (const [file, value] of Object.entries(faults)) {
+			const bytes = typeof value === "function" ? value() : value;
 			fs.writeFileSync(
 				path.join(f.control, file),
-				typeof value === "string" ? value : JSON.stringify(value),
+				typeof bytes === "string" || Buffer.isBuffer(bytes)
+					? bytes
+					: JSON.stringify(bytes),
 			);
+		}
 		const result = await f.generate();
 		assert.notEqual(result.status, 0, result.output);
 		assert.match(result.output, /completion is uncertain/);
 		const ownership = fs.readFileSync(
 			path.join(f.root, ".boat/source-writer.json"),
 		);
+		if (name.startsWith("required ")) {
+			const phase =
+				JSON.parse(ownership).phases[name.includes("raw") ? "start" : "attach"];
+			assert.equal(
+				phase.overflow,
+				true,
+				"the actual adapter must detect the capture limit",
+			);
+			assert.equal(phase.complete, false);
+			assert.ok(phase.streams.stdout.bytes <= 64 * 1024 * 1024);
+			assert.ok(
+				phase.streams["decoded-stdout"].bytes +
+					phase.streams["decoded-stderr"].bytes <=
+					8 * 1024 * 1024,
+			);
+		}
 		assert.deepEqual(
 			fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
 			before,

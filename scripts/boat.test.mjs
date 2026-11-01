@@ -890,6 +890,15 @@ function sourceLocalPipeHolder(control) {
  fs.writeFileSync(path.join(control,'source-local-helper.json'),JSON.stringify({pid:process.pid,parent:process.ppid,birth:fields[19],group:Number(fields[2]),session:Number(fields[3]),cwd:process.cwd()}));
  setInterval(()=>{},1000);
 }
+async function sourceLocalStderr(control) {
+ const fs=require('fs'),path=require('path'),file=path.join(control,'source-local-stderr-chunks.json');
+ if(!fs.existsSync(file))return;
+ for(const encoded of JSON.parse(fs.readFileSync(file))){
+  await new Promise(resolve=>process.stderr.write(Buffer.from(encoded,'base64'),resolve));
+  // Keep neighboring UTF-8 bytes in separate local pipe deliveries.
+  await new Promise(resolve=>setTimeout(resolve,20));
+ }
+}
 async function sourceSilentAttach(control,start,scenario) {
  const fs=require('fs'),path=require('path'),cp=require('child_process');
  process.on('SIGTERM',()=>{fs.writeFileSync(path.join(control,'source-leader-term'),'yes');process.exit(74);});
@@ -912,6 +921,18 @@ async function sourceSilentAttach(control,start,scenario) {
  if(scenario==='malformed-json')await write('{broken frame}\n');
  else if(scenario==='conflicting-process')await write(JSON.stringify({type:'attached',processId:1,stdoutOffset:0,stderrOffset:0})+'\n');
  else if(scenario==='event-limit')await write(JSON.stringify({type:'attached',processId:start.processId,stdoutOffset:0,stderrOffset:0})+'\n');
+ else if(scenario==='local-stderr-invalid-utf8')await new Promise(resolve=>process.stderr.write(Buffer.from([0xff]),resolve));
+ else if(scenario==='local-stderr-split-invalid-utf8'){
+  await new Promise(resolve=>process.stderr.write(Buffer.from([0xf0,0x9f]),resolve));
+  await new Promise(resolve=>setTimeout(resolve,20));
+  await new Promise(resolve=>process.stderr.write(Buffer.from([0x28]),resolve));
+ }
+ else if(scenario==='local-stderr-capture-overflow')await new Promise(resolve=>process.stderr.write(Buffer.alloc(8*1024*1024+1,120),resolve));
+ else if(scenario==='local-stderr-decoded-overflow'){
+  const data='x'.repeat(4*1024*1024);
+  await write(JSON.stringify({type:'stdout',data,nextOffset:Buffer.byteLength(data)})+'\n');
+  await new Promise(resolve=>process.stderr.write(Buffer.alloc(4*1024*1024+1,121),resolve));
+ }
  else throw Error('unknown synthetic silent attach case');
  await new Promise(()=>setInterval(()=>{},1000));
 }
@@ -993,6 +1014,7 @@ async function sourceCommandContract() {
   return true;
  }
  if(!flag('missing-started'))emit('attach',override('attached',{type:'attached',processId:start.processId,stdoutOffset:0,stderrOffset:0}));
+ await sourceLocalStderr(control);
  if(flag('source-local-capture-overflow')){
   process.on('SIGTERM',()=>{fs.writeFileSync(path.join(control,'source-leader-term'),'yes');process.exit(74);});
   cp.spawn(process.execPath,['-e','('+sourceLocalPipeHolder.toString()+')('+JSON.stringify(control)+')'],{env:process.env,stdio:['ignore',1,2]});
@@ -8042,13 +8064,11 @@ test("generation rejects symlinked inputs without reading the outside target", a
 	assert.equal(fs.readlinkSync(schema), outside);
 });
 
-function subsequentAttachedEvidence(t, f) {
+function subsequentAttachedEvidence(t, f, label = "subsequent-attached") {
 	const destination = process.env.BOAT_SOURCE_PROTOCOL_EVIDENCE_DIRECTORY;
 	if (!destination) return () => {};
 	fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
-	const archive = fs.mkdtempSync(
-		path.join(destination, "subsequent-attached-"),
-	);
+	const archive = fs.mkdtempSync(path.join(destination, `${label}-`));
 	fs.chmodSync(archive, 0o700);
 	const files = {};
 	const retain = (name, bytes) => {
@@ -8076,7 +8096,7 @@ function subsequentAttachedEvidence(t, f) {
 	t.diagnostic(JSON.stringify({ archive, ...manifest }));
 	return (result) => {
 		for (const entry of fs.readdirSync(path.join(f.root, ".boat")))
-			if (entry.startsWith("source-command-"))
+			if (entry.startsWith("source-command-") || entry === "source-writer.json")
 				fs.cpSync(
 					path.join(f.root, ".boat", entry),
 					path.join(archive, entry),
@@ -8090,7 +8110,7 @@ function subsequentAttachedEvidence(t, f) {
 		retain("make-output.log", result.output);
 		retain(
 			"result.json",
-			`${JSON.stringify({ status: result.status, files }, null, 2)}\n`,
+			`${JSON.stringify({ status: result.status, signal: result.signal, beforeSafety: fixtureCensus(f.directory), files }, null, 2)}\n`,
 		);
 	};
 }
@@ -8374,6 +8394,156 @@ test("documented source protocol preserves Unicode diagnostics and byte offsets"
 	);
 });
 
+test("synthetic LOCAL CLI stderr preserves Unicode and split UTF-8 warnings with complete source proof", {
+	timeout: 5000,
+}, async (t) => {
+	const f = await lockGenerationCheckout(t, { ownPackageGroups: true });
+	const warning = "synthetic LOCAL CLI warning 日本語 ✓ 🚀\n";
+	const bytes = Buffer.from(warning);
+	const split = bytes.indexOf(Buffer.from("🚀")) + 2;
+	fs.writeFileSync(
+		path.join(f.control, "source-local-stderr-chunks.json"),
+		JSON.stringify([
+			bytes.subarray(0, split).toString("base64"),
+			bytes.subarray(split).toString("base64"),
+		]),
+	);
+	const retain = subsequentAttachedEvidence(t, f, "local-stderr-warning");
+	const result = await f.generate();
+	retain(result);
+	assert.equal(result.status, 0, result.output);
+	assert.equal(result.output.split(warning).length - 1, 1);
+	assert.doesNotMatch(result.output, /\ufffd|toLowerCase is not a function/);
+	const receipts = fs
+		.readdirSync(path.join(f.root, ".boat"))
+		.filter((name) => /^source-command-.*\.json$/.test(name));
+	assert.equal(receipts.length, 1);
+	const receipt = f.json(`.boat/${receipts[0]}`);
+	assert.equal(receipt.protocolError, false);
+	assert.equal(receipt.terminal.exitCode, 0);
+	assert.equal(receipt.terminal.signal, null);
+	assert.equal(receipt.status.processId, receipt.start.processId);
+	assert.equal(receipt.status.exitCode, 0);
+	assert.equal(receipt.status.running, false);
+	for (const phase of ["start", "attach", "status"]) {
+		assert.equal(receipt.phases[phase].complete, true);
+		assert.equal(receipt.phases[phase].closed, true);
+		assert.equal(receipt.phases[phase].overflow, false);
+	}
+	const events = fs
+		.readFileSync(path.join(f.control, "source-protocol-events"), "utf8")
+		.trim()
+		.split("\n")
+		.map(JSON.parse);
+	for (const phase of ["detach", "status", "collect"])
+		assert.equal(events.filter((event) => event.phase === phase).length, 1);
+	const frames = events
+		.filter((event) => event.phase === "attach")
+		.map((event) => event.value);
+	assert.deepEqual(receipt.attached, frames[0]);
+	assert.deepEqual(receipt.terminal, frames.at(-1));
+	const directory = fs
+		.readdirSync(path.join(f.root, ".boat"), { withFileTypes: true })
+		.find(
+			(entry) =>
+				entry.isDirectory() && entry.name.startsWith("source-command-"),
+		);
+	assert.ok(directory);
+	const artifact = (stream) =>
+		fs.readFileSync(
+			path.join(f.root, ".boat", directory.name, `attach.${stream}`),
+		);
+	assert.deepEqual(
+		artifact("stderr"),
+		bytes,
+		"actual local stderr bytes stay separate from remote frames",
+	);
+	assert.deepEqual(artifact("decoded-cli-stderr"), bytes);
+	const remoteStderr = frames
+		.filter((frame) => frame.type === "stderr")
+		.map((frame) => frame.data)
+		.join("");
+	assert.equal(artifact("decoded-stderr").toString(), remoteStderr);
+	assert.equal(remoteStderr.includes(warning), false);
+	assert.equal(receipt.offsets.stderr, Buffer.byteLength(remoteStderr));
+	assert.equal(
+		result.output.split("source fixture lock stdout\n").length - 1,
+		1,
+	);
+	assert.equal(
+		result.output.split("source fixture lock stderr\n").length - 1,
+		1,
+	);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+		false,
+	);
+	assert.deepEqual(
+		fs.readFileSync(path.join(f.root, "pnpm-lock.yaml")),
+		fs.readFileSync(path.join(f.worker, "pnpm-lock.yaml")),
+	);
+});
+
+test("synthetic LOCAL CLI stderr cannot supply remote Drizzle confirmation", async (t) => {
+	const f = await lockGenerationCheckout(t, { ownPackageGroups: true });
+	f.local(
+		"apps/asset/package.json",
+		JSON.stringify({
+			scripts: {
+				"dev:configure": "true",
+				"db:generate":
+					"printf 'synthetic remote generator without confirmation\\n'",
+			},
+		}),
+	);
+	f.local("apps/asset/drizzle.config.ts", "export default {};\n");
+	f.local("apps/asset/src/db/schema.ts", "// synthetic unchanged schema\n");
+	f.local(
+		"apps/asset/drizzle/meta/_journal.json",
+		JSON.stringify({ version: "7", dialect: "postgresql", entries: [] }),
+	);
+	const prepared = await f.generate();
+	assert.equal(prepared.status, 0, prepared.output);
+	const before = migrationBytes(f.root);
+	const warning =
+		"synthetic LOCAL CLI warning: No schema changes, nothing to migrate\n";
+	fs.writeFileSync(
+		path.join(f.control, "source-local-stderr-chunks.json"),
+		JSON.stringify([Buffer.from(warning).toString("base64")]),
+	);
+	const retain = subsequentAttachedEvidence(
+		t,
+		f,
+		"local-stderr-not-drizzle-confirmation",
+	);
+	const result = await f.run("run", "PACKAGE=asset", "SCRIPT=db:generate").done;
+	retain(result);
+	assert.notEqual(result.status, 0, result.output);
+	assert.match(result.output, /Drizzle did not confirm successful generation/);
+	assert.equal(result.output.split(warning).length - 1, 1);
+	assert.deepEqual(migrationBytes(f.root), before);
+	assert.equal(
+		fs.existsSync(path.join(f.root, ".boat/source-writer.json")),
+		false,
+		"terminal source proof is complete even though remote confirmation is missing",
+	);
+	const receipts = fs
+		.readdirSync(path.join(f.root, ".boat"))
+		.filter((name) => /^source-command-.*\.json$/.test(name))
+		.map((name) => f.json(`.boat/${name}`));
+	const receipt = receipts.find((value) => value.kind === "migrations");
+	assert.ok(receipt);
+	assert.equal(receipt.protocolError, false);
+	assert.equal(receipt.terminal.exitCode, 0);
+	assert.equal(receipt.status.exitCode, 0);
+	for (const phase of ["start", "attach", "status"])
+		assert.equal(receipt.phases[phase].complete, true);
+	assert.equal(
+		receipt.phases.attach.streams["decoded-cli-stderr"].bytes,
+		Buffer.byteLength(warning),
+	);
+});
+
 function sourceObservationDiagnostic(archive, kind, observation) {
 	const phases = Object.fromEntries(
 		Object.entries(observation.source.phases).map(([name, phase]) => {
@@ -8484,6 +8654,9 @@ async function assertSourceTransportFailure(t, fault) {
 	flag(f, "stream-loss");
 	if (fault === "capture-overflow") flag(f, "source-local-capture-overflow");
 	else fs.writeFileSync(path.join(f.control, "source-silent-attach"), fault);
+	const retainLocalStderr = fault.startsWith("local-stderr-")
+		? subsequentAttachedEvidence(t, f, fault)
+		: () => {};
 	const command = f.run("run", "PACKAGE=scripts", "SCRIPT=dependencies:lock");
 	const helperFile = path.join(f.control, "source-local-helper.json");
 	await f.readiness.wait(() => {
@@ -8660,6 +8833,7 @@ async function assertSourceTransportFailure(t, fault) {
 	const pendingObservation = observe();
 	flag(f, "source-fault-release");
 	const observation = await pendingObservation;
+	retainLocalStderr({ ...command.terminal, output: command.output() });
 	const ownership = observation.source.phases.attach.localOwnership;
 	const unresolved = ownership?.unresolved?.some((p) => matches(p, helper));
 	assert.ok(
@@ -8711,6 +8885,45 @@ async function assertSourceTransportFailure(t, fault) {
 		assert.equal(observation.source.phases.attach.malformed, true);
 	if (fault === "conflicting-process")
 		assert.equal(observation.source.protocolError, true);
+	if (
+		["local-stderr-invalid-utf8", "local-stderr-split-invalid-utf8"].includes(
+			fault,
+		)
+	) {
+		assert.equal(
+			observation.source.phases.attach.localStderrError,
+			"invalid_utf8",
+		);
+		assert.notEqual(
+			observation.source.phases.attach.malformed,
+			true,
+			"local diagnostics are distinct from malformed NDJSON",
+		);
+	}
+	if (
+		["local-stderr-capture-overflow", "local-stderr-decoded-overflow"].includes(
+			fault,
+		)
+	)
+		assert.equal(observation.source.phases.attach.overflow, true);
+	if (fault === "local-stderr-capture-overflow") {
+		const stream = observation.source.phases.attach.streams.stderr;
+		assert.equal(stream.bytes, 8 * 1024 * 1024);
+		assert.ok(stream.observedBytes > stream.bytes);
+	}
+	if (fault === "local-stderr-decoded-overflow") {
+		const streams = observation.source.phases.attach.streams;
+		assert.equal(
+			streams["decoded-stdout"].bytes +
+				streams["decoded-stderr"].bytes +
+				streams["decoded-cli-stderr"].bytes,
+			8 * 1024 * 1024,
+		);
+		assert.ok(
+			streams.stderr.observedBytes < 8 * 1024 * 1024,
+			"shared decoded budget fails before the raw local stderr cap",
+		);
+	}
 	assert.equal(observation.source.phases.attach.complete, false);
 	const result = await command.done;
 	assert.match(result.output, /completion is uncertain/);
@@ -8746,6 +8959,16 @@ test("source capture failure retires its captured local pipe descendant and prot
 
 for (const fault of ["malformed-json", "conflicting-process", "event-limit"])
 	test(`source fatal ${fault} followed by silence disposes within the failure allowance`, async (t) => {
+		await assertSourceTransportFailure(t, fault);
+	});
+
+for (const fault of [
+	"local-stderr-invalid-utf8",
+	"local-stderr-split-invalid-utf8",
+	"local-stderr-capture-overflow",
+	"local-stderr-decoded-overflow",
+])
+	test(`synthetic LOCAL CLI ${fault} followed by silence protects independent writers`, async (t) => {
 		await assertSourceTransportFailure(t, fault);
 	});
 

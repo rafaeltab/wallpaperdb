@@ -133,9 +133,9 @@ function phaseMetadata(f, name) {
 	);
 }
 
-test("owned completion retains private exact raw bytes before stream parsing", async (t) => {
+test("synthetic closure retains distinct raw CLI stderr, decoded CLI stderr, and remote output", async (t) => {
 	const f = fixture(t);
-	const cliStderr = Buffer.from("launcher diagnostic\t\r\n");
+	const cliStderr = Buffer.from("launcher diagnostic café\t\r\n");
 	const result = await f.run(
 		executeFixture({
 			start: (opts, argv) => {
@@ -155,6 +155,10 @@ test("owned completion retains private exact raw bytes before stream parsing", a
 					observedFrame(frame);
 				};
 				opts.sourceObservation.raw("stderr", cliStderr);
+				assert.equal(
+					opts.sourceObservation.localStderr(cliStderr.toString("utf8")),
+					true,
+				);
 				return observeAttach(opts);
 			},
 		}),
@@ -179,6 +183,7 @@ test("owned completion retains private exact raw bytes before stream parsing", a
 				.join(""),
 		),
 		"attach.stderr": cliStderr,
+		"attach.decoded-cli-stderr": cliStderr,
 		"attach.decoded-stdout": Buffer.from(stdout),
 		"attach.decoded-stderr": Buffer.from(stderr),
 	};
@@ -352,6 +357,112 @@ for (const extra of [0, 1]) {
 		assert.equal(provenOwnedSourceExit(f.records.at(-1)), extra === 0);
 	});
 }
+
+test("synthetic closure shares the exact decoded budget between remote output and CLI stderr", async (t) => {
+	for (const localFirst of [true, false]) {
+		for (const extra of [0, 1]) {
+			await t.test(
+				`CLI stderr ${localFirst ? "first" : "last"}, limit ${extra ? "+ 1" : "exact"}`,
+				async (t) => {
+					const f = fixture(t);
+					const remoteSize = 3 * 1024 * 1024;
+					const localSize = 2 * 1024 * 1024;
+					const remoteOut = "s".repeat(remoteSize);
+					const remoteErr = "e".repeat(remoteSize + (localFirst ? extra : 0));
+					const local = "l".repeat(localSize + (localFirst ? 0 : extra));
+					const frames = [
+						attachFrames()[0],
+						{ type: "stdout", data: remoteOut, nextOffset: remoteOut.length },
+						{ type: "stderr", data: remoteErr, nextOffset: remoteErr.length },
+						{
+							...attachFrames().at(-1),
+							stdoutOffset: remoteOut.length,
+							stderrOffset: remoteErr.length,
+						},
+					];
+					const result = f.run(
+						executeFixture({
+							attach: (opts) => {
+								assert.equal(
+									opts.sourceObservation.raw("stderr", Buffer.from(local)),
+									true,
+								);
+								if (localFirst)
+									assert.equal(opts.sourceObservation.localStderr(local), true);
+								const attached = observeAttach(opts, frames, null);
+								if (!localFirst)
+									assert.equal(
+										opts.sourceObservation.localStderr(local),
+										extra === 0,
+									);
+								opts.sourceObservation.close({ code: 0, signal: null });
+								return attached;
+							},
+							status: (opts) =>
+								observeJson(opts, {
+									...statusReceipt(),
+									stdout: remoteOut,
+									stderr: remoteErr,
+								}),
+						}),
+					);
+					if (extra) await assert.rejects(result, /completion is uncertain/);
+					else assert.equal((await result).output, remoteOut + remoteErr);
+					const meta = phaseMetadata(f, "attach");
+					assert.equal(meta.overflow, extra === 1);
+					assert.equal(meta.complete, extra === 0);
+					assert.equal(provenOwnedSourceExit(f.records.at(-1)), extra === 0);
+					for (const [stream, retained, observedBytes] of [
+						["stderr", local, local.length],
+						["decoded-stdout", remoteOut, remoteOut.length],
+						["decoded-stderr", "e".repeat(remoteSize), remoteErr.length],
+						["decoded-cli-stderr", "l".repeat(localSize), local.length],
+					]) {
+						assert.equal(
+							fs.readFileSync(path.join(f.directory, `attach.${stream}`), "utf8"),
+							retained,
+							stream,
+						);
+						assert.deepEqual(meta.streams[stream], {
+							bytes: retained.length,
+							observedBytes,
+							sha256: createHash("sha256").update(retained).digest("hex"),
+						});
+					}
+				},
+			);
+		}
+	}
+});
+
+test("synthetic closure reports CLI stderr failures without authorizing completion", async (t) => {
+	// These closures report failures; strict UTF-8 decoding belongs to the executor.
+	for (const reason of ["invalid_utf8", "callback_failed"]) {
+		await t.test(reason, async (t) => {
+			const f = fixture(t);
+			await assert.rejects(
+				f.run(
+					executeFixture({
+						attach: (opts) => {
+							opts.sourceObservation.localStderrFailure(reason);
+							return observeAttach(opts);
+						},
+					}),
+				),
+				/completion is uncertain/,
+			);
+			const meta = phaseMetadata(f, "attach");
+			assert.equal(meta.localStderrError, reason);
+			assert.equal(meta.closed, true);
+			assert.equal(meta.overflow, false);
+			assert.equal(meta.complete, false);
+			assert.deepEqual(meta.localExit, { code: 0, signal: null });
+			assert.deepEqual(f.records.at(-1).terminal, attachFrames().at(-1));
+			assert.equal(f.records.at(-1).protocolError, true);
+			assert.equal(provenOwnedSourceExit(f.records.at(-1)), false);
+		});
+	}
+});
 
 test("a matching nonzero terminal and local attach close prove a completed failed generator", async (t) => {
 	const f = fixture(t);

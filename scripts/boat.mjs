@@ -301,7 +301,37 @@ function execute(
 				}
 				if (pending && !sourceAborted) line(pending);
 			});
-			child.stderr.on("data", (bytes) => emit(bytes, true));
+			if (!sourceObservation)
+				child.stderr.on("data", (bytes) => emit(bytes, true));
+		}
+		if (sourceObservation) {
+			// Local CLI diagnostics are not remote stderr frames or generator output.
+			// Decode physical stderr independently so split/invalid UTF-8 cannot
+			// escape the same bounded source failure disposal.
+			const decoder = new TextDecoder("utf-8", { fatal: true });
+			const diagnostic = (bytes, end = false) => {
+				if (sourceAborted) return;
+				let data;
+				try {
+					data = decoder.decode(bytes, { stream: !end });
+				} catch {
+					sourceObservation.localStderrFailure("invalid_utf8");
+					abortSource();
+					return;
+				}
+				try {
+					if (!sourceObservation.localStderr(data)) {
+						abortSource();
+						return;
+					}
+					if (data) process.stderr.write(data);
+				} catch {
+					sourceObservation.localStderrFailure("callback_failed");
+					abortSource();
+				}
+			};
+			child.stderr.on("data", (bytes) => diagnostic(bytes));
+			child.stderr.on("end", () => diagnostic(undefined, true));
 		}
 		if (input !== undefined || shutdown) {
 			child.stdin.on("error", () => {});

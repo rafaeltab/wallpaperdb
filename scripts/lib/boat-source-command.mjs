@@ -142,6 +142,7 @@ function observation(directory, phase, argv, artifact, persistOwnership) {
 		"stderr",
 		"decoded-stdout",
 		"decoded-stderr",
+		"decoded-cli-stderr",
 	]) {
 		fs.writeFileSync(path.join(directory, `${phase}.${stream}`), "", {
 			flag: "wx",
@@ -180,6 +181,13 @@ function observation(directory, phase, argv, artifact, persistOwnership) {
 		return true;
 	};
 	let decoded = 0;
+	const retainDecoded = (stream, data) => {
+		const remaining = Math.max(0, decodedLimit - decoded);
+		decoded += Buffer.byteLength(data);
+		const retained = retain(stream, data, counts[stream].bytes + remaining);
+		if (decoded > decodedLimit) meta.overflow = true;
+		return retained && !meta.overflow;
+	};
 	const hook = {
 		ownership: (receipt) => {
 			meta.localOwnership = receipt;
@@ -187,13 +195,11 @@ function observation(directory, phase, argv, artifact, persistOwnership) {
 			persistOwnership();
 		},
 		raw: (stream, bytes) => retain(stream, bytes, rawLimits[stream]),
-		output: (data, stderr) => {
-			const remaining = Math.max(0, decodedLimit - decoded);
-			decoded += Buffer.byteLength(data);
-			const stream = stderr ? "decoded-stderr" : "decoded-stdout";
-			const retained = retain(stream, data, counts[stream].bytes + remaining);
-			if (decoded > decodedLimit) meta.overflow = true;
-			return retained && !meta.overflow;
+		output: (data, stderr) =>
+			retainDecoded(stderr ? "decoded-stderr" : "decoded-stdout", data),
+		localStderr: (data) => retainDecoded("decoded-cli-stderr", data),
+		localStderrFailure: (reason) => {
+			meta.localStderrError = reason;
 		},
 		malformed: () => {
 			meta.malformed = true;
@@ -246,6 +252,7 @@ function observation(directory, phase, argv, artifact, persistOwnership) {
 				meta.closed &&
 				!meta.overflow &&
 				!meta.malformed &&
+				!meta.localStderrError &&
 				!meta.ioError &&
 				(!meta.localOwnership ||
 					(meta.localOwnership.stage === "finished" &&

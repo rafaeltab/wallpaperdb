@@ -12,6 +12,8 @@ import { protocol } from './fixtures/setup.js';
 async function fixture(
   options: {
     conflict?: boolean;
+    duplicate?: boolean;
+    multiple?: boolean;
     merge?: boolean;
     writer?: boolean | 'completed';
     owningWorktree?: 'clean' | 'dirty';
@@ -32,9 +34,11 @@ async function fixture(
     await writeFile(
       join(
         host.repository,
-        options.conflict && ['D', 'C'].includes(name) ? 'shared.txt' : `${name}.txt`
+        (options.conflict || options.duplicate) && ['D', 'C'].includes(name)
+          ? 'shared.txt'
+          : `${name}.txt`
       ),
-      name
+      options.duplicate && ['D', 'C'].includes(name) ? 'same' : name
     );
     git('add', '.');
     git('commit', '-m', name);
@@ -58,7 +62,8 @@ async function fixture(
     d = git('rev-parse', 'HEAD');
   }
   git('switch', '-c', 'C', a);
-  const c = await commit('C');
+  let c = await commit('C');
+  if (options.multiple) c = await commit('C2');
   git('push', 'origin', 'A', 'B', 'C', 'D');
   git('switch', '--detach', host.base);
   if (options.owningWorktree) {
@@ -178,6 +183,7 @@ it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', 
     expect(git('ls-remote', '--heads', 'origin', 'refs/heads/D').split(/\s/)[0]).toBe(d);
     const metadata = JSON.parse(await readFile(join(host.directory, 'join-live.json'), 'utf8'));
     expect(metadata.prs['104'].base).toBe('D');
+    expect(metadata.prs['103'].base).toBe('B');
     expect(metadata.members).toEqual(
       [101, 102, 103, 104].map(
         (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
@@ -249,7 +255,7 @@ it('retains conflicting branches and exposes a durable blocked outcome without p
       blockedReason: expect.stringContaining('conflict'),
     });
     expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
-    expect((await f.host.calls()).some((call) => call.args[0] === 'stack')).toBe(false);
+    expect((await f.host.calls()).some((call) => isGroupCreation(call))).toBe(false);
   } finally {
     await f.close();
   }
@@ -262,7 +268,7 @@ it('waits for an active prerequisite writer before replay or CI', async () => {
     await Effect.runPromise(f.issues.prepare(5));
     expect(await Effect.runPromise(f.issues.inspect(5))).toMatchObject({ blockersReady: false });
     expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
-    expect((await f.host.calls()).some((call) => call.args[0] === 'stack')).toBe(false);
+    expect((await f.host.calls()).some((call) => isGroupCreation(call))).toBe(false);
   } finally {
     await f.close();
   }
@@ -283,8 +289,8 @@ it('keeps E blocked until the exact replayed head passes CI across adapter reope
     state.newCI = 'SUCCESS';
     await writeFile(path, JSON.stringify(state));
     const reopened = f.reopen();
-    if (!reopened.prepare) throw new Error('Missing preparation');
-    await Effect.runPromise(reopened.prepare(5));
+    if (!reopened.reconcile) throw new Error('Missing reconciliation');
+    await Effect.runPromise(reopened.reconcile());
     expect(await Effect.runPromise(reopened.inspect(5))).toMatchObject({ blockersReady: true });
   } finally {
     await f.close();
@@ -312,7 +318,7 @@ it.each(['base', 'group', 'evidence'] as const)(
         prerequisite: { prBase: 'C' },
       });
       const calls = await f.host.calls();
-      expect(calls.filter((call) => call.args[0] === 'stack')).toHaveLength(1);
+      expect(calls.filter((call) => isGroupCreation(call))).toHaveLength(1);
       expect(
         calls.filter((call) => call.args[0] === 'issue' && call.args[1] === 'comment')
       ).toHaveLength(1);
@@ -335,7 +341,7 @@ it('preserves an externally changed remote head and exposes a blocked lease outc
       blockedReason: expect.stringContaining('head-conflict'),
     });
     expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.d);
-    expect((await f.host.calls()).some((call) => call.args[0] === 'stack')).toBe(false);
+    expect((await f.host.calls()).some((call) => isGroupCreation(call))).toBe(false);
   } finally {
     await f.close();
   }
@@ -380,7 +386,7 @@ it('does not admit E until native grouping is independently read back, retaining
     if (!reopened.prepare) throw new Error('Missing preparation');
     await Effect.runPromise(reopened.prepare(5));
     expect(await Effect.runPromise(reopened.inspect(5))).toMatchObject({ blockersReady: false });
-    expect((await f.host.calls()).filter((call) => call.args[0] === 'stack')).toHaveLength(1);
+    expect((await f.host.calls()).filter((call) => isGroupCreation(call))).toHaveLength(1);
   } finally {
     await f.close();
   }
@@ -394,6 +400,95 @@ it('rejects a nonlinear prerequisite before rewriting or publishing any branch',
     expect(await Effect.runPromise(f.issues.inspect(5))).toMatchObject({
       blockersReady: false,
       blockedReason: expect.stringContaining('nonlinear-prerequisite'),
+    });
+    expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+  } finally {
+    await f.close();
+  }
+});
+
+it('continues a disjoint join while another prerequisite path remains conflicted', async () => {
+  const f = await fixture({ conflict: true });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    f.git('switch', '-c', 'D2', 'A');
+    await writeFile(join(f.host.repository, 'D2.txt'), 'D2');
+    f.git('add', '.');
+    f.git('commit', '-m', 'D2');
+    const d = f.git('rev-parse', 'HEAD');
+    f.git('switch', '-c', 'C2', 'A');
+    await writeFile(join(f.host.repository, 'C2.txt'), 'C2');
+    f.git('add', '.');
+    f.git('commit', '-m', 'C2');
+    const c = f.git('rev-parse', 'HEAD');
+    f.git('push', 'origin', 'D2', 'C2');
+    f.git('switch', '--detach', f.host.base);
+    await writeFile(
+      join(f.host.directory, 'join-live.json'),
+      JSON.stringify({
+        evidence: `https://github.com/rafaeltab/wallpaperdb/pull/106 ${d}\nhttps://github.com/rafaeltab/wallpaperdb/pull/107 ${c}`,
+        originalHeads: { 106: d, 107: c },
+        prs: { 106: { branch: 'D2', base: 'A' }, 107: { branch: 'C2', base: 'A' } },
+        members: [],
+        blockers: [
+          { number: 6, state: 'open' },
+          { number: 7, state: 'open' },
+        ],
+      })
+    );
+    const second = githubIssues({
+      project: f.host.repository,
+      base: f.host.base,
+      prerequisites: [
+        { issue: 6, pr: 106, commit: d },
+        { issue: 7, pr: 107, commit: c },
+      ],
+      joins: {
+        directory: join(f.host.directory, 'joins'),
+        binary: f.host.binary,
+        projectId: 'project-id',
+      },
+    });
+    if (!second.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(second.prepare(8));
+    expect(await Effect.runPromise(second.inspect(8))).toMatchObject({
+      blockersReady: true,
+      prerequisite: { prBase: 'C2' },
+    });
+  } finally {
+    await f.close();
+  }
+});
+
+function isGroupCreation(call: { args: string[] }) {
+  return call.args.includes('POST') && call.args.includes('repos/rafaeltab/wallpaperdb/stacks');
+}
+
+it('preserves every issue-only commit when replaying a multi-commit prerequisite', async () => {
+  const f = await fixture({ multiple: true });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    const ready = await Effect.runPromise(f.issues.inspect(5));
+    const head = ready.prerequisite?.base;
+    if (!head) throw new Error('Missing verified join');
+    expect(f.git('log', '--format=%s', `${f.d}..${head}`)).toBe('C2\nC');
+    expect(f.git('diff', '--name-only', `${f.d}..${head}`)).toBe('C.txt\nC2.txt');
+    expect(f.git('rev-list', '--merges', `${f.host.base}..${head}`)).toBe('');
+  } finally {
+    await f.close();
+  }
+});
+
+it('keeps an empty issue comparison blocked rather than publishing duplicate prerequisite contents', async () => {
+  const f = await fixture({ duplicate: true });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    expect(await Effect.runPromise(f.issues.inspect(5))).toMatchObject({
+      blockersReady: false,
+      blockedReason: expect.stringContaining('empty-replay'),
     });
     expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
   } finally {

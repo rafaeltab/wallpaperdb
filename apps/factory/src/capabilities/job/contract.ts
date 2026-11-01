@@ -73,6 +73,9 @@ export interface Control {
 }
 export const JobStore = Context.Service<JobStore>('wallpaperdb.factory.JobStore');
 export interface Issues {
+  /** Advance only already durable prerequisite joins, even while their CI waits
+   * occupy capacity. Never reserves a new join or admits a child. */
+  reconcile?(): Effect.Effect<void, Unavailable>;
   /** Prepare verified divergent prerequisites without admitting the child. Durable, leased,
    * writer-coordinated replay; inspect remains blocked until CI and metadata agree. */
   prepare?(issue: number): Effect.Effect<void, Unavailable>;

@@ -541,9 +541,34 @@ it('admits both forks at the verified prerequisite tip and retains their PR targ
         issue: number,
         base: a,
         prBase: 'factory/A',
-        context: '\nVerified prerequisite evidence: Issue 1, PR 10, reviewed A with passing CI',
+        context: '',
+        prerequisiteEvidence: 'Issue 1, PR 10, reviewed A with passing CI',
       }))
     );
+  } finally {
+    await f.runtime.dispose();
+  }
+});
+
+it('preserves the full supported maintainer context when binding prerequisite evidence', async () => {
+  const f = fixture();
+  try {
+    f.setIssues([
+      {
+        ...issue(2),
+        blockers: [1],
+        prerequisite: { base: 'b'.repeat(40), prBase: 'factory/A', evidence: 'Verified A' },
+      },
+    ]);
+    expect(
+      await f.run((s) => s.start({ issue: 2, base, context: 'x'.repeat(16000) }))
+    ).toMatchObject({ kind: 'job' });
+    expect(f.snapshot().admissions[0]).toMatchObject({
+      context: 'x'.repeat(16000),
+      prerequisiteEvidence: 'Verified A',
+      base: 'b'.repeat(40),
+      prBase: 'factory/A',
+    });
   } finally {
     await f.runtime.dispose();
   }

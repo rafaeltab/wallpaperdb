@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { passingChecks, normalizeChecks } from './checks.js';
 import { command } from '../../platform/index.js';
 export interface VerifiedPrerequisite {
   readonly issue: number;
@@ -103,11 +104,7 @@ async function selectBase(
   return { blockersReady: true };
 }
 function valid(assertion: VerifiedPrerequisite, current: z.infer<typeof pr>, body: string) {
-  const checks = current.statusCheckRollup.map((check) =>
-    'name' in check
-      ? { name: check.name, passed: check.status === 'COMPLETED' && check.conclusion === 'SUCCESS' }
-      : { name: check.context, passed: check.state === 'SUCCESS' }
-  );
+  const checks = normalizeChecks(current.statusCheckRollup);
   return (
     /^[a-f0-9]{40}$/.test(assertion.commit) &&
     current.headRefOid === assertion.commit &&
@@ -117,15 +114,6 @@ function valid(assertion: VerifiedPrerequisite, current: z.infer<typeof pr>, bod
     /^[A-Za-z0-9][A-Za-z0-9/_.-]*$/.test(current.headRefName) &&
     recordedEvidence(body, current.url, assertion.commit) &&
     passingChecks(checks)
-  );
-}
-function passingChecks(checks: readonly { name: string; passed: boolean }[]) {
-  return (
-    ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'].every(
-      (name) =>
-        checks.some((check) => check.name === name) &&
-        checks.filter((check) => check.name === name).every((check) => check.passed)
-    ) && checks.filter((check) => check.name.startsWith('codecov/')).every((check) => check.passed)
   );
 }
 async function ancestor(project: string, parent: string, child: string, signal?: AbortSignal) {

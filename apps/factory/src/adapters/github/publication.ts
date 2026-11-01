@@ -1,6 +1,7 @@
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { type Issues, Unavailable } from '../../capabilities/job/index.js';
+import { requiredChecks, passingChecks, normalizeChecks } from './checks.js';
 const schema = z.array(
   z.object({
     url: z.string().url(),
@@ -26,7 +27,6 @@ const schema = z.array(
     ),
   })
 );
-const required = ['Build, Lint, and Test', 'E2E Tests', 'Container E2E Tests'];
 export function publication(
   gh: (args: string[], signal?: AbortSignal) => Promise<unknown>,
   base: string
@@ -57,23 +57,8 @@ export function publication(
         const pr = prs[0];
         if (prs.length !== 1 || !pr || !matches(pr, intent.branch, base))
           return { kind: 'ambiguous' as const };
-        const checks = pr.statusCheckRollup.map((check) =>
-          'name' in check
-            ? {
-                name: check.name,
-                success: check.status === 'COMPLETED' && check.conclusion === 'SUCCESS',
-              }
-            : { name: check.context, success: check.state === 'SUCCESS' }
-        );
-        const passed =
-          required.every(
-            (name) =>
-              checks.some((check) => check.name === name) &&
-              checks.filter((check) => check.name === name).every((check) => check.success)
-          ) &&
-          checks
-            .filter((check) => check.name.startsWith('codecov/'))
-            .every((check) => check.success);
+        const checks = normalizeChecks(pr.statusCheckRollup);
+        const passed = passingChecks(checks);
         const progress = await workflowProgress(pr, gh, signal);
         return {
           kind: 'found' as const,
@@ -123,7 +108,7 @@ function ready(pr: z.infer<typeof schema>[number], passed: boolean) {
 }
 
 function applicable(name: string) {
-  return required.includes(name) || name.startsWith('codecov/');
+  return requiredChecks.includes(name) || name.startsWith('codecov/');
 }
 
 const jobsSchema = z.object({

@@ -7,162 +7,7 @@ import { fileStore } from '../src/adapters/store/index.js';
 import { t3Execution } from '../src/adapters/t3/index.js';
 import { expect, it } from 'vitest';
 import { githubIssues } from '../src/adapters/github/index.js';
-import { protocol } from './fixtures/setup.js';
-
-async function fixture(
-  options: {
-    conflict?: boolean;
-    duplicate?: boolean;
-    multiple?: boolean;
-    cCommits?: number;
-    reverse?: boolean;
-    groups?: boolean;
-    descendant?: boolean;
-    merge?: boolean;
-    writer?: boolean | 'completed';
-    owningWorktree?: 'clean' | 'dirty';
-    ciFails?: boolean;
-    lose?: 'base' | 'group' | 'evidence';
-    staleHead?: boolean;
-    corruptGrouping?: boolean;
-  } = {}
-) {
-  const host = await protocol();
-  const previous = process.env.PATH;
-  const fixture = process.env.FACTORY_FIXTURE;
-  process.env.PATH = `${host.directory}:${previous}`;
-  process.env.FACTORY_FIXTURE = host.configFile;
-  const git = (...args: string[]) =>
-    execFileSync('git', ['-C', host.repository, ...args], { encoding: 'utf8' }).trim();
-  const commit = async (name: string) => {
-    await writeFile(
-      join(
-        host.repository,
-        (options.conflict || options.duplicate) && ['D', 'C'].includes(name)
-          ? 'shared.txt'
-          : `${name}.txt`
-      ),
-      options.duplicate && ['D', 'C'].includes(name) ? 'same' : name
-    );
-    git('add', '.');
-    git('commit', '-m', name);
-    return git('rev-parse', 'HEAD');
-  };
-  const rootBranch = git('branch', '--show-current');
-  git('config', 'user.name', 'Test');
-  git('config', 'user.email', 'test@example.invalid');
-  execFileSync('git', ['init', '--bare', join(host.directory, 'remote.git')]);
-  git('remote', 'add', 'origin', join(host.directory, 'remote.git'));
-  git('switch', '-c', 'A');
-  const a = await commit('A');
-  git('switch', '-c', 'B');
-  const b = await commit('B');
-  git('switch', '-c', 'D');
-  let d = await commit('D');
-  if (options.merge) {
-    git('switch', '-c', 'side', a);
-    await commit('M');
-    git('switch', 'D');
-    git('merge', '--no-ff', 'side', '-m', 'merge');
-    d = git('rev-parse', 'HEAD');
-  }
-  git('switch', '-c', 'C', a);
-  let c = await commit('C');
-  for (let index = 2; index <= (options.cCommits ?? (options.multiple ? 2 : 1)); index++)
-    c = await commit(`C${index}`);
-  git('push', 'origin', 'A', 'B', 'C', 'D');
-  if (options.descendant) git('branch', 'F', c);
-  git('switch', '--detach', host.base);
-  if (options.owningWorktree) {
-    const path = join(host.directory, 'owning-C');
-    git('worktree', 'add', path, 'C');
-    if (options.owningWorktree === 'dirty')
-      await writeFile(join(path, 'C.txt'), 'uncommitted writer change');
-  }
-  if (options.staleHead) {
-    const hook = join(host.repository, '.git', 'hooks', 'pre-push');
-    await writeFile(
-      hook,
-      `#!/bin/sh
-git --git-dir='${join(host.directory, 'remote.git')}' update-ref refs/heads/C ${d}
-`
-    );
-    await chmod(hook, 0o700);
-  }
-  await host.save({
-    lost: false,
-    joinWriter: options.descendant ? true : options.writer,
-    joinWriterBranch: options.descendant ? 'F' : 'C',
-    join: {
-      lose: options.lose,
-      blockers: options.reverse
-        ? [
-            { number: 4, state: 'open' },
-            { number: 3, state: 'open' },
-          ]
-        : undefined,
-      originalHeads: { 101: a, 102: b, 103: d, 104: c },
-      groups: options.groups
-        ? [
-            { number: 9, pull_requests: [{ number: 101 }, { number: 104 }] },
-            { number: 10, pull_requests: [{ number: 102 }, { number: 103 }] },
-          ]
-        : undefined,
-      newCI: options.ciFails ? 'FAILURE' : 'SUCCESS',
-      corruptGrouping: options.corruptGrouping,
-      evidence: `https://github.com/rafaeltab/wallpaperdb/pull/103 ${d}\nhttps://github.com/rafaeltab/wallpaperdb/pull/104 ${c}`,
-      prs: {
-        101: { branch: 'A', base: rootBranch },
-        102: { branch: 'B', base: 'A' },
-        103: { branch: 'D', base: 'B' },
-        104: { branch: 'C', base: 'A' },
-      },
-      members: [101, 102, 103].map(
-        (number) => `https://github.com/rafaeltab/wallpaperdb/pull/${number}`
-      ),
-    },
-  });
-  const issues = githubIssues({
-    project: host.repository,
-    base: host.base,
-    prerequisites: [
-      { issue: 3, pr: 103, commit: d },
-      { issue: 4, pr: 104, commit: c },
-    ],
-    joins: {
-      directory: join(host.directory, 'joins'),
-      binary: host.binary,
-      projectId: 'project-id',
-    },
-  });
-  return {
-    host,
-    git,
-    d,
-    c,
-    issues,
-    reopen: () =>
-      githubIssues({
-        project: host.repository,
-        base: host.base,
-        prerequisites: [
-          { issue: 3, pr: 103, commit: d },
-          { issue: 4, pr: 104, commit: c },
-        ],
-        joins: {
-          directory: join(host.directory, 'joins'),
-          binary: host.binary,
-          projectId: 'project-id',
-        },
-      }),
-    close: async () => {
-      process.env.PATH = previous;
-      if (fixture === undefined) delete process.env.FACTORY_FIXTURE;
-      else process.env.FACTORY_FIXTURE = fixture;
-      await host.cleanup();
-    },
-  };
-}
+import { joinFixture as fixture } from './fixtures/join.js';
 
 it('replays only C onto A-B-D, verifies CI and retargets C before admitting E', async () => {
   const f = await fixture();
@@ -296,7 +141,7 @@ it('retains conflicting branches and exposes a durable blocked outcome without p
     await Effect.runPromise(f.issues.prepare(5));
     expect(await Effect.runPromise(f.reopen().inspect(5))).toMatchObject({
       blockersReady: false,
-      joinRequired: false,
+      joinRequired: true,
       blockedReason: expect.stringContaining('conflict'),
     });
     expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
@@ -969,6 +814,53 @@ it.each([
         blockersReady: true,
         prerequisite: { base: next, prBase: 'C' },
       });
+  } finally {
+    await f.close();
+  }
+});
+
+it.each([
+  { outcome: 'SIMPLE' as const, review: false, ready: true },
+  { outcome: 'COMPLEX' as const, review: true, ready: true },
+  { outcome: 'COMPLEX' as const, review: false, ready: false },
+  { outcome: undefined, review: false, ready: false },
+  { outcome: 'SIMPLE' as const, review: false, stale: true, ready: false },
+])('recovers a real isolated conflict with bound classification %j', async (scenario) => {
+  const f = await fixture({
+    conflict: true,
+    substantial: scenario.outcome === 'COMPLEX',
+    restack: scenario,
+  });
+  try {
+    if (!f.issues.prepare) throw new Error('Missing preparation');
+    await Effect.runPromise(f.issues.prepare(5));
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.reopen().prepare?.(5) ?? Effect.void);
+    const ready = await Effect.runPromise(f.reopen().inspect(5));
+    expect(ready.blockersReady).toBe(scenario.ready);
+    if (scenario.ready) {
+      const head = ready.prerequisite?.base;
+      expect(f.git('show', `${head}:shared.txt`)).toContain('resolved');
+      expect(f.git('log', '--format=%s', `${f.d}..${head}`)).toBe('C');
+      expect(f.git('rev-list', '--merges', `${f.host.base}..${head}`)).toBe('');
+      console.log(
+        JSON.stringify({
+          classification: scenario.outcome,
+          ready: true,
+          head,
+          provenance:
+            'Production Issues/T3/Git adapters, real isolated Git and bare remote; controlled GitHub/T3/model/review/CI protocol. No live project publication.',
+        })
+      );
+    } else expect(f.git('ls-remote', '--heads', 'origin', 'refs/heads/C').split(/\s/)[0]).toBe(f.c);
+    const calls = await f.host.calls();
+    const launches = calls.filter(
+      (call) => call.args[1] === 'start' && call.args.includes('--branch')
+    );
+    expect(launches).toHaveLength(1);
+    expect(launches[0].args.join(' ')).toContain('parent');
+    expect(launches[0].args.join(' ')).toContain('/issues/4');
+    expect(launches[0].args.join(' ')).toContain('/pull/104');
   } finally {
     await f.close();
   }

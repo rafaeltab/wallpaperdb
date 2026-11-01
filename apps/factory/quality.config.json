@@ -8,5 +8,5 @@
     "composition",
     "adapters/clock"
   ],
-  "allowedCapabilityDependencies": {}
+  "allowedCapabilityDependencies": { "restack": ["job"] }
 }

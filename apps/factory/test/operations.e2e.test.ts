@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { Effect } from 'effect';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium, expect as browserExpect } from '@playwright/test';
 import { expect, it } from 'vitest';
@@ -330,5 +331,59 @@ it('edits durable scheduler limits and pauses admissions while an existing job c
     else process.env.FACTORY_FIXTURE = previous.fixture;
     await host.cleanup();
     process.stdout.write(`Controlled GitHub/T3 protocol scheduler demo recording: ${recording}\n`);
+  }
+});
+
+it('shows conflict classification and pending questions with a recovery-thread link', async () => {
+  const { joinFixture } = await import('./fixtures/join.js');
+  const f = await joinFixture({ conflict: true, restack: { outcome: 'COMPLEX', review: false } });
+  const browser = await chromium.launch({ headless: true });
+  let running: Awaited<ReturnType<typeof startFactory>> | undefined;
+  try {
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    running = await startFactory({
+      FACTORY_PROJECT: f.host.repository,
+      FACTORY_T3_PROJECT_ID: 'project-id',
+      FACTORY_BASE: f.host.base,
+      FACTORY_T3_BINARY: f.host.binary,
+      FACTORY_STATE: f.host.directory,
+      FACTORY_PORT: '0',
+      FACTORY_PREREQUISITES: JSON.stringify([
+        { issue: 3, pr: 103, commit: f.d },
+        { issue: 4, pr: 104, commit: f.c },
+      ]),
+    });
+    const address = running.app.server.address();
+    if (!address || typeof address === 'string') throw new Error('Missing listener');
+    const context = await browser.newContext({
+      recordVideo: { dir: process.env.FACTORY_DEMO_DIRECTORY ?? join(f.host.directory, 'video') },
+    });
+    const page = await context.newPage();
+    await page.goto(`http://127.0.0.1:${address.port}`);
+    await browserExpect(page.getByRole('heading', { name: 'Conflict recovery #4' })).toBeVisible();
+    await browserExpect(page.getByText('Classification: COMPLEX')).toBeVisible();
+    await browserExpect(page.getByText('Awaiting independent review-loop')).toBeVisible();
+    await browserExpect(page.getByRole('link', { name: 'Open recovery thread' })).toHaveAttribute(
+      'href',
+      't3-thread://v1/restacker'
+    );
+    // Questions remain owned by T3. A later observation must still be incomplete.
+    const resourcePath = join(f.host.directory, 'restacker.json');
+    const resource = JSON.parse(await readFile(resourcePath, 'utf8'));
+    resource.thread.status = 'waiting';
+    resource.thread.pendingRequestCount = 1;
+    await writeFile(resourcePath, JSON.stringify(resource));
+    await Effect.runPromise(f.issues.prepare?.(5) ?? Effect.void);
+    await page.reload();
+    await browserExpect(
+      page.getByText('Question: Open recovery thread to answer the pending question')
+    ).toBeVisible();
+    expect((await Effect.runPromise(f.issues.inspect(5))).blockersReady).toBe(false);
+    await context.close();
+  } finally {
+    await running?.close();
+    await browser.close();
+    await f.close();
   }
 });

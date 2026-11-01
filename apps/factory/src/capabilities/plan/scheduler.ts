@@ -60,7 +60,11 @@ export const SchedulerLive = Layer.effect(
         }
         return { state, jobs };
       });
-    const status = () => Effect.flatMap(store.read(), observe);
+    const status = () =>
+      Effect.gen(function* () {
+        const snapshot = yield* Effect.flatMap(store.read(), observe);
+        return { ...snapshot, recoveries: yield* issues.recoveries?.() ?? Effect.succeed([]) };
+      });
     const reserve = (command: Start, snapshot: ScheduleStatus) =>
       Effect.gen(function* () {
         const { state, jobs } = snapshot;

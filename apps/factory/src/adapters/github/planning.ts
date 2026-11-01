@@ -129,6 +129,7 @@ export function githubPlanning(
             blockersReady: readiness.blockersReady,
             joinRequired: readiness.joinRequired,
             blockedReason: readiness.blockedReason,
+            recovery: readiness.recovery,
             prerequisite: readiness.prerequisite,
             prerequisiteEvidence: JSON.stringify(
               config.prerequisites.filter((p) => issue.blockers.includes(p.issue))

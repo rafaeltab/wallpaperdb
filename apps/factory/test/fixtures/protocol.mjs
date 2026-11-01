@@ -58,6 +58,92 @@ if (
   console.log(JSON.stringify(config.mergedPrerequisites?.[args[1].split('/').at(-1)] ?? null));
   process.exit(0);
 }
+if (config.restack && basename(process.argv[1]) === 't3') {
+  const path = join(config.directory, 'restacker.json');
+  const flag = (name) => args[args.indexOf(name) + 1];
+  let state = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
+  const git = (cwd, ...values) =>
+    execFileSync('git', values, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  if (args[1] === 'start') {
+    const prompt = args[3];
+    const operation = prompt.match(/Operation ([a-f0-9]+)\./)[1];
+    const [onto, parent] = prompt.match(/git rebase --onto ([a-f0-9]+) ([a-f0-9]+)/).slice(1);
+    const worktree = join(config.directory, 'recovery-worker');
+    git(config.repository, 'worktree', 'add', '-b', flag('--branch'), worktree, flag('--worktree'));
+    try {
+      git(worktree, 'rebase', '--onto', onto, parent);
+    } catch {
+      writeFileSync(join(worktree, 'shared.txt'), 'resolved D and C behavior');
+      git(worktree, 'add', 'shared.txt');
+      execFileSync('git', ['-c', 'core.editor=true', 'rebase', '--continue'], {
+        cwd: worktree,
+        stdio: 'pipe',
+      });
+    }
+    const head = git(worktree, 'rev-parse', 'HEAD');
+    state = {
+      thread: {
+        threadId: 'restacker',
+        projectId: 'project-id',
+        title: flag('--title'),
+        branch: flag('--branch'),
+        providerInstanceId: 'codex',
+        model: 'gpt-6.1-sol',
+        worktreePath: worktree,
+        status: config.restack.question ? 'waiting' : 'completed',
+        pendingRequestCount: config.restack.question ? 1 : 0,
+        latestRunId: 'resolve-run',
+        runCount: 1,
+      },
+      operation,
+      head,
+      messages: [
+        {
+          role: 'assistant',
+          runId: 'resolve-run',
+          text:
+            config.restack.question ??
+            JSON.stringify({
+              operation: config.restack.stale ? 'stale' : operation,
+              commit: head,
+              outcome: config.restack.outcome
+                ? `<RESTACK>${config.restack.outcome}</RESTACK>`
+                : 'done',
+            }),
+        },
+      ],
+    };
+    writeFileSync(path, JSON.stringify(state));
+    console.log(
+      JSON.stringify({ threadId: 'restacker', projectId: 'project-id', runId: 'resolve-run' })
+    );
+  } else if (args[1] === 'send') {
+    state.thread.runCount = 2;
+    state.thread.latestRunId = 'review-run';
+    state.messages = [
+      {
+        role: 'assistant',
+        runId: 'review-run',
+        text: JSON.stringify({
+          operation: state.operation,
+          commit: state.head,
+          outcome: config.restack.review ? '<REVIEW>COMPLETE</REVIEW>' : 'incomplete',
+        }),
+      },
+    ];
+    writeFileSync(path, JSON.stringify(state));
+    console.log('{}');
+  } else if (args[1] === 'list')
+    console.log(
+      JSON.stringify(state ? [{ threadId: 'restacker', title: state.thread.title }] : [])
+    );
+  else console.log(JSON.stringify(state));
+  process.exit(0);
+}
 if (config.joinWriter && basename(process.argv[1]) === 't3') {
   console.log(
     JSON.stringify(
@@ -100,6 +186,8 @@ if (config.join && basename(process.argv[1]) === 'gh') {
       body: state.evidence,
     };
   else if (args[0] === 'issue' && args[1] === 'comment') state.evidence += '\n' + flag('--body');
+  else if (args[0] === 'api' && args[1] === 'graphql')
+    result = { data: { repository: { issue: { parent: { number: 571 } } } } };
   else if (args[0] === 'api' && args[1].includes('dependencies'))
     result = [
       state.blockers ?? [

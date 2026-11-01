@@ -121,6 +121,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
             directory: resolve(configuration.FACTORY_STATE, 'joins'),
             binary: configuration.FACTORY_T3_BINARY,
             projectId: configuration.FACTORY_T3_PROJECT_ID,
+            mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+            mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
           },
         })
       ),
@@ -130,9 +132,9 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
           project,
           prBase: configuration.FACTORY_PR_BASE,
           projectId: configuration.FACTORY_T3_PROJECT_ID,
-          binary: configuration.FACTORY_T3_BINARY,
           mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
           mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
+          binary: configuration.FACTORY_T3_BINARY,
         })
       )
     );
@@ -188,6 +190,8 @@ export async function startFactory(environment: NodeJS.ProcessEnv) {
               directory: resolve(configuration.FACTORY_STATE, 'joins'),
               binary: configuration.FACTORY_T3_BINARY,
               projectId: configuration.FACTORY_T3_PROJECT_ID,
+              mcpEndpoint: configuration.FACTORY_T3_MCP_ENDPOINT,
+              mcpAuthorizationFile: configuration.FACTORY_T3_MCP_AUTHORIZATION_FILE,
             },
           },
           job

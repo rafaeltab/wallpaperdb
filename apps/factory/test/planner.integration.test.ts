@@ -68,6 +68,16 @@ it('translates a bound assistant proposal and rejects malformed or user messages
     const pending = Effect.runPromise(adapter.propose(input), { signal: abort.signal });
     setTimeout(() => abort.abort(), 100);
     await expect(pending).rejects.toBeDefined();
+    const starts = (await host.calls()).filter((call) => call.args[1] === 'start').length;
+    await expect(
+      Effect.runPromise(adapter.propose(input), { signal: AbortSignal.timeout(150) })
+    ).rejects.toBeDefined();
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(starts);
+    await host.save({ planner: { proposal, status: 'completed' } });
+    expect(await Effect.runPromise(adapter.propose(input))).toEqual(proposal);
+    expect((await host.calls()).filter((call) => call.args[1] === 'start')).toHaveLength(
+      starts + 1
+    );
   } finally {
     if (previous === undefined) delete process.env.FACTORY_FIXTURE;
     else process.env.FACTORY_FIXTURE = previous;

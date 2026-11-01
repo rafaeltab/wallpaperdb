@@ -1,0 +1,17 @@
+import type { Effect } from 'effect';
+import type { Unavailable } from '../job/index.js';
+export interface Resolution {
+  readonly classification?: 'SIMPLE' | 'COMPLEX';
+  readonly commit?: string;
+  readonly progress: string;
+  readonly threadId?: string;
+  readonly question?: string;
+}
+/** The agent adapter binds observations to the operation, run and clean current head.
+ * Review attests a fresh review-loop of that head; verify publishes with a lease
+ * and checks CI on that same head. Unknown delivery remains pending. */
+export interface RecoveryPorts {
+  resolve(): Effect.Effect<Resolution, Unavailable>;
+  review(commit: string): Effect.Effect<boolean, Unavailable>;
+  verify(commit: string): Effect.Effect<boolean, Unavailable>;
+}

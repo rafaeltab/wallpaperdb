@@ -13,6 +13,12 @@ export interface PlanningIssue {
   readonly parents: readonly number[];
   readonly blockersReady: boolean;
   readonly joinRequired?: boolean;
+  readonly recovery?: {
+    readonly progress: string;
+    readonly classification?: 'SIMPLE' | 'COMPLEX';
+    readonly threadId?: string;
+    readonly question?: string;
+  };
   readonly blockedReason?: string;
   readonly prerequisiteEvidence: string;
   readonly prerequisite?: {
@@ -89,6 +95,14 @@ export interface JobPool {
 }
 export const JobPool = Context.Service<JobPool>('wallpaperdb.factory.JobPool');
 export interface ScheduleStatus {
+  readonly recoveries?: readonly {
+    issue: number;
+    pr: string;
+    progress: string;
+    classification?: 'SIMPLE' | 'COMPLEX';
+    threadId?: string;
+    question?: string;
+  }[];
   readonly state: ScheduleState;
   readonly jobs: readonly Status[];
 }

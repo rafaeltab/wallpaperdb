@@ -79,7 +79,9 @@ export function githubIssues(config: {
     pending: JoinContext['pending'],
     bound: JoinContext['bound']
   ) {
-    if (readiness.blockersReady || pending?.blocked) return false;
+    if (readiness.blockersReady) return false;
+    if (pending?.blocked)
+      return z.object({ kind: z.literal('conflict') }).safeParse(pending.blocked).success;
     return readiness.joinRequired || !!(pending?.operation && bound);
   }
   function publicReadiness(
@@ -91,8 +93,20 @@ export function githubIssues(config: {
     return {
       ...core,
       ...(joins ? { joinRequired: joinRequired(readiness, pending, bound) } : {}),
+      recovery: pending?.recovery
+        ? z
+            .object({
+              progress: z.string(),
+              classification: z.enum(['SIMPLE', 'COMPLEX']).optional(),
+              threadId: z.string().optional(),
+              question: z.string().optional(),
+            })
+            .parse(pending.recovery)
+        : undefined,
       ...(pending?.blocked
-        ? { blockedReason: `Prerequisite join blocked: ${JSON.stringify(pending.blocked)}` }
+        ? {
+            blockedReason: `Prerequisite join blocked: ${JSON.stringify({ conflict: pending.blocked, recovery: pending.recovery })}`,
+          }
         : {}),
     };
   }
@@ -168,6 +182,11 @@ export function githubIssues(config: {
     };
   }
   return {
+    recoveries: () =>
+      Effect.tryPromise({
+        try: () => joins?.recoveries() ?? Promise.resolve([]),
+        catch: (cause) => new Unavailable({ operation: 'read-recoveries', cause }),
+      }),
     reconcile: () =>
       Effect.tryPromise({
         try: (signal) => joins?.reconcile(signal) ?? Promise.resolve(),
